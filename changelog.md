@@ -1,5 +1,15 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-04-05 — MemoryLeakRule genişletme
+
+### Eklenen
+- **Matcher 2 — sonradan atama**: `p = new int(42)` pattern'i. `BinaryOperator(=)` ile LHS pointer, RHS cxxNewExpr.
+- **Matcher 3 — return raw new**: `return new int(100)` pattern'i. `ReturnStmt` ile cxxNewExpr.
+- **5 yeni test**: AssignmentAfterDecl, ReturnRawNew, ReturnNullptr_Clean, MultiplePatterns, AssignMessageContainsVarName.
+
+### Test sonuçları
+- 26/26 test geçti (mevcut 6 MemoryLeak testi bozulmadı)
+
 ## 2026-04-05 — string.h uyarısı çözümü
 
 ### Düzeltilen
