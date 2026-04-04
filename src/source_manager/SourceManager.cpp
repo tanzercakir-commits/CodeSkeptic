@@ -7,6 +7,7 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
+#include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
@@ -110,6 +111,27 @@ int SourceManager::processAll(ASTCallback callback) {
     if (source_files_.empty()) return 0;
 
     clang::tooling::ClangTool tool(*comp_db_, source_files_);
+
+    tool.appendArgumentsAdjuster(
+        clang::tooling::getInsertArgumentAdjuster(
+            {"-isystem", "/usr/include",
+             "-isystem", "/usr/local/include"},
+            clang::tooling::ArgumentInsertPosition::BEGIN));
+
+#ifdef CLANG_RESOURCE_DIR
+    tool.appendArgumentsAdjuster(
+        clang::tooling::getInsertArgumentAdjuster(
+            {"-resource-dir", CLANG_RESOURCE_DIR},
+            clang::tooling::ArgumentInsertPosition::BEGIN));
+#endif
+
+#ifdef MACOS_SDK_PATH
+    tool.appendArgumentsAdjuster(
+        clang::tooling::getInsertArgumentAdjuster(
+            {"-isysroot", MACOS_SDK_PATH},
+            clang::tooling::ArgumentInsertPosition::BEGIN));
+#endif
+
     ZeroDefectActionFactory factory(callback);
     return tool.run(&factory);
 }

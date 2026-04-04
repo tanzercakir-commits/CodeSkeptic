@@ -21,7 +21,7 @@
 
 ## Bekleyen Sorunlar
 
-- [ ] string.h bulunamıyor uyarısı (fallback modunda stdlib path eksik)
+Yok.
 
 ## Dizin Yapısı
 

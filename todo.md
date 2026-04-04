@@ -6,7 +6,7 @@
 - [x] MemoryLeakRule
 - [x] main.cpp giriş noktası
 - [x] Test altyapısı ve testler (GTest) — 21/21 geçiyor
-- [ ] string.h bulunamıyor uyarısı (fallback modunda stdlib path eksik)
+- [x] string.h bulunamıyor uyarısı — çözüldü (resource-dir + isysroot + isystem)
 
 ## Teknik Notlar (Aklında Tut)
 
@@ -36,3 +36,6 @@ cJSON saf C projesi, `new` yok. MemoryLeakRule sadece C++ `new` ifadesini arar (
 
 ### NullPointerRule → UninitPointerRule geçişi
 NullPointerRule her `*ptr` dereference'ı yakalıyordu — 68 bulgu, çoğu false positive. Karmaşık filtreler (address-of, null guard, dataflow) yerine tamamen farklı bir yaklaşım seçildi: başlatılmamış pointer tespiti. Basit matcher, sıfır false positive. cJSON'da 47 gerçek bulgu.
+
+### string.h uyarısı — kök neden ve çözüm
+Clang LibTooling kendi compiler instance'ını çalıştırıyor ama sistemdeki stdlib header arama yollarını otomatik bilmiyor. `compile_commands.json`'da explicit `-I` yoksa `string.h` vb. bulunamıyor. Çözüm: `ClangTool::appendArgumentsAdjuster()` ile `-isystem /usr/include` ekleme. `-I` değil `-isystem` kullanılmalı — sistem header uyarılarını bastırır. `BEGIN` pozisyonuna ekle ki kullanıcı flag'leri override edebilsin. macOS'ta path farklı (`/Library/Developer/CommandLineTools/SDKs/...`), platforma göre ayarlanmalı. İkinci adım olarak CMake'ten `clang -print-resource-dir` ile `stddef.h`/`stdarg.h` için resource dir eklenebilir.

@@ -1,5 +1,19 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-04-05 — string.h uyarısı çözümü
+
+### Düzeltilen
+- **SourceManager.cpp**: `ClangTool::appendArgumentsAdjuster()` ile üç sistem path eklendi:
+  - `-isystem /usr/include` + `-isystem /usr/local/include` (Linux)
+  - `-isysroot <SDK_PATH>` (macOS — xcrun ile otomatik bulunur)
+  - `-resource-dir <CLANG_DIR>` (stddef.h, stdarg.h gibi intrinsic header'lar)
+- **src/CMakeLists.txt**: `clang -print-resource-dir` ve `xcrun --show-sdk-path` ile derleme zamanında path'ler bulunup `#define` olarak aktarılıyor.
+
+### Etki
+- `string.h` / `stdlib.h` uyarıları tamamen gitti
+- cJSON artık tam parse ediliyor — önceki 47 bulgu (eksik parse kaynaklı) → 1 gerçek bulgu
+- 21/21 test hala geçiyor
+
 ## 2026-04-05 — NullPointerRule → UninitPointerRule
 
 ### Değiştirildi
