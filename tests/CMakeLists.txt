@@ -1,0 +1,27 @@
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.14.0
+)
+FetchContent_MakeAvailable(googletest)
+
+add_executable(zerodefect_tests
+    TestHelper.cpp
+    DiagnosticTest.cpp
+    UninitPointerRuleTest.cpp
+    MemoryLeakRuleTest.cpp
+)
+
+target_include_directories(zerodefect_tests
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(zerodefect_tests
+    PRIVATE
+        zerodefect_core
+        GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(zerodefect_tests)

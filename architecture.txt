@@ -1,0 +1,34 @@
+ZeroDefect - Mimari
+
+                    ┌─────────────────────┐
+                    │   StaticAnalyzer     │
+                    │  Orchestrator/facade │
+                    └─┬──────┬──────┬───┬─┘
+                      │      │      │   │
+        ┌─────────────┘      │      │   └─────────────────┐
+        │          ┌─────────┘      └──────────┐          │
+        ▼          ▼                           ▼          ▼
+ ┌────────────┐ ┌──────────────┐  ┌──────────────┐ ┌──────────┐
+ │SourceManager│ │  RuleEngine  │  │   Reporter   │ │  Config  │
+ │Dosya ve AST│ │Kurallari yon.│  │Sonuc raporla.│ │YAML/JSON │
+ └──┬──────┬──┘ └──────┬───────┘  └───┬──────┬──┘ └──────────┘
+    │      │           │               │      │
+    ▼      ▼           ▼               ▼      ▼
+┌────────┐┌────────┐┌─────────────┐┌──────┐┌─────────┐
+│ASTWrap.││FileLoa.││Rule(abstract)││ JSON ││ Console │
+└────────┘└────────┘│check(ASTCtx&)│└──────┘└─────────┘
+                    └──┬─────┬──┬──┘
+                       │     │  │
+        ┌──────────────┘     │  └──────────────┐
+        ▼                    ▼                  ▼
+┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐
+│ NullPointerRule  │ │ MemoryLeakRule  │ │  StyleRule    │
+│ Null dereference │ │ Bellek sizintisi│ │ Stil/konv.   │
+└─────────────────┘ └─────────────────┘ └──────────────┘
+
+
+Veri akisi:
+  Rule.check() ──produces──▶ Diagnostic ──consumed by──▶ Reporter.report()
+
+Diagnostic (veri yapisi):
+  severity, location, message
