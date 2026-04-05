@@ -14,22 +14,6 @@
 ### Test sonuçları
 - 41/41 test geçti — davranış değişikliği yok
 
-## 2026-04-05 — DivByZeroRule (eski — merged above)
-
-### Eklenen
-- **DivByZeroRule** (`src/rules/DivByZeroRule.h`, `.cpp`): İki aşamalı analiz:
-  - Phase 1: Literal sıfıra bölme (CFG'siz, `RecursiveASTVisitor` ile `100/0` pattern)
-  - Phase 2: Variable divisor CFG dataflow — `ZeroState` lattice (Unknown/Zero/NonZero/MaybeZero)
-- `classifyStmt`: `dyn_cast` ile DeclStmt/BinaryOperator, `evaluateAsZero` ile IntegerLiteral analizi
-- `DivFinder` (RecursiveASTVisitor): her Stmt subtree'de `/` ve `%` operatörlerini bulur
-- Float division bilinçli olarak dışarıda (IEEE 754: `1.0/0.0 = inf`, UB değil)
-- Severity: Error (kesin sıfır), Warning (MaybeZero), rapor yok (Unknown — conservative)
-- 10 test: literal div/mod, var zero/nonzero, parameter unknown, conditional maybe, reassign, float, no division
-
-### Test sonuçları
-- 41/41 test geçti (14 UninitPtr + 13 MemLeak + 4 Diagnostic + 10 DivByZero)
-- cJSON: 0 bulgu, tinyxml2: 0 bulgu (3 kural aktif)
-
 ## 2026-04-05 — MemoryLeakRule_Ex (CFG-based leak + double-free)
 
 ### Değiştirildi
