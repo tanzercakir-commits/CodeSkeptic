@@ -1,5 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
+#include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/UninitPointerRule_Ex.h"
 
@@ -24,6 +25,7 @@ int main(int argc, char* argv[]) {
 
     analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
     analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
+    analyzer.addRule<zerodefect::DivByZeroRule>();
 
     int findings = analyzer.run();
 

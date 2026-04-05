@@ -1,15 +1,14 @@
 #include "rules/UninitPointerRule_Ex.h"
 
+#include "engine/DataflowEngine.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/Stmt.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
-#include <clang/Analysis/CFG.h>
 
-#include <queue>
-#include <unordered_map>
 #include <unordered_set>
 
 using namespace clang;
@@ -21,52 +20,38 @@ namespace {
 
 enum class PtrState { Uninit, MaybeInit, Init };
 
-PtrState mergeStates(PtrState a, PtrState b) {
-    if (a == b) return a;
-    return PtrState::MaybeInit;
-}
-
 // --- Statement classification ---
 
 enum class StmtEffect { None, Assigns, Dereferences };
 
 StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
                          ASTContext& ctx) {
-    // Assignment: p = ... (direct assignment to targetVar)
     auto assignMatcher = findAll(binaryOperator(
         hasOperatorName("="),
         hasLHS(ignoringParenImpCasts(
             declRefExpr(to(varDecl(equalsNode(targetVar))))))
     ));
-
-    // Address-of: &p (out-param pattern — conservative Init)
     auto addrOfMatcher = findAll(unaryOperator(
         hasOperatorName("&"),
         hasUnaryOperand(ignoringParenImpCasts(
             declRefExpr(to(varDecl(equalsNode(targetVar))))))
     ));
 
-    // Check assigns first
     if (!match(assignMatcher, *stmt, ctx).empty())
         return StmtEffect::Assigns;
     if (!match(addrOfMatcher, *stmt, ctx).empty())
         return StmtEffect::Assigns;
 
-    // Dereference: *p
     auto derefMatcher = findAll(unaryOperator(
         hasOperatorName("*"),
         hasUnaryOperand(ignoringParenImpCasts(
             declRefExpr(to(varDecl(equalsNode(targetVar))))))
     ));
-
-    // Arrow: p->member
     auto arrowMatcher = findAll(memberExpr(
         isArrow(),
         hasObjectExpression(ignoringParenImpCasts(
             declRefExpr(to(varDecl(equalsNode(targetVar))))))
     ));
-
-    // Array subscript: p[i]
     auto subscriptMatcher = findAll(arraySubscriptExpr(
         hasBase(ignoringParenImpCasts(
             declRefExpr(to(varDecl(equalsNode(targetVar))))))
@@ -82,120 +67,59 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
     return StmtEffect::None;
 }
 
-// --- Dataflow analysis ---
+// --- Analysis struct for DataflowEngine ---
 
-void analyzeFunction(const FunctionDecl* funcDecl,
-                     const VarDecl* targetVar,
-                     ASTContext& ctx,
-                     zerodefect::DiagnosticList& results) {
-    if (!funcDecl->hasBody()) return;
+class UninitPtrAnalysis {
+public:
+    using State = PtrState;
 
-    CFG::BuildOptions opts;
-    std::unique_ptr<CFG> cfg = CFG::buildCFG(
-        funcDecl, funcDecl->getBody(), &ctx, opts);
-    if (!cfg) return;
+    UninitPtrAnalysis(const VarDecl* targetVar,
+                      zerodefect::DiagnosticList& results)
+        : targetVar_(targetVar), results_(results) {}
 
-    const unsigned numBlocks = cfg->getNumBlockIDs();
-    const unsigned maxIterations = numBlocks * 4;
+    State initialState() const { return PtrState::Uninit; }
 
-    // Block exit states
-    std::unordered_map<unsigned, PtrState> blockExitState;
-    std::unordered_set<unsigned> reportedLines;
+    State merge(const State& a, const State& b) const {
+        if (a == b) return a;
+        return PtrState::MaybeInit;
+    }
 
-    // Worklist
-    std::queue<const CFGBlock*> worklist;
-    worklist.push(&cfg->getEntry());
-    unsigned iterations = 0;
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& ctx) const {
+        StmtEffect effect = classifyStmt(stmt, targetVar_, ctx);
+        if (effect == StmtEffect::Assigns)
+            return PtrState::Init;
+        return in;
+    }
 
-    while (!worklist.empty() && iterations < maxIterations) {
-        ++iterations;
-        const CFGBlock* block = worklist.front();
-        worklist.pop();
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State& after, ASTContext& ctx) {
+        StmtEffect effect = classifyStmt(stmt, targetVar_, ctx);
+        if (effect == StmtEffect::Dereferences && before != PtrState::Init) {
+            const SourceManager& sm = ctx.getSourceManager();
+            SourceLocation loc = stmt->getBeginLoc();
+            unsigned line = sm.getSpellingLineNumber(loc);
 
-        // Merge from predecessors
-        PtrState entryState = PtrState::Uninit;
-        bool hasPreds = false;
-        bool firstPred = true;
-
-        for (auto it = block->pred_begin(); it != block->pred_end(); ++it) {
-            const CFGBlock* pred = it->getReachableBlock();
-            if (!pred) continue;
-
-            auto found = blockExitState.find(pred->getBlockID());
-            if (found == blockExitState.end()) continue;
-
-            hasPreds = true;
-            if (firstPred) {
-                entryState = found->second;
-                firstPred = false;
-            } else {
-                entryState = mergeStates(entryState, found->second);
-            }
-        }
-
-        // Entry block: no predecessors → Uninit
-        if (!hasPreds && block == &cfg->getEntry()) {
-            entryState = PtrState::Uninit;
-        } else if (!hasPreds) {
-            continue; // unreachable block
-        }
-
-        // Walk statements in this block
-        PtrState currentState = entryState;
-
-        for (const CFGElement& elem : *block) {
-            auto cfgStmt = elem.getAs<CFGStmt>();
-            if (!cfgStmt) continue;
-
-            const Stmt* stmt = cfgStmt->getStmt();
-            if (!stmt) continue;
-
-            StmtEffect effect = classifyStmt(stmt, targetVar, ctx);
-
-            if (effect == StmtEffect::Assigns) {
-                currentState = PtrState::Init;
-            } else if (effect == StmtEffect::Dereferences &&
-                       currentState != PtrState::Init) {
-                // Report at dereference location
-                const SourceManager& sm = ctx.getSourceManager();
-                SourceLocation loc = stmt->getBeginLoc();
-                unsigned line = sm.getSpellingLineNumber(loc);
-
-                if (reportedLines.insert(line).second) {
-                    zerodefect::Diagnostic diag;
-                    diag.severity = zerodefect::Severity::Error;
-                    diag.file = sm.getFilename(loc).str();
-                    diag.line = line;
-                    diag.column = sm.getSpellingColumnNumber(loc);
-                    diag.rule_id = "uninit-ptr";
-                    diag.message = "Baslatilmamis pointer kullanimi: "
-                        + targetVar->getNameAsString()
-                        + " dereference noktasinda deger atanmamis olabilir";
-                    results.push_back(diag);
-                }
-
-                // Continue analysis but don't re-report
-                currentState = PtrState::MaybeInit;
-            }
-        }
-
-        // Update exit state, propagate if changed
-        auto [it, inserted] = blockExitState.emplace(
-            block->getBlockID(), currentState);
-
-        bool changed = inserted || it->second != currentState;
-        if (changed) {
-            it->second = currentState;
-            for (auto succIt = block->succ_begin();
-                 succIt != block->succ_end(); ++succIt) {
-                const CFGBlock* succ = succIt->getReachableBlock();
-                if (succ) {
-                    worklist.push(succ);
-                }
+            if (reportedLines_.insert(line).second) {
+                zerodefect::Diagnostic diag;
+                diag.severity = zerodefect::Severity::Error;
+                diag.file = sm.getFilename(loc).str();
+                diag.line = line;
+                diag.column = sm.getSpellingColumnNumber(loc);
+                diag.rule_id = "uninit-ptr";
+                diag.message = "Baslatilmamis pointer kullanimi: "
+                    + targetVar_->getNameAsString()
+                    + " dereference noktasinda deger atanmamis olabilir";
+                results_.push_back(diag);
             }
         }
     }
-}
+
+private:
+    const VarDecl* targetVar_;
+    zerodefect::DiagnosticList& results_;
+    std::unordered_set<unsigned> reportedLines_;
+};
 
 // --- Matcher callback ---
 
@@ -212,7 +136,8 @@ public:
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(var->getLocation())) return;
 
-        analyzeFunction(func, var, *result.Context, results_);
+        UninitPtrAnalysis analysis(var, results_);
+        zerodefect::runDataflow(func, *result.Context, analysis);
     }
 
 private:
