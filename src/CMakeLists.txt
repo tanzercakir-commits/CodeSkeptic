@@ -6,7 +6,7 @@ add_library(zerodefect_core STATIC
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
     rules/UninitPointerRule_Ex.cpp
-    rules/MemoryLeakRule.cpp
+    rules/MemoryLeakRule_Ex.cpp
 )
 
 add_executable(zerodefect main.cpp)

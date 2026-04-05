@@ -10,7 +10,7 @@ add_executable(zerodefect_tests
     TestHelper.cpp
     DiagnosticTest.cpp
     UninitPointerRuleExTest.cpp
-    MemoryLeakRuleTest.cpp
+    MemoryLeakRuleExTest.cpp
 )
 
 target_include_directories(zerodefect_tests

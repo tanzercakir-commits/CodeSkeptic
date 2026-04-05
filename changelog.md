@@ -1,5 +1,21 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-04-05 — MemoryLeakRule_Ex (CFG-based leak + double-free)
+
+### Değiştirildi
+- **MemoryLeakRule silindi**, yerine **MemoryLeakRule_Ex** eklendi. CFG üzerinde forward dataflow ile:
+  - Memory leak tespiti (exit block'ta Allocated state → Warning)
+  - Reassignment leak tespiti (p=new; p=new → ilk allocation leaked → Warning)
+  - Double-free tespiti (Freed state'te tekrar Free → Error)
+  - Conservative escape analizi (return, function param → ownership transfer)
+  - C uyumu: malloc/calloc/strdup/free desteği
+- **classifyStmt** tamamen yeniden yazıldı: matcher yerine `dyn_cast` zinciri (DeclStmt, BinaryOperator, CXXDeleteExpr, CallExpr, ReturnStmt). Daha hızlı ve doğru.
+- 13 test: simple leak, correct usage, conditional leak, both branches delete, return escape, reassignment, malloc/free, function param escape, double-free, array new/delete, no allocation, multiple vars
+
+### Test sonuçları
+- 31/31 test geçti (14 UninitPointer_Ex + 13 MemoryLeak_Ex + 4 Diagnostic)
+- cJSON: 0 bulgu (leak yok), tinyxml2: 0 bulgu (tüm allocation'lar yönetiliyor)
+
 ## 2026-04-05 — MemoryLeakRule genişletme
 
 ### Eklenen

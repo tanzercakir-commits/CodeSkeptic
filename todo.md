@@ -47,5 +47,13 @@ NullPointerRule her `*ptr` dereference'ı yakalıyordu — 68 bulgu, çoğu fals
 
 **id() çakışması:** Eski UninitPointerRule ve yeni UninitPointerRule_Ex ikisi de `"uninit-ptr"` dönüyor. Bilinçli — main.cpp'de sadece biri kayıtlı. Paralel tutulacaksa yeni rule'a `"uninit-ptr-ex"` verilebilir.
 
+### MemoryLeakRule_Ex — bilinen sınırlamalar
+
+**Koşullu double-free kaçırılıyor:** `if(c) delete p; delete p;` durumunda merge `Freed + Allocated = Allocated` döner, sonra ikinci delete Allocated→Freed olur — double-free yakalanmaz. Path-sensitive analiz olmadan çözülemez, bilinen trade-off.
+
+**realloc ikili doğası eksik:** `isAllocExpr` realloc tanıyor ama `classifyStmt`'te `realloc(p, n)` eski p'yi free olarak işlemiyor. `p = realloc(p, n)` sadece Allocates dönüyor (reassignment leak tetiklenmez çünkü state zaten Allocated). Ama `q = realloc(p, n)` durumunda eski p invalid — yakalayamıyoruz.
+
+**Conservative escape:** `foo(p)` çağrısı Escaped olarak işaretleniyor. Eğer foo ownership almıyorsa (sadece okuyorsa) bu false negative. Annotation sistemi (`[[takes_ownership]]`) olmadan çözülemez.
+
 ### string.h uyarısı — kök neden ve çözüm
 Clang LibTooling kendi compiler instance'ını çalıştırıyor ama sistemdeki stdlib header arama yollarını otomatik bilmiyor. `compile_commands.json`'da explicit `-I` yoksa `string.h` vb. bulunamıyor. Çözüm: `ClangTool::appendArgumentsAdjuster()` ile `-isystem /usr/include` ekleme. `-I` değil `-isystem` kullanılmalı — sistem header uyarılarını bastırır. `BEGIN` pozisyonuna ekle ki kullanıcı flag'leri override edebilsin. macOS'ta path farklı (`/Library/Developer/CommandLineTools/SDKs/...`), platforma göre ayarlanmalı. İkinci adım olarak CMake'ten `clang -print-resource-dir` ile `stddef.h`/`stdarg.h` için resource dir eklenebilir.

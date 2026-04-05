@@ -1,6 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
-#include "rules/MemoryLeakRule.h"
+#include "rules/MemoryLeakRule_Ex.h"
 #include "rules/UninitPointerRule_Ex.h"
 
 #include <iostream>
@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
     zerodefect::StaticAnalyzer analyzer(std::move(config));
 
     analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
-    analyzer.addRule<zerodefect::MemoryLeakRule>();
+    analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
 
     int findings = analyzer.run();
 
