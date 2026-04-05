@@ -1,11 +1,11 @@
-#ifndef ZERODEFECT_UNINIT_POINTER_RULE_H
-#define ZERODEFECT_UNINIT_POINTER_RULE_H
+#ifndef ZERODEFECT_UNINIT_POINTER_RULE_EX_H
+#define ZERODEFECT_UNINIT_POINTER_RULE_EX_H
 
 #include "core/Rule.h"
 
 namespace zerodefect {
 
-class UninitPointerRule : public Rule {
+class UninitPointerRule_Ex : public Rule {
 public:
     std::string id() const override;
     std::string description() const override;
@@ -16,4 +16,4 @@ public:
 
 } // namespace zerodefect
 
-#endif // ZERODEFECT_UNINIT_POINTER_RULE_H
+#endif // ZERODEFECT_UNINIT_POINTER_RULE_EX_H

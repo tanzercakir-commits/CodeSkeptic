@@ -37,5 +37,15 @@ cJSON saf C projesi, `new` yok. MemoryLeakRule sadece C++ `new` ifadesini arar (
 ### NullPointerRule → UninitPointerRule geçişi
 NullPointerRule her `*ptr` dereference'ı yakalıyordu — 68 bulgu, çoğu false positive. Karmaşık filtreler (address-of, null guard, dataflow) yerine tamamen farklı bir yaklaşım seçildi: başlatılmamış pointer tespiti. Basit matcher, sıfır false positive. cJSON'da 47 gerçek bulgu.
 
+### UninitPointerRule_Ex — bilinen sınırlamalar ve ileride yapılacaklar
+
+**CFG cache yok:** Aynı fonksiyonda N uninit pointer varsa, N kez `CFG::buildCFG` çağrılıyor. Büyük fonksiyonlarda gereksiz iş. İleride `FunctionDecl*` → `CFG*` cache'i eklenebilir.
+
+**classifyStmt maliyeti:** Her CFGElement için 5-6 matcher çalıştırılıyor. Küçük fonksiyonlarda sorun değil, 500+ satırlık fonksiyonlarda hissedilir. İleride manuel `dyn_cast` zincirine geçilebilir.
+
+**Compound expression false negative:** `*p = (p = &x, 42)` gibi comma operator pattern'inde `classifyStmt` bunu `Assigns` olarak sınıflandırır çünkü assign matcher önce çalışıyor. Ama `*p` dereference'ı `p = &x` atamasından önce evaluate ediliyor. Pratikte nadir ama bilinmeli.
+
+**id() çakışması:** Eski UninitPointerRule ve yeni UninitPointerRule_Ex ikisi de `"uninit-ptr"` dönüyor. Bilinçli — main.cpp'de sadece biri kayıtlı. Paralel tutulacaksa yeni rule'a `"uninit-ptr-ex"` verilebilir.
+
 ### string.h uyarısı — kök neden ve çözüm
 Clang LibTooling kendi compiler instance'ını çalıştırıyor ama sistemdeki stdlib header arama yollarını otomatik bilmiyor. `compile_commands.json`'da explicit `-I` yoksa `string.h` vb. bulunamıyor. Çözüm: `ClangTool::appendArgumentsAdjuster()` ile `-isystem /usr/include` ekleme. `-I` değil `-isystem` kullanılmalı — sistem header uyarılarını bastırır. `BEGIN` pozisyonuna ekle ki kullanıcı flag'leri override edebilsin. macOS'ta path farklı (`/Library/Developer/CommandLineTools/SDKs/...`), platforma göre ayarlanmalı. İkinci adım olarak CMake'ten `clang -print-resource-dir` ile `stddef.h`/`stdarg.h` için resource dir eklenebilir.

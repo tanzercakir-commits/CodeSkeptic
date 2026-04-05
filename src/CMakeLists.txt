@@ -5,7 +5,7 @@ add_library(zerodefect_core STATIC
     reporter/JsonReporter.cpp
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
-    rules/UninitPointerRule.cpp
+    rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule.cpp
 )
 

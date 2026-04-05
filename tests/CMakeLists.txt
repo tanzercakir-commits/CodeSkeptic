@@ -9,7 +9,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(zerodefect_tests
     TestHelper.cpp
     DiagnosticTest.cpp
-    UninitPointerRuleTest.cpp
+    UninitPointerRuleExTest.cpp
     MemoryLeakRuleTest.cpp
 )
 
