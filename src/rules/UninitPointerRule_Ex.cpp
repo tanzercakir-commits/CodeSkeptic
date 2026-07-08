@@ -1,5 +1,6 @@
 #include "rules/UninitPointerRule_Ex.h"
 
+#include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTContext.h>
@@ -107,9 +108,9 @@ public:
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "uninit-ptr";
-                diag.message = "Baslatilmamis pointer kullanimi: "
-                    + targetVar_->getNameAsString()
-                    + " dereference noktasinda deger atanmamis olabilir";
+                diag.message = zerodefect::msg(
+                    zerodefect::MsgId::UninitPtrDeref,
+                    targetVar_->getNameAsString());
                 results_.push_back(diag);
             }
         }
@@ -153,7 +154,7 @@ std::string UninitPointerRule_Ex::id() const {
 }
 
 std::string UninitPointerRule_Ex::description() const {
-    return "CFG-tabanli baslatilmamis pointer kullanim analizi";
+    return "CFG-based uninitialized pointer use analysis";
 }
 
 Severity UninitPointerRule_Ex::defaultSeverity() const {

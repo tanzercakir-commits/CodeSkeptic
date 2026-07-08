@@ -1,4 +1,5 @@
 #include "core/Diagnostic.h"
+#include "core/Messages.h"
 
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -32,6 +33,39 @@ TEST(DiagnosticTest, SortBySeverity) {
     EXPECT_EQ(list[0].severity, Severity::Error);
     EXPECT_EQ(list[1].severity, Severity::Warning);
     EXPECT_EQ(list[2].severity, Severity::Info);
+}
+
+TEST(MessagesTest, LangSwitchAndSubstitution) {
+    setLang(Lang::EN);
+    std::string en = msg(MsgId::DoubleFree, "ptr");
+    EXPECT_NE(en.find("Double free"), std::string::npos);
+    EXPECT_NE(en.find("ptr"), std::string::npos);
+
+    setLang(Lang::TR);
+    std::string tr = msg(MsgId::DoubleFree, "ptr");
+    EXPECT_NE(tr.find("Cift serbest birakma"), std::string::npos);
+    EXPECT_NE(tr.find("ptr"), std::string::npos);
+
+    setLang(Lang::EN);  // diger testler icin varsayilana don
+
+    EXPECT_EQ(parseLang("tr"), Lang::TR);
+    EXPECT_EQ(parseLang("en"), Lang::EN);
+    EXPECT_EQ(parseLang("de"), Lang::EN);  // bilinmeyen -> varsayilan
+}
+
+TEST(DiagnosticTest, EqualityAndDedup) {
+    Diagnostic d1{Severity::Warning, "a.cpp", 10, 5, "memory-leak", "msg"};
+    Diagnostic dup = d1;
+    Diagnostic other{Severity::Warning, "a.cpp", 10, 5, "uninit-ptr", "msg"};
+
+    EXPECT_EQ(d1, dup);
+    EXPECT_FALSE(d1 == other);
+
+    // Sıralama sonrası eşit kayıtlar bitişik olmalı → unique tekilleştirir
+    DiagnosticList list = {d1, other, dup};
+    std::sort(list.begin(), list.end());
+    list.erase(std::unique(list.begin(), list.end()), list.end());
+    EXPECT_EQ(list.size(), 2u);
 }
 
 TEST(DiagnosticTest, SortByFileThenLine) {

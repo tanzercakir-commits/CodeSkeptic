@@ -1,5 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
 
+#include "core/Messages.h"
 #include "reporter/ConsoleReporter.h"
 #include "reporter/JsonReporter.h"
 
@@ -11,6 +12,8 @@ namespace zerodefect {
 
 StaticAnalyzer::StaticAnalyzer(Config config)
     : config_(std::move(config)) {
+    setLang(parseLang(config_.lang()));
+
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
 
     if (!config_.sourcePath().empty()) {
@@ -32,12 +35,12 @@ int StaticAnalyzer::run() {
     diagnostics_.clear();
 
     if (source_mgr_->fileCount() == 0) {
-        std::cerr << "[ZeroDefect] Analiz edilecek dosya yok.\n";
+        std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
         return 0;
     }
 
     if (engine_.ruleCount() == 0) {
-        std::cerr << "[ZeroDefect] Kayitli kural yok.\n";
+        std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
         return 0;
     }
 
@@ -47,9 +50,9 @@ int StaticAnalyzer::run() {
         }
     }
 
-    std::cerr << "[ZeroDefect] Analiz basliyor... ("
-              << source_mgr_->fileCount() << " dosya, "
-              << engine_.ruleCount() << " kural)\n";
+    std::cerr << msg(MsgId::AnalysisStarting,
+                     std::to_string(source_mgr_->fileCount()),
+                     std::to_string(engine_.ruleCount())) << "\n";
 
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);
@@ -64,6 +67,12 @@ int StaticAnalyzer::run() {
         diagnostics_.end());
 
     std::sort(diagnostics_.begin(), diagnostics_.end());
+
+    // Header'da tanimli fonksiyonlar birden cok TU'da analiz edilir;
+    // ayni bulgu her TU'dan bir kez gelir — tekillestir.
+    diagnostics_.erase(
+        std::unique(diagnostics_.begin(), diagnostics_.end()),
+        diagnostics_.end());
 
     reporter_->report(diagnostics_);
 

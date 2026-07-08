@@ -32,6 +32,17 @@ struct HasOnStatement<A, std::void_t<decltype(
         std::declval<const typename A::State&>(),
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
+template <typename A, typename = void>
+struct HasRefineOnEdge : std::false_type {};
+
+template <typename A>
+struct HasRefineOnEdge<A, std::void_t<decltype(
+    std::declval<A>().refineOnEdge(
+        std::declval<const clang::Stmt*>(),
+        bool{},
+        std::declval<typename A::State&>(),
+        std::declval<clang::ASTContext&>()))>> : std::true_type {};
+
 } // namespace detail
 
 template <typename Analysis>
@@ -75,12 +86,39 @@ DataflowResult<Analysis> runDataflow(
             auto found = blockExitState.find(pred->getBlockID());
             if (found == blockExitState.end()) continue;
 
+            State predState = found->second;
+
+            // Assume edge: iki ardilli kosullu terminator'da (if/while/for)
+            // true/false kenarina gore state iyilestirilir. succ[0] = true,
+            // succ[1] = false (Clang CFG konvansiyonu).
+            if constexpr (detail::HasRefineOnEdge<Analysis>::value) {
+                if (pred->succ_size() == 2) {
+                    if (const clang::Stmt* cond =
+                            pred->getTerminatorCondition()) {
+                        auto succIt = pred->succ_begin();
+                        const clang::CFGBlock* trueSucc =
+                            succIt->getReachableBlock();
+                        ++succIt;
+                        const clang::CFGBlock* falseSucc =
+                            succIt->getReachableBlock();
+                        if (trueSucc != falseSucc) {
+                            if (block == trueSucc)
+                                analysis.refineOnEdge(cond, true,
+                                                      predState, ctx);
+                            else if (block == falseSucc)
+                                analysis.refineOnEdge(cond, false,
+                                                      predState, ctx);
+                        }
+                    }
+                }
+            }
+
             hasPreds = true;
             if (firstPred) {
-                entryState = found->second;
+                entryState = predState;
                 firstPred = false;
             } else {
-                entryState = analysis.merge(entryState, found->second);
+                entryState = analysis.merge(entryState, predState);
             }
         }
 

@@ -1,4 +1,5 @@
 add_library(zerodefect_core STATIC
+    core/Messages.cpp
     source_manager/SourceManager.cpp
     engine/RuleEngine.cpp
     reporter/ConsoleReporter.cpp

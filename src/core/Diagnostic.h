@@ -38,7 +38,21 @@ struct Diagnostic {
             return severity > other.severity;
         if (file != other.file)
             return file < other.file;
-        return line < other.line;
+        if (line != other.line)
+            return line < other.line;
+        // Kalan alanlar: deterministik sira + esit kayitlarin bitisik
+        // gelmesi (std::unique ile tekillestirme icin sart)
+        if (column != other.column)
+            return column < other.column;
+        if (rule_id != other.rule_id)
+            return rule_id < other.rule_id;
+        return message < other.message;
+    }
+
+    bool operator==(const Diagnostic& other) const {
+        return severity == other.severity && file == other.file &&
+               line == other.line && column == other.column &&
+               rule_id == other.rule_id && message == other.message;
     }
 };
 

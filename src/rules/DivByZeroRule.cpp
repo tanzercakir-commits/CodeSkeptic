@@ -1,5 +1,6 @@
 #include "rules/DivByZeroRule.h"
 
+#include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTContext.h>
@@ -139,9 +140,114 @@ public:
     }
 };
 
-// --- Analysis struct for DataflowEngine ---
+// --- Branch condition refinement (assume edges) ---
 
 using VarState = std::map<const VarDecl*, ZeroState>;
+
+void setIfTracked(VarState& state, const VarDecl* var, ZeroState value) {
+    if (!var) return;
+    auto it = state.find(var);
+    if (it != state.end()) it->second = value;
+}
+
+// Kosul ifadesinin dogru/yanlis oldugu kenarda degisken state'lerini
+// iyilestirir. Ornek: `z != 0` true kenarinda z = NonZero.
+void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
+    if (!cond) return;
+    cond = cond->IgnoreParenImpCasts();
+
+    // if (z) / while (z): truthiness
+    if (const auto* var = getReferencedVar(cond)) {
+        setIfTracked(state, var, isTrue ? ZeroState::NonZero : ZeroState::Zero);
+        return;
+    }
+
+    if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
+        if (unary->getOpcode() == UO_LNot)
+            applyCondition(unary->getSubExpr(), !isTrue, state);
+        return;
+    }
+
+    const auto* binOp = dyn_cast<BinaryOperator>(cond);
+    if (!binOp) return;
+
+    const BinaryOperatorKind opc = binOp->getOpcode();
+
+    // Kisa devre operatorleri: `a && b` dogruysa ikisi de dogru,
+    // `a || b` yanlissa ikisi de yanlis. Diger yonde bilgi yok.
+    if (opc == BO_LAnd) {
+        if (isTrue) {
+            applyCondition(binOp->getLHS(), true, state);
+            applyCondition(binOp->getRHS(), true, state);
+        }
+        return;
+    }
+    if (opc == BO_LOr) {
+        if (!isTrue) {
+            applyCondition(binOp->getLHS(), false, state);
+            applyCondition(binOp->getRHS(), false, state);
+        }
+        return;
+    }
+
+    // Karsilastirmalar: degisken bir tarafta, sabit diger tarafta
+    const Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
+    const Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
+    const VarDecl* var = getReferencedVar(lhs);
+    const Expr* literal = rhs;
+    bool varOnLeft = true;
+    if (!var) {
+        var = getReferencedVar(rhs);
+        literal = lhs;
+        varOnLeft = false;
+    }
+    if (!var) return;
+
+    ZeroState litState = evaluateAsZero(literal);
+
+    if (opc == BO_EQ || opc == BO_NE) {
+        // `z == 0` dogru → Zero; `z != 0` dogru → NonZero (yanlislarda tersi).
+        // Sifir olmayan sabitle: `z == 5` dogru → NonZero; yanlis yonde bilgi yok.
+        bool eqHolds = (opc == BO_EQ) == isTrue;
+        if (litState == ZeroState::Zero)
+            setIfTracked(state, var, eqHolds ? ZeroState::Zero
+                                             : ZeroState::NonZero);
+        else if (litState == ZeroState::NonZero && eqHolds)
+            setIfTracked(state, var, ZeroState::NonZero);
+        return;
+    }
+
+    // Siralama karsilastirmalari yalnizca sifir sabitiyle: esitsizligin
+    // sifiri disladigi yonde NonZero cikarimi yapilabilir.
+    if (litState != ZeroState::Zero) return;
+
+    // Kosulu "var <op> 0" formuna getir (sabit soldaysa operatoru aynala)
+    BinaryOperatorKind rel = opc;
+    if (!varOnLeft) {
+        switch (opc) {
+            case BO_LT: rel = BO_GT; break;   // 0 <  z  ≡  z >  0
+            case BO_GT: rel = BO_LT; break;   // 0 >  z  ≡  z <  0
+            case BO_LE: rel = BO_GE; break;   // 0 <= z  ≡  z >= 0
+            case BO_GE: rel = BO_LE; break;   // 0 >= z  ≡  z <= 0
+            default: break;
+        }
+    }
+
+    switch (rel) {
+        case BO_GT:  // z > 0
+        case BO_LT:  // z < 0
+            if (isTrue) setIfTracked(state, var, ZeroState::NonZero);
+            break;
+        case BO_GE:  // z >= 0: yanlis ise z < 0 → NonZero
+        case BO_LE:  // z <= 0: yanlis ise z > 0 → NonZero
+            if (!isTrue) setIfTracked(state, var, ZeroState::NonZero);
+            break;
+        default:
+            break;
+    }
+}
+
+// --- Analysis struct for DataflowEngine ---
 
 class DivByZeroAnalysis {
 public:
@@ -166,10 +272,16 @@ public:
                 result[var] = stateB;
             else {
                 if (it->second == stateB) continue;
-                if (it->second == ZeroState::Unknown || stateB == ZeroState::Unknown)
-                    it->second = ZeroState::Unknown;
-                else
-                    it->second = ZeroState::MaybeZero;
+                // Herhangi bir yolda kesin/olasi sifir varsa bilgi korunur:
+                // Zero|MaybeZero + baska bir sey = MaybeZero.
+                // Yalnizca NonZero + Unknown bilgisizlige duser.
+                bool anyZeroInfo =
+                    it->second == ZeroState::Zero ||
+                    it->second == ZeroState::MaybeZero ||
+                    stateB == ZeroState::Zero ||
+                    stateB == ZeroState::MaybeZero;
+                it->second = anyZeroInfo ? ZeroState::MaybeZero
+                                         : ZeroState::Unknown;
             }
         }
         return result;
@@ -191,6 +303,11 @@ public:
             }
         }
         return out;
+    }
+
+    void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
+                      ASTContext& /*ctx*/) const {
+        applyCondition(dyn_cast<Expr>(cond), isTrueBranch, state);
     }
 
     void onStatement(const Stmt* stmt, const State& before,
@@ -221,9 +338,9 @@ public:
                     diag.column = sm.getSpellingColumnNumber(
                         div.op->getOperatorLoc());
                     diag.rule_id = "div-by-zero";
-                    diag.message = "Sifira bolme: "
-                        + div.divisorVar->getNameAsString()
-                        + " kesinlikle sifir";
+                    diag.message = zerodefect::msg(
+                        zerodefect::MsgId::DivByZeroDefinite,
+                        div.divisorVar->getNameAsString());
                     results_.push_back(diag);
                 }
             } else if (state == ZeroState::MaybeZero) {
@@ -235,9 +352,9 @@ public:
                     diag.column = sm.getSpellingColumnNumber(
                         div.op->getOperatorLoc());
                     diag.rule_id = "div-by-zero";
-                    diag.message = "Sifira bolme riski: "
-                        + div.divisorVar->getNameAsString()
-                        + " bazi kod yollarinda sifir olabilir";
+                    diag.message = zerodefect::msg(
+                        zerodefect::MsgId::DivByZeroMaybe,
+                        div.divisorVar->getNameAsString());
                     results_.push_back(diag);
                 }
             }
@@ -275,7 +392,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.column = sm.getSpellingColumnNumber(
                     div.op->getOperatorLoc());
                 diag.rule_id = "div-by-zero";
-                diag.message = "Sifira bolme: sabit sifir ile bolme islemi";
+                diag.message = zerodefect::msg(
+                    zerodefect::MsgId::DivByZeroLiteral);
                 results.push_back(diag);
             }
         }
@@ -319,7 +437,7 @@ std::string DivByZeroRule::id() const {
 }
 
 std::string DivByZeroRule::description() const {
-    return "Sifira bolme ve potansiyel sifira bolme tespiti";
+    return "Definite and potential division-by-zero detection";
 }
 
 Severity DivByZeroRule::defaultSeverity() const {

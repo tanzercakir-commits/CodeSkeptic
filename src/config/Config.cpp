@@ -8,6 +8,7 @@ namespace zerodefect {
 Config::Config()
     : build_path_(".")
     , output_format_("console")
+    , lang_("en")
     , min_severity_(Severity::Info) {}
 
 bool Config::loadFromFile(const std::string& path) {
@@ -29,6 +30,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "output_format") output_format_ = value;
         else if (key == "json_output")   json_output_path_ = value;
         else if (key == "min_severity")  min_severity_ = parseSeverity(value);
+        else if (key == "lang")          lang_ = value;
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -51,16 +53,19 @@ bool Config::parseArgs(int argc, char* argv[]) {
             min_severity_ = parseSeverity(argv[++i]);
         } else if (arg == "--disable-rule" && i + 1 < argc) {
             disabled_rules_.insert(argv[++i]);
+        } else if (arg == "--lang" && i + 1 < argc) {
+            lang_ = argv[++i];
         } else if (arg == "--help") {
-            std::cerr << "Kullanim: zerodefect [secenek] [kaynak_yolu]\n"
+            std::cerr << "Usage: zerodefect [options] [source_path]\n"
                       << "\n"
-                      << "Secenekler:\n"
-                      << "  --source <yol>         Analiz edilecek dizin/dosya\n"
-                      << "  --build-path <yol>     compile_commands.json dizini\n"
-                      << "  --json <dosya>         JSON cikti dosyasi\n"
-                      << "  --severity <seviye>    Minimum severity (info/warning/error)\n"
-                      << "  --disable-rule <id>    Kurali devre disi birak\n"
-                      << "  --help                 Bu mesaji goster\n";
+                      << "Options:\n"
+                      << "  --source <path>        Directory/file to analyze\n"
+                      << "  --build-path <path>    compile_commands.json directory\n"
+                      << "  --json <file>          JSON output file\n"
+                      << "  --severity <level>     Minimum severity (info/warning/error)\n"
+                      << "  --disable-rule <id>    Disable a rule\n"
+                      << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
+                      << "  --help                 Show this message\n";
             return false;
         } else if (arg[0] != '-' && source_path_.empty()) {
             source_path_ = arg;

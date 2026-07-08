@@ -1,5 +1,43 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-08 — Faz 0 (public hazırlık) + assume edges
+
+### Düzeltilen
+- **Linux header çözümleme hatası**: koşulsuz `-isystem /usr/include` GCC
+  libstdc++'ın `include_next` zincirini kırıyordu (`stdlib.h` bulunamıyor,
+  analiz kısmi AST ile sessizce devam ediyordu). Artık `#ifdef __APPLE__`
+  ile yalnızca macOS'ta ekleniyor. Doğrulama: `<cstdlib>` içeren demo
+  dosyasında daha önce kaçan double-free artık yakalanıyor.
+- **CMake taşınabilirliği**: Homebrew `CMAKE_PREFIX_PATH` varsayılanı
+  yalnızca `APPLE` altında. Linux'ta sistem LLVM'i otomatik bulunuyor.
+- **Çapraz-TU mükerrer bulgu**: `Diagnostic::operator==` + `operator<`
+  tüm alanlarla deterministik; `StaticAnalyzer::run` sıralama sonrası
+  `std::unique` ile tekilleştiriyor.
+
+### Eklenen
+- **Assume edges (dal koşulu iyileştirmesi)**: `DataflowEngine`'e opsiyonel
+  `refineOnEdge(cond, isTrueBranch, State&, ASTContext&)` hook'u (SFINAE).
+  İki ardıllı terminator'larda (if/while/for) predecessor state'i true/false
+  kenarına göre iyileştirilip öyle merge ediliyor.
+- **DivByZeroRule guard analizi**: `z != 0`, `z == 0`, `z`, `!z`, `z > 0`
+  (+ ayna halleri `0 < z`), `>=`/`<=` false dalları, `&&`/`||` kısa devre
+  kuralları. Bilinen guard FP'si çözüldü; `if (z == 0) 1/z` artık kesin
+  hata olarak yakalanıyor. 9 yeni test.
+- **DivByZero merge düzeltmesi**: `Zero + Unknown = MaybeZero` (eskiden
+  Unknown'a düşüp susuyordu). `int d = 0; if (z > 0) d = z; 100/d`
+  artık uyarı veriyor. Yalnızca `NonZero + Unknown` bilgisizliğe düşer.
+- **i18n**: `core/Messages` modülü (MsgId tablosu EN/TR, `{0}`/`{1}`
+  yer tutucu). Varsayılan İngilizce; `--lang tr` CLI seçeneği ve `lang=`
+  config anahtarı. Tüm kural mesajları, reporter ve CLI çıktıları taşındı.
+- **GitHub Actions CI**: Ubuntu 24.04 + LLVM 18, build + ctest + exit-code
+  smoke testi (`.github/workflows/ci.yml`).
+- **README** (İngilizce, mimari + build + kullanım) ve **LICENSE**
+  (Apache-2.0).
+
+### Test sonuçları
+- 52/52 test geçti (41 mevcut + 1 dedup + 1 i18n + 9 assume-edge)
+- Linux (Ubuntu 24.04, LLVM 18.1.3) üzerinde tam doğrulama
+
 ## 2026-04-05 — DataflowEngine + DivByZeroRule
 
 ### Eklenen
