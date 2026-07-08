@@ -38,6 +38,8 @@ jobs:
               p = new int(7);
           }
           EOF
-          # Bulgu varken exit code 1 olmali
-          ./build/src/zerodefect /tmp/smoke.cpp; code=$?
-          test $code -eq 1
+          # Bulgu varken exit code 1 olmali. Actions adimlari `bash -e` ile
+          # kosar: basarisiz komut || ile yakalanmazsa script aninda olur.
+          code=0
+          ./build/src/zerodefect /tmp/smoke.cpp || code=$?
+          test "$code" -eq 1
