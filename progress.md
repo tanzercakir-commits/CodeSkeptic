@@ -9,13 +9,13 @@
 | Messages (i18n) | `src/core/Messages.h`, `.cpp` | Tamamlandı (EN varsayılan, `--lang tr`) |
 | SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Tamamlandı (Linux header fix) |
 | RuleEngine | `src/engine/RuleEngine.h`, `.cpp` | Tamamlandı |
-| DataflowEngine | `src/engine/DataflowEngine.h` | Tamamlandı (template + assume edges) |
+| DataflowEngine | `src/engine/DataflowEngine.h` | Tamamlandı (template + assume edges + latticeHeight + ince taneli CFG) |
 | Reporter (abstract) | `src/reporter/Reporter.h` | Tamamlandı |
 | ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Tamamlandı |
 | JsonReporter | `src/reporter/JsonReporter.h`, `.cpp` | Tamamlandı |
 | Config | `src/config/Config.h`, `.cpp` | Tamamlandı (`--lang` dahil) |
 | StaticAnalyzer | `src/analyzer/StaticAnalyzer.h`, `.cpp` | Tamamlandı (çapraz-TU dedup) |
-| UninitPointerRule_Ex | `src/rules/UninitPointerRule_Ex.h`, `.cpp` | Tamamlandı (CFG dataflow) |
+| UninitPointerRule_Ex | `src/rules/UninitPointerRule_Ex.h`, `.cpp` | Tamamlandı (çarpım lattice, tek koşu, dyn_cast classify) |
 | MemoryLeakRule_Ex | `src/rules/MemoryLeakRule_Ex.h`, `.cpp` | Tamamlandı (CFG dataflow) |
 | DivByZeroRule | `src/rules/DivByZeroRule.h`, `.cpp` | Tamamlandı (literal + CFG + guard analizi) |
 | main.cpp | `src/main.cpp` | Tamamlandı (3 kural kayıtlı) |

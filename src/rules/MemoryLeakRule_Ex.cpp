@@ -183,6 +183,11 @@ public:
 
     State initialState() const { return initState_; }
 
+    // Degisken basina AllocState zinciri en fazla 3 gecis yapar
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
+    }
+
     State merge(const State& a, const State& b) const {
         State result = a;
         for (const auto& [var, stateB] : b) {

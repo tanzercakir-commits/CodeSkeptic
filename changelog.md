@@ -1,5 +1,26 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-08 (gece) — Faz 1 kalanları: çekirdek birleştirme
+
+### Değiştirildi
+- **DataflowEngine CFG granülerliği**: `BuildOptions::setAllAlwaysAdd()` —
+  alt ifadeler de değerlendirme sırasında birer CFG elemanı (CSA ile aynı).
+  Analizler artık her elemanın yalnızca tepe düğümüne bakıyor; statement
+  içinde nested arama (findAll matcher) tamamen gereksizleşti.
+- **UninitPointerRule_Ex tamamen yeniden yazıldı**: değişken başına ayrı
+  CFG build + dataflow koşusu + statement başına 5-6 matcher yerine, tüm
+  izlenen pointerlar tek çarpım lattice'inde (`map<VarDecl*, PtrState>`)
+  tek koşuda. Sınıflandırma tepe-düğüm `dyn_cast` — düğüm hangi değişkene
+  dokunduğunu kendisi söylediği için değişken başına döngü de yok (O(1)
+  eleman başına). Davranış birebir korundu (14/14 test).
+- **İterasyon tavanı lattice yüksekliğine bağlandı**: opsiyonel
+  `latticeHeight()` hook'u (SFINAE); `maxIterations = numBlocks × (height+2)`.
+  Üç analiz de yüksekliğini bildiriyor (değişken sayısı × zincir uzunluğu).
+  Bildirmeyen analizler için eski varsayılan korunuyor.
+
+### Test sonuçları
+- 52/52 test geçti; demo bulguları birebir aynı (davranış değişikliği yok)
+
 ## 2026-07-08 — Faz 0 (public hazırlık) + assume edges
 
 ### Düzeltilen

@@ -33,6 +33,13 @@ struct HasOnStatement<A, std::void_t<decltype(
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
 template <typename A, typename = void>
+struct HasLatticeHeight : std::false_type {};
+
+template <typename A>
+struct HasLatticeHeight<A, std::void_t<decltype(
+    std::declval<const A&>().latticeHeight())>> : std::true_type {};
+
+template <typename A, typename = void>
 struct HasRefineOnEdge : std::false_type {};
 
 template <typename A>
@@ -56,12 +63,24 @@ DataflowResult<Analysis> runDataflow(
     if (!func || !func->hasBody()) return result;
 
     clang::CFG::BuildOptions opts;
+    // Alt ifadeler de degerlendirme sirasinda birer CFG elemani olsun
+    // (CSA ile ayni granulerlik). Boylece analizler her elemanin yalnizca
+    // tepe dugumune bakabilir; statement icinde nested arama gerekmez.
+    opts.setAllAlwaysAdd();
     std::unique_ptr<clang::CFG> cfg = clang::CFG::buildCFG(
         func, func->getBody(), &ctx, opts);
     if (!cfg) return result;
 
     const unsigned numBlocks = cfg->getNumBlockIDs();
-    const unsigned maxIterations = numBlocks * 4;
+
+    // Monoton transfer + sonlu lattice ile sabitleme garantidir; tavan
+    // yalnizca guvenlik sigortasi. Analiz lattice yuksekligini bildirirse
+    // tavan ona gore olceklenir (blok basina en fazla yukseklik kadar
+    // yukselis olabilir), bildirmezse eski varsayilan kullanilir.
+    unsigned latticeHeight = 4;
+    if constexpr (detail::HasLatticeHeight<Analysis>::value)
+        latticeHeight = analysis.latticeHeight();
+    const unsigned maxIterations = numBlocks * (latticeHeight + 2);
 
     auto& blockExitState = result.blockExitStates;
 

@@ -3,11 +3,13 @@
 ## Sıradaki Görevler (yol haritası: analiz-2026-07.md)
 
 ### Faz 1 kalanları
-- [ ] UninitPointerRule'u çarpım lattice + dyn_cast desenine taşı
-      (MemLeak deseniyle birleştir — değişken başına CFG koşusu kalksın)
-- [ ] Fonksiyon başına CFG önbelleği (tüm kurallar paylaşsın)
-- [ ] İterasyon tavanını lattice yüksekliğine bağla; sabitlenmeyen
-      fonksiyonu raporla (şu an converged=false sessizce kullanılıyor)
+- [ ] Fonksiyon başına CFG önbelleği — kurallar arası paylaşım (şu an her
+      kural kendi CFG'sini kuruyor; fonksiyon başına 3 build). Kurallara
+      ortak bir analiz bağlamı geçirmek gerekir — mimari karar.
+- [ ] converged=false durumunu görünür yap (Info diagnostic veya stderr) —
+      yükseklik-tabanlı tavanla artık pratikte imkânsız ama sessiz kalmasın
+- [ ] MemoryLeakRule transfer'ını da tepe-düğüm Effect desenine taşı
+      (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
 
 ### Faz 2
 - [ ] SARIF reporter
@@ -40,6 +42,9 @@
 - [x] GitHub Actions CI (Ubuntu 24.04 + LLVM 18)
 - [x] README (EN) + LICENSE (Apache-2.0)
 - [x] GTest 52/52
+- [x] CFG granülerliği: setAllAlwaysAdd (alt ifadeler eleman — CSA paritesi)
+- [x] UninitPointerRule çarpım lattice + tepe-düğüm dyn_cast (tek koşu)
+- [x] İterasyon tavanı lattice yüksekliğine bağlandı (latticeHeight hook)
 
 ## Teknik Notlar (Aklında Tut)
 
@@ -65,16 +70,17 @@ LLVM `-fno-rtti` ile derlenir. CMake'de `LLVM_ENABLE_RTTI` kontrolü var.
 `is_directory` ile kontrol ediliyor: dizinse `scanDirectory`, dosyaysa `addSourceFile`.
 
 ### DataflowEngine — Analysis duck typing
-Analysis sınıfı `State`, `initialState()`, `merge()`, `transfer()` sağlamalı. `onStatement()` ve `refineOnEdge()` opsiyonel (SFINAE ile `if constexpr`). `DataflowResult` `exitBlockID` içerir — exit block check için CFG rebuild gereksiz.
+Analysis sınıfı `State`, `initialState()`, `merge()`, `transfer()` sağlamalı. `onStatement()`, `refineOnEdge()` ve `latticeHeight()` opsiyonel (SFINAE ile `if constexpr`). `DataflowResult` `exitBlockID` içerir — exit block check için CFG rebuild gereksiz.
+
+### CFG granülerliği — setAllAlwaysAdd
+Motor CFG'yi `setAllAlwaysAdd` ile kurar: alt ifadeler değerlendirme sırasında ayrı elemanlardır (DumpCFG'deki gibi). Analizler her elemanın YALNIZCA tepe düğümüne bakmalı; findAll/descendant araması hem gereksiz hem mükerrer tetikler (aynı ifade hem kendi elemanı hem üst statement elemanı içinde görünür — rapor dedup'ları bu yüzden var).
 
 ### Assume edges — kenar konvansiyonu
 İki ardıllı terminator'da (if/while/for) `succ[0]` = true dalı, `succ[1]` = false dalı (Clang CFG konvansiyonu). `refineOnEdge` yalnızca `succ_size() == 2` ve `trueSucc != falseSucc` iken çağrılır; switch gibi çok ardıllı terminatorlarda çağrılmaz. Iyileştirme predecessor'ın exit state kopyası üzerinde, merge'den önce yapılır.
 
 ### UninitPointerRule_Ex — bilinen sınırlamalar
 
-**CFG cache yok:** Aynı fonksiyonda N uninit pointer → N kez CFG build. İleride cache eklenebilir.
-
-**classifyStmt maliyeti:** Her CFGElement için 5-6 matcher. Büyük fonksiyonlarda yavaşlayabilir, ileride `dyn_cast` zincirine geçilebilir.
+**ÇÖZÜLDÜ (2026-07): CFG cache / classify maliyeti.** Artık fonksiyon başına tek CFG + tek dataflow koşusu (çarpım lattice); classify tepe-düğüm `dyn_cast`, eleman başına O(1). `setAllAlwaysAdd` ile alt ifadeler kendi elemanları olduğundan nested arama gerekmez.
 
 **Compound expression false negative:** `*p = (p = &x, 42)` — comma operator'da eval sırası sorunlu. Nadir.
 
