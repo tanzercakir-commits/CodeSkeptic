@@ -1,5 +1,7 @@
 #include "reporter/JsonReporter.h"
 
+#include "core/Messages.h"
+
 #include <fstream>
 #include <iostream>
 
@@ -31,8 +33,7 @@ JsonReporter::JsonReporter(const std::string& output_path)
 void JsonReporter::report(const DiagnosticList& diagnostics) {
     std::ofstream file(output_path_);
     if (!file.is_open()) {
-        std::cerr << "[ZeroDefect] JSON dosyasi acilamadi: "
-                  << output_path_ << "\n";
+        std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
         return;
     }
 

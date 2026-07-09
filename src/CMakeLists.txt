@@ -4,8 +4,10 @@ add_library(zerodefect_core STATIC
     engine/RuleEngine.cpp
     reporter/ConsoleReporter.cpp
     reporter/JsonReporter.cpp
+    reporter/SarifReporter.cpp
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
+    analyzer/SuppressionFilter.cpp
     rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp

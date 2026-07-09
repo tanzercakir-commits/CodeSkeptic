@@ -11,9 +11,8 @@
 - [ ] MemoryLeakRule transfer'ını da tepe-düğüm Effect desenine taşı
       (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
 
-### Faz 2
-- [ ] SARIF reporter
-- [ ] `// zerodefect-disable-line <rule>` bastırma + baseline dosyası
+### Faz 2 kalanları
+- [ ] Baseline dosyası (mevcut bulguları dondurup yalnızca yenileri raporla)
 - [ ] NIST Juliet ile precision/recall ölçümü; cJSON/tinyxml2 CI koşusu
 - [ ] Yeni kural: use-after-free (Freed state + dereference kontrolü)
 - [ ] Yeni kural: null-deref (assume edges üzerine)
@@ -45,6 +44,9 @@
 - [x] CFG granülerliği: setAllAlwaysAdd (alt ifadeler eleman — CSA paritesi)
 - [x] UninitPointerRule çarpım lattice + tepe-düğüm dyn_cast (tek koşu)
 - [x] İterasyon tavanı lattice yüksekliğine bağlandı (latticeHeight hook)
+- [x] SARIF 2.1.0 reporter (--sarif, sarif_output=)
+- [x] Suppression yorumları (disable-line / disable-next-line, kural listesi)
+- [x] GTest 66/66
 
 ## Teknik Notlar (Aklında Tut)
 

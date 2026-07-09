@@ -49,11 +49,17 @@ const MsgEntry kMessages[] = {
     // FindingsCount
     {"ZeroDefect: {0} finding(s)",
      "ZeroDefect: {0} bulgu"},
+    // SuppressedCount
+    {"[ZeroDefect] {0} finding(s) suppressed by source comments",
+     "[ZeroDefect] {0} bulgu kaynak yorumlariyla bastirildi"},
     // CompileDbNotFound
     {"[ZeroDefect] compile_commands.json not found: {0}\n"
      "[ZeroDefect] Fallback: continuing with -std=c++17.",
      "[ZeroDefect] compile_commands.json bulunamadi: {0}\n"
      "[ZeroDefect] Fallback: -std=c++17 ile devam ediliyor."},
+    // OutputFileOpenError
+    {"[ZeroDefect] Cannot open output file: {0}",
+     "[ZeroDefect] Cikti dosyasi acilamadi: {0}"},
     // FileNotFound
     {"[ZeroDefect] File not found: {0}",
      "[ZeroDefect] Dosya bulunamadi: {0}"},

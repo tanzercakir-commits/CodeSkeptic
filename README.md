@@ -85,6 +85,7 @@ zerodefect <source_path> [options]
   --source <path>        Directory/file to analyze
   --build-path <path>    compile_commands.json directory
   --json <file>          JSON output file
+  --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --severity <level>     Minimum severity (info/warning/error)
   --disable-rule <id>    Disable a rule
   --lang <en|tr>         Diagnostic message language (default: en)
@@ -92,7 +93,23 @@ zerodefect <source_path> [options]
 
 Options can also be set in a `.zerodefect.conf` file (`key=value` lines:
 `source_path`, `build_path`, `output_format`, `json_output`,
-`min_severity`, `enable_rule`, `disable_rule`, `lang`).
+`sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`).
+
+### Suppressing findings
+
+Individual findings can be suppressed with source comments:
+
+```cpp
+int x = 1 / z;  // zerodefect-disable-line
+int y = 1 / w;  // zerodefect-disable-line div-by-zero
+
+// zerodefect-disable-next-line memory-leak
+p = new int(7);
+```
+
+A bare marker suppresses every rule on that line; a comma- or
+space-separated rule list limits it to those rules. The count of
+suppressed findings is reported on stderr.
 
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.

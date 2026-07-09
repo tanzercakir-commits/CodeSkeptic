@@ -27,7 +27,9 @@ enum class MsgId {
     NoRulesRegistered,
     CleanNoIssues,
     FindingsCount,        // {0} = bulgu sayisi
+    SuppressedCount,      // {0} = bastirilan bulgu sayisi
     CompileDbNotFound,    // {0} = hata mesaji
+    OutputFileOpenError,  // {0} = yol
     FileNotFound,         // {0} = yol
     DirNotFound,          // {0} = yol
     DirScanError,         // {0} = hata mesaji

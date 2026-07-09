@@ -1,8 +1,10 @@
 #include "analyzer/StaticAnalyzer.h"
 
+#include "analyzer/SuppressionFilter.h"
 #include "core/Messages.h"
 #include "reporter/ConsoleReporter.h"
 #include "reporter/JsonReporter.h"
+#include "reporter/SarifReporter.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -26,6 +28,8 @@ StaticAnalyzer::StaticAnalyzer(Config config)
 
     if (config_.outputFormat() == "json") {
         reporter_ = std::make_unique<JsonReporter>(config_.jsonOutputPath());
+    } else if (config_.outputFormat() == "sarif") {
+        reporter_ = std::make_unique<SarifReporter>(config_.sarifOutputPath());
     } else {
         reporter_ = std::make_unique<ConsoleReporter>();
     }
@@ -58,6 +62,13 @@ int StaticAnalyzer::run() {
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
+
+    SuppressionFilter suppression;
+    size_t suppressed = suppression.filter(diagnostics_);
+    if (suppressed > 0) {
+        std::cerr << msg(MsgId::SuppressedCount, std::to_string(suppressed))
+                  << "\n";
+    }
 
     auto severity_below = [this](const Diagnostic& d) {
         return d.severity < config_.minSeverity();

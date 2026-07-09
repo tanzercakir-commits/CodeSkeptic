@@ -12,6 +12,8 @@ add_executable(zerodefect_tests
     UninitPointerRuleExTest.cpp
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
+    SarifReporterTest.cpp
+    SuppressionFilterTest.cpp
 )
 
 target_include_directories(zerodefect_tests
