@@ -137,7 +137,7 @@ TEST(InterprocLeakTest, FreeWrapper_DoubleFree_Error) {
         }
     )");
     ASSERT_EQ(results.size(), 1);
-    EXPECT_EQ(results[0].rule_id, "memory-leak");
+    EXPECT_EQ(results[0].rule_id, "double-free");
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
@@ -225,6 +225,7 @@ TEST(InterprocLeakTest, AliasingCallee_NowFrees_DoubleFree) {
     )");
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[0].rule_id, "double-free");
 }
 
 // ===================================================================

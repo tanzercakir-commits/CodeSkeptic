@@ -1,5 +1,7 @@
 #include "server/McpServer.h"
 
+#include "core/FunctionFilter.h"
+
 #include <fstream>
 #include <string>
 #include <gtest/gtest.h>
@@ -98,6 +100,27 @@ TEST(McpServerTest, AnalyzeWithFunctionScope) {
     EXPECT_EQ(response.find("'a'"), std::string::npos);
     EXPECT_NE(response.find("'b'"), std::string::npos);
     EXPECT_NE(response.find("\\\"count\\\":1"), std::string::npos);
+}
+
+TEST(McpServerTest, FilterStateResetAfterScopedAnalyze) {
+    // Regresyon: filtreli analyze cagrisi global fonksiyon/satir
+    // filtresini set edip birakirsa, ayni surecteki SONRAKI analizler
+    // sessizce budanir (uzun omurlu MCP server + tek-surec test kosumu).
+    // Bulgu kaybi olarak yasandi: InterproceduralTest'in 11 testi
+    // tek-surec kosumda dusuyordu, ctest izolasyonu gizliyordu.
+    auto path = writeTempSource("mcp_scope_reset.cpp", R"(
+        void first() { int* a; int x = *a; (void)x; }
+        void second() { int* b; int y = *b; (void)y; }
+    )");
+
+    std::string request =
+        std::string(R"({"jsonrpc":"2.0","id":9,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","functions":"second","lines":"1-2"}}})";
+    handleMcpMessage(request);
+
+    EXPECT_TRUE(zerodefect::functionFilter().empty());
+    EXPECT_TRUE(zerodefect::lineRanges().empty());
 }
 
 TEST(McpServerTest, AnalyzeMissingPath_Error) {

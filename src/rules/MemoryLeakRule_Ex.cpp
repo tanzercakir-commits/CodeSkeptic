@@ -380,8 +380,10 @@ public:
                        "memory-leak", zerodefect::MsgId::LeakReassign);
             } else if (effect == StmtEffect::Frees &&
                        it->second == AllocState::Freed) {
+                // UAF gibi kendi kimligiyle: CWE415 eslemesi ve
+                // --disable-rule taksonomisi bulgu turunu ayirt edebilsin
                 report(stmt, var, ctx, zerodefect::Severity::Error,
-                       "memory-leak", zerodefect::MsgId::DoubleFree);
+                       "double-free", zerodefect::MsgId::DoubleFree);
             }
         }
 

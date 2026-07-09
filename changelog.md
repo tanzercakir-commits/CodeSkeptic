@@ -1,5 +1,41 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Juliet ölçüm doğruluğu + global filtre sızıntısı düzeltmesi
+
+### Düzeltilen (ürün hatası — testlerin bulduğu)
+- **Global fonksiyon/satır filtresi sızıntısı**: `StaticAnalyzer` ctor'u
+  global filtreyi set ediyor, kimse geri almıyordu. Uzun ömürlü süreçte
+  (MCP server, tek-süreç test koşusu) filtreli bir analiz SONRAKİ
+  analizleri sessizce buduyordu. Bulunma şekli öğretici: test binary'si
+  tek süreçte koşulunca InterproceduralTest'in pozitif bulgu bekleyen
+  11 testi düştü — `ctest` her testi ayrı süreçte koştuğu için CI bunu
+  hiç göremiyordu (0 bekleyen "muhafazakârlık" testleri de her şey
+  filtrelenince sahte geçiyordu). Düzeltme: `~StaticAnalyzer()` filtreyi
+  temizler (RAII); regresyon testi `FilterStateResetAfterScopedAnalyze`;
+  CI'ya **tek-süreç test adımı** eklendi ki bu hata sınıfı bir daha
+  saklanamasın.
+
+### Değişen
+- **`double-free` artık kendi rule_id'si** (eskiden `memory-leak`
+  altındaydı; `use-after-free` emsaline uyum). CWE415 eşlemesi ve
+  `--disable-rule`/baseline taksonomisi bulgu türünü ayırt edebilir.
+  README kural tablosu güncellendi.
+
+### Eklenen (ölçüm doğruluğu)
+- **juliet_eval.py iki görünüm raporlar**: GENEL (dosyadaki tüm bulgular
+  — kullanıcının göreceği gürültü) + EŞLEMELİ (yalnızca test edilen
+  CWE'nin kuralı — kuralın gerçek kalitesi). Kural bazında tp/fp
+  kırılımı basılır; `JULIET_RESULT` satırına `rtp/rfp/rprecision/
+  rhitrate` alanları eklendi (eski alanlar korunur).
+- **Adımlı (stride) örnekleme** `run_juliet.sh`'de: `head -N` alfabetik
+  ilk varyant ailesini seçiyordu (CWE369'da ilk 400 dosyanın tamamı
+  `float_*` çıktı → 0 bulgu). Liste boyunca eşit aralıklarla LIMIT dosya
+  alınır — deterministik, tüm varyant aileleri temsil edilir.
+
+### Doğrulama
+- 157/157 test (ctest + tek-süreç); sentetik mini-süitte (CWE476/415/369)
+  eşlemeli görünüm ve yeni kimlikle uçtan uca precision 1.000.
+
 ## 2026-07-09 — İlk gerçek Juliet rakamları (PR #14)
 
 ### Düzeltilen (benchmark harness)

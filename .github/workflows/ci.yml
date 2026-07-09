@@ -30,6 +30,13 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+      - name: Test (tek surec)
+        # ctest her testi ayri surecte kosar — testler arasi global-durum
+        # sizintisini goremez (McpServerTest'in filtre sizintisi 11
+        # interproc testi boyle gizlemisti). Ayni binary tek surecte de
+        # kosulur ki kirlilik gorunur olsun.
+        run: ./build/tests/zerodefect_tests
+
       - name: Smoke test
         run: |
           cat > /tmp/smoke.cpp << 'EOF'

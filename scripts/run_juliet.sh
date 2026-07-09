@@ -67,8 +67,21 @@ run_cwe() { # <cwe-adi>
     find "$dir" -type f \( -name '*.c' -o -name '*.cpp' \) \
         | grep -v -e 'w32' -e 'wchar_t' -e 'pthread' -e 'fscanf' -e 'socket' \
         | sort > "$list"
+    # Adimli (stride) ornekleme: head -N alfabetik ilk varyant ailesini
+    # secip yanlilik yaratiyordu (CWE369'da ilk 400 dosyanin tamami
+    # float_* cikti, kural float bolmeyi bilincli atlar → 0 bulgu).
+    # Liste boyunca esit araliklarla LIMIT dosya al — deterministik,
+    # tum varyant aileleri temsil edilir.
     if [ "$LIMIT" -gt 0 ]; then
-        head -n "$LIMIT" "$list" > "$list.tmp" && mv "$list.tmp" "$list"
+        awk -v limit="$LIMIT" '
+            NR == FNR { total++; next }
+            FNR == 1  { step = total / limit
+                        if (step < 1) step = 1
+                        next_line = 1 }
+            FNR >= next_line && picked < limit {
+                print; picked++
+                next_line += step
+            }' "$list" "$list" > "$list.tmp" && mv "$list.tmp" "$list"
     fi
     local count
     count=$(wc -l < "$list")
