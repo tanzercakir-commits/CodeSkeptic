@@ -20,6 +20,7 @@ machine-readable findings with dataflow traces.
 |------|----|---------|
 | Uninitialized pointer | `uninit-ptr` | Dereference of a pointer that may be unassigned on some path (CFG dataflow) |
 | Memory leak / double free | `memory-leak` | Leaks at function exit, reassignment leaks, double free, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
+| Use after free | `use-after-free` | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 
 Example:
@@ -88,6 +89,8 @@ zerodefect <source_path> [options]
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
   --severity <level>     Minimum severity (info/warning/error)
   --disable-rule <id>    Disable a rule
+  --baseline <file>      Suppress findings recorded in the baseline
+  --write-baseline <file> Record current findings as the baseline
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
@@ -110,6 +113,19 @@ p = new int(7);
 A bare marker suppresses every rule on that line; a comma- or
 space-separated rule list limits it to those rules. The count of
 suppressed findings is reported on stderr.
+
+### Baseline workflow
+
+Adopting the analyzer on an existing codebase without fixing every
+legacy finding first:
+
+```bash
+zerodefect src/ --write-baseline .zerodefect-baseline   # record & exit clean
+zerodefect src/ --baseline .zerodefect-baseline         # only NEW findings fail
+```
+
+Baseline keys include the line number, so refresh the baseline after
+large refactors (known v1 limitation).
 
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.

@@ -1,5 +1,24 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 2 devam: use-after-free + baseline
+
+### Eklenen
+- **Use-after-free tespiti**: MemLeakAnalysis'e `onStatement` hook'u —
+  Freed durumdaki pointer'ın dereference'i (`*p`, `p->`, `p[i]`, tepe-düğüm
+  tespiti) `use-after-free` rule_id'siyle Error üretir. Var olan Freed
+  state'i yeniden kullanır; ek dataflow koşusu yok. 5 test.
+- **Baseline desteği** (`src/analyzer/Baseline.h/.cpp`):
+  `--write-baseline <dosya>` mevcut bulguları kaydeder ve temiz çıkar
+  (CI'da baseline üretimi); `--baseline <dosya>` bilinen bulguları
+  filtreler, yalnızca YENİ bulgular raporlanır. Anahtar:
+  `rule|file|line|message` (satır kayması v1 sınırlaması — dokümante).
+  Config anahtarı: `baseline=`. 4 test.
+
+### Test sonuçları
+- 75/75 test geçti (66 + 5 UAF + 4 baseline)
+- Uçtan uca: UAF yakalanıyor; write-baseline → exit 0; baseline ile
+  ikinci koşu temiz
+
 ## 2026-07-09 — Faz 2 başlangıcı: SARIF + suppression
 
 ### Eklenen

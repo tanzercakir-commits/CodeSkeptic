@@ -35,6 +35,7 @@ bool Config::loadFromFile(const std::string& path) {
         }
         else if (key == "min_severity")  min_severity_ = parseSeverity(value);
         else if (key == "lang")          lang_ = value;
+        else if (key == "baseline")      baseline_path_ = value;
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -62,6 +63,10 @@ bool Config::parseArgs(int argc, char* argv[]) {
             disabled_rules_.insert(argv[++i]);
         } else if (arg == "--lang" && i + 1 < argc) {
             lang_ = argv[++i];
+        } else if (arg == "--baseline" && i + 1 < argc) {
+            baseline_path_ = argv[++i];
+        } else if (arg == "--write-baseline" && i + 1 < argc) {
+            write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
             std::cerr << "Usage: zerodefect [options] [source_path]\n"
                       << "\n"
@@ -72,6 +77,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --sarif <file>         SARIF 2.1.0 output file\n"
                       << "  --severity <level>     Minimum severity (info/warning/error)\n"
                       << "  --disable-rule <id>    Disable a rule\n"
+                      << "  --baseline <file>      Suppress findings recorded in baseline\n"
+                      << "  --write-baseline <file> Record current findings as baseline\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
             return false;

@@ -20,6 +20,8 @@ public:
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
     const std::string& sarifOutputPath() const { return sarif_output_path_; }
+    const std::string& baselinePath() const { return baseline_path_; }
+    const std::string& writeBaselinePath() const { return write_baseline_path_; }
     const std::string& lang() const { return lang_; }
     Severity minSeverity() const { return min_severity_; }
     bool isRuleEnabled(const std::string& rule_id) const;
@@ -37,6 +39,8 @@ private:
     std::string output_format_;
     std::string json_output_path_;
     std::string sarif_output_path_;
+    std::string baseline_path_;
+    std::string write_baseline_path_;
     std::string lang_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;

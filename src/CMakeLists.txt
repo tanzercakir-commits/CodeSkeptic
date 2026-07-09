@@ -8,6 +8,7 @@ add_library(zerodefect_core STATIC
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
     analyzer/SuppressionFilter.cpp
+    analyzer/Baseline.cpp
     rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp

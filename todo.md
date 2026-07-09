@@ -12,10 +12,9 @@
       (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
 
 ### Faz 2 kalanları
-- [ ] Baseline dosyası (mevcut bulguları dondurup yalnızca yenileri raporla)
 - [ ] NIST Juliet ile precision/recall ölçümü; cJSON/tinyxml2 CI koşusu
-- [ ] Yeni kural: use-after-free (Freed state + dereference kontrolü)
 - [ ] Yeni kural: null-deref (assume edges üzerine)
+- [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
 ### Faz 3 (AI döngüsü)
 - [ ] Artımlı mod (yalnızca değişen fonksiyonlar)
@@ -46,7 +45,9 @@
 - [x] İterasyon tavanı lattice yüksekliğine bağlandı (latticeHeight hook)
 - [x] SARIF 2.1.0 reporter (--sarif, sarif_output=)
 - [x] Suppression yorumları (disable-line / disable-next-line, kural listesi)
-- [x] GTest 66/66
+- [x] Use-after-free tespiti (MemLeak Freed state + dereference)
+- [x] Baseline desteği (--write-baseline / --baseline)
+- [x] GTest 75/75
 
 ## Teknik Notlar (Aklında Tut)
 
