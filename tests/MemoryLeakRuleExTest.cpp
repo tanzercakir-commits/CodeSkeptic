@@ -129,6 +129,7 @@ TEST(MemoryLeakRuleExTest, DoubleFree) {
     )");
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[0].rule_id, "double-free");
 }
 
 TEST(MemoryLeakRuleExTest, ArrayNewDelete_Clean) {

@@ -16,6 +16,11 @@ class StaticAnalyzer {
 public:
     explicit StaticAnalyzer(Config config);
 
+    // Ctor'un set ettigi global filtre durumunu geri alir. Uzun omurlu
+    // sureclerde (MCP server, testler) filtreli bir kosumun sonraki
+    // kosumlari sessizce budamasini engeller.
+    ~StaticAnalyzer();
+
     template <typename T, typename... Args>
     void addRule(Args&&... args) {
         engine_.addRule<T>(std::forward<Args>(args)...);

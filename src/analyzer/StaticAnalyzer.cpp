@@ -42,6 +42,15 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     }
 }
 
+StaticAnalyzer::~StaticAnalyzer() {
+    // Global filtre durumu bu analizin omruyle sinirli kalsin: uzun
+    // omurlu surecte (MCP server) filtreli bir kosum sonrakileri sessizce
+    // budamasin. (Testlerde ayni sizinti InterproceduralTest'in 11
+    // testini dusurmustu — ctest'in surec-basina izolasyonu gizliyordu.)
+    setFunctionFilter({});
+    setLineRanges({});
+}
+
 int StaticAnalyzer::run() {
     diagnostics_.clear();
 

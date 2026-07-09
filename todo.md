@@ -1,5 +1,34 @@
 # ZeroDefect — Yapılacaklar ve Notlar
 
+## 📅 Yarının planı (2026-07-10 oturumu için hazırlandı)
+
+Sıralama önerisi — her madde bağımsız bir PR turu:
+
+1. **Juliet rakam analizi + zayıf-CWE kural iyileştirmesi.** PR #16'nın
+   temsili rakamlarıyla başla (README'ye işlendi/işlenecek). Eşlemeli
+   precision hangi kuralda düşükse oraya odaklan:
+   - CWE415/416 good-fonksiyon FP'leri: Juliet good varyantlarının tipik
+     kalıpları (goodB2G/goodG2B çağrı zincirleri) hangi FP'yi üretiyor?
+     `findings_*.json`'daki `function` alanından iki-üç örnek dosya seç,
+     kalıbı çıkar, kurala test-önce düzeltme uygula.
+   - CWE369: adımlı örneklemeden sonra int varyantları görünür olacak;
+     rand()/fgets kaynaklı akışlarda muhafazakâr sessizlik doğru
+     (Unknown), `data=0` yerel akışları yakalanmalı.
+2. **Korpus bulgu sayısı sabitleme** (küçük tur): beklenen bulgu sayısı
+   dosyası + tolerans; korpus CI adımı sapmada kırmızı. Semantik
+   regresyonların erken yakalayıcısı.
+3. **MemLeak transfer'ını tepe-düğüm Effect desenine taşı** (orta tur):
+   UninitPtr'daki desen; değişken-başına classify döngüsü kalkar,
+   MemLeak Juliet koşusu da hızlanır.
+4. Vakit kalırsa: ortak koşul-yürüyüşü yardımcısı (NullDeref + DivByZero
+   applyCondition tekilleştirmesi) — davranış değişikliği yok, testler
+   sabit kalmalı.
+
+Açık kullanıcı kararları (yol haritası artifact'ındaki 4 madde):
+public v0.1 zamanlaması (önerim: Juliet rakamları README'de olduktan
+sonra), kontrat dili sözdizimi (Ufuk 3 öncesi birlikte tasarım),
+Juliet'in CI ağırlığı, proje adı kontrolü.
+
 ## Sıradaki Görevler (yol haritası: analiz-2026-07.md)
 
 ### Faz 1 kalanları
@@ -16,14 +45,13 @@
       gerçek rakamlar ilk koşudan sonra README'ye)
 - [x] Juliet ilk gerçek koşu tamam (PR #14) — rakamlar ve analiz
       changelog'da (2026-07-09 girişi)
-- [ ] **Juliet ölçüm doğruluğu turu** (sıradaki iş; plan changelog'da):
-      1. run_juliet.sh: `head -N` yerine adımlı örnekleme (CWE369'un
-         0 çıkması float-varyant yanlılığıydı, kural hatası değil)
-      2. juliet_eval.py: kural-bazlı kırılım + CWE→kural eşlemeli
-         precision (`rp=` alanı); genel precision da kalsın
-      3. double-free'ye kendi rule_id'si (şu an `memory-leak` altında;
-         UAF emsali var, testler kimlik iddia etmiyor → güvenli)
-      4. Temsili rakamlar geldikten sonra README'ye benchmark bölümü
+- [x] **Juliet ölçüm doğruluğu turu**: adımlı örnekleme + eşlemeli
+      precision (`rprecision`) + double-free rule_id — 2026-07-10
+      changelog girişine bakınız. Bonus: tek-süreç koşuda global filtre
+      sızıntısı bulundu ve düzeltildi (~StaticAnalyzer RAII; CI'ya
+      tek-süreç test adımı eklendi).
+- [ ] Temsili rakamlar (bu PR'ın Juliet CI koşusundan) README'ye
+      benchmark bölümü olarak işlensin
 - [ ] CWE415/416 good-fonksiyon FP'lerini incele (eşlemeli precision
       sonrası gerçek boyut belli olur); CWE401 dosya isabeti için
       interprosedürel kaynak/lavabo akışı (bilinen v1 sınırı)

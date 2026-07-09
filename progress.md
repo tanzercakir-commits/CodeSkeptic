@@ -24,10 +24,10 @@
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState lattice + assume edges) |
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (156/156 geçiyor) |
+| GTest altyapısı | `tests/` | Tamamlandı (157/157; ctest + tek-süreç) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
-| Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | İlk gerçek koşu tamam (PR #14); ölçüm doğruluğu turu sırada (todo.md) |
+| Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Ölçüm doğruluğu turu tamam (eşlemeli precision + adımlı örnekleme); temsili rakamlar README'ye işlenecek |
 | README / LICENSE | `README.md`, `LICENSE` | Tamamlandı (EN, Apache-2.0) |
 | Durum tespiti / yol haritası | `analiz-2026-07.md` | Tamamlandı |
 
