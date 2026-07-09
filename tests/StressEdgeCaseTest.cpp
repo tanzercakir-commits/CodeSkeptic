@@ -306,3 +306,89 @@ TEST(DocumentedLimitTest, ConditionalDoubleFree_KnownFN) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// ===================================================================
+// DATAFLOW IZLERI — bulgular olay zinciriyle gelmeli
+// ===================================================================
+
+TEST(TraceTest, UseAfterFree_HasAllocAndFreeNotes) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p = new int(1);
+            delete p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    ASSERT_EQ(results[0].notes.size(), 2u);
+    // Notlar kaynak sirasina gore: once alloc (satir 3), sonra free (4)
+    EXPECT_EQ(results[0].notes[0].line, 3u);
+    EXPECT_NE(results[0].notes[0].message.find("allocated"),
+              std::string::npos);
+    EXPECT_EQ(results[0].notes[1].line, 4u);
+    EXPECT_NE(results[0].notes[1].message.find("freed"),
+              std::string::npos);
+}
+
+TEST(TraceTest, ExitLeak_HasAllocNote) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p = new int(1);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_EQ(results[0].notes[0].line, 3u);
+}
+
+TEST(TraceTest, NullDeref_HasAssignedNullNote) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int v = 1;
+            int* p = nullptr;
+            if (c) p = &v;
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_EQ(results[0].notes[0].line, 4u);
+    EXPECT_NE(results[0].notes[0].message.find("null"), std::string::npos);
+}
+
+TEST(TraceTest, DivByZero_HasAssignedZeroNote) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int z = 0;
+            if (c) z = 5;
+            int x = 100 / z;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_EQ(results[0].notes[0].line, 3u);
+}
+
+TEST(TraceTest, UninitPtr_HasDeclaredNote) {
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_EQ(results[0].notes[0].line, 3u);
+    EXPECT_NE(results[0].notes[0].message.find("declared"),
+              std::string::npos);
+}

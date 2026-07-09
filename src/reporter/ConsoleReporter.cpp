@@ -20,6 +20,10 @@ void ConsoleReporter::report(const DiagnosticList& diagnostics) {
         std::cerr << diag.location()
                   << " [" << diag.severityToString() << "] "
                   << diag.rule_id << ": " << diag.message << "\n";
+        for (const auto& note : diag.notes) {
+            std::cerr << "    -> " << note.file << ":" << note.line
+                      << ":" << note.column << " " << note.message << "\n";
+        }
     }
 
     std::cerr << "----------------------------------------\n";

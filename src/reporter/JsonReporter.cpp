@@ -51,7 +51,18 @@ void JsonReporter::report(const DiagnosticList& diagnostics) {
         file << "      \"file\": \"" << escapeJson(diag.file) << "\",\n";
         file << "      \"line\": " << diag.line << ",\n";
         file << "      \"column\": " << diag.column << ",\n";
-        file << "      \"message\": \"" << escapeJson(diag.message) << "\"\n";
+        file << "      \"message\": \"" << escapeJson(diag.message) << "\",\n";
+        file << "      \"notes\": [";
+        for (size_t n = 0; n < diag.notes.size(); ++n) {
+            const auto& note = diag.notes[n];
+            if (n > 0) file << ",";
+            file << "\n        { \"file\": \"" << escapeJson(note.file)
+                 << "\", \"line\": " << note.line
+                 << ", \"column\": " << note.column
+                 << ", \"message\": \"" << escapeJson(note.message)
+                 << "\" }";
+        }
+        file << (diag.notes.empty() ? "]" : "\n      ]") << "\n";
         file << "    }";
     }
 

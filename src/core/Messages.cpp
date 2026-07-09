@@ -43,6 +43,21 @@ const MsgEntry kMessages[] = {
     // NullDerefMaybe
     {"Possible null dereference: '{0}' may be null on some paths",
      "Olasi null dereference: {0} bazi kod yollarinda null olabilir"},
+    // TraceAllocatedHere
+    {"'{0}' allocated here",
+     "{0} burada ayrildi"},
+    // TraceFreedHere
+    {"'{0}' freed here",
+     "{0} burada serbest birakildi"},
+    // TraceAssignedNullHere
+    {"'{0}' assigned null here",
+     "{0} burada null atandi"},
+    // TraceAssignedZeroHere
+    {"'{0}' assigned zero here",
+     "{0} burada sifir atandi"},
+    // TraceDeclaredHere
+    {"'{0}' declared without an initializer here",
+     "{0} burada baslangic degeri olmadan bildirildi"},
     // AnalysisStarting
     {"[ZeroDefect] Analysis starting... ({0} files, {1} rules)",
      "[ZeroDefect] Analiz basliyor... ({0} dosya, {1} kural)"},

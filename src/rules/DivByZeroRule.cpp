@@ -11,6 +11,7 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <vector>
@@ -316,7 +317,15 @@ public:
     }
 
     void onStatement(const Stmt* stmt, const State& before,
-                     const State& /*after*/, ASTContext& ctx) {
+                     const State& after, ASTContext& ctx) {
+        // Dataflow izi: sifira gecis olaylarini kaydet
+        for (const auto& [var, afterState] : after) {
+            auto b = before.find(var);
+            if (b == before.end() || b->second == afterState) continue;
+            if (afterState == ZeroState::Zero)
+                recordEvent(stmt, var, ctx);
+        }
+
         // YALNIZCA tepe dugum: ince taneli CFG'de her bolme kendi elemani
         // olarak gelir. Nested arama (eski DivFinder yaklasimi) ayni
         // bolmeyi kapsayan ifadenin elemaninda — yanlis (join) state'iyle —
@@ -359,13 +368,47 @@ public:
                 var->getNameAsString());
         }
         results_.push_back(diag);
+        noteTargets_.emplace_back(results_.size() - 1, var);
+    }
+
+    // Kosu bittikten sonra: sifir-atama izlerini raporlara ilistir
+    void attachTraces() {
+        for (const auto& [index, var] : noteTargets_) {
+            auto it = events_.find(var);
+            if (it == events_.end()) continue;
+            auto notes = it->second;
+            std::sort(notes.begin(), notes.end());
+            if (notes.size() > 6) notes.resize(6);
+            results_[index].notes = std::move(notes);
+        }
+        noteTargets_.clear();
     }
 
 private:
+    void recordEvent(const Stmt* stmt, const VarDecl* var,
+                     ASTContext& ctx) {
+        const SourceManager& sm = ctx.getSourceManager();
+        SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
+        zerodefect::TraceNote note;
+        note.file = sm.getFilename(loc).str();
+        note.line = sm.getSpellingLineNumber(loc);
+        note.column = sm.getSpellingColumnNumber(loc);
+        note.message = zerodefect::msg(
+            zerodefect::MsgId::TraceAssignedZeroHere,
+            var->getNameAsString());
+
+        auto& list = events_[var];
+        for (const auto& existing : list)
+            if (existing.line == note.line) return;
+        list.push_back(std::move(note));
+    }
+
     const std::set<const VarDecl*>& trackedVars_;
     zerodefect::DiagnosticList& results_;
     std::set<unsigned>& reportedLines_;
     VarState initState_;
+    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
 };
 
 // --- Function-level analysis ---
@@ -406,6 +449,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     DivByZeroAnalysis analysis(trackedVars, results, reportedLines);
     zerodefect::runDataflow(funcDecl, ctx, analysis);
+    analysis.attachTraces();
 }
 
 // --- Matcher callback ---

@@ -27,7 +27,9 @@
 
 ### Faz 3 (AI döngüsü)
 - [ ] Artımlı mod (yalnızca değişen fonksiyonlar)
-- [ ] Bulgulara dataflow izi (LLM'in tüketeceği açıklama formatı)
+- [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
+- [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
+      görünmüyor — motor desteği gerekir)
 - [ ] MCP server / JSON-RPC modu
 
 ## Tamamlanan Görevler

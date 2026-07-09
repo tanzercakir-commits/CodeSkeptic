@@ -24,6 +24,13 @@ enum class MsgId {
     NullDerefDefinite,    // {0} = degisken adi
     NullDerefMaybe,       // {0} = degisken adi
 
+    // Dataflow izi adimlari
+    TraceAllocatedHere,   // {0} = degisken adi
+    TraceFreedHere,       // {0} = degisken adi
+    TraceAssignedNullHere,// {0} = degisken adi
+    TraceAssignedZeroHere,// {0} = degisken adi
+    TraceDeclaredHere,    // {0} = degisken adi
+
     // CLI / calisma zamani
     AnalysisStarting,     // {0} = dosya sayisi, {1} = kural sayisi
     NoFilesToAnalyze,

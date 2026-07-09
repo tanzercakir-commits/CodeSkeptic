@@ -1,5 +1,32 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 3 açılışı: dataflow izleri
+
+### Eklenen
+- **TraceNote** (`core/Diagnostic.h`): bulguya iliştirilen olay zinciri
+  adımı (file/line/column/message). Sıralama ve eşitlikte yer almaz.
+- **Kurallarda olay kaydı** (raporlama geçişinde before/after diff'i):
+  - MemLeak: "allocated here" / "freed here" (UAF, double-free, leak
+    raporlarına)
+  - NullDeref: "assigned null here"
+  - DivByZero: "assigned zero here"
+  - UninitPtr: "declared without an initializer here" (bildirim noktası)
+- Notlar koşu SONUNDA iliştirilir (bekleyen-rapor deseni) — raporlama
+  geçişinin blok sırası kaynak sırası olmadığından rapor anında olaylar
+  henüz tam toplanmamış olabilir. Kaynak sırasına göre sıralanır, 6 ile
+  sınırlanır.
+- **Reporter desteği**: konsolda girintili `-> file:line:col mesaj`
+  satırları; JSON'da `notes` dizisi; SARIF'te `relatedLocations`
+  (GitHub code scanning bulgu detayında gösterir).
+- i18n: 5 yeni iz mesajı (EN/TR).
+
+### Neden
+Faz 3 vizyonunun ilk taşı: iz, hem insana hem LLM'e "bu bulgu neden
+var?" sorusunun cevabıdır — otomatik düzeltme döngüsünün girdisi.
+
+### Test sonuçları
+- 115/115 test geçti (110 + 5 iz testi)
+
 ## 2026-07-09 — Test donanımlandırma: best/worst-case matrisi (+2 av)
 
 ### Eklenen
