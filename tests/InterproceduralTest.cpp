@@ -206,10 +206,10 @@ TEST(InterprocLeakTest, StoringCallee_NoLeakReport) {
     ASSERT_EQ(results.size(), 0);
 }
 
-TEST(InterprocLeakTest, AliasingCallee_Conservative_Silent) {
-    // cJSON_Delete kalibi: parametre yerel degiskene alinip free edilir.
-    // v1 alias'a kor → Stores → Escaped → sessiz (belgelenmis sinir;
-    // alias izleme v2'de bu testi Frees'e cevirmeli).
+TEST(InterprocLeakTest, AliasingCallee_NowFrees_DoubleFree) {
+    // cJSON_Delete kalibi: parametre yerel imlece alinip free edilir.
+    // v2 alias izleme: cur, p'nin temiz alias'i → delete_list = Frees →
+    // cift cagri double-free. (v1'de muhafazakar sessizdi.)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -223,7 +223,175 @@ TEST(InterprocLeakTest, AliasingCallee_Conservative_Silent) {
             delete_list(q);
         }
     )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+// ===================================================================
+// Alias izleme (v2)
+// ===================================================================
+
+TEST(InterprocAliasTest, CursorLoopWalk_RealCJSONDeleteShape) {
+    // Gercek cJSON_Delete sekli: parametre dongude yeniden atanir,
+    // her iterasyonda free edilir. May-semantik: ilk iterasyon orijinali
+    // serbest birakir → Frees → wrapper sonrasi kullanim UAF.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        struct Node { struct Node* next; };
+        void delete_all(struct Node* item) {
+            struct Node* next = nullptr;
+            while (item != nullptr) {
+                next = item->next;
+                free(item);
+                item = next;
+            }
+        }
+        void f() {
+            Node* list = (Node*)malloc(sizeof(Node));
+            list->next = nullptr;
+            delete_all(list);
+            Node* again = list->next;
+            (void)again;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(InterprocAliasTest, AliasChain_TwoHops_Frees) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        void destroy(int* p) {
+            int* a = p;
+            int* b = a;
+            free(b);
+        }
+        void f() {
+            int* q = (int*)malloc(4);
+            destroy(q);
+            destroy(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(InterprocAliasTest, TaintedAlias_ImpureSource_Conservative) {
+    // Alias once p'den, sonra kirli kaynaktan besleniyor → izlenemez →
+    // Stores → sessiz (yanlis Frees iddiasi FP dogururdu)
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        int* pick();
+        void maybe_free(int* p, int c) {
+            int* l = p;
+            if (c) l = pick();
+            free(l);
+        }
+        void f() {
+            int* q = (int*)malloc(4);
+            maybe_free(q, 0);
+            maybe_free(q, 1);
+        }
+    )");
     ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocAliasTest, MultiParamAlias_Conservative) {
+    // Ayni yerel iki parametreden birden ulasilabiliyor → hicbirine
+    // guvenle baglanamaz → ikisi de Stores → sessiz
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        void free_one(int* a, int* b, int c) {
+            int* l = a;
+            if (c) l = b;
+            free(l);
+        }
+        void f() {
+            int* q = (int*)malloc(4);
+            int* r = (int*)malloc(4);
+            free_one(q, r, 0);
+            free_one(q, r, 0);
+            free(r);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocAliasTest, AliasStoredToGlobal_Stores) {
+    // Alias globale yaziliyor → sahiplik devri olabilir → Stores →
+    // cagiran tarafta leak raporu YOK (yanlis ReadsOnly FP'si engellendi)
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int* g_slot = nullptr;
+        void keep_via_alias(int* p) {
+            int* l = p;
+            g_slot = l;
+        }
+        void f() {
+            int* q = new int(7);
+            keep_via_alias(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocAliasTest, AliasReturned_Stores) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int* identity(int* p) {
+            int* l = p;
+            return l;
+        }
+        void f() {
+            int* q = new int(7);
+            int* r = identity(q);
+            (void)r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocAliasTest, AddressTakenAlias_Conservative) {
+    // Alias'in adresi aliniyor → disaridan yazilabilir → izlenemez
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        void reseat(int** pp);
+        void weird_free(int* p) {
+            int* l = p;
+            reseat(&l);
+            free(l);
+        }
+        void f() {
+            int* q = (int*)malloc(4);
+            weird_free(q);
+            weird_free(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocAliasTest, ReadOnlyThroughAlias_LeakVisible) {
+    // Salt-okur kullanim alias uzerinden de ReadsOnly kalmali:
+    // arkasindaki leak gorunur
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int peek(int* p) {
+            int* l = p;
+            return *l;
+        }
+        void f() {
+            int* q = new int(7);
+            int x = peek(q);
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
 TEST(InterprocLeakTest, ExternalCallee_StillEscapes) {
