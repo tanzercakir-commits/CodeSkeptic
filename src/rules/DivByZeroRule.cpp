@@ -467,6 +467,7 @@ public:
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
         if (!zerodefect::functionFilterAllows(*func)) return;
+        if (!zerodefect::lineFilterAllows(*func, sm)) return;
 
         analyzeFunction(func, *result.Context, results_);
     }

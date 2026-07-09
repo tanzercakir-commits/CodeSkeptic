@@ -1,5 +1,27 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Artımlı v2: hunk → fonksiyon eşlemesi
+
+### Eklenen
+- **`--lines <N-M,K>`**: yalnızca verilen satır aralıklarıyla kesişen
+  fonksiyonlar analiz edilir. Aralıklar analiz edilen ANA dosyaya
+  uygulanır (header'daki fonksiyonlar kapsam dışı — diff hunk'ları zaten
+  ana dosyaya aittir). `--function` ile birlikte AND semantiği.
+- **analyze_diff.sh v2**: `git diff -U0` hunk başlıklarından
+  (`+başlangıç,adet`) değişen satır aralıklarını çıkarıp dosya başına
+  `--lines` geçirir. Salt-silme hunk'larında (adet 0) ekleme noktası
+  satırı alınır. Sonuç: *LLM fonksiyonu değiştirir → script diff'ten
+  aralıkları çıkarır → yalnızca dokunulan fonksiyonlar yeniden analiz
+  edilir* — tam otomatik artımlı döngü.
+- İş bölümü ilkesi: git mantığı script'te, AST mantığı araçta.
+
+### Doğrulama
+- 123/123 test (119 + 4 satır filtresi: imza satırı kesişmesi, boş
+  aralık, kapsam dışı aralık)
+- Uçtan uca: iki hatalı fonksiyonlu dosyada yalnızca birine dokunuldu →
+  script `--lines 8-8` üretti → yalnızca dokunulan fonksiyonun bulgusu
+  raporlandı
+
 ## 2026-07-09 — Faz 3 devam: artımlı analiz primitifi
 
 ### Eklenen

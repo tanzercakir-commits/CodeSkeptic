@@ -18,6 +18,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     : config_(std::move(config)) {
     setLang(parseLang(config_.lang()));
     setFunctionFilter(config_.functions());
+    setLineRanges(config_.lines());
 
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
 

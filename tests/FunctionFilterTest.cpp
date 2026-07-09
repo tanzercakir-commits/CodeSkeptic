@@ -73,3 +73,60 @@ TEST(FunctionFilterTest, QualifiedNameMatchesMethod) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_NE(results[0].message.find("p"), std::string::npos);
 }
+
+// --- Satir araligi filtresi (--lines) ---
+
+namespace {
+
+struct LineGuard {
+    explicit LineGuard(LineRanges ranges) {
+        setLineRanges(std::move(ranges));
+    }
+    ~LineGuard() { setLineRanges({}); }
+};
+
+// Satir yerlesimi sabit: first() 2-6, second() 7-11
+const char* kTwoFunctionsFixedLines =
+    "\n"
+    "void first() {\n"      // 2
+    "    int* a;\n"
+    "    int x = *a;\n"
+    "    (void)x;\n"
+    "}\n"                    // 6
+    "void second() {\n"      // 7
+    "    int* b;\n"
+    "    int y = *b;\n"
+    "    (void)y;\n"
+    "}\n";                   // 11
+
+} // anonymous namespace
+
+TEST(LineFilterTest, EmptyRanges_AnalyzesAll) {
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, kTwoFunctionsFixedLines);
+    ASSERT_EQ(results.size(), 2);
+}
+
+TEST(LineFilterTest, RangeSelectsSecondFunction) {
+    LineGuard guard({{8, 9}});
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, kTwoFunctionsFixedLines);
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_NE(results[0].message.find("b"), std::string::npos);
+}
+
+TEST(LineFilterTest, SingleLineOnSignature_Overlaps) {
+    // Fonksiyon kapsamiyla tek satirlik kesisme yeterli (imza satiri)
+    LineGuard guard({{2, 2}});
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, kTwoFunctionsFixedLines);
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_NE(results[0].message.find("a"), std::string::npos);
+}
+
+TEST(LineFilterTest, RangeBetweenFunctions_Nothing) {
+    LineGuard guard({{100, 200}});
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, kTwoFunctionsFixedLines);
+    ASSERT_EQ(results.size(), 0);
+}

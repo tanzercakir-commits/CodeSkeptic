@@ -19,13 +19,38 @@ if [ ${#files[@]} -eq 0 ]; then
     exit 0
 fi
 
+# Hunk basliklarindan (+baslangic,adet) degisen satir araliklarini cikar.
+# Adet yoksa 1; adet 0 ise (salt silme) ekleme noktasinin satiri alinir —
+# silmenin etkiledigi cevre kod da kontrol edilsin.
+changed_ranges() { # <dosya>
+    git diff -U0 --diff-filter=d "$REF" -- "$1" \
+        | sed -n 's/^@@ .*+\([0-9][0-9]*\)\(,\([0-9][0-9]*\)\)\{0,1\} @@.*/\1 \3/p' \
+        | while read -r start count; do
+              if [ -z "$count" ]; then count=1; fi
+              if [ "$count" -eq 0 ]; then
+                  [ "$start" -eq 0 ] && start=1
+                  echo "${start}-${start}"
+              else
+                  echo "${start}-$((start + count - 1))"
+              fi
+          done | paste -sd, -
+}
+
 echo "[analyze-diff] ${#files[@]} changed file(s) since $REF"
 overall=0
 for f in "${files[@]}"; do
     echo ""
-    echo "=== $f ==="
-    code=0
-    "$ZD_BIN" "$f" "$@" || code=$?
+    ranges="$(changed_ranges "$f")"
+    if [ -n "$ranges" ]; then
+        echo "=== $f (lines $ranges) ==="
+        set -- "$@" # mevcut ek argumanlar korunur
+        code=0
+        "$ZD_BIN" "$f" --lines "$ranges" "$@" || code=$?
+    else
+        echo "=== $f ==="
+        code=0
+        "$ZD_BIN" "$f" "$@" || code=$?
+    fi
     if [ "$code" -gt 1 ]; then
         echo "[analyze-diff] FAIL: analyzer error on $f (exit $code)"
         exit "$code"
