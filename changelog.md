@@ -1,5 +1,26 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Beşinci kural: NullDerefRule
+
+### Eklenen
+- **NullDerefRule** (`src/rules/NullDerefRule.h/.cpp`): CFG dataflow ile
+  null pointer dereference tespiti. `NullState` lattice (Unknown / Null /
+  NonNull / MaybeNull); `nullptr`, `NULL`, `0` literal akışı; `&x`, `new`,
+  string literal → NonNull; `&p` escape → Unknown (muhafazakâr).
+  Dal koşulu iyileştirmesi: `p`, `!p`, `==`/`!=` nullptr (her iki yön),
+  `&&` true / `||` false kısa devre. Kesin null deref → Error, olası →
+  Warning. Bilinmeyen değerler sessiz — parametre dereference'i rapor
+  ÜRETMEZ (eski NullPointerRule'un 68-FP tuzağı).
+- 16 test: kesin/olası deref, `->` ve `[]`, guard desenleri (truthiness,
+  erken dönüş, `== nullptr` doğru dalında kesin hata, `&&` zinciri,
+  while-loop çıkışında null), muhafazakârlık testleri (parametre, opak
+  dönüş, out-param escape).
+
+### Doğrulama
+- 92/92 test geçti
+- Gerçekçi desen dosyası: for-döngüsü guard'ı, erken dönüş, `!= nullptr
+  &&` zinciri, opak `find()` → sıfır FP; kasıtlı 2 hata → 2 doğru bulgu
+
 ## 2026-07-09 — Faz 2 devam: use-after-free + baseline
 
 ### Eklenen

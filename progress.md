@@ -21,9 +21,10 @@
 | UninitPointerRule_Ex | `src/rules/UninitPointerRule_Ex.h`, `.cpp` | Tamamlandı (çarpım lattice, tek koşu, dyn_cast classify) |
 | MemoryLeakRule_Ex | `src/rules/MemoryLeakRule_Ex.h`, `.cpp` | Tamamlandı (leak + double-free + use-after-free) |
 | DivByZeroRule | `src/rules/DivByZeroRule.h`, `.cpp` | Tamamlandı (literal + CFG + guard analizi) |
-| main.cpp | `src/main.cpp` | Tamamlandı (3 kural kayıtlı) |
+| NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState lattice + assume edges) |
+| main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (75/75 geçiyor) |
+| GTest altyapısı | `tests/` | Tamamlandı (92/92 geçiyor) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (Ubuntu 24.04 + LLVM 18) |
 | README / LICENSE | `README.md`, `LICENSE` | Tamamlandı (EN, Apache-2.0) |
 | Durum tespiti / yol haritası | `analiz-2026-07.md` | Tamamlandı |
