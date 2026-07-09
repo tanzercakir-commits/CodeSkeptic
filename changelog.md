@@ -1,5 +1,23 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 3 devam: artımlı analiz primitifi
+
+### Eklenen
+- **`--function <adlar>`** (`core/FunctionFilter`): yalnızca adı eşleşen
+  fonksiyonlar analiz edilir — düz ad (`parse`) veya nitelikli ad
+  (`Parser::parse`), virgüllü liste, tekrarlanabilir bayrak, `function=`
+  config anahtarı. Ajan/IDE döngüsünde "yalnızca değiştirdiğin fonksiyonu
+  yeniden kontrol et" için milisaniyelik hedefli analiz. Dört kuralın
+  callback'i de filtreye uyar. 4 test (RAII guard ile global temizliği).
+- **`scripts/analyze_diff.sh <binary> <git-ref> [args...]`**: verilen
+  ref'ten bu yana değişen C/C++ dosyalarını analizciden geçirir; bulgu
+  varsa exit 1, analizci hatasında exit >1 ile durur. CI'da "yalnızca
+  dokunulan dosyaları denetle" kapısı. Simüle git deposuyla uçtan uca
+  doğrulandı (bulgulu diff → 1, temiz diff → 0).
+
+### Test sonuçları
+- 119/119 test geçti (115 + 4 filtre testi)
+
 ## 2026-07-09 — Faz 3 açılışı: dataflow izleri
 
 ### Eklenen

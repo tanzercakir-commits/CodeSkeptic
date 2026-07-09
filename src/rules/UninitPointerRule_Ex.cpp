@@ -1,5 +1,6 @@
 #include "rules/UninitPointerRule_Ex.h"
 
+#include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 
@@ -204,6 +205,7 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
+        if (!zerodefect::functionFilterAllows(*func)) return;
 
         auto trackedVars = collectTrackedVars(func, *result.Context);
         if (trackedVars.empty()) return;

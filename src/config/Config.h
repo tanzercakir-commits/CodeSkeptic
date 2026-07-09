@@ -23,6 +23,7 @@ public:
     const std::string& baselinePath() const { return baseline_path_; }
     const std::string& writeBaselinePath() const { return write_baseline_path_; }
     const std::string& lang() const { return lang_; }
+    const std::set<std::string>& functions() const { return functions_; }
     Severity minSeverity() const { return min_severity_; }
     bool isRuleEnabled(const std::string& rule_id) const;
 
@@ -33,6 +34,7 @@ public:
 
 private:
     Severity parseSeverity(const std::string& str) const;
+    void addFunctions(const std::string& list);
 
     std::string source_path_;
     std::string build_path_;
@@ -42,6 +44,7 @@ private:
     std::string baseline_path_;
     std::string write_baseline_path_;
     std::string lang_;
+    std::set<std::string> functions_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

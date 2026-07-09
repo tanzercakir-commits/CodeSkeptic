@@ -26,7 +26,9 @@
   "koşul yürüyüşü" yardımcıya çıkarılabilir (iki domain, tek iskelet).
 
 ### Faz 3 (AI döngüsü)
-- [ ] Artımlı mod (yalnızca değişen fonksiyonlar)
+- [x] Artımlı analiz primitifi: --function filtresi + analyze_diff.sh
+- [ ] Artımlı mod v2: diff hunk'larından değişen fonksiyonları otomatik
+      çıkar (satır aralığı → fonksiyon eşlemesi)
 - [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
 - [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
       görünmüyor — motor desteği gerekir)

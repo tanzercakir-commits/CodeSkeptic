@@ -36,6 +36,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "min_severity")  min_severity_ = parseSeverity(value);
         else if (key == "lang")          lang_ = value;
         else if (key == "baseline")      baseline_path_ = value;
+        else if (key == "function")      addFunctions(value);
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -65,6 +66,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             lang_ = argv[++i];
         } else if (arg == "--baseline" && i + 1 < argc) {
             baseline_path_ = argv[++i];
+        } else if (arg == "--function" && i + 1 < argc) {
+            addFunctions(argv[++i]);
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -79,6 +82,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --disable-rule <id>    Disable a rule\n"
                       << "  --baseline <file>      Suppress findings recorded in baseline\n"
                       << "  --write-baseline <file> Record current findings as baseline\n"
+                      << "  --function <names>     Analyze only these functions (comma list,\n"
+                      << "                         plain or qualified; repeatable)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
             return false;
@@ -94,6 +99,19 @@ bool Config::isRuleEnabled(const std::string& rule_id) const {
     if (disabled_rules_.count(rule_id)) return false;
     if (enabled_rules_.empty()) return true;
     return enabled_rules_.count(rule_id) > 0;
+}
+
+void Config::addFunctions(const std::string& list) {
+    std::string token;
+    for (size_t i = 0; i <= list.size(); ++i) {
+        char c = (i < list.size()) ? list[i] : ',';
+        if (c == ',') {
+            if (!token.empty()) functions_.insert(token);
+            token.clear();
+        } else if (c != ' ') {
+            token += c;
+        }
+    }
 }
 
 Severity Config::parseSeverity(const std::string& str) const {
