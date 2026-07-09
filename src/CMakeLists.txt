@@ -3,6 +3,7 @@ add_library(zerodefect_core STATIC
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
     engine/RuleEngine.cpp
+    engine/FunctionSummary.cpp
     reporter/ConsoleReporter.cpp
     reporter/JsonReporter.cpp
     reporter/SarifReporter.cpp

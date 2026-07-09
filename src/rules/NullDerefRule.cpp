@@ -3,6 +3,7 @@
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
+#include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -66,6 +67,23 @@ NullState evaluateNullness(const Expr* expr) {
     if (isa<CXXNewExpr>(expr)) return NullState::NonNull;
     if (isa<StringLiteral>(expr)) return NullState::NonNull;
     if (isa<CXXThisExpr>(expr)) return NullState::NonNull;
+
+    // Interprosedurel: cagri donusunun null'lugu fonksiyon ozetinden.
+    // "Null donebilir" ozeti MaybeNull uretir — korumasiz dereference
+    // uyari olur; guard'li kullanim assume-edge ile temiz kalir.
+    if (const auto* call = dyn_cast<CallExpr>(expr)) {
+        using RN = zerodefect::SummaryRegistry::ReturnNullness;
+        const auto* summary =
+            zerodefect::SummaryRegistry::instance().lookup(
+                call->getDirectCallee());
+        if (summary) {
+            if (summary->returnNullness == RN::NeverNull)
+                return NullState::NonNull;
+            if (summary->returnNullness == RN::MaybeNull)
+                return NullState::MaybeNull;
+        }
+        return NullState::Unknown;
+    }
 
     return NullState::Unknown;
 }
@@ -268,12 +286,16 @@ public:
 
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
-        // Dataflow izi: null'a gecis olaylarini kaydet
+        // Dataflow izi: null'a / olasi-null'a gecis olaylarini kaydet
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
             if (afterState == NullState::Null)
-                recordEvent(stmt, var, ctx);
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceAssignedNullHere);
+            else if (afterState == NullState::MaybeNull)
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceAssignedMaybeNullHere);
         }
 
         Effect effect = classifyStmt(stmt);
@@ -325,16 +347,14 @@ public:
 
 private:
     void recordEvent(const Stmt* stmt, const VarDecl* var,
-                     ASTContext& ctx) {
+                     ASTContext& ctx, zerodefect::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         zerodefect::TraceNote note;
         note.file = sm.getFilename(loc).str();
         note.line = sm.getSpellingLineNumber(loc);
         note.column = sm.getSpellingColumnNumber(loc);
-        note.message = zerodefect::msg(
-            zerodefect::MsgId::TraceAssignedNullHere,
-            var->getNameAsString());
+        note.message = zerodefect::msg(msgId, var->getNameAsString());
 
         auto& list = events_[var];
         for (const auto& existing : list)

@@ -1,5 +1,7 @@
 #include "engine/RuleEngine.h"
 
+#include "engine/FunctionSummary.h"
+
 namespace zerodefect {
 
 void RuleEngine::enableRule(const std::string& rule_id, bool enabled) {
@@ -12,12 +14,20 @@ void RuleEngine::enableRule(const std::string& rule_id, bool enabled) {
 }
 
 DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
+    // Interprosedurel ozetler TU basina bir kez, kurallardan ONCE kurulur.
+    // Fonksiyon/satir filtrelerinden bagimsizdir: kapsam-ici fonksiyonun
+    // cagirdigi kapsam-disi fonksiyonlarin da ozetine ihtiyac var.
+    SummaryRegistry::instance().rebuild(ctx);
+
     DiagnosticList results;
     for (auto& rule : rules_) {
         if (rule->isEnabled()) {
             rule->check(ctx, results);
         }
     }
+
+    // FunctionDecl* anahtarlari bu TU'ya ozgu — sarkan pointer birakma
+    SummaryRegistry::instance().clear();
     return results;
 }
 

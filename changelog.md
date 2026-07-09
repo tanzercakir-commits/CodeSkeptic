@@ -1,5 +1,37 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 4 açılışı: interprosedürel analiz v1 (fonksiyon özetleri)
+
+### Eklenen
+- **SummaryRegistry** (`engine/FunctionSummary.h/.cpp`): TU başına, kural
+  koşularından ÖNCE tüm gövdeli fonksiyonlar özetlenir; TU bitince tablo
+  temizlenir (TU-yerel `FunctionDecl*` anahtarları sarkmasın).
+  - **Dönüş nullness'i:** NeverNull (tüm yollar kesin non-null) /
+    MaybeNull (bir yol null literal dönebilir) / Unknown. Literal, `new`,
+    `&x`, string ve çağrı zinciriyle; değişken dönüşü Unknown (v1 sınırı).
+  - **Parametre etkileri:** Frees / ReadsOnly / Stores / Opaque.
+    Alias'a bilinçli kör: parametrenin herhangi bir şeye atanması Stores
+    (cJSON_Delete'in `q=p; free(q)` kalıbı v2'ye kadar Escaped kalır).
+  - **Sabit-nokta taraması** (≤5 tur, her tur sıfırdan): zincirler çözülür
+    (w2→w1→free), rekursiyon güçlü iddia üretemez (Unknown/Opaque başlar).
+- **NullDeref tüketimi:** `p = f()` — özet MaybeNull ise korumasız
+  dereference **uyarı** (guard'lı kullanım assume-edge ile temiz);
+  NeverNull zinciri sessiz. Yeni iz mesajı: "possibly-null value here
+  (callee may return null)".
+- **MemLeak tüketimi:** çağrı sınıflandırması özete bakar —
+  free-wrapper'lar (guard'lı `if(p) free(p)` dahil) **Frees** sayılır →
+  wrapper üzerinden double-free ve use-after-free artık yakalanıyor;
+  salt-okur yardımcılar etkisiz → arkalarındaki **leak görünür oldu**;
+  saklayan/opak çağrılar Escaped (regresyon yok).
+- Güvenlik hijyeni: `getName()` yerine `getIdentifier()` deseni
+  (operator overload'larında tanımsız davranış riski).
+
+### Doğrulama
+- 148/148 test (133 + 15 interprosedürel: zincirler, rekursiyon,
+  karşılıklı rekursiyon, alias muhafazakârlığı, dış fonksiyon regresyonu)
+- Uçtan uca demo: 3 yeni tespit sınıfı (wrapper-UAF izli, olası-null
+  dönüş izli, salt-okur arkası leak) + savunmacı kod tamamen temiz
+
 ## 2026-07-09 — Faz 3 tamam: MCP server modu
 
 ### Eklenen

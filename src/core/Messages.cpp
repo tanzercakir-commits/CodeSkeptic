@@ -52,6 +52,9 @@ const MsgEntry kMessages[] = {
     // TraceAssignedNullHere
     {"'{0}' assigned null here",
      "{0} burada null atandi"},
+    // TraceAssignedMaybeNullHere
+    {"'{0}' assigned a possibly-null value here (callee may return null)",
+     "{0} burada null olabilecek bir deger atandi (cagrilan null donebilir)"},
     // TraceAssignedZeroHere
     {"'{0}' assigned zero here",
      "{0} burada sifir atandi"},

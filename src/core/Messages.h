@@ -28,6 +28,7 @@ enum class MsgId {
     TraceAllocatedHere,   // {0} = degisken adi
     TraceFreedHere,       // {0} = degisken adi
     TraceAssignedNullHere,// {0} = degisken adi
+    TraceAssignedMaybeNullHere, // {0} = degisken adi (ozet: null donebilir)
     TraceAssignedZeroHere,// {0} = degisken adi
     TraceDeclaredHere,    // {0} = degisken adi
 

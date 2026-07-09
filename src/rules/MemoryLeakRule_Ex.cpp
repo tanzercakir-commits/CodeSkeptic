@@ -3,6 +3,7 @@
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
+#include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -47,6 +48,13 @@ auto allocCallMatcher() {
         hasAnyName("malloc", "calloc", "strdup"))));
 }
 
+// Operator overload'larinda getName() gecersiz — guvenli erisim
+llvm::StringRef calleeName(const FunctionDecl* callee) {
+    if (!callee) return {};
+    if (const auto* id = callee->getIdentifier()) return id->getName();
+    return {};
+}
+
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
@@ -54,11 +62,9 @@ bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (const auto* cast = dyn_cast<CastExpr>(expr))
         return isAllocExpr(cast->getSubExpr(), ctx);
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        if (const auto* callee = call->getDirectCallee()) {
-            auto name = callee->getName();
-            return name == "malloc" || name == "calloc" ||
-                   name == "strdup" || name == "realloc";
-        }
+        auto name = calleeName(call->getDirectCallee());
+        return name == "malloc" || name == "calloc" ||
+               name == "strdup" || name == "realloc";
     }
     return false;
 }
@@ -122,16 +128,33 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
             return StmtEffect::Frees;
     }
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
-        if (const auto* callee = call->getDirectCallee()) {
-            if (callee->getName() == "free" && call->getNumArgs() > 0) {
-                if (refersToVar(call->getArg(0), targetVar))
-                    return StmtEffect::Frees;
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (calleeName(callee) == "free" && call->getNumArgs() > 0) {
+            if (refersToVar(call->getArg(0), targetVar))
+                return StmtEffect::Frees;
+        }
+
+        // Interprosedurel: cagrilanin ozeti varsa parametre etkisine gore
+        // siniflandir — free-wrapper'lar Frees (double-free/UAF gorunur),
+        // salt-okur yardimcilar etkisiz (arkalarindaki leak gorunur).
+        // Ayni degisken birden fazla pozisyondaysa en muhafazakari kazanir.
+        const auto* summary =
+            zerodefect::SummaryRegistry::instance().lookup(callee);
+        using PE = zerodefect::SummaryRegistry::ParamEffect;
+        bool sawFrees = false;
+        bool sawReadsOnly = false;
+        for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+            if (!refersToVar(call->getArg(i), targetVar)) continue;
+            PE effect = summary ? summary->paramEffect(i) : PE::Opaque;
+            switch (effect) {
+                case PE::Stores:
+                case PE::Opaque:    return StmtEffect::Escapes;
+                case PE::Frees:     sawFrees = true; break;
+                case PE::ReadsOnly: sawReadsOnly = true; break;
             }
         }
-        for (unsigned i = 0; i < call->getNumArgs(); ++i) {
-            if (refersToVar(call->getArg(i), targetVar))
-                return StmtEffect::Escapes;
-        }
+        if (sawFrees) return StmtEffect::Frees;
+        if (sawReadsOnly) return StmtEffect::None;
     }
     if (const auto* ret = dyn_cast<ReturnStmt>(stmt)) {
         if (refersToVar(ret->getRetValue(), targetVar))
