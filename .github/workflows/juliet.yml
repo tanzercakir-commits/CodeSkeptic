@@ -1,8 +1,9 @@
 name: Juliet benchmark
 
 # Agir kosum (indirme ~120MB + binlerce dosya) — her PR'da degil:
-# haftalik + elle tetikleme. Sonuclar log'daki JULIET_RESULT
-# satirlarindan izlenir.
+# haftalik + elle tetikleme + benchmark altyapisina dokunan PR'lar
+# (harness degisikligi gercek kosuyla dogrulanmali). Sonuclar
+# JULIET_RESULT satirlarindan izlenir.
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +12,11 @@ on:
         default: "400"
   schedule:
     - cron: "0 5 * * 1"  # pazartesi 05:00 UTC
+  pull_request:
+    paths:
+      - ".github/workflows/juliet.yml"
+      - "scripts/run_juliet.sh"
+      - "scripts/juliet_eval.py"
 
 jobs:
   juliet:
