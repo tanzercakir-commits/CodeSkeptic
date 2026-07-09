@@ -37,6 +37,12 @@ const MsgEntry kMessages[] = {
     // DivByZeroMaybe
     {"Possible division by zero: '{0}' may be zero on some paths",
      "Sifira bolme riski: {0} bazi kod yollarinda sifir olabilir"},
+    // NullDerefDefinite
+    {"Null pointer dereference: '{0}' is definitely null",
+     "Null pointer dereference: {0} kesinlikle null"},
+    // NullDerefMaybe
+    {"Possible null dereference: '{0}' may be null on some paths",
+     "Olasi null dereference: {0} bazi kod yollarinda null olabilir"},
     // AnalysisStarting
     {"[ZeroDefect] Analysis starting... ({0} files, {1} rules)",
      "[ZeroDefect] Analiz basliyor... ({0} dosya, {1} kural)"},

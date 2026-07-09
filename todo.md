@@ -13,8 +13,14 @@
 
 ### Faz 2 kalanları
 - [ ] NIST Juliet ile precision/recall ölçümü; cJSON/tinyxml2 CI koşusu
-- [ ] Yeni kural: null-deref (assume edges üzerine)
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
+
+### Kural iyileştirme notları
+- NullDeref: çoklu bildirim (`int *a = nullptr, *b = nullptr;`) yalnızca
+  ilk pointer'ı işler — kalanlar Unknown başlar (bilinen FN, nadir).
+  Effect'i çoklu sonuç dönecek şekilde genişletilebilir.
+- NullDeref + DivByZero applyCondition yapısal olarak benzer — ortak
+  "koşul yürüyüşü" yardımcıya çıkarılabilir (iki domain, tek iskelet).
 
 ### Faz 3 (AI döngüsü)
 - [ ] Artımlı mod (yalnızca değişen fonksiyonlar)
@@ -47,7 +53,8 @@
 - [x] Suppression yorumları (disable-line / disable-next-line, kural listesi)
 - [x] Use-after-free tespiti (MemLeak Freed state + dereference)
 - [x] Baseline desteği (--write-baseline / --baseline)
-- [x] GTest 75/75
+- [x] NullDerefRule (NullState lattice + assume edges, 16 test)
+- [x] GTest 92/92
 
 ## Teknik Notlar (Aklında Tut)
 

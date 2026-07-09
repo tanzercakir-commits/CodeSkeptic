@@ -12,6 +12,7 @@ add_executable(zerodefect_tests
     UninitPointerRuleExTest.cpp
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
+    NullDerefRuleTest.cpp
     SarifReporterTest.cpp
     SuppressionFilterTest.cpp
     BaselineTest.cpp

@@ -3,6 +3,7 @@
 #include "core/Messages.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
+#include "rules/NullDerefRule.h"
 #include "rules/UninitPointerRule_Ex.h"
 
 #include <iostream>
@@ -27,6 +28,7 @@ int main(int argc, char* argv[]) {
     analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
     analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
     analyzer.addRule<zerodefect::DivByZeroRule>();
+    analyzer.addRule<zerodefect::NullDerefRule>();
 
     int findings = analyzer.run();
 

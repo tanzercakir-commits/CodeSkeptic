@@ -12,6 +12,7 @@ add_library(zerodefect_core STATIC
     rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp
+    rules/NullDerefRule.cpp
 )
 
 add_executable(zerodefect main.cpp)

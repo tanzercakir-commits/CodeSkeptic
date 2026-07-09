@@ -21,6 +21,8 @@ enum class MsgId {
     DivByZeroLiteral,
     DivByZeroDefinite,    // {0} = degisken adi
     DivByZeroMaybe,       // {0} = degisken adi
+    NullDerefDefinite,    // {0} = degisken adi
+    NullDerefMaybe,       // {0} = degisken adi
 
     // CLI / calisma zamani
     AnalysisStarting,     // {0} = dosya sayisi, {1} = kural sayisi
