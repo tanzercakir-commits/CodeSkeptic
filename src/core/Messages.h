@@ -17,6 +17,7 @@ enum class MsgId {
     LeakReassign,         // {0} = degisken adi
     LeakEndOfFunction,    // {0} = degisken adi
     DoubleFree,           // {0} = degisken adi
+    UseAfterFree,         // {0} = degisken adi
     DivByZeroLiteral,
     DivByZeroDefinite,    // {0} = degisken adi
     DivByZeroMaybe,       // {0} = degisken adi
@@ -28,6 +29,8 @@ enum class MsgId {
     CleanNoIssues,
     FindingsCount,        // {0} = bulgu sayisi
     SuppressedCount,      // {0} = bastirilan bulgu sayisi
+    BaselineWritten,      // {0} = bulgu sayisi, {1} = dosya yolu
+    BaselineFiltered,     // {0} = baseline ile eslesen bulgu sayisi
     CompileDbNotFound,    // {0} = hata mesaji
     OutputFileOpenError,  // {0} = yol
     FileNotFound,         // {0} = yol

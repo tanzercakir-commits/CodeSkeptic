@@ -1,5 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
 
+#include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
 #include "core/Messages.h"
 #include "reporter/ConsoleReporter.h"
@@ -68,6 +69,30 @@ int StaticAnalyzer::run() {
     if (suppressed > 0) {
         std::cerr << msg(MsgId::SuppressedCount, std::to_string(suppressed))
                   << "\n";
+    }
+
+    // Kayit modu: bulgular baseline'a yazilir, raporlama yapilmaz,
+    // temiz cikilir (CI'da baseline uretmek icin)
+    if (!config_.writeBaselinePath().empty()) {
+        if (Baseline::write(config_.writeBaselinePath(), diagnostics_)) {
+            std::cerr << msg(MsgId::BaselineWritten,
+                             std::to_string(diagnostics_.size()),
+                             config_.writeBaselinePath()) << "\n";
+            return 0;
+        }
+        std::cerr << msg(MsgId::OutputFileOpenError,
+                         config_.writeBaselinePath()) << "\n";
+        return 0;
+    }
+
+    if (!config_.baselinePath().empty()) {
+        Baseline baseline;
+        baseline.load(config_.baselinePath());
+        size_t matched = baseline.filter(diagnostics_);
+        if (matched > 0) {
+            std::cerr << msg(MsgId::BaselineFiltered,
+                             std::to_string(matched)) << "\n";
+        }
     }
 
     auto severity_below = [this](const Diagnostic& d) {

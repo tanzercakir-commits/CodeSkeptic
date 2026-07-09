@@ -25,6 +25,9 @@ const MsgEntry kMessages[] = {
     // DoubleFree
     {"Double free: '{0}' has already been freed",
      "Cift serbest birakma: {0} zaten serbest birakilmis"},
+    // UseAfterFree
+    {"Use after free: '{0}' is dereferenced after being freed",
+     "Serbest birakildiktan sonra kullanim: {0} free edildikten sonra dereference ediliyor"},
     // DivByZeroLiteral
     {"Division by zero: division by a constant zero",
      "Sifira bolme: sabit sifir ile bolme islemi"},
@@ -52,6 +55,12 @@ const MsgEntry kMessages[] = {
     // SuppressedCount
     {"[ZeroDefect] {0} finding(s) suppressed by source comments",
      "[ZeroDefect] {0} bulgu kaynak yorumlariyla bastirildi"},
+    // BaselineWritten
+    {"[ZeroDefect] {0} finding(s) recorded to baseline: {1}",
+     "[ZeroDefect] {0} bulgu baseline dosyasina kaydedildi: {1}"},
+    // BaselineFiltered
+    {"[ZeroDefect] {0} known finding(s) filtered by baseline",
+     "[ZeroDefect] {0} bilinen bulgu baseline ile filtrelendi"},
     // CompileDbNotFound
     {"[ZeroDefect] compile_commands.json not found: {0}\n"
      "[ZeroDefect] Fallback: continuing with -std=c++17.",

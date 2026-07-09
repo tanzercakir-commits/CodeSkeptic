@@ -14,6 +14,7 @@ add_executable(zerodefect_tests
     DivByZeroRuleTest.cpp
     SarifReporterTest.cpp
     SuppressionFilterTest.cpp
+    BaselineTest.cpp
 )
 
 target_include_directories(zerodefect_tests

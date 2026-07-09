@@ -69,6 +69,32 @@ bool refersToVar(const Expr* expr, const VarDecl* targetVar) {
     return false;
 }
 
+const VarDecl* asVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+// Dereference tespiti (use-after-free icin). CFG ince taneli oldugundan
+// yalnizca tepe dugume bakmak yeterli.
+const VarDecl* derefTarget(const Stmt* stmt) {
+    if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+        if (unary->getOpcode() == UO_Deref)
+            return asVar(unary->getSubExpr());
+        return nullptr;
+    }
+    if (const auto* member = dyn_cast<MemberExpr>(stmt)) {
+        if (member->isArrow())
+            return asVar(member->getBase());
+        return nullptr;
+    }
+    if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(stmt))
+        return asVar(subscript->getBase());
+    return nullptr;
+}
+
 StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
                          ASTContext& ctx) {
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
@@ -252,6 +278,30 @@ public:
         return out;
     }
 
+    // Freed durumdaki pointer'in dereference'i: use-after-free
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State& /*after*/, ASTContext& ctx) {
+        const VarDecl* var = derefTarget(stmt);
+        if (!var) return;
+        auto it = before.find(var);
+        if (it == before.end() || it->second != AllocState::Freed) return;
+
+        const SourceManager& sm = ctx.getSourceManager();
+        SourceLocation loc = stmt->getBeginLoc();
+        unsigned line = sm.getSpellingLineNumber(loc);
+        if (reported_.emplace(var, line).second) {
+            zerodefect::Diagnostic diag;
+            diag.severity = zerodefect::Severity::Error;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "use-after-free";
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::UseAfterFree, var->getNameAsString());
+            results_.push_back(diag);
+        }
+    }
+
     std::set<std::pair<const VarDecl*, unsigned>>& reported() {
         return reported_;
     }
@@ -332,7 +382,7 @@ std::string MemoryLeakRule_Ex::id() const {
 }
 
 std::string MemoryLeakRule_Ex::description() const {
-    return "CFG-based memory leak and double-free analysis";
+    return "CFG-based memory leak, double-free and use-after-free analysis";
 }
 
 void MemoryLeakRule_Ex::check(clang::ASTContext& ctx,

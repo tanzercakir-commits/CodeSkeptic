@@ -165,3 +165,73 @@ TEST(MemoryLeakRuleExTest, MultipleVars_OneLeaks) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- Use-after-free ---
+
+TEST(MemoryLeakRuleExTest, UseAfterFree_Delete) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p = new int(1);
+            delete p;
+            int x = *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(MemoryLeakRuleExTest, UseAfterFree_CFree_Arrow) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        struct Node { int data; };
+        void f() {
+            Node* n = (Node*)malloc(sizeof(Node));
+            free(n);
+            int x = n->data;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(MemoryLeakRuleExTest, DeleteThenReassignThenUse_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p = new int(1);
+            delete p;
+            p = new int(2);
+            int x = *p;
+            delete p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(MemoryLeakRuleExTest, UseBeforeFree_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p = new int(1);
+            int x = *p;
+            delete p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(MemoryLeakRuleExTest, UseAfterFree_Subscript) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* arr = new int[10];
+            delete[] arr;
+            int x = arr[3];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
