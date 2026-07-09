@@ -1,34 +1,61 @@
-ZeroDefect - Mimari
+ZeroDefect - Mimari (2026-07 durumu)
 
-                    ┌─────────────────────┐
-                    │   StaticAnalyzer     │
-                    │  Orchestrator/facade │
-                    └─┬──────┬──────┬───┬─┘
-                      │      │      │   │
-        ┌─────────────┘      │      │   └─────────────────┐
-        │          ┌─────────┘      └──────────┐          │
-        ▼          ▼                           ▼          ▼
- ┌────────────┐ ┌──────────────┐  ┌──────────────┐ ┌──────────┐
- │SourceManager│ │  RuleEngine  │  │   Reporter   │ │  Config  │
- │Dosya ve AST│ │Kurallari yon.│  │Sonuc raporla.│ │YAML/JSON │
- └──┬──────┬──┘ └──────┬───────┘  └───┬──────┬──┘ └──────────┘
-    │      │           │               │      │
-    ▼      ▼           ▼               ▼      ▼
-┌────────┐┌────────┐┌─────────────┐┌──────┐┌─────────┐
-│ASTWrap.││FileLoa.││Rule(abstract)││ JSON ││ Console │
-└────────┘└────────┘│check(ASTCtx&)│└──────┘└─────────┘
-                    └──┬─────┬──┬──┘
-                       │     │  │
-        ┌──────────────┘     │  └──────────────┐
-        ▼                    ▼                  ▼
-┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐
-│ NullPointerRule  │ │ MemoryLeakRule  │ │  StyleRule    │
-│ Null dereference │ │ Bellek sizintisi│ │ Stil/konv.   │
-└─────────────────┘ └─────────────────┘ └──────────────┘
+                      ┌──────────────────────┐
+                      │    StaticAnalyzer     │
+                      │  Orchestrator/facade  │
+                      └─┬──────┬───────┬───┬─┘
+                        │      │       │   │
+          ┌─────────────┘      │       │   └──────────────────┐
+          │           ┌────────┘       └─────────┐            │
+          ▼           ▼                          ▼            ▼
+   ┌────────────┐ ┌──────────────┐   ┌───────────────┐ ┌──────────┐
+   │SourceManager│ │  RuleEngine  │   │   Reporter    │ │  Config  │
+   │LibTooling  │ │TU basina:    │   │Console/JSON/  │ │CLI+conf  │
+   │compile DB  │ │1) Ozetler    │   │SARIF (traces) │ │--function│
+   └────────────┘ │2) Kurallar   │   └───────────────┘ │--lines   │
+                  └──────┬───────┘                      │--serve   │
+                         │                              └──────────┘
+        ┌────────────────┼───────────────────┐
+        ▼                ▼                   ▼
+┌───────────────┐ ┌─────────────────┐ ┌──────────────────┐
+│SummaryRegistry│ │ DataflowEngine  │ │  Yardimci filtreler│
+│(interproc v1) │ │ (worklist +     │ │ SuppressionFilter │
+│ donus nullness│ │  fixpoint +     │ │ Baseline          │
+│ param etkileri│ │  assume edges + │ │ FunctionFilter    │
+│ sweep<=5      │ │  rapor-gecisi)  │ │ (ad + satir)      │
+└───────┬───────┘ └────────┬────────┘ └──────────────────┘
+        │ lookup           │ runDataflow(Analysis)
+        ▼                  ▼
+   ┌─────────────────────────────────────────────┐
+   │            Rule (abstract)                   │
+   │  UninitPointerRule_Ex  (PtrState lattice)    │
+   │  MemoryLeakRule_Ex     (AllocState lattice)  │──▶ rule_id'ler:
+   │  DivByZeroRule         (ZeroState lattice)   │    uninit-ptr,
+   │  NullDerefRule         (NullState lattice)   │    memory-leak,
+   └─────────────────────────────────────────────┘    use-after-free,
+                                                        div-by-zero,
+                                                        null-deref
 
+MCP server (--serve): stdio JSON-RPC 2.0 — initialize / tools/list /
+tools/call(analyze). Ajanlar her duzenleme sonrasi cagirir; bulgular
+dataflow izleriyle yapisal JSON doner.
 
 Veri akisi:
-  Rule.check() ──produces──▶ Diagnostic ──consumed by──▶ Reporter.report()
+  SummaryRegistry.rebuild(TU) ──once──▶ Rule.check()
+  Rule.check() ──runDataflow──▶ DataflowEngine
+    Faz 1: fixpoint (yalnizca transfer — SAF)
+    Faz 2: raporlama gecisi (onStatement — fixpoint state'leriyle)
+  Diagnostic(+TraceNote'lar) ──▶ kanonik path → suppression → baseline
+    → severity filtresi → sort+dedup ──▶ Reporter
+
+Motor sozlesmeleri (todo.md "Teknik Notlar" ile senkron):
+  - transfer saftir; raporlama yalnizca fixpoint-sonrasi gecişte
+  - CFG ince taneli (setAllAlwaysAdd): analizler yalnizca tepe dugume bakar
+  - assume edges: succ[0]=true, succ[1]=false; yalnizca 2 ardilli
+    terminatorlerde refineOnEdge cagrilir
+  - iterasyon tavani lattice yuksekligiyle olceklenir (latticeHeight hook)
+  - ozet anahtarlari TU-yerel FunctionDecl* — TU sonunda temizlenir
 
 Diagnostic (veri yapisi):
-  severity, location, message
+  severity, file (kanonik), line, column, rule_id, message,
+  notes[] = dataflow izi adimlari (file, line, column, message)

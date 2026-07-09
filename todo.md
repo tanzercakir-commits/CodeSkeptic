@@ -36,14 +36,18 @@
 - [ ] MCP v2: sıcak süreçte AST/derleme önbelleği (şu an her çağrı yeniden
       parse ediyor — kalıcı sürecin asıl hız kazancı burada)
 
-### Faz 4 (araştırma ufku — sıradaki büyük hedef)
-- [ ] İnterprosedürel analiz v1: fonksiyon özetleri — dönüş nullability'si,
-      parametre sahipliği (free eder mi / saklar mı / sadece okur mu).
-      Çağrı grafiği üzerinde aşağıdan yukarı geçiş; MemLeak'in Escaped
-      muhafazakârlığını ve NullDeref'in opak-dönüş sessizliğini gerçek
-      bilgiye çevirir.
-- [ ] Özet önbelleği (TU başına; artımlı modda yalnızca değişen
-      fonksiyonların özetleri tazelenir)
+### Faz 4 (araştırma ufku)
+- [x] İnterprosedürel v1: fonksiyon özetleri (dönüş nullness + parametre
+      etkileri; sabit-nokta taraması, rekursiyon-güvenli)
+- [ ] İnterprosedürel v2: alias izleme (yerel kopyaya atanan parametrenin
+      free'si — cJSON_Delete kalıbı; AliasingCallee_Conservative_Silent
+      testi o gün Frees beklentisine çevrilmeli)
+- [ ] İnterprosedürel v2: dönüş nullness'inde parametre/dataflow desteği
+      (`return p;` yolları — şimdilik Unknown)
+- [ ] Cross-TU özetler (whole-program modu: özetleri diske yaz/yükle)
+- [ ] Int dönüş sıfır-olabilirliği özeti (DivByZero tüketsin)
+- [ ] Özet önbelleği (artımlı modda yalnızca değişen fonksiyon tazelenir;
+      "özet değişti → çağıranlar etkilendi" = semantik regresyon sinyali)
 
 ## Tamamlanan Görevler
 

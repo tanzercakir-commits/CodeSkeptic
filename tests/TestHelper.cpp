@@ -1,5 +1,7 @@
 #include "TestHelper.h"
 
+#include "engine/FunctionSummary.h"
+
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
 #include <clang/Frontend/FrontendAction.h>
@@ -14,7 +16,11 @@ public:
         : rule_(rule), results_(results) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
+        // Uretimde RuleEngine::runAll'in yaptigi gibi: ozetler kuraldan
+        // once kurulur, TU bitince temizlenir (sarkan pointer olmasin)
+        zerodefect::SummaryRegistry::instance().rebuild(ctx);
         rule_.check(ctx, results_);
+        zerodefect::SummaryRegistry::instance().clear();
     }
 
 private:

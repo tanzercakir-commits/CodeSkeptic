@@ -24,6 +24,14 @@ machine-readable findings with dataflow traces.
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
 
+**Interprocedural (v1):** functions with visible bodies are summarized
+before rules run — return nullness (a `find()`-style function that can
+return null makes unguarded dereferences of its result a warning, with
+a trace note) and parameter effects (free-wrappers count as frees, so
+double-free/use-after-free through wrappers is caught; read-only
+helpers no longer hide leaks behind them). Recursion-safe fixpoint;
+external and aliasing callees stay conservative. |
+
 Example:
 
 ```
