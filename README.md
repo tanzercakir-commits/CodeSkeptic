@@ -52,6 +52,45 @@ the bug. Traces appear indented on the console, as a `notes` array in
 JSON output, and as `relatedLocations` in SARIF (rendered by GitHub
 code scanning).
 
+## Benchmark (NIST Juliet C/C++ 1.3)
+
+Weekly CI runs the analyzer against the [NIST Juliet test
+suite](https://samate.nist.gov/SARD/test-suites/112): 400 files per
+CWE, sampled evenly across all variant families. A finding in a
+function whose name contains `bad` counts as a true positive; in a
+`good` function, a false positive. **Rule-matched** columns count only
+the rule that targets the CWE under test — that is the precision of
+the rule itself. The **all-findings** column includes every rule's
+output on the same files (cross-rule noise; tracked separately as
+FP-hunting material).
+
+| CWE | Target rule | Rule precision | Rule hit rate | All-findings precision |
+|-----|-------------|---------------:|--------------:|-----------------------:|
+| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | 0.446 |
+| CWE-415 Double Free | `double-free` | **1.000** (47 TP / 0 FP) | 0.117 | 0.264 |
+| CWE-416 Use After Free | `use-after-free` | **1.000** (99 TP / 0 FP) | 0.247 | 0.273 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (18 TP / 0 FP) | 0.045 | 1.000 |
+| CWE-401 Memory Leak | `memory-leak` | 0.528 (103 TP / 92 FP) | 0.250 | 0.528 |
+
+Notes on reading these numbers honestly:
+
+- **Zero false positives on four of five rules** reflects the design
+  choice that unknown values stay silent — the analyzer only speaks
+  when the dataflow proves something.
+- **Hit rates are lower bounds.** Many Juliet defects flow through
+  source/sink call chains and class variants; intraprocedural analysis
+  plus v1 summaries catches the local and wrapper-based portion.
+  CWE-369's low rate is by design: most Juliet variants there use
+  floating-point division (defined behavior in IEEE 754 — deliberately
+  not reported) or opaque sources (`rand()`, sockets) that an honest
+  analyzer cannot call zero.
+- **`memory-leak` is the one noisy rule** (also the bulk of the
+  cross-rule noise on other CWEs' files) and is the current
+  improvement target.
+
+Results are from the 2026-07-09 run; grep `JULIET_RESULT` in the
+weekly workflow logs for current numbers.
+
 ## Architecture
 
 ```

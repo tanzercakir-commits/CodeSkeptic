@@ -1,5 +1,34 @@
 # ZeroDefect — Yapılacaklar ve Notlar
 
+## 📅 Yarının planı (2026-07-10 oturumu için hazırlandı)
+
+Sıralama önerisi — her madde bağımsız bir PR turu:
+
+1. **Juliet rakam analizi + zayıf-CWE kural iyileştirmesi.** PR #16'nın
+   temsili rakamlarıyla başla (README'ye işlendi/işlenecek). Eşlemeli
+   precision hangi kuralda düşükse oraya odaklan:
+   - CWE415/416 good-fonksiyon FP'leri: Juliet good varyantlarının tipik
+     kalıpları (goodB2G/goodG2B çağrı zincirleri) hangi FP'yi üretiyor?
+     `findings_*.json`'daki `function` alanından iki-üç örnek dosya seç,
+     kalıbı çıkar, kurala test-önce düzeltme uygula.
+   - CWE369: adımlı örneklemeden sonra int varyantları görünür olacak;
+     rand()/fgets kaynaklı akışlarda muhafazakâr sessizlik doğru
+     (Unknown), `data=0` yerel akışları yakalanmalı.
+2. **Korpus bulgu sayısı sabitleme** (küçük tur): beklenen bulgu sayısı
+   dosyası + tolerans; korpus CI adımı sapmada kırmızı. Semantik
+   regresyonların erken yakalayıcısı.
+3. **MemLeak transfer'ını tepe-düğüm Effect desenine taşı** (orta tur):
+   UninitPtr'daki desen; değişken-başına classify döngüsü kalkar,
+   MemLeak Juliet koşusu da hızlanır.
+4. Vakit kalırsa: ortak koşul-yürüyüşü yardımcısı (NullDeref + DivByZero
+   applyCondition tekilleştirmesi) — davranış değişikliği yok, testler
+   sabit kalmalı.
+
+Açık kullanıcı kararları (yol haritası artifact'ındaki 4 madde):
+public v0.1 zamanlaması (önerim: Juliet rakamları README'de olduktan
+sonra), kontrat dili sözdizimi (Ufuk 3 öncesi birlikte tasarım),
+Juliet'in CI ağırlığı, proje adı kontrolü.
+
 ## Sıradaki Görevler (yol haritası: analiz-2026-07.md)
 
 ### Faz 1 kalanları

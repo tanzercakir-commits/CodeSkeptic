@@ -36,6 +36,25 @@
 - 157/157 test (ctest + tek-süreç); sentetik mini-süitte (CWE476/415/369)
   eşlemeli görünüm ve yeni kimlikle uçtan uca precision 1.000.
 
+### İlk TEMSİLİ rakamlar (bu PR'ın CI koşusu; adımlı örnekleme, 400/CWE)
+| CWE | Eşlemeli precision | Eşlemeli hitrate | Genel precision |
+|-----|-------------------:|-----------------:|----------------:|
+| CWE476 | **1.000** (139/0) | 0.347 | 0.446 |
+| CWE415 | **1.000** (47/0) | 0.117 | 0.264 |
+| CWE416 | **1.000** (99/0) | 0.247 | 0.273 |
+| CWE369 | **1.000** (18/0) | 0.045 | 1.000 |
+| CWE401 | 0.528 (103/92) | 0.250 | 0.528 |
+
+Dünkü tablonun dramatik düzelmesi ölçümün düzelmesidir: kendi CWE'sinde
+**dört kural sıfır FP** üretiyor ("bilinmeyen sessiz kalır" tasarımının
+doğrulaması). Gürültünün kaynağı netleşti: memory-leak kuralı (kendi
+92 FP'si + diğer CWE dosyalarında 646 FP) ve CWE476 good
+fonksiyonlarında uninit-ptr (178 FP) — yarının 1 numaralı iyileştirme
+hedefleri. README'ye Benchmark bölümü eklendi (metodoloji + dürüst
+okuma notlarıyla). CWE369 artık görünür: 18 TP / 0 FP; düşük hitrate
+bilinçli (float bölme IEEE754'te tanımlı — raporlanmaz; rand()/soket
+kaynakları dürüstçe Unknown).
+
 ## 2026-07-09 — İlk gerçek Juliet rakamları (PR #14)
 
 ### Düzeltilen (benchmark harness)
