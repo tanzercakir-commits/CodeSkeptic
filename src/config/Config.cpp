@@ -68,6 +68,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             baseline_path_ = argv[++i];
         } else if (arg == "--function" && i + 1 < argc) {
             addFunctions(argv[++i]);
+        } else if (arg == "--lines" && i + 1 < argc) {
+            addLines(argv[++i]);
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -84,6 +86,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --write-baseline <file> Record current findings as baseline\n"
                       << "  --function <names>     Analyze only these functions (comma list,\n"
                       << "                         plain or qualified; repeatable)\n"
+                      << "  --lines <N-M,K>        Analyze only functions overlapping these\n"
+                      << "                         line ranges of the analyzed file\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
             return false;
@@ -107,6 +111,37 @@ void Config::addFunctions(const std::string& list) {
         char c = (i < list.size()) ? list[i] : ',';
         if (c == ',') {
             if (!token.empty()) functions_.insert(token);
+            token.clear();
+        } else if (c != ' ') {
+            token += c;
+        }
+    }
+}
+
+void Config::addLines(const std::string& list) {
+    // "12-40,55" -> {12,40}, {55,55}. Gecersiz token sessizce atlanir.
+    std::string token;
+    auto flush = [this](const std::string& t) {
+        if (t.empty()) return;
+        auto dash = t.find('-');
+        unsigned from = 0, to = 0;
+        try {
+            if (dash == std::string::npos) {
+                from = to = static_cast<unsigned>(std::stoul(t));
+            } else {
+                from = static_cast<unsigned>(std::stoul(t.substr(0, dash)));
+                to = static_cast<unsigned>(std::stoul(t.substr(dash + 1)));
+            }
+        } catch (...) {
+            return;
+        }
+        if (from == 0 || to < from) return;
+        lines_.emplace_back(from, to);
+    };
+    for (size_t i = 0; i <= list.size(); ++i) {
+        char c = (i < list.size()) ? list[i] : ',';
+        if (c == ',') {
+            flush(token);
             token.clear();
         } else if (c != ' ') {
             token += c;

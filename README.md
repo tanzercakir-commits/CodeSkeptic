@@ -100,6 +100,8 @@ zerodefect <source_path> [options]
   --write-baseline <file> Record current findings as the baseline
   --function <names>     Analyze only these functions (comma list,
                          plain or qualified names; repeatable)
+  --lines <N-M,K>        Analyze only functions overlapping these line
+                         ranges of the analyzed file
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
@@ -145,7 +147,9 @@ changed:
 # re-check just the function you edited (milliseconds)
 zerodefect src/parser.cpp --function Parser::parse
 
-# analyze every C/C++ file changed since a git ref
+# analyze only the functions actually touched since a git ref:
+# the script extracts changed line ranges from diff hunks and passes
+# --lines per file, so untouched functions are skipped entirely
 scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
 ```
 

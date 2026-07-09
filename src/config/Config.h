@@ -5,6 +5,8 @@
 
 #include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace zerodefect {
 
@@ -24,6 +26,9 @@ public:
     const std::string& writeBaselinePath() const { return write_baseline_path_; }
     const std::string& lang() const { return lang_; }
     const std::set<std::string>& functions() const { return functions_; }
+    const std::vector<std::pair<unsigned, unsigned>>& lines() const {
+        return lines_;
+    }
     Severity minSeverity() const { return min_severity_; }
     bool isRuleEnabled(const std::string& rule_id) const;
 
@@ -35,6 +40,7 @@ public:
 private:
     Severity parseSeverity(const std::string& str) const;
     void addFunctions(const std::string& list);
+    void addLines(const std::string& list);
 
     std::string source_path_;
     std::string build_path_;
@@ -45,6 +51,7 @@ private:
     std::string write_baseline_path_;
     std::string lang_;
     std::set<std::string> functions_;
+    std::vector<std::pair<unsigned, unsigned>> lines_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

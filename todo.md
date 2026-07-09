@@ -27,8 +27,8 @@
 
 ### Faz 3 (AI döngüsü)
 - [x] Artımlı analiz primitifi: --function filtresi + analyze_diff.sh
-- [ ] Artımlı mod v2: diff hunk'larından değişen fonksiyonları otomatik
-      çıkar (satır aralığı → fonksiyon eşlemesi)
+- [x] Artımlı v2: --lines aralıkları + hunk ayrıştırma (tam otomatik
+      "yalnızca dokunulan fonksiyonları analiz et" döngüsü)
 - [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
 - [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
       görünmüyor — motor desteği gerekir)

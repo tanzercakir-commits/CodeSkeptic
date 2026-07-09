@@ -363,6 +363,7 @@ public:
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
         if (!zerodefect::functionFilterAllows(*func)) return;
+        if (!zerodefect::lineFilterAllows(*func, sm)) return;
 
         auto trackedVars = collectTrackedVars(func, *result.Context);
         if (trackedVars.empty()) return;
