@@ -1,5 +1,6 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
+#include "core/Messages.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/UninitPointerRule_Ex.h"
@@ -14,10 +15,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    zerodefect::setLang(zerodefect::parseLang(config.lang()));
+
     if (config.sourcePath().empty()) {
-        std::cerr << "Hata: Kaynak dizin belirtilmedi.\n"
-                  << "Kullanim: zerodefect <kaynak_yolu> [secenekler]\n"
-                  << "Detay icin: zerodefect --help\n";
+        std::cerr << zerodefect::msg(zerodefect::MsgId::UsageError) << "\n";
         return 1;
     }
 

@@ -103,6 +103,138 @@ TEST(DivByZeroRuleTest, ReassignToNonZero_Clean) {
     ASSERT_EQ(results.size(), 0);
 }
 
+// --- Assume edges: dal koşulu iyileştirmesi ---
+
+TEST(DivByZeroRuleTest, GuardedDivision_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int z = 0;
+            if (c) z = 5;
+            if (z != 0) {
+                int x = 1 / z;
+            }
+        }
+    )");
+    // z != 0 guard'i icinde bolme guvenli — eski FP artik yok
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroRuleTest, GuardEqualsZero_DefiniteError) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            if (z == 0) {
+                int x = 1 / z;
+            }
+        }
+    )");
+    // z == 0 dogru dalinda bolme → kesin sifira bolme
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(DivByZeroRuleTest, GuardTruthiness_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int z = 0;
+            if (c) z = c;
+            if (z) {
+                int x = 1 / z;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroRuleTest, GuardNotOperator_DefiniteError) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            if (!z) {
+                int x = 1 / z;
+            }
+        }
+    )");
+    // !z dogru → z sifir → kesin hata
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(DivByZeroRuleTest, GuardGreaterThanZero_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            int zero = 0;
+            if (z > 0) {
+                int x = 1 / z;
+            }
+            if (0 < z) {
+                int y = 1 / z;
+            }
+            (void)zero;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroRuleTest, WhileGuard_CleanInside_ErrorAfter) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            int total = 0;
+            while (z != 0) {
+                total = total + 100 / z;
+                z = z - 1;
+            }
+            int x = 1 / z;
+        }
+    )");
+    // Dongu icinde guvenli; donguden cikista z == 0 → kesin hata
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(DivByZeroRuleTest, GuardThenFix_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            if (z == 0) z = 1;
+            int x = 1 / z;
+        }
+    )");
+    // Sifirsa duzeltiliyor: her iki yol da NonZero
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroRuleTest, ZeroOnSomePathUnguarded_Warning) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z) {
+            int d = 0;
+            if (z > 0) d = z;
+            int x = 100 / d;
+        }
+    )");
+    // Bir yolda d kesin sifir, digerinde bilinmiyor → olasi sifira bolme.
+    // (Eski merge Zero+Unknown=Unknown ile sessizce kaciyordu.)
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, LogicalAndGuard_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void f(int z, int c) {
+            if (c && z != 0) {
+                int x = 1 / z;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
 TEST(DivByZeroRuleTest, FloatDivision_Ignored) {
     DivByZeroRule rule;
     auto results = runRule(rule, R"(

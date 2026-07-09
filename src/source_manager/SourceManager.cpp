@@ -1,5 +1,7 @@
 #include "source_manager/SourceManager.h"
 
+#include "core/Messages.h"
+
 #include <filesystem>
 #include <iostream>
 
@@ -68,9 +70,7 @@ SourceManager::SourceManager(const std::string& build_path)
         build_path_, error_msg);
 
     if (!comp_db_) {
-        std::cerr << "[ZeroDefect] compile_commands.json bulunamadi: "
-                  << error_msg << "\n"
-                  << "[ZeroDefect] Fallback: -std=c++17 ile devam ediliyor.\n";
+        std::cerr << msg(MsgId::CompileDbNotFound, error_msg) << "\n";
         comp_db_ = std::make_unique<clang::tooling::FixedCompilationDatabase>(
             ".", std::vector<std::string>{"-std=c++17"});
     }
@@ -81,7 +81,7 @@ SourceManager::~SourceManager() = default;
 void SourceManager::addSourceFile(const std::string& path) {
     auto abs = fs::absolute(path);
     if (!fs::exists(abs)) {
-        std::cerr << "[ZeroDefect] Dosya bulunamadi: " << abs << "\n";
+        std::cerr << msg(MsgId::FileNotFound, abs.string()) << "\n";
         return;
     }
     source_files_.push_back(abs.string());
@@ -89,7 +89,7 @@ void SourceManager::addSourceFile(const std::string& path) {
 
 void SourceManager::scanDirectory(const std::string& dir_path) {
     if (!fs::is_directory(dir_path)) {
-        std::cerr << "[ZeroDefect] Dizin bulunamadi: " << dir_path << "\n";
+        std::cerr << msg(MsgId::DirNotFound, dir_path) << "\n";
         return;
     }
 
@@ -103,7 +103,7 @@ void SourceManager::scanDirectory(const std::string& dir_path) {
             }
         }
     } catch (const fs::filesystem_error& e) {
-        std::cerr << "[ZeroDefect] Dizin tarama hatasi: " << e.what() << "\n";
+        std::cerr << msg(MsgId::DirScanError, e.what()) << "\n";
     }
 }
 
@@ -112,11 +112,16 @@ int SourceManager::processAll(ASTCallback callback) {
 
     clang::tooling::ClangTool tool(*comp_db_, source_files_);
 
+#ifdef __APPLE__
+    // macOS: SDK header'lari isysroot ile gelir; ek sistem path'leri gerekli.
+    // Linux'ta bu path'leri one eklemek GCC libstdc++'in include_next
+    // zincirini kirar (stdlib.h bulunamaz) — resource-dir orada yeterli.
     tool.appendArgumentsAdjuster(
         clang::tooling::getInsertArgumentAdjuster(
             {"-isystem", "/usr/include",
              "-isystem", "/usr/local/include"},
             clang::tooling::ArgumentInsertPosition::BEGIN));
+#endif
 
 #ifdef CLANG_RESOURCE_DIR
     tool.appendArgumentsAdjuster(

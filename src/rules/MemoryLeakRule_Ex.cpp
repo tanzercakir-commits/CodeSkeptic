@@ -1,5 +1,6 @@
 #include "rules/MemoryLeakRule_Ex.h"
 
+#include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTContext.h>
@@ -182,6 +183,11 @@ public:
 
     State initialState() const { return initState_; }
 
+    // Degisken basina AllocState zinciri en fazla 3 gecis yapar
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
+    }
+
     State merge(const State& a, const State& b) const {
         State result = a;
         for (const auto& [var, stateB] : b) {
@@ -212,9 +218,9 @@ public:
                         diag.line = line;
                         diag.column = sm.getSpellingColumnNumber(loc);
                         diag.rule_id = "memory-leak";
-                        diag.message = "Bellek sizintisi: "
-                            + var->getNameAsString()
-                            + " yeniden atanmadan once eski bellek serbest birakilmamis";
+                        diag.message = zerodefect::msg(
+                            zerodefect::MsgId::LeakReassign,
+                            var->getNameAsString());
                         results_.push_back(diag);
                     }
                 }
@@ -231,9 +237,9 @@ public:
                         diag.line = line;
                         diag.column = sm.getSpellingColumnNumber(loc);
                         diag.rule_id = "memory-leak";
-                        diag.message = "Cift serbest birakma: "
-                            + var->getNameAsString()
-                            + " zaten serbest birakilmis";
+                        diag.message = zerodefect::msg(
+                            zerodefect::MsgId::DoubleFree,
+                            var->getNameAsString());
                         results_.push_back(diag);
                     }
                 }
@@ -287,9 +293,9 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(endLoc);
                 diag.rule_id = "memory-leak";
-                diag.message = "Bellek sizintisi: "
-                    + var->getNameAsString()
-                    + " icin ayrilan bellek serbest birakilmamis olabilir";
+                diag.message = zerodefect::msg(
+                    zerodefect::MsgId::LeakEndOfFunction,
+                    var->getNameAsString());
                 results.push_back(diag);
             }
         }
@@ -326,7 +332,7 @@ std::string MemoryLeakRule_Ex::id() const {
 }
 
 std::string MemoryLeakRule_Ex::description() const {
-    return "CFG-tabanli bellek sizintisi ve cift serbest birakma analizi";
+    return "CFG-based memory leak and double-free analysis";
 }
 
 void MemoryLeakRule_Ex::check(clang::ASTContext& ctx,

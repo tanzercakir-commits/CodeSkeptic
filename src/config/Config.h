@@ -19,6 +19,7 @@ public:
     const std::string& buildPath() const { return build_path_; }
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
+    const std::string& lang() const { return lang_; }
     Severity minSeverity() const { return min_severity_; }
     bool isRuleEnabled(const std::string& rule_id) const;
 
@@ -34,6 +35,7 @@ private:
     std::string build_path_;
     std::string output_format_;
     std::string json_output_path_;
+    std::string lang_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;
