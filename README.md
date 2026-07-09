@@ -153,6 +153,28 @@ zerodefect src/parser.cpp --function Parser::parse
 scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
 ```
 
+### MCP server (agent integration)
+
+`zerodefect --serve` runs an MCP (Model Context Protocol) server over
+stdio, exposing an `analyze` tool that returns findings — with dataflow
+traces — as structured JSON. Agents like Claude Code can call it after
+every edit. Register it in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "zerodefect": {
+      "command": "/path/to/zerodefect",
+      "args": ["--serve"]
+    }
+  }
+}
+```
+
+The `analyze` tool accepts `path` plus optional `build_path`,
+`functions` and `lines` — so an agent can scope the re-check to exactly
+the functions it just edited.
+
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.
 

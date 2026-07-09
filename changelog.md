@@ -1,5 +1,28 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 3 tamam: MCP server modu
+
+### Eklenen
+- **`--serve`** (`src/server/McpServer`): MCP (Model Context Protocol)
+  sunucusu — stdio üzerinden satır-ayrımlı JSON-RPC 2.0. Claude Code
+  gibi ajanlar süreci başlatıp her düzenleme sonrası `analyze` aracını
+  çağırır; bulgular dataflow izleriyle yapısal JSON döner.
+- Metodlar: `initialize`, `notifications/*` (yanıtsız), `ping`,
+  `tools/list`, `tools/call` (`analyze`: `path` + opsiyonel
+  `build_path`/`functions`/`lines` — artımlı kapsam MCP'den de
+  kullanılabilir).
+- JSON için yeni bağımlılık YOK: zaten link edilen LLVMSupport'un
+  `llvm/json` kütüphanesi kullanıldı.
+- `handleMcpMessage()` I/O'dan ayrık — 10 birim testle protokol
+  davranışı sabitlendi (hata kodları -32700/-32601/-32602 dahil).
+- Config: `--serve` bayrağı; `addFunctions`/`addLines` public
+  (programatik kapsam).
+
+### Doğrulama
+- 133/133 test (123 + 10 MCP)
+- Uçtan uca gerçek istemci akışı: initialize → initialized bildirimi →
+  analyze çağrısı → count/findings/trace'li yapısal yanıt
+
 ## 2026-07-09 — Artımlı v2: hunk → fonksiyon eşlemesi
 
 ### Eklenen

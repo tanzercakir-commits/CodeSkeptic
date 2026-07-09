@@ -70,6 +70,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addFunctions(argv[++i]);
         } else if (arg == "--lines" && i + 1 < argc) {
             addLines(argv[++i]);
+        } else if (arg == "--serve") {
+            serve_ = true;
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -88,6 +90,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         plain or qualified; repeatable)\n"
                       << "  --lines <N-M,K>        Analyze only functions overlapping these\n"
                       << "                         line ranges of the analyzed file\n"
+                      << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
             return false;

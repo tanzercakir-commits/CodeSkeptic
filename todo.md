@@ -30,9 +30,20 @@
 - [x] Artımlı v2: --lines aralıkları + hunk ayrıştırma (tam otomatik
       "yalnızca dokunulan fonksiyonları analiz et" döngüsü)
 - [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
+- [x] MCP server modu (--serve; initialize / tools/list / tools/call analyze)
 - [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
       görünmüyor — motor desteği gerekir)
-- [ ] MCP server / JSON-RPC modu
+- [ ] MCP v2: sıcak süreçte AST/derleme önbelleği (şu an her çağrı yeniden
+      parse ediyor — kalıcı sürecin asıl hız kazancı burada)
+
+### Faz 4 (araştırma ufku — sıradaki büyük hedef)
+- [ ] İnterprosedürel analiz v1: fonksiyon özetleri — dönüş nullability'si,
+      parametre sahipliği (free eder mi / saklar mı / sadece okur mu).
+      Çağrı grafiği üzerinde aşağıdan yukarı geçiş; MemLeak'in Escaped
+      muhafazakârlığını ve NullDeref'in opak-dönüş sessizliğini gerçek
+      bilgiye çevirir.
+- [ ] Özet önbelleği (TU başına; artımlı modda yalnızca değişen
+      fonksiyonların özetleri tazelenir)
 
 ## Tamamlanan Görevler
 
