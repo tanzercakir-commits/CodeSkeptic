@@ -1,5 +1,22 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Gerçek dünya korpusu CI'da
+
+### Eklenen
+- **scripts/run_corpus.sh**: sabit sürümlü cJSON v1.7.18 (C) ve tinyxml2
+  10.0.0 (C++) projelerini indirir, CMake ile `compile_commands.json`
+  üretir, zerodefect'i koşar. Başarı kriteri: crash-free (exit 0/1);
+  bulgu sayıları bilgi amaçlı loglanır. Build dizini kaynak ağacının
+  dışında (CMake feature-test kaynakları taranmasın);
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5` (CMake 4 uyumu).
+- **CI adımı "Real-world corpus"**: her PR'da iki gerçek proje üzerinde
+  regresyon koşusu.
+
+### Not
+- Bu oturumun ağ proxy'si GitHub tarball indirmesini repo kapsamıyla
+  sınırladığından script yerelde simüle projeyle doğrulandı; gerçek
+  korpus koşusunu PR CI'ı doğrular.
+
 ## 2026-07-09 — Beşinci kural: NullDerefRule
 
 ### Eklenen

@@ -12,7 +12,10 @@
       (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
 
 ### Faz 2 kalanları
-- [ ] NIST Juliet ile precision/recall ölçümü; cJSON/tinyxml2 CI koşusu
+- [ ] NIST Juliet ile precision/recall ölçümü (indirme ~120MB — CI'da veya
+      yerelde koşacak ayrı harness; korpus scripti şablon olarak kullanılabilir)
+- [ ] Korpus bulgu sayılarını sabitle (beklenen sayı dosyası + tolerans) —
+      önce birkaç CI koşusuyla sayıların kararlılığını gözle
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
 ### Kural iyileştirme notları
@@ -55,6 +58,7 @@
 - [x] Baseline desteği (--write-baseline / --baseline)
 - [x] NullDerefRule (NullState lattice + assume edges, 16 test)
 - [x] GTest 92/92
+- [x] Gerçek dünya korpusu CI'da (cJSON + tinyxml2, scripts/run_corpus.sh)
 
 ## Teknik Notlar (Aklında Tut)
 

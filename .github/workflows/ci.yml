@@ -43,3 +43,6 @@ jobs:
           code=0
           ./build/src/zerodefect /tmp/smoke.cpp || code=$?
           test "$code" -eq 1
+
+      - name: Real-world corpus (cJSON + tinyxml2)
+        run: bash scripts/run_corpus.sh ./build/src/zerodefect /tmp/corpus
