@@ -14,8 +14,19 @@
 ### Faz 2 kalanları
 - [x] NIST Juliet ölçüm altyapısı (haftalık workflow + juliet_eval;
       gerçek rakamlar ilk koşudan sonra README'ye)
-- [ ] Juliet ilk koşu sonuçlarını değerlendir; zayıf CWE'lerde kural
-      iyileştirmesi; rakamları README'ye işle
+- [x] Juliet ilk gerçek koşu tamam (PR #14) — rakamlar ve analiz
+      changelog'da (2026-07-09 girişi)
+- [ ] **Juliet ölçüm doğruluğu turu** (sıradaki iş; plan changelog'da):
+      1. run_juliet.sh: `head -N` yerine adımlı örnekleme (CWE369'un
+         0 çıkması float-varyant yanlılığıydı, kural hatası değil)
+      2. juliet_eval.py: kural-bazlı kırılım + CWE→kural eşlemeli
+         precision (`rp=` alanı); genel precision da kalsın
+      3. double-free'ye kendi rule_id'si (şu an `memory-leak` altında;
+         UAF emsali var, testler kimlik iddia etmiyor → güvenli)
+      4. Temsili rakamlar geldikten sonra README'ye benchmark bölümü
+- [ ] CWE415/416 good-fonksiyon FP'lerini incele (eşlemeli precision
+      sonrası gerçek boyut belli olur); CWE401 dosya isabeti için
+      interprosedürel kaynak/lavabo akışı (bilinen v1 sınırı)
 - [ ] Korpus bulgu sayılarını sabitle (beklenen sayı dosyası + tolerans)
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
