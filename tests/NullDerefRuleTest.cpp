@@ -19,6 +19,7 @@ TEST(NullDerefRuleTest, DefiniteNullDeref) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "null-deref");
     EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[0].function, "f");  // Juliet puanlamasi buna dayanir
 }
 
 TEST(NullDerefRuleTest, ZeroLiteralInit) {

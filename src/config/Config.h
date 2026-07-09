@@ -18,6 +18,9 @@ public:
     bool parseArgs(int argc, char* argv[]);
 
     const std::string& sourcePath() const { return source_path_; }
+    const std::vector<std::string>& sourceFiles() const {
+        return source_files_;
+    }
     const std::string& buildPath() const { return build_path_; }
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
@@ -46,6 +49,7 @@ private:
     Severity parseSeverity(const std::string& str) const;
 
     std::string source_path_;
+    std::vector<std::string> source_files_;
     std::string build_path_;
     std::string output_format_;
     std::string json_output_path_;

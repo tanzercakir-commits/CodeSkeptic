@@ -101,7 +101,16 @@ void SarifReporter::report(const DiagnosticList& diagnostics) {
              << escapeJson(toUri(diag.file)) << "\" },\n";
         file << "                \"region\": { \"startLine\": " << diag.line
              << ", \"startColumn\": " << diag.column << " }\n";
-        file << "              }\n";
+        file << "              }";
+        if (!diag.function.empty()) {
+            file << ",\n              \"logicalLocations\": [\n";
+            file << "                { \"name\": \""
+                 << escapeJson(diag.function)
+                 << "\", \"kind\": \"function\" }\n";
+            file << "              ]\n";
+        } else {
+            file << "\n";
+        }
         file << "            }\n";
         file << (diag.notes.empty() ? "          ]\n" : "          ],\n");
         if (!diag.notes.empty()) {

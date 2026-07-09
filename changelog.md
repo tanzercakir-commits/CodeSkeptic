@@ -1,5 +1,29 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Juliet ölçüm altyapısı (Ufuk 1 açılışı)
+
+### Eklenen
+- **`Diagnostic.function`**: her bulgu artık içinde bulunduğu fonksiyonun
+  nitelikli adını taşır — JSON'da `function` alanı, SARIF'te
+  `logicalLocations`. (Juliet puanlaması buna dayanır; ajanlar için de
+  genel değer.)
+- **`--files <liste>`**: satır başına bir yol içeren liste dosyasındaki
+  kaynakları analiz eder — benchmark ve toplu ajan istekleri için.
+- **scripts/run_juliet.sh + juliet_eval.py**: NIST Juliet C/C++ 1.3
+  indirilir (önbellekli; `JULIET_DIR` ile atlanabilir), kurallarla
+  eşleşen 5 CWE dizini taranır (476/401/415/416/369), w32/pthread
+  varyantları elenir, CWE başına compile DB üretilir, bulgular Juliet
+  adlandırma sözleşmesiyle puanlanır: `bad` fonksiyonda → TP, `good`
+  fonksiyonda → FP. Çıktı: precision, dosya isabet oranı ve trend
+  takibi için grep-dostu `JULIET_RESULT` satırları.
+- **.github/workflows/juliet.yml**: haftalık + elle tetikleme (dosya
+  limiti girdisiyle); süit cache'lenir; sonuçlar job summary'de.
+
+### Doğrulama
+- Sentetik mini-süitle uçtan uca: CWE476 ve CWE415'te TP=1 FP=0,
+  precision 1.000. Gerçek rakamlar ilk workflow koşusundan gelecek.
+- 156/156 test (function alanı ana test yoluna sabitlendi)
+
 ## 2026-07-09 — İnterprosedürel v2: alias izleme
 
 ### Eklenen

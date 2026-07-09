@@ -300,8 +300,10 @@ public:
     using State = VarState;
 
     MemLeakAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                    std::string funcName,
                     zerodefect::DiagnosticList& results)
-        : trackedVars_(trackedVars), results_(results) {
+        : trackedVars_(trackedVars), funcName_(std::move(funcName)),
+          results_(results) {
         for (const auto* var : trackedVars_)
             initState_[var] = AllocState::None;
     }
@@ -453,12 +455,14 @@ private:
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = ruleId;
+        diag.function = funcName_;
         diag.message = zerodefect::msg(msgId, var->getNameAsString());
         results_.push_back(diag);
         noteTargets_.emplace_back(results_.size() - 1, var);
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
+    std::string funcName_;
     zerodefect::DiagnosticList& results_;
     VarState initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
@@ -474,7 +478,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     auto trackedVars = collectTrackedVars(funcDecl, ctx);
     if (trackedVars.empty()) return;
 
-    MemLeakAnalysis analysis(trackedVars, results);
+    MemLeakAnalysis analysis(
+        trackedVars, funcDecl->getQualifiedNameAsString(), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
 
     // Exit block leak check
@@ -494,6 +499,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(endLoc);
                 diag.rule_id = "memory-leak";
+                diag.function = funcDecl->getQualifiedNameAsString();
                 diag.message = zerodefect::msg(
                     zerodefect::MsgId::LeakEndOfFunction,
                     var->getNameAsString());

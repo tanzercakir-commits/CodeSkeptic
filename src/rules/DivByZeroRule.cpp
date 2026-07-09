@@ -256,10 +256,11 @@ public:
     using State = VarState;
 
     DivByZeroAnalysis(const std::set<const VarDecl*>& trackedVars,
+                      std::string funcName,
                       zerodefect::DiagnosticList& results,
                       std::set<unsigned>& reportedLines)
-        : trackedVars_(trackedVars), results_(results),
-          reportedLines_(reportedLines) {
+        : trackedVars_(trackedVars), funcName_(std::move(funcName)),
+          results_(results), reportedLines_(reportedLines) {
         for (const auto* var : trackedVars_)
             initState_[var] = ZeroState::Unknown;
     }
@@ -357,6 +358,7 @@ public:
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "div-by-zero";
+        diag.function = funcName_;
         if (state == ZeroState::Zero) {
             diag.severity = zerodefect::Severity::Error;
             diag.message = zerodefect::msg(
@@ -405,6 +407,7 @@ private:
     }
 
     const std::set<const VarDecl*>& trackedVars_;
+    std::string funcName_;
     zerodefect::DiagnosticList& results_;
     std::set<unsigned>& reportedLines_;
     VarState initState_;
@@ -437,6 +440,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "div-by-zero";
+                diag.function = funcDecl->getQualifiedNameAsString();
                 diag.message = zerodefect::msg(
                     zerodefect::MsgId::DivByZeroLiteral);
                 results.push_back(diag);
@@ -448,7 +452,9 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     auto trackedVars = collectDivisorVars(funcDecl, ctx);
     if (trackedVars.empty()) return;
 
-    DivByZeroAnalysis analysis(trackedVars, results, reportedLines);
+    DivByZeroAnalysis analysis(
+        trackedVars, funcDecl->getQualifiedNameAsString(), results,
+        reportedLines);
     zerodefect::runDataflow(funcDecl, ctx, analysis);
     analysis.attachTraces();
 }
