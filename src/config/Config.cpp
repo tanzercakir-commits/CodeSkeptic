@@ -29,6 +29,10 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "build_path")    build_path_ = value;
         else if (key == "output_format") output_format_ = value;
         else if (key == "json_output")   json_output_path_ = value;
+        else if (key == "sarif_output") {
+            output_format_ = "sarif";
+            sarif_output_path_ = value;
+        }
         else if (key == "min_severity")  min_severity_ = parseSeverity(value);
         else if (key == "lang")          lang_ = value;
         else if (key == "enable_rule")   enabled_rules_.insert(value);
@@ -49,6 +53,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--json" && i + 1 < argc) {
             output_format_ = "json";
             json_output_path_ = argv[++i];
+        } else if (arg == "--sarif" && i + 1 < argc) {
+            output_format_ = "sarif";
+            sarif_output_path_ = argv[++i];
         } else if (arg == "--severity" && i + 1 < argc) {
             min_severity_ = parseSeverity(argv[++i]);
         } else if (arg == "--disable-rule" && i + 1 < argc) {
@@ -62,6 +69,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --source <path>        Directory/file to analyze\n"
                       << "  --build-path <path>    compile_commands.json directory\n"
                       << "  --json <file>          JSON output file\n"
+                      << "  --sarif <file>         SARIF 2.1.0 output file\n"
                       << "  --severity <level>     Minimum severity (info/warning/error)\n"
                       << "  --disable-rule <id>    Disable a rule\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"

@@ -1,5 +1,25 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Faz 2 başlangıcı: SARIF + suppression
+
+### Eklenen
+- **SarifReporter** (`src/reporter/SarifReporter.h/.cpp`): SARIF 2.1.0
+  çıktı — GitHub code scanning ile doğrudan entegrasyon. `--sarif <dosya>`
+  CLI seçeneği ve `sarif_output=` config anahtarı. Severity eşlemesi:
+  Error→error, Warning→warning, Info→note. Mutlak path'ler `file://` URI.
+  5 test; çıktı `json.load` ile doğrulandı.
+- **SuppressionFilter** (`src/analyzer/SuppressionFilter.h/.cpp`): kaynak
+  yorumlarıyla bulgu bastırma. `// zerodefect-disable-line [kural,listesi]`
+  ve `// zerodefect-disable-next-line [...]`. Çıplak marker tüm kuralları,
+  kural listesi yalnızca sayılanları bastırır. Bastırılan sayı stderr'e
+  raporlanır. Dosya içeriği önbellekli okunur. 9 test.
+- **MsgId::OutputFileOpenError / SuppressedCount** — i18n'den kaçmış
+  JsonReporter Türkçe mesajı da düzeltildi.
+
+### Test sonuçları
+- 66/66 test geçti (52 + 5 SARIF + 9 suppression)
+- Uçtan uca: suppression yorumu bulguyu düşürüyor, SARIF geçerli JSON
+
 ## 2026-07-08 (gece) — Faz 1 kalanları: çekirdek birleştirme
 
 ### Değiştirildi
