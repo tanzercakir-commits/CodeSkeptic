@@ -1,5 +1,34 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Test donanımlandırma: best/worst-case matrisi (+2 av)
+
+### Eklenen
+- **StressEdgeCaseTest.cpp** (17 test, üç bölüm):
+  - *Best case* (FP sınırı): goto-fail cleanup idiom'u, ternary guard
+    (bölme + null), break-kenarı guard'ı, continue guard'ı, comma
+    operatörü sıralaması
+  - *Worst case* (FN + yakınsama sınırı): 8 seviye iç içe if, 30
+    değişkenli çarpım lattice (tavan ölçekleme testi), 12 kollu else-if
+    zinciri, iç içe döngüde koşullu free, do-while ilk iterasyon,
+    goto ile geri döngü, default'suz switch
+  - *Belgelenmiş sınırlar*: erişimsiz kod analiz edilmez, self-assignment
+    FN'i, compound-assignment FN'i, koşullu double-free FN'i — davranış
+    değişirse test kırılır, todo ile senkron
+
+### Testlerin ilk turda yakaladığı iki kural açığı (düzeltildi)
+- **MemLeak malloc-başarısızlık FP'si**: `p = malloc(); if (p == 0)
+  return -1;` yolunda leak raporlanıyordu — null kenarında ortada
+  sızacak bellek yok. MemLeak'e `refineOnEdge` eklendi: p'nin null
+  olduğu kenarlarda (`!p`, `p == NULL/0/nullptr`, truthiness false,
+  `&&`/`||`) Allocated → None. C'nin en yaygın kalıbındaki FP kapandı.
+- **DivByZero ternary FP'si**: onStatement içindeki recursive DivFinder,
+  bölmeyi kapsayan join-blok elemanında yanlış state ile ikinci kez
+  keşfediyordu (`z ? 100/z : 0` guard'ına rağmen uyarı). Motor
+  sözleşmesine uygun tepe-düğüm sınıflandırmasına geçildi.
+
+### Test sonuçları
+- 110/110 test geçti (93 + 17 stress/edge)
+
 ## 2026-07-09 — Motor düzeltmesi: fixpoint sonrası raporlama
 
 ### Düzeltilen (korpusun ilk avı)

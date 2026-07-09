@@ -317,47 +317,48 @@ public:
 
     void onStatement(const Stmt* stmt, const State& before,
                      const State& /*after*/, ASTContext& ctx) {
-        DivFinder finder;
-        finder.TraverseStmt(const_cast<Stmt*>(stmt));
+        // YALNIZCA tepe dugum: ince taneli CFG'de her bolme kendi elemani
+        // olarak gelir. Nested arama (eski DivFinder yaklasimi) ayni
+        // bolmeyi kapsayan ifadenin elemaninda — yanlis (join) state'iyle —
+        // ikinci kez kesfedip FP uretiyordu (ternary guard vakasi).
+        const auto* op = dyn_cast<BinaryOperator>(stmt);
+        if (!op) return;
+        if (op->getOpcode() != BO_Div && op->getOpcode() != BO_Rem) return;
+        if (op->getType()->isFloatingType()) return;
+
+        const Expr* rhs = op->getRHS()->IgnoreParenImpCasts();
+        if (evaluateAsZero(rhs) == ZeroState::Zero) return;  // Phase 1'de
+        const VarDecl* var = getReferencedVar(rhs);
+        if (!var) return;
+
+        auto stateIt = before.find(var);
+        if (stateIt == before.end()) return;
+        ZeroState state = stateIt->second;
+        if (state != ZeroState::Zero && state != ZeroState::MaybeZero)
+            return;
 
         const SourceManager& sm = ctx.getSourceManager();
-        for (const auto& div : finder.divs) {
-            SourceLocation loc =
-                sm.getExpansionLoc(div.op->getOperatorLoc());
-            unsigned line = sm.getSpellingLineNumber(loc);
+        SourceLocation loc = sm.getExpansionLoc(op->getOperatorLoc());
+        unsigned line = sm.getSpellingLineNumber(loc);
+        if (!reportedLines_.insert(line).second) return;
 
-            if (div.isLiteralZero) {
-                // Already handled in Phase 1
-                continue;
-            }
-            if (!div.divisorVar) continue;
-
-            auto stateIt = before.find(div.divisorVar);
-            if (stateIt == before.end()) continue;
-            ZeroState state = stateIt->second;
-
-            if (state != ZeroState::Zero && state != ZeroState::MaybeZero)
-                continue;
-            if (!reportedLines_.insert(line).second) continue;
-
-            zerodefect::Diagnostic diag;
-            diag.file = sm.getFilename(loc).str();
-            diag.line = line;
-            diag.column = sm.getSpellingColumnNumber(loc);
-            diag.rule_id = "div-by-zero";
-            if (state == ZeroState::Zero) {
-                diag.severity = zerodefect::Severity::Error;
-                diag.message = zerodefect::msg(
-                    zerodefect::MsgId::DivByZeroDefinite,
-                    div.divisorVar->getNameAsString());
-            } else {
-                diag.severity = zerodefect::Severity::Warning;
-                diag.message = zerodefect::msg(
-                    zerodefect::MsgId::DivByZeroMaybe,
-                    div.divisorVar->getNameAsString());
-            }
-            results_.push_back(diag);
+        zerodefect::Diagnostic diag;
+        diag.file = sm.getFilename(loc).str();
+        diag.line = line;
+        diag.column = sm.getSpellingColumnNumber(loc);
+        diag.rule_id = "div-by-zero";
+        if (state == ZeroState::Zero) {
+            diag.severity = zerodefect::Severity::Error;
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::DivByZeroDefinite,
+                var->getNameAsString());
+        } else {
+            diag.severity = zerodefect::Severity::Warning;
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::DivByZeroMaybe,
+                var->getNameAsString());
         }
+        results_.push_back(diag);
     }
 
 private:

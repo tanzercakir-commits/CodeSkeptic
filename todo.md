@@ -61,7 +61,10 @@
 - [x] Gerçek dünya korpusu CI'da (cJSON + tinyxml2, scripts/run_corpus.sh)
 - [x] Motor: fixpoint sonrası raporlama geçişi (erken-state severity hatası)
 - [x] Path kanonikleştirme + makro expansion loc (korpus bulguları)
-- [x] GTest 93/93
+- [x] Best/worst-case stress süiti (17 test; belgelenmiş FN'ler dahil)
+- [x] MemLeak null-farkındalıklı refineOnEdge (malloc-başarısızlık FP'si)
+- [x] DivByZero onStatement tepe-düğüm sınıflandırması (ternary FP'si)
+- [x] GTest 110/110
 
 ## Teknik Notlar (Aklında Tut)
 
@@ -106,7 +109,9 @@ Motor CFG'yi `setAllAlwaysAdd` ile kurar: alt ifadeler değerlendirme sırasınd
 
 ### MemoryLeakRule_Ex — bilinen sınırlamalar
 
-**Koşullu double-free kaçırılıyor:** `if(c) delete p; delete p;` — merge `Freed + Allocated = Allocated`, ikinci delete yakalanmaz. Path-sensitive analiz gerekir.
+**Koşullu double-free kaçırılıyor:** `if(c) delete p; delete p;` — merge `Freed + Allocated = Allocated`, ikinci delete yakalanmaz. Path-sensitive analiz gerekir. (Test olarak sabitlendi: `DocumentedLimitTest.ConditionalDoubleFree_KnownFN`)
+
+**Null-farkındalık VAR (2026-07):** `p = malloc(); if (!p) return;` yolu artık leak DEĞİL — refineOnEdge null kenarında Allocated → None yapar.
 
 **realloc ikili doğası eksik:** `q = realloc(p, n)` durumunda eski p invalid — yakalayamıyoruz.
 
