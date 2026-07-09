@@ -11,6 +11,7 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <vector>
@@ -265,7 +266,15 @@ public:
     }
 
     void onStatement(const Stmt* stmt, const State& before,
-                     const State& /*after*/, ASTContext& ctx) {
+                     const State& after, ASTContext& ctx) {
+        // Dataflow izi: null'a gecis olaylarini kaydet
+        for (const auto& [var, afterState] : after) {
+            auto b = before.find(var);
+            if (b == before.end() || b->second == afterState) continue;
+            if (afterState == NullState::Null)
+                recordEvent(stmt, var, ctx);
+        }
+
         Effect effect = classifyStmt(stmt);
         if (effect.kind != EffectKind::Deref) return;
 
@@ -297,12 +306,46 @@ public:
                 effect.var->getNameAsString());
         }
         results_.push_back(diag);
+        noteTargets_.emplace_back(results_.size() - 1, effect.var);
+    }
+
+    // Kosu bittikten sonra: null-atama izlerini raporlara ilistir
+    void attachTraces() {
+        for (const auto& [index, var] : noteTargets_) {
+            auto it = events_.find(var);
+            if (it == events_.end()) continue;
+            auto notes = it->second;
+            std::sort(notes.begin(), notes.end());
+            if (notes.size() > 6) notes.resize(6);
+            results_[index].notes = std::move(notes);
+        }
+        noteTargets_.clear();
     }
 
 private:
+    void recordEvent(const Stmt* stmt, const VarDecl* var,
+                     ASTContext& ctx) {
+        const SourceManager& sm = ctx.getSourceManager();
+        SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
+        zerodefect::TraceNote note;
+        note.file = sm.getFilename(loc).str();
+        note.line = sm.getSpellingLineNumber(loc);
+        note.column = sm.getSpellingColumnNumber(loc);
+        note.message = zerodefect::msg(
+            zerodefect::MsgId::TraceAssignedNullHere,
+            var->getNameAsString());
+
+        auto& list = events_[var];
+        for (const auto& existing : list)
+            if (existing.line == note.line) return;
+        list.push_back(std::move(note));
+    }
+
     zerodefect::DiagnosticList& results_;
     NullVarState initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
+    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
 };
 
 // --- Matcher callback ---
@@ -324,6 +367,7 @@ public:
 
         NullDerefAnalysis analysis(trackedVars, results_);
         zerodefect::runDataflow(func, *result.Context, analysis);
+        analysis.attachTraces();
     }
 
 private:

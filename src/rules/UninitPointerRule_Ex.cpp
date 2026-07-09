@@ -168,6 +168,19 @@ public:
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::UninitPtrDeref,
                 effect.var->getNameAsString());
+
+            // Iz: bildirim noktasi (baslangic degeri olmayan tanim)
+            SourceLocation declLoc =
+                sm.getExpansionLoc(effect.var->getLocation());
+            zerodefect::TraceNote note;
+            note.file = sm.getFilename(declLoc).str();
+            note.line = sm.getSpellingLineNumber(declLoc);
+            note.column = sm.getSpellingColumnNumber(declLoc);
+            note.message = zerodefect::msg(
+                zerodefect::MsgId::TraceDeclaredHere,
+                effect.var->getNameAsString());
+            diag.notes.push_back(std::move(note));
+
             results_.push_back(diag);
         }
     }

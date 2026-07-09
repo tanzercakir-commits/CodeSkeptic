@@ -12,6 +12,22 @@ enum class Severity {
     Error
 };
 
+// Bulguya iliştirilen dataflow izi adımı: hataya götüren olay zinciri
+// (ör. "p burada alloc edildi", "p burada free edildi"). Hem insan hem
+// LLM tüketicisi için "neden?" sorusunun cevabı.
+struct TraceNote {
+    std::string file;
+    unsigned line = 0;
+    unsigned column = 0;
+    std::string message;
+
+    bool operator<(const TraceNote& other) const {
+        if (file != other.file) return file < other.file;
+        if (line != other.line) return line < other.line;
+        return column < other.column;
+    }
+};
+
 struct Diagnostic {
     Severity severity;
     std::string file;
@@ -19,6 +35,7 @@ struct Diagnostic {
     unsigned column;
     std::string rule_id;
     std::string message;
+    std::vector<TraceNote> notes;  // sıralama/eşitlikte yer almaz
 
     std::string severityToString() const {
         switch (severity) {

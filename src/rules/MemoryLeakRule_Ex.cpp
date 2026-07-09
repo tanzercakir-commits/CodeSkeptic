@@ -11,6 +11,7 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <vector>
@@ -327,7 +328,21 @@ public:
     // Fixpoint sonrasi raporlama: reassignment leak, double free ve
     // use-after-free burada uretilir.
     void onStatement(const Stmt* stmt, const State& before,
-                     const State& /*after*/, ASTContext& ctx) {
+                     const State& after, ASTContext& ctx) {
+        // Dataflow izi: state degistiren olaylari kaydet (alloc/free).
+        // Notlar rapora kosu SONUNDA ilistirilir — raporlama gecisinin
+        // blok sirasi kaynak sirasi degildir.
+        for (const auto& [var, afterState] : after) {
+            auto b = before.find(var);
+            if (b == before.end() || b->second == afterState) continue;
+            if (afterState == AllocState::Allocated)
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceAllocatedHere);
+            else if (afterState == AllocState::Freed)
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceFreedHere);
+        }
+
         for (const auto* var : trackedVars_) {
             StmtEffect effect = classifyStmt(stmt, var, ctx);
             auto it = before.find(var);
@@ -358,7 +373,46 @@ public:
         return reported_;
     }
 
+    // Kosu bittikten sonra: biriken olay notlarini raporlara ilistir
+    void attachTraces() {
+        for (const auto& [index, var] : noteTargets_) {
+            auto it = events_.find(var);
+            if (it == events_.end()) continue;
+            auto notes = it->second;
+            std::sort(notes.begin(), notes.end());
+            if (notes.size() > 6) notes.resize(6);
+            results_[index].notes = std::move(notes);
+        }
+        noteTargets_.clear();
+    }
+
+    // Dis raporlar (exit-block leak) icin: hedef kaydi + olay erisimi
+    void registerNoteTarget(size_t resultIndex, const VarDecl* var) {
+        noteTargets_.emplace_back(resultIndex, var);
+    }
+
 private:
+    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
+
+    void recordEvent(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
+                     zerodefect::MsgId msgId) {
+        const SourceManager& sm = ctx.getSourceManager();
+        SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
+        zerodefect::TraceNote note;
+        note.file = sm.getFilename(loc).str();
+        note.line = sm.getSpellingLineNumber(loc);
+        note.column = sm.getSpellingColumnNumber(loc);
+        note.message = zerodefect::msg(msgId, var->getNameAsString());
+
+        auto& list = events_[var];
+        for (const auto& existing : list)
+            if (existing.line == note.line &&
+                existing.message == note.message)
+                return;
+        list.push_back(std::move(note));
+    }
+
     void report(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
                 zerodefect::Severity severity, const char* ruleId,
                 zerodefect::MsgId msgId) {
@@ -377,6 +431,7 @@ private:
         diag.rule_id = ruleId;
         diag.message = zerodefect::msg(msgId, var->getNameAsString());
         results_.push_back(diag);
+        noteTargets_.emplace_back(results_.size() - 1, var);
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
@@ -419,9 +474,12 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                     zerodefect::MsgId::LeakEndOfFunction,
                     var->getNameAsString());
                 results.push_back(diag);
+                analysis.registerNoteTarget(results.size() - 1, var);
             }
         }
     }
+
+    analysis.attachTraces();
 }
 
 // --- Matcher callback ---

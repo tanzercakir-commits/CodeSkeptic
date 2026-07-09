@@ -28,14 +28,20 @@ Example:
 
 ```
 $ zerodefect demo.cpp
-ZeroDefect: 4 finding(s)
+ZeroDefect: 2 finding(s)
 ----------------------------------------
-demo.cpp:14:5 [error] memory-leak: Double free: 'q' has already been freed
-demo.cpp:18:12 [error] uninit-ptr: Use of uninitialized pointer: 'r' may not be assigned at this dereference
-demo.cpp:9:5 [warning] memory-leak: Memory leak: 'p' is reassigned without freeing the previous allocation
-demo.cpp:10:1 [warning] memory-leak: Memory leak: allocation stored in 'p' may not be freed
+demo.cpp:4:13 [error] use-after-free: Use after free: 'p' is dereferenced after being freed
+    -> demo.cpp:2:5 'p' allocated here
+    -> demo.cpp:3:5 'p' freed here
+demo.cpp:9:12 [warning] div-by-zero: Possible division by zero: 'z' may be zero on some paths
+    -> demo.cpp:7:5 'z' assigned zero here
 ----------------------------------------
 ```
+
+Findings carry **dataflow traces** — the chain of events that leads to
+the bug. Traces appear indented on the console, as a `notes` array in
+JSON output, and as `relatedLocations` in SARIF (rendered by GitHub
+code scanning).
 
 ## Architecture
 

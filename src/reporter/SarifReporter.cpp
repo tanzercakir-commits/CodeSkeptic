@@ -103,7 +103,26 @@ void SarifReporter::report(const DiagnosticList& diagnostics) {
              << ", \"startColumn\": " << diag.column << " }\n";
         file << "              }\n";
         file << "            }\n";
-        file << "          ]\n";
+        file << (diag.notes.empty() ? "          ]\n" : "          ],\n");
+        if (!diag.notes.empty()) {
+            file << "          \"relatedLocations\": [";
+            for (size_t n = 0; n < diag.notes.size(); ++n) {
+                const auto& note = diag.notes[n];
+                if (n > 0) file << ",";
+                file << "\n            {\n";
+                file << "              \"physicalLocation\": {\n";
+                file << "                \"artifactLocation\": { \"uri\": \""
+                     << escapeJson(toUri(note.file)) << "\" },\n";
+                file << "                \"region\": { \"startLine\": "
+                     << note.line << ", \"startColumn\": " << note.column
+                     << " }\n";
+                file << "              },\n";
+                file << "              \"message\": { \"text\": \""
+                     << escapeJson(note.message) << "\" }\n";
+                file << "            }";
+            }
+            file << "\n          ]\n";
+        }
         file << "        }";
     }
 
