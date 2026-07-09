@@ -35,7 +35,8 @@ struct Diagnostic {
     unsigned column;
     std::string rule_id;
     std::string message;
-    std::vector<TraceNote> notes;  // sıralama/eşitlikte yer almaz
+    std::string function;          // bulgunun icinde oldugu fonksiyon
+    std::vector<TraceNote> notes;  // function ve notes siralamada yok
 
     std::string severityToString() const {
         switch (severity) {

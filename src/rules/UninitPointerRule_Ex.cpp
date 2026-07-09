@@ -111,8 +111,9 @@ public:
     using State = PtrVarState;
 
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                      std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : results_(results) {
+        : funcName_(std::move(funcName)), results_(results) {
         for (const auto* var : trackedVars)
             initState_[var] = PtrState::Uninit;
     }
@@ -166,6 +167,7 @@ public:
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "uninit-ptr";
+            diag.function = funcName_;
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::UninitPtrDeref,
                 effect.var->getNameAsString());
@@ -187,6 +189,7 @@ public:
     }
 
 private:
+    std::string funcName_;
     zerodefect::DiagnosticList& results_;
     PtrVarState initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
@@ -211,7 +214,8 @@ public:
         auto trackedVars = collectTrackedVars(func, *result.Context);
         if (trackedVars.empty()) return;
 
-        UninitPtrAnalysis analysis(trackedVars, results_);
+        UninitPtrAnalysis analysis(
+            trackedVars, func->getQualifiedNameAsString(), results_);
         zerodefect::runDataflow(func, *result.Context, analysis);
     }
 

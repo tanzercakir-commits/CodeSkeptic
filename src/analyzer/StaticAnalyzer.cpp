@@ -29,6 +29,9 @@ StaticAnalyzer::StaticAnalyzer(Config config)
             source_mgr_->addSourceFile(config_.sourcePath());
         }
     }
+    for (const auto& file : config_.sourceFiles()) {
+        source_mgr_->addSourceFile(file);
+    }
 
     if (config_.outputFormat() == "json") {
         reporter_ = std::make_unique<JsonReporter>(config_.jsonOutputPath());

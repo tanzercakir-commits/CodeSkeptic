@@ -239,8 +239,9 @@ public:
     using State = NullVarState;
 
     NullDerefAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                      std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : results_(results) {
+        : funcName_(std::move(funcName)), results_(results) {
         for (const auto* var : trackedVars)
             initState_[var] = NullState::Unknown;
     }
@@ -317,6 +318,7 @@ public:
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "null-deref";
+        diag.function = funcName_;
         if (it->second == NullState::Null) {
             diag.severity = zerodefect::Severity::Error;
             diag.message = zerodefect::msg(
@@ -362,6 +364,7 @@ private:
         list.push_back(std::move(note));
     }
 
+    std::string funcName_;
     zerodefect::DiagnosticList& results_;
     NullVarState initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
@@ -388,7 +391,8 @@ public:
         auto trackedVars = collectTrackedVars(func, *result.Context);
         if (trackedVars.empty()) return;
 
-        NullDerefAnalysis analysis(trackedVars, results_);
+        NullDerefAnalysis analysis(
+            trackedVars, func->getQualifiedNameAsString(), results_);
         zerodefect::runDataflow(func, *result.Context, analysis);
         analysis.attachTraces();
     }

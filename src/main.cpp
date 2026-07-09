@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
         return zerodefect::runMcpServer();
     }
 
-    if (config.sourcePath().empty()) {
+    if (config.sourcePath().empty() && config.sourceFiles().empty()) {
         std::cerr << zerodefect::msg(zerodefect::MsgId::UsageError) << "\n";
         return 1;
     }

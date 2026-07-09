@@ -12,10 +12,11 @@
       (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
 
 ### Faz 2 kalanları
-- [ ] NIST Juliet ile precision/recall ölçümü (indirme ~120MB — CI'da veya
-      yerelde koşacak ayrı harness; korpus scripti şablon olarak kullanılabilir)
-- [ ] Korpus bulgu sayılarını sabitle (beklenen sayı dosyası + tolerans) —
-      önce birkaç CI koşusuyla sayıların kararlılığını gözle
+- [x] NIST Juliet ölçüm altyapısı (haftalık workflow + juliet_eval;
+      gerçek rakamlar ilk koşudan sonra README'ye)
+- [ ] Juliet ilk koşu sonuçlarını değerlendir; zayıf CWE'lerde kural
+      iyileştirmesi; rakamları README'ye işle
+- [ ] Korpus bulgu sayılarını sabitle (beklenen sayı dosyası + tolerans)
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
 ### Kural iyileştirme notları

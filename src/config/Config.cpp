@@ -72,6 +72,14 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addLines(argv[++i]);
         } else if (arg == "--serve") {
             serve_ = true;
+        } else if (arg == "--files" && i + 1 < argc) {
+            // Liste dosyasi: satir basina bir kaynak dosya yolu.
+            // Buyuk/secilmis kumeler icin (benchmark, ajan toplu istegi).
+            std::ifstream listFile(argv[++i]);
+            std::string fileLine;
+            while (std::getline(listFile, fileLine)) {
+                if (!fileLine.empty()) source_files_.push_back(fileLine);
+            }
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
@@ -91,6 +99,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --lines <N-M,K>        Analyze only functions overlapping these\n"
                       << "                         line ranges of the analyzed file\n"
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
+                      << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
             return false;
