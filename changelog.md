@@ -1,5 +1,52 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — İlk gerçek Juliet rakamları (PR #14)
+
+### Düzeltilen (benchmark harness)
+- **Sahte-yeşil koşu yakalandı ve kapatıldı**: ilk gerçek koşuda
+  `run_juliet.sh` `cd` sonrası göreli `BASH_SOURCE` yüzünden kendi
+  dizinini bulamıyordu ve `| tee` borusu hata kodunu maskeliyordu —
+  0 CWE tarandı ama job yeşil göründü. Düzeltmeler: `SCRIPT_DIR`
+  herhangi bir `cd`'den ÖNCE çözülür; süit kök dizini `find`
+  fallback'leriyle sağlamlaştırıldı; benchmark adımı `shell: bash`
+  (`-eo pipefail`) ile koşar.
+
+### İlk gerçek sonuçlar (CWE başına alfabetik ilk 400 dosya)
+| CWE | TP | FP | Precision | Dosya isabeti |
+|-----|----|----|-----------|---------------|
+| CWE476 NULL Pointer Deref | 216 | 262 | 0.452 | 0.375 |
+| CWE401 Memory Leak | 64 | 58 | 0.525 | 0.155 |
+| CWE415 Double Free | 55 | 145 | 0.275 | 0.138 |
+| CWE416 Use After Free | 280 | 742 | 0.274 | 0.700 |
+| CWE369 Divide by Zero | 0 | 0 | 0.000 | 0.000 |
+
+### Rakamların analizi (bir sonraki turun planı)
+1. **CWE369 = 0 bulgu bir kural hatası değil, örnekleme yanlılığı:**
+   dosya listesi alfabetik sıralanıp `head -400` alınıyor; CWE369'da
+   `float_*` varyantları başta ve DivByZero kuralı float bölmeyi
+   BİLİNÇLİ atlar (IEEE754'te 0'a bölme tanımlı: inf/NaN — UB olan
+   tamsayı bölmesidir). İlk 400 dosyanın tamamı float varyantı çıktı.
+   → Düzeltme: `head` yerine deterministik adımlı (stride) örnekleme —
+   liste boyunca eşit aralıklarla 400 dosya, tüm varyant aileleri
+   temsil edilir.
+2. **Eval tüm kuralların bulgularını sayıyor:** CWE416 dosyasındaki bir
+   `memory-leak` uyarısı UAF hassasiyetine FP yazılıyor. İki görünüm
+   gerekir: genel precision (kullanıcının gördüğü) + CWE'yle eşleşen
+   kuralın precision'ı (kuralın gerçek kalitesi). → juliet_eval.py'ye
+   kural-bazlı kırılım + CWE→kural eşlemesi.
+3. **Double-free bulgusu `memory-leak` rule_id'siyle çıkıyor** (UAF'nin
+   kendi kimliği var, double-free'nin yok). CWE415 eşlemesi ve kullanıcı
+   taksonomisi için kendi `double-free` kimliğini almalı (pre-release —
+   kimlik değişikliğinin baseline maliyeti şimdi sıfıra yakın).
+4. CWE415/416 good-fonksiyon FP'leri (2. madde düzeltilince gerçek
+   boyutu görülecek) kural iyileştirme adayı; CWE401 dosya isabeti
+   (0.155) düşük — Juliet leak'lerinin çoğu kaynak/lavabo fonksiyon
+   çiftlerinde (interprosedürel akış), bilinen v1 sınırı.
+
+README'ye rakam işlenmedi: örnekleme yanlılığı düzeltilmeden bu tablo
+halka açık vitrine konmaz. Sıradaki tur: harness düzeltmeleri → temsili
+rakamlar → README benchmark bölümü.
+
 ## 2026-07-09 — Juliet ölçüm altyapısı (Ufuk 1 açılışı)
 
 ### Eklenen
