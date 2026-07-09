@@ -36,11 +36,14 @@ public:
     void setBuildPath(const std::string& path) { build_path_ = path; }
     void setOutputFormat(const std::string& format) { output_format_ = format; }
     void setMinSeverity(Severity severity) { min_severity_ = severity; }
+    bool serve() const { return serve_; }
+
+    // Programatik kapsam ayari (MCP server bunlari dogrudan kullanir)
+    void addFunctions(const std::string& list);
+    void addLines(const std::string& list);
 
 private:
     Severity parseSeverity(const std::string& str) const;
-    void addFunctions(const std::string& list);
-    void addLines(const std::string& list);
 
     std::string source_path_;
     std::string build_path_;
@@ -52,6 +55,7 @@ private:
     std::string lang_;
     std::set<std::string> functions_;
     std::vector<std::pair<unsigned, unsigned>> lines_;
+    bool serve_ = false;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

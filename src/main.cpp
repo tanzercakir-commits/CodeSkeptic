@@ -5,6 +5,7 @@
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
 #include "rules/UninitPointerRule_Ex.h"
+#include "server/McpServer.h"
 
 #include <iostream>
 
@@ -17,6 +18,10 @@ int main(int argc, char* argv[]) {
     }
 
     zerodefect::setLang(zerodefect::parseLang(config.lang()));
+
+    if (config.serve()) {
+        return zerodefect::runMcpServer();
+    }
 
     if (config.sourcePath().empty()) {
         std::cerr << zerodefect::msg(zerodefect::MsgId::UsageError) << "\n";

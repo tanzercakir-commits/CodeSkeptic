@@ -18,6 +18,7 @@ add_executable(zerodefect_tests
     BaselineTest.cpp
     StressEdgeCaseTest.cpp
     FunctionFilterTest.cpp
+    McpServerTest.cpp
 )
 
 target_include_directories(zerodefect_tests
