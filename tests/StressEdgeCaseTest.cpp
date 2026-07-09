@@ -1,0 +1,308 @@
+// Best-case / worst-case matrisi:
+//  - Best case: savunmacı, dogru yazilmis kod TEMIZ kalmali (FP siniri)
+//  - Worst case: patolojik CFG sekilleri yakinsamali ve tohumlanmis
+//    hatalar YAKALANMALI (FN + yakinsama siniri)
+//  - Belgelenmis sinirlar: bilinen FN'ler test olarak sabitlenir ki
+//    davranis degisirse fark edelim (todo.md ile senkron)
+
+#include "TestHelper.h"
+#include "rules/DivByZeroRule.h"
+#include "rules/MemoryLeakRule_Ex.h"
+#include "rules/NullDerefRule.h"
+#include "rules/UninitPointerRule_Ex.h"
+
+#include <string>
+#include <gtest/gtest.h>
+
+using namespace zerodefect;
+using namespace zerodefect::testing;
+
+// ===================================================================
+// BEST CASE — savunmaci kaliplar temiz kalmali
+// ===================================================================
+
+TEST(BestCaseTest, GotoFailCleanup_Clean) {
+    // cJSON'un her yerde kullandigi idiom: hata yollari tek cleanup
+    // etiketine atlar. Iki yol da free ediyor — ne leak ne double-free.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        int f(int c) {
+            int* p = (int*)malloc(4);
+            if (p == 0) return -1;
+            if (c) goto fail;
+            free(p);
+            return 0;
+        fail:
+            free(p);
+            return -1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(BestCaseTest, TernaryGuardDivision_Clean) {
+    // Ternary kosulu da bir dal kenaridir: true kolunda z NonZero
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int z) {
+            int zero = 0;
+            if (z == 0) zero = 1;
+            int x = z ? 100 / z : 0;
+            (void)zero;
+            return x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(BestCaseTest, TernaryGuardNullDeref_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int f(int* p) {
+            int v = 0;
+            if (p == nullptr) v = 1;
+            return p ? *p : v;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(BestCaseTest, BreakEdgeGuard_Clean) {
+    // Donguden yalnizca z != 0 iken cikilabiliyor — break kenari
+    // uzerinden dongu sonrasi z NonZero
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int next();
+        int f() {
+            int z = 0;
+            while (true) {
+                z = next();
+                if (z != 0) break;
+            }
+            return 100 / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(BestCaseTest, ContinueGuard_Clean) {
+    // Korumasiz yol continue ile atlaniyor
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Node { int data; Node* next; };
+        int f(Node** items, int n) {
+            int total = 0;
+            for (int i = 0; i < n; i++) {
+                Node* p = items[i];
+                if (!p) continue;
+                total += p->data;
+            }
+            return total;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(BestCaseTest, CommaOperatorOrdering_Clean) {
+    // Ince taneli CFG degerlendirme sirasini korur: atama bolmeden once
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f() {
+            int z = 0;
+            int x = (z = 5, 100 / z);
+            return x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+// ===================================================================
+// WORST CASE — patolojik sekiller: yakinsama + tohumlanmis hatalar
+// ===================================================================
+
+TEST(WorstCaseTest, DeepNesting_OnePathInits) {
+    // 8 seviye ic ice if; yalnizca en icteki yol init ediyor.
+    // 255/256 yol uninit — rapor SART, analiz yakinsamali.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int a, int b, int c, int d, int e, int g, int h, int k) {
+            int v = 1;
+            int* p;
+            if (a) { if (b) { if (c) { if (d) {
+            if (e) { if (g) { if (h) { if (k) {
+                p = &v;
+            }}}}}}}}
+            int x = *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(WorstCaseTest, WideProductLattice_AllLeaksFound) {
+    // 30 degiskenli carpim lattice: iterasyon tavani yukseklikle
+    // olceklenmeli ve TUM leak'ler bulunmali (yarim analiz yok)
+    std::string code = "void f() {\n";
+    for (int i = 0; i < 30; i++)
+        code += "    int* p" + std::to_string(i) + " = new int(" +
+                std::to_string(i) + ");\n";
+    code += "}\n";
+
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, code);
+    ASSERT_EQ(results.size(), 30);
+}
+
+TEST(WorstCaseTest, LongElseIfChain_OneArmZero) {
+    // 12 kollu zincirin tek kolu sifir atiyor → olasi sifira bolme
+    std::string code = "void f(int x) {\n    int z = 1;\n";
+    code += "    if (x == 1) z = 2;\n";
+    for (int i = 2; i <= 10; i++)
+        code += "    else if (x == " + std::to_string(i) + ") z = " +
+                std::to_string(i + 1) + ";\n";
+    code += "    else if (x == 11) z = 0;\n";
+    code += "    int r = 100 / z;\n    (void)r;\n}\n";
+
+    DivByZeroRule rule;
+    auto results = runRule(rule, code);
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(WorstCaseTest, NestedLoopConditionalFree) {
+    // Ic dongude alloc, kosullu free: hem reassign-leak (2. iterasyonda
+    // eski Allocated uzerine new) hem exit-leak raporlanmali
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int a, int b, int c) {
+            int* p = nullptr;
+            while (a) {
+                while (b) {
+                    p = new int(1);
+                    if (c) delete p;
+                }
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 2);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+    EXPECT_EQ(results[1].severity, Severity::Warning);
+}
+
+TEST(WorstCaseTest, DoWhileFirstIteration_UninitDeref) {
+    // do-while govdesi ilk iterasyonda kosulsuz calisir: init'ten ONCEKI
+    // dereference yakalanmali (fixpoint raporlamasi bunu kacirmamali)
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int v = 1;
+            int* p;
+            do {
+                int x = *p;
+                p = &v;
+                (void)x;
+            } while (c);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(WorstCaseTest, GotoBackwardLoop) {
+    // goto ile kurulmus dongu: n <= 0 yolunda p hic init edilmiyor
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int n) {
+            int v = 1;
+            int* p;
+        again:
+            if (n > 0) {
+                p = &v;
+                n--;
+                goto again;
+            }
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(WorstCaseTest, SwitchWithoutDefault_MaybeUninit) {
+    // default'suz switch: hicbir case eslesmezse p uninit kalir
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int x) {
+            int a = 1;
+            int* p;
+            switch (x) {
+                case 0: p = &a; break;
+                case 1: p = &a; break;
+            }
+            int v = *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+// ===================================================================
+// BELGELENMIS SINIRLAR — bilinen FN'ler (davranis degisirse fark edelim)
+// ===================================================================
+
+TEST(DocumentedLimitTest, UnreachableCodeNotAnalyzed) {
+    // return sonrasi kod CFG'de erisimsiz — analiz edilmez (bilincli:
+    // olu koddaki "hatalar" calisan programi etkilemez)
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            return;
+            int* p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DocumentedLimitTest, SelfAssignmentHidesUninit_KnownFN) {
+    // p = p atamasi p'yi "Init" isaretler — bilinen soundness acigi.
+    // Duzeltilirse bu test kirilir ve todo guncellenir.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* p;
+            p = p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DocumentedLimitTest, CompoundAssignNotModeled_KnownFN) {
+    // z -= z sifir uretir ama CompoundAssignOperator izlenmiyor
+    // (todo'da: BO_Assign disindaki atamalar AssignsUnknown bile degil)
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f() {
+            int z = 5;
+            z -= z;
+            return 100 / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DocumentedLimitTest, ConditionalDoubleFree_KnownFN) {
+    // if(c) delete p; delete p; — merge Freed+Allocated=Allocated,
+    // ikinci delete yakalanmiyor. Path-sensitivity gerektirir (todo).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int c) {
+            int* p = new int(1);
+            if (c) delete p;
+            delete p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

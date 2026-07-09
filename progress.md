@@ -24,7 +24,7 @@
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState lattice + assume edges) |
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (92/92 geçiyor) |
+| GTest altyapısı | `tests/` | Tamamlandı (110/110 geçiyor) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | README / LICENSE | `README.md`, `LICENSE` | Tamamlandı (EN, Apache-2.0) |
