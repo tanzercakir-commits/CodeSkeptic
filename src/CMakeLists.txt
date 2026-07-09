@@ -1,5 +1,6 @@
 add_library(zerodefect_core STATIC
     core/Messages.cpp
+    core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
     engine/RuleEngine.cpp
     reporter/ConsoleReporter.cpp

@@ -1,5 +1,6 @@
 #include "rules/DivByZeroRule.h"
 
+#include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 
@@ -465,6 +466,7 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
+        if (!zerodefect::functionFilterAllows(*func)) return;
 
         analyzeFunction(func, *result.Context, results_);
     }

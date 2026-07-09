@@ -17,6 +17,7 @@ add_executable(zerodefect_tests
     SuppressionFilterTest.cpp
     BaselineTest.cpp
     StressEdgeCaseTest.cpp
+    FunctionFilterTest.cpp
 )
 
 target_include_directories(zerodefect_tests

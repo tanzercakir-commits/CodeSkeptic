@@ -98,6 +98,8 @@ zerodefect <source_path> [options]
   --disable-rule <id>    Disable a rule
   --baseline <file>      Suppress findings recorded in the baseline
   --write-baseline <file> Record current findings as the baseline
+  --function <names>     Analyze only these functions (comma list,
+                         plain or qualified names; repeatable)
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
@@ -133,6 +135,19 @@ zerodefect src/ --baseline .zerodefect-baseline         # only NEW findings fail
 
 Baseline keys include the line number, so refresh the baseline after
 large refactors (known v1 limitation).
+
+### Incremental analysis
+
+For edit-check loops (agents, IDEs, pre-commit hooks) analyze only what
+changed:
+
+```bash
+# re-check just the function you edited (milliseconds)
+zerodefect src/parser.cpp --function Parser::parse
+
+# analyze every C/C++ file changed since a git ref
+scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
+```
 
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.
