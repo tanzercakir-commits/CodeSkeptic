@@ -322,7 +322,9 @@ public:
 
         const SourceManager& sm = ctx.getSourceManager();
         for (const auto& div : finder.divs) {
-            unsigned line = sm.getSpellingLineNumber(div.op->getOperatorLoc());
+            SourceLocation loc =
+                sm.getExpansionLoc(div.op->getOperatorLoc());
+            unsigned line = sm.getSpellingLineNumber(loc);
 
             if (div.isLiteralZero) {
                 // Already handled in Phase 1
@@ -334,35 +336,27 @@ public:
             if (stateIt == before.end()) continue;
             ZeroState state = stateIt->second;
 
+            if (state != ZeroState::Zero && state != ZeroState::MaybeZero)
+                continue;
+            if (!reportedLines_.insert(line).second) continue;
+
+            zerodefect::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "div-by-zero";
             if (state == ZeroState::Zero) {
-                if (reportedLines_.insert(line).second) {
-                    zerodefect::Diagnostic diag;
-                    diag.severity = zerodefect::Severity::Error;
-                    diag.file = sm.getFilename(div.op->getOperatorLoc()).str();
-                    diag.line = line;
-                    diag.column = sm.getSpellingColumnNumber(
-                        div.op->getOperatorLoc());
-                    diag.rule_id = "div-by-zero";
-                    diag.message = zerodefect::msg(
-                        zerodefect::MsgId::DivByZeroDefinite,
-                        div.divisorVar->getNameAsString());
-                    results_.push_back(diag);
-                }
-            } else if (state == ZeroState::MaybeZero) {
-                if (reportedLines_.insert(line).second) {
-                    zerodefect::Diagnostic diag;
-                    diag.severity = zerodefect::Severity::Warning;
-                    diag.file = sm.getFilename(div.op->getOperatorLoc()).str();
-                    diag.line = line;
-                    diag.column = sm.getSpellingColumnNumber(
-                        div.op->getOperatorLoc());
-                    diag.rule_id = "div-by-zero";
-                    diag.message = zerodefect::msg(
-                        zerodefect::MsgId::DivByZeroMaybe,
-                        div.divisorVar->getNameAsString());
-                    results_.push_back(diag);
-                }
+                diag.severity = zerodefect::Severity::Error;
+                diag.message = zerodefect::msg(
+                    zerodefect::MsgId::DivByZeroDefinite,
+                    div.divisorVar->getNameAsString());
+            } else {
+                diag.severity = zerodefect::Severity::Warning;
+                diag.message = zerodefect::msg(
+                    zerodefect::MsgId::DivByZeroMaybe,
+                    div.divisorVar->getNameAsString());
             }
+            results_.push_back(diag);
         }
     }
 
@@ -388,14 +382,15 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     literalFinder.TraverseStmt(funcDecl->getBody());
     for (const auto& div : literalFinder.divs) {
         if (div.isLiteralZero) {
-            unsigned line = sm.getSpellingLineNumber(div.op->getOperatorLoc());
+            SourceLocation loc =
+                sm.getExpansionLoc(div.op->getOperatorLoc());
+            unsigned line = sm.getSpellingLineNumber(loc);
             if (reportedLines.insert(line).second) {
                 zerodefect::Diagnostic diag;
                 diag.severity = zerodefect::Severity::Error;
-                diag.file = sm.getFilename(div.op->getOperatorLoc()).str();
+                diag.file = sm.getFilename(loc).str();
                 diag.line = line;
-                diag.column = sm.getSpellingColumnNumber(
-                    div.op->getOperatorLoc());
+                diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "div-by-zero";
                 diag.message = zerodefect::msg(
                     zerodefect::MsgId::DivByZeroLiteral);

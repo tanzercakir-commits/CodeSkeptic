@@ -25,7 +25,8 @@
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
 | GTest altyapısı | `tests/` | Tamamlandı (92/92 geçiyor) |
-| CI | `.github/workflows/ci.yml` | Tamamlandı (Ubuntu 24.04 + LLVM 18) |
+| CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
+| Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | README / LICENSE | `README.md`, `LICENSE` | Tamamlandı (EN, Apache-2.0) |
 | Durum tespiti / yol haritası | `analiz-2026-07.md` | Tamamlandı |
 

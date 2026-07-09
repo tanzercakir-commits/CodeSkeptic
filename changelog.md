@@ -1,5 +1,45 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Motor düzeltmesi: fixpoint sonrası raporlama
+
+### Düzeltilen (korpusun ilk avı)
+- **Raporlama fixpoint'e taşındı**: `onStatement` artık worklist iterasyonu
+  sırasında DEĞİL, sabitleme sonrası ayrı bir raporlama geçişinde çağrılıyor.
+  Eski davranışta do-while/for gövdesinin ilk ziyaretinde back-edge state'i
+  henüz yokken rapor üretiliyor, satır dedup'ı da sonraki doğru state'in
+  düzeltmesini engelliyordu. cJSON'da `parse_array`'in linked-list kurma
+  kalıbı bu yüzden "kesinlikle null" (Error) çıkıyordu — doğrusu MaybeNull
+  (Warning). Regresyon testi eski motorla kırılıyor, yenisiyle geçiyor
+  (falsifikasyon doğrulandı).
+- **MemLeak transfer'ı saflaştırıldı**: reassignment-leak ve double-free
+  raporları transfer'dan onStatement'a taşındı (motor sözleşmesi: transfer
+  saf state fonksiyonu, raporlama yalnızca fixpoint geçişinde).
+- **Path kanonikleştirme**: `tests/../cJSON.c` ile `cJSON.c` aynı dosya —
+  `weakly_canonical` ile tekilleştirme ve baseline anahtarları güvenilir.
+- **Makro konumları**: tüm kurallar expansion loc kullanıyor; makro içi
+  bulgularda dosya adının boş kalması sorunu giderildi (cJSON unity
+  test makrolarında görüldü).
+
+### Test sonuçları
+- 93/93 test geçti (92 + 1 motor regresyon testi)
+
+## 2026-07-09 — Gerçek dünya korpusu CI'da
+
+### Eklenen
+- **scripts/run_corpus.sh**: sabit sürümlü cJSON v1.7.18 (C) ve tinyxml2
+  10.0.0 (C++) projelerini indirir, CMake ile `compile_commands.json`
+  üretir, zerodefect'i koşar. Başarı kriteri: crash-free (exit 0/1);
+  bulgu sayıları bilgi amaçlı loglanır. Build dizini kaynak ağacının
+  dışında (CMake feature-test kaynakları taranmasın);
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5` (CMake 4 uyumu).
+- **CI adımı "Real-world corpus"**: her PR'da iki gerçek proje üzerinde
+  regresyon koşusu.
+
+### Not
+- Bu oturumun ağ proxy'si GitHub tarball indirmesini repo kapsamıyla
+  sınırladığından script yerelde simüle projeyle doğrulandı; gerçek
+  korpus koşusunu PR CI'ı doğrular.
+
 ## 2026-07-09 — Beşinci kural: NullDerefRule
 
 ### Eklenen

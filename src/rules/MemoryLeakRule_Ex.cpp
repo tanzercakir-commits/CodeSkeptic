@@ -226,79 +226,52 @@ public:
         return result;
     }
 
-    State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) {
+    // Saf state gecisi — rapor uretmez. Raporlama, fixpoint sonrasi
+    // gecis olan onStatement icindedir (engine garantisi).
+    State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
         State out = in;
-        const SourceManager& sm = ctx.getSourceManager();
-
         for (const auto* var : trackedVars_) {
             StmtEffect effect = classifyStmt(stmt, var, ctx);
-
-            if (effect == StmtEffect::Allocates) {
-                if (out[var] == AllocState::Allocated) {
-                    SourceLocation loc = stmt->getBeginLoc();
-                    unsigned line = sm.getSpellingLineNumber(loc);
-                    if (reported_.emplace(var, line).second) {
-                        zerodefect::Diagnostic diag;
-                        diag.severity = zerodefect::Severity::Warning;
-                        diag.file = sm.getFilename(loc).str();
-                        diag.line = line;
-                        diag.column = sm.getSpellingColumnNumber(loc);
-                        diag.rule_id = "memory-leak";
-                        diag.message = zerodefect::msg(
-                            zerodefect::MsgId::LeakReassign,
-                            var->getNameAsString());
-                        results_.push_back(diag);
-                    }
-                }
-                out[var] = AllocState::Allocated;
-
-            } else if (effect == StmtEffect::Frees) {
-                if (out[var] == AllocState::Freed) {
-                    SourceLocation loc = stmt->getBeginLoc();
-                    unsigned line = sm.getSpellingLineNumber(loc);
-                    if (reported_.emplace(var, line).second) {
-                        zerodefect::Diagnostic diag;
-                        diag.severity = zerodefect::Severity::Error;
-                        diag.file = sm.getFilename(loc).str();
-                        diag.line = line;
-                        diag.column = sm.getSpellingColumnNumber(loc);
-                        diag.rule_id = "memory-leak";
-                        diag.message = zerodefect::msg(
-                            zerodefect::MsgId::DoubleFree,
-                            var->getNameAsString());
-                        results_.push_back(diag);
-                    }
-                }
-                out[var] = AllocState::Freed;
-
-            } else if (effect == StmtEffect::Escapes) {
-                out[var] = AllocState::Escaped;
+            switch (effect) {
+                case StmtEffect::Allocates:
+                    out[var] = AllocState::Allocated; break;
+                case StmtEffect::Frees:
+                    out[var] = AllocState::Freed; break;
+                case StmtEffect::Escapes:
+                    out[var] = AllocState::Escaped; break;
+                case StmtEffect::None: break;
             }
         }
         return out;
     }
 
-    // Freed durumdaki pointer'in dereference'i: use-after-free
+    // Fixpoint sonrasi raporlama: reassignment leak, double free ve
+    // use-after-free burada uretilir.
     void onStatement(const Stmt* stmt, const State& before,
                      const State& /*after*/, ASTContext& ctx) {
-        const VarDecl* var = derefTarget(stmt);
-        if (!var) return;
-        auto it = before.find(var);
-        if (it == before.end() || it->second != AllocState::Freed) return;
+        for (const auto* var : trackedVars_) {
+            StmtEffect effect = classifyStmt(stmt, var, ctx);
+            auto it = before.find(var);
+            if (it == before.end()) continue;
 
-        const SourceManager& sm = ctx.getSourceManager();
-        SourceLocation loc = stmt->getBeginLoc();
-        unsigned line = sm.getSpellingLineNumber(loc);
-        if (reported_.emplace(var, line).second) {
-            zerodefect::Diagnostic diag;
-            diag.severity = zerodefect::Severity::Error;
-            diag.file = sm.getFilename(loc).str();
-            diag.line = line;
-            diag.column = sm.getSpellingColumnNumber(loc);
-            diag.rule_id = "use-after-free";
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::UseAfterFree, var->getNameAsString());
-            results_.push_back(diag);
+            if (effect == StmtEffect::Allocates &&
+                it->second == AllocState::Allocated) {
+                report(stmt, var, ctx, zerodefect::Severity::Warning,
+                       "memory-leak", zerodefect::MsgId::LeakReassign);
+            } else if (effect == StmtEffect::Frees &&
+                       it->second == AllocState::Freed) {
+                report(stmt, var, ctx, zerodefect::Severity::Error,
+                       "memory-leak", zerodefect::MsgId::DoubleFree);
+            }
+        }
+
+        // Freed durumdaki pointer'in dereference'i: use-after-free
+        if (const VarDecl* var = derefTarget(stmt)) {
+            auto it = before.find(var);
+            if (it != before.end() && it->second == AllocState::Freed) {
+                report(stmt, var, ctx, zerodefect::Severity::Error,
+                       "use-after-free", zerodefect::MsgId::UseAfterFree);
+            }
         }
     }
 
@@ -307,6 +280,26 @@ public:
     }
 
 private:
+    void report(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
+                zerodefect::Severity severity, const char* ruleId,
+                zerodefect::MsgId msgId) {
+        const SourceManager& sm = ctx.getSourceManager();
+        // Makro icindeki bulgular kullanim noktasina (expansion) baglanir;
+        // aksi halde dosya adi bos kalabiliyor (scratch buffer)
+        SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
+        unsigned line = sm.getSpellingLineNumber(loc);
+        if (!reported_.emplace(var, line).second) return;
+
+        zerodefect::Diagnostic diag;
+        diag.severity = severity;
+        diag.file = sm.getFilename(loc).str();
+        diag.line = line;
+        diag.column = sm.getSpellingColumnNumber(loc);
+        diag.rule_id = ruleId;
+        diag.message = zerodefect::msg(msgId, var->getNameAsString());
+        results_.push_back(diag);
+    }
+
     const std::vector<const VarDecl*>& trackedVars_;
     zerodefect::DiagnosticList& results_;
     VarState initState_;

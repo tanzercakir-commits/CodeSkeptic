@@ -84,18 +84,13 @@ DataflowResult<Analysis> runDataflow(
 
     auto& blockExitState = result.blockExitStates;
 
-    std::queue<const clang::CFGBlock*> worklist;
-    worklist.push(&cfg->getEntry());
-    unsigned iterations = 0;
-
-    while (!worklist.empty() && iterations < maxIterations) {
-        ++iterations;
-        const clang::CFGBlock* block = worklist.front();
-        worklist.pop();
-
-        // Merge from predecessors
+    // Predecessor exit state'lerinden blok giris state'ini hesaplar
+    // (assume-edge iyilestirmesi dahil). Hem worklist fazinda hem
+    // raporlama gecisinde ayni mantik kullanilir.
+    auto computeEntryState = [&](const clang::CFGBlock* block,
+                                 bool& hasPreds) -> State {
         State entryState = analysis.initialState();
-        bool hasPreds = false;
+        hasPreds = false;
         bool firstPred = true;
 
         for (auto it = block->pred_begin(); it != block->pred_end(); ++it) {
@@ -140,24 +135,34 @@ DataflowResult<Analysis> runDataflow(
                 entryState = analysis.merge(entryState, predState);
             }
         }
+        return entryState;
+    };
 
+    // --- Faz 1: fixpoint iterasyonu ---
+    // Bu fazda YALNIZCA transfer calisir; onStatement CAGRILMAZ.
+    // Erken (henuz sabitlenmemis) state'lerle rapor uretmek yanlis
+    // severity'ye yol acar: ornegin do-while govdesinin ilk ziyaretinde
+    // back-edge state'i henuz yokken "kesinlikle null" denebilir.
+    std::queue<const clang::CFGBlock*> worklist;
+    worklist.push(&cfg->getEntry());
+    unsigned iterations = 0;
+
+    while (!worklist.empty() && iterations < maxIterations) {
+        ++iterations;
+        const clang::CFGBlock* block = worklist.front();
+        worklist.pop();
+
+        bool hasPreds = false;
+        State entryState = computeEntryState(block, hasPreds);
         if (!hasPreds && block != &cfg->getEntry()) continue;
 
-        // Walk statements
         State currentState = entryState;
-
         for (const clang::CFGElement& elem : *block) {
             auto cfgStmt = elem.getAs<clang::CFGStmt>();
             if (!cfgStmt) continue;
             const clang::Stmt* stmt = cfgStmt->getStmt();
             if (!stmt) continue;
-
-            State before = currentState;
             currentState = analysis.transfer(stmt, currentState, ctx);
-
-            if constexpr (detail::HasOnStatement<Analysis>::value) {
-                analysis.onStatement(stmt, before, currentState, ctx);
-            }
         }
 
         // Update exit state, propagate if changed
@@ -177,6 +182,33 @@ DataflowResult<Analysis> runDataflow(
 
     result.converged = (iterations < maxIterations);
     result.exitBlockID = cfg->getExit().getBlockID();
+
+    // --- Faz 2: raporlama gecisi ---
+    // Sabitlenmis exit state'lerden her blogun giris state'i yeniden
+    // hesaplanir ve elemanlar bir kez daha yurunerek onStatement cagrilir.
+    // Boylece raporlar her zaman fixpoint'teki state'i yansitir.
+    if constexpr (detail::HasOnStatement<Analysis>::value) {
+        for (const clang::CFGBlock* block : *cfg) {
+            if (!block) continue;
+
+            bool hasPreds = false;
+            State entryState = computeEntryState(block, hasPreds);
+            if (!hasPreds && block != &cfg->getEntry()) continue;
+
+            State currentState = entryState;
+            for (const clang::CFGElement& elem : *block) {
+                auto cfgStmt = elem.getAs<clang::CFGStmt>();
+                if (!cfgStmt) continue;
+                const clang::Stmt* stmt = cfgStmt->getStmt();
+                if (!stmt) continue;
+
+                State before = currentState;
+                currentState = analysis.transfer(stmt, currentState, ctx);
+                analysis.onStatement(stmt, before, currentState, ctx);
+            }
+        }
+    }
+
     return result;
 }
 

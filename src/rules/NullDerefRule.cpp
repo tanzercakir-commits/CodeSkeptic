@@ -276,7 +276,7 @@ public:
             return;
 
         const SourceManager& sm = ctx.getSourceManager();
-        SourceLocation loc = stmt->getBeginLoc();
+        SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reported_.emplace(effect.var, line).second) return;
 
