@@ -10,6 +10,9 @@
 # (yerel/testte sahte mini-suite ile calistirmayi da mumkun kilar).
 set -euo pipefail
 
+# Kendi dizinimizi HERHANGI bir cd'den ONCE coz (goreli yol tuzagi)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 ZD_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 WORK="${2:-juliet-work}"
 LIMIT="${3:-400}"
@@ -28,11 +31,22 @@ if [ -z "${JULIET_DIR:-}" ]; then
     JULIET_DIR="$(pwd)/juliet"
 fi
 
-TESTCASES="$JULIET_DIR/C/testcases"
-SUPPORT="$JULIET_DIR/C/testcasesupport"
-[ -d "$TESTCASES" ] || { echo "[juliet] testcases bulunamadi: $TESTCASES"; exit 1; }
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Zip yerlesimi surumden suruma degisebilir — testcasesupport'u arayarak
+# kok dizini sagalamlastir
+if [ ! -d "$JULIET_DIR/C/testcases" ]; then
+    found="$(find "$JULIET_DIR" -maxdepth 4 -type d -name testcasesupport \
+        | head -1 || true)"
+    [ -n "$found" ] && JULIET_DIR="$(dirname "$found")/.."
+fi
+TESTCASES="$(cd "$JULIET_DIR" && pwd)/C/testcases"
+SUPPORT="$(cd "$JULIET_DIR" && pwd)/C/testcasesupport"
+if [ ! -d "$TESTCASES" ]; then
+    # Alternatif: dogrudan testcases iceren yerlesim
+    alt="$(find "$JULIET_DIR" -maxdepth 4 -type d -name testcases | head -1 || true)"
+    [ -n "$alt" ] || { echo "[juliet] testcases bulunamadi: $JULIET_DIR"; exit 1; }
+    TESTCASES="$alt"
+    SUPPORT="$(dirname "$alt")/testcasesupport"
+fi
 
 # Kural -> CWE eslemesi
 CWES=(

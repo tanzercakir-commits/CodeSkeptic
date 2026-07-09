@@ -44,6 +44,8 @@ jobs:
           key: juliet-c-cpp-1.3
 
       - name: Run benchmark
+        # shell: bash → -eo pipefail: tee borusu exit kodunu maskeleyemez
+        shell: bash
         run: |
           bash scripts/run_juliet.sh ./build/src/zerodefect juliet-work \
             "${{ github.event.inputs.limit || '400' }}" | tee juliet-output.txt
