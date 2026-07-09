@@ -1,5 +1,27 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — İnterprosedürel v2: alias izleme
+
+### Eklenen
+- **Parametre etkilerinde alias izleme** (`engine/FunctionSummary`):
+  iki geçişli tasarım — (A) kopya grafı + taint tohumları, (B) etkiler
+  temiz alias'lar üzerinden parametreye çözülür.
+  - `void destroy(int* p) { int* cur = p; free(cur); }` artık **Frees** —
+    imleç-desenli yıkıcılar (her C kütüphanesinin `*_Delete`'i) wrapper
+    üzerinden double-free/UAF tespitine katıldı. Gerçek cJSON_Delete
+    şekli (parametre döngüde yeniden atanır) may-semantikle Frees.
+  - **Taint kuralları** (yanlış Frees/ReadsOnly iddiası FP doğururdu):
+    kirli kaynaktan beslenen (`l = pick()`), adresi alınan (`&l`),
+    static-yerel veya birden fazla parametreden ulaşılabilen yerel temiz
+    alias DEĞİLDİR; böyle yerele ulaşan parametre Stores'a düşer. Taint
+    kopya grafında yayılır (kirliden kopyalanan kirlidir).
+  - Salt-okur kullanım alias üzerinden de ReadsOnly kalır (leak görünür);
+    alias'ın globale yazılması/dönmesi Stores (kaçış korunur).
+
+### Doğrulama
+- 156/156 test (8 yeni alias testi + eski muhafazakârlık testi Frees
+  beklentisine çevrildi: `AliasingCallee_NowFrees_DoubleFree`)
+
 ## 2026-07-09 — Faz 4 açılışı: interprosedürel analiz v1 (fonksiyon özetleri)
 
 ### Eklenen

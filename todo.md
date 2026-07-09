@@ -39,9 +39,9 @@
 ### Faz 4 (araştırma ufku)
 - [x] İnterprosedürel v1: fonksiyon özetleri (dönüş nullness + parametre
       etkileri; sabit-nokta taraması, rekursiyon-güvenli)
-- [ ] İnterprosedürel v2: alias izleme (yerel kopyaya atanan parametrenin
-      free'si — cJSON_Delete kalıbı; AliasingCallee_Conservative_Silent
-      testi o gün Frees beklentisine çevrilmeli)
+- [x] İnterprosedürel v2: alias izleme (kopya grafı + taint yayılımı;
+      imleç-desenli yıkıcılar Frees; kirli/çok-kaynaklı/adresli yereller
+      muhafazakâr)
 - [ ] İnterprosedürel v2: dönüş nullness'inde parametre/dataflow desteği
       (`return p;` yolları — şimdilik Unknown)
 - [ ] Cross-TU özetler (whole-program modu: özetleri diske yaz/yükle)
