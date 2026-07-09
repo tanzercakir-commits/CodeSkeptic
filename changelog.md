@@ -1,5 +1,28 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-09 — Motor düzeltmesi: fixpoint sonrası raporlama
+
+### Düzeltilen (korpusun ilk avı)
+- **Raporlama fixpoint'e taşındı**: `onStatement` artık worklist iterasyonu
+  sırasında DEĞİL, sabitleme sonrası ayrı bir raporlama geçişinde çağrılıyor.
+  Eski davranışta do-while/for gövdesinin ilk ziyaretinde back-edge state'i
+  henüz yokken rapor üretiliyor, satır dedup'ı da sonraki doğru state'in
+  düzeltmesini engelliyordu. cJSON'da `parse_array`'in linked-list kurma
+  kalıbı bu yüzden "kesinlikle null" (Error) çıkıyordu — doğrusu MaybeNull
+  (Warning). Regresyon testi eski motorla kırılıyor, yenisiyle geçiyor
+  (falsifikasyon doğrulandı).
+- **MemLeak transfer'ı saflaştırıldı**: reassignment-leak ve double-free
+  raporları transfer'dan onStatement'a taşındı (motor sözleşmesi: transfer
+  saf state fonksiyonu, raporlama yalnızca fixpoint geçişinde).
+- **Path kanonikleştirme**: `tests/../cJSON.c` ile `cJSON.c` aynı dosya —
+  `weakly_canonical` ile tekilleştirme ve baseline anahtarları güvenilir.
+- **Makro konumları**: tüm kurallar expansion loc kullanıyor; makro içi
+  bulgularda dosya adının boş kalması sorunu giderildi (cJSON unity
+  test makrolarında görüldü).
+
+### Test sonuçları
+- 93/93 test geçti (92 + 1 motor regresyon testi)
+
 ## 2026-07-09 — Gerçek dünya korpusu CI'da
 
 ### Eklenen

@@ -59,6 +59,9 @@
 - [x] NullDerefRule (NullState lattice + assume edges, 16 test)
 - [x] GTest 92/92
 - [x] Gerçek dünya korpusu CI'da (cJSON + tinyxml2, scripts/run_corpus.sh)
+- [x] Motor: fixpoint sonrası raporlama geçişi (erken-state severity hatası)
+- [x] Path kanonikleştirme + makro expansion loc (korpus bulguları)
+- [x] GTest 93/93
 
 ## Teknik Notlar (Aklında Tut)
 
@@ -85,6 +88,9 @@ LLVM `-fno-rtti` ile derlenir. CMake'de `LLVM_ENABLE_RTTI` kontrolü var.
 
 ### DataflowEngine — Analysis duck typing
 Analysis sınıfı `State`, `initialState()`, `merge()`, `transfer()` sağlamalı. `onStatement()`, `refineOnEdge()` ve `latticeHeight()` opsiyonel (SFINAE ile `if constexpr`). `DataflowResult` `exitBlockID` içerir — exit block check için CFG rebuild gereksiz.
+
+### Motor sözleşmesi — transfer saf, raporlama fixpoint'te
+`transfer()` SAF olmalı (yalnızca state döndürür, yan etki üretmez) — worklist fazında defalarca çağrılır. Raporlama `onStatement()` içinde yapılır; motor onu yalnızca fixpoint SONRASI raporlama geçişinde çağırır. Erken state ile rapor üretmek yanlış severity verir (cJSON parse_array vakası, 2026-07-09).
 
 ### CFG granülerliği — setAllAlwaysAdd
 Motor CFG'yi `setAllAlwaysAdd` ile kurar: alt ifadeler değerlendirme sırasında ayrı elemanlardır (DumpCFG'deki gibi). Analizler her elemanın YALNIZCA tepe düğümüne bakmalı; findAll/descendant araması hem gereksiz hem mükerrer tetikler (aynı ifade hem kendi elemanı hem üst statement elemanı içinde görünür — rapor dedup'ları bu yüzden var).

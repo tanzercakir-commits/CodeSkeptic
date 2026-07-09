@@ -64,6 +64,15 @@ int StaticAnalyzer::run() {
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
 
+    // Ayni dosya farkli path'lerle gelebilir (compile DB'de "tests/../x.c"
+    // gibi) — tekillestirme ve baseline anahtarlari icin kanonik path
+    for (auto& diag : diagnostics_) {
+        if (diag.file.empty()) continue;
+        std::error_code ec;
+        auto canonical = std::filesystem::weakly_canonical(diag.file, ec);
+        if (!ec) diag.file = canonical.string();
+    }
+
     SuppressionFilter suppression;
     size_t suppressed = suppression.filter(diagnostics_);
     if (suppressed > 0) {

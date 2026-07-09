@@ -226,6 +226,34 @@ TEST(NullDerefRuleTest, OutParamEscape_Clean) {
     ASSERT_EQ(results.size(), 0);
 }
 
+TEST(NullDerefRuleTest, LinkedListBuildLoop_WarningNotError) {
+    // cJSON parse_array kalibi: cur ilk iterasyonda then-dalinda atanir,
+    // sonrakilerde else-dalinda dereference edilir. head/cur korelasyonu
+    // izlenmedigi icin MaybeNull (Warning) durustce raporlanir — ama
+    // fixpoint oncesi erken state ile "kesinlikle null" (Error) DEMEK
+    // yanlisti (motor regresyon testi).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Node { Node* next; };
+        void f(int n) {
+            Node* head = nullptr;
+            Node* cur = nullptr;
+            for (int i = 0; i < n; i++) {
+                Node* item = new Node;
+                if (head == nullptr) {
+                    head = item;
+                    cur = item;
+                } else {
+                    cur->next = item;
+                    cur = item;
+                }
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);  // Error DEGIL
+}
+
 TEST(NullDerefRuleTest, OpaqueFunctionReturn_Silent) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
