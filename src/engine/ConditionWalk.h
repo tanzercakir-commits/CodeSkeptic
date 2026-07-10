@@ -47,6 +47,20 @@ inline bool isNullLiteral(const clang::Expr* expr) {
     return false;
 }
 
+// Tamsayi sabitinin sifirligi: IntegerLiteral (+ unary eksi zinciri).
+// Uc deger: 1 = kesin sifir, 0 = kesin sifir-degil, -1 = sabit degil.
+inline int zeroLiteralState(const clang::Expr* expr) {
+    if (!expr) return -1;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* lit = llvm::dyn_cast<clang::IntegerLiteral>(expr))
+        return lit->getValue() == 0 ? 1 : 0;
+    if (const auto* unary = llvm::dyn_cast<clang::UnaryOperator>(expr)) {
+        if (unary->getOpcode() == clang::UO_Minus)
+            return zeroLiteralState(unary->getSubExpr());
+    }
+    return -1;
+}
+
 inline clang::BinaryOperatorKind mirror(clang::BinaryOperatorKind opc) {
     switch (opc) {
         case clang::BO_LT: return clang::BO_GT;
@@ -129,6 +143,54 @@ void walkNullCondition(const clang::Expr* cond, bool isTrue,
             if (!d::isNullLiteral(other)) return;
             bool eqHolds = (opc == clang::BO_EQ) == edgeTrue;
             setNull(var, eqHolds);
+        });
+}
+
+// Tamsayi-sifirlik domain'i: setZero(var, isZeroOnEdge) — bu kenarda
+// var'in kesin sifir (true) ya da kesin sifir-degil (false) oldugu
+// bilgisi. Desteklenen kaliplar: truthiness, ==/!= (sifir ve sifir
+// olmayan sabit), sifir sabitiyle siralamalar (esitsizligin sifiri
+// disladigi yon). Iki istemci: DivByZeroRule (kenar iyilestirmesi) ve
+// FunctionSummary'nin sifirlik mini-akisi.
+template <typename SetZeroFn>
+void walkZeroCondition(const clang::Expr* cond, bool isTrue,
+                       SetZeroFn&& setZero) {
+    namespace d = condwalk_detail;
+    walkCondition(
+        cond, isTrue,
+        [&](const clang::VarDecl* var, bool truthy) {
+            setZero(var, !truthy);  // `if (z)` dogru → sifir-degil
+        },
+        [&](const clang::VarDecl* var, clang::BinaryOperatorKind opc,
+            const clang::Expr* other, bool edgeTrue) {
+            const int lit = d::zeroLiteralState(other);
+
+            if (opc == clang::BO_EQ || opc == clang::BO_NE) {
+                // `z == 0` dogru → Zero; `z != 0` dogru → NonZero
+                // (yanlislarda tersi). Sifir olmayan sabitle esitlik
+                // tutuyorsa → NonZero; tutmuyorsa bilgi yok.
+                const bool eqHolds = (opc == clang::BO_EQ) == edgeTrue;
+                if (lit == 1)
+                    setZero(var, eqHolds);
+                else if (lit == 0 && eqHolds)
+                    setZero(var, false);
+                return;
+            }
+
+            // Siralamalar yalnizca sifir sabitiyle (opc degisken-solda)
+            if (lit != 1) return;
+            switch (opc) {
+                case clang::BO_GT:  // z > 0
+                case clang::BO_LT:  // z < 0
+                    if (edgeTrue) setZero(var, false);
+                    break;
+                case clang::BO_GE:  // z >= 0: yanlis ise z < 0
+                case clang::BO_LE:  // z <= 0: yanlis ise z > 0
+                    if (!edgeTrue) setZero(var, false);
+                    break;
+                default:
+                    break;
+            }
         });
 }
 

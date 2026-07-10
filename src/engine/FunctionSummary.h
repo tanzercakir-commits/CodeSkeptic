@@ -39,10 +39,16 @@ namespace zerodefect {
 class SummaryRegistry {
 public:
     enum class ReturnNullness { Unknown, NeverNull, MaybeNull };
+    // Tamsayi donduren fonksiyonlar icin sifir-olabilirlik: DivByZero
+    // fonksiyonlar arasi gorur (`data = 0; return data;` kaynagi baska
+    // fonksiyonda/dosyada olsa da bolen uyarilir). Null'un aynasi:
+    // ayni mini-akis, sifir domain'iyle.
+    enum class ReturnZeroness { Unknown, NeverZero, MaybeZero };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
 
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
+        ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
         std::vector<ParamEffect> params;
 
         ParamEffect paramEffect(unsigned index) const {

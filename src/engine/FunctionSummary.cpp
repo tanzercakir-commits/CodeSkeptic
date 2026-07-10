@@ -23,6 +23,7 @@ namespace {
 constexpr unsigned kMaxSweeps = 5;
 
 using ReturnNullness = zerodefect::SummaryRegistry::ReturnNullness;
+using ReturnZeroness = zerodefect::SummaryRegistry::ReturnZeroness;
 using ParamEffect = zerodefect::SummaryRegistry::ParamEffect;
 using FunctionSummary = zerodefect::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
@@ -42,15 +43,16 @@ const FunctionSummary* lookupPrev(const SummaryTable& previous,
     return zerodefect::SummaryRegistry::instance().lookupGlobal(callee);
 }
 
-// Deger-duzeyi null durumu. NullDerefRule'un lattice'iyle ayni sekil;
-// ozet baglaminda yasar (TU-anonim, cakisma yok).
-enum class VState { Unknown, Null, NonNull, MaybeNull };
+// Deger-duzeyi "kotu deger" durumu. Iki domain ayni sekli paylasir:
+// null domain'inde Bad = null, sifir domain'inde Bad = 0. NullDeref'in
+// lattice'iyle ayni; ozet baglaminda yasar (TU-anonim, cakisma yok).
+enum class VState { Unknown, Bad, NonBad, MaybeBad };
 
 VState mergeVState(VState a, VState b) {
     if (a == b) return a;
-    bool anyNullInfo = a == VState::Null || a == VState::MaybeNull ||
-                       b == VState::Null || b == VState::MaybeNull;
-    return anyNullInfo ? VState::MaybeNull : VState::Unknown;
+    bool anyBadInfo = a == VState::Bad || a == VState::MaybeBad ||
+                      b == VState::Bad || b == VState::MaybeBad;
+    return anyBadInfo ? VState::MaybeBad : VState::Unknown;
 }
 
 // Ifadenin null durumu: literal/new/&x/string dogrudan; cagri zinciri
@@ -59,23 +61,49 @@ VState vstateOf(const Expr* expr, const SummaryTable& previous) {
     if (!expr) return VState::Unknown;
     expr = expr->IgnoreParenCasts();
 
-    if (isa<CXXNullPtrLiteralExpr>(expr)) return VState::Null;
-    if (isa<GNUNullExpr>(expr)) return VState::Null;
+    if (isa<CXXNullPtrLiteralExpr>(expr)) return VState::Bad;
+    if (isa<GNUNullExpr>(expr)) return VState::Bad;
     if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
-        return lit->getValue() == 0 ? VState::Null : VState::NonNull;
+        return lit->getValue() == 0 ? VState::Bad : VState::NonBad;
     if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
-        if (unary->getOpcode() == UO_AddrOf) return VState::NonNull;
+        if (unary->getOpcode() == UO_AddrOf) return VState::NonBad;
     }
-    if (isa<CXXNewExpr>(expr)) return VState::NonNull;
-    if (isa<StringLiteral>(expr)) return VState::NonNull;
+    if (isa<CXXNewExpr>(expr)) return VState::NonBad;
+    if (isa<StringLiteral>(expr)) return VState::NonBad;
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         if (const auto* summary =
                 lookupPrev(previous, call->getDirectCallee())) {
             if (summary->returnNullness == ReturnNullness::NeverNull)
-                return VState::NonNull;
+                return VState::NonBad;
             if (summary->returnNullness == ReturnNullness::MaybeNull)
-                return VState::MaybeNull;
+                return VState::MaybeBad;
+        }
+        return VState::Unknown;
+    }
+    return VState::Unknown;
+}
+
+// Ifadenin sifir durumu (sifir domain'i): tamsayi sabitleri dogrudan,
+// cagri zinciri ozetlerin returnZeroness alaniyla cozulur.
+VState zstateOf(const Expr* expr, const SummaryTable& previous) {
+    if (!expr) return VState::Unknown;
+    expr = expr->IgnoreParenCasts();
+
+    if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
+        return lit->getValue() == 0 ? VState::Bad : VState::NonBad;
+    if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+        if (unary->getOpcode() == UO_Minus)
+            return zstateOf(unary->getSubExpr(), previous);
+    }
+
+    if (const auto* call = dyn_cast<CallExpr>(expr)) {
+        if (const auto* summary =
+                lookupPrev(previous, call->getDirectCallee())) {
+            if (summary->returnZeroness == ReturnZeroness::NeverZero)
+                return VState::NonBad;
+            if (summary->returnZeroness == ReturnZeroness::MaybeZero)
+                return VState::MaybeBad;
         }
         return VState::Unknown;
     }
@@ -90,38 +118,55 @@ const VarDecl* exprAsVar(const Expr* expr) {
     return nullptr;
 }
 
-// Kosul kenarlarinda pointer nullness iyilestirmesi — ortak yuruyus
-// iskeleti uzerinden (engine/ConditionWalk.h)
+// Kosul kenarlarinda domain iyilestirmeleri — ortak yuruyus iskeleti
+// uzerinden (engine/ConditionWalk.h)
 void applyNullCond(const Expr* cond, bool isTrue,
                    std::map<const VarDecl*, VState>& state) {
     zerodefect::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
             auto it = state.find(var);
             if (it != state.end())
-                it->second = isNull ? VState::Null : VState::NonNull;
+                it->second = isNull ? VState::Bad : VState::NonBad;
         });
 }
 
-// --- Degisken donduren yollar icin mini null-akisi ---
+void applyZeroCond(const Expr* cond, bool isTrue,
+                   std::map<const VarDecl*, VState>& state) {
+    zerodefect::walkZeroCondition(
+        cond, isTrue, [&](const VarDecl* var, bool isZero) {
+            auto it = state.find(var);
+            if (it != state.end())
+                it->second = isZero ? VState::Bad : VState::NonBad;
+        });
+}
+
+// --- Degisken donduren yollar icin mini deger-akisi ---
 //
 // `return p;` yollari yapisal degerlendirmeyle Unknown kaliyordu (v1
-// siniri). Simdi pointer yerelleri/parametreleri kendi motorumuzla
+// siniri). Simdi izlenen yereller/parametreler kendi motorumuzla
 // (runDataflow: iki fazli raporlama + assume-edge iyilestirmesi) akis-
 // DUYARLI izlenir ve her return elemani yakinsamis durumdan katki alir.
 // Akis-duyarsiz kestirme bilincli reddedildi: `p = NULL; p = &g;
 // return p;` kalibinda yanlis MaybeNull uretir, precision'i yakardi.
 //
-// Katki eslemesi: Null/MaybeNull -> "bu yol null dondurebilir";
-// NonNull -> NeverNull katkisi; Unknown -> Unknown. Fonksiyon toplami
-// eski kuralla ayni: herhangi bir null yolu -> MaybeNull; TUM yollar
-// NonNull -> NeverNull; aksi Unknown. CFG'nin ulasamadigi return'ler
-// (olu kod) katki vermez.
-class ReturnNullFlowAnalysis {
+// Domain sablon parametreleridir: ValueOf ifade degerlendirmesi
+// (vstateOf / zstateOf), Refine kenar iyilestirmesi (applyNullCond /
+// applyZeroCond). Ayni omurga hem null hem sifir domain'ine hizmet
+// eder — Bad null domain'inde "null", sifir domain'inde "0" demektir.
+//
+// Katki eslemesi: Bad/MaybeBad -> "bu yol kotu deger dondurebilir";
+// NonBad -> Never* katkisi; Unknown -> Unknown. Fonksiyon toplami:
+// herhangi bir kotu yol -> Maybe*; TUM yollar NonBad -> Never*; aksi
+// Unknown. CFG'nin ulasamadigi return'ler (olu kod) katki vermez.
+template <VState (*ValueOf)(const Expr*, const SummaryTable&),
+          void (*Refine)(const Expr*, bool,
+                         std::map<const VarDecl*, VState>&)>
+class ReturnFlowAnalysis {
 public:
     using State = std::map<const VarDecl*, VState>;
 
-    ReturnNullFlowAnalysis(std::vector<const VarDecl*> trackedVars,
-                           const SummaryTable& previous)
+    ReturnFlowAnalysis(std::vector<const VarDecl*> trackedVars,
+                       const SummaryTable& previous)
         : previous_(previous) {
         for (const auto* var : trackedVars)
             initState_[var] = VState::Unknown;
@@ -151,7 +196,7 @@ public:
                 if (const auto* vd = dyn_cast<VarDecl>(decl)) {
                     auto it = out.find(vd);
                     if (it != out.end() && vd->hasInit())
-                        it->second = vstateOf(vd->getInit(), previous_);
+                        it->second = ValueOf(vd->getInit(), previous_);
                 }
             }
             return out;
@@ -162,7 +207,7 @@ public:
             auto it = var ? in.find(var) : in.end();
             if (it == in.end()) return in;
             State out = in;
-            out[var] = vstateOf(binOp->getRHS(), previous_);
+            out[var] = ValueOf(binOp->getRHS(), previous_);
             return out;
         }
         if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
@@ -181,7 +226,7 @@ public:
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
-        applyNullCond(dyn_cast<Expr>(cond), isTrueBranch, state);
+        Refine(dyn_cast<Expr>(cond), isTrueBranch, state);
     }
 
     // Fixpoint sonrasi: her ULASILABILIR return'un katkisi toplanir
@@ -195,9 +240,9 @@ public:
         if (const VarDecl* var = exprAsVar(expr)) {
             auto it = before.find(var);
             v = (it != before.end()) ? it->second
-                                     : vstateOf(expr, previous_);
+                                     : ValueOf(expr, previous_);
         } else {
-            v = vstateOf(expr, previous_);
+            v = ValueOf(expr, previous_);
         }
         contributions.push_back(v);
     }
@@ -209,20 +254,82 @@ private:
     State initState_;
 };
 
-ReturnNullness aggregateContributions(const std::vector<VState>& contribs) {
-    if (contribs.empty()) return ReturnNullness::Unknown;
-    bool sawNull = false;
-    bool allNeverNull = true;
+// Katki toplami (iki domain'in ortak kurali): herhangi bir kotu yol ->
+// Maybe*; TUM yollar kesin NonBad -> Never* (guclu iddia); aksi Unknown.
+struct AggregateFlags {
+    bool empty = true;
+    bool sawBad = false;
+    bool allNonBad = true;
+};
+
+AggregateFlags aggregateFlags(const std::vector<VState>& contribs) {
+    AggregateFlags flags;
+    flags.empty = contribs.empty();
     for (VState v : contribs) {
-        if (v == VState::Null || v == VState::MaybeNull) sawNull = true;
-        if (v != VState::NonNull) allNeverNull = false;
+        if (v == VState::Bad || v == VState::MaybeBad) flags.sawBad = true;
+        if (v != VState::NonBad) flags.allNonBad = false;
     }
-    // Herhangi bir yol null dondurebiliyorsa MaybeNull — diger yollarin
-    // belirsizligi bunu zayiflatmaz. NeverNull ise TUM yollarin kesin
-    // non-null olmasini gerektirir (guclu iddia).
-    if (sawNull) return ReturnNullness::MaybeNull;
-    if (allNeverNull) return ReturnNullness::NeverNull;
-    return ReturnNullness::Unknown;
+    return flags;
+}
+
+// Return toplayici + izlenecek degisken toplayici — iki domain ortak.
+struct ReturnCollector : RecursiveASTVisitor<ReturnCollector> {
+    std::vector<const Expr*> returns;
+    bool anyVarReturn = false;
+    bool VisitReturnStmt(ReturnStmt* ret) {
+        returns.push_back(ret->getRetValue());
+        if (exprAsVar(ret->getRetValue())) anyVarReturn = true;
+        return true;
+    }
+    // Ic ice fonksiyonlarin (lambda) return'leri sayilmasin
+    bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+};
+
+template <typename TypePred>
+std::vector<const VarDecl*> collectTypedVars(const FunctionDecl* func,
+                                             TypePred matches) {
+    struct VarCollector : RecursiveASTVisitor<VarCollector> {
+        TypePred* pred;
+        std::set<const VarDecl*> vars;
+        bool VisitVarDecl(VarDecl* vd) {
+            if ((*pred)(vd->getType())) vars.insert(vd);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    };
+    VarCollector collector;
+    collector.pred = &matches;
+    collector.TraverseStmt(func->getBody());
+    for (const auto* param : func->parameters())
+        if (matches(param->getType())) collector.vars.insert(param);
+    return {collector.vars.begin(), collector.vars.end()};
+}
+
+// Iki domain'in ortak govdesi: hizli yapisal yol (degisken donduren
+// return yoksa CFG'siz), aksi halde mini deger-akisi.
+template <VState (*ValueOf)(const Expr*, const SummaryTable&),
+          void (*Refine)(const Expr*, bool,
+                         std::map<const VarDecl*, VState>&),
+          typename TypePred>
+AggregateFlags computeReturnFlow(const FunctionDecl* func, ASTContext& ctx,
+                                 const SummaryTable& previous,
+                                 TypePred varMatches) {
+    ReturnCollector collector;
+    collector.TraverseStmt(func->getBody());
+    if (collector.returns.empty()) return {};
+
+    if (!collector.anyVarReturn) {
+        std::vector<VState> contribs;
+        contribs.reserve(collector.returns.size());
+        for (const auto* ret : collector.returns)
+            contribs.push_back(ValueOf(ret, previous));
+        return aggregateFlags(contribs);
+    }
+
+    ReturnFlowAnalysis<ValueOf, Refine> analysis(
+        collectTypedVars(func, varMatches), previous);
+    zerodefect::runDataflow(func, ctx, analysis);
+    return aggregateFlags(analysis.contributions);
 }
 
 ReturnNullness computeReturnNullness(const FunctionDecl* func,
@@ -231,50 +338,32 @@ ReturnNullness computeReturnNullness(const FunctionDecl* func,
     if (!func->getReturnType()->isPointerType())
         return ReturnNullness::Unknown;
 
-    struct ReturnCollector : RecursiveASTVisitor<ReturnCollector> {
-        std::vector<const Expr*> returns;
-        bool anyVarReturn = false;
-        bool VisitReturnStmt(ReturnStmt* ret) {
-            returns.push_back(ret->getRetValue());
-            if (exprAsVar(ret->getRetValue())) anyVarReturn = true;
-            return true;
-        }
-        // Ic ice fonksiyonlarin (lambda) return'leri sayilmasin
-        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
-    };
-    ReturnCollector collector;
-    collector.TraverseStmt(func->getBody());
-    if (collector.returns.empty()) return ReturnNullness::Unknown;
+    AggregateFlags flags = computeReturnFlow<vstateOf, applyNullCond>(
+        func, ctx, previous,
+        [](QualType t) { return t->isPointerType(); });
+    if (flags.empty) return ReturnNullness::Unknown;
+    if (flags.sawBad) return ReturnNullness::MaybeNull;
+    if (flags.allNonBad) return ReturnNullness::NeverNull;
+    return ReturnNullness::Unknown;
+}
 
-    // Hizli yol: degisken donduren return yoksa CFG'siz yapisal
-    // degerlendirme yeterli (yaygin durum; dataflow maliyeti odenmez)
-    if (!collector.anyVarReturn) {
-        std::vector<VState> contribs;
-        contribs.reserve(collector.returns.size());
-        for (const auto* ret : collector.returns)
-            contribs.push_back(vstateOf(ret, previous));
-        return aggregateContributions(contribs);
-    }
+ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
+                                     ASTContext& ctx,
+                                     const SummaryTable& previous) {
+    // bool haric: `return ok;` kalibindaki false'lar sifir sayilip her
+    // yerde MaybeZero uretirdi; bool bolen zaten anlamsiz
+    QualType retType = func->getReturnType();
+    if (!retType->isIntegerType() || retType->isBooleanType())
+        return ReturnZeroness::Unknown;
 
-    // Degisken donduren yol var: pointer yerelleri/parametreleri topla
-    // ve mini null-akisini kos
-    struct PtrVarCollector : RecursiveASTVisitor<PtrVarCollector> {
-        std::set<const VarDecl*> vars;
-        bool VisitVarDecl(VarDecl* vd) {
-            if (vd->getType()->isPointerType()) vars.insert(vd);
-            return true;
-        }
-        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
-    };
-    PtrVarCollector ptrVars;
-    ptrVars.TraverseStmt(func->getBody());
-    for (const auto* param : func->parameters())
-        if (param->getType()->isPointerType()) ptrVars.vars.insert(param);
-
-    ReturnNullFlowAnalysis analysis(
-        {ptrVars.vars.begin(), ptrVars.vars.end()}, previous);
-    zerodefect::runDataflow(func, ctx, analysis);
-    return aggregateContributions(analysis.contributions);
+    AggregateFlags flags = computeReturnFlow<zstateOf, applyZeroCond>(
+        func, ctx, previous, [](QualType t) {
+            return t->isIntegerType() && !t->isBooleanType();
+        });
+    if (flags.empty) return ReturnZeroness::Unknown;
+    if (flags.sawBad) return ReturnZeroness::MaybeZero;
+    if (flags.allNonBad) return ReturnZeroness::NeverZero;
+    return ReturnZeroness::Unknown;
 }
 
 // --- Parametre etkileri (v2: alias izlemeli) ---
@@ -626,6 +715,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
         for (const auto* func : collector.functions) {
             FunctionSummary summary;
             summary.returnNullness = computeReturnNullness(func, ctx, current);
+            summary.returnZeroness = computeReturnZeroness(func, ctx, current);
             summary.params = computeParamEffects(func, current);
 
             const auto* key = func->getCanonicalDecl();
@@ -634,6 +724,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             auto prev = current.find(key);
             if (prev == current.end() ||
                 prev->second.returnNullness != summary.returnNullness ||
+                prev->second.returnZeroness != summary.returnZeroness ||
                 prev->second.params != summary.params) {
                 changed = true;
             }
@@ -665,9 +756,12 @@ std::string globalKey(const FunctionDecl* func) {
 void mergeConservative(SummaryRegistry::FunctionSummary& into,
                        const SummaryRegistry::FunctionSummary& from) {
     using RN = SummaryRegistry::ReturnNullness;
+    using RZ = SummaryRegistry::ReturnZeroness;
     using PE = SummaryRegistry::ParamEffect;
     if (into.returnNullness != from.returnNullness)
         into.returnNullness = RN::Unknown;
+    if (into.returnZeroness != from.returnZeroness)
+        into.returnZeroness = RZ::Unknown;
     if (into.params.size() != from.params.size()) {
         into.params.clear();  // paramEffect() varsayilani Opaque'tir
         return;
@@ -676,12 +770,14 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
         if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
 }
 
-// --- Disk formati (v1) ---
+// --- Disk formati ---
 //
-// Baslik satiri + kayit basina bir satir: anahtar<TAB>donus<TAB>paramlar
-// Donus: U/N/M; parametreler O/R/F/S karakter dizisi, bos vektor "-".
+// v2: anahtar<TAB>donus-null<TAB>paramlar<TAB>donus-sifir
+// v1 (eski): son sutun yok — yuklemede taninir, sifirlik Unknown kalir.
+// Donusler: U/N/M; parametreler O/R/F/S karakter dizisi, bos vektor "-".
 // Nitelikli adlar TAB/yenisatir iceremez — anahtar guvenli.
-constexpr const char* kSummaryFileHeader = "zerodefect-summaries v1";
+constexpr const char* kSummaryFileHeader = "zerodefect-summaries v2";
+constexpr const char* kSummaryFileHeaderV1 = "zerodefect-summaries v1";
 
 char rnToChar(ReturnNullness v) {
     switch (v) {
@@ -697,6 +793,24 @@ bool rnFromChar(char c, ReturnNullness& out) {
         case 'U': out = ReturnNullness::Unknown;   return true;
         case 'N': out = ReturnNullness::NeverNull; return true;
         case 'M': out = ReturnNullness::MaybeNull; return true;
+    }
+    return false;
+}
+
+char rzToChar(ReturnZeroness v) {
+    switch (v) {
+        case ReturnZeroness::NeverZero: return 'N';
+        case ReturnZeroness::MaybeZero: return 'M';
+        case ReturnZeroness::Unknown:   break;
+    }
+    return 'U';
+}
+
+bool rzFromChar(char c, ReturnZeroness& out) {
+    switch (c) {
+        case 'U': out = ReturnZeroness::Unknown;   return true;
+        case 'N': out = ReturnZeroness::NeverZero; return true;
+        case 'M': out = ReturnZeroness::MaybeZero; return true;
     }
     return false;
 }
@@ -756,7 +870,7 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
             for (ParamEffect effect : summary.params)
                 out << peToChar(effect);
         }
-        out << '\n';
+        out << '\t' << rzToChar(summary.returnZeroness) << '\n';
     }
     return out.good();
 }
@@ -766,7 +880,8 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
     if (!in.is_open()) return false;
 
     std::string line;
-    if (!std::getline(in, line) || line != kSummaryFileHeader)
+    if (!std::getline(in, line)) return false;
+    if (line != kSummaryFileHeader && line != kSummaryFileHeaderV1)
         return false;
 
     // Once tumuyle ayristir, sonra depoya kat: bozuk dosya kismi durum
@@ -774,18 +889,30 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
     std::map<std::string, FunctionSummary> parsed;
     while (std::getline(in, line)) {
         if (line.empty()) continue;
-        const auto tab1 = line.find('\t');
-        const auto tab2 =
-            tab1 == std::string::npos ? tab1 : line.find('\t', tab1 + 1);
-        if (tab2 == std::string::npos) return false;
 
-        std::string key = line.substr(0, tab1);
-        const std::string rn = line.substr(tab1 + 1, tab2 - tab1 - 1);
-        const std::string pe = line.substr(tab2 + 1);
+        std::vector<std::string> fields;
+        size_t start = 0;
+        for (auto tab = line.find('\t'); tab != std::string::npos;
+             tab = line.find('\t', start)) {
+            fields.push_back(line.substr(start, tab - start));
+            start = tab + 1;
+        }
+        fields.push_back(line.substr(start));
+
+        // v1: 3 alan (sifirlik yok -> Unknown); v2: 4 alan
+        if (fields.size() != 3 && fields.size() != 4) return false;
+        const std::string& key = fields[0];
+        const std::string& rn = fields[1];
+        const std::string& pe = fields[2];
         if (key.empty() || rn.size() != 1 || pe.empty()) return false;
 
         FunctionSummary summary;
         if (!rnFromChar(rn[0], summary.returnNullness)) return false;
+        if (fields.size() == 4) {
+            if (fields[3].size() != 1 ||
+                !rzFromChar(fields[3][0], summary.returnZeroness))
+                return false;
+        }
         if (pe != "-") {
             summary.params.reserve(pe.size());
             for (char c : pe) {
@@ -794,7 +921,7 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
                 summary.params.push_back(effect);
             }
         }
-        auto [it, inserted] = parsed.emplace(std::move(key), summary);
+        auto [it, inserted] = parsed.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);
     }
 

@@ -7,6 +7,7 @@
 //  - Rekursiyon guclu iddia uretmez (soundness).
 
 #include "TestHelper.h"
+#include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
 
@@ -751,10 +752,10 @@ struct GlobalStoreGuard {
 TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     GlobalStoreGuard guard;
     const std::string content =
-        "zerodefect-summaries v1\n"
-        "alpha/1\tN\tR\n"
-        "beta/2\tM\tOF\n"
-        "gamma/0\tU\t-\n";
+        "zerodefect-summaries v2\n"
+        "alpha/1\tN\tR\tU\n"
+        "beta/2\tM\tOF\tM\n"
+        "gamma/0\tU\t-\tN\n";
     auto inPath = writePersistFile("sum_roundtrip_in.txt", content);
 
     auto& registry = SummaryRegistry::instance();
@@ -766,25 +767,44 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     EXPECT_EQ(readWholeFile(outPath), content);
 }
 
+TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
+    // v1 dosyasi (3 sutun, sifirlik yok): yuklenir, sifirlik Unknown —
+    // eski hasat dosyalari yeni surumde calismaya devam eder
+    GlobalStoreGuard guard;
+    auto v1Path = writePersistFile("sum_v1_compat.txt",
+        "zerodefect-summaries v1\n"
+        "legacy/1\tN\tR\n");
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(v1Path));
+    EXPECT_EQ(registry.globalSize(), 1u);
+
+    auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(outPath));
+    EXPECT_EQ(readWholeFile(outPath),
+              "zerodefect-summaries v2\nlegacy/1\tN\tR\tU\n");
+}
+
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     GlobalStoreGuard guard;
     auto pathA = writePersistFile("sum_conflict_a.txt",
-        "zerodefect-summaries v1\n"
-        "foo/1\tN\tR\n");
+        "zerodefect-summaries v2\n"
+        "foo/1\tN\tR\tN\n");
     auto pathB = writePersistFile("sum_conflict_b.txt",
-        "zerodefect-summaries v1\n"
-        "foo/1\tM\tF\n");
+        "zerodefect-summaries v2\n"
+        "foo/1\tM\tF\tM\n");
 
     auto& registry = SummaryRegistry::instance();
     ASSERT_TRUE(registry.loadGlobal(pathA));
     ASSERT_TRUE(registry.loadGlobal(pathB));
     EXPECT_EQ(registry.globalSize(), 1u);
 
-    // Uyusmayan alanlar zayif iddiaya duser: N vs M -> U, R vs F -> O
+    // Uyusmayan alanlar zayif iddiaya duser: iki donus alani N vs M -> U,
+    // param R vs F -> O
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v1\nfoo/1\tU\tO\n");
+              "zerodefect-summaries v2\nfoo/1\tU\tO\tU\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -792,8 +812,8 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto& registry = SummaryRegistry::instance();
 
     auto good = writePersistFile("sum_good.txt",
-        "zerodefect-summaries v1\n"
-        "keep/1\tN\tR\n");
+        "zerodefect-summaries v2\n"
+        "keep/1\tN\tR\tU\n");
     ASSERT_TRUE(registry.loadGlobal(good));
 
     // Yanlis baslik: reddet
@@ -804,23 +824,29 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     // Gecerli baslik ama bozuk kayit (bilinmeyen etki karakteri):
     // dosyanin TAMAMI reddedilir — onceki gecerli satiri da almayiz
     auto badLine = writePersistFile("sum_bad_line.txt",
-        "zerodefect-summaries v1\n"
-        "bar/1\tN\tR\n"
-        "baz/1\tX\tqq\n");
+        "zerodefect-summaries v2\n"
+        "bar/1\tN\tR\tU\n"
+        "baz/1\tX\tqq\tU\n");
     EXPECT_FALSE(registry.loadGlobal(badLine));
 
     // Eksik alanli satir: reddet
     auto badFields = writePersistFile("sum_bad_fields.txt",
-        "zerodefect-summaries v1\n"
+        "zerodefect-summaries v2\n"
         "noeffects/1\tN\n");
     EXPECT_FALSE(registry.loadGlobal(badFields));
+
+    // Fazla alanli satir: reddet (bilinmeyen gelecek format degildir)
+    auto extraFields = writePersistFile("sum_extra_fields.txt",
+        "zerodefect-summaries v2\n"
+        "extra/1\tN\tR\tU\tX\n");
+    EXPECT_FALSE(registry.loadGlobal(extraFields));
 
     // Depo ilk yuklemeden beri degismemis olmali
     EXPECT_EQ(registry.globalSize(), 1u);
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v1\nkeep/1\tN\tR\n");
+              "zerodefect-summaries v2\nkeep/1\tN\tR\tU\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -887,4 +913,126 @@ TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
         EXPECT_EQ(analyzer.diagnostics()[0].rule_id, "null-deref");
         EXPECT_EQ(analyzer.diagnostics()[0].severity, Severity::Warning);
     }
+}
+
+// ===================================================================
+// Donus sifir-olabilirligi ozeti (ReturnZeroness): DivByZero artik
+// fonksiyonlar arasi gorur — `data = 0; return data;` kaynagi baska
+// fonksiyonda/dosyada olsa da bolen uyarilir. Null'un aynasi: ayni
+// mini-akis, sifir domain'iyle (walkZeroCondition).
+// Bilincli sinir: ozet yalniz ATAMA yolundan tuketilir; dogrudan
+// `x / f()` boleni raporlanmaz (atanmamis cagri sonucu guard'lanamaz,
+// gercek kodda FP ailesi dogururdu).
+// ===================================================================
+
+TEST(InterprocZeroTest, BadSourceLiteral_UnguardedDiv_Warning) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int badSource() { return 0; }
+        int f() {
+            int d = badSource();
+            return 100 / d;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(InterprocZeroTest, JulietShape_VarFlowSource_Warning) {
+    // Juliet CWE369 akis-varyanti kaynagi: yerel once 0, return o
+    // degiskenle — yapisal degerlendirme Unknown birakirdi, mini akis
+    // MaybeZero cikarir
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int badSource(int k) {
+            int data = 0;
+            if (k > 10) data = k;
+            return data;
+        }
+        int f(int k) {
+            int d = badSource(k);
+            return 100 / d;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(InterprocZeroTest, GuardedUse_Silent) {
+    // MaybeZero atansa da guard iyilestirmesi bolme noktasinda NonZero
+    // verir — ozet tuketimi mevcut path hassasiyetiyle birlesir
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int badSource() { return 0; }
+        int f() {
+            int d = badSource();
+            if (d != 0) return 100 / d;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocZeroTest, FlowKilledZero_NeverZero_Silent) {
+    // FP-katili: kaynak icinde 0 atanip SONRA ezilirse akis-duyarli
+    // ozet NeverZero'yu bilir — akis-duyarsiz "bir yerde 0 var"
+    // kestirmesi burada yanlis uyari uretirdi
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int source() {
+            int d = 0;
+            d = 5;
+            return d;
+        }
+        int f() {
+            int x = source();
+            return 100 / x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocZeroTest, DirectCallDivisor_DocumentedSilent) {
+    // Belgeli sinir: atanmamis cagri sonucu bolen olarak raporlanmaz
+    // (guard'lanamaz; FP ailesi riski) — davranis testle sabitlenir
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int badSource() { return 0; }
+        int f() {
+            return 100 / badSource();
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(InterprocZeroTest, TraceNote_MentionsCalleeMayReturnZero) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int badSource() { return 0; }
+        int f() {
+            int d = badSource();
+            return 100 / d;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_FALSE(results[0].notes.empty());
+    EXPECT_NE(results[0].notes[0].message.find("possibly-zero"),
+              std::string::npos);
+}
+
+TEST(InterprocZeroTest, CrossTU_ZeronessTravels) {
+    // Sifirlik cross-TU depodan da tasinir (whole-program / summary-in)
+    DivByZeroRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int badSource() { return 0; }
+    )", R"(
+        int badSource();
+        int f() {
+            int d = badSource();
+            return 100 / d;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
 }

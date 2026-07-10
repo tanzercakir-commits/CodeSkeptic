@@ -131,6 +131,9 @@ const MsgEntry kMessages[] = {
     // SummarySaveError
     {"[ZeroDefect] warning: could not save summaries to {0}",
      "[ZeroDefect] uyari: ozetler kaydedilemedi: {0}"},
+    // TraceAssignedMaybeZeroHere
+    {"'{0}' assigned a possibly-zero value here (callee may return zero)",
+     "{0} burada sifir olabilecek bir deger atandi (cagrilan sifir donebilir)"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

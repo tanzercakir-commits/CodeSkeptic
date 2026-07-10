@@ -117,7 +117,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       kontrolü (kaynak mtime > özet mtime uyarısı)
 - [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
       (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
-- [ ] Int dönüş sıfır-olabilirliği özeti (DivByZero tüketsin)
+- [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama
+      yolundan tüketiyor — doğrudan `x/f()` böleni bilinçli raporlanmıyor;
+      özet dosya formatı v2, v1 geriye uyumlu)
 - [ ] Özet önbelleği (artımlı modda yalnızca değişen fonksiyon tazelenir;
       "özet değişti → çağıranlar etkilendi" = semantik regresyon sinyali)
 

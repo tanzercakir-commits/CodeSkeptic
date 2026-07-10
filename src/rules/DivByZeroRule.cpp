@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
+#include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -38,6 +39,31 @@ ZeroState evaluateAsZero(const Expr* expr) {
     if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
         if (unary->getOpcode() == UO_Minus)
             return evaluateAsZero(unary->getSubExpr());
+    }
+    return ZeroState::Unknown;
+}
+
+// Atanan degerin sifirligi: sabitler dogrudan; cagrilar ozet
+// (returnZeroness) uzerinden — `data = badSource();` kaynagi baska
+// fonksiyonda/dosyada olsa da gorunur. Ozet tuketimi BILEREK yalnizca
+// atama yolundan: dogrudan `x / f()` bolenini raporlamiyoruz — cagri
+// sonucu atanmadan guard'lanamaz (`if (f() != 0) x / f()` taze cagridir),
+// raporlasak gercek kodda FP ailesi dogardi. Atanan deger ise dataflow
+// izler, guard'lar iyilestirir.
+ZeroState evaluateAssignedValue(const Expr* expr) {
+    ZeroState lit = evaluateAsZero(expr);
+    if (lit != ZeroState::Unknown) return lit;
+    if (!expr) return ZeroState::Unknown;
+    const Expr* stripped = expr->IgnoreParenImpCasts();
+    if (const auto* call = dyn_cast<CallExpr>(stripped)) {
+        using RZ = zerodefect::SummaryRegistry::ReturnZeroness;
+        if (const auto* summary = zerodefect::SummaryRegistry::instance()
+                                      .lookup(call->getDirectCallee())) {
+            if (summary->returnZeroness == RZ::NeverZero)
+                return ZeroState::NonZero;
+            if (summary->returnZeroness == RZ::MaybeZero)
+                return ZeroState::MaybeZero;
+        }
     }
     return ZeroState::Unknown;
 }
@@ -81,30 +107,34 @@ std::set<const VarDecl*> collectDivisorVars(const FunctionDecl* funcDecl,
 
 // --- Statement classification ---
 
-enum class StmtEffect { None, AssignsZero, AssignsNonZero, AssignsUnknown };
+enum class StmtEffect {
+    None, AssignsZero, AssignsNonZero, AssignsMaybeZero, AssignsUnknown
+};
+
+StmtEffect effectOfValue(ZeroState val) {
+    switch (val) {
+        case ZeroState::Zero:      return StmtEffect::AssignsZero;
+        case ZeroState::NonZero:   return StmtEffect::AssignsNonZero;
+        case ZeroState::MaybeZero: return StmtEffect::AssignsMaybeZero;
+        case ZeroState::Unknown:   break;
+    }
+    return StmtEffect::AssignsUnknown;
+}
 
 StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (vd == targetVar && vd->hasInit()) {
-                    ZeroState val = evaluateAsZero(vd->getInit());
-                    if (val == ZeroState::Zero) return StmtEffect::AssignsZero;
-                    if (val == ZeroState::NonZero) return StmtEffect::AssignsNonZero;
-                    return StmtEffect::AssignsUnknown;
-                }
+                if (vd == targetVar && vd->hasInit())
+                    return effectOfValue(evaluateAssignedValue(vd->getInit()));
             }
         }
         return StmtEffect::None;
     }
     if (const auto* binOp = dyn_cast<BinaryOperator>(stmt)) {
         if (binOp->getOpcode() == BO_Assign &&
-            refersToVar(binOp->getLHS(), targetVar)) {
-            ZeroState val = evaluateAsZero(binOp->getRHS());
-            if (val == ZeroState::Zero) return StmtEffect::AssignsZero;
-            if (val == ZeroState::NonZero) return StmtEffect::AssignsNonZero;
-            return StmtEffect::AssignsUnknown;
-        }
+            refersToVar(binOp->getLHS(), targetVar))
+            return effectOfValue(evaluateAssignedValue(binOp->getRHS()));
     }
     return StmtEffect::None;
 }
@@ -259,6 +289,9 @@ public:
                     out[var] = ZeroState::Zero; break;
                 case StmtEffect::AssignsNonZero:
                     out[var] = ZeroState::NonZero; break;
+                case StmtEffect::AssignsMaybeZero:
+                    // Ozetten: cagrilan bazi yollarda 0 dondurebilir
+                    out[var] = ZeroState::MaybeZero; break;
                 case StmtEffect::AssignsUnknown:
                     out[var] = ZeroState::Unknown; break;
                 case StmtEffect::None: break;
@@ -274,12 +307,16 @@ public:
 
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
-        // Dataflow izi: sifira gecis olaylarini kaydet
+        // Dataflow izi: sifira / olasi-sifira gecis olaylarini kaydet
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
             if (afterState == ZeroState::Zero)
-                recordEvent(stmt, var, ctx);
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceAssignedZeroHere);
+            else if (afterState == ZeroState::MaybeZero)
+                recordEvent(stmt, var, ctx,
+                            zerodefect::MsgId::TraceAssignedMaybeZeroHere);
         }
 
         // YALNIZCA tepe dugum: ince taneli CFG'de her bolme kendi elemani
@@ -343,16 +380,14 @@ public:
 
 private:
     void recordEvent(const Stmt* stmt, const VarDecl* var,
-                     ASTContext& ctx) {
+                     ASTContext& ctx, zerodefect::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         zerodefect::TraceNote note;
         note.file = sm.getFilename(loc).str();
         note.line = sm.getSpellingLineNumber(loc);
         note.column = sm.getSpellingColumnNumber(loc);
-        note.message = zerodefect::msg(
-            zerodefect::MsgId::TraceAssignedZeroHere,
-            var->getNameAsString());
+        note.message = zerodefect::msg(msgId, var->getNameAsString());
 
         auto& list = events_[var];
         for (const auto& existing : list)

@@ -53,6 +53,7 @@ enum class MsgId {
     SummariesSaved,       // {0} = ozet sayisi, {1} = dosya yolu
     SummaryLoadError,     // {0} = dosya yolu
     SummarySaveError,     // {0} = dosya yolu
+    TraceAssignedMaybeZeroHere, // {0} = degisken adi (ozet: 0 donebilir)
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.
