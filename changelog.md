@@ -1,5 +1,30 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Özet-diff v1: sözleşme değişim raporu (semantik regresyon kapısı)
+
+### Eklenen
+- **`--summary-diff <eski> <yeni>`**: analiz yerine iki hasat arasında
+  fonksiyon SÖZLEŞMELERİNİN nasıl değiştiğini raporlar. Sınıflandırma
+  yön bilinçli: **WEAKENED** = güçlü iddia kaybı/değişimi (NeverNull /
+  NeverZero düştü; ReadsOnly/Frees param iddiası başkasına döndü) — bu
+  iddiaya yaslanan ÇAĞIRANLAR yeniden incelenmeli, **exit 1 = CI
+  kapısı**. STRENGTHENED bilgi, CHANGED yönsüz, ADDED/REMOVED anahtar
+  giriş/çıkışı (imza değişimi REMOVED+ADDED — anahtar ariteyi içerir,
+  bilinçli). Zayıflayanlar rapor başında; SUMMARY_DIFF önekli satırlar
+  makine-greplenebilir.
+- `SummaryRegistry::parseSummaryFile`: dosyayı depoya karıştırmadan
+  ayrıştırma (loadGlobal bunun üstüne kuruldu — davranış aynı).
+- CLI dumanı gerçek senaryoyla: `return &g` → `return 0` refactor'ü
+  sonrası `WEAKENED find/1 returnNullness: NeverNull -> MaybeNull` +
+  exit 1.
+- Kontrat DİLİ tasarımı bilinçli olarak bu turun dışında — kullanıcıyla
+  birlikte-tasarım oturumu (todo'da ayrı). Bu araç o oturuma veri üretir.
+
+### Doğrulama
+- 228/228 test (ctest + tek-süreç; +7 SummaryDiffTest: zayıflama/param
+  zayıflaması/güçlenme/yönsüz/eklenen-çıkan+sıralama/özdeş/E2E exit
+  kodları)
+
 ## 2026-07-10 — CFG önbelleği: fonksiyon başına tek inşa
 
 ### Eklenen

@@ -279,6 +279,33 @@ Stale or malformed summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the
 weaker claim, so a wrong strong claim cannot enter through the file.
 
+### Semantic regression gate (summary diff)
+
+Summary files are deterministic, so two harvests can be compared as
+*contracts*:
+
+```bash
+zerodefect src/ --summary-out before.txt     # e.g. on main
+# ... apply the change ...
+zerodefect src/ --summary-out after.txt
+zerodefect --summary-diff before.txt after.txt
+```
+
+```
+SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
+[ZeroDefect] 1 weakened, 0 strengthened, 0 changed, 0 added, 0 removed
+[ZeroDefect] weakened contracts: callers relying on them must be re-checked
+```
+
+`WEAKENED` means a strong claim callers may rely on was lost — a
+function that could never return null now can, a callee that used to
+be read-only now stores its argument. The exit code is `1` in that
+case, so the diff doubles as a CI gate: *this change silently altered
+function contracts; the callers deserve a look*. Gained claims report
+as `STRENGTHENED` (informational), directionless drifts as `CHANGED`,
+and signature changes appear as `REMOVED`+`ADDED` (the key includes
+arity — an arity change breaks callers anyway).
+
 ### MCP server (agent integration)
 
 `zerodefect --serve` runs an MCP (Model Context Protocol) server over

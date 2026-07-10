@@ -100,6 +100,13 @@ public:
     bool saveGlobal(const std::string& path) const;
     bool loadGlobal(const std::string& path);
 
+    // Dosyayi depoya KARISTIRMADAN ayristir: ozet-diff gibi iki hasadi
+    // yan yana gorme ihtiyaclari icin. Kabul/red kurallari loadGlobal
+    // ile birebir ayni (surumler, bozukta butunuyle red).
+    static bool parseSummaryFile(
+        const std::string& path,
+        std::map<std::string, FunctionSummary>& out);
+
     void clear();
     void clearGlobal();
     size_t size() const { return summaries_.size(); }

@@ -29,7 +29,8 @@
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
 | CfgCache | `src/engine/CfgCache.h`, `.cpp` | Tamamlandı (fonksiyon başına tek CFG; TU-sonu temizlik + ctx-değişim emniyeti) |
-| GTest altyapısı | `tests/` | Tamamlandı (221/221; ctest + tek-süreç) |
+| SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Tamamlandı (--summary-diff; WEAKENED = exit 1 CI kapısı) |
+| GTest altyapısı | `tests/` | Tamamlandı (228/228; ctest + tek-süreç) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Tam entegrasyon: F1 + skor bekçisi; her kod PR'ında koşar (draft hariç); rakamlar README'de |

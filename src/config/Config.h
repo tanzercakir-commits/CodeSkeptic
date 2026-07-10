@@ -49,6 +49,9 @@ public:
     // hasat, sonra degisen dosya tek basina ama proje bilgisiyle.
     const std::string& summaryIn() const { return summary_in_path_; }
     const std::string& summaryOut() const { return summary_out_path_; }
+    // --summary-diff <eski> <yeni>: analiz yerine sozlesme farki raporu
+    const std::string& summaryDiffOld() const { return summary_diff_old_; }
+    const std::string& summaryDiffNew() const { return summary_diff_new_; }
     void setSummaryIn(const std::string& path) { summary_in_path_ = path; }
     void setSummaryOut(const std::string& path) { summary_out_path_ = path; }
 
@@ -82,6 +85,8 @@ private:
     bool warm_cache_ = false;
     std::string summary_in_path_;
     std::string summary_out_path_;
+    std::string summary_diff_old_;
+    std::string summary_diff_new_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

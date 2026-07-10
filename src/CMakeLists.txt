@@ -4,6 +4,7 @@ add_library(zerodefect_core STATIC
     source_manager/SourceManager.cpp
     engine/CfgCache.cpp
     engine/RuleEngine.cpp
+    engine/SummaryDiff.cpp
     engine/FunctionSummary.cpp
     engine/PathFacts.cpp
     reporter/ConsoleReporter.cpp

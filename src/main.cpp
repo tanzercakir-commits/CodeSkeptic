@@ -1,6 +1,7 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
 #include "core/Messages.h"
+#include "engine/SummaryDiff.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
@@ -21,6 +22,13 @@ int main(int argc, char* argv[]) {
 
     if (config.serve()) {
         return zerodefect::runMcpServer();
+    }
+
+    // Ozet-diff modu: analiz degil, iki hasat arasinda sozlesme farki
+    // raporu. WEAKENED varsa exit 1 — semantik regresyon CI kapisi.
+    if (!config.summaryDiffOld().empty()) {
+        return zerodefect::reportSummaryDiff(
+            config.summaryDiffOld(), config.summaryDiffNew(), std::cout);
     }
 
     if (config.sourcePath().empty() && config.sourceFiles().empty()) {
