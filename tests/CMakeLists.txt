@@ -14,6 +14,7 @@ add_executable(zerodefect_tests
     DivByZeroRuleTest.cpp
     NullDerefRuleTest.cpp
     SarifReporterTest.cpp
+    HtmlReporterTest.cpp
     SuppressionFilterTest.cpp
     BaselineTest.cpp
     StressEdgeCaseTest.cpp

@@ -6,6 +6,7 @@
 #include "core/Messages.h"
 #include "engine/FunctionSummary.h"
 #include "reporter/ConsoleReporter.h"
+#include "reporter/HtmlReporter.h"
 #include "reporter/JsonReporter.h"
 #include "reporter/SarifReporter.h"
 
@@ -39,6 +40,8 @@ StaticAnalyzer::StaticAnalyzer(Config config)
         reporter_ = std::make_unique<JsonReporter>(config_.jsonOutputPath());
     } else if (config_.outputFormat() == "sarif") {
         reporter_ = std::make_unique<SarifReporter>(config_.sarifOutputPath());
+    } else if (config_.outputFormat() == "html") {
+        reporter_ = std::make_unique<HtmlReporter>(config_.htmlOutputPath());
     } else {
         reporter_ = std::make_unique<ConsoleReporter>();
     }

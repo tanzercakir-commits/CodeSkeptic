@@ -25,6 +25,7 @@ public:
     const std::string& outputFormat() const { return output_format_; }
     const std::string& jsonOutputPath() const { return json_output_path_; }
     const std::string& sarifOutputPath() const { return sarif_output_path_; }
+    const std::string& htmlOutputPath() const { return html_output_path_; }
     const std::string& baselinePath() const { return baseline_path_; }
     const std::string& writeBaselinePath() const { return write_baseline_path_; }
     const std::string& lang() const { return lang_; }
@@ -70,6 +71,7 @@ private:
     std::string output_format_;
     std::string json_output_path_;
     std::string sarif_output_path_;
+    std::string html_output_path_;
     std::string baseline_path_;
     std::string write_baseline_path_;
     std::string lang_;
