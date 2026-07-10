@@ -76,10 +76,16 @@ FP-hunting material).
 | CWE | Target rule | Rule precision | Rule hit rate | All-findings precision |
 |-----|-------------|---------------:|--------------:|-----------------------:|
 | CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | 0.446 |
-| CWE-415 Double Free | `double-free` | **1.000** (47 TP / 0 FP) | 0.117 | 0.264 |
-| CWE-416 Use After Free | `use-after-free` | **1.000** (99 TP / 0 FP) | 0.247 | 0.273 |
+| CWE-415 Double Free | `double-free` | **1.000** (79 TP / 0 FP) | 0.198 | 0.464 |
+| CWE-416 Use After Free | `use-after-free` | **1.000** (174 TP / 0 FP) | 0.435 | 0.328 |
 | CWE-369 Divide by Zero | `div-by-zero` | **1.000** (18 TP / 0 FP) | 0.045 | 1.000 |
-| CWE-401 Memory Leak | `memory-leak` | 0.528 (103 TP / 92 FP) | 0.250 | 0.528 |
+| CWE-401 Memory Leak | `memory-leak` | 0.628 (103 TP / 61 FP) | 0.250 | 0.628 |
+
+Targeted path-sensitivity (2026-07-10) both cut memory-leak false
+positives (92 → 61) and *surfaced previously missed true positives*:
+correlated-guard double frees (+32 TP) and use-after-frees (+75 TP,
+hit rate 0.247 → 0.435) were false negatives under the merged-path
+analysis.
 
 Notes on reading these numbers honestly:
 

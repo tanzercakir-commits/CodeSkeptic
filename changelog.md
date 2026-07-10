@@ -38,10 +38,23 @@ uninit-ptr'ın 178'i, null-deref'in 241'i aynı kök nedene işaret ediyor.
   dokunamaz).
 
 ### Doğrulama
-- 167/167 test (10 yeni: Juliet kalıbı, olumsuzlama, karşıt-korelasyon,
-  mutasyon, çağrı-guard'ı, yeni-yakalanan double-free/UAF, döngü çifti)
+- 168/168 test (10 yeni PathSensitivity + &arg escape testi)
 - Mini-süit uçtan uca: goodB2G korelasyonlu guard fp=0, bad leak tp=1
-- Gerçek etki bu PR'ın Juliet CI koşusundan okunacak
+
+### Juliet etkisi (PR #17 ikinci koşu — ölçülen)
+| Kural | Önce | Sonra |
+|-------|------|-------|
+| memory-leak | 103 TP / 92 FP (p=0.528) | 103 TP / **61 FP** (p=0.628) |
+| double-free | 47 TP | **79 TP** (+32; korelasyonlu double-free FN'di) |
+| use-after-free | 99 TP | **174 TP** (+75; hitrate 0.247→0.435) |
+
+Yol duyarlılığı FP kesmenin ötesinde gizli TP açığa çıkardı — birleşik
+yol analizinde görünmeyen kusurlar disjunktlarla görünür oldu.
+Ek düzeltme: `sink(&data)` argümanı artık escape sayılıyor (Juliet 63x
+varyantı FP'si). Kalan FP aileleri: uninit-ptr 178 + null-deref 241
+(disjunkt portu — sıradaki tur); CWE401'de kalan 61 FP'nin bir kısmı
+farklı-global çiftleri (globalTrue/globalFalse değerleri TU dışında —
+dürüst sınır).
 
 ## 2026-07-10 — Juliet ölçüm doğruluğu + global filtre sızıntısı düzeltmesi
 

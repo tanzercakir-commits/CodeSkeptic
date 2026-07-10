@@ -401,3 +401,19 @@ TEST(DocumentedLimitTest, CallBetweenCorrelatedGuards_MayMaskLeak) {
     )");
     EXPECT_EQ(results.size(), 0);  // dokumante sinir
 }
+
+TEST(MemoryLeakRuleExTest, AddrOfArg_Escapes_NoLeak) {
+    // sink(&p): cagrilan p'yi serbest birakabilir/yeniden atayabilir —
+    // izleme durur. (Juliet 63x varyanti: &data gorunmeyince sahte
+    // exit-leak dogyordu.)
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" { void* malloc(unsigned long); void free(void*); }
+        void sink(int** pp);
+        void f() {
+            int* p = (int*)malloc(4);
+            sink(&p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

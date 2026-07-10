@@ -86,6 +86,18 @@ const VarDecl* asVar(const Expr* expr) {
     return nullptr;
 }
 
+// `&var` bicimindeki arguman: cagrilan fonksiyon pointer'i yeniden
+// atayabilir/serbest birakabilir — izleme burada durur (escape).
+// (Juliet 63x varyanti FP'si: sink(&data) gorunmeyince data Allocated
+// kaliyor ve sahte exit-leak doguyordu.)
+bool isAddrOfVar(const Expr* expr, const VarDecl* targetVar) {
+    if (!expr) return false;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* unary = dyn_cast<UnaryOperator>(expr);
+    if (!unary || unary->getOpcode() != UO_AddrOf) return false;
+    return refersToVar(unary->getSubExpr(), targetVar);
+}
+
 // Dereference tespiti (use-after-free icin). CFG ince taneli oldugundan
 // yalnizca tepe dugume bakmak yeterli.
 const VarDecl* derefTarget(const Stmt* stmt) {
@@ -145,6 +157,8 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
         bool sawFrees = false;
         bool sawReadsOnly = false;
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+            if (isAddrOfVar(call->getArg(i), targetVar))
+                return StmtEffect::Escapes;
             if (!refersToVar(call->getArg(i), targetVar)) continue;
             PE effect = summary ? summary->paramEffect(i) : PE::Opaque;
             switch (effect) {
