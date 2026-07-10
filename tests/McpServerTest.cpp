@@ -194,6 +194,40 @@ TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
     EXPECT_NE(second.find("div-by-zero"), std::string::npos);
 }
 
+TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
+    // "summaries" argumani: --summary-out ile yazilmis dosya MCP analyze
+    // cagrisina verilir — tek dosya, tum-proje bilgisiyle analiz edilir.
+    // Ayni cagri ozetsiz sessiz (kontrol grubu; bilgi dosyadan geliyor).
+    auto caller = writeTempSource("mcp_sum_caller.cpp", R"(
+        int* find(int c);
+        void f(int c) {
+            int* p = find(c);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    auto sumPath = writeTempSource("mcp_sum_store.txt",
+        "zerodefect-summaries v2\nfind/1\tM\t-\tU\n");
+
+    auto without = handleMcpMessage(
+        std::string(R"({"jsonrpc":"2.0","id":30,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + caller +
+        R"("}}})");
+    EXPECT_EQ(without.find("null-deref"), std::string::npos);
+
+    auto with = handleMcpMessage(
+        std::string(R"({"jsonrpc":"2.0","id":31,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + caller +
+        R"(","summaries":")" + sumPath + R"("}}})");
+    EXPECT_NE(with.find("null-deref"), std::string::npos);
+}
+
+TEST(McpServerTest, ToolsListMentionsSummaries) {
+    auto response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":32,"method":"tools/list"})");
+    EXPECT_NE(response.find("\"summaries\""), std::string::npos);
+}
+
 TEST(McpServerTest, AnalyzeMissingPath_Error) {
     auto response = handleMcpMessage(
         R"({"jsonrpc":"2.0","id":6,"method":"tools/call",)"

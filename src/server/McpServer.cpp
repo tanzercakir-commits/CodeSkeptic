@@ -81,6 +81,13 @@ json::Value handleToolsList(const json::Value& id) {
                  "Comma-separated line ranges (e.g. \"10-40,55\") of the "
                  "analyzed file; only overlapping functions are analyzed"},
             }},
+            {"summaries", json::Object{
+                {"type", "string"},
+                {"description",
+                 "Path to a summary file written by --summary-out; single-"
+                 "file analysis then sees cross-file function knowledge "
+                 "(e.g. a callee in another file that may return null/zero)"},
+            }},
         }},
         {"required", json::Array{"path"}},
     };
@@ -111,6 +118,8 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addFunctions(functions->str());
     if (auto lines = args->getString("lines"))
         config.addLines(lines->str());
+    if (auto summaries = args->getString("summaries"))
+        config.setSummaryIn(summaries->str());
     // Uzun omurlu surec: parse edilmis AST'ler cagrilar arasi sicak
     // tutulur (parmak izi eskimeyi yakalar — bayat AST asla servis edilmez)
     config.setWarmCache(true);

@@ -82,7 +82,7 @@ FP-hunting material).
 | CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | **0.516** |
 | CWE-415 Double Free | `double-free` | **1.000** (88 TP / 0 FP) | 0.220 | 0.361 |
 | CWE-401 Memory Leak | `memory-leak` | 0.653 (case-level) | 0.246 | 0.357 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (18 TP / 0 FP) | 0.045 | 0.086 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (21 TP / 0 FP) | 0.053 | 0.100 |
 
 The journey these numbers took (all on 2026-07-10): targeted
 path-sensitivity cut false positives across rules (memory-leak
@@ -92,7 +92,11 @@ double frees and use-after-frees (+107 TP combined) were false
 negatives under merged-path analysis. Cross-TU summaries
 (`--whole-program`) then connected source/sink flows split across
 files (double-free +9 TP, leak +5 TP, with variant-group sampling so
-a/b file pairs stay together). A caveat on cross-rule findings: Juliet
+a/b file pairs stay together). Return-zeroness summaries lifted
+divide-by-zero across function boundaries (18 → 21 TP at precision
+1.000 in the PR sample; the `data = badSource(); 100 / data` pattern
+dominates CWE-369 and its source is almost never in the same
+function). A caveat on cross-rule findings: Juliet
 `good` functions are only guaranteed free of the *tested* CWE — e.g. a
 CWE-416 good function may genuinely leak, so a `memory-leak` finding
 there is counted against us while possibly being correct. The
@@ -259,7 +263,14 @@ zerodefect src/ --summary-out .zerodefect-summaries
 # then: analyze just the changed file WITH whole-project knowledge —
 # e.g. a callee in another file that may return null is still known
 zerodefect src/parser.cpp --summary-in .zerodefect-summaries
+
+# analyze_diff.sh forwards extra options, so the diff loop composes:
+scripts/analyze_diff.sh build/src/zerodefect origin/main \
+    --summary-in .zerodefect-summaries --severity error
 ```
+
+The MCP `analyze` tool accepts the same file via its optional
+`summaries` argument, so agent loops get cross-file knowledge too.
 
 Stale or malformed summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the
