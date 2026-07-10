@@ -5,4 +5,5 @@
 # commit mesajinda gorunur olur).
 #
 # proje bulgu-sayisi
+cjson 111
 tinyxml2 9
