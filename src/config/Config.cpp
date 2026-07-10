@@ -74,6 +74,10 @@ bool Config::parseArgs(int argc, char* argv[]) {
             serve_ = true;
         } else if (arg == "--whole-program") {
             whole_program_ = true;
+        } else if (arg == "--summary-in" && i + 1 < argc) {
+            summary_in_path_ = argv[++i];
+        } else if (arg == "--summary-out" && i + 1 < argc) {
+            summary_out_path_ = argv[++i];
         } else if (arg == "--files" && i + 1 < argc) {
             // Liste dosyasi: satir basina bir kaynak dosya yolu.
             // Buyuk/secilmis kumeler icin (benchmark, ajan toplu istegi).
@@ -103,6 +107,11 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --whole-program        Two-pass mode: collect function summaries\n"
                       << "                         across all files first, then analyze\n"
+                      << "  --summary-out <file>   Save harvested cross-file function\n"
+                      << "                         summaries to a file after analysis\n"
+                      << "  --summary-in <file>    Load function summaries saved earlier;\n"
+                      << "                         analyze single files with whole-project\n"
+                      << "                         knowledge (incremental whole-program)\n"
                       << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";

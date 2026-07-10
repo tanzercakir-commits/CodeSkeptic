@@ -12,7 +12,7 @@
 | DataflowEngine | `src/engine/DataflowEngine.h` | Tamamlandı (template + assume edges + latticeHeight + ince taneli CFG + iki fazlı raporlama) |
 | PathFacts | `src/engine/PathFacts.h`, `.cpp` | Tamamlandı (koşul→kanonik anahtar; mutasyon görücüsü) |
 | GuardedDisjuncts | `src/engine/GuardedDisjuncts.h` | Tamamlandı (guard'lı disjunkt şablonu — 3 kural kullanıyor) |
-| FunctionSummary | `src/engine/FunctionSummary.h`, `.cpp` | Tamamlandı (TU-yerel + cross-TU depo; --whole-program) |
+| FunctionSummary | `src/engine/FunctionSummary.h`, `.cpp` | Tamamlandı (TU-yerel + cross-TU depo; --whole-program; diske yaz/yükle) |
 | Reporter (abstract) | `src/reporter/Reporter.h` | Tamamlandı |
 | ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Tamamlandı |
 | JsonReporter | `src/reporter/JsonReporter.h`, `.cpp` | Tamamlandı |
@@ -27,7 +27,7 @@
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState + assume edges + disjunktlar + dönüş-nullness özeti) |
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (190/190; ctest + tek-süreç) |
+| GTest altyapısı | `tests/` | Tamamlandı (195/195; ctest + tek-süreç) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Tam entegrasyon: F1 + skor bekçisi; her kod PR'ında koşar (draft hariç); rakamlar README'de |

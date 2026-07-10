@@ -42,6 +42,15 @@ public:
     bool serve() const { return serve_; }
     bool wholeProgram() const { return whole_program_; }
 
+    // Ozet kaliciligi (Cross-TU v2): --summary-out hasat edilen depoyu
+    // diske yazar; --summary-in analiz oncesi depoya yukler. Ikisi
+    // birlikte artimli whole-program'i verir: bir kez tum projeden
+    // hasat, sonra degisen dosya tek basina ama proje bilgisiyle.
+    const std::string& summaryIn() const { return summary_in_path_; }
+    const std::string& summaryOut() const { return summary_out_path_; }
+    void setSummaryIn(const std::string& path) { summary_in_path_ = path; }
+    void setSummaryOut(const std::string& path) { summary_out_path_ = path; }
+
     // Sicak AST onbellegi: uzun omurlu surecler (MCP server) icin
     // programatik anahtar. CLI'da acilmaz — buyuk dizin taramasinda tum
     // AST'leri surec omru boyunca canli tutmak bellek acisindan yanlis.
@@ -69,6 +78,8 @@ private:
     bool serve_ = false;
     bool whole_program_ = false;
     bool warm_cache_ = false;
+    std::string summary_in_path_;
+    std::string summary_out_path_;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

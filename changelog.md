@@ -1,5 +1,34 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Cross-TU v2: özetler diske (artımlı whole-program)
+
+### Eklenen
+- **`--summary-out` / `--summary-in`**: hasat edilen cross-TU fonksiyon
+  özetleri sürümlü, satır-tabanlı metin dosyasına yazılır ve sonraki
+  koşularda yüklenir. Artımlı whole-program hikayesi tamam: bir kez tüm
+  projeden hasat et, sonra DEĞİŞEN dosyayı tek başına ama tüm-proje
+  bilgisiyle analiz et (başka dosyadaki "null dönebilir" callee tek
+  dosya koşusunda da görünür — CLI dumanı + E2E test kanıtlıyor).
+- **Hasat rules geçişinde** (RuleEngine::enableGlobalHarvest): runAll'ın
+  TU başına zaten kurduğu yerel tablodan, temizlikten önce — whole-program
+  modunun ikinci parse bedeli ödenmez. `--summary-out` bu yüzden
+  `--whole-program`sız da çalışır.
+- **Güvenlik değişmezleri**: bozuk/eksik dosya BÜTÜNÜYLE reddedilir
+  (depo değişmez; analiz özetsiz, muhafazakâr devam eder — stderr'de
+  uyarı); çakışan kayıtlar hasatla aynı muhafazakâr birleşimle zayıf
+  iddiaya düşer (N+M→U, R+F→O) — yanlış güçlü iddia dosya yoluyla
+  giremez. Deterministik çıktı (sıralı map) — özet dosyası diff'lenebilir,
+  "özet değişti mi" sorusu dosya karşılaştırması.
+- 4 yeni i18n mesajı (SummariesLoaded/Saved, SummaryLoad/SaveError).
+
+### Doğrulama
+- 195/195 test (ctest + tek-süreç; +5: format round-trip, çakışma
+  birleşimi, bozuk dosya reddi ×3 varyant, eksik dosya, E2E
+  summary-out→summary-in cross-TU bulgu + özetsiz kontrol grubu)
+- CLI dumanı: callee.cpp hasadı `find/1 M O` üretti; caller.cpp
+  `--summary-in` ile tek başına analiz edilince null-deref uyarısı
+  izleme notuyla göründü
+
 ## 2026-07-10 — MCP v2: sıcak süreçte AST önbelleği
 
 ### Eklenen

@@ -117,6 +117,20 @@ const MsgEntry kMessages[] = {
      "(iteration cap hit); findings in this function may be incomplete",
      "[ZeroDefect] uyari: '{0}' icinde dataflow yakinsamadi (iterasyon "
      "tavani); bu fonksiyondaki bulgular eksik olabilir"},
+    // SummariesLoaded
+    {"[ZeroDefect] {0} function summaries loaded from {1}",
+     "[ZeroDefect] {0} fonksiyon ozeti yuklendi: {1}"},
+    // SummariesSaved
+    {"[ZeroDefect] {0} function summaries saved to {1}",
+     "[ZeroDefect] {0} fonksiyon ozeti kaydedildi: {1}"},
+    // SummaryLoadError
+    {"[ZeroDefect] warning: could not load summaries from {0} "
+     "(missing or malformed file); continuing without them",
+     "[ZeroDefect] uyari: ozetler yuklenemedi: {0} (dosya yok ya da "
+     "bozuk); ozetsiz devam ediliyor"},
+    // SummarySaveError
+    {"[ZeroDefect] warning: could not save summaries to {0}",
+     "[ZeroDefect] uyari: ozetler kaydedilemedi: {0}"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
