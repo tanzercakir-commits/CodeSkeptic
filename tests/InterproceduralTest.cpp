@@ -447,9 +447,10 @@ TEST(InterprocLeakTest, DeleteWrapper_UAF) {
 }
 
 // ===================================================================
-// Cross-TU ozetler (Ufuk 2: whole-program modu)
-// Cagrilan BASKA dosyada tanimli: ozet 1. geciste hasat edilir,
-// 2. gecis kurali cagiran dosyada Opaque yerine gercek ozeti gorur.
+// Cross-TU summaries (Horizon 2: whole-program mode)
+// The callee is defined in ANOTHER file: the summary is harvested in
+// pass 1; in pass 2 the rule sees the real summary in the calling file
+// instead of Opaque.
 // ===================================================================
 
 TEST(CrossTUTest, MaybeNullReturn_AcrossTU_Warning) {
@@ -492,8 +493,8 @@ TEST(CrossTUTest, FreeWrapper_AcrossTU_DoubleFree) {
 }
 
 TEST(CrossTUTest, ReadsOnlyCallee_AcrossTU_LeakVisible) {
-    // Baska dosyadaki salt-okur yardimci leak'i artik GIZLEMEZ
-    // (tek-TU modda Opaque -> Escapes -> sessizdi)
+    // A read-only helper in another file no longer HIDES the leak
+    // (in single-TU mode it was Opaque -> Escapes -> silent)
     MemoryLeakRule_Ex rule;
     auto results = runRuleCrossTU(rule, R"(
         void use(int* p) { int x = *p; (void)x; }
@@ -510,9 +511,10 @@ TEST(CrossTUTest, ReadsOnlyCallee_AcrossTU_LeakVisible) {
 }
 
 TEST(CrossTUTest, StaticCallee_NotShared) {
-    // callee-TU'daki static (dosya-yerel) make ile caller-TU'nun
-    // extern bildirimi FARKLI fonksiyonlar — ozet TASINMAMALI.
-    // Tasinsaydi NeverNull... yerine null donebilirlik iddia edilirdi.
+    // The static (file-local) make in the callee TU and the caller TU's
+    // extern declaration are DIFFERENT functions — the summary MUST NOT
+    // travel. If it did, may-return-null would be claimed instead of
+    // NeverNull...
     NullDerefRule rule;
     auto results = runRuleCrossTU(rule, R"(
         static int* make() { return 0; }
@@ -525,13 +527,13 @@ TEST(CrossTUTest, StaticCallee_NotShared) {
             (void)x;
         }
     )");
-    // Opaque kalmali -> Unknown -> sessiz (muhafazakar)
+    // Must stay Opaque -> Unknown -> silent (conservative)
     ASSERT_EQ(results.size(), 0);
 }
 
 TEST(CrossTUTest, WithoutHarvest_StaysConservative) {
-    // Ayni cagiran kod TEK-TU modda (hasatsiz): Opaque -> sessiz.
-    // Cross-TU kazancinin kontrol grubu.
+    // The same calling code in SINGLE-TU mode (no harvest): Opaque ->
+    // silent. Control group for the cross-TU gain.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* find(int c);
@@ -545,15 +547,17 @@ TEST(CrossTUTest, WithoutHarvest_StaysConservative) {
 }
 
 // ===================================================================
-// Donus-nullness dataflow'u (v2): `return p;` yollari
-// Yapisal degerlendirme Unknown birakirdi; mini null-akisi (kendi
-// motorumuzla) degisken donduren yollari akis-DUYARLI cozer.
+// Return-nullness dataflow (v2): `return p;` paths
+// Structural evaluation used to leave Unknown; the mini null-flow
+// (using our own engine) resolves variable-returning paths
+// flow-SENSITIVELY.
 // ===================================================================
 
 TEST(ReturnFlowTest, InitNullThenSet_NeverNull_Silent) {
-    // FP-katili vaka: akis-duyarsiz "bir yerde NULL atanmis" kestirmesi
-    // burada yanlis MaybeNull uretirdi. Akis-duyarli: return aninda
-    // p = &g kesin non-null -> fonksiyon NeverNull -> sessiz.
+    // FP-killer case: a flow-insensitive "NULL was assigned somewhere"
+    // shortcut would wrongly produce MaybeNull here. Flow-sensitive: at
+    // the return, p = &g is definitely non-null -> the function is
+    // NeverNull -> silent.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int g;
@@ -572,8 +576,8 @@ TEST(ReturnFlowTest, InitNullThenSet_NeverNull_Silent) {
 }
 
 TEST(ReturnFlowTest, MaybeNullVarFlow_Warning) {
-    // find() kalibi: r bazi yollarda null kalir -> MaybeNull ->
-    // korumasiz dereference uyari + iz notu
+    // The find() pattern: r stays null on some paths -> MaybeNull ->
+    // unguarded dereference warns + trace note
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int g;
@@ -596,8 +600,8 @@ TEST(ReturnFlowTest, MaybeNullVarFlow_Warning) {
 }
 
 TEST(ReturnFlowTest, GuardedFallthrough_NeverNull_Silent) {
-    // Erken-donus guard'i: `if (!p) return &fb;` sonrasi p kesin
-    // non-null (assume-edge) -> iki yol da NonNull -> NeverNull
+    // Early-return guard: after `if (!p) return &fb;` p is definitely
+    // non-null (assume-edge) -> both paths NonNull -> NeverNull
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int g; int fb;
@@ -634,8 +638,9 @@ TEST(ReturnFlowTest, DefiniteNullVar_Warning) {
 }
 
 TEST(ReturnFlowTest, ParamPassthrough_StaysUnknown_Silent) {
-    // Parametre-duyarli ozet v2 kapsami disinda (belgelenmis sinir):
-    // `return p;` (p param, hic atanmamis) Unknown kalir -> sessiz
+    // Parameter-sensitive summaries are out of v2 scope (documented
+    // limit): `return p;` (p a param, never assigned) stays Unknown ->
+    // silent
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* id(int* p) { return p; }
@@ -649,9 +654,9 @@ TEST(ReturnFlowTest, ParamPassthrough_StaysUnknown_Silent) {
 }
 
 TEST(ReturnFlowTest, ChainThroughVariable_Warning) {
-    // Zincir: inner degisken-akisiyla MaybeNull; outer onu degiskene
-    // alip dondurur -> taramalar arasi yayilim (sweep 2) outer'i da
-    // MaybeNull yapar
+    // Chain: inner is MaybeNull via variable flow; outer takes it into
+    // a variable and returns it -> propagation across sweeps (sweep 2)
+    // makes outer MaybeNull too
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int g;
@@ -675,8 +680,8 @@ TEST(ReturnFlowTest, ChainThroughVariable_Warning) {
 }
 
 TEST(ReturnFlowTest, JulietBadSourceShape_ParamReassignedNull_Warning) {
-    // Juliet akis-varyanti kaynagi birebir: parametre NULL'a atanip
-    // dondurulur -> MaybeNull -> cagiranin korumasiz kullanimi uyari
+    // Verbatim Juliet flow-variant source: the parameter is assigned
+    // NULL and returned -> MaybeNull -> the caller's unguarded use warns
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* badSource(int* data) {
@@ -694,7 +699,7 @@ TEST(ReturnFlowTest, JulietBadSourceShape_ParamReassignedNull_Warning) {
 }
 
 TEST(ReturnFlowTest, CrossTU_VarFlowMaybeNull_Warning) {
-    // Degisken-akisli MaybeNull cross-TU depodan da tasinir
+    // Variable-flow MaybeNull travels through the cross-TU store too
     NullDerefRule rule;
     auto results = runRuleCrossTU(rule, R"(
         int g;
@@ -716,11 +721,11 @@ TEST(ReturnFlowTest, CrossTU_VarFlowMaybeNull_Warning) {
 }
 
 // ===================================================================
-// Ozet kaliciligi (Cross-TU v2): saveGlobal / loadGlobal +
-// --summary-out / --summary-in uctan uca.
-// Degismezler: (1) yukleme davranis olarak hasatla es-deger, (2) bozuk
-// dosya butunuyle reddedilir — kismi veri guclu iddiaya donusemez,
-// (3) cakisan kayitlar muhafazakar birlesir.
+// Summary persistence (Cross-TU v2): saveGlobal / loadGlobal +
+// --summary-out / --summary-in end to end.
+// Invariants: (1) loading is behaviorally equivalent to harvesting,
+// (2) a corrupt file is rejected as a whole — partial data cannot turn
+// into a strong claim, (3) conflicting records merge conservatively.
 // ===================================================================
 
 #include "analyzer/StaticAnalyzer.h"
@@ -747,8 +752,9 @@ std::string readWholeFile(const std::string& path) {
             std::istreambuf_iterator<char>()};
 }
 
-// Test izolasyonu: global depo surec-omurlu — her test temiz baslasin
-// ve temiz biraksin (tek-surec kosumda sizinti sonraki testleri bozar)
+// Test isolation: the global store is process-lived — every test must
+// start clean and leave clean (in a single-process run a leak breaks
+// the tests that follow)
 struct GlobalStoreGuard {
     GlobalStoreGuard() { SummaryRegistry::instance().clearGlobal(); }
     ~GlobalStoreGuard() { SummaryRegistry::instance().clearGlobal(); }
@@ -775,8 +781,8 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
-    // v1 dosyasi (3 sutun, sifirlik yok): yuklenir, sifirlik Unknown —
-    // eski hasat dosyalari yeni surumde calismaya devam eder
+    // A v1 file (3 columns, no zeroness): it loads, zeroness is Unknown
+    // — old harvest files keep working in the new version
     GlobalStoreGuard guard;
     auto v1Path = writePersistFile("sum_v1_compat.txt",
         "zerodefect-summaries v1\n"
@@ -806,8 +812,8 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     ASSERT_TRUE(registry.loadGlobal(pathB));
     EXPECT_EQ(registry.globalSize(), 1u);
 
-    // Uyusmayan alanlar zayif iddiaya duser: iki donus alani N vs M -> U,
-    // param R vs F -> O
+    // Disagreeing fields fall to the weaker claim: the two return
+    // fields N vs M -> U, param R vs F -> O
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
@@ -823,32 +829,33 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
         "keep/1\tN\tR\tU\n");
     ASSERT_TRUE(registry.loadGlobal(good));
 
-    // Yanlis baslik: reddet
+    // Wrong header: reject
     auto badHeader = writePersistFile("sum_bad_header.txt",
         "some-other-format v9\nfoo/1\tN\tR\n");
     EXPECT_FALSE(registry.loadGlobal(badHeader));
 
-    // Gecerli baslik ama bozuk kayit (bilinmeyen etki karakteri):
-    // dosyanin TAMAMI reddedilir — onceki gecerli satiri da almayiz
+    // Valid header but a corrupt record (unknown effect character):
+    // the ENTIRE file is rejected — we don't take the earlier valid
+    // line either
     auto badLine = writePersistFile("sum_bad_line.txt",
         "zerodefect-summaries v2\n"
         "bar/1\tN\tR\tU\n"
         "baz/1\tX\tqq\tU\n");
     EXPECT_FALSE(registry.loadGlobal(badLine));
 
-    // Eksik alanli satir: reddet
+    // Line with missing fields: reject
     auto badFields = writePersistFile("sum_bad_fields.txt",
         "zerodefect-summaries v2\n"
         "noeffects/1\tN\n");
     EXPECT_FALSE(registry.loadGlobal(badFields));
 
-    // Fazla alanli satir: reddet (bilinmeyen gelecek format degildir)
+    // Line with extra fields: reject (not an unknown future format)
     auto extraFields = writePersistFile("sum_extra_fields.txt",
         "zerodefect-summaries v2\n"
         "extra/1\tN\tR\tU\tX\n");
     EXPECT_FALSE(registry.loadGlobal(extraFields));
 
-    // Depo ilk yuklemeden beri degismemis olmali
+    // The store must be unchanged since the first load
     EXPECT_EQ(registry.globalSize(), 1u);
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
@@ -864,11 +871,11 @@ TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
 }
 
 TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
-    // Artimli whole-program hikayesinin tamami: 1. kosu callee
-    // dosyasindan ozet hasat edip diske yazar; 2. kosu YALNIZ caller
-    // dosyasini ozet dosyasiyla analiz eder ve cross-TU bulguyu verir.
-    // Analizorlerin dtor'u global depoyu temizler — bilgiyi 2. kosuya
-    // tasiyan tek sey DOSYAdir.
+    // The full incremental whole-program story: run 1 harvests summaries
+    // from the callee file and writes them to disk; run 2 analyzes ONLY
+    // the caller file with the summary file and reports the cross-TU
+    // finding. The analyzers' dtor clears the global store — the only
+    // thing carrying knowledge into run 2 is the FILE.
     GlobalStoreGuard guard;
     auto calleePath = writePersistFile("sumpersist_callee.cpp", R"(
         int g;
@@ -898,7 +905,7 @@ TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
     EXPECT_NE(readWholeFile(summaryPath).find("find/1\tM"),
               std::string::npos);
 
-    // Kontrol: ozetsiz kosu muhafazakar — Opaque, sessiz
+    // Control: the run without summaries is conservative — Opaque, silent
     {
         Config config;
         config.setSourcePath(callerPath);
@@ -908,7 +915,7 @@ TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
         EXPECT_EQ(analyzer.diagnostics().size(), 0u);
     }
 
-    // Ozet dosyasiyla: yalniz caller analiz edilir, bulgu gorunur
+    // With the summary file: only the caller is analyzed, the finding shows
     {
         Config config;
         config.setSourcePath(callerPath);
@@ -923,13 +930,14 @@ TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
 }
 
 // ===================================================================
-// Donus sifir-olabilirligi ozeti (ReturnZeroness): DivByZero artik
-// fonksiyonlar arasi gorur — `data = 0; return data;` kaynagi baska
-// fonksiyonda/dosyada olsa da bolen uyarilir. Null'un aynasi: ayni
-// mini-akis, sifir domain'iyle (walkZeroCondition).
-// Bilincli sinir: ozet yalniz ATAMA yolundan tuketilir; dogrudan
-// `x / f()` boleni raporlanmaz (atanmamis cagri sonucu guard'lanamaz,
-// gercek kodda FP ailesi dogururdu).
+// Return zeroness summary (ReturnZeroness): DivByZero now sees across
+// functions — the divisor warns even when the `data = 0; return data;`
+// source lives in another function/file. The mirror of null: the same
+// mini-flow with the zero domain (walkZeroCondition).
+// Deliberate limit: the summary is consumed only through the
+// ASSIGNMENT path; a direct `x / f()` divisor is not reported (an
+// unassigned call result cannot be guarded and would breed a family
+// of FPs in real code).
 // ===================================================================
 
 TEST(InterprocZeroTest, BadSourceLiteral_UnguardedDiv_Warning) {
@@ -947,9 +955,9 @@ TEST(InterprocZeroTest, BadSourceLiteral_UnguardedDiv_Warning) {
 }
 
 TEST(InterprocZeroTest, JulietShape_VarFlowSource_Warning) {
-    // Juliet CWE369 akis-varyanti kaynagi: yerel once 0, return o
-    // degiskenle — yapisal degerlendirme Unknown birakirdi, mini akis
-    // MaybeZero cikarir
+    // Juliet CWE369 flow-variant source: the local is 0 first, the
+    // return uses that variable — structural evaluation used to leave
+    // Unknown, the mini flow derives MaybeZero
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int badSource(int k) {
@@ -967,8 +975,9 @@ TEST(InterprocZeroTest, JulietShape_VarFlowSource_Warning) {
 }
 
 TEST(InterprocZeroTest, GuardedUse_Silent) {
-    // MaybeZero atansa da guard iyilestirmesi bolme noktasinda NonZero
-    // verir — ozet tuketimi mevcut path hassasiyetiyle birlesir
+    // Even with MaybeZero assigned, the guard refinement yields NonZero
+    // at the division point — summary consumption composes with the
+    // existing path sensitivity
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int badSource() { return 0; }
@@ -982,9 +991,10 @@ TEST(InterprocZeroTest, GuardedUse_Silent) {
 }
 
 TEST(InterprocZeroTest, FlowKilledZero_NeverZero_Silent) {
-    // FP-katili: kaynak icinde 0 atanip SONRA ezilirse akis-duyarli
-    // ozet NeverZero'yu bilir — akis-duyarsiz "bir yerde 0 var"
-    // kestirmesi burada yanlis uyari uretirdi
+    // FP-killer: if 0 is assigned inside the source and THEN
+    // overwritten, the flow-sensitive summary knows NeverZero — a
+    // flow-insensitive "there's a 0 somewhere" shortcut would produce
+    // a false warning here
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int source() {
@@ -1001,8 +1011,9 @@ TEST(InterprocZeroTest, FlowKilledZero_NeverZero_Silent) {
 }
 
 TEST(InterprocZeroTest, DirectCallDivisor_DocumentedSilent) {
-    // Belgeli sinir: atanmamis cagri sonucu bolen olarak raporlanmaz
-    // (guard'lanamaz; FP ailesi riski) — davranis testle sabitlenir
+    // Documented limit: an unassigned call result is not reported as a
+    // divisor (cannot be guarded; FP-family risk) — the behavior is
+    // pinned by this test
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int badSource() { return 0; }
@@ -1029,7 +1040,8 @@ TEST(InterprocZeroTest, TraceNote_MentionsCalleeMayReturnZero) {
 }
 
 TEST(InterprocZeroTest, CrossTU_ZeronessTravels) {
-    // Sifirlik cross-TU depodan da tasinir (whole-program / summary-in)
+    // Zeroness travels through the cross-TU store too (whole-program /
+    // summary-in)
     DivByZeroRule rule;
     auto results = runRuleCrossTU(rule, R"(
         int badSource() { return 0; }
@@ -1045,9 +1057,10 @@ TEST(InterprocZeroTest, CrossTU_ZeronessTravels) {
 }
 
 TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
-    // Tazelik uyarisi: kaynak, ozet dosyasindan yeniyse stderr'de uyari
-    // — ama analiz durmaz ve ozetler yine kullanilir (muhafazakar yon:
-    // bayat ozet dogrulugu bozmaz, en fazla eksik/fazla iddia tasir)
+    // Freshness warning: if the source is newer than the summary file,
+    // warn on stderr — but analysis does not stop and the summaries are
+    // still used (conservative direction: a stale summary does not
+    // break correctness, at worst it carries missing/extra claims)
     GlobalStoreGuard guard;
     auto sumPath = writePersistFile("sum_stale.txt",
         "zerodefect-summaries v2\nfind/1\tM\t-\tU\n");
@@ -1059,7 +1072,7 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
             (void)x;
         }
     )");
-    // Kaynagi ozetten ACIKCA yeni damgala (ayni-saniye flake'i olmasin)
+    // Stamp the source CLEARLY newer than the summary (no same-second flake)
     namespace fs = std::filesystem;
     fs::last_write_time(src,
         fs::last_write_time(sumPath) + std::chrono::hours(1));
@@ -1072,12 +1085,12 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
         StaticAnalyzer analyzer(std::move(config));
         analyzer.addRule<NullDerefRule>();
         analyzer.run();
-        EXPECT_EQ(analyzer.diagnostics().size(), 1u);  // ozet yine islek
+        EXPECT_EQ(analyzer.diagnostics().size(), 1u);  // summary still works
     }
     std::string err = ::testing::internal::GetCapturedStderr();
     EXPECT_NE(err.find("may be stale"), std::string::npos);
 
-    // Kontrol: ozet kaynaktan yeniyse uyari YOK
+    // Control: if the summary is newer than the source, NO warning
     fs::last_write_time(sumPath,
         fs::last_write_time(src) + std::chrono::hours(1));
     ::testing::internal::CaptureStderr();

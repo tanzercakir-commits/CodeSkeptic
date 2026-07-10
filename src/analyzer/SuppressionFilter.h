@@ -9,17 +9,17 @@
 
 namespace zerodefect {
 
-// Kaynak koddaki bastirma yorumlarini uygular:
-//   // zerodefect-disable-line              -> o satirdaki tum bulgular
-//   // zerodefect-disable-line rule1,rule2  -> o satirda yalnizca bu kurallar
-//   // zerodefect-disable-next-line [...]   -> bir sonraki satir icin ayni
-// Kural listesi bosluk veya virgulle ayrilabilir.
+// Applies suppression comments found in the source code:
+//   // zerodefect-disable-line              -> all findings on that line
+//   // zerodefect-disable-line rule1,rule2  -> only these rules on that line
+//   // zerodefect-disable-next-line [...]   -> same, for the next line
+// The rule list may be separated by spaces or commas.
 class SuppressionFilter {
 public:
-    // Bastirilan bulgulari listeden cikarir, cikarilan sayiyi dondurur.
+    // Removes suppressed findings from the list, returns the number removed.
     size_t filter(DiagnosticList& diagnostics);
 
-    // Tek bir bulgunun bastirilip bastirilmadigini soyler (test edilebilir).
+    // Tells whether a single finding is suppressed (testable).
     bool isSuppressed(const Diagnostic& diag);
 
 private:
@@ -28,8 +28,8 @@ private:
     std::map<std::string, std::vector<std::string>> file_cache_;
 };
 
-// Yorum metni verilen kurali bastiriyor mu? (markerdan sonra kural listesi
-// yoksa tum kurallar bastirilir) — birim test icin disari acik.
+// Does the comment text suppress the given rule? (if no rule list follows
+// the marker, all rules are suppressed) — exposed for unit testing.
 bool markerSuppressesRule(const std::string& line_text,
                           const std::string& marker,
                           const std::string& rule_id);

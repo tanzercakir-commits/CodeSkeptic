@@ -1,9 +1,10 @@
-// Best-case / worst-case matrisi:
-//  - Best case: savunmacı, dogru yazilmis kod TEMIZ kalmali (FP siniri)
-//  - Worst case: patolojik CFG sekilleri yakinsamali ve tohumlanmis
-//    hatalar YAKALANMALI (FN + yakinsama siniri)
-//  - Belgelenmis sinirlar: bilinen FN'ler test olarak sabitlenir ki
-//    davranis degisirse fark edelim (todo.md ile senkron)
+// Best-case / worst-case matrix:
+//  - Best case: defensive, correctly written code must stay CLEAN (FP
+//    bound)
+//  - Worst case: pathological CFG shapes must converge and seeded bugs
+//    MUST be caught (FN + convergence bound)
+//  - Documented limits: known FNs are pinned as tests so we notice if
+//    the behavior changes (in sync with todo.md)
 
 #include "TestHelper.h"
 #include "rules/DivByZeroRule.h"
@@ -18,12 +19,12 @@ using namespace zerodefect;
 using namespace zerodefect::testing;
 
 // ===================================================================
-// BEST CASE — savunmaci kaliplar temiz kalmali
+// BEST CASE — defensive patterns must stay clean
 // ===================================================================
 
 TEST(BestCaseTest, GotoFailCleanup_Clean) {
-    // cJSON'un her yerde kullandigi idiom: hata yollari tek cleanup
-    // etiketine atlar. Iki yol da free ediyor — ne leak ne double-free.
+    // The idiom cJSON uses everywhere: error paths jump to a single
+    // cleanup label. Both paths free — neither a leak nor a double-free.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -42,7 +43,7 @@ TEST(BestCaseTest, GotoFailCleanup_Clean) {
 }
 
 TEST(BestCaseTest, TernaryGuardDivision_Clean) {
-    // Ternary kosulu da bir dal kenaridir: true kolunda z NonZero
+    // A ternary condition is a branch edge too: on the true arm z is NonZero
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int f(int z) {
@@ -69,8 +70,8 @@ TEST(BestCaseTest, TernaryGuardNullDeref_Clean) {
 }
 
 TEST(BestCaseTest, BreakEdgeGuard_Clean) {
-    // Donguden yalnizca z != 0 iken cikilabiliyor — break kenari
-    // uzerinden dongu sonrasi z NonZero
+    // The loop can only be exited while z != 0 — via the break edge,
+    // z is NonZero after the loop
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int next();
@@ -87,7 +88,7 @@ TEST(BestCaseTest, BreakEdgeGuard_Clean) {
 }
 
 TEST(BestCaseTest, ContinueGuard_Clean) {
-    // Korumasiz yol continue ile atlaniyor
+    // The unguarded path is skipped via continue
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct Node { int data; Node* next; };
@@ -105,7 +106,8 @@ TEST(BestCaseTest, ContinueGuard_Clean) {
 }
 
 TEST(BestCaseTest, CommaOperatorOrdering_Clean) {
-    // Ince taneli CFG degerlendirme sirasini korur: atama bolmeden once
+    // The fine-grained CFG preserves evaluation order: the assignment
+    // comes before the division
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int f() {
@@ -118,12 +120,13 @@ TEST(BestCaseTest, CommaOperatorOrdering_Clean) {
 }
 
 // ===================================================================
-// WORST CASE — patolojik sekiller: yakinsama + tohumlanmis hatalar
+// WORST CASE — pathological shapes: convergence + seeded bugs
 // ===================================================================
 
 TEST(WorstCaseTest, DeepNesting_OnePathInits) {
-    // 8 seviye ic ice if; yalnizca en icteki yol init ediyor.
-    // 255/256 yol uninit — rapor SART, analiz yakinsamali.
+    // 8 levels of nested ifs; only the innermost path initializes.
+    // 255/256 paths are uninit — a report is a MUST, the analysis must
+    // converge.
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int a, int b, int c, int d, int e, int g, int h, int k) {
@@ -141,8 +144,8 @@ TEST(WorstCaseTest, DeepNesting_OnePathInits) {
 }
 
 TEST(WorstCaseTest, WideProductLattice_AllLeaksFound) {
-    // 30 degiskenli carpim lattice: iterasyon tavani yukseklikle
-    // olceklenmeli ve TUM leak'ler bulunmali (yarim analiz yok)
+    // A 30-variable product lattice: the iteration cap must scale with
+    // the height and ALL leaks must be found (no half-done analysis)
     std::string code = "void f() {\n";
     for (int i = 0; i < 30; i++)
         code += "    int* p" + std::to_string(i) + " = new int(" +
@@ -155,7 +158,7 @@ TEST(WorstCaseTest, WideProductLattice_AllLeaksFound) {
 }
 
 TEST(WorstCaseTest, LongElseIfChain_OneArmZero) {
-    // 12 kollu zincirin tek kolu sifir atiyor → olasi sifira bolme
+    // Only one arm of the 12-arm chain assigns zero → possible div-by-zero
     std::string code = "void f(int x) {\n    int z = 1;\n";
     code += "    if (x == 1) z = 2;\n";
     for (int i = 2; i <= 10; i++)
@@ -171,11 +174,11 @@ TEST(WorstCaseTest, LongElseIfChain_OneArmZero) {
 }
 
 TEST(WorstCaseTest, NestedLoopConditionalFree) {
-    // a,b,c fonksiyon icinde HIC degismiyor: tek is parcaciginda
-    // while(a)'dan cikis ancak a==0 ile mumkun — o yolda p hic allocate
-    // edilmez. Yol-duyarli analiz exit-leak raporlamamakta haklidir
-    // (eski 2. bulgu yol-duyarsizligin artefaktiydi). Dongu icindeki
-    // reassign-leak gercek ve raporlanir.
+    // a,b,c NEVER change inside the function: single-threaded, the only
+    // way out of while(a) is a==0 — on that path p is never allocated.
+    // The path-sensitive analysis is right not to report an exit-leak
+    // (the old 2nd finding was an artifact of path insensitivity). The
+    // reassign-leak inside the loop is real and is reported.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int a, int b, int c) {
@@ -193,8 +196,9 @@ TEST(WorstCaseTest, NestedLoopConditionalFree) {
 }
 
 TEST(WorstCaseTest, NestedLoopConditionalFree_MutatedConds) {
-    // Gercekci dongu: kosullar degisiyor (a--, b--) → anahtarlanmazlar,
-    // cikis gercekten ulasilabilir → reassign-leak + exit-leak birlikte
+    // Realistic loop: the conditions change (a--, b--) → they are not
+    // keyed, the exit is genuinely reachable → reassign-leak +
+    // exit-leak together
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int a, int b, int c) {
@@ -213,8 +217,9 @@ TEST(WorstCaseTest, NestedLoopConditionalFree_MutatedConds) {
 }
 
 TEST(WorstCaseTest, DoWhileFirstIteration_UninitDeref) {
-    // do-while govdesi ilk iterasyonda kosulsuz calisir: init'ten ONCEKI
-    // dereference yakalanmali (fixpoint raporlamasi bunu kacirmamali)
+    // A do-while body runs unconditionally on the first iteration: the
+    // dereference BEFORE the init must be caught (fixpoint reporting
+    // must not miss it)
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int c) {

@@ -136,8 +136,8 @@ TEST(UninitPointerRuleExTest, NoDereference_NoDiagnostic) {
             int* ptr;
         }
     )");
-    // Eski rule bunu raporlardı, yeni rule raporlamaz
-    // çünkü dereference noktası yok
+    // The old rule reported this, the new rule does not,
+    // because there is no dereference point
     ASSERT_EQ(results.size(), 0);
 }
 
@@ -193,14 +193,14 @@ TEST(UninitPointerRuleExTest, NestedIf_DeepMerge) {
             int r = *p;
         }
     )");
-    // Sadece x && y && z path'inde init var, diğer 7 path'te uninit
+    // Only the x && y && z path has the init; the other 7 paths are uninit
     ASSERT_EQ(results.size(), 1);
 }
 
-// --- Hedefli yol duyarliligi (GuardedDisjuncts) ---
+// --- Targeted path sensitivity (GuardedDisjuncts) ---
 
 TEST(UninitPtrPathSensitivityTest, CorrelatedGuards_InitUse_Clean) {
-    // Juliet char_07 kalibi: init ve kullanim ayni degismez kosul altinda
+    // Juliet char_07 pattern: init and use under the same invariant condition
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         int flag;
@@ -215,7 +215,8 @@ TEST(UninitPtrPathSensitivityTest, CorrelatedGuards_InitUse_Clean) {
 }
 
 TEST(UninitPtrPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
-    // Init yanlis dalda: flag!=5 yolunda data init'siz dereference edilir
+    // Init on the wrong branch: on the flag!=5 path data is dereferenced
+    // uninitialized
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         int flag;
@@ -230,8 +231,8 @@ TEST(UninitPtrPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
 }
 
 TEST(UninitPointerRuleExTest, MultiDeclaration_SecondPointerTracked) {
-    // Coklu bildirimde ikinci init'siz pointer da izlenir (ince taneli
-    // CFG bolmesi) — regresyon testi
+    // In a multi-declaration the second uninitialized pointer is tracked
+    // too (fine-grained CFG split) — regression test
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f() {

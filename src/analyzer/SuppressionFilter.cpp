@@ -24,9 +24,9 @@ bool markerSuppressesRule(const std::string& line_text,
     auto pos = line_text.find(marker);
     if (pos == std::string::npos) return false;
 
-    // Marker'dan sonraki kural listesi: bosluk/virgul ayrilmis token'lar.
-    // "zerodefect-disable-line" araniyorken "-next-line" varyantina denk
-    // gelmemek icin marker'in kendi basina bittigini dogrula.
+    // Rule list after the marker: space/comma-separated tokens.
+    // Verify the marker ends on its own so that searching for
+    // "zerodefect-disable-line" does not match the "-next-line" variant.
     size_t after = pos + marker.size();
     if (after < line_text.size() && isRuleChar(line_text[after]))
         return false;
@@ -42,13 +42,13 @@ bool markerSuppressesRule(const std::string& line_text,
                 rules.push_back(token);
                 token.clear();
             }
-            // Kural listesi yalnizca bosluk ve virgulle surer;
-            // baska bir karakter listeyi bitirir
+            // The rule list continues ONLY through spaces and commas;
+            // any other character ends the list
             if (c != ' ' && c != '\t' && c != ',' && c != '\0') break;
         }
     }
 
-    if (rules.empty()) return true;  // kural belirtilmemis -> hepsi
+    if (rules.empty()) return true;  // no rules specified -> all of them
     return std::find(rules.begin(), rules.end(), rule_id) != rules.end();
 }
 
@@ -73,13 +73,13 @@ bool SuppressionFilter::isSuppressed(const Diagnostic& diag) {
     const auto* lines = linesFor(diag.file);
     if (lines->empty()) return false;
 
-    // Ayni satirda disable-line
+    // disable-line on the same line
     if (diag.line <= lines->size() &&
         markerSuppressesRule((*lines)[diag.line - 1], kDisableLine,
                              diag.rule_id))
         return true;
 
-    // Bir onceki satirda disable-next-line
+    // disable-next-line on the previous line
     if (diag.line >= 2 && diag.line - 1 <= lines->size() &&
         markerSuppressesRule((*lines)[diag.line - 2], kDisableNextLine,
                              diag.rule_id))
