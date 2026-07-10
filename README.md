@@ -304,6 +304,41 @@ the functions it just edited.
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.
 
+### Editor & code-scanning integration (via SARIF)
+
+The SARIF 2.1.0 output works today with standard tooling — no plugin of
+our own required:
+
+**VS Code.** Install the
+[SARIF Viewer](https://marketplace.visualstudio.com/items?itemName=MS-SarifVSCode.sarif-viewer)
+extension (Microsoft), then:
+
+```bash
+zerodefect src/ --sarif findings.sarif
+code findings.sarif   # or: open via the SARIF Viewer panel
+```
+
+Findings appear in a results panel; clicking one jumps to the source
+line, and ZeroDefect's dataflow traces show up as *related locations*
+(the allocation/free/null-assignment chain behind each finding is
+navigable step by step).
+
+**GitHub code scanning.** Upload the same file from CI and findings
+appear in the repository's Security tab and as PR annotations:
+
+```yaml
+- run: build/src/zerodefect src/ --sarif findings.sarif || true
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: findings.sarif
+```
+
+(`|| true` because ZeroDefect exits 1 on findings; code scanning does
+its own gating.)
+
+For a shareable, tool-free view of the same findings, use `--html` —
+one self-contained file with filters and source-context traces.
+
 ## Roadmap
 
 See [`analiz-2026-07.md`](analiz-2026-07.md) (Turkish) for the full
