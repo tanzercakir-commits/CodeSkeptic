@@ -7,7 +7,7 @@
 | Diagnostic | `src/core/Diagnostic.h` | Tamamlandı (operator== + tam sıralama) |
 | Rule | `src/core/Rule.h` | Tamamlandı |
 | Messages (i18n) | `src/core/Messages.h`, `.cpp` | Tamamlandı (EN varsayılan, `--lang tr`) |
-| SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Tamamlandı (Linux header fix) |
+| SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Tamamlandı (Linux header fix + sıcak AST önbelleği, MCP yolu) |
 | RuleEngine | `src/engine/RuleEngine.h`, `.cpp` | Tamamlandı |
 | DataflowEngine | `src/engine/DataflowEngine.h` | Tamamlandı (template + assume edges + latticeHeight + ince taneli CFG + iki fazlı raporlama) |
 | PathFacts | `src/engine/PathFacts.h`, `.cpp` | Tamamlandı (koşul→kanonik anahtar; mutasyon görücüsü) |
@@ -27,7 +27,7 @@
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState + assume edges + disjunktlar + dönüş-nullness özeti) |
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (180/180; ctest + tek-süreç) |
+| GTest altyapısı | `tests/` | Tamamlandı (190/190; ctest + tek-süreç) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Tam entegrasyon: F1 + skor bekçisi; her kod PR'ında koşar (draft hariç); rakamlar README'de |

@@ -1,5 +1,31 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — MCP v2: sıcak süreçte AST önbelleği
+
+### Eklenen
+- **SourceManager sıcak AST önbelleği** (`enableWarmCache`): uzun ömürlü
+  süreçte (MCP server) parse edilmiş TU'lar süreç ömrü boyunca tutulur;
+  aynı dosyaya sonraki analyze çağrıları parse maliyeti ödemez. Ölçüm
+  (--serve, 5 çağrı): sıcak 0.51s vs soğuk 1.50s — tekrar çağrı ~6x
+  (küçük dosyada; gerçek header yüküyle makas büyür).
+- **Tasarım değişmezi: bayat AST asla servis edilmez.** Anahtar
+  yol+build-path; parmak izi boyut+mtime. Uyuşmazsa girdi yeniden
+  kurulur. Test bunu uçtan uca kanıtlar: dosya değişince eski
+  use-after-free kaybolur, yeni div-by-zero görünür
+  (WarmCache_InvalidatedOnChange).
+- **Kapsam bilinçli dar**: yalnız MCP serve yolu açar
+  (`Config::setWarmCache`); CLI tek-atım koşularında kapalı — büyük
+  dizin taramasında tüm AST'leri canlı tutmak bellek açısından yanlış.
+  Bellek tavanı kMaxCachedAsts=16 (aşımda tümden boşalt; LRU
+  karmaşıklığına değmez).
+- Filtre-sızıntısı dersiyle ilişkisi not düşüldü: burada çağrılar-arası
+  kalıcılık ÖZELLİĞİN kendisi, doğruluk içerik-türevli anahtarla korunur
+  — global durum yasak değil, anahtarsız global durum yasak.
+
+### Doğrulama
+- 190/190 test (ctest + tek-süreç; +2: ikinci çağrı isabet sayacı ve
+  aynı bulgular, değişen dosyada taze bulgular)
+
 ## 2026-07-10 — Ortak koşul-yürüyüşü iskeleti (ConditionWalk)
 
 ### Değişen

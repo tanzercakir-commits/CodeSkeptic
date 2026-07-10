@@ -1,6 +1,7 @@
 #include "server/McpServer.h"
 
 #include "core/FunctionFilter.h"
+#include "source_manager/SourceManager.h"
 
 #include <fstream>
 #include <string>
@@ -121,6 +122,76 @@ TEST(McpServerTest, FilterStateResetAfterScopedAnalyze) {
 
     EXPECT_TRUE(zerodefect::functionFilter().empty());
     EXPECT_TRUE(zerodefect::lineRanges().empty());
+}
+
+namespace {
+
+std::string analyzeRequest(int id, const std::string& path) {
+    return std::string(R"({"jsonrpc":"2.0","id":)") + std::to_string(id) +
+           R"(,"method":"tools/call",)" +
+           R"("params":{"name":"analyze","arguments":{"path":")" + path +
+           R"("}}})";
+}
+
+} // anonymous namespace
+
+TEST(McpServerTest, WarmCache_SecondCallHits) {
+    // MCP uzun omurlu surec: ayni dosyaya ikinci analyze cagrisi parse
+    // maliyeti odememeli — ve onbellekten gelen AST AYNI bulgulari
+    // uretmeli (onbellek davranis degistirmez, sadece hizlandirir).
+    SourceManager::clearWarmCache();
+    auto path = writeTempSource("mcp_warm_hit.cpp", R"(
+        void f() {
+            int* p = new int(1);
+            delete p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+
+    auto first = handleMcpMessage(analyzeRequest(20, path));
+    EXPECT_GE(SourceManager::warmCacheMisses(), 1u);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 0u);
+
+    auto second = handleMcpMessage(analyzeRequest(21, path));
+    EXPECT_GE(SourceManager::warmCacheHits(), 1u);
+
+    EXPECT_NE(first.find("use-after-free"), std::string::npos);
+    EXPECT_NE(second.find("use-after-free"), std::string::npos);
+    EXPECT_NE(second.find("\\\"count\\\":1"), std::string::npos);
+}
+
+TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
+    // Tasarim degismezi: BAYAT AST ASLA SERVIS EDILMEZ. Dosya degisince
+    // (farkli boyut -> farkli parmak izi) ikinci cagri YENI icerigin
+    // bulgularini vermeli — eski use-after-free kaybolur, yeni
+    // div-by-zero gorunur.
+    SourceManager::clearWarmCache();
+    auto path = writeTempSource("mcp_warm_inval.cpp", R"(
+        void f() {
+            int* p = new int(1);
+            delete p;
+            int x = *p;
+            (void)x;
+        }
+    )");
+
+    auto first = handleMcpMessage(analyzeRequest(22, path));
+    EXPECT_NE(first.find("use-after-free"), std::string::npos);
+
+    // Ayni yol, farkli boyutta yeni icerik: UAF yok, sifira bolme var
+    writeTempSource("mcp_warm_inval.cpp", R"(
+        int g(int n) {
+            if (n == 0) {
+                return 100 / n;
+            }
+            return 0;
+        }
+    )");
+
+    auto second = handleMcpMessage(analyzeRequest(23, path));
+    EXPECT_EQ(second.find("use-after-free"), std::string::npos);
+    EXPECT_NE(second.find("div-by-zero"), std::string::npos);
 }
 
 TEST(McpServerTest, AnalyzeMissingPath_Error) {

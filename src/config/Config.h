@@ -42,6 +42,12 @@ public:
     bool serve() const { return serve_; }
     bool wholeProgram() const { return whole_program_; }
 
+    // Sicak AST onbellegi: uzun omurlu surecler (MCP server) icin
+    // programatik anahtar. CLI'da acilmaz — buyuk dizin taramasinda tum
+    // AST'leri surec omru boyunca canli tutmak bellek acisindan yanlis.
+    void setWarmCache(bool enabled) { warm_cache_ = enabled; }
+    bool warmCache() const { return warm_cache_; }
+
     // Programatik kapsam ayari (MCP server bunlari dogrudan kullanir)
     void addFunctions(const std::string& list);
     void addLines(const std::string& list);
@@ -62,6 +68,7 @@ private:
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;
+    bool warm_cache_ = false;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

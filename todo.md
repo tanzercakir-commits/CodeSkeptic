@@ -76,8 +76,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [x] MCP server modu (--serve; initialize / tools/list / tools/call analyze)
 - [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
       görünmüyor — motor desteği gerekir)
-- [ ] MCP v2: sıcak süreçte AST/derleme önbelleği (şu an her çağrı yeniden
-      parse ediyor — kalıcı sürecin asıl hız kazancı burada)
+- [x] MCP v2: sıcak süreçte AST/derleme önbelleği (yol+build-path anahtarı,
+      boyut+mtime parmak izi — bayat AST asla servis edilmez; yalnız MCP
+      yolunda açık, CLI kapalı; tekrar çağrıda ~6x hız)
 
 ### Arayüz (UI) — son etap, pratiklik + görsellik
 - [ ] **HTML rapor**: `--html rapor.html` — tek, kendine yeten dosya

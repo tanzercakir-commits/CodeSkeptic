@@ -4,9 +4,11 @@
 
 #include <filesystem>
 #include <iostream>
+#include <map>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
+#include <clang/Frontend/ASTUnit.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
@@ -107,11 +109,9 @@ void SourceManager::scanDirectory(const std::string& dir_path) {
     }
 }
 
-int SourceManager::processAll(ASTCallback callback) {
-    if (source_files_.empty()) return 0;
+namespace {
 
-    clang::tooling::ClangTool tool(*comp_db_, source_files_);
-
+void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 #ifdef __APPLE__
     // macOS: SDK header'lari isysroot ile gelir; ek sistem path'leri gerekli.
     // Linux'ta bu path'leri one eklemek GCC libstdc++'in include_next
@@ -136,6 +136,87 @@ int SourceManager::processAll(ASTCallback callback) {
             {"-isysroot", MACOS_SDK_PATH},
             clang::tooling::ArgumentInsertPosition::BEGIN));
 #endif
+}
+
+// --- Surec-omurlu sicak AST onbellegi ---
+//
+// Bilincli global durum (filtre-sizintisi dersinin TERSI degil,
+// tamamlayicisi): burada cagrilar-arasi kalicilik OZELLIGIN kendisi ve
+// dogruluk icerik-turevli anahtarla korunur — yol+build-path anahtari,
+// mtime+boyut parmak izi. Parmak izi uyusmazsa girdi yeniden kurulur;
+// bayat AST'nin servis edilebilecegi bir yol yoktur.
+struct CachedAst {
+    std::string fingerprint;
+    std::unique_ptr<clang::ASTUnit> unit;
+};
+
+std::map<std::string, CachedAst>& astCache() {
+    static std::map<std::string, CachedAst> cache;
+    return cache;
+}
+unsigned g_warmHits = 0;
+unsigned g_warmMisses = 0;
+
+// Basit bellek tavani: LRU karmasikligina degmez — asiminda tumden
+// bosalt (MCP kullaniminda dosya sayisi kucuk, nadiren tetiklenir)
+constexpr size_t kMaxCachedAsts = 16;
+
+std::string fingerprintOf(const std::string& path) {
+    std::error_code ec;
+    auto size = fs::file_size(path, ec);
+    if (ec) return {};
+    auto mtime = fs::last_write_time(path, ec);
+    if (ec) return {};
+    return std::to_string(size) + ":" +
+           std::to_string(mtime.time_since_epoch().count());
+}
+
+} // anonymous namespace
+
+unsigned SourceManager::warmCacheHits() { return g_warmHits; }
+unsigned SourceManager::warmCacheMisses() { return g_warmMisses; }
+void SourceManager::clearWarmCache() {
+    astCache().clear();
+    g_warmHits = 0;
+    g_warmMisses = 0;
+}
+
+int SourceManager::processAll(ASTCallback callback) {
+    if (source_files_.empty()) return 0;
+
+    if (warm_cache_) {
+        bool anyFailed = false;
+        for (const auto& file : source_files_) {
+            const std::string key = file + "|" + build_path_;
+            const std::string fp = fingerprintOf(file);
+
+            auto it = astCache().find(key);
+            if (!fp.empty() && it != astCache().end() &&
+                it->second.fingerprint == fp && it->second.unit) {
+                ++g_warmHits;
+                callback(it->second.unit->getASTContext());
+                continue;
+            }
+
+            ++g_warmMisses;
+            clang::tooling::ClangTool tool(*comp_db_, {file});
+            applyPlatformAdjusters(tool);
+            std::vector<std::unique_ptr<clang::ASTUnit>> units;
+            tool.buildASTs(units);
+            if (units.empty() || !units[0]) {
+                anyFailed = true;
+                continue;
+            }
+            callback(units[0]->getASTContext());
+
+            if (astCache().size() >= kMaxCachedAsts) astCache().clear();
+            astCache()[key] = {fp, std::move(units[0])};
+        }
+        return anyFailed ? 1 : 0;
+    }
+
+    clang::tooling::ClangTool tool(*comp_db_, source_files_);
+    applyPlatformAdjusters(tool);
 
     ZeroDefectActionFactory factory(callback);
     return tool.run(&factory);

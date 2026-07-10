@@ -22,6 +22,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setLineRanges(config_.lines());
 
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
+    if (config_.warmCache()) source_mgr_->enableWarmCache(true);
 
     if (!config_.sourcePath().empty()) {
         if (std::filesystem::is_directory(config_.sourcePath())) {
