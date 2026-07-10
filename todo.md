@@ -85,7 +85,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       muhafazakâr)
 - [ ] İnterprosedürel v2: dönüş nullness'inde parametre/dataflow desteği
       (`return p;` yolları — şimdilik Unknown)
-- [ ] Cross-TU özetler (whole-program modu: özetleri diske yaz/yükle)
+- [x] Cross-TU özetler v1 (--whole-program iki geçişli mod; ad+arite
+      anahtarı, yalnız harici bağlantı, çakışmada muhafazakâr birleşim)
+- [ ] Cross-TU v2: özetleri diske yaz/yükle (artımlı whole-program)
 - [ ] Int dönüş sıfır-olabilirliği özeti (DivByZero tüketsin)
 - [ ] Özet önbelleği (artımlı modda yalnızca değişen fonksiyon tazelenir;
       "özet değişti → çağıranlar etkilendi" = semantik regresyon sinyali)

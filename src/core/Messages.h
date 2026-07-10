@@ -47,6 +47,7 @@ enum class MsgId {
     DirNotFound,          // {0} = yol
     DirScanError,         // {0} = hata mesaji
     UsageError,
+    WholeProgramPass,     // {0} = dosya sayisi
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.

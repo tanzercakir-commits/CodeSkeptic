@@ -12,6 +12,12 @@ namespace testing {
 DiagnosticList runRule(Rule& rule, const std::string& code,
                        const std::string& filename = "test.cpp");
 
+// Whole-program modunun test karsiligi: once calleeTU'dan ozetler
+// hasat edilir (cross-TU deposuna), sonra kural callerTU uzerinde
+// kosulur. Depo cikista temizlenir (test izolasyonu).
+DiagnosticList runRuleCrossTU(Rule& rule, const std::string& calleeTU,
+                              const std::string& callerTU);
+
 } // namespace testing
 } // namespace zerodefect
 

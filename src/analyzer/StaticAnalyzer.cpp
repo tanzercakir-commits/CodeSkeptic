@@ -4,6 +4,7 @@
 #include "analyzer/SuppressionFilter.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/FunctionSummary.h"
 #include "reporter/ConsoleReporter.h"
 #include "reporter/JsonReporter.h"
 #include "reporter/SarifReporter.h"
@@ -49,6 +50,9 @@ StaticAnalyzer::~StaticAnalyzer() {
     // testini dusurmustu — ctest'in surec-basina izolasyonu gizliyordu.)
     setFunctionFilter({});
     setLineRanges({});
+    // Ayni gerekce cross-TU ozet deposu icin: bir kosunun ozetleri
+    // sonraki kosuya sizmasin (MCP server ayni surecte cok analiz kosar)
+    SummaryRegistry::instance().clearGlobal();
 }
 
 int StaticAnalyzer::run() {
@@ -73,6 +77,21 @@ int StaticAnalyzer::run() {
     std::cerr << msg(MsgId::AnalysisStarting,
                      std::to_string(source_mgr_->fileCount()),
                      std::to_string(engine_.ruleCount())) << "\n";
+
+    // Whole-program modu (Ufuk 2): 1. gecis tum TU'lardan harici
+    // baglantili fonksiyon ozetlerini toplar; 2. gecisteki kurallar
+    // dosyalar arasi cagrilarda Opaque yerine gercek ozeti gorur.
+    // Bedeli ikinci parse'tir — bilincli, bayrakla acilir.
+    if (config_.wholeProgram()) {
+        std::cerr << msg(MsgId::WholeProgramPass,
+                         std::to_string(source_mgr_->fileCount())) << "\n";
+        source_mgr_->processAll([](clang::ASTContext& ctx) {
+            auto& registry = SummaryRegistry::instance();
+            registry.rebuild(ctx);
+            registry.harvestGlobal();
+            registry.clear();
+        });
+    }
 
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);

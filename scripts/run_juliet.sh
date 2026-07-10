@@ -114,7 +114,9 @@ PYEOF
     echo "[juliet] $cwe: $count dosya taraniyor..."
     set +e
     # --files: yalnizca secilmis (elenmis + limitli) dosyalar analiz edilir
-    "$ZD_BIN" --files "$list" --build-path "$build" \
+    # --whole-program: akis varyantlari (61/63/64...) kaynak/lavaboyu
+    # a/b dosyalarina boler — cross-TU ozetler olmadan gorunmezler
+    "$ZD_BIN" --files "$list" --build-path "$build" --whole-program \
         --json "findings_$cwe.json" > /dev/null 2> "log_$cwe.txt"
     local code=$?
     set -e
