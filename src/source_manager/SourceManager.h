@@ -26,6 +26,19 @@ public:
     void scanDirectory(const std::string& dir_path);
     int processAll(ASTCallback callback);
 
+    // Sicak AST onbellegi (MCP server / uzun omurlu surec): parse
+    // edilmis TU'lar SUREC omurlu tutulur, sonraki cagrilar parse
+    // maliyeti odemez. Anahtar yol+build-path; parmak izi (mtime+boyut)
+    // uyusmazsa yeniden kurulur — BAYAT AST ASLA SERVIS EDILMEZ.
+    // CLI tek-atim kosularinda kapali kalir (bellek: buyuk dizin
+    // taramasinda tum AST'leri canli tutmak istemeyiz).
+    void enableWarmCache(bool enabled) { warm_cache_ = enabled; }
+
+    // Test/teshis: onbellek sayaclari ve sifirlama (surec-omurlu depo)
+    static unsigned warmCacheHits();
+    static unsigned warmCacheMisses();
+    static void clearWarmCache();
+
     size_t fileCount() const;
     const std::vector<std::string>& files() const;
 
@@ -33,6 +46,7 @@ private:
     std::string build_path_;
     std::vector<std::string> source_files_;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;
+    bool warm_cache_ = false;
 };
 
 } // namespace zerodefect

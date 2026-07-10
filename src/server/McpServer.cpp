@@ -111,6 +111,9 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addFunctions(functions->str());
     if (auto lines = args->getString("lines"))
         config.addLines(lines->str());
+    // Uzun omurlu surec: parse edilmis AST'ler cagrilar arasi sicak
+    // tutulur (parmak izi eskimeyi yakalar — bayat AST asla servis edilmez)
+    config.setWarmCache(true);
 
     zerodefect::StaticAnalyzer analyzer(std::move(config));
     analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
