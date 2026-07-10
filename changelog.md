@@ -1,5 +1,25 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — İz v2: guard olayları izlerde (onEdgeRefined)
+
+### Eklenen
+- **DataflowEngine'e opsiyonel `onEdgeRefined` kancası**: kenar
+  iyileştirmesi (assume edge) state'i GERÇEKTEN değiştirdiğinde, yalnız
+  RAPORLAMA geçişinde çağrılır — onStatement'ın fixpoint kuralının
+  aynısı (faz 1'de erken state'le sahte guard olayı doğardı). Kanca
+  yoksa davranış bire bir eski hali (SFINAE).
+- **Guard iz notları**: atama olmadan salt guard'dan gelen kesin bilgi
+  önceden İZSİZDİ. `if (p == 0) { *p }` bulgusu artık kosul satırında
+  "'p' is null on this branch (per this condition)" notu taşıyor
+  (NullDeref, disjunkt-düzleştirmeli fark); `if (n == 0) 100 / n` için
+  simetrik "zero on this branch" (DivByZero). İki yeni i18n mesajı.
+- Not, koşul satırını gösterir (dereference/bölme satırını değil) —
+  test bunu satır karşılaştırmasıyla sabitler.
+
+### Doğrulama
+- 213/213 test (ctest + tek-süreç; +2 guard-izi testi; mevcut 211 sabit
+  — kancasız analizler ve mevcut izler davranış korunumlu)
+
 ## 2026-07-10 — Artımlı akışın uçları: MCP `summaries` + diff döngüsü belgesi
 
 ### Eklenen

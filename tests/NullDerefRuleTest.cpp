@@ -333,3 +333,24 @@ TEST(NullDerefRuleTest, MultiDeclaration_SecondPointerTracked) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
+
+TEST(NullDerefTraceTest, GuardOnlyNull_TraceShowsCondition) {
+    // Iz v2: atama olmadan, salt guard'dan gelen kesin-null onceden
+    // IZSIZDI — simdi kosul noktasi "bu dalda null" notuyla gorunur
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void f(int* p) {
+            if (p == 0) {
+                int x = *p;
+                (void)x;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    ASSERT_FALSE(results[0].notes.empty());
+    EXPECT_NE(results[0].notes[0].message.find("null on this branch"),
+              std::string::npos);
+    // Not, kosulun satirini gostermeli (dereference'in degil)
+    EXPECT_LT(results[0].notes[0].line, results[0].line);
+}
