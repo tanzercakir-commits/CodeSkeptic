@@ -15,6 +15,7 @@
 #include <clang/ASTMatchers/ASTMatchers.h>
 
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <set>
 #include <vector>
@@ -410,7 +411,11 @@ public:
         NullDerefAnalysis analysis(
             trackedVars, zerodefect::collectMutatedDecls(func),
             func->getQualifiedNameAsString(), results_);
-        zerodefect::runDataflow(func, *result.Context, analysis);
+        auto df = zerodefect::runDataflow(func, *result.Context, analysis);
+        if (!df.converged)
+            std::cerr << zerodefect::msg(
+                zerodefect::MsgId::AnalysisNotConverged,
+                func->getQualifiedNameAsString()) << "\n";
         analysis.attachTraces();
     }
 

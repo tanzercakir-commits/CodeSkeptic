@@ -35,10 +35,10 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [ ] Fonksiyon başına CFG önbelleği — kurallar arası paylaşım (şu an her
       kural kendi CFG'sini kuruyor; fonksiyon başına 3 build). Kurallara
       ortak bir analiz bağlamı geçirmek gerekir — mimari karar.
-- [ ] converged=false durumunu görünür yap (Info diagnostic veya stderr) —
-      yükseklik-tabanlı tavanla artık pratikte imkânsız ama sessiz kalmasın
-- [ ] MemoryLeakRule transfer'ını da tepe-düğüm Effect desenine taşı
-      (değişken başına classify döngüsü kalksın — UninitPtr'daki gibi)
+- [x] converged=false artık stderr'de görünür (AnalysisNotConverged,
+      4 kuralda; i18n'li)
+- [x] MemoryLeakRule tepe-düğüm Effect desenine taşındı
+      (classifyStmtEffects: ifade bir kez sınıflandırılır)
 
 ### Faz 2 kalanları
 - [x] NIST Juliet ölçüm altyapısı (haftalık workflow + juliet_eval;
