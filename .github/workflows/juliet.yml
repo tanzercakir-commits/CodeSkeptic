@@ -1,9 +1,9 @@
 name: Juliet benchmark
 
-# Agir kosum (indirme ~120MB + binlerce dosya) — her PR'da degil:
-# haftalik + elle tetikleme + benchmark altyapisina dokunan PR'lar
-# (harness degisikligi gercek kosuyla dogrulanmali). Sonuclar
-# JULIET_RESULT satirlarindan izlenir.
+# Juliet skor bekcisi: analiz koduna dokunan HER PR'da kosar
+# (suit cache'te, ~3.5 dk) ve juliet_expected.txt tabanlarinin altina
+# dusus job'i kirmizi yapar (JULIET_GUARD_FAIL). Docs-only PR'lar paths
+# filtresiyle muaf. Sonuclar JULIET_RESULT satirlarindan izlenir.
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,10 @@ on:
       - ".github/workflows/juliet.yml"
       - "scripts/run_juliet.sh"
       - "scripts/juliet_eval.py"
+      - "scripts/juliet_expected.txt"
+      - "src/**"
+      - "tests/**"
+      - "CMakeLists.txt"
 
 jobs:
   juliet:
