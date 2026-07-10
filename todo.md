@@ -89,6 +89,8 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [x] Cross-TU özetler v1 (--whole-program iki geçişli mod; ad+arite
       anahtarı, yalnız harici bağlantı, çakışmada muhafazakâr birleşim)
 - [ ] Cross-TU v2: özetleri diske yaz/yükle (artımlı whole-program)
+- [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
+      (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
 - [ ] Int dönüş sıfır-olabilirliği özeti (DivByZero tüketsin)
 - [ ] Özet önbelleği (artımlı modda yalnızca değişen fonksiyon tazelenir;
       "özet değişti → çağıranlar etkilendi" = semantik regresyon sinyali)
