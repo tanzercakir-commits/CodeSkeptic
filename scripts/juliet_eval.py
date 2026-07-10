@@ -24,6 +24,7 @@ Kullanim:
 """
 
 import json
+import os
 import sys
 
 # Test edilen CWE'ye "bu kusuru bulmak bu kuralin isi" diyen esleme.
@@ -116,6 +117,21 @@ def main() -> int:
         t, f_, o = by_rule[rule]
         tag = "*" if rule in rules else " "
         print(f"   {tag}{rule:<16} tp={t:<5} fp={f_:<5} diger={o}")
+
+    # FP ornekleri: kural iyilestirmesi icin ham malzeme. Suite CI'da
+    # yasadigi icin FP kaliplari yalnizca loglardan okunabilir —
+    # kural basina ilk 5 ornek (deterministik: dosya+satir sirali).
+    fp_by_rule = {}
+    for d in fp:
+        rule = d.get("rule") or d.get("rule_id") or "?"
+        fp_by_rule.setdefault(rule, []).append(d)
+    for rule in sorted(fp_by_rule):
+        samples = sorted(fp_by_rule[rule],
+                         key=lambda d: (d.get("file", ""), d.get("line", 0)))
+        for d in samples[:5]:
+            base = os.path.basename(d.get("file", "?"))
+            print(f"FP_SAMPLE {cwe} {rule} {base}:{d.get('line', 0)} "
+                  f"{d.get('function', '?')} :: {d.get('message', '')}")
 
     # Makine-okur satir (trend takibi icin grep-dostu).
     # Eski alanlar korunur; r* alanlari eslemeli gorunumdur.
