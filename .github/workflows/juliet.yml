@@ -59,10 +59,18 @@ jobs:
 
       - name: Run benchmark
         # shell: bash → -eo pipefail: tee borusu exit kodunu maskeleyemez
+        # Limit: PR bekcisi 400 (hizli sinyal); haftalik cron 1600 (derin
+        # ornekleme — 61-ailesi gibi seyrek akis varyantlari PR orneklemine
+        # girmiyor, trend olcumu onlari da gorsun)
         shell: bash
         run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            LIMIT=1600
+          else
+            LIMIT="${{ github.event.inputs.limit || '400' }}"
+          fi
           bash scripts/run_juliet.sh ./build/src/zerodefect juliet-work \
-            "${{ github.event.inputs.limit || '400' }}" | tee juliet-output.txt
+            "$LIMIT" | tee juliet-output.txt
 
       - name: Summary
         if: always()
