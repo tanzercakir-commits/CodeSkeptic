@@ -93,8 +93,8 @@ TEST(BaselineV2Test, LineShift_StillSuppressed) {
 
     // Two lines added above: the finding is now on line 4
     writeSource("blv2_shift.cpp",
-        "// yeni aciklama\n"
-        "// bir satir daha\n"
+        "// new comment\n"
+        "// one more line\n"
         "void f() {\n"
         "    int* p = new int(1);\n"
         "}\n");

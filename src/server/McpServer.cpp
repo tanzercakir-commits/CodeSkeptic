@@ -20,7 +20,10 @@ namespace {
 
 const char kProtocolVersion[] = "2024-11-05";
 const char kServerName[] = "zerodefect";
-const char kServerVersion[] = "0.9.0";
+#ifndef ZERODEFECT_VERSION
+#define ZERODEFECT_VERSION "0.0.0-dev"
+#endif
+const char kServerVersion[] = ZERODEFECT_VERSION;
 
 std::string serialize(const json::Value& value) {
     std::string out;

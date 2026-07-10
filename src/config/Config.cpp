@@ -129,6 +129,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         exits 1 if any contract weakened\n"
                       << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
+                      << "  --version              Print version and exit\n"
                       << "  --help                 Show this message\n";
             return false;
         } else if (arg[0] != '-' && source_path_.empty()) {

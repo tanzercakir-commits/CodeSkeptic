@@ -1,10 +1,10 @@
-// Interprosedurel v1 — fonksiyon ozetleri:
-//  - Donus nullness'i: "null donebilir" fonksiyonun korumasiz kullanimi
-//    uyari; guard'li kullanim temiz; NeverNull zinciri sessiz.
-//  - Parametre etkileri: free-wrapper'lar double-free/UAF gorunur kilar;
-//    salt-okur yardimcilar arkalarindaki leak'i gizlemez; saklayan/opak
-//    cagrilar bugunku muhafazakarligi korur (regresyon yok).
-//  - Rekursiyon guclu iddia uretmez (soundness).
+// Interprocedural v1 — function summaries:
+//  - Return nullness: unguarded use of a "may return null" function
+//    warns; guarded use is clean; a NeverNull chain stays silent.
+//  - Parameter effects: free wrappers make double-free/UAF visible;
+//    read-only helpers do not hide the leak behind them; storing/opaque
+//    calls keep today's conservatism (no regression).
+//  - Recursion produces no strong claims (soundness).
 
 #include "TestHelper.h"
 #include "rules/DivByZeroRule.h"

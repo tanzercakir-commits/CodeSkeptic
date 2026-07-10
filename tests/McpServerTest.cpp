@@ -82,7 +82,7 @@ TEST(McpServerTest, AnalyzeCallReturnsFindingsWithTrace) {
     EXPECT_NE(response.find("use-after-free"), std::string::npos);
     EXPECT_NE(response.find("allocated here"), std::string::npos);
     EXPECT_NE(response.find("freed here"), std::string::npos);
-    // Ic JSON, text alaninda kacirilmis tirnakla tasinir: \"count\":
+    // The inner JSON travels in the text field with escaped quotes: \"count\":
     EXPECT_NE(response.find("\\\"count\\\":"), std::string::npos);
 }
 
@@ -104,11 +104,12 @@ TEST(McpServerTest, AnalyzeWithFunctionScope) {
 }
 
 TEST(McpServerTest, FilterStateResetAfterScopedAnalyze) {
-    // Regresyon: filtreli analyze cagrisi global fonksiyon/satir
-    // filtresini set edip birakirsa, ayni surecteki SONRAKI analizler
-    // sessizce budanir (uzun omurlu MCP server + tek-surec test kosumu).
-    // Bulgu kaybi olarak yasandi: InterproceduralTest'in 11 testi
-    // tek-surec kosumda dusuyordu, ctest izolasyonu gizliyordu.
+    // Regression: if a scoped analyze call sets the global function/line
+    // filter and leaves it behind, SUBSEQUENT analyses in the same
+    // process are silently pruned (long-lived MCP server + single-process
+    // test run). Seen in the wild as lost findings: 11 tests of
+    // InterproceduralTest failed in a single-process run, while ctest
+    // isolation was hiding it.
     auto path = writeTempSource("mcp_scope_reset.cpp", R"(
         void first() { int* a; int x = *a; (void)x; }
         void second() { int* b; int y = *b; (void)y; }
@@ -136,9 +137,10 @@ std::string analyzeRequest(int id, const std::string& path) {
 } // anonymous namespace
 
 TEST(McpServerTest, WarmCache_SecondCallHits) {
-    // MCP uzun omurlu surec: ayni dosyaya ikinci analyze cagrisi parse
-    // maliyeti odememeli — ve onbellekten gelen AST AYNI bulgulari
-    // uretmeli (onbellek davranis degistirmez, sadece hizlandirir).
+    // MCP is a long-lived process: a second analyze call on the same
+    // file must not pay the parse cost — and the AST served from the
+    // cache must produce the SAME findings (the cache does not change
+    // behavior, it only speeds things up).
     SourceManager::clearWarmCache();
     auto path = writeTempSource("mcp_warm_hit.cpp", R"(
         void f() {
@@ -162,10 +164,10 @@ TEST(McpServerTest, WarmCache_SecondCallHits) {
 }
 
 TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
-    // Tasarim degismezi: BAYAT AST ASLA SERVIS EDILMEZ. Dosya degisince
-    // (farkli boyut -> farkli parmak izi) ikinci cagri YENI icerigin
-    // bulgularini vermeli — eski use-after-free kaybolur, yeni
-    // div-by-zero gorunur.
+    // Design invariant: a STALE AST IS NEVER SERVED. When the file
+    // changes (different size -> different fingerprint) the second call
+    // must report the NEW content's findings — the old use-after-free
+    // disappears, the new div-by-zero shows up.
     SourceManager::clearWarmCache();
     auto path = writeTempSource("mcp_warm_inval.cpp", R"(
         void f() {
@@ -179,7 +181,7 @@ TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
     auto first = handleMcpMessage(analyzeRequest(22, path));
     EXPECT_NE(first.find("use-after-free"), std::string::npos);
 
-    // Ayni yol, farkli boyutta yeni icerik: UAF yok, sifira bolme var
+    // Same path, new content with a different size: no UAF, has div-by-zero
     writeTempSource("mcp_warm_inval.cpp", R"(
         int g(int n) {
             if (n == 0) {
@@ -195,9 +197,10 @@ TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
 }
 
 TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
-    // "summaries" argumani: --summary-out ile yazilmis dosya MCP analyze
-    // cagrisina verilir — tek dosya, tum-proje bilgisiyle analiz edilir.
-    // Ayni cagri ozetsiz sessiz (kontrol grubu; bilgi dosyadan geliyor).
+    // The "summaries" argument: a file written with --summary-out is
+    // handed to the MCP analyze call — a single file is analyzed with
+    // whole-project knowledge. The same call without summaries is silent
+    // (control group; the knowledge comes from the file).
     auto caller = writeTempSource("mcp_sum_caller.cpp", R"(
         int* find(int c);
         void f(int c) {

@@ -34,8 +34,8 @@ bool lineFilterAllows(const clang::FunctionDecl& func,
 
     clang::SourceLocation begin = sm.getExpansionLoc(func.getBeginLoc());
     clang::SourceLocation end = sm.getExpansionLoc(func.getEndLoc());
-    // Degisen satirlar analiz edilen ana dosyaya aittir; header'daki
-    // fonksiyonlar bu kapsamda degildir
+    // Changed lines belong to the main file being analyzed; functions
+    // in headers are not in this scope
     if (!sm.isInMainFile(begin)) return false;
 
     unsigned funcBegin = sm.getSpellingLineNumber(begin);

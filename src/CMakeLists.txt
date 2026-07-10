@@ -35,6 +35,8 @@ target_include_directories(zerodefect_core SYSTEM
 
 target_compile_definitions(zerodefect_core
     PUBLIC ${LLVM_DEFINITIONS}
+    # Single source of truth for the version: project(VERSION ...) above
+    PUBLIC ZERODEFECT_VERSION="${PROJECT_VERSION}"
 )
 
 # Clang resource dir (for intrinsic headers such as stddef.h, stdarg.h)

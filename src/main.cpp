@@ -8,9 +8,22 @@
 #include "rules/UninitPointerRule_Ex.h"
 #include "server/McpServer.h"
 
+#include <cstring>
 #include <iostream>
 
+#ifndef ZERODEFECT_VERSION
+#define ZERODEFECT_VERSION "0.0.0-dev"
+#endif
+
 int main(int argc, char* argv[]) {
+    // --version exits 0 by convention (unlike --help's usage-error exit)
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--version") == 0) {
+            std::cout << "ZeroDefect " << ZERODEFECT_VERSION << "\n";
+            return 0;
+        }
+    }
+
     zerodefect::Config config;
     config.loadFromFile(".zerodefect.conf");
 
