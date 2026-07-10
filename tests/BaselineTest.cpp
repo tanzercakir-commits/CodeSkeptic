@@ -34,7 +34,7 @@ TEST(BaselineTest, WriteLoadFilterRoundtrip) {
     Baseline baseline;
     ASSERT_TRUE(baseline.load(path));
 
-    // Ayni bulgular + bir yeni bulgu
+    // Same findings + one new finding
     DiagnosticList current = original;
     current.push_back(makeDiag("c.cpp", 5, "uninit-ptr", "new finding"));
 
@@ -73,16 +73,16 @@ TEST(BaselineTest, EmptyDiagnostics_WritesEmptyFile) {
 }
 
 // ===================================================================
-// Baseline v2: satir-bagimsiz anahtar (satir icerigi hash'i)
-// Degismezler: (1) kod kaydiginca baseline gecerli kalir, (2) satirin
-// KENDISI degisince bulgu yeniden gorunur, (3) ozdes satirlar sayiyla
-// izlenir — birini baseline'a almak digerini gizlemez, (4) eski v1
-// dosyalari eski anlamiyla calismaya devam eder.
+// Baseline v2: line-independent key (hash of the line content)
+// Invariants: (1) the baseline stays valid when code shifts, (2) the
+// finding resurfaces when the line ITSELF changes, (3) identical lines
+// are tracked by count — baselining one does not hide the other,
+// (4) old v1 files keep working with their old semantics.
 // ===================================================================
 
 TEST(BaselineV2Test, LineShift_StillSuppressed) {
-    // Bulgu satirinin USTUNE kod eklenir: satir numarasi kayar ama
-    // icerik ayni — v1'in bilinen sinirlamasi, v2'de cozuldu
+    // Code is added ABOVE the finding line: the line number shifts but
+    // the content is the same — v1's known limitation, solved in v2
     auto src = writeSource("blv2_shift.cpp",
         "void f() {\n"
         "    int* p = new int(1);\n"
@@ -91,7 +91,7 @@ TEST(BaselineV2Test, LineShift_StillSuppressed) {
     ASSERT_TRUE(Baseline::write(path,
         { makeDiag(src, 2, "memory-leak", "leak of p") }));
 
-    // Ustune iki satir eklendi: bulgu artik 4. satirda
+    // Two lines added above: the finding is now on line 4
     writeSource("blv2_shift.cpp",
         "// yeni aciklama\n"
         "// bir satir daha\n"
@@ -106,8 +106,9 @@ TEST(BaselineV2Test, LineShift_StillSuppressed) {
 }
 
 TEST(BaselineV2Test, ReindentedLine_StillSuppressed) {
-    // Yalniz girinti degisti (ornegin blok bir if icine alindi ama
-    // bulgu satiri ayni): kirpilmis icerik ayni -> bastirilmis kalir
+    // Only the indentation changed (e.g. the block was wrapped in an if
+    // but the finding line is the same): trimmed content is the same ->
+    // stays suppressed
     auto src = writeSource("blv2_indent.cpp",
         "int* p = new int(1);\n");
     std::string path = ::testing::TempDir() + "blv2_indent.txt";
@@ -123,8 +124,8 @@ TEST(BaselineV2Test, ReindentedLine_StillSuppressed) {
 }
 
 TEST(BaselineV2Test, ChangedLine_ResurfacesAsNew) {
-    // Satirin KENDISI degisti: bulgu yeniden gorunmeli — degisen satir
-    // yeniden gozden gecirilmeli (bilincli davranis)
+    // The line ITSELF changed: the finding must resurface — a changed
+    // line should be re-reviewed (deliberate behavior)
     auto src = writeSource("blv2_changed.cpp",
         "int* p = new int(1);\n");
     std::string path = ::testing::TempDir() + "blv2_changed.txt";
@@ -141,9 +142,10 @@ TEST(BaselineV2Test, ChangedLine_ResurfacesAsNew) {
 }
 
 TEST(BaselineV2Test, IdenticalLines_CountedSeparately) {
-    // Iki ayri konumda OZDES satir + ozdes mesaj: baseline'da BIR kayit
-    // varsa yalniz BIR bulgu bastirilir — ikincisi yeni sayilir
-    // (set semantigi olsaydi ikisi de sessizce yutulurdu)
+    // IDENTICAL line + identical message at two separate locations: with
+    // ONE record in the baseline only ONE finding is suppressed — the
+    // second counts as new (with set semantics both would be silently
+    // swallowed)
     auto src = writeSource("blv2_dup.cpp",
         "void f() { delete p; }\n"
         "void g() { delete p; }\n");
@@ -151,8 +153,8 @@ TEST(BaselineV2Test, IdenticalLines_CountedSeparately) {
     ASSERT_TRUE(Baseline::write(path,
         { makeDiag(src, 1, "double-free", "double free of p") }));
 
-    // Kirpilmis satir icerikleri farkli (f vs g) — bu test ayni ICERIGI
-    // zorlamali: iki satir birebir ayni olsun
+    // Trimmed line contents differ (f vs g) — this test must force the
+    // same CONTENT: make the two lines exactly identical
     src = writeSource("blv2_dup2.cpp",
         "    delete p;\n"
         "    delete p;\n");
@@ -169,7 +171,7 @@ TEST(BaselineV2Test, IdenticalLines_CountedSeparately) {
     EXPECT_EQ(baseline.filter(current), 1u);
     ASSERT_EQ(current.size(), 1u);
 
-    // Iki kayitli baseline ikisini de bastirir
+    // A baseline with two records suppresses both
     ASSERT_TRUE(Baseline::write(path, {
         makeDiag(src, 1, "double-free", "double free of p"),
         makeDiag(src, 2, "double-free", "double free of p"),
@@ -185,9 +187,9 @@ TEST(BaselineV2Test, IdenticalLines_CountedSeparately) {
 }
 
 TEST(BaselineV2Test, OldV1File_StillMatchesByLine) {
-    // Elle yazilmis v1 dosyasi (basliksiz, satir numarali anahtar):
-    // ayni satirdaki bulgu bastirilir, kayan bulgu bastirilMAZ (eski
-    // davranis korunur — tazeleyince v2'ye gecilir)
+    // Hand-written v1 file (headerless, line-numbered key): a finding on
+    // the same line is suppressed, a shifted one is NOT (old behavior is
+    // preserved — refreshing migrates to v2)
     std::string path = ::testing::TempDir() + "blv2_v1compat.txt";
     {
         std::ofstream file(path);
@@ -204,8 +206,8 @@ TEST(BaselineV2Test, OldV1File_StillMatchesByLine) {
 }
 
 TEST(BaselineV2Test, FileHeaderWritten) {
-    // v2 dosyasi surumlu basliyor — ileride format degisirse ayirt
-    // edilebilir; '#' satirlari yuklemede yorumdur
+    // The v2 file starts with a versioned header — distinguishable if
+    // the format changes later; '#' lines are comments when loading
     std::string path = ::testing::TempDir() + "blv2_header.txt";
     ASSERT_TRUE(Baseline::write(path, {}));
     std::ifstream file(path);

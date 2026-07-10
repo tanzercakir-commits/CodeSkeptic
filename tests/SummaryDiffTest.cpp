@@ -1,7 +1,8 @@
-// Ozet-diff: sozlesme degisim siniflandirmasi. Degismezler: (1) guclu
-// iddianin kaybi/degisimi WEAKENED (cagiranlar etkilendi -> exit 1),
-// (2) guclu iddia kazanimi STRENGTHENED, yonsuz fark CHANGED, (3)
-// ozdes hasatlar sifir kayit, (4) bozuk dosya exit 2.
+// Summary diff: contract change classification. Invariants: (1) losing
+// or changing a strong claim is WEAKENED (callers affected -> exit 1),
+// (2) gaining a strong claim is STRENGTHENED, a directionless drift is
+// CHANGED, (3) identical harvests yield zero records, (4) a corrupt
+// file exits 2.
 
 #include "engine/SummaryDiff.h"
 
@@ -45,8 +46,8 @@ TEST(SummaryDiffTest, StrongClaimLost_Weakened) {
 }
 
 TEST(SummaryDiffTest, ParamStrongClaimChanged_Weakened) {
-    // Frees -> Stores: double-free tespiti kaybolur, cagiranlar
-    // yeniden incelenmeli
+    // Frees -> Stores: double-free detection is lost, callers must be
+    // re-examined
     SummaryMap oldMap{{"my_free/1",
                        makeSum(RN::Unknown, RZ::Unknown, {PE::Frees})}};
     SummaryMap newMap{{"my_free/1",
@@ -87,7 +88,7 @@ TEST(SummaryDiffTest, AddedRemoved_AndWeakenedFirst) {
     EXPECT_EQ(result.added, 1u);
     EXPECT_EQ(result.removed, 1u);
     ASSERT_EQ(result.weakened, 1u);
-    // Zayiflayanlar listenin BASINDA (rapor okunurlugu)
+    // Weakened entries come FIRST in the list (report readability)
     EXPECT_EQ(result.changes[0].kind, ChangeKind::Weakened);
 }
 

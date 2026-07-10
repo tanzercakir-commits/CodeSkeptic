@@ -17,8 +17,9 @@ public:
         : rule_(rule), results_(results) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
-        // Uretimde RuleEngine::runAll'in yaptigi gibi: ozetler kuraldan
-        // once kurulur, TU bitince temizlenir (sarkan pointer olmasin)
+        // As RuleEngine::runAll does in production: summaries are built
+        // before the rule and cleared when the TU ends (no dangling
+        // pointers)
         zerodefect::SummaryRegistry::instance().rebuild(ctx);
         rule_.check(ctx, results_);
         zerodefect::SummaryRegistry::instance().clear();
@@ -46,7 +47,7 @@ private:
     zerodefect::DiagnosticList& results_;
 };
 
-// Whole-program 1. gecisin test karsiligi: yalnizca ozet hasadi
+// Test counterpart of whole-program pass 1: summary harvesting only
 class HarvestASTConsumer : public clang::ASTConsumer {
 public:
     void HandleTranslationUnit(clang::ASTContext& ctx) override {

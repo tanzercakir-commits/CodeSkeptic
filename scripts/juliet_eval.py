@@ -1,41 +1,43 @@
 #!/usr/bin/env python3
-"""Juliet degerlendiricisi.
+"""Juliet evaluator.
 
-zerodefect'in --json ciktisini Juliet adlandirma sozlesmesiyle puanlar:
-  - Bulgu, adi 'bad' iceren fonksiyondaysa  -> TP (dogru pozitif)
-  - Bulgu, adi 'good' iceren fonksiyondaysa -> FP (yanlis pozitif)
-  - Digerleri (yardimcilar, main vb.)       -> sayilmaz (other)
+Scores zerodefect's --json output using the Juliet naming convention:
+  - Finding in a function whose name contains 'bad'  -> TP (true positive)
+  - Finding in a function whose name contains 'good' -> FP (false positive)
+  - Everything else (helpers, main, etc.)            -> not counted (other)
 
-Iki gorunum raporlanir:
-  1. GENEL: dosyalardaki TUM bulgular (kullanicinin gorecegi gurultu).
-  2. ESLEMELI: yalnizca test edilen CWE'yle eslesen kuralin bulgulari
-     (kuralin gercek kalitesi). Ornek: CWE416 dosyasindaki bir
-     memory-leak uyarisi UAF kuralinin hanesine yazilmaz.
+Two views are reported:
+  1. OVERALL: ALL findings in the files (the noise a user would see).
+  2. RULE-MATCHED: only findings from the rule matching the CWE under
+     test (the rule's true quality). Example: a memory-leak warning in a
+     CWE416 file is not credited to the UAF rule.
 
-Vaka-bazli metrikler (F1'in temeli): her dosya bir vakadir — bad
-fonksiyonda eslesen bulgu varsa vaka-TP, good fonksiyonda varsa vaka-FP,
-bad'e hic bulgu yoksa FN (her Juliet dosyasi tam bir kusur baglami
-icerir). Vaka-precision + recall'dan F1 turetilir. Akis varyantlarinda
-(54a..54e) kusur dosyalar arasi bolundugu icin recall alt sinirdir.
+Case-level metrics (the basis of F1): each file is one case — a matched
+finding in a bad function makes the case a TP, one in a good function an
+FP, and no finding in bad at all an FN (every Juliet file contains one
+complete defect context). F1 is derived from case precision + recall.
+For flow variants (54a..54e) the defect is split across files, so recall
+is a lower bound.
 
-ROC BILINCLI YOK: analizci olasiliksal degil, kanit-temelli ikili —
-taranabilir esik olmadigi icin iki noktali "egri"den AUC yaniltici olur.
-Durust karsiligi iki isletim noktasi: tum bulgular vs yalniz Error.
+DELIBERATELY NO ROC: the analyzer is evidence-based and binary, not
+probabilistic — with no sweepable threshold, an AUC from a two-point
+"curve" would be misleading. The honest counterpart is two operating
+points: all findings vs errors only.
 
-Beklenen tabanlar (4. arguman, opsiyonel): satir formati
-  <CWE-adi> <min-rprecision> <min-rhitrate>
-Taban ihlali exit 1 → CI kirmizi (Juliet skor bekcisi).
+Expected baselines (4th argument, optional): line format
+  <CWE-name> <min-rprecision> <min-rhitrate>
+A baseline violation exits 1 → CI goes red (Juliet score guard).
 
-Kullanim:
-  juliet_eval.py <findings.json> <cwe-adi> <dosya-listesi> [beklenen.txt]
+Usage:
+  juliet_eval.py <findings.json> <cwe-name> <file-list> [expected.txt]
 """
 
 import json
 import os
 import sys
 
-# Test edilen CWE'ye "bu kusuru bulmak bu kuralin isi" diyen esleme.
-# Anahtar CWE adinin on eki; deger rule_id kumesi.
+# Mapping that says "finding this defect is this rule's job" for the CWE
+# under test. Key is a prefix of the CWE name; value is a set of rule_ids.
 CWE_RULES = {
     "CWE476": {"null-deref"},
     "CWE401": {"memory-leak"},
@@ -53,7 +55,7 @@ def relevant_rules(cwe: str) -> set:
 
 
 def score(diags):
-    """(tp, fp, other) uclusu — Juliet fonksiyon-adi sozlesmesiyle."""
+    """(tp, fp, other) triple — per the Juliet function-name convention."""
     tp, fp, other = [], [], []
     for d in diags:
         func = d.get("function", "")
@@ -72,7 +74,7 @@ def precision(tp, fp):
 
 
 def load_expected(path, cwe):
-    """Beklenen taban satirini (min_rprec, min_rhit) olarak dondurur."""
+    """Returns the expected baseline line as (min_rprec, min_rhit)."""
     if not path or not os.path.exists(path):
         return None
     with open(path) as f:
@@ -100,12 +102,12 @@ def main() -> int:
     diags = data.get("diagnostics", [])
     total_files = len(scanned_files)
 
-    # 1) Genel gorunum: tum kurallarin bulgulari
+    # 1) Overall view: findings from all rules
     tp, fp, other = score(diags)
     files_with_tp = {d["file"] for d in tp}
     hit_rate = (len(files_with_tp) / total_files) if total_files else 0.0
 
-    # 2) Eslemeli gorunum: yalnizca CWE'nin kurali
+    # 2) Rule-matched view: only the CWE's own rule
     rules = relevant_rules(cwe)
     matched = [d for d in diags if d.get("rule") in rules or
                d.get("rule_id") in rules]
@@ -113,7 +115,7 @@ def main() -> int:
     rfiles_with_tp = {d["file"] for d in rtp}
     rhit = (len(rfiles_with_tp) / total_files) if total_files else 0.0
 
-    # Vaka-bazli (dosya = vaka): F1 buradan turetilir
+    # Case-level (file = case): F1 is derived from this
     case_tp = len(rfiles_with_tp)
     case_fp = len({d["file"] for d in rfp})
     case_fn = total_files - case_tp
@@ -124,25 +126,26 @@ def main() -> int:
     f1 = (2 * case_prec * case_rec / (case_prec + case_rec)) \
         if (case_prec + case_rec) else 0.0
 
-    # Ikinci isletim noktasi: yalniz Error (kesin iddialar)
+    # Second operating point: errors only (definite claims)
     err = [d for d in matched if d.get("severity") == "error"]
     etp, efp, _ = score(err)
 
     print(f"=== {cwe} ===")
-    print(f"  taranan dosya       : {total_files}")
-    print(f"  GENEL  TP/FP        : {len(tp)}/{len(fp)}"
+    print(f"  files scanned              : {total_files}")
+    print(f"  OVERALL TP/FP              : {len(tp)}/{len(fp)}"
           f"  precision={precision(tp, fp):.3f}  hitrate={hit_rate:.3f}")
-    print(f"  ESLEMELI ({','.join(sorted(rules)) or '-'})")
-    print(f"         TP/FP        : {len(rtp)}/{len(rfp)}"
+    print(f"  RULE-MATCHED ({','.join(sorted(rules)) or '-'})")
+    print(f"          TP/FP              : {len(rtp)}/{len(rfp)}"
           f"  precision={precision(rtp, rfp):.3f}  hitrate={rhit:.3f}")
-    print(f"  vaka (dosya) bazli  : TP={case_tp} FP={case_fp} FN={case_fn}"
+    print(f"  case (file) level          : TP={case_tp} FP={case_fp}"
+          f" FN={case_fn}"
           f"  precision={case_prec:.3f}  recall={case_rec:.3f}"
           f"  F1={f1:.3f}")
-    print(f"  yalniz-Error noktasi: TP/FP {len(etp)}/{len(efp)}"
+    print(f"  errors-only operating point: TP/FP {len(etp)}/{len(efp)}"
           f"  precision={precision(etp, efp):.3f}")
-    print(f"  sayilmayan (diger)  : {len(other)}")
+    print(f"  uncounted (other)          : {len(other)}")
 
-    # Kural bazinda kirilim: FP'nin hangi kuraldan geldigi gorunur olsun
+    # Per-rule breakdown: make it visible which rule the FPs come from
     by_rule = {}
     for d in diags:
         rule = d.get("rule") or d.get("rule_id") or "?"
@@ -157,11 +160,11 @@ def main() -> int:
     for rule in sorted(by_rule):
         t, f_, o = by_rule[rule]
         tag = "*" if rule in rules else " "
-        print(f"   {tag}{rule:<16} tp={t:<5} fp={f_:<5} diger={o}")
+        print(f"   {tag}{rule:<16} tp={t:<5} fp={f_:<5} other={o}")
 
-    # FP ornekleri: kural iyilestirmesi icin ham malzeme. Suite CI'da
-    # yasadigi icin FP kaliplari yalnizca loglardan okunabilir —
-    # kural basina ilk 5 ornek (deterministik: dosya+satir sirali).
+    # FP samples: raw material for rule improvement. Since the suite
+    # lives in CI, FP patterns can only be read from the logs —
+    # first 5 samples per rule (deterministic: sorted by file+line).
     fp_by_rule = {}
     for d in fp:
         rule = d.get("rule") or d.get("rule_id") or "?"
@@ -174,8 +177,8 @@ def main() -> int:
             print(f"FP_SAMPLE {cwe} {rule} {base}:{d.get('line', 0)} "
                   f"{d.get('function', '?')} :: {d.get('message', '')}")
 
-    # Makine-okur satir (trend takibi icin grep-dostu).
-    # Eski alanlar korunur; r* alanlari eslemeli gorunumdur.
+    # Machine-readable line (grep-friendly for trend tracking).
+    # Legacy fields are preserved; r* fields are the rule-matched view.
     print(f"JULIET_RESULT {cwe} files={total_files} tp={len(tp)} "
           f"fp={len(fp)} precision={precision(tp, fp):.3f} "
           f"hitrate={hit_rate:.3f} rtp={len(rtp)} rfp={len(rfp)} "
@@ -183,18 +186,18 @@ def main() -> int:
           f"rcaseprec={case_prec:.3f} rf1={f1:.3f} "
           f"eprecision={precision(etp, efp):.3f}")
 
-    # Skor bekcisi: sabitlenen tabanlarin altina dusus = kirmizi.
-    # Tabanlar bilincli iyilestirme PR'larinda AYNI PR'da guncellenir.
+    # Score guard: dropping below the pinned baselines = red.
+    # Baselines are updated in the SAME PR for deliberate improvement PRs.
     bounds = load_expected(expected_path, cwe)
     if bounds:
         min_prec, min_hit = bounds
         rprec = precision(rtp, rfp)
         if rprec < min_prec or rhit < min_hit:
             print(f"JULIET_GUARD_FAIL {cwe} rprecision={rprec:.3f} "
-                  f"(taban {min_prec}) rhitrate={rhit:.3f} "
-                  f"(taban {min_hit})")
+                  f"(baseline {min_prec}) rhitrate={rhit:.3f} "
+                  f"(baseline {min_hit})")
             return 1
-        print(f"[juliet] {cwe}: skor bekcisi OK "
+        print(f"[juliet] {cwe}: score guard OK "
               f"(rprec>={min_prec}, rhit>={min_hit})")
     return 0
 

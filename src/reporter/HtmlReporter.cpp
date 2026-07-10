@@ -33,9 +33,9 @@ std::string toLower(std::string s) {
     return s;
 }
 
-// Dosya-basina satir onbellegi: baglam alintilari icin kaynak bir kez
-// okunur. Rapor uretim aninda gomulur — rapor baska makineye tasindiginda
-// baglam kaybolmaz.
+// Per-file line cache: the source is read once for the context
+// excerpts. Embedded at report generation time — the context is not
+// lost when the report is moved to another machine.
 using LineCache = std::map<std::string, std::vector<std::string>>;
 
 const std::vector<std::string>& fileLines(LineCache& cache,
@@ -49,7 +49,8 @@ const std::vector<std::string>& fileLines(LineCache& cache,
     return cache.emplace(path, std::move(lines)).first->second;
 }
 
-// hedef satir isaretli, ±2 satir baglam; kaynak okunamazsa bos doner
+// target line highlighted, ±2 lines of context; returns empty if the
+// source cannot be read
 std::string sourceContext(LineCache& cache, const std::string& path,
                           unsigned line) {
     const auto& lines = fileLines(cache, path);
@@ -159,7 +160,7 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
         return;
     }
 
-    // Ozet sayimlari
+    // Summary counts
     std::map<std::string, size_t> bySeverity;
     std::map<std::string, size_t> byRule;
     for (const auto& d : diagnostics) {
@@ -184,7 +185,7 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
          << " finding(s) &middot; generated " << stamp << "</p>\n"
          << "</header>\n";
 
-    // Kartlar = filtreler: severity satiri + kural satiri
+    // Cards = filters: a severity row + a rule row
     file << "<div class=\"cards\">\n";
     const char* sevs[] = {"error", "warning", "info"};
     const char* cls[] = {"err", "warn", "info"};
@@ -229,7 +230,7 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
         file << "</div>\n<p class=\"msg\">" << escapeHtml(d.message)
              << "</p>\n";
 
-        // Iz + bulgu noktasi, kaynak baglamiyla
+        // Trace + finding point, with source context
         std::string findingCtx = sourceContext(cache, d.file, d.line);
         if (!d.notes.empty() || !findingCtx.empty()) {
             file << "<details><summary>Dataflow trace";

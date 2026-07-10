@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# NIST Juliet C/C++ 1.3 uzerinde olcum: kurallarimizla eslesen CWE
-# dizinlerini tarar, bulgulari good/bad fonksiyon adlariyla puanlar.
+# Measurement on NIST Juliet C/C++ 1.3: scans the CWE directories that
+# match our rules and scores findings via good/bad function names.
 #
-# Kullanim: scripts/run_juliet.sh <zerodefect-binary> [calisma-dizini] [dosya-limiti]
-#   dosya-limiti: CWE basina taranacak azami dosya (varsayilan 400;
-#                 0 = limitsiz). CI suresini sinirlamak icin.
+# Usage: scripts/run_juliet.sh <zerodefect-binary> [work-dir] [file-limit]
+#   file-limit: maximum files to scan per CWE (default 400;
+#               0 = unlimited). Used to bound CI time.
 #
-# JULIET_DIR onceden indirilmis paketi gosteriyorsa indirme atlanir
-# (yerel/testte sahte mini-suite ile calistirmayi da mumkun kilar).
-# Cikti: JULIET_RESULT (trend) + FP_SAMPLE (kural iyilestirme malzemesi)
-# satirlari grep-dostudur. Kural degisikligi PR'lari bu dosyaya kucuk
-# bir dokunusla Juliet kosusunu tetikleyebilir (workflow_dispatch
-# entegrasyon token'inda 403 verdigi icin bilinen yol budur).
+# If JULIET_DIR points to a pre-downloaded package the download is
+# skipped (this also makes it possible to run against a fake mini-suite
+# locally/in tests). Output: JULIET_RESULT (trend) + FP_SAMPLE (raw
+# material for rule improvement) lines are grep-friendly. Rule-change
+# PRs can trigger the Juliet run by touching this file (the known path,
+# since workflow_dispatch returns 403 on the integration token).
 set -euo pipefail
 
-# Kendi dizinimizi HERHANGI bir cd'den ONCE coz (goreli yol tuzagi)
+# Resolve our own directory BEFORE any cd (relative-path trap)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ZD_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
@@ -35,8 +35,8 @@ if [ -z "${JULIET_DIR:-}" ]; then
     JULIET_DIR="$(pwd)/juliet"
 fi
 
-# Zip yerlesimi surumden suruma degisebilir — testcasesupport'u arayarak
-# kok dizini sagalamlastir
+# The zip layout can change between releases — harden the root directory
+# detection by searching for testcasesupport
 if [ ! -d "$JULIET_DIR/C/testcases" ]; then
     found="$(find "$JULIET_DIR" -maxdepth 4 -type d -name testcasesupport \
         | head -1 || true)"
@@ -45,14 +45,14 @@ fi
 TESTCASES="$(cd "$JULIET_DIR" && pwd)/C/testcases"
 SUPPORT="$(cd "$JULIET_DIR" && pwd)/C/testcasesupport"
 if [ ! -d "$TESTCASES" ]; then
-    # Alternatif: dogrudan testcases iceren yerlesim
+    # Alternative: a layout containing testcases directly
     alt="$(find "$JULIET_DIR" -maxdepth 4 -type d -name testcases | head -1 || true)"
-    [ -n "$alt" ] || { echo "[juliet] testcases bulunamadi: $JULIET_DIR"; exit 1; }
+    [ -n "$alt" ] || { echo "[juliet] testcases not found: $JULIET_DIR"; exit 1; }
     TESTCASES="$alt"
     SUPPORT="$(dirname "$alt")/testcasesupport"
 fi
 
-# Kural -> CWE eslemesi
+# Rule -> CWE mapping
 CWES=(
     "CWE476_NULL_Pointer_Dereference"
     "CWE401_Memory_Leak"
@@ -61,26 +61,28 @@ CWES=(
     "CWE369_Divide_by_Zero"
 )
 
-run_cwe() { # <cwe-adi>
+run_cwe() { # <cwe-name>
     local cwe="$1"
     local dir="$TESTCASES/$cwe"
-    [ -d "$dir" ] || { echo "[juliet] atlandi (dizin yok): $cwe"; return 0; }
+    [ -d "$dir" ] || { echo "[juliet] skipped (no directory): $cwe"; return 0; }
 
-    # Windows/pthread varyantlarini ele; .c/.cpp dosyalarini sec
+    # Filter out Windows/pthread variants; pick .c/.cpp files
     local list="files_$cwe.txt"
     find "$dir" -type f \( -name '*.c' -o -name '*.cpp' \) \
         | grep -v -e 'w32' -e 'wchar_t' -e 'pthread' -e 'fscanf' -e 'socket' \
         | sort > "$list"
-    # GRUP-bazli adimli ornekleme. Iki ders birden:
-    #  1. head -N alfabetik ilk varyant ailesini secip yanlilik
-    #     yaratiyordu (CWE369: ilk 400 dosyanin tamami float_*).
-    #  2. Dosya-bazli stride, akis varyantlarinin a/b CIFTLERINI
-    #     kiriyordu (63a taranir, 63b atlanir) — cross-TU ozetlerin
-    #     baglayacagi cift kalmiyordu (whole-program etkisi olculemez).
-    # Cozum: dosyalar varyant grubuna indirgenir (sondaki harf eki
-    # atilir: 63a/63b -> 63), gruplar esit araliklarla ornekle-
-    # nir ve secilen grubun TUM dosyalari girer. Limit grup basinda
-    # denetlenir — grup asla bolunmez (hafif asim kabul).
+    # GROUP-based strided sampling. Two lessons at once:
+    #  1. head -N picked the alphabetically first variant family and
+    #     introduced bias (CWE369: all of the first 400 files were
+    #     float_*).
+    #  2. File-level stride broke the a/b PAIRS of flow variants
+    #     (63a scanned, 63b skipped) — no pair was left for cross-TU
+    #     summaries to link (whole-program effect unmeasurable).
+    # Solution: files are reduced to their variant group (trailing
+    # letter suffix dropped: 63a/63b -> 63), groups are sampled at
+    # even intervals, and ALL files of a selected group go in. The
+    # limit is checked at group start — a group is never split
+    # (slight overshoot accepted).
     if [ "$LIMIT" -gt 0 ]; then
         awk -v limit="$LIMIT" '
             function base(p) { g = p; sub(/[a-e]?\.(c|cpp)$/, "", g)
@@ -90,7 +92,7 @@ run_cwe() { # <cwe-adi>
                         total++; next }
             FNR == 1  { gstep = (ngroups * limit) / total
                         gstep = ngroups / (gstep < 1 ? 1 : gstep)
-                        # hedef: ~limit dosya => limit*ngroups/total grup
+                        # target: ~limit files => limit*ngroups/total groups
                         if (gstep < 1) gstep = 1
                         next_g = 1; gi = 0; lastb = "" }
             {
@@ -105,9 +107,9 @@ run_cwe() { # <cwe-adi>
     fi
     local count
     count=$(wc -l < "$list")
-    [ "$count" -gt 0 ] || { echo "[juliet] $cwe: uygun dosya yok"; return 0; }
+    [ "$count" -gt 0 ] || { echo "[juliet] $cwe: no eligible files"; return 0; }
 
-    # compile_commands.json uret: her dosya icin destek include'lariyla
+    # Generate compile_commands.json: with support includes for each file
     local build="build_$cwe"
     mkdir -p "$build"
     python3 - "$list" "$SUPPORT" "$build/compile_commands.json" << 'PYEOF'
@@ -127,17 +129,17 @@ with open(out, "w") as f:
 PYEOF
 
     echo ""
-    echo "[juliet] $cwe: $count dosya taraniyor..."
+    echo "[juliet] $cwe: scanning $count files..."
     set +e
-    # --files: yalnizca secilmis (elenmis + limitli) dosyalar analiz edilir
-    # --whole-program: akis varyantlari (61/63/64...) kaynak/lavaboyu
-    # a/b dosyalarina boler — cross-TU ozetler olmadan gorunmezler
+    # --files: only the selected (filtered + limited) files are analyzed
+    # --whole-program: flow variants (61/63/64...) split source/sink
+    # across a/b files — invisible without cross-TU summaries
     "$ZD_BIN" --files "$list" --build-path "$build" --whole-program \
         --json "findings_$cwe.json" > /dev/null 2> "log_$cwe.txt"
     local code=$?
     set -e
     if [ "$code" -gt 1 ]; then
-        echo "[juliet] FAIL: analizci hatasi ($cwe, exit $code)"
+        echo "[juliet] FAIL: analyzer error ($cwe, exit $code)"
         tail -5 "log_$cwe.txt"
         return 1
     fi
@@ -153,8 +155,8 @@ done
 
 echo ""
 if [ "$overall" -eq 0 ]; then
-    echo "[juliet] OK — ozet icin JULIET_RESULT satirlarina bakin"
+    echo "[juliet] OK — see the JULIET_RESULT lines for a summary"
 else
-    echo "[juliet] tamamlandi (bazi CWE'lerde hata) — loglara bakin"
+    echo "[juliet] finished (errors in some CWEs) — check the logs"
 fi
 exit "$overall"

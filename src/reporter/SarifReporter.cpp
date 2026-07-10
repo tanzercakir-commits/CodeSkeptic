@@ -33,8 +33,8 @@ const char* sarifLevel(zerodefect::Severity severity) {
     return "none";
 }
 
-// SARIF artifactLocation.uri: mutlak path'ler file:// semasiyla,
-// goreceli path'ler oldugu gibi
+// SARIF artifactLocation.uri: absolute paths with the file:// scheme,
+// relative paths as-is
 std::string toUri(const std::string& path) {
     if (!path.empty() && path[0] == '/')
         return "file://" + path;

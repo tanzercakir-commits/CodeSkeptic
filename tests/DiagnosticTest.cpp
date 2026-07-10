@@ -29,7 +29,7 @@ TEST(DiagnosticTest, SortBySeverity) {
     DiagnosticList list = {info, warn, err};
     std::sort(list.begin(), list.end());
 
-    // Error > Warning > Info (severity büyük olan önce)
+    // Error > Warning > Info (higher severity first)
     EXPECT_EQ(list[0].severity, Severity::Error);
     EXPECT_EQ(list[1].severity, Severity::Warning);
     EXPECT_EQ(list[2].severity, Severity::Info);
@@ -46,11 +46,11 @@ TEST(MessagesTest, LangSwitchAndSubstitution) {
     EXPECT_NE(tr.find("Cift serbest birakma"), std::string::npos);
     EXPECT_NE(tr.find("ptr"), std::string::npos);
 
-    setLang(Lang::EN);  // diger testler icin varsayilana don
+    setLang(Lang::EN);  // return to the default for other tests
 
     EXPECT_EQ(parseLang("tr"), Lang::TR);
     EXPECT_EQ(parseLang("en"), Lang::EN);
-    EXPECT_EQ(parseLang("de"), Lang::EN);  // bilinmeyen -> varsayilan
+    EXPECT_EQ(parseLang("de"), Lang::EN);  // unknown -> default
 }
 
 TEST(DiagnosticTest, EqualityAndDedup) {
@@ -61,7 +61,7 @@ TEST(DiagnosticTest, EqualityAndDedup) {
     EXPECT_EQ(d1, dup);
     EXPECT_FALSE(d1 == other);
 
-    // Sıralama sonrası eşit kayıtlar bitişik olmalı → unique tekilleştirir
+    // Equal records must be adjacent after sorting → unique deduplicates
     DiagnosticList list = {d1, other, dup};
     std::sort(list.begin(), list.end());
     list.erase(std::unique(list.begin(), list.end()), list.end());
@@ -76,7 +76,7 @@ TEST(DiagnosticTest, SortByFileThenLine) {
     DiagnosticList list = {d1, d2, d3};
     std::sort(list.begin(), list.end());
 
-    // Aynı severity → dosya alfabetik → satır küçükten büyüğe
+    // Same severity → file alphabetical → line ascending
     EXPECT_EQ(list[0].file, "a.cpp");
     EXPECT_EQ(list[0].line, 5u);
     EXPECT_EQ(list[1].file, "a.cpp");

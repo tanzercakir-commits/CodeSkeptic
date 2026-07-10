@@ -51,7 +51,7 @@ auto allocCallMatcher() {
         hasAnyName("malloc", "calloc", "strdup"))));
 }
 
-// Operator overload'larinda getName() gecersiz — guvenli erisim
+// getName() is invalid on operator overloads — safe access
 llvm::StringRef calleeName(const FunctionDecl* callee) {
     if (!callee) return {};
     if (const auto* id = callee->getIdentifier()) return id->getName();
@@ -80,8 +80,8 @@ const VarDecl* asVar(const Expr* expr) {
     return nullptr;
 }
 
-// Dereference tespiti (use-after-free icin). CFG ince taneli oldugundan
-// yalnizca tepe dugume bakmak yeterli.
+// Dereference detection (for use-after-free). Since the CFG is
+// fine-grained, looking only at the top node is enough.
 const VarDecl* derefTarget(const Stmt* stmt) {
     if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
         if (unary->getOpcode() == UO_Deref)
@@ -98,10 +98,11 @@ const VarDecl* derefTarget(const Stmt* stmt) {
     return nullptr;
 }
 
-// Tepe-dugum Effect deseni (UninitPtr'daki gibi): ifade BIR KEZ
-// siniflandirilir ve dokundugu izlenen degiskenlerin etkilerini kendisi
-// soyler — degisken basina yeniden tarama yok. Ince taneli CFG'de her
-// eleman kendi tepe dugumuyle gelir, nested arama gerekmez.
+// Top-node Effect pattern (as in UninitPtr): the expression is
+// classified ONCE and itself reports the effects on the tracked
+// variables it touches — no per-variable rescanning. In the
+// fine-grained CFG each element comes with its own top node, so no
+// nested search is needed.
 using StmtEffects = std::vector<std::pair<const VarDecl*, StmtEffect>>;
 
 StmtEffects classifyStmtEffects(const Stmt* stmt,
@@ -141,9 +142,9 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             zerodefect::SummaryRegistry::instance().lookup(callee);
         using PE = zerodefect::SummaryRegistry::ParamEffect;
 
-        // Ayni degisken birden fazla pozisyondaysa en muhafazakari
-        // kazanir: Escapes > Frees > ReadsOnly. &var her zaman Escapes
-        // (cagrilan yeniden atayabilir/serbest birakabilir).
+        // If the same variable appears in multiple positions the most
+        // conservative wins: Escapes > Frees > ReadsOnly. &var is always
+        // Escapes (the callee may reassign/free it).
         struct VarCallEffect { bool escapes = false; bool frees = false; };
         std::map<const VarDecl*, VarCallEffect> byVar;
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
@@ -168,7 +169,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 case PE::Stores:
                 case PE::Opaque:    byVar[var].escapes = true; break;
                 case PE::Frees:     byVar[var].frees = true; break;
-                case PE::ReadsOnly: byVar[var]; break;  // gorunur ol, etkisiz
+                case PE::ReadsOnly: byVar[var]; break;  // become visible, no effect
             }
         }
         for (const auto& [var, e] : byVar) {
@@ -176,7 +177,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 effects.emplace_back(var, StmtEffect::Escapes);
             else if (e.frees)
                 effects.emplace_back(var, StmtEffect::Frees);
-            // yalniz-ReadsOnly: etkisiz (leak gorunur kalir)
+            // ReadsOnly-only: no effect (the leak stays visible)
         }
         return effects;
     }
@@ -246,10 +247,10 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
 
 using VarState = std::map<const VarDecl*, AllocState>;
 
-// Null oldugu bilinen kenarda "allocation" yoktur: malloc/new
-// basarisizlik yolu leak DEGILDIR (p = malloc; if (!p) return;).
-// Yuruyus ortak iskeletten (engine/ConditionWalk.h); bu domain yalnizca
-// null kenariyla ilgilenir, non-null bilgisini yok sayar.
+// On an edge known to be null there is no "allocation": the malloc/new
+// failure path is NOT a leak (p = malloc; if (!p) return;).
+// The walk comes from the shared skeleton (engine/ConditionWalk.h); this
+// domain only cares about the null edge and ignores non-null knowledge.
 void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
     zerodefect::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
@@ -260,13 +261,14 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
         });
 }
 
-// --- Guard'li disjunktlar (hedefli yol duyarliligi) ---
+// --- Guarded disjuncts (targeted path sensitivity) ---
 //
-// Juliet FP avi (2026-07-10) tek kok neden gosterdi: ayni degismez
-// kosul iki kez test edildiginde ("if(g==5) alloc; ... if(g==5) free;")
-// join'de yollar karisiyor ve "alloc olup free olmayan yol" hayaleti
-// doguyordu. Ortak makine engine/GuardedDisjuncts.h'te — burada yalnizca
-// AllocState birlestiricisiyle somutlanir.
+// The Juliet FP hunt (2026-07-10) showed a single root cause: when the
+// same invariant condition is tested twice ("if(g==5) alloc; ... if(g==5)
+// free;"), paths get mixed at the join and a phantom "path that allocates
+// but never frees" is born. The shared machinery is in
+// engine/GuardedDisjuncts.h — here it is only instantiated with the
+// AllocState merger.
 
 using DisjunctState = zerodefect::GuardedState<VarState>;
 
@@ -296,8 +298,9 @@ public:
 
     State initialState() const { return initState_; }
 
-    // Degisken basina AllocState zinciri en fazla 3 gecis yapar;
-    // disjunkt sayisi yukseligi carpar (her disjunkt ayri yukselebilir)
+    // The per-variable AllocState chain makes at most 3 transitions;
+    // the number of disjuncts multiplies the height (each disjunct can
+    // rise independently)
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
                    static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
@@ -307,10 +310,10 @@ public:
         return zerodefect::mergeGuarded(a, b, mergeAllocStates);
     }
 
-    // Saf state gecisi — rapor uretmez. Raporlama, fixpoint sonrasi
-    // gecis olan onStatement icindedir (engine garantisi).
+    // Pure state transition — produces no reports. Reporting lives in
+    // onStatement, the post-fixpoint pass (an engine guarantee).
     State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
-        // Etkiler state'ten bagimsiz: bir kez siniflandir, her disjunkta uygula
+        // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
         if (effects.empty()) return in;
 
@@ -340,18 +343,18 @@ public:
             applyNullCondition(condExpr, isTrueBranch, d.vars);
     }
 
-    // Fixpoint sonrasi raporlama: reassignment leak, double free ve
-    // use-after-free burada uretilir.
+    // Post-fixpoint reporting: reassignment leak, double free and
+    // use-after-free are produced here.
     void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
                      const State& afterDisjuncts, ASTContext& ctx) {
-        // Raporlama bugunku tek-state gorunumuyle calisir; yol
-        // duyarliliginin kazanci refineOnEdge'in dusurdugu disjunktlarin
-        // bu birlesime hic girmemesidir.
+        // Reporting works on today's single-state view; the payoff of
+        // path sensitivity is that disjuncts dropped by refineOnEdge
+        // never enter this merge at all.
         VarState before = flattenState(beforeDisjuncts);
         VarState after = flattenState(afterDisjuncts);
-        // Dataflow izi: state degistiren olaylari kaydet (alloc/free).
-        // Notlar rapora kosu SONUNDA ilistirilir — raporlama gecisinin
-        // blok sirasi kaynak sirasi degildir.
+        // Dataflow trace: record state-changing events (alloc/free).
+        // Notes are attached to the report at the END of the run — the
+        // reporting pass's block order is not source order.
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
@@ -374,14 +377,15 @@ public:
                        "memory-leak", zerodefect::MsgId::LeakReassign);
             } else if (effect == StmtEffect::Frees &&
                        it->second == AllocState::Freed) {
-                // UAF gibi kendi kimligiyle: CWE415 eslemesi ve
-                // --disable-rule taksonomisi bulgu turunu ayirt edebilsin
+                // Under its own identity, like UAF: so the CWE415 mapping
+                // and the --disable-rule taxonomy can tell the finding
+                // kinds apart
                 report(stmt, var, ctx, zerodefect::Severity::Error,
                        "double-free", zerodefect::MsgId::DoubleFree);
             }
         }
 
-        // Freed durumdaki pointer'in dereference'i: use-after-free
+        // Dereference of a pointer in the Freed state: use-after-free
         if (const VarDecl* var = derefTarget(stmt)) {
             auto it = before.find(var);
             if (it != before.end() && it->second == AllocState::Freed) {
@@ -395,7 +399,7 @@ public:
         return reported_;
     }
 
-    // Kosu bittikten sonra: biriken olay notlarini raporlara ilistir
+    // After the run finishes: attach the accumulated event notes to reports
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
             auto it = events_.find(var);
@@ -408,7 +412,7 @@ public:
         noteTargets_.clear();
     }
 
-    // Dis raporlar (exit-block leak) icin: hedef kaydi + olay erisimi
+    // For external reports (exit-block leak): target registration + event access
     void registerNoteTarget(size_t resultIndex, const VarDecl* var) {
         noteTargets_.emplace_back(resultIndex, var);
     }
@@ -439,8 +443,8 @@ private:
                 zerodefect::Severity severity, const char* ruleId,
                 zerodefect::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
-        // Makro icindeki bulgular kullanim noktasina (expansion) baglanir;
-        // aksi halde dosya adi bos kalabiliyor (scratch buffer)
+        // Findings inside macros are bound to the use site (expansion);
+        // otherwise the file name can end up empty (scratch buffer)
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reported_.emplace(var, line).second) return;

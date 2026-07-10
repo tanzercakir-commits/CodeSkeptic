@@ -7,8 +7,9 @@
 
 namespace zerodefect {
 
-// SARIF 2.1.0 cikti — GitHub code scanning ve modern CI araclarinin
-// ortak dili. Minimal ama gecerli sema: tool.driver + rules + results.
+// SARIF 2.1.0 output — the lingua franca of GitHub code scanning and
+// modern CI tools. Minimal but valid schema: tool.driver + rules +
+// results.
 class SarifReporter : public Reporter {
 public:
     explicit SarifReporter(const std::string& output_path);

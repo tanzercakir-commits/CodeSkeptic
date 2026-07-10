@@ -1,17 +1,18 @@
 name: Juliet benchmark
 
-# Juliet skor bekcisi: analiz koduna dokunan HER PR'da kosar
-# (suit cache'te, ~3.5 dk) ve juliet_expected.txt tabanlarinin altina
-# dusus job'i kirmizi yapar (JULIET_GUARD_FAIL). Docs-only PR'lar paths
-# filtresiyle muaf. Sonuclar JULIET_RESULT satirlarindan izlenir.
+# Juliet score guard: runs on EVERY PR that touches analysis code
+# (suite is cached, ~3.5 min) and dropping below the juliet_expected.txt
+# baselines turns the job red (JULIET_GUARD_FAIL). Docs-only PRs are
+# exempt via the paths filter. Results are tracked via JULIET_RESULT
+# lines.
 on:
   workflow_dispatch:
     inputs:
       limit:
-        description: "CWE basina dosya limiti (0 = limitsiz)"
+        description: "File limit per CWE (0 = unlimited)"
         default: "400"
   schedule:
-    - cron: "0 5 * * 1"  # pazartesi 05:00 UTC
+    - cron: "0 5 * * 1"  # Monday 05:00 UTC
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -23,15 +24,15 @@ on:
       - "tests/**"
       - "CMakeLists.txt"
 
-# Maliyet dengesi: ayni ref'e ust uste push eski kosumu iptal eder
+# Cost balance: back-to-back pushes to the same ref cancel the old run
 concurrency:
   group: juliet-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   juliet:
-    # Draft'ta kosma: PR basina bekci bir kez, ready aninda calisir
-    # (build-and-test her push'ta kaliyor — hizli cekirdek sinyal).
+    # Don't run on drafts: the guard runs once per PR, at ready time
+    # (build-and-test stays on every push — fast core signal).
     if: github.event_name != 'pull_request' ||
         github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
@@ -58,10 +59,10 @@ jobs:
           key: juliet-c-cpp-1.3
 
       - name: Run benchmark
-        # shell: bash → -eo pipefail: tee borusu exit kodunu maskeleyemez
-        # Limit: PR bekcisi 400 (hizli sinyal); haftalik cron 1600 (derin
-        # ornekleme — 61-ailesi gibi seyrek akis varyantlari PR orneklemine
-        # girmiyor, trend olcumu onlari da gorsun)
+        # shell: bash → -eo pipefail: the tee pipe cannot mask the exit code
+        # Limit: PR guard 400 (fast signal); weekly cron 1600 (deep
+        # sampling — sparse flow variants like the 61-family don't make it
+        # into the PR sample, the trend measurement should see them too)
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
@@ -76,8 +77,8 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Juliet sonuçları"
+            echo "## Juliet results"
             echo '```'
-            grep "JULIET_RESULT" juliet-output.txt || echo "(sonuç yok)"
+            grep "JULIET_RESULT" juliet-output.txt || echo "(no results)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

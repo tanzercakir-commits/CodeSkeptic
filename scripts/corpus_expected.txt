@@ -1,9 +1,9 @@
-# Korpus beklenen bulgu sayilari (run_corpus.sh dogrular, %10+2 tolerans).
-# Surumler sabit oldugu icin sapma semantik regresyon isaretidir:
-# dusus = sessiz bulgu kaybi, artis = FP patlamasi. Bilincli kural
-# degisikliklerinde bu dosya AYNI PR'da guncellenir (degisiklik gerekcesi
-# commit mesajinda gorunur olur).
+# Expected corpus finding counts (validated by run_corpus.sh, 10%+2 tolerance).
+# Versions are pinned, so deviation signals a semantic regression:
+# a drop = silent finding loss, a rise = FP explosion. On deliberate rule
+# changes this file is updated in the SAME PR (the rationale stays
+# visible in the commit message).
 #
-# proje bulgu-sayisi
+# project finding-count
 cjson 123
 tinyxml2 9

@@ -1,8 +1,8 @@
-// CFG onbellegi: fonksiyon basina TEK insa, tuketiciler paylasir.
-// Degismezler: (1) ayni TU icinde ozet akislari + kural ayni CFG'yi
-// kullanir (isabet), (2) TU bitiminde depo bosalir — bayat FunctionDecl*
-// anahtari sonraki TU'ya SIZAMAZ (adres yeniden kullanimi sahte isabet
-// ureteceginden bu dogruluk kosuludur, hijyen degil).
+// CFG cache: ONE build per function, shared by consumers.
+// Invariants: (1) within the same TU, summary flows + the rule use the
+// same CFG (a hit), (2) the store empties at TU end — a stale
+// FunctionDecl* key must NOT leak into the next TU (address reuse would
+// produce false hits, so this is a correctness condition, not hygiene).
 
 #include "TestHelper.h"
 #include "engine/CfgCache.h"
@@ -24,9 +24,9 @@ TEST(CfgCacheTest, SharedWithinTU_SummaryFlowAndRuleReuse) {
             if (p) { int x = *p; (void)x; }
         }
     )");
-    EXPECT_EQ(results.size(), 0u);  // guard'li kullanim temiz
-    // Iki fonksiyon = tam iki insa; gerisi isabet (ozet taramalari +
-    // kuralin kendi kosusu ayni CFG'leri paylasir)
+    EXPECT_EQ(results.size(), 0u);  // guarded use is clean
+    // Two functions = exactly two builds; the rest are hits (summary
+    // scans + the rule's own run share the same CFGs)
     EXPECT_EQ(CfgCache::misses(), 2u);
     EXPECT_GE(CfgCache::hits(), 2u);
 }
@@ -36,14 +36,14 @@ TEST(CfgCacheTest, ClearedAtTUEnd_NoStaleCarryover) {
     runRule(rule, R"(
         void a1() { int* p = 0; if (p) { int x = *p; (void)x; } }
     )");
-    // TU bitti: depo bos olmali (sarkan FunctionDecl* anahtari yok)
+    // TU ended: the store must be empty (no dangling FunctionDecl* keys)
     EXPECT_EQ(CfgCache::instance().size(), 0u);
 
     CfgCache::resetCounters();
     runRule(rule, R"(
         void b1() { int* q = 0; if (q) { int y = *q; (void)y; } }
     )");
-    // Yeni TU sifirdan insa etmeli — onceki TU'dan sahte isabet yok
+    // A new TU must build from scratch — no false hits from the previous TU
     EXPECT_GE(CfgCache::misses(), 1u);
     EXPECT_EQ(CfgCache::instance().size(), 0u);
 }

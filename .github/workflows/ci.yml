@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-# Maliyet dengesi: ayni ref'e ust uste push eski kosumu iptal eder
+# Cost balance: back-to-back pushes to the same ref cancel the old run
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -35,11 +35,11 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
-      - name: Test (tek surec)
-        # ctest her testi ayri surecte kosar — testler arasi global-durum
-        # sizintisini goremez (McpServerTest'in filtre sizintisi 11
-        # interproc testi boyle gizlemisti). Ayni binary tek surecte de
-        # kosulur ki kirlilik gorunur olsun.
+      - name: Test (single process)
+        # ctest runs each test in its own process — it cannot see
+        # global-state leakage between tests (this is how McpServerTest's
+        # filter leak hid 11 interproc tests). The same binary is also
+        # run in a single process so contamination becomes visible.
         run: ./build/tests/zerodefect_tests
 
       - name: Smoke test
@@ -50,8 +50,9 @@ jobs:
               p = new int(7);
           }
           EOF
-          # Bulgu varken exit code 1 olmali. Actions adimlari `bash -e` ile
-          # kosar: basarisiz komut || ile yakalanmazsa script aninda olur.
+          # Exit code must be 1 when there are findings. Actions steps run
+          # with `bash -e`: a failing command not caught with || kills the
+          # script immediately.
           code=0
           ./build/src/zerodefect /tmp/smoke.cpp || code=$?
           test "$code" -eq 1

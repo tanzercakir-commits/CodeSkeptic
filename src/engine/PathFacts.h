@@ -1,29 +1,30 @@
 #ifndef ZERODEFECT_PATH_FACTS_H
 #define ZERODEFECT_PATH_FACTS_H
 
-// Hedefli yol duyarliligi icin kosul-gercekleri (path facts).
+// Condition facts (path facts) for targeted path sensitivity.
 //
-// Motivasyon (Juliet FP avi, 2026-07-10): analizler ayni degismez
-// kosulun iki kez test edildigi kaliplarda korelasyon kuramiyordu:
+// Motivation (Juliet FP hunt, 2026-07-10): analyses could not build a
+// correlation in patterns where the same invariant condition is
+// tested twice:
 //
-//   if (globalFive == 5) data = malloc(...);   // kaynak
-//   if (globalFive == 5) free(data);           // lavabo — AYNI kosul
+//   if (globalFive == 5) data = malloc(...);   // source
+//   if (globalFive == 5) free(data);           // sink — SAME condition
 //
-// Ilk if'in join'inde {Allocated, None} karisir; ikinci if'te "alloc
-// olup free olmayan yol" hayaleti dogar. Cozum: kosullar kanonik bir
-// anahtara indirgenir (FactKey) ve analiz state'i az sayida "guard'li
-// disjunkt" halinde tutulur; ayni anahtar ikinci kez gorulunce celisen
-// disjunkt dusurulur.
+// At the first if's join, {Allocated, None} mix; at the second if a
+// phantom "allocated but not freed" path is born. Solution: conditions
+// are reduced to a canonical key (FactKey) and the analysis state is
+// kept as a small number of "guarded disjuncts"; when the same key is
+// seen a second time, the contradicting disjunct is dropped.
 //
-// BILINCLI SINIRLAR (precision-first):
-//  - Yalnizca DeclRef degisken vs tamsayi-sabit karsilastirmalari
-//    anahtarlanir (fonksiyon cagrilari ASLA — rand() korelasyonu yanlis
-//    olur).
-//  - Fonksiyon icinde atanan / adresi alinan degiskenler anahtarlanmaz.
-//  - Cagrilarin globalleri degistirebilecegi ihmal edilir: iki korelasyonlu
-//    guard arasindaki bir cagri globali degistirirse gercek bir kusur
-//    gizlenebilir (FN yonu). FP'siz kalmak icin kabul edilen taviz —
-//    testte dokumante edilir.
+// DELIBERATE LIMITS (precision-first):
+//  - Only DeclRef variable vs integer-constant comparisons are keyed
+//    (function calls NEVER — a rand() correlation would be wrong).
+//  - Variables assigned / address-taken inside the function are not
+//    keyed.
+//  - That calls may modify globals is ignored: if a call between two
+//    correlated guards changes the global, a real defect can be
+//    hidden (FN direction). A trade-off accepted to stay FP-free —
+//    documented in a test.
 
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
@@ -37,8 +38,8 @@
 
 namespace zerodefect {
 
-// Kanonik kosul anahtari: "var REL literal". REL yalnizca EQ/LT/LE —
-// NE/GT/GE deger tersleme ile bunlara indirgenir (X!=5 ≡ !(X==5)).
+// Canonical condition key: "var REL literal". REL is only EQ/LT/LE —
+// NE/GT/GE reduce to these by flipping the value (X!=5 ≡ !(X==5)).
 struct FactKey {
     const clang::ValueDecl* var = nullptr;
     clang::BinaryOperatorKind rel = clang::BO_EQ;  // BO_EQ | BO_LT | BO_LE
@@ -53,16 +54,18 @@ struct FactKey {
     }
 };
 
-// Kosulu (anahtar, deger) ciftine indirger: dondurulen bool, KOSUL DOGRU
-// oldugunda anahtarin degeridir. Ornek: `X != 5` icin {(X,EQ,5), false}.
-// Kenar yanlissa cagiran degeri tersler. Anahtarlanamayan kosul -> nullopt.
-// `mutated`: fonksiyon icinde atanan/adresi alinan decl'ler (anahtar disi).
+// Reduces a condition to a (key, value) pair: the returned bool is the
+// key's value WHEN THE CONDITION IS TRUE. Example: `X != 5` gives
+// {(X,EQ,5), false}. On a false edge the caller flips the value. A
+// condition that cannot be keyed -> nullopt. `mutated`: decls
+// assigned/address-taken inside the function (excluded from keying).
 std::optional<std::pair<FactKey, bool>> conditionFact(
     const clang::Expr* cond,
     const std::set<const clang::ValueDecl*>& mutated);
 
-// Govdede atanan, ++/-- uygulanan veya adresi alinan decl'leri toplar.
-// Bu decl'lere dayali kosullar iki test arasinda degisebilir — anahtarlanmaz.
+// Collects decls that are assigned, ++/--'d, or address-taken in the
+// body. Conditions based on these decls can change between two tests
+// — they are not keyed.
 std::set<const clang::ValueDecl*> collectMutatedDecls(
     const clang::FunctionDecl* func);
 

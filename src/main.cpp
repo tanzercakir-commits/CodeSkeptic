@@ -24,8 +24,9 @@ int main(int argc, char* argv[]) {
         return zerodefect::runMcpServer();
     }
 
-    // Ozet-diff modu: analiz degil, iki hasat arasinda sozlesme farki
-    // raporu. WEAKENED varsa exit 1 — semantik regresyon CI kapisi.
+    // Summary-diff mode: not analysis, but a contract-diff report
+    // between two harvests. Exit 1 if anything is WEAKENED — a semantic
+    // regression CI gate.
     if (!config.summaryDiffOld().empty()) {
         return zerodefect::reportSummaryDiff(
             config.summaryDiffOld(), config.summaryDiffNew(), std::cout);

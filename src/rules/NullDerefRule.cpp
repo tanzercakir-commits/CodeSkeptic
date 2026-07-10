@@ -28,17 +28,17 @@ namespace {
 
 // --- NullState lattice ---
 //
-// Unknown : bilgi yok (parametre, opak fonksiyon donusu)
-// Null    : tum yollarda kesin null
-// NonNull : tum yollarda kesin null degil
-// MaybeNull: en az bir yolda null (raporlanabilir sinyal)
+// Unknown : no information (parameter, opaque function return)
+// Null    : definitely null on all paths
+// NonNull : definitely not null on all paths
+// MaybeNull: null on at least one path (reportable signal)
 
 enum class NullState { Unknown, Null, NonNull, MaybeNull };
 
 NullState mergeNullStates(NullState a, NullState b) {
     if (a == b) return a;
-    // Herhangi bir yolda null bilgisi varsa korunur; yalnizca
-    // NonNull + Unknown bilgisizlige duser (DivByZero merge'iyle ayni sekil)
+    // Null knowledge on any path is preserved; only NonNull + Unknown
+    // decays to no knowledge (same shape as the DivByZero merge)
     bool anyNullInfo = a == NullState::Null || a == NullState::MaybeNull ||
                        b == NullState::Null || b == NullState::MaybeNull;
     return anyNullInfo ? NullState::MaybeNull : NullState::Unknown;
@@ -56,7 +56,7 @@ const VarDecl* asVar(const Expr* expr) {
 
 NullState evaluateNullness(const Expr* expr) {
     if (!expr) return NullState::Unknown;
-    // Acik cast'leri de soy: (int*)0, (Node*)nullptr
+    // Strip explicit casts too: (int*)0, (Node*)nullptr
     expr = expr->IgnoreParenCasts();
 
     if (isa<CXXNullPtrLiteralExpr>(expr)) return NullState::Null;
@@ -71,9 +71,10 @@ NullState evaluateNullness(const Expr* expr) {
     if (isa<StringLiteral>(expr)) return NullState::NonNull;
     if (isa<CXXThisExpr>(expr)) return NullState::NonNull;
 
-    // Interprosedurel: cagri donusunun null'lugu fonksiyon ozetinden.
-    // "Null donebilir" ozeti MaybeNull uretir — korumasiz dereference
-    // uyari olur; guard'li kullanim assume-edge ile temiz kalir.
+    // Interprocedural: the null-ness of a call's return comes from the
+    // function summary. A "may return null" summary produces MaybeNull —
+    // an unguarded dereference becomes a warning; guarded use stays
+    // clean via the assume-edge.
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         using RN = zerodefect::SummaryRegistry::ReturnNullness;
         const auto* summary =
@@ -98,13 +99,13 @@ enum class EffectKind { None, Assign, AssignUnknown, Deref };
 struct Effect {
     const VarDecl* var = nullptr;
     EffectKind kind = EffectKind::None;
-    NullState value = NullState::Unknown;  // yalnizca Assign icin
+    NullState value = NullState::Unknown;  // only for Assign
 };
 
 Effect classifyStmt(const Stmt* stmt) {
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
-        // Coklu bildirimde ilk pointer init'i alinir; kalanlar Unknown
-        // baslar (muhafazakar). Nadir durum, todo'da not edildi.
+        // In a multi-declaration the first pointer init is taken; the
+        // rest start Unknown (conservative). Rare case, noted in the todo.
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
                 if (vd->getType()->isPointerType() && vd->hasInit())
@@ -122,7 +123,7 @@ Effect classifyStmt(const Stmt* stmt) {
         return {};
     }
     if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
-        // &p bir fonksiyona gidiyorsa p'ye deger atanmis olabilir
+        // If &p goes to a function, p may have been assigned a value
         if (unary->getOpcode() == UO_AddrOf)
             if (const auto* var = asVar(unary->getSubExpr()))
                 return {var, EffectKind::AssignUnknown};
@@ -155,8 +156,8 @@ void setIfTracked(NullVarState& state, const VarDecl* var, NullState value) {
     if (it != state.end()) it->second = value;
 }
 
-// Ortak yuruyus iskeleti uzerinden (engine/ConditionWalk.h): `if (p)`,
-// `!p`, `p ==/!= nullptr/NULL/0`, && / || kisa devre.
+// Via the shared walk skeleton (engine/ConditionWalk.h): `if (p)`,
+// `!p`, `p ==/!= nullptr/NULL/0`, && / || short-circuiting.
 void applyCondition(const Expr* cond, bool isTrue, NullVarState& state) {
     zerodefect::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
@@ -171,8 +172,9 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
                                                 ASTContext& ctx) {
     std::set<const VarDecl*> vars;
 
-    // Fonksiyonda gecen tum pointer yerel degiskenleri ve parametreler.
-    // Parametreler Unknown baslar — cagiran hakkinda varsayim yapilmaz.
+    // All pointer local variables and parameters appearing in the
+    // function. Parameters start Unknown — no assumption is made about
+    // the caller.
     auto ptrVarMatcher = varDecl(hasType(pointerType())).bind("var");
     auto wrapper = functionDecl(equalsNode(funcDecl),
                                  forEachDescendant(ptrVarMatcher));
@@ -191,11 +193,12 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
 
 class NullDerefAnalysis {
 public:
-    // Guard'li disjunktlar (hedefli yol duyarliligi): Juliet int_07/08/09
-    // kalibi — `if(staticTrue) data = alloc; ... if(staticTrue) *data;`
-    // — korelasyonsuz analizde sahte "may be null" uretiyordu. Ortak
-    // makine engine/GuardedDisjuncts.h'te; pointer nullness iyilestirmesi
-    // (applyCondition) disjunkt basina ayrica islenir.
+    // Guarded disjuncts (targeted path sensitivity): the Juliet
+    // int_07/08/09 pattern — `if(staticTrue) data = alloc; ...
+    // if(staticTrue) *data;` — produced a false "may be null" under
+    // correlation-free analysis. The shared machinery is in
+    // engine/GuardedDisjuncts.h; the pointer nullness refinement
+    // (applyCondition) is additionally applied per disjunct.
     using State = zerodefect::GuardedState<NullVarState>;
 
     NullDerefAnalysis(const std::vector<const VarDecl*>& trackedVars,
@@ -212,8 +215,8 @@ public:
 
     State initialState() const { return initState_; }
 
-    // Degisken basina NullState zinciri en fazla 3 gecis yapar;
-    // disjunkt sayisi yukseligi carpar
+    // The per-variable NullState chain makes at most 3 transitions;
+    // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 3 +
                 1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
@@ -233,7 +236,7 @@ public:
         State out = in;
         for (auto& d : out) {
             auto it = d.vars.find(effect.var);
-            if (it == d.vars.end()) continue;  // izlenmiyor
+            if (it == d.vars.end()) continue;  // not tracked
             it->second = (effect.kind == EffectKind::Assign)
                              ? effect.value
                              : NullState::Unknown;
@@ -250,10 +253,11 @@ public:
             applyCondition(condExpr, isTrueBranch, d.vars);
     }
 
-    // Guard izi (Iz v2): raporlama gecisinde, kenar iyilestirmesi bir
-    // degiskeni KESIN null yaptiysa kosul noktasina iz notu dusulur —
-    // `if (p == 0) { *p }` bulgusunun "neden null" sorusu artik cevapli
-    // (atama olmadan, salt guard'dan gelen null onceden izsizdi).
+    // Guard trace (Trace v2): during the reporting pass, if the edge
+    // refinement made a variable DEFINITELY null, a trace note is added
+    // at the condition point — the "why null" question for the
+    // `if (p == 0) { *p }` finding now has an answer (null coming purely
+    // from a guard, with no assignment, used to be traceless).
     void onEdgeRefined(const Stmt* cond, bool /*isTrueBranch*/,
                        const State& beforeDisjuncts,
                        const State& afterDisjuncts, ASTContext& ctx) {
@@ -276,7 +280,7 @@ public:
             zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
         NullVarState after =
             zerodefect::flattenGuarded(afterDisjuncts, mergeNullStates);
-        // Dataflow izi: null'a / olasi-null'a gecis olaylarini kaydet
+        // Dataflow trace: record transitions to null / possibly-null
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
@@ -323,7 +327,7 @@ public:
         noteTargets_.emplace_back(results_.size() - 1, effect.var);
     }
 
-    // Kosu bittikten sonra: null-atama izlerini raporlara ilistir
+    // After the run finishes: attach the null-assignment traces to reports
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
             auto it = events_.find(var);

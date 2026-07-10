@@ -43,25 +43,27 @@ public:
     bool serve() const { return serve_; }
     bool wholeProgram() const { return whole_program_; }
 
-    // Ozet kaliciligi (Cross-TU v2): --summary-out hasat edilen depoyu
-    // diske yazar; --summary-in analiz oncesi depoya yukler. Ikisi
-    // birlikte artimli whole-program'i verir: bir kez tum projeden
-    // hasat, sonra degisen dosya tek basina ama proje bilgisiyle.
+    // Summary persistence (Cross-TU v2): --summary-out writes the
+    // harvested store to disk; --summary-in loads it into the store
+    // before analysis. Together they give incremental whole-program:
+    // harvest the whole project once, then analyze the changed file on
+    // its own but with project knowledge.
     const std::string& summaryIn() const { return summary_in_path_; }
     const std::string& summaryOut() const { return summary_out_path_; }
-    // --summary-diff <eski> <yeni>: analiz yerine sozlesme farki raporu
+    // --summary-diff <old> <new>: contract-diff report instead of analysis
     const std::string& summaryDiffOld() const { return summary_diff_old_; }
     const std::string& summaryDiffNew() const { return summary_diff_new_; }
     void setSummaryIn(const std::string& path) { summary_in_path_ = path; }
     void setSummaryOut(const std::string& path) { summary_out_path_ = path; }
 
-    // Sicak AST onbellegi: uzun omurlu surecler (MCP server) icin
-    // programatik anahtar. CLI'da acilmaz — buyuk dizin taramasinda tum
-    // AST'leri surec omru boyunca canli tutmak bellek acisindan yanlis.
+    // Warm AST cache: a programmatic switch for long-lived processes
+    // (MCP server). Not enabled in the CLI — keeping all ASTs alive for
+    // the process lifetime during a large directory scan is wrong
+    // memory-wise.
     void setWarmCache(bool enabled) { warm_cache_ = enabled; }
     bool warmCache() const { return warm_cache_; }
 
-    // Programatik kapsam ayari (MCP server bunlari dogrudan kullanir)
+    // Programmatic scope settings (the MCP server uses these directly)
     void addFunctions(const std::string& list);
     void addLines(const std::string& list);
 

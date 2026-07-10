@@ -1,509 +1,546 @@
-# ZeroDefect — Değişiklik Günlüğü
+# ZeroDefect — Changelog
 
-## 2026-07-10 — Özet-diff v1: sözleşme değişim raporu (semantik regresyon kapısı)
+## 2026-07-10 — Summary-diff v1: contract change report (semantic regression gate)
 
-### Eklenen
-- **`--summary-diff <eski> <yeni>`**: analiz yerine iki hasat arasında
-  fonksiyon SÖZLEŞMELERİNİN nasıl değiştiğini raporlar. Sınıflandırma
-  yön bilinçli: **WEAKENED** = güçlü iddia kaybı/değişimi (NeverNull /
-  NeverZero düştü; ReadsOnly/Frees param iddiası başkasına döndü) — bu
-  iddiaya yaslanan ÇAĞIRANLAR yeniden incelenmeli, **exit 1 = CI
-  kapısı**. STRENGTHENED bilgi, CHANGED yönsüz, ADDED/REMOVED anahtar
-  giriş/çıkışı (imza değişimi REMOVED+ADDED — anahtar ariteyi içerir,
-  bilinçli). Zayıflayanlar rapor başında; SUMMARY_DIFF önekli satırlar
-  makine-greplenebilir.
-- `SummaryRegistry::parseSummaryFile`: dosyayı depoya karıştırmadan
-  ayrıştırma (loadGlobal bunun üstüne kuruldu — davranış aynı).
-- CLI dumanı gerçek senaryoyla: `return &g` → `return 0` refactor'ü
-  sonrası `WEAKENED find/1 returnNullness: NeverNull -> MaybeNull` +
+### Added
+- **`--summary-diff <old> <new>`**: instead of analyzing, reports how
+  function CONTRACTS changed between two harvests. Classification is
+  direction-aware: **WEAKENED** = loss/change of a strong claim (NeverNull /
+  NeverZero dropped; a ReadsOnly/Frees param claim turned into something
+  else) — CALLERS leaning on that claim must be re-reviewed, **exit 1 = CI
+  gate**. STRENGTHENED is informational, CHANGED directionless,
+  ADDED/REMOVED is key entry/exit (a signature change is REMOVED+ADDED —
+  the key includes arity, deliberate). Weakened entries lead the report;
+  SUMMARY_DIFF-prefixed lines are machine-greppable.
+- `SummaryRegistry::parseSummaryFile`: parse a file without mixing it into
+  the registry (loadGlobal was rebuilt on top of it — behavior identical).
+- CLI smoke with a real scenario: after a `return &g` → `return 0`
+  refactor, `WEAKENED find/1 returnNullness: NeverNull -> MaybeNull` +
   exit 1.
-- Kontrat DİLİ tasarımı bilinçli olarak bu turun dışında — kullanıcıyla
-  birlikte-tasarım oturumu (todo'da ayrı). Bu araç o oturuma veri üretir.
+- Contract LANGUAGE design is deliberately out of scope for this round —
+  a co-design session with the user (separate todo item). This tool
+  produces input data for that session.
 
-### Doğrulama
-- 228/228 test (ctest + tek-süreç; +7 SummaryDiffTest: zayıflama/param
-  zayıflaması/güçlenme/yönsüz/eklenen-çıkan+sıralama/özdeş/E2E exit
-  kodları)
+### Verification
+- 228/228 tests (ctest + single-process; +7 SummaryDiffTest: weakening /
+  param weakening / strengthening / directionless / added-removed+ordering /
+  identical / E2E exit codes)
 
-## 2026-07-10 — CFG önbelleği: fonksiyon başına tek inşa
+## 2026-07-10 — CFG cache: one build per function
 
-### Eklenen
-- **engine/CfgCache**: FunctionDecl* anahtarlı memoize CFG deposu —
-  özet mini-akışlarının her taraması + 4 kural aynı fonksiyonun CFG'sini
-  artık paylaşıyor (önceden fonksiyon başına 6+ inşa; sayaç testi tam
-  sayımı sabitler: 2 fonksiyon = 2 miss, gerisi hit). Kurulum
-  seçenekleri (setAllAlwaysAdd) tek yere taşındı — tüketiciler aynı
-  granülerliği görmek ZORUNDA (iki fazlı raporlama sözleşmesi buna
-  dayanır), artık ayrışamaz.
-- **Geçerlilik iki korumalı** (bayat-asla-servis ilkesinin CFG hali):
-  TU sonunda açık temizlik (SummaryRegistry::clear ile aynı noktalar:
-  RuleEngine::runAll, TestHelper, whole-program hasadı, ~StaticAnalyzer)
-  + ASTContext değişiminde otomatik boşaltma (yedek emniyet — adres
-  yeniden kullanımı sahte isabete dönüşemez). Test TU-sonu boşluğunu da
-  sabitler: bu doğruluk koşulu, hijyen değil.
-- Ölçüm: 600-fonksiyonlu sentetikte uçtan uca ~%10-15 (parse dahil);
-  kazanç büyük fonksiyonlarda ve whole-program iki-geçişte büyür.
+### Added
+- **engine/CfgCache**: memoized CFG store keyed by FunctionDecl* — every
+  scan of the summary mini-flows + the 4 rules now share the same
+  function's CFG (previously 6+ builds per function; a counter test pins
+  the exact count: 2 functions = 2 misses, everything else hits). Build
+  options (setAllAlwaysAdd) moved to a single place — consumers MUST see
+  the same granularity (the two-phase reporting contract depends on it),
+  they can no longer diverge.
+- **Validity is doubly protected** (the CFG form of the never-serve-stale
+  principle): explicit cleanup at TU end (same points as
+  SummaryRegistry::clear: RuleEngine::runAll, TestHelper, whole-program
+  harvest, ~StaticAnalyzer) + automatic flush on ASTContext change
+  (backup safety — address reuse cannot turn into a false hit). A test
+  also pins TU-end emptiness: this is a correctness condition, not
+  hygiene.
+- Measurement: ~10-15% end to end on a 600-function synthetic (parse
+  included); the gain grows with large functions and the whole-program
+  two-pass.
 
-### Doğrulama
-- 221/221 test (ctest + tek-süreç; +2 CfgCacheTest) — davranış korunumlu
-  (219 mevcut test hakem); korpus/Juliet bekçileri CI'da
+### Verification
+- 221/221 tests (ctest + single-process; +2 CfgCacheTest) —
+  behavior-preserving (the 219 existing tests are the referee);
+  corpus/Juliet guards in CI
 
-## 2026-07-10 — Editör entegrasyonu rehberi (sıfır kod)
+## 2026-07-10 — Editor integration guide (zero code)
 
-### Eklenen
-- README'ye "Editor & code-scanning integration" bölümü: VS Code SARIF
-  Viewer akışı (izlerimiz related locations olarak adım adım gezilebilir)
-  ve GitHub code scanning upload-sarif YAML örneği (`|| true` notuyla —
-  bulguda exit 1 veriyoruz, gating'i code scanning yapar). Ekran
-  görüntüsü bu ortamdan alınamadı; metin rehber tam akışı veriyor.
+### Added
+- "Editor & code-scanning integration" section in the README: the VS Code
+  SARIF Viewer flow (our traces are navigable step by step as related
+  locations) and a GitHub code scanning upload-sarif YAML example (with a
+  `|| true` note — we exit 1 on findings, code scanning does the gating).
+  A screenshot could not be captured from this environment; the text
+  guide covers the full flow.
 
-## 2026-07-10 — HTML rapor (`--html`): UI etabının ilk adımı
+## 2026-07-10 — HTML report (`--html`): first step of the UI phase
 
-### Eklenen
-- **HtmlReporter**: tek, kendine yeten HTML dosyası (harici kaynak yok
-  — test bunu "http:// içermez" ile sabitler; offline açılır, e-posta/PR
-  eki kadar kolay paylaşılır). Özet kartları aynı zamanda filtre
-  (severity + kural, tıkla-aç/kapa); metin kutusu dosya/fonksiyon/mesaj
-  süzer; her bulgunun dataflow izi `<details>` ile açılır ve hem iz
-  adımları hem bulgu noktası ±2 satır KAYNAK BAĞLAMIYLA, hedef satır
-  işaretli gömülür (üretim anında okunur — rapor taşındığında bağlam
-  kaybolmaz). Koyu/açık tema `prefers-color-scheme` ile otomatik.
-- **Güvenlik değişmezi**: tüm kullanıcı verisi HTML-escape'li — kaynak
-  koddaki `<script>` rapora sızamaz (testli).
-- `--html <file>` CLI bayrağı + `html_output=` config anahtarı.
-- Kaynak dosya yoksa bağlam atlanır, rapor yine üretilir (testli).
+### Added
+- **HtmlReporter**: a single, self-contained HTML file (no external
+  resources — a test pins this with "contains no http://"; opens offline,
+  as easy to share as an email/PR attachment). Summary cards double as
+  filters (severity + rule, click to toggle); a text box filters by
+  file/function/message; each finding's dataflow trace opens via
+  `<details>`, and both the trace steps and the finding location are
+  embedded WITH ±2 lines of SOURCE CONTEXT, target line highlighted
+  (read at generation time — context isn't lost when the report is
+  moved). Dark/light theme automatic via `prefers-color-scheme`.
+- **Security invariant**: all user data is HTML-escaped — a `<script>` in
+  source code cannot leak into the report (tested).
+- `--html <file>` CLI flag + `html_output=` config key.
+- If the source file is missing, context is skipped and the report is
+  still produced (tested).
 
-### Doğrulama
-- 219/219 test (ctest + tek-süreç; +5 HtmlReporterTest)
-- CLI dumanı: 4 kural ailesinden 5 bulgulu demo raporu üretildi
-  (fonksiyonlar arası sıfırlık ve guard-null izleri dahil)
+### Verification
+- 219/219 tests (ctest + single-process; +5 HtmlReporterTest)
+- CLI smoke: produced a demo report with 5 findings from 4 rule families
+  (interprocedural zeroness and guard-null traces included)
 
-## 2026-07-10 — Özet dosyası tazelik uyarısı
+## 2026-07-10 — Summary file staleness warning
 
-### Eklenen
-- `--summary-in` ile yüklenen özet dosyasından YENİ bir kaynak analiz
-  ediliyorsa stderr'de tek uyarı: "summaries may be stale; re-run
-  --summary-out". Analiz durmaz, özetler yine kullanılır (bayat özet
-  doğruluğu bozmaz — en fazla eksik/fazla iddia taşır; ama kullanıcı
-  tazelemeyi bilmeli). Test mtime'ları açıkça damgalar (aynı-saniye
-  flake'i yok) ve iki yönü de sabitler: bayat → uyarı + bulgular yine
-  gelir; taze → uyarı yok.
+### Added
+- If a source NEWER than the summary file loaded via `--summary-in` is
+  being analyzed, a single warning on stderr: "summaries may be stale;
+  re-run --summary-out". Analysis does not stop, summaries are still
+  used (a stale summary does not break correctness — at worst it carries
+  missing/extra claims; but the user should know to refresh). The test
+  stamps mtimes explicitly (no same-second flake) and pins both
+  directions: stale → warning + findings still arrive; fresh → no
+  warning.
 
-### Doğrulama
-- 214/214 test (ctest + tek-süreç)
+### Verification
+- 214/214 tests (ctest + single-process)
 
-## 2026-07-10 — İz v2: guard olayları izlerde (onEdgeRefined)
+## 2026-07-10 — Trace v2: guard events in traces (onEdgeRefined)
 
-### Eklenen
-- **DataflowEngine'e opsiyonel `onEdgeRefined` kancası**: kenar
-  iyileştirmesi (assume edge) state'i GERÇEKTEN değiştirdiğinde, yalnız
-  RAPORLAMA geçişinde çağrılır — onStatement'ın fixpoint kuralının
-  aynısı (faz 1'de erken state'le sahte guard olayı doğardı). Kanca
-  yoksa davranış bire bir eski hali (SFINAE).
-- **Guard iz notları**: atama olmadan salt guard'dan gelen kesin bilgi
-  önceden İZSİZDİ. `if (p == 0) { *p }` bulgusu artık kosul satırında
-  "'p' is null on this branch (per this condition)" notu taşıyor
-  (NullDeref, disjunkt-düzleştirmeli fark); `if (n == 0) 100 / n` için
-  simetrik "zero on this branch" (DivByZero). İki yeni i18n mesajı.
-- Not, koşul satırını gösterir (dereference/bölme satırını değil) —
-  test bunu satır karşılaştırmasıyla sabitler.
+### Added
+- **Optional `onEdgeRefined` hook on DataflowEngine**: called only in the
+  REPORTING pass, when edge refinement (assume edge) ACTUALLY changes the
+  state — the same fixpoint rule as onStatement (in phase 1 a spurious
+  guard event would be born from early state). Without the hook, behavior
+  is bit-for-bit the old one (SFINAE).
+- **Guard trace notes**: definite knowledge coming from a bare guard,
+  with no assignment, previously had NO trace. The `if (p == 0) { *p }`
+  finding now carries a note on the condition line: "'p' is null on this
+  branch (per this condition)" (NullDeref, diffed with disjunct
+  flattening); symmetric "zero on this branch" for `if (n == 0) 100 / n`
+  (DivByZero). Two new i18n messages.
+- The note points at the condition line (not the dereference/division
+  line) — a test pins this with a line comparison.
 
-### Doğrulama
-- 213/213 test (ctest + tek-süreç; +2 guard-izi testi; mevcut 211 sabit
-  — kancasız analizler ve mevcut izler davranış korunumlu)
+### Verification
+- 213/213 tests (ctest + single-process; +2 guard-trace tests; the
+  existing 211 unchanged — hook-less analyses and existing traces are
+  behavior-preserving)
 
-## 2026-07-10 — Artımlı akışın uçları: MCP `summaries` + diff döngüsü belgesi
+## 2026-07-10 — Endpoints of the incremental flow: MCP `summaries` + diff loop docs
 
-### Eklenen
-- **MCP analyze aracına `summaries` argümanı**: --summary-out ile
-  yazılmış dosya MCP çağrısına verilir; ajan döngüsü tek dosyayı
-  tüm-proje bilgisiyle analiz eder (test: özetsiz sessiz, özetli
-  null-deref görünür — bilgiyi taşıyan tek şey dosya).
-- analyze_diff.sh zaten ek argümanları ilettiğinden `--summary-in`
-  oradan bugün çalışıyor — script başlığına ve README'ye belgelendi.
-  Artımlı hikaye tamam: hasat (bir kez) → diff döngüsü / MCP çağrısı
-  (her düzenlemede, tüm-proje bilgisiyle).
+### Added
+- **`summaries` argument on the MCP analyze tool**: a file written with
+  --summary-out is handed to the MCP call; the agent loop analyzes a
+  single file with whole-project knowledge (test: silent without
+  summaries, null-deref visible with summaries — the file is the only
+  thing carrying the knowledge).
+- Since analyze_diff.sh already forwards extra arguments, `--summary-in`
+  works from there today — documented in the script header and the
+  README. The incremental story is complete: harvest (once) → diff loop /
+  MCP call (on every edit, with whole-project knowledge).
 
-### Değişen
-- README benchmark: CWE369 satırı PR #30 sonrası tazelendi
+### Changed
+- README benchmark: the CWE369 row refreshed after PR #30
   (18→21 TP, hitrate 0.045→0.053, F1 0.086→0.100, precision 1.000
-  sabit) + rakam yolculuğu paragrafına dönüş-sıfırlık cümlesi.
+  unchanged) + a return-zeroness sentence in the numbers-journey
+  paragraph.
 
-### Doğrulama
-- 211/211 test (ctest + tek-süreç; +2: MCP summaries argümanı E2E,
-  tools/list şeması)
+### Verification
+- 211/211 tests (ctest + single-process; +2: MCP summaries argument E2E,
+  tools/list schema)
 
-## 2026-07-10 — Dönüş sıfır-olabilirliği özeti (DivByZero fonksiyonlar arası)
+## 2026-07-10 — Return zeroness summary (DivByZero interprocedural)
 
-### Eklenen
-- **ReturnZeroness özet alanı**: tamsayı dönen fonksiyonlar için
-  NeverZero/MaybeZero/Unknown — null'un aynası, aynı mini deger-akışı
-  şimdi domain-şablonlu (`ReturnFlowAnalysis<ValueOf, Refine>`;
-  vstateOf/zstateOf + applyNullCond/applyZeroCond). bool bilinçli hariç
-  (`return ok;` false'ları her yerde MaybeZero üretirdi).
-- **walkZeroCondition** ConditionWalk'a eklendi (null'un simetriği);
-  DivByZeroRule::applyCondition ve özet mini-akışı aynı yorumu paylaşır
-  (davranış korunumlu — DivByZero'nun kenar testleri sabit).
-- **DivByZero tüketimi atama yolundan**: `int d = badSource();` →
-  d MaybeZero → korumasız bölme uyarı + "possibly-zero value" iz notu;
-  guard'lar (`if (d != 0)`) mevcut kenar iyileştirmesiyle susturur.
-  Juliet CWE369 akış-varyantı kaynağı (`data = 0; ... return data;`)
-  artık fonksiyonlar/dosyalar arası görünür (cross-TU testli).
-- **Bilinçli sınır (testle sabit)**: doğrudan `x / f()` böleni
-  raporlanmaz — atanmamış çağrı sonucu guard'lanamaz (`if (f() != 0)
-  x / f()` taze çağrıdır), raporlamak gerçek kodda FP ailesi doğururdu.
-- **Özet dosya formatı v2** (4. sütun sıfırlık); v1 dosyaları yüklemede
-  tanınır (sıfırlık Unknown), fazla/eksik alan bütünüyle red.
-- FP-katili testler: kaynak içinde 0 sonra ezilirse NeverZero → sessiz
-  (akış-duyarsız kestirme burada yanlış uyarırdı).
+### Added
+- **ReturnZeroness summary field**: NeverZero/MaybeZero/Unknown for
+  integer-returning functions — the mirror of null, the same mini
+  value-flow is now domain-templated (`ReturnFlowAnalysis<ValueOf,
+  Refine>`; vstateOf/zstateOf + applyNullCond/applyZeroCond). bool
+  deliberately excluded (`return ok;` falses would produce MaybeZero
+  everywhere).
+- **walkZeroCondition** added to ConditionWalk (the symmetric of null);
+  DivByZeroRule::applyCondition and the summary mini-flow share the same
+  interpretation (behavior-preserving — DivByZero's edge tests
+  unchanged).
+- **DivByZero consumption via the assignment path**: `int d = badSource();`
+  → d MaybeZero → unguarded division warns + "possibly-zero value" trace
+  note; guards (`if (d != 0)`) silence it via the existing edge
+  refinement. The Juliet CWE369 flow-variant source
+  (`data = 0; ... return data;`) is now visible across functions/files
+  (cross-TU tested).
+- **Deliberate limit (pinned by test)**: a direct `x / f()` divisor is
+  not reported — an unassigned call result cannot be guarded
+  (`if (f() != 0) x / f()` is a fresh call), reporting it would spawn an
+  FP family in real code.
+- **Summary file format v2** (4th column zeroness); v1 files are
+  recognized on load (zeroness Unknown), extra/missing fields rejected
+  wholesale.
+- FP-killer tests: if a 0 inside the source is later overwritten,
+  NeverZero → silent (a flow-insensitive shortcut would warn incorrectly
+  here).
 
-### Doğrulama
-- 209/209 test (ctest + tek-süreç; +8: sıfırlık davranışları 7 +
-  v1-dosya uyumu; persistence testleri v2 formatına taşındı)
-- Korpus lokalde koşulamadı (proxy tarball'ı engelliyor) — pin bekçisi
-  CI'da hakem; CWE369 hitrate etkisi PR Juliet koşusunda görülecek
+### Verification
+- 209/209 tests (ctest + single-process; +8: 7 zeroness behaviors +
+  v1-file compatibility; persistence tests migrated to the v2 format)
+- Corpus could not be run locally (proxy blocks the tarball) — the pin
+  guard is the referee in CI; the CWE369 hitrate impact will be seen in
+  the PR's Juliet run
 
-## 2026-07-10 — Baseline v2: satır-bağımsız anahtar
+## 2026-07-10 — Baseline v2: line-independent key
 
-### Değişen
-- **Baseline anahtarı artık satır numarası içermiyor**: yerine bulgu
-  satırının kırpılmış METİN içeriğinin FNV-1a 64 hash'i (std::hash
-  değil — baseline repo'ya girer, farklı makinede üretilenle eşleşmek
-  zorunda; FNV platformlar arası sabit). Üste kod eklenip bulgu kayınca
-  baseline geçerli kalır (v1'in bilinen sınırlaması çözüldü); satırın
-  KENDİSİ değişirse bulgu yeniden görünür — bilinçli: değişen satır
-  yeniden gözden geçirilmeli. Kırpma sayesinde salt girinti değişimi
-  tazelemez.
-- **Multiset semantiği**: özdeş satır+mesajlı bulgular SAYIYLA izlenir —
-  iki ayrı `delete p;` satırından birini baseline'a almak diğerini
-  gizlemez (set semantiği ikisini de yutardı; sessiz FN kaynağı olurdu).
-- **Geriye uyum**: v2 dosyası sürümlü başlıkla yazılır; başlıksız eski
-  v1 dosyaları yüklemede tanınır ve eski satır-numaralı anlamıyla
-  eşleşmeye devam eder. filter const kaldı (sayaçlar yerel kopyada
-  tüketilir; tekrarlanan çağrılar bağımsız).
+### Changed
+- **The baseline key no longer contains the line number**: instead, the
+  FNV-1a 64 hash of the finding line's trimmed TEXT content (not
+  std::hash — the baseline goes into the repo and must match one
+  produced on a different machine; FNV is stable across platforms). When
+  code is added above and the finding shifts, the baseline stays valid
+  (v1's known limitation solved); if the line ITSELF changes, the
+  finding reappears — deliberate: a changed line should be re-reviewed.
+  Thanks to trimming, an indentation-only change does not refresh it.
+- **Multiset semantics**: findings with identical line+message are
+  tracked by COUNT — baselining one of two separate `delete p;` lines
+  does not hide the other (set semantics would swallow both; a source of
+  silent FNs).
+- **Backward compatibility**: the v2 file is written with a versioned
+  header; old headerless v1 files are recognized on load and keep
+  matching with the old line-numbered meaning. filter stayed const
+  (counters are consumed on a local copy; repeated calls are
+  independent).
 
-### Doğrulama
-- 201/201 test (ctest + tek-süreç; +6: satır kayması, girinti, değişen
-  satır yeniden görünür, özdeş satır sayacı, v1 uyumu, başlık)
-- CLI dumanı: baseline yazıldı, dosyanın başına 2 satır eklendi,
-  yeniden analiz "1 known finding(s) filtered by baseline → Clean"
+### Verification
+- 201/201 tests (ctest + single-process; +6: line shift, indentation,
+  changed line reappears, identical-line counter, v1 compatibility,
+  header)
+- CLI smoke: baseline written, 2 lines added at the top of the file,
+  re-analysis "1 known finding(s) filtered by baseline → Clean"
 
-## 2026-07-10 — Cross-TU v2: özetler diske (artımlı whole-program)
+## 2026-07-10 — Cross-TU v2: summaries to disk (incremental whole-program)
 
-### Eklenen
-- **`--summary-out` / `--summary-in`**: hasat edilen cross-TU fonksiyon
-  özetleri sürümlü, satır-tabanlı metin dosyasına yazılır ve sonraki
-  koşularda yüklenir. Artımlı whole-program hikayesi tamam: bir kez tüm
-  projeden hasat et, sonra DEĞİŞEN dosyayı tek başına ama tüm-proje
-  bilgisiyle analiz et (başka dosyadaki "null dönebilir" callee tek
-  dosya koşusunda da görünür — CLI dumanı + E2E test kanıtlıyor).
-- **Hasat rules geçişinde** (RuleEngine::enableGlobalHarvest): runAll'ın
-  TU başına zaten kurduğu yerel tablodan, temizlikten önce — whole-program
-  modunun ikinci parse bedeli ödenmez. `--summary-out` bu yüzden
-  `--whole-program`sız da çalışır.
-- **Güvenlik değişmezleri**: bozuk/eksik dosya BÜTÜNÜYLE reddedilir
-  (depo değişmez; analiz özetsiz, muhafazakâr devam eder — stderr'de
-  uyarı); çakışan kayıtlar hasatla aynı muhafazakâr birleşimle zayıf
-  iddiaya düşer (N+M→U, R+F→O) — yanlış güçlü iddia dosya yoluyla
-  giremez. Deterministik çıktı (sıralı map) — özet dosyası diff'lenebilir,
-  "özet değişti mi" sorusu dosya karşılaştırması.
-- 4 yeni i18n mesajı (SummariesLoaded/Saved, SummaryLoad/SaveError).
+### Added
+- **`--summary-out` / `--summary-in`**: harvested cross-TU function
+  summaries are written to a versioned, line-based text file and loaded
+  in later runs. The incremental whole-program story is complete:
+  harvest the whole project once, then analyze the CHANGED file on its
+  own but with whole-project knowledge (a "may return null" callee in
+  another file is visible even in a single-file run — CLI smoke + E2E
+  test prove it).
+- **Harvest in the rules pass** (RuleEngine::enableGlobalHarvest): from
+  the local table runAll already builds per TU, before cleanup — the
+  second-parse cost of whole-program mode is not paid. That is why
+  `--summary-out` also works without `--whole-program`.
+- **Safety invariants**: a corrupt/missing file is rejected WHOLESALE
+  (registry unchanged; analysis continues conservatively without
+  summaries — warning on stderr); conflicting records fall to the weaker
+  claim with the same conservative merge as harvest (N+M→U, R+F→O) — a
+  wrong strong claim cannot enter via the file path. Deterministic
+  output (sorted map) — the summary file is diffable, "did the summary
+  change" is a file comparison.
+- 4 new i18n messages (SummariesLoaded/Saved, SummaryLoad/SaveError).
 
-### Doğrulama
-- 195/195 test (ctest + tek-süreç; +5: format round-trip, çakışma
-  birleşimi, bozuk dosya reddi ×3 varyant, eksik dosya, E2E
-  summary-out→summary-in cross-TU bulgu + özetsiz kontrol grubu)
-- CLI dumanı: callee.cpp hasadı `find/1 M O` üretti; caller.cpp
-  `--summary-in` ile tek başına analiz edilince null-deref uyarısı
-  izleme notuyla göründü
+### Verification
+- 195/195 tests (ctest + single-process; +5: format round-trip, conflict
+  merge, corrupt file rejection ×3 variants, missing file, E2E
+  summary-out→summary-in cross-TU finding + summary-less control group)
+- CLI smoke: harvesting callee.cpp produced `find/1 M O`; analyzing
+  caller.cpp on its own with `--summary-in` showed the null-deref
+  warning with a trace note
 
-## 2026-07-10 — MCP v2: sıcak süreçte AST önbelleği
+## 2026-07-10 — MCP v2: AST cache in the warm process
 
-### Eklenen
-- **SourceManager sıcak AST önbelleği** (`enableWarmCache`): uzun ömürlü
-  süreçte (MCP server) parse edilmiş TU'lar süreç ömrü boyunca tutulur;
-  aynı dosyaya sonraki analyze çağrıları parse maliyeti ödemez. Ölçüm
-  (--serve, 5 çağrı): sıcak 0.51s vs soğuk 1.50s — tekrar çağrı ~6x
-  (küçük dosyada; gerçek header yüküyle makas büyür).
-- **Tasarım değişmezi: bayat AST asla servis edilmez.** Anahtar
-  yol+build-path; parmak izi boyut+mtime. Uyuşmazsa girdi yeniden
-  kurulur. Test bunu uçtan uca kanıtlar: dosya değişince eski
-  use-after-free kaybolur, yeni div-by-zero görünür
+### Added
+- **SourceManager warm AST cache** (`enableWarmCache`): in a long-lived
+  process (MCP server) parsed TUs are kept for the process lifetime;
+  later analyze calls on the same file don't pay the parse cost.
+  Measurement (--serve, 5 calls): warm 0.51s vs cold 1.50s — repeat
+  calls ~6x (on a small file; the gap widens with real header load).
+- **Design invariant: a stale AST is never served.** Key is
+  path+build-path; fingerprint is size+mtime. On mismatch the input is
+  rebuilt. A test proves this end to end: when the file changes, the old
+  use-after-free disappears, the new div-by-zero appears
   (WarmCache_InvalidatedOnChange).
-- **Kapsam bilinçli dar**: yalnız MCP serve yolu açar
-  (`Config::setWarmCache`); CLI tek-atım koşularında kapalı — büyük
-  dizin taramasında tüm AST'leri canlı tutmak bellek açısından yanlış.
-  Bellek tavanı kMaxCachedAsts=16 (aşımda tümden boşalt; LRU
-  karmaşıklığına değmez).
-- Filtre-sızıntısı dersiyle ilişkisi not düşüldü: burada çağrılar-arası
-  kalıcılık ÖZELLİĞİN kendisi, doğruluk içerik-türevli anahtarla korunur
-  — global durum yasak değil, anahtarsız global durum yasak.
+- **Scope deliberately narrow**: only the MCP serve path enables it
+  (`Config::setWarmCache`); off in CLI one-shot runs — keeping all ASTs
+  alive while scanning a large directory is wrong memory-wise. Memory
+  ceiling kMaxCachedAsts=16 (flush everything on overflow; not worth LRU
+  complexity).
+- Its relation to the filter-leak lesson was noted: here cross-call
+  persistence IS the feature, correctness is protected by a
+  content-derived key — global state isn't forbidden, keyless global
+  state is.
 
-### Doğrulama
-- 190/190 test (ctest + tek-süreç; +2: ikinci çağrı isabet sayacı ve
-  aynı bulgular, değişen dosyada taze bulgular)
+### Verification
+- 190/190 tests (ctest + single-process; +2: second-call hit counter and
+  identical findings, fresh findings on a changed file)
 
-## 2026-07-10 — Ortak koşul-yürüyüşü iskeleti (ConditionWalk)
+## 2026-07-10 — Shared condition-walk skeleton (ConditionWalk)
 
-### Değişen
-- **engine/ConditionWalk.h** (header-only): `walkCondition` — dallanma
-  koşulu yürüyüşünün ortak omurgası (`!` ters kenar, `&&` doğru kenarda
-  iki taraf, `||` yanlış kenarda iki taraf, karşılaştırmada değişken-
-  solda normalizasyon/aynalama) + `walkNullCondition` — pointer-null
-  domain'inin hazır özeti.
-- **Dört istemci tek iskelete geçti** (davranış korunumlu):
-  NullDerefRule, MemoryLeakRule (yalnız-null-kenarı), FunctionSummary
-  mini-akışı (null domain) ve DivByZeroRule (sıfır domain'i, genel
-  iskelet). Dönüş-nullness turunun üçe çıkardığı kopya sıfıra indi;
-  yeni kenar-bilgisi domain'i eklemek artık iki lambda.
+### Changed
+- **engine/ConditionWalk.h** (header-only): `walkCondition` — the shared
+  backbone of branch-condition walking (`!` flips the edge, `&&` both
+  sides on the true edge, `||` both sides on the false edge,
+  variable-on-left normalization/mirroring for comparisons) +
+  `walkNullCondition` — a ready-made summary of the pointer-null domain.
+- **Four clients moved to the single skeleton** (behavior-preserving):
+  NullDerefRule, MemoryLeakRule (null-edge only), the FunctionSummary
+  mini-flow (null domain) and DivByZeroRule (zero domain, generic
+  skeleton). The duplication the return-nullness round had grown to
+  three copies dropped to zero; adding a new edge-knowledge domain is
+  now two lambdas.
 
-### Doğrulama
-- 188/188 test (ctest + tek-süreç) — saf yeniden düzenleme; korpus ve
-  Juliet bekçileri CI'da hakem
+### Verification
+- 188/188 tests (ctest + single-process) — pure refactoring; corpus and
+  Juliet guards are the referee in CI
 
-## 2026-07-10 — Dönüş-nullness dataflow'u (özet v2'nin kalbi)
+## 2026-07-10 — Return-nullness dataflow (the heart of summary v2)
 
-### Eklenen
-- **`return p;` yolları artık akış-duyarlı** (`FunctionSummary`):
-  pointer yereller/parametreler fonksiyon başına mini null-akışıyla
-  izlenir — kendi motorumuzun (runDataflow) istemcisi olarak: iki fazlı
-  raporlama, assume-edge iyileştirmesi ve yükseklik tavanı hazır gelir.
-  Her ULAŞILABİLİR return, yakınsamış durumdan katkı alır (ölü koddaki
-  return katkı vermez); toplama kuralı eskisiyle aynı (herhangi null
-  yolu → MaybeNull; tüm yollar NonNull → NeverNull).
-- **Akış-duyarsız kestirme bilinçli reddedildi** (tasarım kaydı):
-  "değişkene bir yerde NULL atanmış mı" yaklaşımı `p = NULL; p = &g;
-  return p;` yaygın kalıbında yanlış MaybeNull üretir, precision
-  1.000'i yakardı. FP-katili regresyon testi: InitNullThenSet.
-- Erken-dönüş guard'ı doğru çözülür: `if (!p) return &fb; return p;`
-  → iki yol da NonNull → **NeverNull** (assume-edge sayesinde).
-- Juliet akış-varyantı kaynağı artık görünür: `badSource(data){ data =
-  NULL; return data; }` → MaybeNull → çağıranın korumasız kullanımı
-  uyarı (cross-TU ile birleşince 61/63/64 aileleri bağlanır).
-- Hızlı yol korundu: değişken döndüren return yoksa CFG kurulmaz
-  (yapısal değerlendirme — yaygın durum bedava kalır).
+### Added
+- **`return p;` paths are now flow-sensitive** (`FunctionSummary`):
+  pointer locals/parameters are tracked with a per-function mini
+  null-flow — as a client of our own engine (runDataflow): two-phase
+  reporting, assume-edge refinement and the lattice-height ceiling come
+  for free. Every REACHABLE return contributes from the converged state
+  (a return in dead code contributes nothing); the aggregation rule is
+  the same as before (any null path → MaybeNull; all paths NonNull →
+  NeverNull).
+- **A flow-insensitive shortcut was deliberately rejected** (design
+  record): the "was NULL ever assigned to the variable anywhere"
+  approach produces a wrong MaybeNull for the common `p = NULL; p = &g;
+  return p;` pattern and would burn precision 1.000. FP-killer
+  regression test: InitNullThenSet.
+- The early-return guard resolves correctly: `if (!p) return &fb; return p;`
+  → both paths NonNull → **NeverNull** (thanks to assume-edge).
+- The Juliet flow-variant source is now visible: `badSource(data){ data =
+  NULL; return data; }` → MaybeNull → the caller's unguarded use warns
+  (combined with cross-TU, the 61/63/64 families connect).
+- The fast path is preserved: if no return returns a variable, no CFG is
+  built (structural evaluation — the common case stays free).
 
-### Bilinçli sınırlar
-- Parametre passthrough (`int* id(int* p){ return p; }`) Unknown kalır
-  — parametre-duyarlı özet (nullness'in argümana bağlı fonksiyonu)
-  ayrı bir ufuk; testle belgelendi.
+### Deliberate limits
+- Parameter passthrough (`int* id(int* p){ return p; }`) stays Unknown —
+  a parameter-sensitive summary (nullness as a function of the argument)
+  is a separate horizon; documented with a test.
 
-### Doğrulama
-- 188/188 test (8 yeni ReturnFlowTest: FP-katili, guard'lı fallthrough,
-  kesin-null, zincir yayılımı, Juliet badSource kalıbı, cross-TU akış,
-  param sınırı)
-- Mini-süit uçtan uca temiz; gerçek korpus/Juliet etkisi CI'dan
-  okunacak (korpus sayıları bilinçli değişebilir — bekçi yakalar,
-  pinler aynı PR'da gerekçeyle güncellenir)
+### Verification
+- 188/188 tests (8 new ReturnFlowTest: FP-killer, guarded fallthrough,
+  definite-null, chain propagation, Juliet badSource pattern, cross-TU
+  flow, param limit)
+- Mini-suite clean end to end; the real corpus/Juliet impact will be
+  read from CI (corpus numbers may deliberately change — the guard
+  catches it, pins get updated with justification in the same PR)
 
-## 2026-07-10 — Ufuk 2 açılışı: cross-TU özetler (--whole-program)
+## 2026-07-10 — Horizon 2 opening: cross-TU summaries (--whole-program)
 
-### Eklenen
-- **SummaryRegistry'ye cross-TU depo**: nitelikli-ad+arite anahtarı,
-  YALNIZCA harici bağlantılı fonksiyonlar (static dosya-yereller
-  anahtarlanmaz — Juliet'te her dosyada aynı adla varlar, yanlış
-  eşleşme üretirdi; soundness testi `StaticCallee_NotShared`).
-  Anahtar çakışmasında (C++ overload) alanlar muhafazakâr birleşir:
-  returnNullness→Unknown, param→Opaque — yanlış güçlü iddia doğamaz.
-- **`--whole-program` iki geçişli mod**: 1. geçiş tüm TU'lardan özet
-  hasadı (`harvestGlobal`), 2. geçiş kurallar — dosyalar arası
-  çağrılarda Opaque yerine gerçek özet. Bedeli ikinci parse; bilinçli,
-  bayrakla açılır. Özet hesaplamasının kendisi de depoya düşer
-  (cross-TU nullness zincirleri çözülür).
-- MCP hijyeni: `~StaticAnalyzer` depoyu da temizler (filtre sızıntısı
-  dersinin uygulaması — koşular arası özet sızmaz).
-- Juliet harness `--whole-program` ile koşar: akış varyantları
-  (61/63/64...) kaynak/lavaboyu a/b dosyalarına böler — recall etkisi
-  bu PR'ın koşusundan ölçülecek.
+### Added
+- **Cross-TU store in SummaryRegistry**: qualified-name+arity key, ONLY
+  externally-linked functions (static file-locals are not keyed — in
+  Juliet they exist under the same name in every file and would produce
+  wrong matches; soundness test `StaticCallee_NotShared`). On key
+  collision (C++ overloads) fields merge conservatively:
+  returnNullness→Unknown, param→Opaque — no wrong strong claim can be
+  born.
+- **`--whole-program` two-pass mode**: pass 1 harvests summaries from
+  all TUs (`harvestGlobal`), pass 2 runs the rules — real summaries
+  instead of Opaque on cross-file calls. The cost is a second parse;
+  deliberate, opt-in via the flag. The summary computation itself also
+  lands in the store (cross-TU nullness chains resolve).
+- MCP hygiene: `~StaticAnalyzer` clears the store too (application of
+  the filter-leak lesson — summaries don't leak across runs).
+- The Juliet harness runs with `--whole-program`: flow variants
+  (61/63/64...) split source/sink across a/b files — the recall impact
+  will be measured from this PR's run.
 
-### Doğrulama
-- 178/178 test (5 yeni CrossTU testi: MaybeNull dönüş, free-wrapper
-  double-free, salt-okur-leak-görünür, static-paylaşılmaz, hasatsız
-  kontrol grubu)
+### Verification
+- 178/178 tests (5 new CrossTU tests: MaybeNull return, free-wrapper
+  double-free, leak-behind-read-only-visible, static-not-shared,
+  harvest-less control group)
 
-## 2026-07-10 — Dengeli metrikler (F1) + Juliet skor bekçisi
+## 2026-07-10 — Balanced metrics (F1) + Juliet score guard
 
-### Eklenen
-- **Vaka-bazlı F1** (`juliet_eval.py`): her dosya bir vaka — bad
-  fonksiyonda eşleşen bulgu = vaka-TP, good'da = vaka-FP, sessiz bad
-  dosya = FN. `JULIET_RESULT` satırına `rcaseprec/rf1` alanları.
-- **İkinci işletim noktası**: yalnız-Error kesiti (`eprecision`) —
-  kesin iddiaların precision'ı ayrıca görünür.
-- **ROC bilinçli YOK** (README'de gerekçeli): analizci olasılıksal
-  değil kanıt-temelli ikili; taranabilir eşik olmadığından iki noktalı
-  "eğriden" AUC yanıltıcı olur. Dürüst karşılık: iki işletim noktası.
-- **Juliet skor bekçisi**: `scripts/juliet_expected.txt` CWE başına
-  rprecision/rhitrate tabanları; ihlal `JULIET_GUARD_FAIL` + exit 1 =
-  CI kırmızı. Workflow tetikleyicisi `src/**`, `tests/**` ve
-  CMakeLists'e genişletildi: analiz koduna dokunan HER PR'da benchmark
-  koşar (süit cache'te, ~3.5 dk) — "Juliet'in CI ağırlığı" kararı böylece
-  tam entegrasyonla kapandı; docs-only PR'lar muaf.
+### Added
+- **Case-based F1** (`juliet_eval.py`): each file is a case — a matching
+  finding in the bad function = case-TP, in good = case-FP, a silent bad
+  file = FN. `rcaseprec/rf1` fields on the `JULIET_RESULT` line.
+- **A second operating point**: the Error-only slice (`eprecision`) —
+  the precision of definite claims is visible on its own.
+- **ROC deliberately ABSENT** (justified in the README): the analyzer is
+  evidence-based binary, not probabilistic; with no sweepable threshold
+  an AUC from a two-point "curve" would be misleading. The honest
+  counterpart: two operating points.
+- **Juliet score guard**: `scripts/juliet_expected.txt` per-CWE
+  rprecision/rhitrate floors; a violation is `JULIET_GUARD_FAIL` +
+  exit 1 = CI red. The workflow trigger widened to `src/**`, `tests/**`
+  and CMakeLists: the benchmark runs on EVERY PR touching analysis code
+  (suite cached, ~3.5 min) — the "Juliet's CI weight" decision thus
+  closed with full integration; docs-only PRs are exempt.
 
-### Doğrulama
-- Mini-süit: F1/eprecision satırları + bekçi OK yolu; sıkı tabanla
-  ihlal yolu (exit 1) borusuz doğrulandı.
+### Verification
+- Mini-suite: F1/eprecision lines + guard OK path; the violation path
+  (exit 1) verified pipe-free with a tight floor.
 
-## 2026-07-10 — Yol duyarlılığı tüm kurallara: GuardedDisjuncts bileşeni
+## 2026-07-10 — Path sensitivity for all rules: GuardedDisjuncts component
 
-### Değişen
-- **Disjunkt makinesi ortak şablona çıkarıldı**
+### Changed
+- **The disjunct machinery was lifted into a shared template**
   (`engine/GuardedDisjuncts.h`, header-only): `Guarded<VarMap>` +
   `GuardedState<VarMap>` + `mergeGuarded` / `flattenGuarded` /
-  `refineGuardedFacts` / `normalizeGuarded` — değer birleştiricisi
-  (mergeVal) parametrik. MemoryLeakRule yerel kopyadan şablona geçti
-  (davranış aynı, 168 test sabit).
-- **UninitPointerRule + NullDerefRule portu**: her iki kural da
-  GuardedState kullanır; NullDeref'te pointer-nullness iyileştirmesi
-  (applyCondition) disjunkt başına ayrıca işlenir — int gerçekleri ve
-  pointer guard'ları aynı fonksiyonda birlikte çalışır. Hedef FP
-  aileleri: uninit-ptr 178 (char_07/08 kalıbı), null-deref 241
-  (int_07/08/09 kalıbı) — gerçek etki bu PR'ın Juliet koşusundan.
+  `refineGuardedFacts` / `normalizeGuarded` — the value merger
+  (mergeVal) is parametric. MemoryLeakRule moved from its local copy to
+  the template (behavior identical, 168 tests unchanged).
+- **UninitPointerRule + NullDerefRule port**: both rules use
+  GuardedState; in NullDeref the pointer-nullness refinement
+  (applyCondition) is additionally processed per disjunct — int facts
+  and pointer guards work together in the same function. Target FP
+  families: uninit-ptr 178 (char_07/08 pattern), null-deref 241
+  (int_07/08/09 pattern) — real impact from this PR's Juliet run.
 
-### Doğrulama
-- 173/173 test (5 yeni: uninit/null korelasyonlu + karşıt-korelasyonlu +
-  pointer-guard-ile-birlikte)
-- Mini-süit: üçlü guard zinciri (`if(t) malloc; if(t) deref; if(t) free`)
-  tüm kurallarda fp=0, tp korunuyor
+### Verification
+- 173/173 tests (5 new: uninit/null correlated + anti-correlated +
+  together-with-pointer-guard)
+- Mini-suite: triple guard chain (`if(t) malloc; if(t) deref; if(t) free`)
+  fp=0 across all rules, tp preserved
 
-### Juliet etkisi (PR #18 koşusu — ölçülen)
-- uninit-ptr FP 178→**80**; null-deref CWE416 gürültüsü FP 241→**129**;
-  CWE476 genel precision 0.446→0.526. Eşlemeli precision'lar 1.000 sabit.
-- Tesadüfi "TP"ler de temizlendi (uninit 47→15, null-deref/416 140→65):
-  `if(staticTrue) data=NULL; if(staticTrue) *data` vakasında "atanmamış
-  olabilir" yanlış gerekçeydi, bad fonksiyona denk geldiği için TP
-  sayılıyordu — asıl kusuru null-deref yakalıyor (139 TP sabit).
-- Kalan FP aileleri üç ilkeli sınıra indi: çağrı-guard'ları (bilinçli
-  anahtarlanmaz), farklı-global çiftleri (değerler TU dışında —
-  cross-TU/Ufuk 2), C++ tmpData yerel alias'ları (yerel alias izleme).
-- Metodoloji notu README'ye eklendi: Juliet good fonksiyonları yalnızca
-  test edilen CWE'den arınmıştır — CWE416 good'undaki memory-leak
-  bulgusu "genel FP" sayılır ama gerçek leak olabilir; sağlam metrik
-  eşlemeli sütunlardır.
+### Juliet impact (PR #18 run — measured)
+- uninit-ptr FP 178→**80**; null-deref CWE416 noise FP 241→**129**;
+  CWE476 overall precision 0.446→0.526. Mapped precisions stay 1.000.
+- Coincidental "TPs" got cleaned up too (uninit 47→15, null-deref/416
+  140→65): in the `if(staticTrue) data=NULL; if(staticTrue) *data` case
+  "may be uninitialized" was the wrong justification, counted as TP only
+  because it landed in the bad function — the actual defect is caught by
+  null-deref (139 TP unchanged).
+- The remaining FP families shrank to three principled limits: call
+  guards (deliberately not keyed), distinct-global pairs (values outside
+  the TU — cross-TU/Horizon 2), C++ tmpData local aliases (local alias
+  tracking).
+- A methodology note was added to the README: Juliet good functions are
+  only free of the CWE under test — a memory-leak finding in a CWE416
+  good counts as a "general FP" but may be a real leak; the robust
+  metric is the mapped columns.
 
-## 2026-07-10 — Hedefli yol duyarlılığı (guard'lı disjunktlar)
+## 2026-07-10 — Targeted path sensitivity (guarded disjuncts)
 
-### Teşhis (FP_SAMPLE verisiyle)
-Juliet FP'lerinin tamamına yakını TEK kalıba indi: aynı değişmez koşul
-iki kez test ediliyor (`if(globalFive==5) alloc; … if(globalFive==5)
-free;` — good varyantlarının 05/07/09/10/11 kontrol-akış aileleri).
-Join'de yollar karışınca "alloc olup free olmayan yol" hayaleti doğuyordu.
-memory-leak'in 92 FP'si + diğer CWE dosyalarındaki ~646 FP'si,
-uninit-ptr'ın 178'i, null-deref'in 241'i aynı kök nedene işaret ediyor.
+### Diagnosis (from FP_SAMPLE data)
+Nearly all Juliet FPs reduced to ONE pattern: the same invariant
+condition tested twice (`if(globalFive==5) alloc; … if(globalFive==5)
+free;` — the 05/07/09/10/11 control-flow families of the good variants).
+When paths mixed at the join, a ghost "path that allocs but never frees"
+was born. memory-leak's 92 FPs + its ~646 FPs in other CWE files,
+uninit-ptr's 178, null-deref's 241 all point at the same root cause.
 
-### Eklenen
-- **engine/PathFacts**: koşulları kanonik anahtara indirger
-  (`var REL literal`; NE/GT/GE tersleme ile EQ/LT/LE'ye normalize).
-  Yalnızca fonksiyon içinde atanmayan/adresi alınmayan, volatile
-  olmayan tamsayı değişkenler anahtarlanır; fonksiyon çağrıları ASLA
-  (rand() korelasyonu yanlış olur). `collectMutatedDecls` görücüsü.
-- **MemoryLeakRule State'i disjunkt kümesi oldu**: en fazla 4
-  (koşul-gerçekleri, var-durumları) çifti; refineOnEdge çelişen
-  disjunktı düşürür; tavan aşımında widening (facts kesişimi + var
-  birleşimi) bugünkü davranışa geri düşer. **Motor değişmedi** —
-  duck-typed State tasarımı disjunktif lattice'i analiz içinde taşıdı.
-- Raporlama düzleştirilmiş (flatten) görünümle bugünkü mantığın aynısı;
-  kazanç, düşürülen disjunktların birleşime hiç girmemesi.
+### Added
+- **engine/PathFacts**: reduces conditions to a canonical key
+  (`var REL literal`; NE/GT/GE normalized to EQ/LT/LE by inversion).
+  Only integer variables never assigned/address-taken within the
+  function and not volatile are keyed; function calls NEVER (rand()
+  correlation would be wrong). `collectMutatedDecls` visitor.
+- **MemoryLeakRule's State became a disjunct set**: at most 4
+  (condition-facts, var-states) pairs; refineOnEdge drops a
+  contradicting disjunct; on ceiling overflow, widening (facts
+  intersection + var join) falls back to today's behavior. **The engine
+  did not change** — the duck-typed State design carried the disjunctive
+  lattice inside the analysis.
+- Reporting is the same logic as today over the flattened view; the win
+  is that dropped disjuncts never enter the join.
 
-### Yan kazanımlar
-- Korelasyonlu double-free/UAF artık YAKALANIYOR (önceden FN):
-  `if(f) free(p); if(f) free(p);` ikinci gövdeye yalnızca Freed yolu girer.
-- `while(a)` gövdesinde a hiç değişmiyorsa çıkış yolu a==0 demektir —
-  eski exit-leak artefaktı kayboldu (NestedLoopConditionalFree testi
-  semantiğe göre güncellendi; gerçekçi mutasyonlu varyant eklendi).
+### Side benefits
+- Correlated double-free/UAF is now CAUGHT (previously FN):
+  `if(f) free(p); if(f) free(p);` only the Freed path enters the second
+  body.
+- If a never changes inside a `while(a)` body, the exit path means a==0 —
+  the old exit-leak artifact disappeared (the NestedLoopConditionalFree
+  test was updated to the semantics; a realistic mutated variant added).
 
-### Bilinçli sınırlar (dokümante + test)
-- İki guard arasındaki çağrı globali değiştirebilir → korelasyon gerçek
-  kusuru gizleyebilir (FN yönü; `CallBetweenCorrelatedGuards` testi).
-  Yerel/param koşullarda bu risk yok (adresi kaçmayan yerele çağrı
-  dokunamaz).
+### Deliberate limits (documented + tested)
+- A call between the two guards may change the global → correlation can
+  hide a real defect (FN direction; `CallBetweenCorrelatedGuards` test).
+  No such risk with local/param conditions (a call cannot touch a local
+  whose address never escapes).
 
-### Doğrulama
-- 168/168 test (10 yeni PathSensitivity + &arg escape testi)
-- Mini-süit uçtan uca: goodB2G korelasyonlu guard fp=0, bad leak tp=1
+### Verification
+- 168/168 tests (10 new PathSensitivity + &arg escape test)
+- Mini-suite end to end: goodB2G correlated guard fp=0, bad leak tp=1
 
-### Juliet etkisi (PR #17 ikinci koşu — ölçülen)
-| Kural | Önce | Sonra |
-|-------|------|-------|
+### Juliet impact (PR #17 second run — measured)
+| Rule | Before | After |
+|------|--------|-------|
 | memory-leak | 103 TP / 92 FP (p=0.528) | 103 TP / **61 FP** (p=0.628) |
-| double-free | 47 TP | **79 TP** (+32; korelasyonlu double-free FN'di) |
+| double-free | 47 TP | **79 TP** (+32; correlated double-free was FN) |
 | use-after-free | 99 TP | **174 TP** (+75; hitrate 0.247→0.435) |
 
-Yol duyarlılığı FP kesmenin ötesinde gizli TP açığa çıkardı — birleşik
-yol analizinde görünmeyen kusurlar disjunktlarla görünür oldu.
-Ek düzeltme: `sink(&data)` argümanı artık escape sayılıyor (Juliet 63x
-varyantı FP'si). Kalan FP aileleri: uninit-ptr 178 + null-deref 241
-(disjunkt portu — sıradaki tur); CWE401'de kalan 61 FP'nin bir kısmı
-farklı-global çiftleri (globalTrue/globalFalse değerleri TU dışında —
-dürüst sınır).
+Path sensitivity went beyond cutting FPs and exposed hidden TPs —
+defects invisible in the merged-path analysis became visible with
+disjuncts. Extra fix: a `sink(&data)` argument now counts as an escape
+(the Juliet 63x variant FP). Remaining FP families: uninit-ptr 178 +
+null-deref 241 (the disjunct port — next round); part of the remaining
+61 FPs in CWE401 are distinct-global pairs (globalTrue/globalFalse
+values live outside the TU — an honest limit).
 
-## 2026-07-10 — Juliet ölçüm doğruluğu + global filtre sızıntısı düzeltmesi
+## 2026-07-10 — Juliet measurement accuracy + global filter leak fix
 
-### Düzeltilen (ürün hatası — testlerin bulduğu)
-- **Global fonksiyon/satır filtresi sızıntısı**: `StaticAnalyzer` ctor'u
-  global filtreyi set ediyor, kimse geri almıyordu. Uzun ömürlü süreçte
-  (MCP server, tek-süreç test koşusu) filtreli bir analiz SONRAKİ
-  analizleri sessizce buduyordu. Bulunma şekli öğretici: test binary'si
-  tek süreçte koşulunca InterproceduralTest'in pozitif bulgu bekleyen
-  11 testi düştü — `ctest` her testi ayrı süreçte koştuğu için CI bunu
-  hiç göremiyordu (0 bekleyen "muhafazakârlık" testleri de her şey
-  filtrelenince sahte geçiyordu). Düzeltme: `~StaticAnalyzer()` filtreyi
-  temizler (RAII); regresyon testi `FilterStateResetAfterScopedAnalyze`;
-  CI'ya **tek-süreç test adımı** eklendi ki bu hata sınıfı bir daha
-  saklanamasın.
+### Fixed (product bug — found by the tests)
+- **Global function/line filter leak**: the `StaticAnalyzer` ctor set
+  the global filter, nobody ever reset it. In a long-lived process (MCP
+  server, single-process test run) a filtered analysis silently pruned
+  SUBSEQUENT analyses. How it was found is instructive: when the test
+  binary ran in a single process, InterproceduralTest's 11 tests
+  expecting positive findings failed — because `ctest` runs each test in
+  its own process, CI could never see this (the "conservatism" tests
+  expecting 0 also passed spuriously since everything was filtered).
+  Fix: `~StaticAnalyzer()` clears the filter (RAII); regression test
+  `FilterStateResetAfterScopedAnalyze`; a **single-process test step**
+  was added to CI so this bug class can never hide again.
 
-### Değişen
-- **`double-free` artık kendi rule_id'si** (eskiden `memory-leak`
-  altındaydı; `use-after-free` emsaline uyum). CWE415 eşlemesi ve
-  `--disable-rule`/baseline taksonomisi bulgu türünü ayırt edebilir.
-  README kural tablosu güncellendi.
+### Changed
+- **`double-free` now has its own rule_id** (previously under
+  `memory-leak`; matching the `use-after-free` precedent). The CWE415
+  mapping and the `--disable-rule`/baseline taxonomy can tell the
+  finding type apart. README rule table updated.
 
-### Eklenen (ölçüm doğruluğu)
-- **juliet_eval.py iki görünüm raporlar**: GENEL (dosyadaki tüm bulgular
-  — kullanıcının göreceği gürültü) + EŞLEMELİ (yalnızca test edilen
-  CWE'nin kuralı — kuralın gerçek kalitesi). Kural bazında tp/fp
-  kırılımı basılır; `JULIET_RESULT` satırına `rtp/rfp/rprecision/
-  rhitrate` alanları eklendi (eski alanlar korunur).
-- **Adımlı (stride) örnekleme** `run_juliet.sh`'de: `head -N` alfabetik
-  ilk varyant ailesini seçiyordu (CWE369'da ilk 400 dosyanın tamamı
-  `float_*` çıktı → 0 bulgu). Liste boyunca eşit aralıklarla LIMIT dosya
-  alınır — deterministik, tüm varyant aileleri temsil edilir.
+### Added (measurement accuracy)
+- **juliet_eval.py reports two views**: OVERALL (all findings in the
+  file — the noise the user would see) + MAPPED (only the rule of the
+  CWE under test — the rule's true quality). A per-rule tp/fp breakdown
+  is printed; `rtp/rfp/rprecision/rhitrate` fields added to the
+  `JULIET_RESULT` line (old fields preserved).
+- **Strided sampling** in `run_juliet.sh`: `head -N` was picking the
+  alphabetically first variant family (in CWE369 the entire first 400
+  files came out `float_*` → 0 findings). LIMIT files are taken at equal
+  intervals across the list — deterministic, all variant families
+  represented.
 
-### Doğrulama
-- 157/157 test (ctest + tek-süreç); sentetik mini-süitte (CWE476/415/369)
-  eşlemeli görünüm ve yeni kimlikle uçtan uca precision 1.000.
+### Verification
+- 157/157 tests (ctest + single-process); on the synthetic mini-suite
+  (CWE476/415/369) the mapped view and the new id give end-to-end
+  precision 1.000.
 
-### İlk TEMSİLİ rakamlar (bu PR'ın CI koşusu; adımlı örnekleme, 400/CWE)
-| CWE | Eşlemeli precision | Eşlemeli hitrate | Genel precision |
-|-----|-------------------:|-----------------:|----------------:|
+### First REPRESENTATIVE numbers (this PR's CI run; strided sampling, 400/CWE)
+| CWE | Mapped precision | Mapped hitrate | Overall precision |
+|-----|-----------------:|----------------:|------------------:|
 | CWE476 | **1.000** (139/0) | 0.347 | 0.446 |
 | CWE415 | **1.000** (47/0) | 0.117 | 0.264 |
 | CWE416 | **1.000** (99/0) | 0.247 | 0.273 |
 | CWE369 | **1.000** (18/0) | 0.045 | 1.000 |
 | CWE401 | 0.528 (103/92) | 0.250 | 0.528 |
 
-Dünkü tablonun dramatik düzelmesi ölçümün düzelmesidir: kendi CWE'sinde
-**dört kural sıfır FP** üretiyor ("bilinmeyen sessiz kalır" tasarımının
-doğrulaması). Gürültünün kaynağı netleşti: memory-leak kuralı (kendi
-92 FP'si + diğer CWE dosyalarında 646 FP) ve CWE476 good
-fonksiyonlarında uninit-ptr (178 FP) — yarının 1 numaralı iyileştirme
-hedefleri. README'ye Benchmark bölümü eklendi (metodoloji + dürüst
-okuma notlarıyla). CWE369 artık görünür: 18 TP / 0 FP; düşük hitrate
-bilinçli (float bölme IEEE754'te tanımlı — raporlanmaz; rand()/soket
-kaynakları dürüstçe Unknown).
+The dramatic improvement over yesterday's table is the measurement
+getting fixed: **four rules produce zero FPs** in their own CWE
+(validation of the "unknown stays silent" design). The source of the
+noise became clear: the memory-leak rule (its own 92 FPs + 646 FPs in
+other CWE files) and uninit-ptr in CWE476 good functions (178 FPs) —
+tomorrow's number-one improvement targets. A Benchmark section was added
+to the README (with methodology + honest-reading notes). CWE369 is now
+visible: 18 TP / 0 FP; the low hitrate is deliberate (float division is
+defined in IEEE754 — not reported; rand()/socket sources are honestly
+Unknown).
 
-## 2026-07-09 — İlk gerçek Juliet rakamları (PR #14)
+## 2026-07-09 — First real Juliet numbers (PR #14)
 
-### Düzeltilen (benchmark harness)
-- **Sahte-yeşil koşu yakalandı ve kapatıldı**: ilk gerçek koşuda
-  `run_juliet.sh` `cd` sonrası göreli `BASH_SOURCE` yüzünden kendi
-  dizinini bulamıyordu ve `| tee` borusu hata kodunu maskeliyordu —
-  0 CWE tarandı ama job yeşil göründü. Düzeltmeler: `SCRIPT_DIR`
-  herhangi bir `cd`'den ÖNCE çözülür; süit kök dizini `find`
-  fallback'leriyle sağlamlaştırıldı; benchmark adımı `shell: bash`
-  (`-eo pipefail`) ile koşar.
+### Fixed (benchmark harness)
+- **A false-green run was caught and closed**: in the first real run
+  `run_juliet.sh` could not find its own directory because of a relative
+  `BASH_SOURCE` after `cd`, and the `| tee` pipe masked the error code —
+  0 CWEs were scanned but the job looked green. Fixes: `SCRIPT_DIR` is
+  resolved BEFORE any `cd`; the suite root hardened with `find`
+  fallbacks; the benchmark step runs with `shell: bash`
+  (`-eo pipefail`).
 
-### İlk gerçek sonuçlar (CWE başına alfabetik ilk 400 dosya)
-| CWE | TP | FP | Precision | Dosya isabeti |
+### First real results (alphabetically first 400 files per CWE)
+| CWE | TP | FP | Precision | File hit rate |
 |-----|----|----|-----------|---------------|
 | CWE476 NULL Pointer Deref | 216 | 262 | 0.452 | 0.375 |
 | CWE401 Memory Leak | 64 | 58 | 0.525 | 0.155 |
@@ -511,504 +548,608 @@ kaynakları dürüstçe Unknown).
 | CWE416 Use After Free | 280 | 742 | 0.274 | 0.700 |
 | CWE369 Divide by Zero | 0 | 0 | 0.000 | 0.000 |
 
-### Rakamların analizi (bir sonraki turun planı)
-1. **CWE369 = 0 bulgu bir kural hatası değil, örnekleme yanlılığı:**
-   dosya listesi alfabetik sıralanıp `head -400` alınıyor; CWE369'da
-   `float_*` varyantları başta ve DivByZero kuralı float bölmeyi
-   BİLİNÇLİ atlar (IEEE754'te 0'a bölme tanımlı: inf/NaN — UB olan
-   tamsayı bölmesidir). İlk 400 dosyanın tamamı float varyantı çıktı.
-   → Düzeltme: `head` yerine deterministik adımlı (stride) örnekleme —
-   liste boyunca eşit aralıklarla 400 dosya, tüm varyant aileleri
-   temsil edilir.
-2. **Eval tüm kuralların bulgularını sayıyor:** CWE416 dosyasındaki bir
-   `memory-leak` uyarısı UAF hassasiyetine FP yazılıyor. İki görünüm
-   gerekir: genel precision (kullanıcının gördüğü) + CWE'yle eşleşen
-   kuralın precision'ı (kuralın gerçek kalitesi). → juliet_eval.py'ye
-   kural-bazlı kırılım + CWE→kural eşlemesi.
-3. **Double-free bulgusu `memory-leak` rule_id'siyle çıkıyor** (UAF'nin
-   kendi kimliği var, double-free'nin yok). CWE415 eşlemesi ve kullanıcı
-   taksonomisi için kendi `double-free` kimliğini almalı (pre-release —
-   kimlik değişikliğinin baseline maliyeti şimdi sıfıra yakın).
-4. CWE415/416 good-fonksiyon FP'leri (2. madde düzeltilince gerçek
-   boyutu görülecek) kural iyileştirme adayı; CWE401 dosya isabeti
-   (0.155) düşük — Juliet leak'lerinin çoğu kaynak/lavabo fonksiyon
-   çiftlerinde (interprosedürel akış), bilinen v1 sınırı.
+### Analysis of the numbers (the plan for the next round)
+1. **CWE369 = 0 findings is not a rule bug, it's sampling bias:** the
+   file list is sorted alphabetically and `head -400` is taken; in
+   CWE369 the `float_*` variants come first and the DivByZero rule
+   DELIBERATELY skips float division (division by 0 is defined in
+   IEEE754: inf/NaN — it's integer division that is UB). The entire
+   first 400 files turned out to be float variants.
+   → Fix: deterministic strided sampling instead of `head` — 400 files
+   at equal intervals across the list, all variant families represented.
+2. **The eval counts findings from all rules:** a `memory-leak` warning
+   in a CWE416 file is booked as an FP against UAF precision. Two views
+   are needed: overall precision (what the user sees) + the precision of
+   the rule matching the CWE (the rule's true quality). → per-rule
+   breakdown + a CWE→rule mapping in juliet_eval.py.
+3. **The double-free finding ships with the `memory-leak` rule_id** (UAF
+   has its own identity, double-free doesn't). For the CWE415 mapping
+   and the user taxonomy it should get its own `double-free` id
+   (pre-release — the baseline cost of an id change is near zero right
+   now).
+4. The CWE415/416 good-function FPs (their real size will show once
+   item 2 is fixed) are rule-improvement candidates; the CWE401 file hit
+   rate (0.155) is low — most Juliet leaks live in source/sink function
+   pairs (interprocedural flow), the known v1 limit.
 
-README'ye rakam işlenmedi: örnekleme yanlılığı düzeltilmeden bu tablo
-halka açık vitrine konmaz. Sıradaki tur: harness düzeltmeleri → temsili
-rakamlar → README benchmark bölümü.
+No numbers went into the README: this table does not go into the public
+showcase before the sampling bias is fixed. Next round: harness fixes →
+representative numbers → README benchmark section.
 
-## 2026-07-09 — Juliet ölçüm altyapısı (Ufuk 1 açılışı)
+## 2026-07-09 — Juliet measurement infrastructure (Horizon 1 opening)
 
-### Eklenen
-- **`Diagnostic.function`**: her bulgu artık içinde bulunduğu fonksiyonun
-  nitelikli adını taşır — JSON'da `function` alanı, SARIF'te
-  `logicalLocations`. (Juliet puanlaması buna dayanır; ajanlar için de
-  genel değer.)
-- **`--files <liste>`**: satır başına bir yol içeren liste dosyasındaki
-  kaynakları analiz eder — benchmark ve toplu ajan istekleri için.
-- **scripts/run_juliet.sh + juliet_eval.py**: NIST Juliet C/C++ 1.3
-  indirilir (önbellekli; `JULIET_DIR` ile atlanabilir), kurallarla
-  eşleşen 5 CWE dizini taranır (476/401/415/416/369), w32/pthread
-  varyantları elenir, CWE başına compile DB üretilir, bulgular Juliet
-  adlandırma sözleşmesiyle puanlanır: `bad` fonksiyonda → TP, `good`
-  fonksiyonda → FP. Çıktı: precision, dosya isabet oranı ve trend
-  takibi için grep-dostu `JULIET_RESULT` satırları.
-- **.github/workflows/juliet.yml**: haftalık + elle tetikleme (dosya
-  limiti girdisiyle); süit cache'lenir; sonuçlar job summary'de.
+### Added
+- **`Diagnostic.function`**: every finding now carries the qualified
+  name of the function it sits in — the `function` field in JSON,
+  `logicalLocations` in SARIF. (Juliet scoring relies on it; general
+  value for agents too.)
+- **`--files <list>`**: analyzes the sources in a list file containing
+  one path per line — for benchmarks and bulk agent requests.
+- **scripts/run_juliet.sh + juliet_eval.py**: downloads NIST Juliet
+  C/C++ 1.3 (cached; skippable via `JULIET_DIR`), scans the 5 CWE
+  directories matching our rules (476/401/415/416/369), filters out
+  w32/pthread variants, produces a compile DB per CWE, scores findings
+  with the Juliet naming convention: in a `bad` function → TP, in a
+  `good` function → FP. Output: precision, file hit rate and
+  grep-friendly `JULIET_RESULT` lines for trend tracking.
+- **.github/workflows/juliet.yml**: weekly + manual trigger (with a
+  file-limit input); the suite is cached; results in the job summary.
 
-### Doğrulama
-- Sentetik mini-süitle uçtan uca: CWE476 ve CWE415'te TP=1 FP=0,
-  precision 1.000. Gerçek rakamlar ilk workflow koşusundan gelecek.
-- 156/156 test (function alanı ana test yoluna sabitlendi)
+### Verification
+- End to end with the synthetic mini-suite: TP=1 FP=0 in CWE476 and
+  CWE415, precision 1.000. Real numbers will come from the first
+  workflow run.
+- 156/156 tests (the function field pinned in the main test path)
 
-## 2026-07-09 — İnterprosedürel v2: alias izleme
+## 2026-07-09 — Interprocedural v2: alias tracking
 
-### Eklenen
-- **Parametre etkilerinde alias izleme** (`engine/FunctionSummary`):
-  iki geçişli tasarım — (A) kopya grafı + taint tohumları, (B) etkiler
-  temiz alias'lar üzerinden parametreye çözülür.
-  - `void destroy(int* p) { int* cur = p; free(cur); }` artık **Frees** —
-    imleç-desenli yıkıcılar (her C kütüphanesinin `*_Delete`'i) wrapper
-    üzerinden double-free/UAF tespitine katıldı. Gerçek cJSON_Delete
-    şekli (parametre döngüde yeniden atanır) may-semantikle Frees.
-  - **Taint kuralları** (yanlış Frees/ReadsOnly iddiası FP doğururdu):
-    kirli kaynaktan beslenen (`l = pick()`), adresi alınan (`&l`),
-    static-yerel veya birden fazla parametreden ulaşılabilen yerel temiz
-    alias DEĞİLDİR; böyle yerele ulaşan parametre Stores'a düşer. Taint
-    kopya grafında yayılır (kirliden kopyalanan kirlidir).
-  - Salt-okur kullanım alias üzerinden de ReadsOnly kalır (leak görünür);
-    alias'ın globale yazılması/dönmesi Stores (kaçış korunur).
+### Added
+- **Alias tracking in parameter effects** (`engine/FunctionSummary`):
+  a two-pass design — (A) copy graph + taint seeds, (B) effects resolve
+  to the parameter through clean aliases.
+  - `void destroy(int* p) { int* cur = p; free(cur); }` is now **Frees** —
+    cursor-style destructors (every C library's `*_Delete`) joined
+    double-free/UAF detection through the wrapper. The real cJSON_Delete
+    shape (the parameter is reassigned in a loop) is Frees with
+    may-semantics.
+  - **Taint rules** (a wrong Frees/ReadsOnly claim would spawn FPs): a
+    local fed from a dirty source (`l = pick()`), address-taken (`&l`),
+    static-local or reachable from more than one parameter is NOT a
+    clean alias; a parameter reaching such a local falls to Stores.
+    Taint propagates through the copy graph (a copy of dirty is dirty).
+  - Read-only use through an alias also stays ReadsOnly (the leak stays
+    visible); the alias being written to a global/returned is Stores
+    (escape preserved).
 
-### Doğrulama
-- 156/156 test (8 yeni alias testi + eski muhafazakârlık testi Frees
-  beklentisine çevrildi: `AliasingCallee_NowFrees_DoubleFree`)
+### Verification
+- 156/156 tests (8 new alias tests + the old conservatism test flipped
+  to a Frees expectation: `AliasingCallee_NowFrees_DoubleFree`)
 
-## 2026-07-09 — Faz 4 açılışı: interprosedürel analiz v1 (fonksiyon özetleri)
+## 2026-07-09 — Phase 4 opening: interprocedural analysis v1 (function summaries)
 
-### Eklenen
-- **SummaryRegistry** (`engine/FunctionSummary.h/.cpp`): TU başına, kural
-  koşularından ÖNCE tüm gövdeli fonksiyonlar özetlenir; TU bitince tablo
-  temizlenir (TU-yerel `FunctionDecl*` anahtarları sarkmasın).
-  - **Dönüş nullness'i:** NeverNull (tüm yollar kesin non-null) /
-    MaybeNull (bir yol null literal dönebilir) / Unknown. Literal, `new`,
-    `&x`, string ve çağrı zinciriyle; değişken dönüşü Unknown (v1 sınırı).
-  - **Parametre etkileri:** Frees / ReadsOnly / Stores / Opaque.
-    Alias'a bilinçli kör: parametrenin herhangi bir şeye atanması Stores
-    (cJSON_Delete'in `q=p; free(q)` kalıbı v2'ye kadar Escaped kalır).
-  - **Sabit-nokta taraması** (≤5 tur, her tur sıfırdan): zincirler çözülür
-    (w2→w1→free), rekursiyon güçlü iddia üretemez (Unknown/Opaque başlar).
-- **NullDeref tüketimi:** `p = f()` — özet MaybeNull ise korumasız
-  dereference **uyarı** (guard'lı kullanım assume-edge ile temiz);
-  NeverNull zinciri sessiz. Yeni iz mesajı: "possibly-null value here
-  (callee may return null)".
-- **MemLeak tüketimi:** çağrı sınıflandırması özete bakar —
-  free-wrapper'lar (guard'lı `if(p) free(p)` dahil) **Frees** sayılır →
-  wrapper üzerinden double-free ve use-after-free artık yakalanıyor;
-  salt-okur yardımcılar etkisiz → arkalarındaki **leak görünür oldu**;
-  saklayan/opak çağrılar Escaped (regresyon yok).
-- Güvenlik hijyeni: `getName()` yerine `getIdentifier()` deseni
-  (operator overload'larında tanımsız davranış riski).
+### Added
+- **SummaryRegistry** (`engine/FunctionSummary.h/.cpp`): per TU, BEFORE
+  the rule runs, all functions with bodies are summarized; the table is
+  cleared when the TU ends (so TU-local `FunctionDecl*` keys don't
+  dangle).
+  - **Return nullness:** NeverNull (all paths definitely non-null) /
+    MaybeNull (some path may return a null literal) / Unknown. Via
+    literal, `new`, `&x`, string and call chains; returning a variable
+    is Unknown (v1 limit).
+  - **Parameter effects:** Frees / ReadsOnly / Stores / Opaque.
+    Deliberately blind to aliasing: assigning the parameter to anything
+    is Stores (cJSON_Delete's `q=p; free(q)` pattern stays Escaped until
+    v2).
+  - **Fixed-point scan** (≤5 rounds, each from scratch): chains resolve
+    (w2→w1→free), recursion cannot produce a strong claim (starts
+    Unknown/Opaque).
+- **NullDeref consumption:** `p = f()` — if the summary is MaybeNull, an
+  unguarded dereference **warns** (guarded use is clean via
+  assume-edge); a NeverNull chain is silent. New trace message:
+  "possibly-null value here (callee may return null)".
+- **MemLeak consumption:** call classification consults the summary —
+  free-wrappers (including guarded `if(p) free(p)`) count as **Frees** →
+  double-free and use-after-free through wrappers are now caught;
+  read-only helpers are effect-free → the **leak behind them became
+  visible**; storing/opaque calls are Escaped (no regressions).
+- Safety hygiene: the `getIdentifier()` pattern instead of `getName()`
+  (undefined behavior risk on operator overloads).
 
-### Doğrulama
-- 148/148 test (133 + 15 interprosedürel: zincirler, rekursiyon,
-  karşılıklı rekursiyon, alias muhafazakârlığı, dış fonksiyon regresyonu)
-- Uçtan uca demo: 3 yeni tespit sınıfı (wrapper-UAF izli, olası-null
-  dönüş izli, salt-okur arkası leak) + savunmacı kod tamamen temiz
+### Verification
+- 148/148 tests (133 + 15 interprocedural: chains, recursion, mutual
+  recursion, alias conservatism, external function regression)
+- End-to-end demo: 3 new detection classes (wrapper-UAF with trace,
+  possibly-null return with trace, leak behind a read-only helper) +
+  defensive code fully clean
 
-## 2026-07-09 — Faz 3 tamam: MCP server modu
+## 2026-07-09 — Phase 3 complete: MCP server mode
 
-### Eklenen
-- **`--serve`** (`src/server/McpServer`): MCP (Model Context Protocol)
-  sunucusu — stdio üzerinden satır-ayrımlı JSON-RPC 2.0. Claude Code
-  gibi ajanlar süreci başlatıp her düzenleme sonrası `analyze` aracını
-  çağırır; bulgular dataflow izleriyle yapısal JSON döner.
-- Metodlar: `initialize`, `notifications/*` (yanıtsız), `ping`,
-  `tools/list`, `tools/call` (`analyze`: `path` + opsiyonel
-  `build_path`/`functions`/`lines` — artımlı kapsam MCP'den de
-  kullanılabilir).
-- JSON için yeni bağımlılık YOK: zaten link edilen LLVMSupport'un
-  `llvm/json` kütüphanesi kullanıldı.
-- `handleMcpMessage()` I/O'dan ayrık — 10 birim testle protokol
-  davranışı sabitlendi (hata kodları -32700/-32601/-32602 dahil).
-- Config: `--serve` bayrağı; `addFunctions`/`addLines` public
-  (programatik kapsam).
+### Added
+- **`--serve`** (`src/server/McpServer`): an MCP (Model Context
+  Protocol) server — line-delimited JSON-RPC 2.0 over stdio. Agents like
+  Claude Code start the process and call the `analyze` tool after every
+  edit; findings come back as structured JSON with dataflow traces.
+- Methods: `initialize`, `notifications/*` (no response), `ping`,
+  `tools/list`, `tools/call` (`analyze`: `path` + optional
+  `build_path`/`functions`/`lines` — incremental scoping is usable from
+  MCP too).
+- NO new dependency for JSON: the `llvm/json` library from the
+  already-linked LLVMSupport was used.
+- `handleMcpMessage()` decoupled from I/O — protocol behavior pinned
+  with 10 unit tests (error codes -32700/-32601/-32602 included).
+- Config: `--serve` flag; `addFunctions`/`addLines` public
+  (programmatic scoping).
 
-### Doğrulama
-- 133/133 test (123 + 10 MCP)
-- Uçtan uca gerçek istemci akışı: initialize → initialized bildirimi →
-  analyze çağrısı → count/findings/trace'li yapısal yanıt
+### Verification
+- 133/133 tests (123 + 10 MCP)
+- End-to-end real client flow: initialize → initialized notification →
+  analyze call → structured response with count/findings/trace
 
-## 2026-07-09 — Artımlı v2: hunk → fonksiyon eşlemesi
+## 2026-07-09 — Incremental v2: hunk → function mapping
 
-### Eklenen
-- **`--lines <N-M,K>`**: yalnızca verilen satır aralıklarıyla kesişen
-  fonksiyonlar analiz edilir. Aralıklar analiz edilen ANA dosyaya
-  uygulanır (header'daki fonksiyonlar kapsam dışı — diff hunk'ları zaten
-  ana dosyaya aittir). `--function` ile birlikte AND semantiği.
-- **analyze_diff.sh v2**: `git diff -U0` hunk başlıklarından
-  (`+başlangıç,adet`) değişen satır aralıklarını çıkarıp dosya başına
-  `--lines` geçirir. Salt-silme hunk'larında (adet 0) ekleme noktası
-  satırı alınır. Sonuç: *LLM fonksiyonu değiştirir → script diff'ten
-  aralıkları çıkarır → yalnızca dokunulan fonksiyonlar yeniden analiz
-  edilir* — tam otomatik artımlı döngü.
-- İş bölümü ilkesi: git mantığı script'te, AST mantığı araçta.
+### Added
+- **`--lines <N-M,K>`**: only functions intersecting the given line
+  ranges are analyzed. Ranges apply to the MAIN file under analysis
+  (functions in headers are out of scope — diff hunks belong to the main
+  file anyway). AND semantics when combined with `--function`.
+- **analyze_diff.sh v2**: extracts changed line ranges from
+  `git diff -U0` hunk headers (`+start,count`) and passes `--lines` per
+  file. For deletion-only hunks (count 0) the insertion-point line is
+  taken. Result: *the LLM changes a function → the script extracts the
+  ranges from the diff → only the touched functions are re-analyzed* —
+  a fully automatic incremental loop.
+- Division-of-labor principle: git logic in the script, AST logic in the
+  tool.
 
-### Doğrulama
-- 123/123 test (119 + 4 satır filtresi: imza satırı kesişmesi, boş
-  aralık, kapsam dışı aralık)
-- Uçtan uca: iki hatalı fonksiyonlu dosyada yalnızca birine dokunuldu →
-  script `--lines 8-8` üretti → yalnızca dokunulan fonksiyonun bulgusu
-  raporlandı
+### Verification
+- 123/123 tests (119 + 4 line filter: signature-line intersection, empty
+  range, out-of-scope range)
+- End to end: in a file with two buggy functions only one was touched →
+  the script produced `--lines 8-8` → only the touched function's
+  finding was reported
 
-## 2026-07-09 — Faz 3 devam: artımlı analiz primitifi
+## 2026-07-09 — Phase 3 continued: incremental analysis primitive
 
-### Eklenen
-- **`--function <adlar>`** (`core/FunctionFilter`): yalnızca adı eşleşen
-  fonksiyonlar analiz edilir — düz ad (`parse`) veya nitelikli ad
-  (`Parser::parse`), virgüllü liste, tekrarlanabilir bayrak, `function=`
-  config anahtarı. Ajan/IDE döngüsünde "yalnızca değiştirdiğin fonksiyonu
-  yeniden kontrol et" için milisaniyelik hedefli analiz. Dört kuralın
-  callback'i de filtreye uyar. 4 test (RAII guard ile global temizliği).
-- **`scripts/analyze_diff.sh <binary> <git-ref> [args...]`**: verilen
-  ref'ten bu yana değişen C/C++ dosyalarını analizciden geçirir; bulgu
-  varsa exit 1, analizci hatasında exit >1 ile durur. CI'da "yalnızca
-  dokunulan dosyaları denetle" kapısı. Simüle git deposuyla uçtan uca
-  doğrulandı (bulgulu diff → 1, temiz diff → 0).
+### Added
+- **`--function <names>`** (`core/FunctionFilter`): only functions whose
+  name matches are analyzed — plain name (`parse`) or qualified name
+  (`Parser::parse`), comma-separated list, repeatable flag, `function=`
+  config key. Millisecond-scale targeted analysis for "re-check only the
+  function you changed" in the agent/IDE loop. All four rules' callbacks
+  honor the filter. 4 tests (global cleanup via an RAII guard).
+- **`scripts/analyze_diff.sh <binary> <git-ref> [args...]`**: runs the
+  C/C++ files changed since the given ref through the analyzer; exits 1
+  if there are findings, stops with exit >1 on an analyzer error. A
+  "check only the touched files" gate in CI. Verified end to end with a
+  simulated git repo (diff with a finding → 1, clean diff → 0).
 
-### Test sonuçları
-- 119/119 test geçti (115 + 4 filtre testi)
+### Test results
+- 119/119 tests passed (115 + 4 filter tests)
 
-## 2026-07-09 — Faz 3 açılışı: dataflow izleri
+## 2026-07-09 — Phase 3 opening: dataflow traces
 
-### Eklenen
-- **TraceNote** (`core/Diagnostic.h`): bulguya iliştirilen olay zinciri
-  adımı (file/line/column/message). Sıralama ve eşitlikte yer almaz.
-- **Kurallarda olay kaydı** (raporlama geçişinde before/after diff'i):
-  - MemLeak: "allocated here" / "freed here" (UAF, double-free, leak
-    raporlarına)
+### Added
+- **TraceNote** (`core/Diagnostic.h`): an event-chain step attached to a
+  finding (file/line/column/message). Not part of ordering or equality.
+- **Event recording in the rules** (before/after diff in the reporting
+  pass):
+  - MemLeak: "allocated here" / "freed here" (on UAF, double-free, leak
+    reports)
   - NullDeref: "assigned null here"
   - DivByZero: "assigned zero here"
-  - UninitPtr: "declared without an initializer here" (bildirim noktası)
-- Notlar koşu SONUNDA iliştirilir (bekleyen-rapor deseni) — raporlama
-  geçişinin blok sırası kaynak sırası olmadığından rapor anında olaylar
-  henüz tam toplanmamış olabilir. Kaynak sırasına göre sıralanır, 6 ile
-  sınırlanır.
-- **Reporter desteği**: konsolda girintili `-> file:line:col mesaj`
-  satırları; JSON'da `notes` dizisi; SARIF'te `relatedLocations`
-  (GitHub code scanning bulgu detayında gösterir).
-- i18n: 5 yeni iz mesajı (EN/TR).
+  - UninitPtr: "declared without an initializer here" (declaration
+    point)
+- Notes are attached at the END of the run (pending-report pattern) —
+  since the reporting pass's block order is not source order, events may
+  not be fully collected yet at report time. Sorted in source order,
+  capped at 6.
+- **Reporter support**: indented `-> file:line:col message` lines on the
+  console; a `notes` array in JSON; `relatedLocations` in SARIF (GitHub
+  code scanning shows them in the finding detail).
+- i18n: 5 new trace messages (EN/TR).
 
-### Neden
-Faz 3 vizyonunun ilk taşı: iz, hem insana hem LLM'e "bu bulgu neden
-var?" sorusunun cevabıdır — otomatik düzeltme döngüsünün girdisi.
+### Why
+The first stone of the Phase 3 vision: the trace is the answer to "why
+does this finding exist?" for both humans and LLMs — the input to the
+automatic fix loop.
 
-### Test sonuçları
-- 115/115 test geçti (110 + 5 iz testi)
+### Test results
+- 115/115 tests passed (110 + 5 trace tests)
 
-## 2026-07-09 — Test donanımlandırma: best/worst-case matrisi (+2 av)
+## 2026-07-09 — Test hardening: best/worst-case matrix (+2 catches)
 
-### Eklenen
-- **StressEdgeCaseTest.cpp** (17 test, üç bölüm):
-  - *Best case* (FP sınırı): goto-fail cleanup idiom'u, ternary guard
-    (bölme + null), break-kenarı guard'ı, continue guard'ı, comma
-    operatörü sıralaması
-  - *Worst case* (FN + yakınsama sınırı): 8 seviye iç içe if, 30
-    değişkenli çarpım lattice (tavan ölçekleme testi), 12 kollu else-if
-    zinciri, iç içe döngüde koşullu free, do-while ilk iterasyon,
-    goto ile geri döngü, default'suz switch
-  - *Belgelenmiş sınırlar*: erişimsiz kod analiz edilmez, self-assignment
-    FN'i, compound-assignment FN'i, koşullu double-free FN'i — davranış
-    değişirse test kırılır, todo ile senkron
+### Added
+- **StressEdgeCaseTest.cpp** (17 tests, three sections):
+  - *Best case* (FP boundary): the goto-fail cleanup idiom, ternary
+    guard (division + null), break-edge guard, continue guard, comma
+    operator sequencing
+  - *Worst case* (FN + convergence boundary): 8 levels of nested if,
+    30-variable product lattice (ceiling scaling test), 12-arm else-if
+    chain, conditional free in nested loops, do-while first iteration,
+    backward loop via goto, switch without default
+  - *Documented limits*: unreachable code is not analyzed,
+    self-assignment FN, compound-assignment FN, conditional double-free
+    FN — if behavior changes the test breaks, kept in sync with the todo
 
-### Testlerin ilk turda yakaladığı iki kural açığı (düzeltildi)
-- **MemLeak malloc-başarısızlık FP'si**: `p = malloc(); if (p == 0)
-  return -1;` yolunda leak raporlanıyordu — null kenarında ortada
-  sızacak bellek yok. MemLeak'e `refineOnEdge` eklendi: p'nin null
-  olduğu kenarlarda (`!p`, `p == NULL/0/nullptr`, truthiness false,
-  `&&`/`||`) Allocated → None. C'nin en yaygın kalıbındaki FP kapandı.
-- **DivByZero ternary FP'si**: onStatement içindeki recursive DivFinder,
-  bölmeyi kapsayan join-blok elemanında yanlış state ile ikinci kez
-  keşfediyordu (`z ? 100/z : 0` guard'ına rağmen uyarı). Motor
-  sözleşmesine uygun tepe-düğüm sınıflandırmasına geçildi.
+### Two rule gaps the tests caught in the first round (fixed)
+- **MemLeak malloc-failure FP**: a leak was reported on the
+  `p = malloc(); if (p == 0) return -1;` path — there is no memory to
+  leak on the null edge. `refineOnEdge` added to MemLeak: on edges where
+  p is null (`!p`, `p == NULL/0/nullptr`, truthiness false, `&&`/`||`)
+  Allocated → None. The FP on C's most common pattern closed.
+- **DivByZero ternary FP**: the recursive DivFinder inside onStatement
+  was discovering the division a second time, with the wrong state, in
+  the join-block element containing it (a warning despite the
+  `z ? 100/z : 0` guard). Moved to top-node classification per the
+  engine contract.
 
-### Test sonuçları
-- 110/110 test geçti (93 + 17 stress/edge)
+### Test results
+- 110/110 tests passed (93 + 17 stress/edge)
 
-## 2026-07-09 — Motor düzeltmesi: fixpoint sonrası raporlama
+## 2026-07-09 — Engine fix: reporting after fixpoint
 
-### Düzeltilen (korpusun ilk avı)
-- **Raporlama fixpoint'e taşındı**: `onStatement` artık worklist iterasyonu
-  sırasında DEĞİL, sabitleme sonrası ayrı bir raporlama geçişinde çağrılıyor.
-  Eski davranışta do-while/for gövdesinin ilk ziyaretinde back-edge state'i
-  henüz yokken rapor üretiliyor, satır dedup'ı da sonraki doğru state'in
-  düzeltmesini engelliyordu. cJSON'da `parse_array`'in linked-list kurma
-  kalıbı bu yüzden "kesinlikle null" (Error) çıkıyordu — doğrusu MaybeNull
-  (Warning). Regresyon testi eski motorla kırılıyor, yenisiyle geçiyor
-  (falsifikasyon doğrulandı).
-- **MemLeak transfer'ı saflaştırıldı**: reassignment-leak ve double-free
-  raporları transfer'dan onStatement'a taşındı (motor sözleşmesi: transfer
-  saf state fonksiyonu, raporlama yalnızca fixpoint geçişinde).
-- **Path kanonikleştirme**: `tests/../cJSON.c` ile `cJSON.c` aynı dosya —
-  `weakly_canonical` ile tekilleştirme ve baseline anahtarları güvenilir.
-- **Makro konumları**: tüm kurallar expansion loc kullanıyor; makro içi
-  bulgularda dosya adının boş kalması sorunu giderildi (cJSON unity
-  test makrolarında görüldü).
+### Fixed (the corpus's first catch)
+- **Reporting moved to the fixpoint**: `onStatement` is now called in a
+  separate reporting pass after stabilization, NOT during worklist
+  iteration. In the old behavior a report was produced on the first
+  visit of a do-while/for body while the back-edge state did not exist
+  yet, and the line dedup then blocked the later correct state's
+  correction. That is why cJSON's `parse_array` linked-list-building
+  pattern came out "definitely null" (Error) — the correct answer is
+  MaybeNull (Warning). The regression test fails with the old engine and
+  passes with the new one (falsification verified).
+- **MemLeak transfer purified**: reassignment-leak and double-free
+  reports moved from transfer into onStatement (engine contract:
+  transfer is a pure state function, reporting happens only in the
+  fixpoint pass).
+- **Path canonicalization**: `tests/../cJSON.c` and `cJSON.c` are the
+  same file — dedup and baseline keys are reliable via
+  `weakly_canonical`.
+- **Macro locations**: all rules use the expansion loc; the
+  empty-file-name problem for findings inside macros fixed (seen in
+  cJSON unity test macros).
 
-### Test sonuçları
-- 93/93 test geçti (92 + 1 motor regresyon testi)
+### Test results
+- 93/93 tests passed (92 + 1 engine regression test)
 
-## 2026-07-09 — Gerçek dünya korpusu CI'da
+## 2026-07-09 — Real-world corpus in CI
 
-### Eklenen
-- **scripts/run_corpus.sh**: sabit sürümlü cJSON v1.7.18 (C) ve tinyxml2
-  10.0.0 (C++) projelerini indirir, CMake ile `compile_commands.json`
-  üretir, zerodefect'i koşar. Başarı kriteri: crash-free (exit 0/1);
-  bulgu sayıları bilgi amaçlı loglanır. Build dizini kaynak ağacının
-  dışında (CMake feature-test kaynakları taranmasın);
-  `CMAKE_POLICY_VERSION_MINIMUM=3.5` (CMake 4 uyumu).
-- **CI adımı "Real-world corpus"**: her PR'da iki gerçek proje üzerinde
-  regresyon koşusu.
+### Added
+- **scripts/run_corpus.sh**: downloads version-pinned cJSON v1.7.18 (C)
+  and tinyxml2 10.0.0 (C++), produces `compile_commands.json` with
+  CMake, runs zerodefect. Success criterion: crash-free (exit 0/1);
+  finding counts logged for information. The build directory is outside
+  the source tree (so CMake feature-test sources are not scanned);
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5` (CMake 4 compatibility).
+- **CI step "Real-world corpus"**: a regression run over two real
+  projects on every PR.
 
-### Not
-- Bu oturumun ağ proxy'si GitHub tarball indirmesini repo kapsamıyla
-  sınırladığından script yerelde simüle projeyle doğrulandı; gerçek
-  korpus koşusunu PR CI'ı doğrular.
+### Note
+- Since this session's network proxy limited GitHub tarball downloads to
+  the repo scope, the script was verified locally with a simulated
+  project; the PR CI verifies the real corpus run.
 
-## 2026-07-09 — Beşinci kural: NullDerefRule
+## 2026-07-09 — Fifth rule: NullDerefRule
 
-### Eklenen
-- **NullDerefRule** (`src/rules/NullDerefRule.h/.cpp`): CFG dataflow ile
-  null pointer dereference tespiti. `NullState` lattice (Unknown / Null /
-  NonNull / MaybeNull); `nullptr`, `NULL`, `0` literal akışı; `&x`, `new`,
-  string literal → NonNull; `&p` escape → Unknown (muhafazakâr).
-  Dal koşulu iyileştirmesi: `p`, `!p`, `==`/`!=` nullptr (her iki yön),
-  `&&` true / `||` false kısa devre. Kesin null deref → Error, olası →
-  Warning. Bilinmeyen değerler sessiz — parametre dereference'i rapor
-  ÜRETMEZ (eski NullPointerRule'un 68-FP tuzağı).
-- 16 test: kesin/olası deref, `->` ve `[]`, guard desenleri (truthiness,
-  erken dönüş, `== nullptr` doğru dalında kesin hata, `&&` zinciri,
-  while-loop çıkışında null), muhafazakârlık testleri (parametre, opak
-  dönüş, out-param escape).
+### Added
+- **NullDerefRule** (`src/rules/NullDerefRule.h/.cpp`): null pointer
+  dereference detection with CFG dataflow. `NullState` lattice
+  (Unknown / Null / NonNull / MaybeNull); `nullptr`, `NULL`, `0` literal
+  flow; `&x`, `new`, string literal → NonNull; `&p` escape → Unknown
+  (conservative). Branch-condition refinement: `p`, `!p`, `==`/`!=`
+  nullptr (both directions), `&&` true / `||` false short-circuit.
+  Definite null deref → Error, possible → Warning. Unknown values stay
+  silent — a parameter dereference produces NO report (the old
+  NullPointerRule's 68-FP trap).
+- 16 tests: definite/possible deref, `->` and `[]`, guard patterns
+  (truthiness, early return, definite error on the true branch of
+  `== nullptr`, `&&` chain, null at while-loop exit), conservatism tests
+  (parameter, opaque return, out-param escape).
 
-### Doğrulama
-- 92/92 test geçti
-- Gerçekçi desen dosyası: for-döngüsü guard'ı, erken dönüş, `!= nullptr
-  &&` zinciri, opak `find()` → sıfır FP; kasıtlı 2 hata → 2 doğru bulgu
+### Verification
+- 92/92 tests passed
+- Realistic pattern file: for-loop guard, early return, `!= nullptr &&`
+  chain, opaque `find()` → zero FPs; 2 deliberate bugs → 2 correct
+  findings
 
-## 2026-07-09 — Faz 2 devam: use-after-free + baseline
+## 2026-07-09 — Phase 2 continued: use-after-free + baseline
 
-### Eklenen
-- **Use-after-free tespiti**: MemLeakAnalysis'e `onStatement` hook'u —
-  Freed durumdaki pointer'ın dereference'i (`*p`, `p->`, `p[i]`, tepe-düğüm
-  tespiti) `use-after-free` rule_id'siyle Error üretir. Var olan Freed
-  state'i yeniden kullanır; ek dataflow koşusu yok. 5 test.
-- **Baseline desteği** (`src/analyzer/Baseline.h/.cpp`):
-  `--write-baseline <dosya>` mevcut bulguları kaydeder ve temiz çıkar
-  (CI'da baseline üretimi); `--baseline <dosya>` bilinen bulguları
-  filtreler, yalnızca YENİ bulgular raporlanır. Anahtar:
-  `rule|file|line|message` (satır kayması v1 sınırlaması — dokümante).
-  Config anahtarı: `baseline=`. 4 test.
+### Added
+- **Use-after-free detection**: an `onStatement` hook on
+  MemLeakAnalysis — dereferencing a pointer in Freed state (`*p`, `p->`,
+  `p[i]`, top-node detection) produces an Error with the
+  `use-after-free` rule_id. Reuses the existing Freed state; no extra
+  dataflow run. 5 tests.
+- **Baseline support** (`src/analyzer/Baseline.h/.cpp`):
+  `--write-baseline <file>` records the current findings and exits clean
+  (baseline production in CI); `--baseline <file>` filters known
+  findings, only NEW findings are reported. Key:
+  `rule|file|line|message` (line drift is a v1 limitation — documented).
+  Config key: `baseline=`. 4 tests.
 
-### Test sonuçları
-- 75/75 test geçti (66 + 5 UAF + 4 baseline)
-- Uçtan uca: UAF yakalanıyor; write-baseline → exit 0; baseline ile
-  ikinci koşu temiz
+### Test results
+- 75/75 tests passed (66 + 5 UAF + 4 baseline)
+- End to end: UAF caught; write-baseline → exit 0; second run with the
+  baseline is clean
 
-## 2026-07-09 — Faz 2 başlangıcı: SARIF + suppression
+## 2026-07-09 — Phase 2 start: SARIF + suppression
 
-### Eklenen
+### Added
 - **SarifReporter** (`src/reporter/SarifReporter.h/.cpp`): SARIF 2.1.0
-  çıktı — GitHub code scanning ile doğrudan entegrasyon. `--sarif <dosya>`
-  CLI seçeneği ve `sarif_output=` config anahtarı. Severity eşlemesi:
-  Error→error, Warning→warning, Info→note. Mutlak path'ler `file://` URI.
-  5 test; çıktı `json.load` ile doğrulandı.
-- **SuppressionFilter** (`src/analyzer/SuppressionFilter.h/.cpp`): kaynak
-  yorumlarıyla bulgu bastırma. `// zerodefect-disable-line [kural,listesi]`
-  ve `// zerodefect-disable-next-line [...]`. Çıplak marker tüm kuralları,
-  kural listesi yalnızca sayılanları bastırır. Bastırılan sayı stderr'e
-  raporlanır. Dosya içeriği önbellekli okunur. 9 test.
-- **MsgId::OutputFileOpenError / SuppressedCount** — i18n'den kaçmış
-  JsonReporter Türkçe mesajı da düzeltildi.
+  output — direct integration with GitHub code scanning. `--sarif <file>`
+  CLI option and `sarif_output=` config key. Severity mapping:
+  Error→error, Warning→warning, Info→note. Absolute paths as `file://`
+  URIs. 5 tests; output validated with `json.load`.
+- **SuppressionFilter** (`src/analyzer/SuppressionFilter.h/.cpp`):
+  finding suppression via source comments.
+  `// zerodefect-disable-line [rule,list]` and
+  `// zerodefect-disable-next-line [...]`. A bare marker suppresses all
+  rules, a rule list only the listed ones. The suppressed count is
+  reported to stderr. File contents are read with caching. 9 tests.
+- **MsgId::OutputFileOpenError / SuppressedCount** — a Turkish
+  JsonReporter message that had escaped i18n was fixed as well.
 
-### Test sonuçları
-- 66/66 test geçti (52 + 5 SARIF + 9 suppression)
-- Uçtan uca: suppression yorumu bulguyu düşürüyor, SARIF geçerli JSON
+### Test results
+- 66/66 tests passed (52 + 5 SARIF + 9 suppression)
+- End to end: a suppression comment drops the finding, SARIF is valid
+  JSON
 
-## 2026-07-08 (gece) — Faz 1 kalanları: çekirdek birleştirme
+## 2026-07-08 (night) — Phase 1 leftovers: core consolidation
 
-### Değiştirildi
-- **DataflowEngine CFG granülerliği**: `BuildOptions::setAllAlwaysAdd()` —
-  alt ifadeler de değerlendirme sırasında birer CFG elemanı (CSA ile aynı).
-  Analizler artık her elemanın yalnızca tepe düğümüne bakıyor; statement
-  içinde nested arama (findAll matcher) tamamen gereksizleşti.
-- **UninitPointerRule_Ex tamamen yeniden yazıldı**: değişken başına ayrı
-  CFG build + dataflow koşusu + statement başına 5-6 matcher yerine, tüm
-  izlenen pointerlar tek çarpım lattice'inde (`map<VarDecl*, PtrState>`)
-  tek koşuda. Sınıflandırma tepe-düğüm `dyn_cast` — düğüm hangi değişkene
-  dokunduğunu kendisi söylediği için değişken başına döngü de yok (O(1)
-  eleman başına). Davranış birebir korundu (14/14 test).
-- **İterasyon tavanı lattice yüksekliğine bağlandı**: opsiyonel
-  `latticeHeight()` hook'u (SFINAE); `maxIterations = numBlocks × (height+2)`.
-  Üç analiz de yüksekliğini bildiriyor (değişken sayısı × zincir uzunluğu).
-  Bildirmeyen analizler için eski varsayılan korunuyor.
+### Changed
+- **DataflowEngine CFG granularity**: `BuildOptions::setAllAlwaysAdd()` —
+  subexpressions are individual CFG elements in evaluation order too
+  (same as CSA). Analyses now look only at each element's top node;
+  nested searching inside a statement (findAll matcher) became entirely
+  unnecessary.
+- **UninitPointerRule_Ex fully rewritten**: instead of a separate CFG
+  build + dataflow run per variable + 5-6 matchers per statement, all
+  tracked pointers live in one product lattice (`map<VarDecl*, PtrState>`)
+  in a single run. Classification is top-node `dyn_cast` — since the
+  node itself says which variable it touches, there is no per-variable
+  loop either (O(1) per element). Behavior preserved exactly (14/14
+  tests).
+- **Iteration ceiling tied to lattice height**: optional
+  `latticeHeight()` hook (SFINAE); `maxIterations = numBlocks × (height+2)`.
+  All three analyses report their height (variable count × chain
+  length). The old default is kept for analyses that don't report one.
 
-### Test sonuçları
-- 52/52 test geçti; demo bulguları birebir aynı (davranış değişikliği yok)
+### Test results
+- 52/52 tests passed; demo findings exactly identical (no behavior
+  change)
 
-## 2026-07-08 — Faz 0 (public hazırlık) + assume edges
+## 2026-07-08 — Phase 0 (public prep) + assume edges
 
-### Düzeltilen
-- **Linux header çözümleme hatası**: koşulsuz `-isystem /usr/include` GCC
-  libstdc++'ın `include_next` zincirini kırıyordu (`stdlib.h` bulunamıyor,
-  analiz kısmi AST ile sessizce devam ediyordu). Artık `#ifdef __APPLE__`
-  ile yalnızca macOS'ta ekleniyor. Doğrulama: `<cstdlib>` içeren demo
-  dosyasında daha önce kaçan double-free artık yakalanıyor.
-- **CMake taşınabilirliği**: Homebrew `CMAKE_PREFIX_PATH` varsayılanı
-  yalnızca `APPLE` altında. Linux'ta sistem LLVM'i otomatik bulunuyor.
-- **Çapraz-TU mükerrer bulgu**: `Diagnostic::operator==` + `operator<`
-  tüm alanlarla deterministik; `StaticAnalyzer::run` sıralama sonrası
-  `std::unique` ile tekilleştiriyor.
+### Fixed
+- **Linux header resolution bug**: the unconditional
+  `-isystem /usr/include` was breaking GCC libstdc++'s `include_next`
+  chain (`stdlib.h` not found, analysis silently continued with a
+  partial AST). Now added only on macOS via `#ifdef __APPLE__`.
+  Verification: the previously missed double-free in a demo file
+  including `<cstdlib>` is now caught.
+- **CMake portability**: the Homebrew `CMAKE_PREFIX_PATH` default only
+  under `APPLE`. On Linux the system LLVM is found automatically.
+- **Cross-TU duplicate findings**: `Diagnostic::operator==` +
+  `operator<` deterministic over all fields; `StaticAnalyzer::run`
+  deduplicates with `std::unique` after sorting.
 
-### Eklenen
-- **Assume edges (dal koşulu iyileştirmesi)**: `DataflowEngine`'e opsiyonel
-  `refineOnEdge(cond, isTrueBranch, State&, ASTContext&)` hook'u (SFINAE).
-  İki ardıllı terminator'larda (if/while/for) predecessor state'i true/false
-  kenarına göre iyileştirilip öyle merge ediliyor.
-- **DivByZeroRule guard analizi**: `z != 0`, `z == 0`, `z`, `!z`, `z > 0`
-  (+ ayna halleri `0 < z`), `>=`/`<=` false dalları, `&&`/`||` kısa devre
-  kuralları. Bilinen guard FP'si çözüldü; `if (z == 0) 1/z` artık kesin
-  hata olarak yakalanıyor. 9 yeni test.
-- **DivByZero merge düzeltmesi**: `Zero + Unknown = MaybeZero` (eskiden
-  Unknown'a düşüp susuyordu). `int d = 0; if (z > 0) d = z; 100/d`
-  artık uyarı veriyor. Yalnızca `NonZero + Unknown` bilgisizliğe düşer.
-- **i18n**: `core/Messages` modülü (MsgId tablosu EN/TR, `{0}`/`{1}`
-  yer tutucu). Varsayılan İngilizce; `--lang tr` CLI seçeneği ve `lang=`
-  config anahtarı. Tüm kural mesajları, reporter ve CLI çıktıları taşındı.
-- **GitHub Actions CI**: Ubuntu 24.04 + LLVM 18, build + ctest + exit-code
-  smoke testi (`.github/workflows/ci.yml`).
-- **README** (İngilizce, mimari + build + kullanım) ve **LICENSE**
+### Added
+- **Assume edges (branch-condition refinement)**: an optional
+  `refineOnEdge(cond, isTrueBranch, State&, ASTContext&)` hook on
+  `DataflowEngine` (SFINAE). On two-successor terminators (if/while/for)
+  the predecessor state is refined per true/false edge and merged that
+  way.
+- **DivByZeroRule guard analysis**: `z != 0`, `z == 0`, `z`, `!z`,
+  `z > 0` (+ mirrored forms `0 < z`), `>=`/`<=` false branches,
+  `&&`/`||` short-circuit rules. The known guard FP solved;
+  `if (z == 0) 1/z` is now caught as a definite error. 9 new tests.
+- **DivByZero merge fix**: `Zero + Unknown = MaybeZero` (previously fell
+  to Unknown and went silent). `int d = 0; if (z > 0) d = z; 100/d` now
+  warns. Only `NonZero + Unknown` falls to ignorance.
+- **i18n**: the `core/Messages` module (MsgId table EN/TR, `{0}`/`{1}`
+  placeholders). Default English; `--lang tr` CLI option and `lang=`
+  config key. All rule messages, reporters and CLI output migrated.
+- **GitHub Actions CI**: Ubuntu 24.04 + LLVM 18, build + ctest +
+  exit-code smoke test (`.github/workflows/ci.yml`).
+- **README** (English, architecture + build + usage) and **LICENSE**
   (Apache-2.0).
 
-### Test sonuçları
-- 52/52 test geçti (41 mevcut + 1 dedup + 1 i18n + 9 assume-edge)
-- Linux (Ubuntu 24.04, LLVM 18.1.3) üzerinde tam doğrulama
+### Test results
+- 52/52 tests passed (41 existing + 1 dedup + 1 i18n + 9 assume-edge)
+- Full verification on Linux (Ubuntu 24.04, LLVM 18.1.3)
 
 ## 2026-04-05 — DataflowEngine + DivByZeroRule
 
-### Eklenen
-- **DataflowEngine** (`src/engine/DataflowEngine.h`): Template-based forward dataflow engine. `Analysis` duck typing ile State, initialState, merge, transfer, onStatement (SFINAE ile opsiyonel) sağlar. CFG build, worklist, predecessor merge, successor propagation — tüm ortak kod tek yerde.
-- **DivByZeroRule** (`src/rules/DivByZeroRule.h`, `.cpp`): İki aşamalı sıfıra bölme tespiti. Phase 1: literal `100/0` (RecursiveASTVisitor, CFG'siz). Phase 2: variable divisor CFG dataflow (`ZeroState` lattice). Float division hariç (IEEE 754). 10 test.
+### Added
+- **DataflowEngine** (`src/engine/DataflowEngine.h`): Template-based
+  forward dataflow engine. `Analysis` provides State, initialState,
+  merge, transfer, onStatement (optional via SFINAE) through duck
+  typing. CFG build, worklist, predecessor merge, successor
+  propagation — all shared code in one place.
+- **DivByZeroRule** (`src/rules/DivByZeroRule.h`, `.cpp`): Two-phase
+  division-by-zero detection. Phase 1: literal `100/0`
+  (RecursiveASTVisitor, no CFG). Phase 2: variable divisor CFG dataflow
+  (`ZeroState` lattice). Float division excluded (IEEE 754). 10 tests.
 
 ### Refactor
-- **UninitPointerRule_Ex**: worklist döngüsü kaldırıldı, `runDataflow` + `UninitPtrAnalysis` kullanılıyor.
-- **DivByZeroRule**: worklist döngüsü kaldırıldı, `runDataflow` + `DivByZeroAnalysis` kullanılıyor.
-- **MemoryLeakRule_Ex**: worklist döngüsü kaldırıldı, `runDataflow` + `MemLeakAnalysis` kullanılıyor. Exit block check engine sonucu üzerinden.
+- **UninitPointerRule_Ex**: worklist loop removed, uses `runDataflow` +
+  `UninitPtrAnalysis`.
+- **DivByZeroRule**: worklist loop removed, uses `runDataflow` +
+  `DivByZeroAnalysis`.
+- **MemoryLeakRule_Ex**: worklist loop removed, uses `runDataflow` +
+  `MemLeakAnalysis`. Exit block check via the engine result.
 
-### Test sonuçları
-- 41/41 test geçti — davranış değişikliği yok
+### Test results
+- 41/41 tests passed — no behavior change
 
 ## 2026-04-05 — MemoryLeakRule_Ex (CFG-based leak + double-free)
 
-### Değiştirildi
-- **MemoryLeakRule silindi**, yerine **MemoryLeakRule_Ex** eklendi. CFG üzerinde forward dataflow ile:
-  - Memory leak tespiti (exit block'ta Allocated state → Warning)
-  - Reassignment leak tespiti (p=new; p=new → ilk allocation leaked → Warning)
-  - Double-free tespiti (Freed state'te tekrar Free → Error)
-  - Conservative escape analizi (return, function param → ownership transfer)
-  - C uyumu: malloc/calloc/strdup/free desteği
-- **classifyStmt** tamamen yeniden yazıldı: matcher yerine `dyn_cast` zinciri (DeclStmt, BinaryOperator, CXXDeleteExpr, CallExpr, ReturnStmt). Daha hızlı ve doğru.
-- 13 test: simple leak, correct usage, conditional leak, both branches delete, return escape, reassignment, malloc/free, function param escape, double-free, array new/delete, no allocation, multiple vars
+### Changed
+- **MemoryLeakRule deleted**, replaced by **MemoryLeakRule_Ex**. With
+  forward dataflow over the CFG:
+  - Memory leak detection (Allocated state in the exit block → Warning)
+  - Reassignment leak detection (p=new; p=new → first allocation leaked
+    → Warning)
+  - Double-free detection (Free again in Freed state → Error)
+  - Conservative escape analysis (return, function param → ownership
+    transfer)
+  - C compatibility: malloc/calloc/strdup/free support
+- **classifyStmt fully rewritten**: a `dyn_cast` chain instead of
+  matchers (DeclStmt, BinaryOperator, CXXDeleteExpr, CallExpr,
+  ReturnStmt). Faster and more accurate.
+- 13 tests: simple leak, correct usage, conditional leak, both branches
+  delete, return escape, reassignment, malloc/free, function param
+  escape, double-free, array new/delete, no allocation, multiple vars
 
-### Test sonuçları
-- 31/31 test geçti (14 UninitPointer_Ex + 13 MemoryLeak_Ex + 4 Diagnostic)
-- cJSON: 0 bulgu (leak yok), tinyxml2: 0 bulgu (tüm allocation'lar yönetiliyor)
+### Test results
+- 31/31 tests passed (14 UninitPointer_Ex + 13 MemoryLeak_Ex + 4
+  Diagnostic)
+- cJSON: 0 findings (no leaks), tinyxml2: 0 findings (all allocations
+  managed)
 
-## 2026-04-05 — MemoryLeakRule genişletme
+## 2026-04-05 — MemoryLeakRule extension
 
-### Eklenen
-- **Matcher 2 — sonradan atama**: `p = new int(42)` pattern'i. `BinaryOperator(=)` ile LHS pointer, RHS cxxNewExpr.
-- **Matcher 3 — return raw new**: `return new int(100)` pattern'i. `ReturnStmt` ile cxxNewExpr.
-- **5 yeni test**: AssignmentAfterDecl, ReturnRawNew, ReturnNullptr_Clean, MultiplePatterns, AssignMessageContainsVarName.
+### Added
+- **Matcher 2 — assignment after declaration**: the `p = new int(42)`
+  pattern. `BinaryOperator(=)` with pointer LHS, cxxNewExpr RHS.
+- **Matcher 3 — return raw new**: the `return new int(100)` pattern.
+  `ReturnStmt` with cxxNewExpr.
+- **5 new tests**: AssignmentAfterDecl, ReturnRawNew,
+  ReturnNullptr_Clean, MultiplePatterns, AssignMessageContainsVarName.
 
-### Test sonuçları
-- 26/26 test geçti (mevcut 6 MemoryLeak testi bozulmadı)
+### Test results
+- 26/26 tests passed (the existing 6 MemoryLeak tests unbroken)
 
-## 2026-04-05 — string.h uyarısı çözümü
+## 2026-04-05 — string.h warning fix
 
-### Düzeltilen
-- **SourceManager.cpp**: `ClangTool::appendArgumentsAdjuster()` ile üç sistem path eklendi:
+### Fixed
+- **SourceManager.cpp**: three system paths added via
+  `ClangTool::appendArgumentsAdjuster()`:
   - `-isystem /usr/include` + `-isystem /usr/local/include` (Linux)
-  - `-isysroot <SDK_PATH>` (macOS — xcrun ile otomatik bulunur)
-  - `-resource-dir <CLANG_DIR>` (stddef.h, stdarg.h gibi intrinsic header'lar)
-- **src/CMakeLists.txt**: `clang -print-resource-dir` ve `xcrun --show-sdk-path` ile derleme zamanında path'ler bulunup `#define` olarak aktarılıyor.
+  - `-isysroot <SDK_PATH>` (macOS — found automatically via xcrun)
+  - `-resource-dir <CLANG_DIR>` (intrinsic headers like stddef.h,
+    stdarg.h)
+- **src/CMakeLists.txt**: the paths are discovered at build time with
+  `clang -print-resource-dir` and `xcrun --show-sdk-path` and passed
+  through as `#define`s.
 
-### Etki
-- `string.h` / `stdlib.h` uyarıları tamamen gitti
-- cJSON artık tam parse ediliyor — önceki 47 bulgu (eksik parse kaynaklı) → 1 gerçek bulgu
-- 21/21 test hala geçiyor
+### Impact
+- The `string.h` / `stdlib.h` warnings are completely gone
+- cJSON now parses fully — the previous 47 findings (caused by
+  incomplete parsing) → 1 real finding
+- 21/21 tests still pass
 
 ## 2026-04-05 — NullPointerRule → UninitPointerRule
 
-### Değiştirildi
-- **NullPointerRule silindi**, yerine **UninitPointerRule** (`src/rules/UninitPointerRule.h`, `.cpp`) eklendi. Başlatılmamış pointer tespiti — `varDecl(pointerType, unless(hasInitializer), unless(parmVarDecl))`. Basit matcher, sıfır false positive.
-- **NullPointerRuleTest silindi**, yerine **UninitPointerRuleTest** (`tests/UninitPointerRuleTest.cpp`) — 11 test: basic uninit, multiple, nullptr/address-of/new/function return clean, parameter ignored, mixed, var name in message, no pointer, location.
+### Changed
+- **NullPointerRule deleted**, replaced by **UninitPointerRule**
+  (`src/rules/UninitPointerRule.h`, `.cpp`). Uninitialized pointer
+  detection — `varDecl(pointerType, unless(hasInitializer),
+  unless(parmVarDecl))`. A simple matcher, zero false positives.
+- **NullPointerRuleTest deleted**, replaced by **UninitPointerRuleTest**
+  (`tests/UninitPointerRuleTest.cpp`) — 11 tests: basic uninit,
+  multiple, nullptr/address-of/new/function return clean, parameter
+  ignored, mixed, var name in message, no pointer, location.
 - **main.cpp**: `NullPointerRule` → `UninitPointerRule`
-- **CMake dosyaları**: dosya adları güncellendi
+- **CMake files**: file names updated
 
-### Neden?
-NullPointerRule her `*ptr` dereference'ı yakalıyordu (cJSON'da 68 bulgu, çoğu false positive). Karmaşık filtreler (address-of, null guard) yerine temelden farklı bir yaklaşım: başlatılmamış pointer tespiti. Matcher kesin, filtre gereksiz.
+### Why?
+NullPointerRule caught every `*ptr` dereference (68 findings in cJSON,
+mostly false positives). Instead of complex filters (address-of, null
+guard), a fundamentally different approach: uninitialized pointer
+detection. The matcher is precise, no filter needed.
 
-### Test sonuçları
-- 21/21 test geçti (11 UninitPointer + 6 MemoryLeak + 4 Diagnostic)
-- cJSON: 47 uninit-ptr bulgusu (hepsi gerçek), 0 memory-leak (C projesi)
+### Test results
+- 21/21 tests passed (11 UninitPointer + 6 MemoryLeak + 4 Diagnostic)
+- cJSON: 47 uninit-ptr findings (all real), 0 memory-leak (C project)
 
-## 2026-04-04 — GTest Altyapısı
+## 2026-04-04 — GTest infrastructure
 
-### Eklenen
-- **Test helper** (`tests/TestHelper.h`, `.cpp`): `runRule(rule, code)` — `runToolOnCode` ile string'den AST üretip kuralı çalıştırır. Tüm testlerin ortak boilerplate'i.
-- **DiagnosticTest** (`tests/DiagnosticTest.cpp`): 4 test — severityToString, location formatı, severity sıralaması, dosya+satır sıralaması.
-- **NullPointerRuleTest** (`tests/NullPointerRuleTest.cpp`): 6 test — basic deref, safe deref (false positive belgeleme), parameter deref, no pointer, multiple deref, location doğrulama.
-- **MemoryLeakRuleTest** (`tests/MemoryLeakRuleTest.cpp`): 6 test — raw new int, array, no new, stack alloc, delete still warns, mesajda değişken adı.
-- **CMake test desteği**: FetchContent ile GTest v1.14.0, `gtest_discover_tests`.
+### Added
+- **Test helper** (`tests/TestHelper.h`, `.cpp`): `runRule(rule, code)` —
+  builds an AST from a string with `runToolOnCode` and runs the rule.
+  The shared boilerplate of all tests.
+- **DiagnosticTest** (`tests/DiagnosticTest.cpp`): 4 tests —
+  severityToString, location format, severity ordering, file+line
+  ordering.
+- **NullPointerRuleTest** (`tests/NullPointerRuleTest.cpp`): 6 tests —
+  basic deref, safe deref (false positive documentation), parameter
+  deref, no pointer, multiple deref, location verification.
+- **MemoryLeakRuleTest** (`tests/MemoryLeakRuleTest.cpp`): 6 tests —
+  raw new int, array, no new, stack alloc, delete still warns, variable
+  name in message.
+- **CMake test support**: GTest v1.14.0 via FetchContent,
+  `gtest_discover_tests`.
 
-### Test sonuçları
-- 16/16 test geçti (0.84 saniye)
+### Test results
+- 16/16 tests passed (0.84 seconds)
 
 ## 2026-04-04 — MemoryLeakRule
 
-### Eklenen
-- **MemoryLeakRule** (`src/rules/MemoryLeakRule.h`, `.cpp`): İkinci concrete rule. ASTMatcher ile `varDecl(pointerType, cxxNewExpr)` pattern'i arar. Değişken adını mesaja ekler. `defaultSeverity()` override etmez — base class'ın Warning varsayılanını kullanır.
-- **Test dosyaları**: `test_projects/samples/memory_leak.cpp`
-- **cJSON test projesi**: `test_projects/cJSON/` — gerçek dünya C projesi, compile_commands.json ile test.
+### Added
+- **MemoryLeakRule** (`src/rules/MemoryLeakRule.h`, `.cpp`): the second
+  concrete rule. Searches for the `varDecl(pointerType, cxxNewExpr)`
+  pattern with ASTMatchers. Adds the variable name to the message. Does
+  not override `defaultSeverity()` — uses the base class's Warning
+  default.
+- **Test files**: `test_projects/samples/memory_leak.cpp`
+- **cJSON test project**: `test_projects/cJSON/` — a real-world C
+  project, tested with compile_commands.json.
 
-### Test sonuçları
-- memory_leak.cpp: 4/4 doğru tespit (raw new single, array, struct, delete sonrası bile)
-- cJSON: 68 null-deref bulgusu (pipeline çalışıyor), 0 memory-leak (C projesi, new yok — beklenen)
+### Test results
+- memory_leak.cpp: 4/4 correct detections (raw new single, array,
+  struct, even after delete)
+- cJSON: 68 null-deref findings (the pipeline works), 0 memory-leak (C
+  project, no new — expected)
 
 ## 2026-04-04 — NullPointerRule + main.cpp
 
-### Eklenen
-- **NullPointerRule** (`src/rules/NullPointerRule.h`, `.cpp`): İlk concrete rule. ASTMatcher ile `*ptr` dereference pattern'i arar, sistem header'larını filtreler. Callback anonymous namespace'de.
-- **main.cpp** (`src/main.cpp`): Giriş noktası. Config oku → Analyzer kur → kuralları kaydet → çalıştır → CI/CD exit code.
-- **`zerodefect` executable**: CMake'de `add_executable` + `zerodefect_core` link.
+### Added
+- **NullPointerRule** (`src/rules/NullPointerRule.h`, `.cpp`): the first
+  concrete rule. Searches for the `*ptr` dereference pattern with
+  ASTMatchers, filters system headers. Callback in an anonymous
+  namespace.
+- **main.cpp** (`src/main.cpp`): entry point. Read Config → set up
+  Analyzer → register rules → run → CI/CD exit code.
+- **`zerodefect` executable**: `add_executable` + `zerodefect_core` link
+  in CMake.
 
-### Düzeltilen
-- **StaticAnalyzer constructor**: `sourcePath` dosya veya dizin olabilir. `is_directory` kontrolü eklendi — dosyaysa `addSourceFile`, dizinse `scanDirectory`.
+### Fixed
+- **StaticAnalyzer constructor**: `sourcePath` may be a file or a
+  directory. `is_directory` check added — `addSourceFile` for a file,
+  `scanDirectory` for a directory.
 
-## 2026-04-04 — Temel Mimari
+## 2026-04-04 — Core architecture
 
-### Eklenen
-- **Diagnostic** (`src/core/Diagnostic.h`): Bulgu veri yapısı — severity, location, message. Header-only struct, `operator<` ile sıralama, `DiagnosticList` alias.
-- **Rule** (`src/core/Rule.h`): Abstract base class — `check(ASTContext&, DiagnosticList&)` pure virtual. `enabled_` private, `defaultSeverity()` virtual (varsayılan Warning).
-- **SourceManager** (`src/source_manager/`): Clang LibTooling sarmalayıcı. `compile_commands.json` yükler, fallback olarak `FixedCompilationDatabase`. Callback ile AST teslimi. İç Clang zinciri (Factory→Action→Consumer) anonymous namespace'de.
-- **RuleEngine** (`src/engine/`): Kural yöneticisi. `addRule<T>()` variadic template, `runAll()` aktif kuralları çalıştırıp temiz DiagnosticList döner, `enableRule()` id ile aç/kapa.
-- **Reporter** (`src/reporter/`): Abstract base + iki concrete: ConsoleReporter (stderr), JsonReporter (dosyaya, escapeJson ile güvenli).
-- **Config** (`src/config/`): key=value dosya parser + CLI argüman parser. Whitelist/blacklist kural yönetimi, severity filtresi, `--help` çıktısı.
-- **StaticAnalyzer** (`src/analyzer/`): Facade/orkestratör. Config alır, bileşenleri kurar, `run()` ile akış: AST üret → kuralları çalıştır → severity filtrele → sırala → raporla.
-- **CMake build sistemi**: LLVM/Clang find_package, `-fno-rtti` uyumu, `zerodefect_core` static library.
+### Added
+- **Diagnostic** (`src/core/Diagnostic.h`): the finding data structure —
+  severity, location, message. Header-only struct, ordering via
+  `operator<`, `DiagnosticList` alias.
+- **Rule** (`src/core/Rule.h`): abstract base class —
+  `check(ASTContext&, DiagnosticList&)` pure virtual. `enabled_`
+  private, `defaultSeverity()` virtual (default Warning).
+- **SourceManager** (`src/source_manager/`): Clang LibTooling wrapper.
+  Loads `compile_commands.json`, `FixedCompilationDatabase` as fallback.
+  AST delivery via callback. The internal Clang chain
+  (Factory→Action→Consumer) in an anonymous namespace.
+- **RuleEngine** (`src/engine/`): rule manager. `addRule<T>()` variadic
+  template, `runAll()` runs the active rules and returns a clean
+  DiagnosticList, `enableRule()` toggles by id.
+- **Reporter** (`src/reporter/`): abstract base + two concretes:
+  ConsoleReporter (stderr), JsonReporter (to a file, safe via
+  escapeJson).
+- **Config** (`src/config/`): key=value file parser + CLI argument
+  parser. Whitelist/blacklist rule management, severity filter, `--help`
+  output.
+- **StaticAnalyzer** (`src/analyzer/`): facade/orchestrator. Takes the
+  Config, wires the components, `run()` flow: build ASTs → run rules →
+  filter by severity → sort → report.
+- **CMake build system**: LLVM/Clang find_package, `-fno-rtti`
+  compatibility, `zerodefect_core` static library.
 
-### Düzeltilen
-- `SourceManager::processAll`: callback `std::move` yerine kopya ile geçiriliyor (tekrar çağrılabilirlik).
-- `FixedCompilationDatabase`: working directory `build_path_` yerine `"."` (göreceli path güvenliği).
-- CMake: `LANGUAGES CXX` → `LANGUAGES C CXX` (LLVM'in C check macro'su için).
+### Fixed
+- `SourceManager::processAll`: the callback is passed by copy instead of
+  `std::move` (re-callability).
+- `FixedCompilationDatabase`: working directory `"."` instead of
+  `build_path_` (relative-path safety).
+- CMake: `LANGUAGES CXX` → `LANGUAGES C CXX` (for LLVM's C check macro).

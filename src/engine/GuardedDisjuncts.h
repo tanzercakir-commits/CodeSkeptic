@@ -1,23 +1,26 @@
 #ifndef ZERODEFECT_GUARDED_DISJUNCTS_H
 #define ZERODEFECT_GUARDED_DISJUNCTS_H
 
-// Guard'li disjunkt state'i: hedefli yol duyarliliginin veri yapisi.
+// Guarded-disjunct state: the data structure of targeted path
+// sensitivity.
 //
-// Bir analiz state'i tek birlesik VarMap yerine az sayida
-// (kosul-gercekleri, VarMap) cifti olarak tutulur. refineOnEdge ayni
-// kosulu ikinci kez gordugunde celisen disjunkti dusurur — boylece
-// "if(g==5) uret; ... if(g==5) tuket;" kalibindaki hayalet yollar
-// (uretilip tuketilmeyen) hic dogmaz. Juliet FP avinin kok cozumu;
-// once MemoryLeakRule'da dogrulandi, uc kuralin ortak bileseni oldu.
+// An analysis state is kept not as one merged VarMap but as a small
+// number of (condition-facts, VarMap) pairs. When refineOnEdge sees
+// the same condition a second time, it drops the contradicting
+// disjunct — so the phantom paths in the "if(g==5) produce; ...
+// if(g==5) consume;" pattern (produced but not consumed) are never
+// born. Root fix of the Juliet FP hunt; first validated in
+// MemoryLeakRule, now a shared component of three rules.
 //
-// Motor sozlesmesiyle uyum: State = std::vector<Guarded<VarMap>>
-// operator== ile karsilastirilir; normalizeGuarded kanonik sira ve
-// tavan (widening) uygular — motorun "state degisti mi" testi kararli
-// kalir. Tavan asiminda tek disjunkta genisletilir: ortak gercekler
-// kesisir, VarMap'ler birlesir (klasik birlesik analize geri dusus).
+// Fit with the engine contract: State = std::vector<Guarded<VarMap>>
+// is compared with operator==; normalizeGuarded applies a canonical
+// order and a cap (widening) — the engine's "did the state change"
+// test stays stable. On cap overflow we widen to a single disjunct:
+// common facts are intersected, VarMaps merged (a fallback to the
+// classic merged analysis).
 //
-// VarMap gereksinimleri: std::map<K, V>; V icin cagiran bir
-// mergeVal(V, V) -> V birlestiricisi saglar.
+// VarMap requirements: std::map<K, V>; the caller supplies a
+// mergeVal(V, V) -> V combiner for V.
 
 #include "engine/PathFacts.h"
 
@@ -49,9 +52,10 @@ struct Guarded {
 template <typename VarMap>
 using GuardedState = std::vector<Guarded<VarMap>>;
 
-// Disjunkt tavani. Kucuk tutulur: hedef genel yol duyarliligi degil,
-// korelasyonlu guard kalibi. Asiminda widening bugunku (birlesik)
-// davranisa geri duser — dogruluk kaybi yok, keskinlik kaybi var.
+// Disjunct cap. Kept small: the goal is the correlated-guard pattern,
+// not general path sensitivity. On overflow, widening falls back to
+// today's (merged) behavior — no loss of soundness, some loss of
+// sharpness.
 constexpr std::size_t kMaxDisjuncts = 4;
 
 template <typename VarMap, typename MergeVal>
@@ -65,8 +69,8 @@ void mergeVarMaps(VarMap& into, const VarMap& from, MergeVal mergeVal) {
     }
 }
 
-// Kanonik form: sirali; ayni-facts disjunktlar birlesik; tavan asiminda
-// genisletilmis. Motorun != karsilastirmasi icin sira kararliligi sart.
+// Canonical form: sorted; same-facts disjuncts merged; widened on cap
+// overflow. Order stability is required for the engine's != comparison.
 template <typename VarMap, typename MergeVal>
 void normalizeGuarded(GuardedState<VarMap>& state, MergeVal mergeVal) {
     std::sort(state.begin(), state.end());
@@ -108,10 +112,10 @@ GuardedState<VarMap> mergeGuarded(const GuardedState<VarMap>& a,
     return result;
 }
 
-// Raporlama gorunumu: tum disjunktlarin pointwise birlesimi — tek-state
-// analizin birebir karsiligi. Raporlama mantiklari degismeden calisir;
-// yol duyarliliginin kazanci, dusurulen disjunktlarin bu birlesime hic
-// girmemesidir.
+// Reporting view: the pointwise merge of all disjuncts — the exact
+// counterpart of a single-state analysis. Reporting logic runs
+// unchanged; the payoff of path sensitivity is that dropped disjuncts
+// never enter this merge.
 template <typename VarMap, typename MergeVal>
 VarMap flattenGuarded(const GuardedState<VarMap>& state, MergeVal mergeVal) {
     VarMap out;
@@ -119,10 +123,11 @@ VarMap flattenGuarded(const GuardedState<VarMap>& state, MergeVal mergeVal) {
     return out;
 }
 
-// Kosul anahtarlanabiliyorsa: celisen disjunktlar bu kenarda olanaksizdir
-// (dusurulur), kalanlara gercek islenir. Anahtarlanamayan kosul no-op.
-// Tum disjunktlar duserse state bosalir = kenar olanaksiz (dogru semantik:
-// o kenardan hicbir rapor dogmaz).
+// If the condition can be keyed: contradicting disjuncts are
+// impossible on this edge (dropped), the fact is recorded into the
+// rest. A condition that cannot be keyed is a no-op. If all disjuncts
+// drop, the state empties = the edge is infeasible (correct
+// semantics: no report is born from that edge).
 template <typename VarMap, typename MergeVal>
 void refineGuardedFacts(GuardedState<VarMap>& state,
                         const clang::Expr* cond, bool isTrueBranch,

@@ -1,7 +1,8 @@
-// HTML rapor: tek kendine-yeten dosya. Degismezler: (1) her kullanici
-// verisi HTML-escape'lidir (kaynak koddaki <script> rapora sizamaz),
-// (2) izler kaynak baglamiyla gomulur (rapor tasinabilir), (3) ozet
-// kartlari/filtre iskeleti ve bos-rapor hali dogru uretilir.
+// HTML report: a single self-contained file. Invariants: (1) all user
+// data is HTML-escaped (a <script> in source code cannot leak into the
+// report), (2) traces are embedded with source context (the report is
+// portable), (3) summary cards/filter skeleton and the empty-report
+// state are generated correctly.
 
 #include "reporter/HtmlReporter.h"
 
@@ -39,16 +40,16 @@ TEST(HtmlReporterTest, BasicStructure_CardsFiltersFindings) {
 
     std::string html = readWhole(out);
     EXPECT_NE(html.find("<!DOCTYPE html>"), std::string::npos);
-    // Ozet kartlari (ayni zamanda filtre): severity + kural
+    // Summary cards (also filters): severity + rule
     EXPECT_NE(html.find("data-sev=\"error\""), std::string::npos);
     EXPECT_NE(html.find("data-rule=\"memory-leak\""), std::string::npos);
-    // Bulgu govdesi ve konum
+    // Finding body and location
     EXPECT_NE(html.find("a.cpp:3:1"), std::string::npos);
     EXPECT_NE(html.find("maybe null"), std::string::npos);
-    // Filtre iskeleti: metin kutusu + script
+    // Filter skeleton: text box + script
     EXPECT_NE(html.find("id=\"q\""), std::string::npos);
     EXPECT_NE(html.find("<script>"), std::string::npos);
-    // Dis kaynak yok (kendine yeten dosya)
+    // No external resources (self-contained file)
     EXPECT_EQ(html.find("http://"), std::string::npos);
     EXPECT_EQ(html.find("https://"), std::string::npos);
 }
@@ -70,8 +71,9 @@ TEST(HtmlReporterTest, UserData_IsHtmlEscaped) {
 }
 
 TEST(HtmlReporterTest, Trace_EmbedsSourceContext) {
-    // Gercek bir kaynak dosya: iz notu ve bulgu, ±2 satir baglamla ve
-    // hedef satir isaretli gomulmeli — rapor tasindiginda baglam kalir
+    // A real source file: the trace note and finding must be embedded
+    // with ±2 lines of context and the target line marked — the context
+    // survives when the report is moved
     std::string src = ::testing::TempDir() + "ctx_demo.cpp";
     {
         std::ofstream f(src);
@@ -91,10 +93,10 @@ TEST(HtmlReporterTest, Trace_EmbedsSourceContext) {
     std::string html = readWhole(out);
     EXPECT_NE(html.find("Dataflow trace"), std::string::npos);
     EXPECT_NE(html.find("p assigned null here"), std::string::npos);
-    // Kaynak satirlari gomulu (escape'li)
+    // Source lines are embedded (escaped)
     EXPECT_NE(html.find("int* p = 0;"), std::string::npos);
     EXPECT_NE(html.find("int x = *p;"), std::string::npos);
-    // Hedef satir isaretli
+    // Target line is marked
     EXPECT_NE(html.find("cl hit"), std::string::npos);
 }
 
@@ -108,7 +110,8 @@ TEST(HtmlReporterTest, EmptyReport_ShowsClean) {
 }
 
 TEST(HtmlReporterTest, MissingSourceFile_NoContextButNoCrash) {
-    // Kaynak yoksa (tasima/silme) baglam atlanir, rapor yine uretilir
+    // If the source is missing (moved/deleted) context is skipped, the
+    // report is still generated
     std::string out = ::testing::TempDir() + "report_nosrc.html";
     Diagnostic d = makeDiag("/no/such/file.cpp", 10, "memory-leak", "leak");
     d.notes.push_back({"/no/such/file.cpp", 5, 1, "allocated here"});

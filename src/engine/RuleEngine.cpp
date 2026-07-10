@@ -15,9 +15,9 @@ void RuleEngine::enableRule(const std::string& rule_id, bool enabled) {
 }
 
 DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
-    // Interprosedurel ozetler TU basina bir kez, kurallardan ONCE kurulur.
-    // Fonksiyon/satir filtrelerinden bagimsizdir: kapsam-ici fonksiyonun
-    // cagirdigi kapsam-disi fonksiyonlarin da ozetine ihtiyac var.
+    // Interprocedural summaries are built once per TU, BEFORE the rules.
+    // Independent of function/line filters: we also need summaries of
+    // out-of-scope functions called by in-scope functions.
     SummaryRegistry::instance().rebuild(ctx);
 
     DiagnosticList results;
@@ -27,12 +27,13 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
         }
     }
 
-    // Hasat, temizlikten ONCE: depo string-anahtarli (TU'dan bagimsiz),
-    // yerel tablo ise birazdan silinecek
+    // Harvest BEFORE the cleanup: the store is string-keyed (TU-
+    // independent), while the local table is about to be deleted
     if (harvest_global_) SummaryRegistry::instance().harvestGlobal();
 
-    // FunctionDecl* anahtarlari bu TU'ya ozgu — sarkan pointer birakma
-    // (ozet tablosu ve CFG onbellegi ayni gerekceyle birlikte temizlenir)
+    // FunctionDecl* keys are specific to this TU — leave no dangling
+    // pointers (summary table and CFG cache are cleared together for
+    // the same reason)
     SummaryRegistry::instance().clear();
     CfgCache::instance().clear();
     return results;

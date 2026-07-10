@@ -120,8 +120,8 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addLines(lines->str());
     if (auto summaries = args->getString("summaries"))
         config.setSummaryIn(summaries->str());
-    // Uzun omurlu surec: parse edilmis AST'ler cagrilar arasi sicak
-    // tutulur (parmak izi eskimeyi yakalar — bayat AST asla servis edilmez)
+    // Long-lived process: parsed ASTs are kept warm between calls (the
+    // fingerprint catches staleness — a stale AST is NEVER served)
     config.setWarmCache(true);
 
     zerodefect::StaticAnalyzer analyzer(std::move(config));
@@ -158,8 +158,9 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         {"findings", std::move(findings)},
     };
 
-    // MCP tool sonucu: metin icerigi olarak JSON (ajanlar dogrudan parse
-    // eder); bulgu varsa isError degil — analiz BASARILI, sonuc bulgular
+    // MCP tool result: JSON as text content (agents parse it directly);
+    // findings do not mean isError — the analysis SUCCEEDED, the result
+    // is the findings
     return makeResponse(id, json::Object{
         {"content", json::Array{json::Object{
             {"type", "text"},
@@ -207,7 +208,7 @@ std::string handleMcpMessage(const std::string& line) {
             makeError(id, -32600, "missing method")));
     }
 
-    // Bildirimler (notifications/*) yanit almaz
+    // Notifications (notifications/*) get no response
     if (isNotification) return "";
 
     json::Value response(nullptr);

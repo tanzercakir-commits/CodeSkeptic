@@ -26,15 +26,15 @@ public:
     void scanDirectory(const std::string& dir_path);
     int processAll(ASTCallback callback);
 
-    // Sicak AST onbellegi (MCP server / uzun omurlu surec): parse
-    // edilmis TU'lar SUREC omurlu tutulur, sonraki cagrilar parse
-    // maliyeti odemez. Anahtar yol+build-path; parmak izi (mtime+boyut)
-    // uyusmazsa yeniden kurulur — BAYAT AST ASLA SERVIS EDILMEZ.
-    // CLI tek-atim kosularinda kapali kalir (bellek: buyuk dizin
-    // taramasinda tum AST'leri canli tutmak istemeyiz).
+    // Warm AST cache (MCP server / long-lived process): parsed TUs are
+    // kept for the PROCESS lifetime, so subsequent calls do not pay the
+    // parse cost. The key is path+build-path; if the fingerprint
+    // (mtime+size) does not match, it is rebuilt — a STALE AST IS NEVER
+    // SERVED. Stays off in one-shot CLI runs (memory: we do not want to
+    // keep all ASTs alive during a large directory scan).
     void enableWarmCache(bool enabled) { warm_cache_ = enabled; }
 
-    // Test/teshis: onbellek sayaclari ve sifirlama (surec-omurlu depo)
+    // Test/diagnostics: cache counters and reset (process-lifetime store)
     static unsigned warmCacheHits();
     static unsigned warmCacheMisses();
     static void clearWarmCache();

@@ -28,13 +28,13 @@ using ParamEffect = zerodefect::SummaryRegistry::ParamEffect;
 using FunctionSummary = zerodefect::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
-// --- Donus nullness'i ---
+// --- Return nullness ---
 
-// Donus ifadesinin null'lugu: literal/new/&x/string dogrudan; cagri
-// zinciri onceki taramanin ozetleriyle cozulur.
-// Cagrilan ozetini once TU-yerel tabloda, yoksa cross-TU depoda ara.
-// (Whole-program 1. gecisi depoyu doldurur; tek-TU modda depo bos,
-// davranis eskisiyle ayni.)
+// Nullness of the return expression: literal/new/&x/string directly;
+// call chains are resolved with the previous sweep's summaries.
+// Look up the callee's summary in the TU-local table first, else in
+// the cross-TU store. (Whole-program pass 1 fills the store; in
+// single-TU mode the store is empty and behavior is unchanged.)
 const FunctionSummary* lookupPrev(const SummaryTable& previous,
                                   const FunctionDecl* callee) {
     if (!callee) return nullptr;
@@ -43,9 +43,9 @@ const FunctionSummary* lookupPrev(const SummaryTable& previous,
     return zerodefect::SummaryRegistry::instance().lookupGlobal(callee);
 }
 
-// Deger-duzeyi "kotu deger" durumu. Iki domain ayni sekli paylasir:
-// null domain'inde Bad = null, sifir domain'inde Bad = 0. NullDeref'in
-// lattice'iyle ayni; ozet baglaminda yasar (TU-anonim, cakisma yok).
+// Value-level "bad value" state. The two domains share one shape: in
+// the null domain Bad = null, in the zero domain Bad = 0. Same as
+// NullDeref's lattice; lives in summary context (TU-anonymous, no clash).
 enum class VState { Unknown, Bad, NonBad, MaybeBad };
 
 VState mergeVState(VState a, VState b) {
@@ -55,8 +55,9 @@ VState mergeVState(VState a, VState b) {
     return anyBadInfo ? VState::MaybeBad : VState::Unknown;
 }
 
-// Ifadenin null durumu: literal/new/&x/string dogrudan; cagri zinciri
-// onceki taramanin ozetleriyle (+ cross-TU depo) cozulur.
+// Null state of an expression: literal/new/&x/string directly; call
+// chains are resolved with the previous sweep's summaries (+ cross-TU
+// store).
 VState vstateOf(const Expr* expr, const SummaryTable& previous) {
     if (!expr) return VState::Unknown;
     expr = expr->IgnoreParenCasts();
@@ -84,8 +85,8 @@ VState vstateOf(const Expr* expr, const SummaryTable& previous) {
     return VState::Unknown;
 }
 
-// Ifadenin sifir durumu (sifir domain'i): tamsayi sabitleri dogrudan,
-// cagri zinciri ozetlerin returnZeroness alaniyla cozulur.
+// Zero state of an expression (zero domain): integer constants
+// directly, call chains resolved via the summaries' returnZeroness.
 VState zstateOf(const Expr* expr, const SummaryTable& previous) {
     if (!expr) return VState::Unknown;
     expr = expr->IgnoreParenCasts();
@@ -118,8 +119,8 @@ const VarDecl* exprAsVar(const Expr* expr) {
     return nullptr;
 }
 
-// Kosul kenarlarinda domain iyilestirmeleri — ortak yuruyus iskeleti
-// uzerinden (engine/ConditionWalk.h)
+// Domain refinements on condition edges — via the shared walking
+// skeleton (engine/ConditionWalk.h)
 void applyNullCond(const Expr* cond, bool isTrue,
                    std::map<const VarDecl*, VState>& state) {
     zerodefect::walkNullCondition(
@@ -140,24 +141,27 @@ void applyZeroCond(const Expr* cond, bool isTrue,
         });
 }
 
-// --- Degisken donduren yollar icin mini deger-akisi ---
+// --- Mini value-flow for variable-returning paths ---
 //
-// `return p;` yollari yapisal degerlendirmeyle Unknown kaliyordu (v1
-// siniri). Simdi izlenen yereller/parametreler kendi motorumuzla
-// (runDataflow: iki fazli raporlama + assume-edge iyilestirmesi) akis-
-// DUYARLI izlenir ve her return elemani yakinsamis durumdan katki alir.
-// Akis-duyarsiz kestirme bilincli reddedildi: `p = NULL; p = &g;
-// return p;` kalibinda yanlis MaybeNull uretir, precision'i yakardi.
+// `return p;` paths used to stay Unknown under structural evaluation
+// (a v1 limit). Now tracked locals/parameters are followed flow-
+// SENSITIVELY with our own engine (runDataflow: two-phase reporting +
+// assume-edge refinement) and each return element takes its
+// contribution from the converged state. The flow-insensitive
+// shortcut was deliberately rejected: on the `p = NULL; p = &g;
+// return p;` pattern it yields a false MaybeNull, burning precision.
 //
-// Domain sablon parametreleridir: ValueOf ifade degerlendirmesi
-// (vstateOf / zstateOf), Refine kenar iyilestirmesi (applyNullCond /
-// applyZeroCond). Ayni omurga hem null hem sifir domain'ine hizmet
-// eder — Bad null domain'inde "null", sifir domain'inde "0" demektir.
+// The domain comes as template parameters: ValueOf is expression
+// evaluation (vstateOf / zstateOf), Refine is edge refinement
+// (applyNullCond / applyZeroCond). The same backbone serves both the
+// null and the zero domain — Bad means "null" in the null domain and
+// "0" in the zero domain.
 //
-// Katki eslemesi: Bad/MaybeBad -> "bu yol kotu deger dondurebilir";
-// NonBad -> Never* katkisi; Unknown -> Unknown. Fonksiyon toplami:
-// herhangi bir kotu yol -> Maybe*; TUM yollar NonBad -> Never*; aksi
-// Unknown. CFG'nin ulasamadigi return'ler (olu kod) katki vermez.
+// Contribution mapping: Bad/MaybeBad -> "this path may return a bad
+// value"; NonBad -> a Never* contribution; Unknown -> Unknown.
+// Function total: any bad path -> Maybe*; ALL paths NonBad -> Never*;
+// otherwise Unknown. Returns the CFG cannot reach (dead code)
+// contribute nothing.
 template <VState (*ValueOf)(const Expr*, const SummaryTable&),
           void (*Refine)(const Expr*, bool,
                          std::map<const VarDecl*, VState>&)>
@@ -211,7 +215,7 @@ public:
             return out;
         }
         if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
-            // &p bir fonksiyona gidiyorsa p degismis olabilir
+            // if &p goes into a function, p may have changed
             if (unary->getOpcode() == UO_AddrOf) {
                 const VarDecl* var = exprAsVar(unary->getSubExpr());
                 auto it = var ? in.find(var) : in.end();
@@ -229,7 +233,7 @@ public:
         Refine(dyn_cast<Expr>(cond), isTrueBranch, state);
     }
 
-    // Fixpoint sonrasi: her ULASILABILIR return'un katkisi toplanir
+    // After the fixpoint: each REACHABLE return's contribution is collected
     void onStatement(const Stmt* stmt, const State& before,
                      const State& /*after*/, ASTContext& /*ctx*/) {
         const auto* ret = dyn_cast<ReturnStmt>(stmt);
@@ -254,8 +258,8 @@ private:
     State initState_;
 };
 
-// Katki toplami (iki domain'in ortak kurali): herhangi bir kotu yol ->
-// Maybe*; TUM yollar kesin NonBad -> Never* (guclu iddia); aksi Unknown.
+// Contribution total (rule shared by both domains): any bad path ->
+// Maybe*; ALL paths surely NonBad -> Never* (strong claim); else Unknown.
 struct AggregateFlags {
     bool empty = true;
     bool sawBad = false;
@@ -272,7 +276,7 @@ AggregateFlags aggregateFlags(const std::vector<VState>& contribs) {
     return flags;
 }
 
-// Return toplayici + izlenecek degisken toplayici — iki domain ortak.
+// Return collector + tracked-variable collector — shared by both domains.
 struct ReturnCollector : RecursiveASTVisitor<ReturnCollector> {
     std::vector<const Expr*> returns;
     bool anyVarReturn = false;
@@ -281,7 +285,7 @@ struct ReturnCollector : RecursiveASTVisitor<ReturnCollector> {
         if (exprAsVar(ret->getRetValue())) anyVarReturn = true;
         return true;
     }
-    // Ic ice fonksiyonlarin (lambda) return'leri sayilmasin
+    // Do not count the returns of nested functions (lambdas)
     bool TraverseLambdaExpr(LambdaExpr*) { return true; }
 };
 
@@ -305,8 +309,8 @@ std::vector<const VarDecl*> collectTypedVars(const FunctionDecl* func,
     return {collector.vars.begin(), collector.vars.end()};
 }
 
-// Iki domain'in ortak govdesi: hizli yapisal yol (degisken donduren
-// return yoksa CFG'siz), aksi halde mini deger-akisi.
+// Shared body of the two domains: fast structural path (no CFG when
+// no return returns a variable), otherwise the mini value-flow.
 template <VState (*ValueOf)(const Expr*, const SummaryTable&),
           void (*Refine)(const Expr*, bool,
                          std::map<const VarDecl*, VState>&),
@@ -350,8 +354,9 @@ ReturnNullness computeReturnNullness(const FunctionDecl* func,
 ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
                                      ASTContext& ctx,
                                      const SummaryTable& previous) {
-    // bool haric: `return ok;` kalibindaki false'lar sifir sayilip her
-    // yerde MaybeZero uretirdi; bool bolen zaten anlamsiz
+    // bool excluded: the falses in the `return ok;` pattern would count
+    // as zero, yielding MaybeZero everywhere; a bool divisor is
+    // meaningless anyway
     QualType retType = func->getReturnType();
     if (!retType->isIntegerType() || retType->isBooleanType())
         return ReturnZeroness::Unknown;
@@ -366,23 +371,23 @@ ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
     return ReturnZeroness::Unknown;
 }
 
-// --- Parametre etkileri (v2: alias izlemeli) ---
+// --- Parameter effects (v2: with alias tracking) ---
 //
-// Iki gecis:
-//  A) Kopya kenarlari toplanir (`T* L = X;` / `L = X;`, X dogrudan
-//     param/yerel referansi, L yerel) + taint tohumlari (dogrudan-ref
-//     olmayan atama, adresi alinan yerel, static yerel).
-//  B) Etki baglamlar temiz alias'lar uzerinden parametreye cozulur.
+// Two passes:
+//  A) Copy edges are collected (`T* L = X;` / `L = X;`, X a direct
+//     param/local reference, L a local) + taint seeds (non-direct-ref
+//     assignment, address-taken local, static local).
+//  B) Effect contexts are resolved to the parameter via clean aliases.
 //
-// Taint kurallari: kirli kaynaktan beslenen, adresi alinan veya birden
-// fazla parametreden ulasilabilen yerel "temiz alias" DEGILDIR; boyle
-// bir yerele ulasan parametre muhafazakar olarak Stores'a duser (yanlis
-// Frees/ReadsOnly iddiasi FP uretebilirdi).
+// Taint rules: a local fed from a dirty source, address-taken, or
+// reachable from more than one parameter is NOT a "clean alias"; a
+// parameter reaching such a local conservatively falls to Stores (a
+// false Frees/ReadsOnly claim could have produced FPs).
 //
-// Bilinen asiri-yaklasim (may-semantik): parametrenin kendisi yeniden
-// atansa da adi orijinal degeri temsil etmeye devam eder — cJSON_Delete
-// tarzi `while(item){ ...; free(item); item = next; }` donguleri boylece
-// Frees gorulur (ilk iterasyon orijinali serbest birakir).
+// Known over-approximation (may-semantics): even if the parameter
+// itself is reassigned, its name keeps denoting the original value —
+// cJSON_Delete-style `while(item){ ...; free(item); item = next; }`
+// loops are thus seen as Frees (the first iteration frees the original).
 
 struct ParamFlags {
     bool frees = false;
@@ -399,7 +404,7 @@ const ValueDecl* asVarOrParam(const Expr* expr) {
     if (!expr) return nullptr;
     expr = expr->IgnoreParenCasts();
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
-        return dyn_cast<VarDecl>(ref->getDecl());  // ParmVarDecl dahil
+        return dyn_cast<VarDecl>(ref->getDecl());  // includes ParmVarDecl
     return nullptr;
 }
 
@@ -408,7 +413,7 @@ bool isPlainLocal(const ValueDecl* d) {
     return var && !isa<ParmVarDecl>(var) && var->hasLocalStorage();
 }
 
-// Pass A: kopya grafi + taint tohumlari
+// Pass A: copy graph + taint seeds
 class AliasCollector : public RecursiveASTVisitor<AliasCollector> {
 public:
     std::vector<std::pair<const ValueDecl*, const VarDecl*>> edges;
@@ -416,7 +421,7 @@ public:
 
     bool VisitVarDecl(VarDecl* var) {
         if (!var->hasInit() || isa<ParmVarDecl>(var)) return true;
-        if (!var->hasLocalStorage()) return true;  // static yerel: pass B
+        if (!var->hasLocalStorage()) return true;  // static local: pass B
         recordAssign(var, var->getInit());
         return true;
     }
@@ -431,7 +436,7 @@ public:
 
     bool VisitUnaryOperator(UnaryOperator* unary) {
         if (unary->getOpcode() != UO_AddrOf) return true;
-        // Adresi alinan yerel disaridan yazilabilir — izlenemez
+        // An address-taken local can be written from outside — untrackable
         const ValueDecl* operand = asVarOrParam(unary->getSubExpr());
         if (isPlainLocal(operand))
             tainted.insert(cast<VarDecl>(operand));
@@ -446,16 +451,16 @@ private:
         if (directRef)
             edges.emplace_back(source, target);
         else
-            tainted.insert(target);  // kirli kaynak (cagri, uye, aritmetik)
+            tainted.insert(target);  // dirty source (call, member, arithmetic)
     }
 };
 
 struct AliasInfo {
-    // temiz yerel alias -> tek parametre kaynagi
+    // clean local alias -> its single parameter source
     std::map<const VarDecl*, const ParmVarDecl*> cleanAlias;
-    // parametre -> {parametre + temiz alias'lari} (containment icin)
+    // parameter -> {parameter + its clean aliases} (for containment)
     std::map<const ParmVarDecl*, std::set<const ValueDecl*>> family;
-    // kirli/cok-kaynakli yerele ulasan parametreler
+    // parameters that reach a dirty/multi-source local
     std::set<const ParmVarDecl*> taintedReach;
 };
 
@@ -463,7 +468,7 @@ AliasInfo computeAliases(const FunctionDecl* func,
                          const AliasCollector& collected) {
     AliasInfo info;
 
-    // Taint yayilimi: kirli yerelden kopyalanan da kirlidir
+    // Taint propagation: a copy of a dirty local is dirty too
     std::set<const VarDecl*> tainted = collected.tainted;
     bool changed = true;
     while (changed) {
@@ -476,8 +481,8 @@ AliasInfo computeAliases(const FunctionDecl* func,
         }
     }
 
-    // Koken kumeleri: parametrelerden temiz yereller uzerinden BFS.
-    // Kirli yerele ULASAN parametre taintedReach'e girer.
+    // Origin sets: BFS from the parameters through clean locals. A
+    // parameter that REACHES a dirty local enters taintedReach.
     std::map<const VarDecl*, std::set<const ParmVarDecl*>> origins;
     for (const auto* p : func->parameters()) {
         if (!p->getType()->isPointerType()) continue;
@@ -490,7 +495,7 @@ AliasInfo computeAliases(const FunctionDecl* func,
                 visited.insert(to);
                 if (tainted.count(to)) {
                     info.taintedReach.insert(p);
-                    continue;  // kirliden oteye koken tasimayiz
+                    continue;  // we carry no origin past a dirty local
                 }
                 origins[to].insert(p);
                 next.insert(to);
@@ -505,8 +510,8 @@ AliasInfo computeAliases(const FunctionDecl* func,
             info.cleanAlias[local] = p;
             info.family[p].insert(local);
         } else {
-            // Birden fazla parametreden ulasilabilen yerel: hicbirine
-            // guvenle baglanamaz — ilgili parametreler muhafazakar
+            // A local reachable from several parameters: cannot be
+            // safely tied to any — the involved parameters go conservative
             for (const auto* p : params) info.taintedReach.insert(p);
         }
     }
@@ -516,7 +521,7 @@ AliasInfo computeAliases(const FunctionDecl* func,
     return info;
 }
 
-// expr icinde ailedeki (param + temiz alias'lar) herhangi bir uye var mi?
+// Does expr contain any member of the family (param + clean aliases)?
 bool containsAnyRef(const Expr* expr,
                     const std::set<const ValueDecl*>& family) {
     if (!expr) return false;
@@ -537,7 +542,7 @@ bool containsAnyRef(const Expr* expr,
     return finder.found;
 }
 
-// Pass B: etkiler — baglamlar alias'lar uzerinden parametreye cozulur
+// Pass B: effects — contexts are resolved to the parameter via aliases
 class ParamEffectVisitor : public RecursiveASTVisitor<ParamEffectVisitor> {
 public:
     ParamEffectVisitor(const FunctionDecl* func,
@@ -546,7 +551,7 @@ public:
                        std::map<const ParmVarDecl*, ParamFlags>& flags)
         : previous_(previous), aliases_(aliases), flags_(flags) {
         for (const auto* p : func->parameters())
-            if (p->getType()->isPointerType()) flags_[p];  // kaydi ac
+            if (p->getType()->isPointerType()) flags_[p];  // open the entry
     }
 
     bool VisitCXXDeleteExpr(CXXDeleteExpr* del) {
@@ -570,17 +575,17 @@ public:
                         case ParamEffect::Frees:
                             flags_[p].frees = true; break;
                         case ParamEffect::ReadsOnly:
-                            break;  // etkisiz
+                            break;  // no effect
                         case ParamEffect::Stores:
                         case ParamEffect::Opaque:
                             flags_[p].stores = true; break;
                     }
                 } else {
-                    flags_[p].stores = true;  // opak cagri
+                    flags_[p].stores = true;  // opaque call
                 }
             } else {
-                // Aile uyesi argumanin ICINDE geciyorsa (p ? p : q)
-                // turetilmis deger kaciyor olabilir — muhafazakar
+                // If a family member occurs INSIDE the argument
+                // (p ? p : q) a derived value may escape — conservative
                 for (auto& [param, f] : flags_) {
                     if (containsAnyRef(arg, aliases_.family.at(param)))
                         f.stores = true;
@@ -594,8 +599,9 @@ public:
         if (binOp->getOpcode() != BO_Assign) return true;
         const auto* p = resolve(binOp->getRHS());
         if (!p) return true;
-        // Yerel/param hedefe kopya alias grafinin isi (pass A + taint);
-        // diger her hedef (global, uye, deref, dizi) gercek kacis
+        // A copy into a local/param target is the alias graph's job
+        // (pass A + taint); any other target (global, member, deref,
+        // array) is a real escape
         const ValueDecl* lhs = asVarOrParam(binOp->getLHS());
         bool lhsIsLocalish =
             lhs && (isa<ParmVarDecl>(lhs) || isPlainLocal(lhs));
@@ -604,16 +610,16 @@ public:
     }
 
     bool VisitVarDecl(VarDecl* var) {
-        // static yerel init: fonksiyon omrunu asan saklama
+        // static local init: storage outliving the function
         if (isa<ParmVarDecl>(var) || !var->hasInit()) return true;
-        if (var->hasLocalStorage()) return true;  // pass A halletti
+        if (var->hasLocalStorage()) return true;  // pass A handled it
         if (const auto* p = resolve(var->getInit()))
             flags_[p].stores = true;
         return true;
     }
 
     bool VisitReturnStmt(ReturnStmt* ret) {
-        // return p / return alias — cagirana geri kacis
+        // return p / return alias — escape back to the caller
         if (const auto* p = resolve(ret->getRetValue()))
             flags_[p].stores = true;
         return true;
@@ -621,8 +627,8 @@ public:
 
     bool VisitUnaryOperator(UnaryOperator* unary) {
         if (unary->getOpcode() != UO_AddrOf) return true;
-        // &p (parametrenin adresi) — izlenemez yazma kanali.
-        // (&alias pass A'da taint tohumu; taintedReach halleder.)
+        // &p (address of the parameter) — untrackable write channel.
+        // (&alias is a taint seed in pass A; taintedReach handles it.)
         const ValueDecl* operand = asVarOrParam(unary->getSubExpr());
         if (const auto* p = dyn_cast_or_null<ParmVarDecl>(operand))
             if (flags_.count(p)) flags_[p].stores = true;
@@ -654,7 +660,7 @@ std::vector<ParamEffect> computeParamEffects(const FunctionDecl* func,
     ParamEffectVisitor visitor(func, previous, aliases, flags);
     visitor.TraverseStmt(func->getBody());
 
-    // Kirli/cok-kaynakli yerele ulasan parametre: izlenemez akis
+    // A parameter reaching a dirty/multi-source local: untrackable flow
     for (const auto* p : aliases.taintedReach)
         if (flags.count(p)) flags[p].stores = true;
 
@@ -676,7 +682,7 @@ std::vector<ParamEffect> computeParamEffects(const FunctionDecl* func,
     return effects;
 }
 
-// --- TU'daki govdeli fonksiyonlari topla ---
+// --- Collect the functions with bodies in the TU ---
 
 struct FunctionCollector : RecursiveASTVisitor<FunctionCollector> {
     std::vector<const FunctionDecl*> functions;
@@ -704,10 +710,10 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
     FunctionCollector collector;
     collector.TraverseDecl(ctx.getTranslationUnitDecl());
 
-    // Sabit noktali tarama: her turda ozetler onceki turun tablosuyla
-    // SIFIRDAN hesaplanir; degisiklik kalmayinca durulur. Rekursiyon
-    // kendi eski ozetini gorur — guclu iddialar (NeverNull, ReadsOnly)
-    // ancak desteklenirse olusur.
+    // Fixpoint sweeping: each round recomputes the summaries FROM
+    // SCRATCH against the previous round's table; we stop when nothing
+    // changes. Recursion sees its own old summary — strong claims
+    // (NeverNull, ReadsOnly) form only when supported.
     SummaryTable current;
     for (unsigned sweep = 0; sweep < kMaxSweeps; ++sweep) {
         SummaryTable next;
@@ -750,9 +756,9 @@ std::string globalKey(const FunctionDecl* func) {
            std::to_string(func->getNumParams());
 }
 
-// Ayni anahtara dusen farkli ozetler (C++ overload'lari) muhafazakar
-// birlesir: uyusmayan alan zayif iddiaya duser — yanlis guclu iddia
-// (NeverNull/Frees/ReadsOnly) cakismadan dogamaz.
+// Different summaries landing on the same key (C++ overloads) merge
+// conservatively: a mismatched field falls to the weak claim — a false
+// strong claim (NeverNull/Frees/ReadsOnly) cannot arise from a collision.
 void mergeConservative(SummaryRegistry::FunctionSummary& into,
                        const SummaryRegistry::FunctionSummary& from) {
     using RN = SummaryRegistry::ReturnNullness;
@@ -763,19 +769,19 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
     if (into.params.size() != from.params.size()) {
-        into.params.clear();  // paramEffect() varsayilani Opaque'tir
+        into.params.clear();  // paramEffect() defaults to Opaque
         return;
     }
     for (size_t i = 0; i < into.params.size(); ++i)
         if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
 }
 
-// --- Disk formati ---
+// --- Disk format ---
 //
-// v2: anahtar<TAB>donus-null<TAB>paramlar<TAB>donus-sifir
-// v1 (eski): son sutun yok — yuklemede taninir, sifirlik Unknown kalir.
-// Donusler: U/N/M; parametreler O/R/F/S karakter dizisi, bos vektor "-".
-// Nitelikli adlar TAB/yenisatir iceremez — anahtar guvenli.
+// v2: key<TAB>return-null<TAB>params<TAB>return-zero
+// v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
+// Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
+// Qualified names cannot contain TAB/newline — the key is safe.
 constexpr const char* kSummaryFileHeader = "zerodefect-summaries v2";
 constexpr const char* kSummaryFileHeaderV1 = "zerodefect-summaries v1";
 
@@ -860,8 +866,8 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
     std::ofstream out(path);
     if (!out.is_open()) return false;
     out << kSummaryFileHeader << "\n";
-    // std::map sirali gezinir — cikti deterministik (diff'lenebilir;
-    // "ozet degisti mi" sorusu dosya karsilastirmasiyla cevaplanir)
+    // std::map iterates in order — output is deterministic (diffable;
+    // "did the summary change" is answered by comparing files)
     for (const auto& [key, summary] : globalStore_) {
         out << key << '\t' << rnToChar(summary.returnNullness) << '\t';
         if (summary.params.empty()) {
@@ -886,8 +892,8 @@ bool SummaryRegistry::parseSummaryFile(
     if (line != kSummaryFileHeader && line != kSummaryFileHeaderV1)
         return false;
 
-    // Once tumuyle ayristir, sonra teslim et: bozuk dosya kismi durum
-    // birakmadan reddedilir
+    // Parse fully first, then hand over: a corrupt file is rejected
+    // without leaving partial state behind
     std::map<std::string, FunctionSummary> parsed;
     while (std::getline(in, line)) {
         if (line.empty()) continue;
@@ -901,7 +907,7 @@ bool SummaryRegistry::parseSummaryFile(
         }
         fields.push_back(line.substr(start));
 
-        // v1: 3 alan (sifirlik yok -> Unknown); v2: 4 alan
+        // v1: 3 fields (no zeroness -> Unknown); v2: 4 fields
         if (fields.size() != 3 && fields.size() != 4) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];

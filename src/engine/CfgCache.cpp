@@ -20,8 +20,8 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
                           clang::ASTContext& ctx) {
     if (!func || !func->hasBody()) return nullptr;
 
-    // Yedek emniyet: baska bir TU'nun baglami geldiyse eski anahtarlar
-    // (o TU'nun FunctionDecl adresleri) gecersizdir — tumden bosalt
+    // Backup safety: if another TU's context arrives, the old keys
+    // (that TU's FunctionDecl addresses) are invalid — flush entirely
     if (&ctx != ctx_) {
         cache_.clear();
         ctx_ = &ctx;
@@ -36,14 +36,14 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
 
     ++g_misses;
     clang::CFG::BuildOptions opts;
-    // Alt ifadeler de degerlendirme sirasinda birer CFG elemani olsun
-    // (CSA ile ayni granulerlik). Analizler her elemanin yalnizca tepe
-    // dugumune bakar; statement icinde nested arama gerekmez.
+    // Make subexpressions CFG elements in evaluation order too (same
+    // granularity as the CSA). Analyses look only at each element's
+    // top node; no nested search inside a statement is needed.
     opts.setAllAlwaysAdd();
     auto cfg = clang::CFG::buildCFG(func, func->getBody(), &ctx, opts);
     clang::CFG* raw = cfg.get();
-    cache_[key] = std::move(cfg);  // kurulamadiysa nullptr da onbellege
-                                   // girer — tekrar tekrar denenmez
+    cache_[key] = std::move(cfg);  // if the build failed, the nullptr
+                                   // is cached too — no repeated retries
     return raw;
 }
 

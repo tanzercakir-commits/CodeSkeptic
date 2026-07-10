@@ -7,7 +7,7 @@ using namespace zerodefect;
 
 namespace {
 
-// Gecici kaynak dosyasi olusturur, path'ini dondurur
+// Creates a temporary source file, returns its path
 std::string writeTempSource(const std::string& name,
                             const std::string& content) {
     std::string path = ::testing::TempDir() + name;
@@ -23,7 +23,7 @@ Diagnostic makeDiag(const std::string& file, unsigned line,
 
 } // anonymous namespace
 
-// --- markerSuppressesRule birim testleri ---
+// --- markerSuppressesRule unit tests ---
 
 TEST(SuppressionMarkerTest, BareMarkerSuppressesAllRules) {
     EXPECT_TRUE(markerSuppressesRule(
@@ -46,7 +46,7 @@ TEST(SuppressionMarkerTest, RuleListLimitsSuppression) {
 }
 
 TEST(SuppressionMarkerTest, NextLineVariantDoesNotMatchLineMarker) {
-    // disable-next-line satiri, disable-line markeri olarak sayilmamali
+    // A disable-next-line line must not count as a disable-line marker
     EXPECT_FALSE(markerSuppressesRule(
         "// zerodefect-disable-next-line",
         "zerodefect-disable-line", "div-by-zero"));
@@ -67,7 +67,7 @@ TEST(SuppressionMarkerTest, NoMarker_NoSuppression) {
                                       "div-by-zero"));
 }
 
-// --- SuppressionFilter dosya testleri ---
+// --- SuppressionFilter file tests ---
 
 TEST(SuppressionFilterTest, DisableLineSameLine) {
     auto path = writeTempSource("supp1.cpp",
@@ -77,8 +77,8 @@ TEST(SuppressionFilterTest, DisableLineSameLine) {
 
     SuppressionFilter filter;
     DiagnosticList diags = {
-        makeDiag(path, 2, "div-by-zero"),  // bastirilir
-        makeDiag(path, 3, "div-by-zero"),  // kalir
+        makeDiag(path, 2, "div-by-zero"),  // suppressed
+        makeDiag(path, 3, "div-by-zero"),  // stays
     };
     size_t removed = filter.filter(diags);
 
@@ -95,9 +95,9 @@ TEST(SuppressionFilterTest, DisableNextLine) {
 
     SuppressionFilter filter;
     DiagnosticList diags = {
-        makeDiag(path, 2, "div-by-zero"),   // bastirilir
-        makeDiag(path, 2, "memory-leak"),   // kural listede yok -> kalir
-        makeDiag(path, 3, "div-by-zero"),   // kalir
+        makeDiag(path, 2, "div-by-zero"),   // suppressed
+        makeDiag(path, 2, "memory-leak"),   // rule not in the list -> stays
+        makeDiag(path, 3, "div-by-zero"),   // stays
     };
     filter.filter(diags);
 

@@ -9,7 +9,7 @@ using namespace zerodefect::testing;
 
 namespace {
 
-// Global filtreyi test sonunda temizleyen RAII bekcisi
+// RAII guard that clears the global filter at test end
 struct FilterGuard {
     explicit FilterGuard(std::set<std::string> names) {
         setFunctionFilter(std::move(names));
@@ -43,7 +43,7 @@ TEST(FunctionFilterTest, FilterSelectsSingleFunction) {
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, kTwoBuggyFunctions);
     ASSERT_EQ(results.size(), 1);
-    // Bulgu second() icindeki b degiskenine ait olmali
+    // The finding must belong to variable b inside second()
     EXPECT_NE(results[0].message.find("b"), std::string::npos);
 }
 
@@ -74,7 +74,7 @@ TEST(FunctionFilterTest, QualifiedNameMatchesMethod) {
     EXPECT_NE(results[0].message.find("p"), std::string::npos);
 }
 
-// --- Satir araligi filtresi (--lines) ---
+// --- Line range filter (--lines) ---
 
 namespace {
 
@@ -85,7 +85,7 @@ struct LineGuard {
     ~LineGuard() { setLineRanges({}); }
 };
 
-// Satir yerlesimi sabit: first() 2-6, second() 7-11
+// Line layout is fixed: first() 2-6, second() 7-11
 const char* kTwoFunctionsFixedLines =
     "\n"
     "void first() {\n"      // 2
@@ -116,7 +116,7 @@ TEST(LineFilterTest, RangeSelectsSecondFunction) {
 }
 
 TEST(LineFilterTest, SingleLineOnSignature_Overlaps) {
-    // Fonksiyon kapsamiyla tek satirlik kesisme yeterli (imza satiri)
+    // A single-line overlap with the function extent suffices (signature line)
     LineGuard guard({{2, 2}});
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, kTwoFunctionsFixedLines);

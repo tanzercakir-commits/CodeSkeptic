@@ -103,7 +103,7 @@ TEST(DivByZeroRuleTest, ReassignToNonZero_Clean) {
     ASSERT_EQ(results.size(), 0);
 }
 
-// --- Assume edges: dal koşulu iyileştirmesi ---
+// --- Assume edges: branch condition refinement ---
 
 TEST(DivByZeroRuleTest, GuardedDivision_Clean) {
     DivByZeroRule rule;
@@ -116,7 +116,7 @@ TEST(DivByZeroRuleTest, GuardedDivision_Clean) {
             }
         }
     )");
-    // z != 0 guard'i icinde bolme guvenli — eski FP artik yok
+    // Division inside the z != 0 guard is safe — the old FP is gone
     ASSERT_EQ(results.size(), 0);
 }
 
@@ -129,7 +129,7 @@ TEST(DivByZeroRuleTest, GuardEqualsZero_DefiniteError) {
             }
         }
     )");
-    // z == 0 dogru dalinda bolme → kesin sifira bolme
+    // Division on the true branch of z == 0 → definite division by zero
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
@@ -157,7 +157,7 @@ TEST(DivByZeroRuleTest, GuardNotOperator_DefiniteError) {
             }
         }
     )");
-    // !z dogru → z sifir → kesin hata
+    // !z is true → z is zero → definite error
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
@@ -191,7 +191,7 @@ TEST(DivByZeroRuleTest, WhileGuard_CleanInside_ErrorAfter) {
             int x = 1 / z;
         }
     )");
-    // Dongu icinde guvenli; donguden cikista z == 0 → kesin hata
+    // Safe inside the loop; on loop exit z == 0 → definite error
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
@@ -204,7 +204,7 @@ TEST(DivByZeroRuleTest, GuardThenFix_Clean) {
             int x = 1 / z;
         }
     )");
-    // Sifirsa duzeltiliyor: her iki yol da NonZero
+    // Fixed up if zero: both paths are NonZero
     ASSERT_EQ(results.size(), 0);
 }
 
@@ -217,8 +217,9 @@ TEST(DivByZeroRuleTest, ZeroOnSomePathUnguarded_Warning) {
             int x = 100 / d;
         }
     )");
-    // Bir yolda d kesin sifir, digerinde bilinmiyor → olasi sifira bolme.
-    // (Eski merge Zero+Unknown=Unknown ile sessizce kaciyordu.)
+    // On one path d is definitely zero, on the other unknown → possible
+    // division by zero. (The old merge silently escaped via
+    // Zero+Unknown=Unknown.)
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
@@ -257,8 +258,8 @@ TEST(DivByZeroRuleTest, NoDivision_Clean) {
 }
 
 TEST(DivByZeroTraceTest, GuardOnlyZero_TraceShowsCondition) {
-    // Iz v2: `if (n == 0) 100 / n` bulgusunun "neden sifir" cevabi
-    // kosul noktasindaki guard notu
+    // Trace v2: the "why zero" answer for the `if (n == 0) 100 / n`
+    // finding is the guard note at the condition point
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int f(int n) {
