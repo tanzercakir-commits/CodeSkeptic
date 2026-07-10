@@ -8,6 +8,10 @@
 #
 # JULIET_DIR onceden indirilmis paketi gosteriyorsa indirme atlanir
 # (yerel/testte sahte mini-suite ile calistirmayi da mumkun kilar).
+# Cikti: JULIET_RESULT (trend) + FP_SAMPLE (kural iyilestirme malzemesi)
+# satirlari grep-dostudur. Kural degisikligi PR'lari bu dosyaya kucuk
+# bir dokunusla Juliet kosusunu tetikleyebilir (workflow_dispatch
+# entegrasyon token'inda 403 verdigi icin bilinen yol budur).
 set -euo pipefail
 
 # Kendi dizinimizi HERHANGI bir cd'den ONCE coz (goreli yol tuzagi)
