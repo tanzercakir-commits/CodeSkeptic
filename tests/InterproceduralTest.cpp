@@ -537,3 +537,174 @@ TEST(CrossTUTest, WithoutHarvest_StaysConservative) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// ===================================================================
+// Donus-nullness dataflow'u (v2): `return p;` yollari
+// Yapisal degerlendirme Unknown birakirdi; mini null-akisi (kendi
+// motorumuzla) degisken donduren yollari akis-DUYARLI cozer.
+// ===================================================================
+
+TEST(ReturnFlowTest, InitNullThenSet_NeverNull_Silent) {
+    // FP-katili vaka: akis-duyarsiz "bir yerde NULL atanmis" kestirmesi
+    // burada yanlis MaybeNull uretirdi. Akis-duyarli: return aninda
+    // p = &g kesin non-null -> fonksiyon NeverNull -> sessiz.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g;
+        int* get() {
+            int* p = 0;
+            p = &g;
+            return p;
+        }
+        void f() {
+            int* q = get();
+            int x = *q;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ReturnFlowTest, MaybeNullVarFlow_Warning) {
+    // find() kalibi: r bazi yollarda null kalir -> MaybeNull ->
+    // korumasiz dereference uyari + iz notu
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g;
+        int* find(int k) {
+            int* r = 0;
+            if (k) r = &g;
+            return r;
+        }
+        void f(int k) {
+            int* p = find(k);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_NE(results[0].notes[0].message.find("possibly-null"),
+              std::string::npos);
+}
+
+TEST(ReturnFlowTest, GuardedFallthrough_NeverNull_Silent) {
+    // Erken-donus guard'i: `if (!p) return &fb;` sonrasi p kesin
+    // non-null (assume-edge) -> iki yol da NonNull -> NeverNull
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g; int fb;
+        int* wrap(int k) {
+            int* p = 0;
+            if (k) p = &g;
+            if (!p) return &fb;
+            return p;
+        }
+        void f(int k) {
+            int* q = wrap(k);
+            int x = *q;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ReturnFlowTest, DefiniteNullVar_Warning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* bad() {
+            int* p = 0;
+            return p;
+        }
+        void f() {
+            int* q = bad();
+            int x = *q;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ReturnFlowTest, ParamPassthrough_StaysUnknown_Silent) {
+    // Parametre-duyarli ozet v2 kapsami disinda (belgelenmis sinir):
+    // `return p;` (p param, hic atanmamis) Unknown kalir -> sessiz
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* id(int* p) { return p; }
+        void f(int* a) {
+            int* q = id(a);
+            int x = *q;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ReturnFlowTest, ChainThroughVariable_Warning) {
+    // Zincir: inner degisken-akisiyla MaybeNull; outer onu degiskene
+    // alip dondurur -> taramalar arasi yayilim (sweep 2) outer'i da
+    // MaybeNull yapar
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g;
+        int* inner(int k) {
+            int* r = 0;
+            if (k) r = &g;
+            return r;
+        }
+        int* outer(int k) {
+            int* t = inner(k);
+            return t;
+        }
+        void f(int k) {
+            int* p = outer(k);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ReturnFlowTest, JulietBadSourceShape_ParamReassignedNull_Warning) {
+    // Juliet akis-varyanti kaynagi birebir: parametre NULL'a atanip
+    // dondurulur -> MaybeNull -> cagiranin korumasiz kullanimi uyari
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* badSource(int* data) {
+            data = 0;
+            return data;
+        }
+        void f(int* data) {
+            data = badSource(data);
+            int x = *data;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ReturnFlowTest, CrossTU_VarFlowMaybeNull_Warning) {
+    // Degisken-akisli MaybeNull cross-TU depodan da tasinir
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int g;
+        int* find(int k) {
+            int* r = 0;
+            if (k) r = &g;
+            return r;
+        }
+    )", R"(
+        int* find(int k);
+        void f(int k) {
+            int* p = find(k);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
