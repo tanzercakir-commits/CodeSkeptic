@@ -16,9 +16,9 @@ class StaticAnalyzer {
 public:
     explicit StaticAnalyzer(Config config);
 
-    // Ctor'un set ettigi global filtre durumunu geri alir. Uzun omurlu
-    // sureclerde (MCP server, testler) filtreli bir kosumun sonraki
-    // kosumlari sessizce budamasini engeller.
+    // Reverts the global filter state set by the ctor. In long-lived
+    // processes (MCP server, tests) this prevents a filtered run from
+    // silently pruning subsequent runs.
     ~StaticAnalyzer();
 
     template <typename T, typename... Args>

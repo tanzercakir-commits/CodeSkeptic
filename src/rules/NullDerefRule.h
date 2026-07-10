@@ -5,10 +5,10 @@
 
 namespace zerodefect {
 
-// CFG dataflow ile null pointer dereference tespiti. nullptr/NULL/0
-// akisini izler; dal kosulu iyilestirmesi (assume edges) sayesinde
-// `if (p)` / `if (p != nullptr)` guard'lari anlasilir — eski
-// NullPointerRule'un yuksek false-positive orani bu yuzden yoktur.
+// Null pointer dereference detection via CFG dataflow. Tracks the flow
+// of nullptr/NULL/0; thanks to branch condition refinement (assume
+// edges), `if (p)` / `if (p != nullptr)` guards are understood — which
+// is why the old NullPointerRule's high false-positive rate is absent.
 class NullDerefRule : public Rule {
 public:
     std::string id() const override;

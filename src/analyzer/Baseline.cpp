@@ -21,9 +21,9 @@ std::string trimmed(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-// Platformlar/derleyiciler arasi SABIT hash: baseline dosyasi repo'ya
-// girer, farkli makinede uretilenle eslesmek zorunda (std::hash bunu
-// garanti etmez)
+// Hash that is STABLE across platforms/compilers: the baseline file is
+// checked into the repo and must match one produced on a different
+// machine (std::hash does not guarantee this)
 std::string fnv1a64Hex(const std::string& s) {
     std::uint64_t h = 1469598103934665603ull;
     for (unsigned char c : s) {
@@ -36,7 +36,7 @@ std::string fnv1a64Hex(const std::string& s) {
     return buf;
 }
 
-// Dosya-basina satir onbellegi: ayni dosyadaki N bulgu icin tek okuma
+// Per-file line cache: a single read for N findings in the same file
 using LineCache = std::map<std::string, std::vector<std::string>>;
 
 const std::string& sourceLine(LineCache& cache, const std::string& file,
@@ -54,7 +54,7 @@ const std::string& sourceLine(LineCache& cache, const std::string& file,
     return it->second[line - 1];
 }
 
-// Kirpma bilincli: yeniden girintileme (indent) bulguyu tazelemesin
+// Trimming is deliberate: re-indenting must not resurface a finding
 std::string keyV2Cached(const Diagnostic& d, LineCache& cache) {
     return d.rule_id + "|" + d.file + "|" +
            fnv1a64Hex(trimmed(sourceLine(cache, d.file, d.line))) + "|" +
@@ -79,8 +79,8 @@ bool Baseline::write(const std::string& path,
     if (!file.is_open()) return false;
 
     file << kHeaderV2 << "\n";
-    // Deterministik cikti icin sirali; multiset — ozdes anahtarlar
-    // SAYILARIYLA korunur (filter o kadar bulgu bastirir)
+    // Sorted for deterministic output; multiset — identical keys are
+    // preserved with their COUNTS (filter suppresses that many findings)
     LineCache cache;
     std::multiset<std::string> keys;
     for (const auto& diag : diagnostics)
@@ -106,8 +106,8 @@ bool Baseline::load(const std::string& path) {
 size_t Baseline::filter(DiagnosticList& diagnostics) const {
     if (counts_.empty()) return 0;
 
-    // Yerel kopya: sayaclar bu cagri icinde tuketilir — filter const
-    // kalir, tekrarlanan cagrilar birbirinden bagimsizdir
+    // Local copy: the counters are consumed within this call — filter
+    // stays const, and repeated calls are independent of each other
     auto budget = counts_;
     LineCache cache;
 
@@ -122,8 +122,8 @@ size_t Baseline::filter(DiagnosticList& diagnostics) const {
     diagnostics.erase(
         std::remove_if(diagnostics.begin(), diagnostics.end(),
                        [&](const Diagnostic& d) {
-                           // v1 once: eski (basliksiz) dosyalar eski
-                           // satir-numarali anlamiyla eslesmeye devam eder
+                           // v1 first: old (headerless) files keep
+                           // matching with their old line-number meaning
                            return consume(keyV1(d)) ||
                                   consume(keyV2Cached(d, cache));
                        }),

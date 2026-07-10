@@ -13,28 +13,28 @@ class SourceManager;
 
 namespace zerodefect {
 
-// Artimli analiz primitifleri: filtreler bos degilse yalnizca kapsam
-// icindeki fonksiyonlar analiz edilir. Ajan/IDE dongusunde "yalnizca
-// degiseni yeniden kontrol et" icin. setLang gibi surec-geneli tek
-// ayar (analiz tek is parcaciginda kosar).
+// Incremental analysis primitives: when the filters are non-empty,
+// ONLY the functions in scope are analyzed. For the "re-check only
+// what changed" agent/IDE loop. Process-wide single setting like
+// setLang (analysis runs on a single thread).
 
-// --- Ad filtresi (--function) ---
+// --- Name filter (--function) ---
 void setFunctionFilter(std::set<std::string> names);
 const std::set<std::string>& functionFilter();
 
-// Bos filtre herkese izin verir; aksi halde duz ad ("parse") veya
-// nitelikli ad ("Parser::parse") eslesmesi aranir.
+// An empty filter allows everything; otherwise a match on the plain
+// name ("parse") or the qualified name ("Parser::parse") is required.
 bool functionFilterAllows(const clang::FunctionDecl& func);
 
-// --- Satir araligi filtresi (--lines, hunk -> fonksiyon eslemesi) ---
-// Araliklar analiz edilen ANA dosyaya uygulanir (diff hunk'lari zaten o
-// dosyaya aittir); header'daki fonksiyonlar kapsam disidir.
+// --- Line-range filter (--lines, hunk -> function mapping) ---
+// Ranges apply to the MAIN file being analyzed (diff hunks belong to
+// that file anyway); functions in headers are out of scope.
 using LineRanges = std::vector<std::pair<unsigned, unsigned>>;
 void setLineRanges(LineRanges ranges);
 const LineRanges& lineRanges();
 
-// Bos filtre herkese izin verir; aksi halde fonksiyonun [baslangic,
-// bitis] satir araligi verilen araliklardan biriyle kesismelidir.
+// An empty filter allows everything; otherwise the function's [begin,
+// end] line range must intersect one of the given ranges.
 bool lineFilterAllows(const clang::FunctionDecl& func,
                       const clang::SourceManager& sm);
 

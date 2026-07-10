@@ -10,30 +10,31 @@
 
 namespace zerodefect {
 
-// Ozet-diff (semantik regresyon sinyalinin cekirdegi): iki hasat
-// arasinda fonksiyon SOZLESMELERI nasil degisti?
+// Summary-diff (the core of the semantic regression signal): how did
+// function CONTRACTS change between two harvests?
 //
-//  WEAKENED     guclu bir iddia kayboldu ya da degisti (NeverNull /
-//               NeverZero dustu; ReadsOnly/Frees param iddiasi baskasina
-//               dondu). Bu iddiaya yaslanan CAGIRANLAR yeniden
-//               incelenmeli — CI kapisi: cikis kodu 1.
-//  STRENGTHENED yeni guclu iddia kazanildi (bilgi; risk yok).
-//  CHANGED      yon icermeyen degisim (Unknown <-> Maybe* gibi) —
-//               bulgu kumesi oynayabilir ama sozlesme riski yok.
-//  ADDED /      anahtar (nitelikli ad + arite) yeni dosyada girdi /
-//  REMOVED      cikti. Imza degisikligi ayni fonksiyonu REMOVED+ADDED
-//               olarak gosterir (anahtar ariteyi icerir — bilerek:
-//               arite degisimi zaten tum cagiranlari kirar).
+//  WEAKENED     a strong claim was lost or changed (NeverNull /
+//               NeverZero dropped; a ReadsOnly/Frees param claim
+//               turned into something else). CALLERS leaning on that
+//               claim must be re-examined — CI gate: exit code 1.
+//  STRENGTHENED a new strong claim was gained (informational; no risk).
+//  CHANGED      a directionless change (like Unknown <-> Maybe*) —
+//               the finding set may shift but no contract risk.
+//  ADDED /      the key (qualified name + arity) entered / left in
+//  REMOVED      the new file. A signature change shows the same
+//               function as REMOVED+ADDED (the key includes arity —
+//               deliberately: an arity change breaks all callers
+//               anyway).
 enum class ChangeKind { Added, Removed, Weakened, Strengthened, Changed };
 
 struct SummaryChange {
     ChangeKind kind;
     std::string key;
-    std::string detail;  // alan farklari, insan-okur ("rn: N -> M" gibi)
+    std::string detail;  // field diffs, human-readable ("rn: N -> M" etc.)
 };
 
 struct SummaryDiffResult {
-    // Siralama: once Weakened (en onemli), sonra digerleri anahtar sirali
+    // Ordering: Weakened first (most important), then the rest by key
     std::vector<SummaryChange> changes;
     size_t weakened = 0;
     size_t strengthened = 0;
@@ -48,9 +49,9 @@ using SummaryMap =
 SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                                 const SummaryMap& newMap);
 
-// Iki dosyayi ayristirir, diff'i `out`a yazar (makine-greplenebilir
-// "SUMMARY_DIFF <KIND> <key> <detail>" satirlari + ozet). Cikis kodu:
-// 0 = zayiflama yok, 1 = WEAKENED var (CI kapisi), 2 = dosya okunamadi.
+// Parses the two files, writes the diff to `out` (machine-greppable
+// "SUMMARY_DIFF <KIND> <key> <detail>" lines + a summary). Exit code:
+// 0 = no weakening, 1 = has WEAKENED (CI gate), 2 = file unreadable.
 int reportSummaryDiff(const std::string& oldPath,
                       const std::string& newPath, std::ostream& out);
 

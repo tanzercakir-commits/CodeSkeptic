@@ -12,9 +12,9 @@ enum class Severity {
     Error
 };
 
-// Bulguya iliştirilen dataflow izi adımı: hataya götüren olay zinciri
-// (ör. "p burada alloc edildi", "p burada free edildi"). Hem insan hem
-// LLM tüketicisi için "neden?" sorusunun cevabı.
+// Dataflow trace step attached to a finding: the chain of events that
+// leads to the error (e.g. "p allocated here", "p freed here"). The
+// answer to "why?" for both human and LLM consumers.
 struct TraceNote {
     std::string file;
     unsigned line = 0;
@@ -35,8 +35,8 @@ struct Diagnostic {
     unsigned column;
     std::string rule_id;
     std::string message;
-    std::string function;          // bulgunun icinde oldugu fonksiyon
-    std::vector<TraceNote> notes;  // function ve notes siralamada yok
+    std::string function;          // function the finding occurs in
+    std::vector<TraceNote> notes;  // function and notes excluded from ordering
 
     std::string severityToString() const {
         switch (severity) {
@@ -58,8 +58,8 @@ struct Diagnostic {
             return file < other.file;
         if (line != other.line)
             return line < other.line;
-        // Kalan alanlar: deterministik sira + esit kayitlarin bitisik
-        // gelmesi (std::unique ile tekillestirme icin sart)
+        // Remaining fields: deterministic order + equal records must be
+        // adjacent (required for deduplication via std::unique)
         if (column != other.column)
             return column < other.column;
         if (rule_id != other.rule_id)

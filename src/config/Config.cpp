@@ -89,8 +89,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             summary_diff_old_ = argv[++i];
             summary_diff_new_ = argv[++i];
         } else if (arg == "--files" && i + 1 < argc) {
-            // Liste dosyasi: satir basina bir kaynak dosya yolu.
-            // Buyuk/secilmis kumeler icin (benchmark, ajan toplu istegi).
+            // List file: one source file path per line.
+            // For large/hand-picked sets (benchmarks, agent batch requests).
             std::ifstream listFile(argv[++i]);
             std::string fileLine;
             while (std::getline(listFile, fileLine)) {
@@ -129,6 +129,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         exits 1 if any contract weakened\n"
                       << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
+                      << "  --version              Print version and exit\n"
                       << "  --help                 Show this message\n";
             return false;
         } else if (arg[0] != '-' && source_path_.empty()) {
@@ -159,7 +160,7 @@ void Config::addFunctions(const std::string& list) {
 }
 
 void Config::addLines(const std::string& list) {
-    // "12-40,55" -> {12,40}, {55,55}. Gecersiz token sessizce atlanir.
+    // "12-40,55" -> {12,40}, {55,55}. Invalid tokens are silently skipped.
     std::string token;
     auto flush = [this](const std::string& t) {
         if (t.empty()) return;

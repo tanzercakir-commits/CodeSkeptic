@@ -11,7 +11,7 @@ struct MsgEntry {
     const char* tr;
 };
 
-// MsgId enum sirasiyla birebir ayni sirada olmali.
+// Must be in exactly the same order as the MsgId enum.
 const MsgEntry kMessages[] = {
     // UninitPtrDeref
     {"Use of uninitialized pointer: '{0}' may not be assigned at this dereference",

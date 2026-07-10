@@ -368,7 +368,7 @@ one self-contained file with filters and source-context traces.
 
 ## Roadmap
 
-See [`analiz-2026-07.md`](analiz-2026-07.md) (Turkish) for the full
+See [`ROADMAP.md`](ROADMAP.md) for the full
 assessment and phased roadmap: SARIF output, suppression/baseline
 support, benchmark-driven precision measurement, incremental analysis,
 and MCP-server mode for agent integration.

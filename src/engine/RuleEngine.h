@@ -25,9 +25,9 @@ public:
     void enableRule(const std::string& rule_id, bool enabled);
     DiagnosticList runAll(clang::ASTContext& ctx);
 
-    // --summary-out icin: runAll TU-yerel ozet tablosunu temizlemeden
-    // once cross-TU depoya hasat etsin (tablo temizligi sarkan-pointer
-    // guvenligi geregi runAll icinde — hasat da orada olmali).
+    // For --summary-out: runAll must harvest into the cross-TU store
+    // before clearing the TU-local summary table (the clear lives in
+    // runAll for dangling-pointer safety — the harvest must too).
     void enableGlobalHarvest(bool enabled) { harvest_global_ = enabled; }
 
     size_t ruleCount() const;

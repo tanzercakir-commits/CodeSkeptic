@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
-project(ZeroDefect LANGUAGES C CXX)
+project(ZeroDefect VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Homebrew LLVM (macOS ARM). Linux'ta sistem LLVM'i bulunur;
-# gerekirse -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18 verilebilir.
+# Homebrew LLVM (macOS ARM). On Linux the system LLVM is found;
+# if needed, -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18 can be passed.
 if(APPLE AND NOT DEFINED CMAKE_PREFIX_PATH)
     set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/llvm")
 endif()

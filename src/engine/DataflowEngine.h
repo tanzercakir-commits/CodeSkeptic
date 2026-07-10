@@ -76,17 +76,17 @@ DataflowResult<Analysis> runDataflow(
 
     if (!func || !func->hasBody()) return result;
 
-    // CFG paylasimli onbellekten (fonksiyon basina bir insa; kurulum
-    // secenekleri — setAllAlwaysAdd dahil — CfgCache'te yasar)
+    // CFG comes from the shared cache (built once per function; build
+    // options — including setAllAlwaysAdd — live in CfgCache)
     clang::CFG* cfg = CfgCache::instance().get(func, ctx);
     if (!cfg) return result;
 
     const unsigned numBlocks = cfg->getNumBlockIDs();
 
-    // Monoton transfer + sonlu lattice ile sabitleme garantidir; tavan
-    // yalnizca guvenlik sigortasi. Analiz lattice yuksekligini bildirirse
-    // tavan ona gore olceklenir (blok basina en fazla yukseklik kadar
-    // yukselis olabilir), bildirmezse eski varsayilan kullanilir.
+    // A monotone transfer + finite lattice guarantees convergence; the
+    // cap is only a safety fuse. If the analysis reports its lattice
+    // height, the cap scales with it (each block can climb at most
+    // height times), otherwise the old default is used.
     unsigned latticeHeight = 4;
     if constexpr (detail::HasLatticeHeight<Analysis>::value)
         latticeHeight = analysis.latticeHeight();
@@ -94,13 +94,14 @@ DataflowResult<Analysis> runDataflow(
 
     auto& blockExitState = result.blockExitStates;
 
-    // Predecessor exit state'lerinden blok giris state'ini hesaplar
-    // (assume-edge iyilestirmesi dahil). Hem worklist fazinda hem
-    // raporlama gecisinde ayni mantik kullanilir. `reporting` yalnizca
-    // raporlama gecisinde true'dur: analiz onEdgeRefined sagliyorsa,
-    // iyilestirmenin state'i GERCEKTEN degistirdigi kenarlarda cagrilir
-    // — guard izleri boyle dogar. Faz 1'de cagrilmaz (erken state'le
-    // sahte olay uretirdi; onStatement'in fixpoint kuralinin aynisi).
+    // Computes the block entry state from the predecessors' exit
+    // states (including assume-edge refinement). The same logic serves
+    // both the worklist phase and the reporting pass. `reporting` is
+    // true only in the reporting pass: if the analysis provides
+    // onEdgeRefined, it is invoked on edges where refinement ACTUALLY
+    // changed the state — this is how guard traces are born. It is not
+    // invoked in phase 1 (that would emit spurious events from early
+    // state; the same fixpoint rule as onStatement).
     auto computeEntryState = [&](const clang::CFGBlock* block,
                                  bool& hasPreds, bool reporting) -> State {
         State entryState = analysis.initialState();
@@ -116,9 +117,10 @@ DataflowResult<Analysis> runDataflow(
 
             State predState = found->second;
 
-            // Assume edge: iki ardilli kosullu terminator'da (if/while/for)
-            // true/false kenarina gore state iyilestirilir. succ[0] = true,
-            // succ[1] = false (Clang CFG konvansiyonu).
+            // Assume edge: on a conditional terminator with two
+            // successors (if/while/for), the state is refined per the
+            // true/false edge. succ[0] = true, succ[1] = false (Clang
+            // CFG convention).
             if constexpr (detail::HasRefineOnEdge<Analysis>::value) {
                 if (pred->succ_size() == 2) {
                     if (const clang::Stmt* cond =
@@ -167,11 +169,11 @@ DataflowResult<Analysis> runDataflow(
         return entryState;
     };
 
-    // --- Faz 1: fixpoint iterasyonu ---
-    // Bu fazda YALNIZCA transfer calisir; onStatement CAGRILMAZ.
-    // Erken (henuz sabitlenmemis) state'lerle rapor uretmek yanlis
-    // severity'ye yol acar: ornegin do-while govdesinin ilk ziyaretinde
-    // back-edge state'i henuz yokken "kesinlikle null" denebilir.
+    // --- Phase 1: fixpoint iteration ---
+    // In this phase ONLY transfer runs; onStatement is NOT called.
+    // Reporting from early (not yet converged) states leads to wrong
+    // severity: e.g. on the first visit of a do-while body, before the
+    // back-edge state exists, we might claim "definitely null".
     std::queue<const clang::CFGBlock*> worklist;
     worklist.push(&cfg->getEntry());
     unsigned iterations = 0;
@@ -213,10 +215,10 @@ DataflowResult<Analysis> runDataflow(
     result.converged = (iterations < maxIterations);
     result.exitBlockID = cfg->getExit().getBlockID();
 
-    // --- Faz 2: raporlama gecisi ---
-    // Sabitlenmis exit state'lerden her blogun giris state'i yeniden
-    // hesaplanir ve elemanlar bir kez daha yurunerek onStatement cagrilir.
-    // Boylece raporlar her zaman fixpoint'teki state'i yansitir.
+    // --- Phase 2: reporting pass ---
+    // Each block's entry state is recomputed from the converged exit
+    // states and the elements are walked once more, calling onStatement.
+    // This way reports always reflect the state at the fixpoint.
     if constexpr (detail::HasOnStatement<Analysis>::value) {
         for (const clang::CFGBlock* block : *cfg) {
             if (!block) continue;

@@ -1,4 +1,4 @@
-ZeroDefect - Mimari (2026-07 durumu)
+ZeroDefect - Architecture (as of 2026-07)
 
                       ┌──────────────────────┐
                       │    StaticAnalyzer     │
@@ -10,52 +10,55 @@ ZeroDefect - Mimari (2026-07 durumu)
           ▼           ▼                          ▼            ▼
    ┌────────────┐ ┌──────────────┐   ┌───────────────┐ ┌──────────┐
    │SourceManager│ │  RuleEngine  │   │   Reporter    │ │  Config  │
-   │LibTooling  │ │TU basina:    │   │Console/JSON/  │ │CLI+conf  │
-   │compile DB  │ │1) Ozetler    │   │SARIF (traces) │ │--function│
-   └────────────┘ │2) Kurallar   │   └───────────────┘ │--lines   │
-                  └──────┬───────┘                      │--serve   │
-                         │                              └──────────┘
+   │LibTooling  │ │Per TU:       │   │Console/JSON/  │ │CLI+conf  │
+   │compile DB  │ │1) Summaries  │   │SARIF/HTML     │ │--function│
+   │warm AST    │ │2) Rules      │   │(traces)       │ │--lines   │
+   │cache (MCP) │ └──────┬───────┘   └───────────────┘ │--serve   │
+   └────────────┘        │                              └──────────┘
         ┌────────────────┼───────────────────┐
         ▼                ▼                   ▼
 ┌───────────────┐ ┌─────────────────┐ ┌──────────────────┐
-│SummaryRegistry│ │ DataflowEngine  │ │  Yardimci filtreler│
-│(interproc v1) │ │ (worklist +     │ │ SuppressionFilter │
-│ donus nullness│ │  fixpoint +     │ │ Baseline          │
-│ param etkileri│ │  assume edges + │ │ FunctionFilter    │
-│ sweep<=5      │ │  rapor-gecisi)  │ │ (ad + satir)      │
-└───────┬───────┘ └────────┬────────┘ └──────────────────┘
-        │ lookup           │ runDataflow(Analysis)
-        ▼                  ▼
+│SummaryRegistry│ │ DataflowEngine  │ │  Helper filters   │
+│(interproc)    │ │ (worklist +     │ │ SuppressionFilter │
+│ return null-  │ │  fixpoint +     │ │ Baseline          │
+│ ness/zeroness │ │  assume edges + │ │ FunctionFilter    │
+│ param effects │ │  report pass)   │ │ (name + lines)    │
+│ sweep<=5      │ └────────┬────────┘ └──────────────────┘
+│ disk persist  │          │ runDataflow(Analysis)
+└───────┬───────┘          │ (CFG via shared CfgCache)
+        │ lookup           ▼
    ┌─────────────────────────────────────────────┐
    │            Rule (abstract)                   │
-   │  UninitPointerRule_Ex  (PtrState lattice)    │
-   │  MemoryLeakRule_Ex     (AllocState lattice)  │──▶ rule_id'ler:
-   │  DivByZeroRule         (ZeroState lattice)   │    uninit-ptr,
-   │  NullDerefRule         (NullState lattice)   │    memory-leak,
+   │  UninitPointerRule_Ex  (PtrState lattice)    │──▶ rule_ids:
+   │  MemoryLeakRule_Ex     (AllocState lattice)  │    uninit-ptr,
+   │  DivByZeroRule         (ZeroState lattice)   │    memory-leak,
+   │  NullDerefRule         (NullState lattice)   │    double-free,
    └─────────────────────────────────────────────┘    use-after-free,
                                                         div-by-zero,
                                                         null-deref
 
 MCP server (--serve): stdio JSON-RPC 2.0 — initialize / tools/list /
-tools/call(analyze). Ajanlar her duzenleme sonrasi cagirir; bulgular
-dataflow izleriyle yapisal JSON doner.
+tools/call(analyze). Agents call it after every edit; findings return
+as structured JSON with dataflow traces.
 
-Veri akisi:
-  SummaryRegistry.rebuild(TU) ──once──▶ Rule.check()
+Data flow:
+  SummaryRegistry.rebuild(TU) ──first──▶ Rule.check()
   Rule.check() ──runDataflow──▶ DataflowEngine
-    Faz 1: fixpoint (yalnizca transfer — SAF)
-    Faz 2: raporlama gecisi (onStatement — fixpoint state'leriyle)
-  Diagnostic(+TraceNote'lar) ──▶ kanonik path → suppression → baseline
-    → severity filtresi → sort+dedup ──▶ Reporter
+    Phase 1: fixpoint (transfer only — PURE)
+    Phase 2: reporting pass (onStatement — with fixpoint states)
+  Diagnostic(+TraceNotes) ──▶ canonical path → suppression → baseline
+    → severity filter → sort+dedup ──▶ Reporter
 
-Motor sozlesmeleri (todo.md "Teknik Notlar" ile senkron):
-  - transfer saftir; raporlama yalnizca fixpoint-sonrasi gecişte
-  - CFG ince taneli (setAllAlwaysAdd): analizler yalnizca tepe dugume bakar
-  - assume edges: succ[0]=true, succ[1]=false; yalnizca 2 ardilli
-    terminatorlerde refineOnEdge cagrilir
-  - iterasyon tavani lattice yuksekligiyle olceklenir (latticeHeight hook)
-  - ozet anahtarlari TU-yerel FunctionDecl* — TU sonunda temizlenir
+Engine contracts (kept in sync with todo.md "Technical Notes"):
+  - transfer is pure; reporting happens only in the post-fixpoint pass
+  - CFG is fine-grained (setAllAlwaysAdd): analyses look only at the
+    top node of each element; CFGs come from the shared CfgCache
+    (one build per function)
+  - assume edges: succ[0]=true, succ[1]=false; refineOnEdge is called
+    only on two-successor terminators
+  - the iteration cap scales with lattice height (latticeHeight hook)
+  - summary/CFG keys are TU-local FunctionDecl* — cleared at TU end
 
-Diagnostic (veri yapisi):
-  severity, file (kanonik), line, column, rule_id, message,
-  notes[] = dataflow izi adimlari (file, line, column, message)
+Diagnostic (data shape):
+  severity, file (canonical), line, column, rule_id, message,
+  notes[] = dataflow trace steps (file, line, column, message)

@@ -35,9 +35,11 @@ target_include_directories(zerodefect_core SYSTEM
 
 target_compile_definitions(zerodefect_core
     PUBLIC ${LLVM_DEFINITIONS}
+    # Single source of truth for the version: project(VERSION ...) above
+    PUBLIC ZERODEFECT_VERSION="${PROJECT_VERSION}"
 )
 
-# Clang resource dir (stddef.h, stdarg.h gibi intrinsic header'lar için)
+# Clang resource dir (for intrinsic headers such as stddef.h, stdarg.h)
 execute_process(
     COMMAND ${LLVM_TOOLS_BINARY_DIR}/clang -print-resource-dir
     OUTPUT_VARIABLE CLANG_RESOURCE_DIR
@@ -50,7 +52,7 @@ if(CLANG_RESOURCE_DIR)
     message(STATUS "Clang resource dir: ${CLANG_RESOURCE_DIR}")
 endif()
 
-# macOS SDK sysroot (string.h, stdlib.h vb. için)
+# macOS SDK sysroot (for string.h, stdlib.h, etc.)
 if(APPLE)
     execute_process(
         COMMAND xcrun --show-sdk-path

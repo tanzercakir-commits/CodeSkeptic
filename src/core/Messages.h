@@ -12,54 +12,54 @@ Lang currentLang();
 Lang parseLang(const std::string& value);
 
 enum class MsgId {
-    // Tani mesajlari
-    UninitPtrDeref,       // {0} = degisken adi
-    LeakReassign,         // {0} = degisken adi
-    LeakEndOfFunction,    // {0} = degisken adi
-    DoubleFree,           // {0} = degisken adi
-    UseAfterFree,         // {0} = degisken adi
+    // Diagnostic messages
+    UninitPtrDeref,       // {0} = variable name
+    LeakReassign,         // {0} = variable name
+    LeakEndOfFunction,    // {0} = variable name
+    DoubleFree,           // {0} = variable name
+    UseAfterFree,         // {0} = variable name
     DivByZeroLiteral,
-    DivByZeroDefinite,    // {0} = degisken adi
-    DivByZeroMaybe,       // {0} = degisken adi
-    NullDerefDefinite,    // {0} = degisken adi
-    NullDerefMaybe,       // {0} = degisken adi
+    DivByZeroDefinite,    // {0} = variable name
+    DivByZeroMaybe,       // {0} = variable name
+    NullDerefDefinite,    // {0} = variable name
+    NullDerefMaybe,       // {0} = variable name
 
-    // Dataflow izi adimlari
-    TraceAllocatedHere,   // {0} = degisken adi
-    TraceFreedHere,       // {0} = degisken adi
-    TraceAssignedNullHere,// {0} = degisken adi
-    TraceAssignedMaybeNullHere, // {0} = degisken adi (ozet: null donebilir)
-    TraceAssignedZeroHere,// {0} = degisken adi
-    TraceDeclaredHere,    // {0} = degisken adi
+    // Dataflow trace steps
+    TraceAllocatedHere,   // {0} = variable name
+    TraceFreedHere,       // {0} = variable name
+    TraceAssignedNullHere,// {0} = variable name
+    TraceAssignedMaybeNullHere, // {0} = variable name (summary: may return null)
+    TraceAssignedZeroHere,// {0} = variable name
+    TraceDeclaredHere,    // {0} = variable name
 
-    // CLI / calisma zamani
-    AnalysisStarting,     // {0} = dosya sayisi, {1} = kural sayisi
+    // CLI / runtime
+    AnalysisStarting,     // {0} = file count, {1} = rule count
     NoFilesToAnalyze,
     NoRulesRegistered,
     CleanNoIssues,
-    FindingsCount,        // {0} = bulgu sayisi
-    SuppressedCount,      // {0} = bastirilan bulgu sayisi
-    BaselineWritten,      // {0} = bulgu sayisi, {1} = dosya yolu
-    BaselineFiltered,     // {0} = baseline ile eslesen bulgu sayisi
-    CompileDbNotFound,    // {0} = hata mesaji
-    OutputFileOpenError,  // {0} = yol
-    FileNotFound,         // {0} = yol
-    DirNotFound,          // {0} = yol
-    DirScanError,         // {0} = hata mesaji
+    FindingsCount,        // {0} = finding count
+    SuppressedCount,      // {0} = suppressed finding count
+    BaselineWritten,      // {0} = finding count, {1} = file path
+    BaselineFiltered,     // {0} = count of findings matching the baseline
+    CompileDbNotFound,    // {0} = error message
+    OutputFileOpenError,  // {0} = path
+    FileNotFound,         // {0} = path
+    DirNotFound,          // {0} = path
+    DirScanError,         // {0} = error message
     UsageError,
-    WholeProgramPass,     // {0} = dosya sayisi
-    AnalysisNotConverged, // {0} = fonksiyon adi
-    SummariesLoaded,      // {0} = ozet sayisi, {1} = dosya yolu
-    SummariesSaved,       // {0} = ozet sayisi, {1} = dosya yolu
-    SummaryLoadError,     // {0} = dosya yolu
-    SummarySaveError,     // {0} = dosya yolu
-    TraceAssignedMaybeZeroHere, // {0} = degisken adi (ozet: 0 donebilir)
-    TraceAssumedNullHere,       // {0} = degisken adi (guard: bu dalda null)
-    TraceAssumedZeroHere,       // {0} = degisken adi (guard: bu dalda sifir)
-    SummaryStaleWarning,        // {0} = ozet dosyasi, {1} = yeni kaynak
+    WholeProgramPass,     // {0} = file count
+    AnalysisNotConverged, // {0} = function name
+    SummariesLoaded,      // {0} = summary count, {1} = file path
+    SummariesSaved,       // {0} = summary count, {1} = file path
+    SummaryLoadError,     // {0} = file path
+    SummarySaveError,     // {0} = file path
+    TraceAssignedMaybeZeroHere, // {0} = variable name (summary: may return 0)
+    TraceAssumedNullHere,       // {0} = variable name (guard: null on this branch)
+    TraceAssumedZeroHere,       // {0} = variable name (guard: zero on this branch)
+    SummaryStaleWarning,        // {0} = summary file, {1} = newer source
 };
 
-// {0} ve {1} yer tutucularini argumanlarla degistirir.
+// Replaces the {0} and {1} placeholders with the arguments.
 std::string msg(MsgId id, const std::string& a0 = "",
                 const std::string& a1 = "");
 

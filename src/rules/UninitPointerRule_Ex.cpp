@@ -32,10 +32,10 @@ PtrState mergePtrStates(PtrState a, PtrState b) {
 }
 
 // --- Statement classification ---
-// CFG elemanlari alt ifadeleri ayri elemanlar olarak icerir; her elemanin
-// yalnizca tepe dugumune bakmak yeterli (statement icinde nested arama
-// gerekmez). Dugum hangi degiskene dokundugunu kendisi soyler — degisken
-// basina dongu de gerekmez.
+// CFG elements contain sub-expressions as separate elements; looking only
+// at the top node of each element is enough (no nested search inside the
+// statement is needed). The node itself tells which variable it touches —
+// no per-variable loop is needed either.
 
 enum class EffectKind { None, Assigns, Dereferences };
 
@@ -60,7 +60,7 @@ Effect classifyStmt(const Stmt* stmt) {
         return {};
     }
     if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
-        // &p: out-param ile init edilmis olabilir — muhafazakar Assigns
+        // &p: may have been initialized via out-param — conservative Assigns
         if (unary->getOpcode() == UO_AddrOf)
             if (const auto* var = asVar(unary->getSubExpr()))
                 return {var, EffectKind::Assigns};
@@ -110,10 +110,10 @@ using PtrVarState = std::map<const VarDecl*, PtrState>;
 
 class UninitPtrAnalysis {
 public:
-    // Guard'li disjunktlar (hedefli yol duyarliligi): Juliet char_07
-    // kalibi — `if(staticTrue) data = ...; ... if(staticTrue) use(data);`
-    // — korelasyonsuz analizde sahte "may not be assigned" uretiyordu.
-    // Ortak makine engine/GuardedDisjuncts.h'te.
+    // Guarded disjuncts (targeted path sensitivity): the Juliet char_07
+    // pattern — `if(staticTrue) data = ...; ... if(staticTrue) use(data);`
+    // — produced a false "may not be assigned" under correlation-free
+    // analysis. The shared machinery is in engine/GuardedDisjuncts.h.
     using State = zerodefect::GuardedState<PtrVarState>;
 
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
@@ -130,8 +130,8 @@ public:
 
     State initialState() const { return initState_; }
 
-    // Degisken basina zincir: Uninit -> MaybeInit -> Init (yukseklik 2);
-    // disjunkt sayisi yukseligi carpar
+    // Per-variable chain: Uninit -> MaybeInit -> Init (height 2);
+    // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 2 +
                 1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
@@ -187,7 +187,7 @@ public:
                 zerodefect::MsgId::UninitPtrDeref,
                 effect.var->getNameAsString());
 
-            // Iz: bildirim noktasi (baslangic degeri olmayan tanim)
+            // Trace: declaration point (definition without an initial value)
             SourceLocation declLoc =
                 sm.getExpansionLoc(effect.var->getLocation());
             zerodefect::TraceNote note;

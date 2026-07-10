@@ -5,11 +5,12 @@
 
 namespace zerodefect {
 
-// Tek, kendine yeten HTML rapor: bagimlilik yok, offline acilir,
-// e-posta/PR eki kadar kolay paylasilir. Ozet kartlari ayni zamanda
-// filtre (severity/kural), metin kutusu dosya/mesaj suzer; her bulgunun
-// dataflow izi tiklaninca kaynak baglamiyla acilir (rapor uretilirken
-// kaynak satirlari goturulur — rapor tasindiginda baglam kaybolmaz).
+// A single, self-contained HTML report: no dependencies, opens offline,
+// as easy to share as an email/PR attachment. The summary cards double
+// as filters (severity/rule), the text box filters by file/message;
+// each finding's dataflow trace expands on click with source context
+// (source lines are carried along when the report is generated — the
+// context is not lost when the report is moved).
 class HtmlReporter : public Reporter {
 public:
     explicit HtmlReporter(const std::string& output_path);

@@ -31,7 +31,7 @@ TEST(SarifReporterTest, MinimalStructure) {
     EXPECT_NE(out.find("\"version\": \"2.1.0\""), std::string::npos);
     EXPECT_NE(out.find("sarif-schema-2.1.0.json"), std::string::npos);
     EXPECT_NE(out.find("\"name\": \"ZeroDefect\""), std::string::npos);
-    // Kurallar driver.rules altinda tekil listelenir
+    // Rules are listed uniquely under driver.rules
     EXPECT_NE(out.find("{ \"id\": \"uninit-ptr\" }"), std::string::npos);
     EXPECT_NE(out.find("{ \"id\": \"memory-leak\" }"), std::string::npos);
 }
@@ -47,7 +47,7 @@ TEST(SarifReporterTest, ResultFields) {
     EXPECT_NE(out.find("\"text\": \"bad deref\""), std::string::npos);
     EXPECT_NE(out.find("\"startLine\": 10"), std::string::npos);
     EXPECT_NE(out.find("\"startColumn\": 5"), std::string::npos);
-    // Mutlak path file:// URI'ye cevrilir
+    // Absolute paths are converted to file:// URIs
     EXPECT_NE(out.find("\"uri\": \"file:///src/a.cpp\""), std::string::npos);
 }
 

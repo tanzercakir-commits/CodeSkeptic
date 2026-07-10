@@ -238,15 +238,15 @@ TEST(MemoryLeakRuleExTest, UseAfterFree_Subscript) {
 }
 
 // ===================================================================
-// Hedefli yol duyarliligi: korelasyonlu guard'lar (PathFacts)
-// Juliet FP avinin kok nedeni — ayni degismez kosul iki kez test
-// edildiginde yollarin karismasi. Motor degil, analiz state'i cozer
-// (guard'li disjunktlar).
+// Targeted path sensitivity: correlated guards (PathFacts)
+// Root cause of the Juliet FP hunt — paths getting mixed when the same
+// invariant condition is tested twice. Solved by the analysis state,
+// not the engine (guarded disjuncts).
 // ===================================================================
 
 TEST(PathSensitivityTest, CorrelatedGuards_AllocFree_Clean) {
-    // Juliet goodB2G/goodG2B kalibi birebir: kaynak ve lavabo ayni
-    // global kosulla korunur — leak yok
+    // Verbatim Juliet goodB2G/goodG2B pattern: source and sink are
+    // guarded by the same global condition — no leak
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -261,7 +261,7 @@ TEST(PathSensitivityTest, CorrelatedGuards_AllocFree_Clean) {
 }
 
 TEST(PathSensitivityTest, CorrelatedGuards_Truthiness_Clean) {
-    // if (flag) ... if (flag) ... bicimi (Juliet staticTrue varyanti)
+    // The if (flag) ... if (flag) ... form (Juliet staticTrue variant)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -276,7 +276,7 @@ TEST(PathSensitivityTest, CorrelatedGuards_Truthiness_Clean) {
 }
 
 TEST(PathSensitivityTest, CorrelatedGuards_NegatedPair_Clean) {
-    // if (!flag) alloc; if (!flag) free — olumsuzlama da eslesir
+    // if (!flag) alloc; if (!flag) free — negation matches too
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -291,7 +291,8 @@ TEST(PathSensitivityTest, CorrelatedGuards_NegatedPair_Clean) {
 }
 
 TEST(PathSensitivityTest, AntiCorrelatedGuards_LeakStays) {
-    // if (flag) alloc; if (!flag) free — free YANLIS dalda: leak gercek
+    // if (flag) alloc; if (!flag) free — free is on the WRONG branch:
+    // the leak is real
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -308,9 +309,10 @@ TEST(PathSensitivityTest, AntiCorrelatedGuards_LeakStays) {
 }
 
 TEST(PathSensitivityTest, MutatedBetweenGuards_WarningStays) {
-    // Kosul degiskeni iki test arasinda degisiyor: korelasyon KURULMAZ
-    // (anahtarlanmaz), muhafazakar uyari korunur — c==5 ilk testte
-    // dogruysa alloc olur, ikinci test artik yanlis, free kacar
+    // The condition variable changes between the two tests: NO
+    // correlation is established (not keyed), the conservative warning
+    // is kept — if c==5 is true at the first test the alloc happens,
+    // the second test is now false, the free is missed
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -326,8 +328,9 @@ TEST(PathSensitivityTest, MutatedBetweenGuards_WarningStays) {
 }
 
 TEST(PathSensitivityTest, FunctionCallGuard_NotCorrelated) {
-    // Fonksiyon cagrisi ASLA anahtarlanmaz (rand() korelasyonu yanlis
-    // olurdu): iki check() cagrisi farkli sonuc verebilir → uyari kalir
+    // A function call is NEVER keyed (a rand() correlation would be
+    // wrong): two check() calls may give different results → the
+    // warning stays
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -343,10 +346,11 @@ TEST(PathSensitivityTest, FunctionCallGuard_NotCorrelated) {
 }
 
 TEST(PathSensitivityTest, CorrelatedGuards_DoubleFree_NowCaught) {
-    // Onceden FN'di: join'de Freed+Allocated karisimi ikinci free'yi
-    // gizliyordu. Disjunktlarla ikinci if(flag) govdesine yalnizca
-    // Freed yolu girer → double-free. Ayrica flag==0 yolunda hic free
-    // yok → gercek exit-leak de raporlanir (iki bulgu da dogru).
+    // Used to be an FN: the Freed+Allocated mix at the join hid the
+    // second free. With disjuncts only the Freed path enters the second
+    // if(flag) body → double-free. Also no free at all on the flag==0
+    // path → the real exit-leak is reported too (both findings are
+    // correct).
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -365,7 +369,7 @@ TEST(PathSensitivityTest, CorrelatedGuards_DoubleFree_NowCaught) {
 }
 
 TEST(PathSensitivityTest, CorrelatedGuards_UAF_NowCaught) {
-    // Ayni sekilde: free ve kullanim ayni guard altinda → kesin UAF
+    // Likewise: free and use under the same guard → definite UAF
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -382,11 +386,12 @@ TEST(PathSensitivityTest, CorrelatedGuards_UAF_NowCaught) {
 }
 
 TEST(DocumentedLimitTest, CallBetweenCorrelatedGuards_MayMaskLeak) {
-    // BILINCLI TAVIZ: iki guard arasindaki cagri globali degistirebilir
-    // (gercek leak gizlenebilir — FN yonu). Cagri etkilerini globallere
-    // yaymamak Juliet'in printLine'li kaliplarinda FP'siz kalmanin
-    // bedeli. Yerel/param kosullar icin bu risk YOKTUR (adresi kacmayan
-    // yerele cagri dokunamaz).
+    // DELIBERATE TRADE-OFF: a call between the two guards may change
+    // the global (a real leak can be hidden — FN direction). Not
+    // propagating call effects to globals is the price of staying
+    // FP-free on Juliet's printLine-laden patterns. For local/param
+    // conditions this risk does NOT exist (a call cannot touch a local
+    // whose address does not escape).
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -399,13 +404,13 @@ TEST(DocumentedLimitTest, CallBetweenCorrelatedGuards_MayMaskLeak) {
             if (flag) free(data);
         }
     )");
-    EXPECT_EQ(results.size(), 0);  // dokumante sinir
+    EXPECT_EQ(results.size(), 0);  // documented limit
 }
 
 TEST(MemoryLeakRuleExTest, AddrOfArg_Escapes_NoLeak) {
-    // sink(&p): cagrilan p'yi serbest birakabilir/yeniden atayabilir —
-    // izleme durur. (Juliet 63x varyanti: &data gorunmeyince sahte
-    // exit-leak dogyordu.)
+    // sink(&p): the callee may free/reassign p — tracking stops.
+    // (Juliet 63x variant: when &data went unseen, a bogus exit-leak
+    // was born.)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }

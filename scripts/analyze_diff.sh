@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Diff-farkinda analiz: verilen git referansindan bu yana degisen C/C++
-# dosyalarini zerodefect'ten gecirir. Ajan/CI dongusunde "yalnizca
-# dokundugun yerleri kontrol et" primitifi.
+# Diff-aware analysis: runs zerodefect over the C/C++ files changed
+# since the given git ref. The "only check what you touched" primitive
+# for agent/CI loops.
 #
-# Kullanim: scripts/analyze_diff.sh <zerodefect-binary> <git-ref> [ek args...]
-#   ornek:  scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
+# Usage: scripts/analyze_diff.sh <zerodefect-binary> <git-ref> [extra args...]
+#   example: scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
 #
-# Ek argumanlar binary'ye aynen iletilir; --summary-in ile diff dongusu
-# tum-proje bilgisine kavusur (baska dosyadaki callee ozetleri gorunur):
+# Extra arguments are forwarded to the binary verbatim; with --summary-in
+# the diff loop gains whole-project knowledge (callee summaries from
+# other files become visible):
 #   scripts/analyze_diff.sh build/src/zerodefect origin/main \
 #       --summary-in .zerodefect-summaries
 set -euo pipefail
@@ -24,10 +25,10 @@ if [ ${#files[@]} -eq 0 ]; then
     exit 0
 fi
 
-# Hunk basliklarindan (+baslangic,adet) degisen satir araliklarini cikar.
-# Adet yoksa 1; adet 0 ise (salt silme) ekleme noktasinin satiri alinir —
-# silmenin etkiledigi cevre kod da kontrol edilsin.
-changed_ranges() { # <dosya>
+# Extract changed line ranges from hunk headers (+start,count).
+# No count means 1; count 0 (pure deletion) takes the insertion point's
+# line — so the surrounding code affected by the deletion is checked too.
+changed_ranges() { # <file>
     git diff -U0 --diff-filter=d "$REF" -- "$1" \
         | sed -n 's/^@@ .*+\([0-9][0-9]*\)\(,\([0-9][0-9]*\)\)\{0,1\} @@.*/\1 \3/p' \
         | while read -r start count; do
@@ -48,7 +49,7 @@ for f in "${files[@]}"; do
     ranges="$(changed_ranges "$f")"
     if [ -n "$ranges" ]; then
         echo "=== $f (lines $ranges) ==="
-        set -- "$@" # mevcut ek argumanlar korunur
+        set -- "$@" # existing extra arguments are preserved
         code=0
         "$ZD_BIN" "$f" --lines "$ranges" "$@" || code=$?
     else

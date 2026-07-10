@@ -113,9 +113,9 @@ namespace {
 
 void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 #ifdef __APPLE__
-    // macOS: SDK header'lari isysroot ile gelir; ek sistem path'leri gerekli.
-    // Linux'ta bu path'leri one eklemek GCC libstdc++'in include_next
-    // zincirini kirar (stdlib.h bulunamaz) — resource-dir orada yeterli.
+    // macOS: SDK headers come via isysroot; extra system paths are needed.
+    // On Linux, prepending these paths breaks GCC libstdc++'s include_next
+    // chain (stdlib.h not found) — resource-dir is sufficient there.
     tool.appendArgumentsAdjuster(
         clang::tooling::getInsertArgumentAdjuster(
             {"-isystem", "/usr/include",
@@ -138,13 +138,14 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
 #endif
 }
 
-// --- Surec-omurlu sicak AST onbellegi ---
+// --- Process-lifetime warm AST cache ---
 //
-// Bilincli global durum (filtre-sizintisi dersinin TERSI degil,
-// tamamlayicisi): burada cagrilar-arasi kalicilik OZELLIGIN kendisi ve
-// dogruluk icerik-turevli anahtarla korunur — yol+build-path anahtari,
-// mtime+boyut parmak izi. Parmak izi uyusmazsa girdi yeniden kurulur;
-// bayat AST'nin servis edilebilecegi bir yol yoktur.
+// Deliberate global state (not the OPPOSITE of the filter-leak lesson,
+// but its complement): here cross-call persistence IS the feature, and
+// correctness is protected by a content-derived key — path+build-path
+// key, mtime+size fingerprint. If the fingerprint does not match, the
+// entry is rebuilt; there is no path by which a stale AST could be
+// served.
 struct CachedAst {
     std::string fingerprint;
     std::unique_ptr<clang::ASTUnit> unit;
@@ -157,8 +158,8 @@ std::map<std::string, CachedAst>& astCache() {
 unsigned g_warmHits = 0;
 unsigned g_warmMisses = 0;
 
-// Basit bellek tavani: LRU karmasikligina degmez — asiminda tumden
-// bosalt (MCP kullaniminda dosya sayisi kucuk, nadiren tetiklenir)
+// Simple memory ceiling: not worth LRU complexity — flush everything on
+// overflow (in MCP usage the file count is small, rarely triggered)
 constexpr size_t kMaxCachedAsts = 16;
 
 std::string fingerprintOf(const std::string& path) {

@@ -8,9 +8,22 @@
 #include "rules/UninitPointerRule_Ex.h"
 #include "server/McpServer.h"
 
+#include <cstring>
 #include <iostream>
 
+#ifndef ZERODEFECT_VERSION
+#define ZERODEFECT_VERSION "0.0.0-dev"
+#endif
+
 int main(int argc, char* argv[]) {
+    // --version exits 0 by convention (unlike --help's usage-error exit)
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--version") == 0) {
+            std::cout << "ZeroDefect " << ZERODEFECT_VERSION << "\n";
+            return 0;
+        }
+    }
+
     zerodefect::Config config;
     config.loadFromFile(".zerodefect.conf");
 
@@ -24,8 +37,9 @@ int main(int argc, char* argv[]) {
         return zerodefect::runMcpServer();
     }
 
-    // Ozet-diff modu: analiz degil, iki hasat arasinda sozlesme farki
-    // raporu. WEAKENED varsa exit 1 — semantik regresyon CI kapisi.
+    // Summary-diff mode: not analysis, but a contract-diff report
+    // between two harvests. Exit 1 if anything is WEAKENED — a semantic
+    // regression CI gate.
     if (!config.summaryDiffOld().empty()) {
         return zerodefect::reportSummaryDiff(
             config.summaryDiffOld(), config.summaryDiffNew(), std::cout);

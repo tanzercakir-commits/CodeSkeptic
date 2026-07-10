@@ -6,14 +6,14 @@ using namespace clang;
 
 namespace {
 
-// Tamsayi sabiti degerlendir: literal veya -literal. EvaluateAsInt
-// KULLANILMAZ: const global degiskenler (GLOBAL_CONST_FIVE) sabit
-// katlanabilirdi ama onlar zaten DeclRef tarafinda anahtarlaniyor.
+// Evaluate an integer constant: literal or -literal. EvaluateAsInt is
+// NOT used: const global variables (GLOBAL_CONST_FIVE) could have
+// been constant-folded, but those are already keyed on the DeclRef side.
 std::optional<int64_t> intLiteralValue(const Expr* expr) {
     if (!expr) return std::nullopt;
     expr = expr->IgnoreParenImpCasts();
     if (const auto* lit = dyn_cast<IntegerLiteral>(expr)) {
-        // 64-bit'e sigmayan literaller (pratikte gorulmez) atlanir
+        // Literals that do not fit 64 bits (unseen in practice) are skipped
         if (lit->getValue().getSignificantBits() > 64) return std::nullopt;
         return lit->getValue().getSExtValue();
     }
@@ -33,29 +33,29 @@ const ValueDecl* stableDeclRef(
     const auto* ref = dyn_cast<DeclRefExpr>(expr);
     if (!ref) return nullptr;
     const auto* vd = dyn_cast<VarDecl>(ref->getDecl());
-    // Yalnizca degiskenler (fonksiyon cagrisi/enum sabiti degil) ve
-    // yalnizca tamsayi tipliler: pointer truthiness'i null-refinement'in
-    // isi, onunla cakismayalim.
+    // Only variables (not function calls/enum constants) and only
+    // integer-typed ones: pointer truthiness is null-refinement's
+    // job, let's not clash with it.
     if (!vd || !vd->getType()->isIntegerType()) return nullptr;
-    if (vd->getType().isVolatileQualified()) return nullptr;  // her okuma degisebilir
+    if (vd->getType().isVolatileQualified()) return nullptr;  // every read may differ
     if (mutated.count(vd)) return nullptr;
     return vd;
 }
 
-// (var REL lit) formunu EQ/LT/LE tabanina indirger. `holds`: kosul dogru
-// oldugunda anahtarin degeri.
+// Reduces the (var REL lit) form to the EQ/LT/LE base. `holds`: the
+// key's value when the condition is true.
 std::optional<std::pair<zerodefect::FactKey, bool>> normalizeCompare(
         const ValueDecl* var, BinaryOperatorKind opc, int64_t lit,
         bool varOnLeft) {
     using K = zerodefect::FactKey;
     if (!varOnLeft) {
-        // "lit OP var" -> operatoru aynala: 5 < X  ≡  X > 5
+        // "lit OP var" -> mirror the operator: 5 < X  ≡  X > 5
         switch (opc) {
             case BO_LT: opc = BO_GT; break;
             case BO_GT: opc = BO_LT; break;
             case BO_LE: opc = BO_GE; break;
             case BO_GE: opc = BO_LE; break;
-            default: break;  // EQ/NE simetrik
+            default: break;  // EQ/NE are symmetric
         }
     }
     switch (opc) {
@@ -103,7 +103,7 @@ std::optional<std::pair<FactKey, bool>> conditionFact(
     if (!cond) return std::nullopt;
     cond = cond->IgnoreParenImpCasts();
 
-    // if (X): truthiness  ≡  (X == 0) yanlis
+    // if (X): truthiness  ≡  (X == 0) is false
     if (const ValueDecl* var = stableDeclRef(cond, mutated))
         return {{FactKey{var, BO_EQ, 0}, false}};
 

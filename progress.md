@@ -1,47 +1,47 @@
-# ZeroDefect — İlerleme Durumu
+# ZeroDefect — Progress Status
 
-## Tamamlanan Bileşenler
+## Completed Components
 
-| Bileşen | Dosyalar | Durum |
-|---------|----------|-------|
-| Diagnostic | `src/core/Diagnostic.h` | Tamamlandı (operator== + tam sıralama) |
-| Rule | `src/core/Rule.h` | Tamamlandı |
-| Messages (i18n) | `src/core/Messages.h`, `.cpp` | Tamamlandı (EN varsayılan, `--lang tr`) |
-| SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Tamamlandı (Linux header fix + sıcak AST önbelleği, MCP yolu) |
-| RuleEngine | `src/engine/RuleEngine.h`, `.cpp` | Tamamlandı |
-| DataflowEngine | `src/engine/DataflowEngine.h` | Tamamlandı (template + assume edges + latticeHeight + ince taneli CFG + iki fazlı raporlama) |
-| PathFacts | `src/engine/PathFacts.h`, `.cpp` | Tamamlandı (koşul→kanonik anahtar; mutasyon görücüsü) |
-| GuardedDisjuncts | `src/engine/GuardedDisjuncts.h` | Tamamlandı (guard'lı disjunkt şablonu — 3 kural kullanıyor) |
-| FunctionSummary | `src/engine/FunctionSummary.h`, `.cpp` | Tamamlandı (TU-yerel + cross-TU depo; --whole-program; diske yaz/yükle) |
-| Reporter (abstract) | `src/reporter/Reporter.h` | Tamamlandı |
-| ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Tamamlandı |
-| JsonReporter | `src/reporter/JsonReporter.h`, `.cpp` | Tamamlandı |
-| SarifReporter | `src/reporter/SarifReporter.h`, `.cpp` | Tamamlandı (SARIF 2.1.0) |
-| HtmlReporter | `src/reporter/HtmlReporter.h`, `.cpp` | Tamamlandı (tek dosya; filtreler + kaynak bağlamlı izler) |
-| SuppressionFilter | `src/analyzer/SuppressionFilter.h`, `.cpp` | Tamamlandı (disable-line / next-line) |
-| Baseline | `src/analyzer/Baseline.h`, `.cpp` | Tamamlandı (v2: satır-bağımsız içerik-hash anahtarı; v1 uyumlu) |
-| Config | `src/config/Config.h`, `.cpp` | Tamamlandı (`--lang` dahil) |
-| StaticAnalyzer | `src/analyzer/StaticAnalyzer.h`, `.cpp` | Tamamlandı (çapraz-TU dedup) |
-| UninitPointerRule_Ex | `src/rules/UninitPointerRule_Ex.h`, `.cpp` | Tamamlandı (çarpım lattice + guard'lı disjunktlar) |
-| MemoryLeakRule_Ex | `src/rules/MemoryLeakRule_Ex.h`, `.cpp` | Tamamlandı (leak + double-free + UAF; disjunktlar + Effect deseni + özet tüketimi) |
-| DivByZeroRule | `src/rules/DivByZeroRule.h`, `.cpp` | Tamamlandı (literal + CFG + guard analizi) |
-| NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState + assume edges + disjunktlar + dönüş-nullness özeti) |
-| main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
-| CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| CfgCache | `src/engine/CfgCache.h`, `.cpp` | Tamamlandı (fonksiyon başına tek CFG; TU-sonu temizlik + ctx-değişim emniyeti) |
-| SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Tamamlandı (--summary-diff; WEAKENED = exit 1 CI kapısı) |
-| GTest altyapısı | `tests/` | Tamamlandı (228/228; ctest + tek-süreç) |
-| CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
-| Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
-| Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Tam entegrasyon: F1 + skor bekçisi; her kod PR'ında koşar (draft hariç); rakamlar README'de |
-| README / LICENSE | `README.md`, `LICENSE` | Tamamlandı (EN, Apache-2.0) |
-| Durum tespiti / yol haritası | `analiz-2026-07.md` | Tamamlandı |
+| Component | Files | Status |
+|-----------|-------|--------|
+| Diagnostic | `src/core/Diagnostic.h` | Done (operator== + total ordering) |
+| Rule | `src/core/Rule.h` | Done |
+| Messages (i18n) | `src/core/Messages.h`, `.cpp` | Done (EN default, `--lang tr`) |
+| SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Done (Linux header fix + warm AST cache, MCP path) |
+| RuleEngine | `src/engine/RuleEngine.h`, `.cpp` | Done |
+| DataflowEngine | `src/engine/DataflowEngine.h` | Done (template + assume edges + latticeHeight + fine-grained CFG + two-phase reporting) |
+| PathFacts | `src/engine/PathFacts.h`, `.cpp` | Done (condition→canonical key; mutation visitor) |
+| GuardedDisjuncts | `src/engine/GuardedDisjuncts.h` | Done (guarded disjunct template — used by 3 rules) |
+| FunctionSummary | `src/engine/FunctionSummary.h`, `.cpp` | Done (TU-local + cross-TU store; --whole-program; write/load to disk) |
+| Reporter (abstract) | `src/reporter/Reporter.h` | Done |
+| ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Done |
+| JsonReporter | `src/reporter/JsonReporter.h`, `.cpp` | Done |
+| SarifReporter | `src/reporter/SarifReporter.h`, `.cpp` | Done (SARIF 2.1.0) |
+| HtmlReporter | `src/reporter/HtmlReporter.h`, `.cpp` | Done (single file; filters + source-context traces) |
+| SuppressionFilter | `src/analyzer/SuppressionFilter.h`, `.cpp` | Done (disable-line / next-line) |
+| Baseline | `src/analyzer/Baseline.h`, `.cpp` | Done (v2: line-independent content-hash key; v1 compatible) |
+| Config | `src/config/Config.h`, `.cpp` | Done (including `--lang`) |
+| StaticAnalyzer | `src/analyzer/StaticAnalyzer.h`, `.cpp` | Done (cross-TU dedup) |
+| UninitPointerRule_Ex | `src/rules/UninitPointerRule_Ex.h`, `.cpp` | Done (product lattice + guarded disjuncts) |
+| MemoryLeakRule_Ex | `src/rules/MemoryLeakRule_Ex.h`, `.cpp` | Done (leak + double-free + UAF; disjuncts + Effect pattern + summary consumption) |
+| DivByZeroRule | `src/rules/DivByZeroRule.h`, `.cpp` | Done (literal + CFG + guard analysis) |
+| NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Done (NullState + assume edges + disjuncts + return-nullness summary) |
+| main.cpp | `src/main.cpp` | Done (4 rules registered, 5 rule_ids) |
+| CMake build system | `CMakeLists.txt`, `src/CMakeLists.txt` | Done (Linux + macOS) |
+| CfgCache | `src/engine/CfgCache.h`, `.cpp` | Done (one CFG per function; TU-end cleanup + ctx-change safety) |
+| SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Done (--summary-diff; WEAKENED = exit 1 CI gate) |
+| GTest infrastructure | `tests/` | Done (228/228; ctest + single-process) |
+| CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
+| Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
+| Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |
+| README / LICENSE | `README.md`, `LICENSE` | Done (EN, Apache-2.0) |
+| Assessment / roadmap | `ROADMAP.md` | Done |
 
-## Bekleyen Sorunlar
+## Open Issues
 
-Yok. (Bilinen analiz sınırlamaları için `todo.md`'ye bakınız.)
+None. (See `todo.md` for known analysis limitations.)
 
-## Dizin Yapısı
+## Directory Layout
 
 ```
 ZeroDefect/
@@ -49,7 +49,7 @@ ZeroDefect/
 ├── README.md
 ├── LICENSE
 ├── architecture.txt
-├── analiz-2026-07.md
+├── ROADMAP.md
 ├── progress.md
 ├── todo.md
 ├── changelog.md
@@ -65,7 +65,7 @@ ZeroDefect/
 │   │   └── Config.cpp
 │   ├── core/
 │   │   ├── Diagnostic.h          (header-only)
-│   │   ├── Messages.h/.cpp       (i18n: EN/TR mesaj tablosu)
+│   │   ├── Messages.h/.cpp       (i18n: EN/TR message table)
 │   │   └── Rule.h                (header-only)
 │   ├── engine/
 │   │   ├── DataflowEngine.h      (template, header-only)
@@ -85,11 +85,11 @@ ZeroDefect/
 ├── tests/
 │   ├── CMakeLists.txt
 │   ├── TestHelper.h/.cpp
-│   ├── DiagnosticTest.cpp          (6 test: 4 + dedup + i18n)
-│   ├── UninitPointerRuleExTest.cpp (14 test)
-│   ├── MemoryLeakRuleExTest.cpp    (13 test)
-│   └── DivByZeroRuleTest.cpp       (19 test: 10 + 9 guard)
+│   ├── DiagnosticTest.cpp          (6 tests: 4 + dedup + i18n)
+│   ├── UninitPointerRuleExTest.cpp (14 tests)
+│   ├── MemoryLeakRuleExTest.cpp    (13 tests)
+│   └── DivByZeroRuleTest.cpp       (19 tests: 10 + 9 guard)
 ├── test_projects/
-│   ├── cJSON/                      (C test projesi)
-│   └── tinyxml2/                   (C++ test projesi)
+│   ├── cJSON/                      (C test project)
+│   └── tinyxml2/                   (C++ test project)
 ```

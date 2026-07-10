@@ -43,13 +43,14 @@ ZeroState evaluateAsZero(const Expr* expr) {
     return ZeroState::Unknown;
 }
 
-// Atanan degerin sifirligi: sabitler dogrudan; cagrilar ozet
-// (returnZeroness) uzerinden — `data = badSource();` kaynagi baska
-// fonksiyonda/dosyada olsa da gorunur. Ozet tuketimi BILEREK yalnizca
-// atama yolundan: dogrudan `x / f()` bolenini raporlamiyoruz — cagri
-// sonucu atanmadan guard'lanamaz (`if (f() != 0) x / f()` taze cagridir),
-// raporlasak gercek kodda FP ailesi dogardi. Atanan deger ise dataflow
-// izler, guard'lar iyilestirir.
+// Zero-ness of the assigned value: constants directly; calls via the
+// summary (returnZeroness) — `data = badSource();` is visible even when
+// the source lives in another function/file. Summary consumption is
+// DELIBERATELY assignment-path only: we do not report a direct `x / f()`
+// divisor — a call result cannot be guarded without being assigned
+// (`if (f() != 0) x / f()` is a fresh call), and reporting it would
+// spawn a family of FPs in real code. An assigned value, by contrast,
+// is tracked by dataflow and refined by guards.
 ZeroState evaluateAssignedValue(const Expr* expr) {
     ZeroState lit = evaluateAsZero(expr);
     if (lit != ZeroState::Unknown) return lit;
@@ -184,10 +185,11 @@ void setIfTracked(VarState& state, const VarDecl* var, ZeroState value) {
     if (it != state.end()) it->second = value;
 }
 
-// Kosul ifadesinin dogru/yanlis oldugu kenarda degisken state'lerini
-// iyilestirir. Ornek: `z != 0` true kenarinda z = NonZero. Yuruyus
-// ortak iskeletten (engine/ConditionWalk.h) — !, && / || kisa devre ve
-// degisken-solda normalizasyon orada; sifir-domain yorumu burada.
+// Refines variable states on the edge where the condition expression is
+// true/false. Example: on the true edge of `z != 0`, z = NonZero. The
+// walk comes from the shared skeleton (engine/ConditionWalk.h) — !,
+// && / || short-circuiting and variable-on-the-left normalization live
+// there; the zero-domain interpretation lives here.
 void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
     zerodefect::walkCondition(
         cond, isTrue,
@@ -201,9 +203,10 @@ void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
             ZeroState litState = evaluateAsZero(other);
 
             if (opc == BO_EQ || opc == BO_NE) {
-                // `z == 0` dogru → Zero; `z != 0` dogru → NonZero
-                // (yanlislarda tersi). Sifir olmayan sabitle: `z == 5`
-                // dogru → NonZero; yanlis yonde bilgi yok.
+                // `z == 0` true → Zero; `z != 0` true → NonZero
+                // (the reverse on false). With a nonzero constant:
+                // `z == 5` true → NonZero; no information on the false
+                // side.
                 bool eqHolds = (opc == BO_EQ) == edgeTrue;
                 if (litState == ZeroState::Zero)
                     setIfTracked(state, var, eqHolds ? ZeroState::Zero
@@ -213,8 +216,9 @@ void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
                 return;
             }
 
-            // Siralamalar yalnizca sifir sabitiyle: esitsizligin sifiri
-            // disladigi yonde NonZero cikarimi (opc degisken-solda gelir)
+            // Orderings only against the zero constant: infer NonZero in
+            // the direction where the inequality excludes zero (opc
+            // arrives variable-on-the-left)
             if (litState != ZeroState::Zero) return;
             switch (opc) {
                 case BO_GT:  // z > 0
@@ -222,8 +226,8 @@ void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
                     if (edgeTrue)
                         setIfTracked(state, var, ZeroState::NonZero);
                     break;
-                case BO_GE:  // z >= 0: yanlis ise z < 0 → NonZero
-                case BO_LE:  // z <= 0: yanlis ise z > 0 → NonZero
+                case BO_GE:  // z >= 0: if false then z < 0 → NonZero
+                case BO_LE:  // z <= 0: if false then z > 0 → NonZero
                     if (!edgeTrue)
                         setIfTracked(state, var, ZeroState::NonZero);
                     break;
@@ -251,7 +255,7 @@ public:
 
     State initialState() const { return initState_; }
 
-    // Degisken basina ZeroState zinciri en fazla 3 gecis yapar
+    // The per-variable ZeroState chain makes at most 3 transitions
     unsigned latticeHeight() const {
         return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
     }
@@ -264,9 +268,9 @@ public:
                 result[var] = stateB;
             else {
                 if (it->second == stateB) continue;
-                // Herhangi bir yolda kesin/olasi sifir varsa bilgi korunur:
-                // Zero|MaybeZero + baska bir sey = MaybeZero.
-                // Yalnizca NonZero + Unknown bilgisizlige duser.
+                // If any path has definite/possible zero, the knowledge
+                // is preserved: Zero|MaybeZero + anything = MaybeZero.
+                // Only NonZero + Unknown decays to no knowledge.
                 bool anyZeroInfo =
                     it->second == ZeroState::Zero ||
                     it->second == ZeroState::MaybeZero ||
@@ -290,7 +294,7 @@ public:
                 case StmtEffect::AssignsNonZero:
                     out[var] = ZeroState::NonZero; break;
                 case StmtEffect::AssignsMaybeZero:
-                    // Ozetten: cagrilan bazi yollarda 0 dondurebilir
+                    // From the summary: the callee may return 0 on some paths
                     out[var] = ZeroState::MaybeZero; break;
                 case StmtEffect::AssignsUnknown:
                     out[var] = ZeroState::Unknown; break;
@@ -305,9 +309,10 @@ public:
         applyCondition(dyn_cast<Expr>(cond), isTrueBranch, state);
     }
 
-    // Guard izi (Iz v2): kenar iyilestirmesi degiskeni KESIN sifir
-    // yaptiysa kosul noktasina iz notu — `if (n == 0) 100 / n`
-    // bulgusunun "neden sifir" sorusu artik cevapli
+    // Guard trace (Trace v2): if the edge refinement made the variable
+    // DEFINITELY zero, add a trace note at the condition point — the
+    // "why zero" question for the `if (n == 0) 100 / n` finding now has
+    // an answer
     void onEdgeRefined(const Stmt* cond, bool /*isTrueBranch*/,
                        const State& before, const State& after,
                        ASTContext& ctx) {
@@ -322,7 +327,7 @@ public:
 
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
-        // Dataflow izi: sifira / olasi-sifira gecis olaylarini kaydet
+        // Dataflow trace: record transitions to zero / possibly-zero
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
@@ -334,17 +339,18 @@ public:
                             zerodefect::MsgId::TraceAssignedMaybeZeroHere);
         }
 
-        // YALNIZCA tepe dugum: ince taneli CFG'de her bolme kendi elemani
-        // olarak gelir. Nested arama (eski DivFinder yaklasimi) ayni
-        // bolmeyi kapsayan ifadenin elemaninda — yanlis (join) state'iyle —
-        // ikinci kez kesfedip FP uretiyordu (ternary guard vakasi).
+        // Top node ONLY: in the fine-grained CFG every division arrives
+        // as its own element. Nested search (the old DivFinder approach)
+        // rediscovered the same division a second time in the enclosing
+        // expression's element — with the wrong (join) state — and
+        // produced FPs (the ternary guard case).
         const auto* op = dyn_cast<BinaryOperator>(stmt);
         if (!op) return;
         if (op->getOpcode() != BO_Div && op->getOpcode() != BO_Rem) return;
         if (op->getType()->isFloatingType()) return;
 
         const Expr* rhs = op->getRHS()->IgnoreParenImpCasts();
-        if (evaluateAsZero(rhs) == ZeroState::Zero) return;  // Phase 1'de
+        if (evaluateAsZero(rhs) == ZeroState::Zero) return;  // in Phase 1
         const VarDecl* var = getReferencedVar(rhs);
         if (!var) return;
 
@@ -380,7 +386,7 @@ public:
         noteTargets_.emplace_back(results_.size() - 1, var);
     }
 
-    // Kosu bittikten sonra: sifir-atama izlerini raporlara ilistir
+    // After the run finishes: attach the zero-assignment traces to reports
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
             auto it = events_.find(var);

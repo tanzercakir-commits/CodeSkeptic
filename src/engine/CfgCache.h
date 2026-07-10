@@ -12,32 +12,35 @@ class FunctionDecl;
 
 namespace zerodefect {
 
-// Fonksiyon basina CFG onbellegi: ayni fonksiyonun CFG'si TU icinde BIR
-// kez kurulur, tum tuketiciler (4 kural + ozet mini-akislarinin her
-// taramasi) paylasir. Onceden fonksiyon basina 6+ insa vardi.
+// Per-function CFG cache: the CFG of a function is built ONCE within
+// the TU and shared by all consumers (4 rules + every sweep of the
+// summary mini-flows). Previously there were 6+ builds per function.
 //
-// Kurulum secenekleri (setAllAlwaysAdd) artik YALNIZCA burada yasar —
-// tuketiciler ayni granulerligi gormek zorunda (iki fazli raporlama ve
-// tepe-dugum sozlesmesi buna dayanir).
+// Build options (setAllAlwaysAdd) now live ONLY here — consumers must
+// see the same granularity (two-phase reporting and the top-node
+// contract depend on it).
 //
-// Gecerlilik: FunctionDecl* anahtarlari TU'ya ozgudur. Iki koruma:
-//  1. TU sonunda acik temizlik (RuleEngine::runAll / TestHelper /
-//     whole-program hasadi — SummaryRegistry::clear ile ayni noktalar).
-//  2. ASTContext degisiminde otomatik bosaltma (yedek emniyet: adres
-//     yeniden kullanimiyla sahte isabet olasiligina karsi — bayat CFG
-//     ASLA servis edilmez ilkesinin burada karsiligi).
+// Validity: FunctionDecl* keys are TU-specific. Two protections:
+//  1. Explicit cleanup at the end of the TU (RuleEngine::runAll /
+//     TestHelper / whole-program harvest — the same points as
+//     SummaryRegistry::clear).
+//  2. Automatic flush when the ASTContext changes (backup safety:
+//     against the chance of a false hit via address reuse — this is
+//     the local embodiment of the "stale CFG is NEVER served"
+//     principle).
 class CfgCache {
 public:
     static CfgCache& instance();
 
-    // Fonksiyonun CFG'sini dondurur (gerekirse kurar). Kurulamazsa
-    // nullptr. Donen isaretci bir sonraki clear()'a kadar gecerli.
+    // Returns the function's CFG (building it if needed). nullptr if
+    // it cannot be built. The returned pointer is valid until the
+    // next clear().
     clang::CFG* get(const clang::FunctionDecl* func,
                     clang::ASTContext& ctx);
 
     void clear();
 
-    // Test/teshis sayaclari (surec-omurlu)
+    // Test/diagnostic counters (process-lifetime)
     static unsigned hits();
     static unsigned misses();
     static void resetCounters();

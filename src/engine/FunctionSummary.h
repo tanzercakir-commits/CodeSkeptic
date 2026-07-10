@@ -12,37 +12,39 @@ class FunctionDecl;
 
 namespace zerodefect {
 
-// Interprosedurel analiz v1: TU-yerel fonksiyon ozetleri.
+// Interprocedural analysis v1: TU-local function summaries.
 //
-// Iki bilgi cikarilir:
-//  1. Donus nullness'i — fonksiyon pointer donduruyorsa, donus degeri
-//     hicbir yolda null olamaz mi (NeverNull), bazi yollarda null
-//     olabilir mi (MaybeNull), yoksa bilinmiyor mu (Unknown)?
-//  2. Parametre etkileri — govde parametreyi free mi ediyor (Frees),
-//     yalnizca okuyor mu (ReadsOnly), saklıyor/kaciriyor mu (Stores)?
-//     Govdesi gorunmeyen fonksiyonlar Opaque'tir.
+// Two pieces of information are extracted:
+//  1. Return nullness — if the function returns a pointer, can the
+//     return value never be null on any path (NeverNull), be null on
+//     some paths (MaybeNull), or is it unknown (Unknown)?
+//  2. Parameter effects — does the body free the parameter (Frees),
+//     only read it (ReadsOnly), or store/escape it (Stores)?
+//     Functions whose body is not visible are Opaque.
 //
-// Kapsam ve guvenlik sinirlari (v1):
-//  - Yalnizca ayni TU'da GOVDESI gorunen fonksiyonlar ozetlenir;
-//    disaridakiler Opaque kalir (cagiran taraf muhafazakar davranir).
-//  - Alias'lara kor: parametrenin BASKA BIR SEYE atanmasi (yerel dahil)
-//    Stores sayilir — cJSON_Delete'in `q = p; free(q)` kalibi bilerek
-//    Escaped'de birakilir (v2: alias izleme).
-//  - Donus nullness'i literal/new/&x/string ve cagri zinciriyle sinirli;
-//    degisken donduren yollar Unknown'a duser.
+// Scope and safety limits (v1):
+//  - Only functions whose BODY is visible in the same TU get
+//    summarized; outsiders stay Opaque (callers act conservatively).
+//  - Blind to aliases: assigning the parameter to ANYTHING ELSE
+//    (locals included) counts as Stores — cJSON_Delete's
+//    `q = p; free(q)` pattern is deliberately left Escaped
+//    (v2: alias tracking).
+//  - Return nullness is limited to literal/new/&x/string and call
+//    chains; paths that return a variable fall to Unknown.
 //
-// Yakinsam: ozetler sabit sayida tarama ile (<= kMaxSweeps) sifirdan
-// yeniden hesaplanir; degisiklik kalmayinca durulur. Rekursif fonksiyon
-// kendi onceki ozetini gorur — Unknown/Opaque baslangic, NeverNull ve
-// ReadsOnly/Frees gibi guclu iddialarin rekursiyonla sizmasini onler
-// (yanlis yonde iyimserlik yok).
+// Convergence: summaries are recomputed from scratch over a bounded
+// number of sweeps (<= kMaxSweeps); we stop once nothing changes. A
+// recursive function sees its own previous summary — the
+// Unknown/Opaque start keeps strong claims such as NeverNull and
+// ReadsOnly/Frees from leaking in through recursion (no optimism in
+// the wrong direction).
 class SummaryRegistry {
 public:
     enum class ReturnNullness { Unknown, NeverNull, MaybeNull };
-    // Tamsayi donduren fonksiyonlar icin sifir-olabilirlik: DivByZero
-    // fonksiyonlar arasi gorur (`data = 0; return data;` kaynagi baska
-    // fonksiyonda/dosyada olsa da bolen uyarilir). Null'un aynasi:
-    // ayni mini-akis, sifir domain'iyle.
+    // Zero-possibility for integer-returning functions: lets DivByZero
+    // see across functions (the divisor is flagged even when the
+    // `data = 0; return data;` source lives in another function/file).
+    // The mirror of null: same mini-flow, with the zero domain.
     enum class ReturnZeroness { Unknown, NeverZero, MaybeZero };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
 
@@ -59,50 +61,53 @@ public:
 
     static SummaryRegistry& instance();
 
-    // TU basina bir kez: tum govdeli fonksiyonlarin ozetlerini hesaplar.
-    // FunctionDecl* anahtarlari TU'ya ozgudur — her cagri onceki tabloyu
-    // TAMAMEN temizler (sarkan pointer olmasin).
+    // Once per TU: computes summaries for all functions with a body.
+    // FunctionDecl* keys are TU-specific — each call clears the
+    // previous table COMPLETELY (no dangling pointers).
     void rebuild(clang::ASTContext& ctx);
 
-    // Ozet yoksa nullptr doner. Once TU-yerel tablo, sonra cross-TU
-    // deposu (yalnizca harici baglantili fonksiyonlar) denenir.
+    // Returns nullptr if there is no summary. The TU-local table is
+    // tried first, then the cross-TU store (external linkage only).
     const FunctionSummary* lookup(const clang::FunctionDecl* func) const;
 
-    // --- Cross-TU katmani (Ufuk 2: whole-program modu) ---
+    // --- Cross-TU layer (Horizon 2: whole-program mode) ---
     //
-    // Anahtar: nitelikli ad + "/" + parametre sayisi. Yalnizca HARICI
-    // baglantili fonksiyonlar depolanir/aranir — static (dosya-yerel)
-    // fonksiyonlar TU disindan cagrilamaz ve Juliet gibi korpuslarda
-    // ayni adla her dosyada bulunur; onlari anahtarlamak yanlis
-    // eslesme uretirdi. C++ overload'lari ayni anahtara dusebilir:
-    // cakismada alanlar muhafazakar birlesir (returnNullness -> Unknown,
-    // param -> Opaque) — belirsizlik her zaman kaybeder, yanlis guclu
-    // iddia dogamaz.
+    // Key: qualified name + "/" + parameter count. Only EXTERNALLY
+    // linked functions are stored/looked up — static (file-local)
+    // functions cannot be called from outside the TU and, in corpora
+    // like Juliet, occur in every file under the same name; keying
+    // them would produce false matches. C++ overloads may land on the
+    // same key: on collision, fields merge conservatively
+    // (returnNullness -> Unknown, param -> Opaque) — ambiguity always
+    // loses, no false strong claim can arise.
 
-    // TU-yerel tablodaki harici-baglantili ozetleri depoya katar
-    // (whole-program 1. gecisinde TU basina bir kez cagrilir).
+    // Folds the externally-linked summaries of the TU-local table into
+    // the store (called once per TU in whole-program pass 1).
     void harvestGlobal();
 
-    // Depodan arama; yalnizca harici-baglantili decl'ler icin.
+    // Lookup from the store; for externally-linked decls only.
     const FunctionSummary* lookupGlobal(
         const clang::FunctionDecl* func) const;
 
-    // --- Kalicilik (Cross-TU v2: artimli whole-program) ---
+    // --- Persistence (Cross-TU v2: incremental whole-program) ---
     //
-    // Depo satir-tabanli surumlu metin olarak diske yazilir/yuklenir:
-    // bir kez tum projeden hasat et (--summary-out), sonra degisen
-    // dosyayi tek basina ama proje bilgisiyle analiz et (--summary-in).
+    // The store is saved/loaded to disk as line-based versioned text:
+    // harvest the whole project once (--summary-out), then analyze a
+    // changed file on its own but with project knowledge
+    // (--summary-in).
     //
-    // Yukleme MEVCUT depoya eklenir; anahtar cakismasinda hasatla ayni
-    // muhafazakar birlesim (uyusmayan alan zayif iddiaya duser). Bozuk
-    // dosya butunuyle REDDEDILIR (false; depo degismez) — kismi/yanlis
-    // veri sessizce guclu iddiaya donusemez.
+    // Loading adds into the EXISTING store; on key collision, the same
+    // conservative merge as harvest (a mismatched field falls to the
+    // weak claim). A corrupt file is REJECTED wholesale (false; store
+    // unchanged) — partial/wrong data can never silently become a
+    // strong claim.
     bool saveGlobal(const std::string& path) const;
     bool loadGlobal(const std::string& path);
 
-    // Dosyayi depoya KARISTIRMADAN ayristir: ozet-diff gibi iki hasadi
-    // yan yana gorme ihtiyaclari icin. Kabul/red kurallari loadGlobal
-    // ile birebir ayni (surumler, bozukta butunuyle red).
+    // Parses the file WITHOUT mixing it into the store: for callers
+    // like summary-diff that need two harvests side by side. The
+    // accept/reject rules match loadGlobal exactly (versions,
+    // wholesale reject on corruption).
     static bool parseSummaryFile(
         const std::string& path,
         std::map<std::string, FunctionSummary>& out);

@@ -8,40 +8,44 @@
 
 namespace zerodefect {
 
-// Baseline: mevcut bulgulari dosyaya dondurur, sonraki kosularda
-// yalnizca YENI bulgular raporlanir. Eski koda kademeli adaptasyonun
-// standart yolu.
+// Baseline: freezes the current findings into a file; subsequent runs
+// report ONLY NEW findings. The standard path for gradual adoption on
+// legacy code.
 //
-// v2 anahtari SATIR-BAGIMSIZ: satir numarasi yerine bulgu satirinin
-// kirpilmis METIN iceriginin hash'i (FNV-1a 64 — platformlar arasi
-// sabit; std::hash garanti vermez). Ustune kod eklenip bulgu kaydiginca
-// anahtar degismez; satirin KENDISI degisirse bulgu yeniden gorunur —
-// bu bir ozellik (degisen satir yeniden gozden gecirilmeli).
+// The v2 key is LINE-INDEPENDENT: instead of the line number it uses a
+// hash of the trimmed TEXT content of the finding's line (FNV-1a 64 —
+// stable across platforms; std::hash gives no such guarantee). When
+// code is added above and the finding shifts, the key does not change;
+// if the line ITSELF changes, the finding reappears — that is a
+// feature (a changed line should be re-reviewed).
 //
-// Ayni anahtarli birden fazla bulgu SAYIYLA izlenir (multiset
-// semantigi): iki ayri fonksiyondaki ozdes `delete p;` satirlarinin
-// birini baseline'a almak digerini gizlemez.
+// Multiple findings with the same key are tracked by COUNT (multiset
+// semantics): baselining one of two identical `delete p;` lines in two
+// different functions does not hide the other.
 //
-// Format: "# zerodefect-baseline v2" basligi + satir basina bir anahtar
-// (rule_id|file|satir-hash|message; tekrarlar korunur). Basliksiz eski
-// v1 dosyalari (rule_id|file|line|message) yuklemede taninir ve eski
-// anlamiyla eslesmeye devam eder — baseline tazelenince v2'ye gecilir.
+// Format: "# zerodefect-baseline v2" header + one key per line
+// (rule_id|file|line-hash|message; duplicates preserved). Headerless
+// old v1 files (rule_id|file|line|message) are recognized on load and
+// keep matching with their old meaning — refreshing the baseline
+// migrates to v2.
 class Baseline {
 public:
-    // Bulgulari baseline dosyasina yazar (v2 format). Basari durumu.
+    // Writes findings to the baseline file (v2 format). Returns success.
     static bool write(const std::string& path,
                       const DiagnosticList& diagnostics);
 
-    // Baseline dosyasini yukler. Dosya yoksa bos baseline (hata degil).
+    // Loads the baseline file. A missing file means an empty baseline
+    // (not an error).
     bool load(const std::string& path);
 
-    // Baseline'da kayitli bulgulari listeden cikarir, cikarilan sayiyi
-    // dondurur. Anahtar basina kayit SAYISI kadar bulgu bastirilir.
+    // Removes findings recorded in the baseline from the list, returns
+    // the number removed. Per key, as many findings are suppressed as
+    // there are recorded entries.
     size_t filter(DiagnosticList& diagnostics) const;
 
-    // v1: satir numarali eski anahtar (yalniz eski dosya uyumu icin)
+    // v1: old line-number key (only for legacy file compatibility)
     static std::string keyV1(const Diagnostic& diag);
-    // v2: satir-icerigi hash'li anahtar (diag.file diskten okunur)
+    // v2: line-content-hash key (diag.file is read from disk)
     static std::string keyV2(const Diagnostic& diag);
 
 private:

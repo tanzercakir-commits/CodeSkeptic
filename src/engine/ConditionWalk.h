@@ -1,21 +1,23 @@
 #ifndef ZERODEFECT_CONDITION_WALK_H
 #define ZERODEFECT_CONDITION_WALK_H
 
-// Kosul-yuruyusu iskeleti: dallanma kosullarindan kenar-bilgisi cikaran
-// TUM analizlerin ortak omurgasi. Yapi her domain'de ayni:
-//   - `!c`     : ters kenara in
-//   - `a && b` : DOGRU kenarda iki taraf da dogru
-//   - `a || b` : YANLIS kenarda iki taraf da yanlis
-//   - truthiness (`if (x)`) ve ikili karsilastirmalar → callback
-// Domain'e ozgu yorum (pointer nullness, tamsayi sifirligi, path-fact)
-// callback'lerde yasar. Karsilastirmalarda degisken hangi taraftaysa
-// operator degisken-solda olacak sekilde AYNALANIR — istemciler tek
-// yonu dusunur.
+// Condition-walk skeleton: the shared backbone of ALL analyses that
+// extract edge information from branch conditions. The structure is
+// the same in every domain:
+//   - `!c`     : descend into the opposite edge
+//   - `a && b` : on the TRUE edge both sides are true
+//   - `a || b` : on the FALSE edge both sides are false
+//   - truthiness (`if (x)`) and binary comparisons → callback
+// The domain-specific reading (pointer nullness, integer zeroness,
+// path-fact) lives in the callbacks. In comparisons, whichever side
+// the variable is on, the operator is MIRRORED so the variable is on
+// the left — clients think in one direction only.
 //
-// walkNullCondition: pointer-nullness domain'inin hazir ozeti — uc
-// kullanicinin (NullDerefRule, MemoryLeakRule, FunctionSummary) ortak
-// yuruyusu. setNull(var, isNullOnEdge) iki yonde de cagrilir; yalnizca
-// null kenariyla ilgilenen istemci (MemLeak) digerini yok sayar.
+// walkNullCondition: the ready-made digest of the pointer-nullness
+// domain — the shared walk of three users (NullDerefRule,
+// MemoryLeakRule, FunctionSummary). setNull(var, isNullOnEdge) is
+// called in both directions; a client that only cares about the null
+// edge (MemLeak) ignores the other.
 
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
@@ -47,8 +49,9 @@ inline bool isNullLiteral(const clang::Expr* expr) {
     return false;
 }
 
-// Tamsayi sabitinin sifirligi: IntegerLiteral (+ unary eksi zinciri).
-// Uc deger: 1 = kesin sifir, 0 = kesin sifir-degil, -1 = sabit degil.
+// Zeroness of an integer constant: IntegerLiteral (+ unary minus
+// chain). Three values: 1 = surely zero, 0 = surely non-zero,
+// -1 = not a constant.
 inline int zeroLiteralState(const clang::Expr* expr) {
     if (!expr) return -1;
     expr = expr->IgnoreParenImpCasts();
@@ -67,15 +70,15 @@ inline clang::BinaryOperatorKind mirror(clang::BinaryOperatorKind opc) {
         case clang::BO_GT: return clang::BO_LT;
         case clang::BO_LE: return clang::BO_GE;
         case clang::BO_GE: return clang::BO_LE;
-        default: return opc;  // EQ/NE simetrik
+        default: return opc;  // EQ/NE are symmetric
     }
 }
 
 } // namespace condwalk_detail
 
-// Genel iskelet. onTruth(var, isTrue): `if (x)` bicimi.
-// onCompare(var, opc, other, isTrue): `x OPC other` bicimi; opc her
-// zaman degisken-solda normalize edilmistir, other karsi taraftir.
+// The general skeleton. onTruth(var, isTrue): the `if (x)` form.
+// onCompare(var, opc, other, isTrue): the `x OPC other` form; opc is
+// always normalized variable-on-left, other is the opposite side.
 template <typename TruthFn, typename CompareFn>
 void walkCondition(const clang::Expr* cond, bool isTrue,
                    TruthFn&& onTruth, CompareFn&& onCompare) {
@@ -123,9 +126,9 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
     }
 }
 
-// Pointer-nullness domain'i: setNull(var, isNullOnEdge) — bu kenarda
-// var'in kesin null (true) ya da kesin non-null (false) oldugu bilgisi.
-// Yalnizca pointer tipli degiskenler ve null-literal karsilastirmalari.
+// Pointer-nullness domain: setNull(var, isNullOnEdge) — the fact that
+// on this edge var is surely null (true) or surely non-null (false).
+// Only pointer-typed variables and null-literal comparisons.
 template <typename SetNullFn>
 void walkNullCondition(const clang::Expr* cond, bool isTrue,
                        SetNullFn&& setNull) {
@@ -134,7 +137,7 @@ void walkNullCondition(const clang::Expr* cond, bool isTrue,
         cond, isTrue,
         [&](const clang::VarDecl* var, bool truthy) {
             if (var->getType()->isPointerType())
-                setNull(var, !truthy);  // `if (p)` dogru → non-null
+                setNull(var, !truthy);  // `if (p)` true → non-null
         },
         [&](const clang::VarDecl* var, clang::BinaryOperatorKind opc,
             const clang::Expr* other, bool edgeTrue) {
@@ -146,12 +149,12 @@ void walkNullCondition(const clang::Expr* cond, bool isTrue,
         });
 }
 
-// Tamsayi-sifirlik domain'i: setZero(var, isZeroOnEdge) — bu kenarda
-// var'in kesin sifir (true) ya da kesin sifir-degil (false) oldugu
-// bilgisi. Desteklenen kaliplar: truthiness, ==/!= (sifir ve sifir
-// olmayan sabit), sifir sabitiyle siralamalar (esitsizligin sifiri
-// disladigi yon). Iki istemci: DivByZeroRule (kenar iyilestirmesi) ve
-// FunctionSummary'nin sifirlik mini-akisi.
+// Integer-zeroness domain: setZero(var, isZeroOnEdge) — the fact that
+// on this edge var is surely zero (true) or surely non-zero (false).
+// Supported patterns: truthiness, ==/!= (with zero and non-zero
+// constants), orderings against the zero constant (the direction
+// where the inequality excludes zero). Two clients: DivByZeroRule
+// (edge refinement) and FunctionSummary's zeroness mini-flow.
 template <typename SetZeroFn>
 void walkZeroCondition(const clang::Expr* cond, bool isTrue,
                        SetZeroFn&& setZero) {
@@ -159,16 +162,16 @@ void walkZeroCondition(const clang::Expr* cond, bool isTrue,
     walkCondition(
         cond, isTrue,
         [&](const clang::VarDecl* var, bool truthy) {
-            setZero(var, !truthy);  // `if (z)` dogru → sifir-degil
+            setZero(var, !truthy);  // `if (z)` true → non-zero
         },
         [&](const clang::VarDecl* var, clang::BinaryOperatorKind opc,
             const clang::Expr* other, bool edgeTrue) {
             const int lit = d::zeroLiteralState(other);
 
             if (opc == clang::BO_EQ || opc == clang::BO_NE) {
-                // `z == 0` dogru → Zero; `z != 0` dogru → NonZero
-                // (yanlislarda tersi). Sifir olmayan sabitle esitlik
-                // tutuyorsa → NonZero; tutmuyorsa bilgi yok.
+                // `z == 0` true → Zero; `z != 0` true → NonZero
+                // (inverted on false edges). Equality with a non-zero
+                // constant, if it holds → NonZero; if not, no info.
                 const bool eqHolds = (opc == clang::BO_EQ) == edgeTrue;
                 if (lit == 1)
                     setZero(var, eqHolds);
@@ -177,15 +180,15 @@ void walkZeroCondition(const clang::Expr* cond, bool isTrue,
                 return;
             }
 
-            // Siralamalar yalnizca sifir sabitiyle (opc degisken-solda)
+            // Orderings only against the zero constant (opc variable-on-left)
             if (lit != 1) return;
             switch (opc) {
                 case clang::BO_GT:  // z > 0
                 case clang::BO_LT:  // z < 0
                     if (edgeTrue) setZero(var, false);
                     break;
-                case clang::BO_GE:  // z >= 0: yanlis ise z < 0
-                case clang::BO_LE:  // z <= 0: yanlis ise z > 0
+                case clang::BO_GE:  // z >= 0: if false then z < 0
+                case clang::BO_LE:  // z <= 0: if false then z > 0
                     if (!edgeTrue) setZero(var, false);
                     break;
                 default:

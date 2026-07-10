@@ -6,7 +6,7 @@
 using namespace zerodefect;
 using namespace zerodefect::testing;
 
-// --- Kesin null dereference ---
+// --- Definite null dereference ---
 
 TEST(NullDerefRuleTest, DefiniteNullDeref) {
     NullDerefRule rule;
@@ -19,7 +19,7 @@ TEST(NullDerefRuleTest, DefiniteNullDeref) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "null-deref");
     EXPECT_EQ(results[0].severity, Severity::Error);
-    EXPECT_EQ(results[0].function, "f");  // Juliet puanlamasi buna dayanir
+    EXPECT_EQ(results[0].function, "f");  // Juliet scoring relies on this
 }
 
 TEST(NullDerefRuleTest, ZeroLiteralInit) {
@@ -71,7 +71,7 @@ TEST(NullDerefRuleTest, AssignNullInsideGuard) {
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
-// --- Olasi null (MaybeNull) ---
+// --- Possible null (MaybeNull) ---
 
 TEST(NullDerefRuleTest, MaybeNull_Warning) {
     NullDerefRule rule;
@@ -87,7 +87,7 @@ TEST(NullDerefRuleTest, MaybeNull_Warning) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
-// --- Guard'lar: eski NullPointerRule'un FP mezarligi ---
+// --- Guards: the old NullPointerRule's FP graveyard ---
 
 TEST(NullDerefRuleTest, TruthinessGuard_Clean) {
     NullDerefRule rule;
@@ -140,7 +140,7 @@ TEST(NullDerefRuleTest, EqualsNullGuard_DefiniteError) {
             }
         }
     )");
-    // p == nullptr dogru dalinda dereference: kesin hata
+    // Dereference on the true branch of p == nullptr: definite error
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
@@ -169,12 +169,12 @@ TEST(NullDerefRuleTest, WhileGuard_ErrorAfterLoop) {
             int x = n->data;
         }
     )");
-    // Dongu icinde n NonNull (temiz); donguden cikista n kesin null
+    // Inside the loop n is NonNull (clean); on loop exit n is definitely null
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
-// --- Muhafazakarlik: bilinmeyen sessiz kalir ---
+// --- Conservatism: unknown stays silent ---
 
 TEST(NullDerefRuleTest, ParamUnguarded_Silent) {
     NullDerefRule rule;
@@ -183,7 +183,7 @@ TEST(NullDerefRuleTest, ParamUnguarded_Silent) {
             int x = *p;
         }
     )");
-    // Parametre Unknown -> rapor yok. Eski kuralin 68-FP tuzagi buydu.
+    // Parameter is Unknown -> no report. This was the old rule's 68-FP trap.
     ASSERT_EQ(results.size(), 0);
 }
 
@@ -223,16 +223,17 @@ TEST(NullDerefRuleTest, OutParamEscape_Clean) {
             int x = *p;
         }
     )");
-    // &p bir fonksiyona gitti -> p Unknown -> sessiz (muhafazakar)
+    // &p went into a function -> p Unknown -> silent (conservative)
     ASSERT_EQ(results.size(), 0);
 }
 
 TEST(NullDerefRuleTest, LinkedListBuildLoop_WarningNotError) {
-    // cJSON parse_array kalibi: cur ilk iterasyonda then-dalinda atanir,
-    // sonrakilerde else-dalinda dereference edilir. head/cur korelasyonu
-    // izlenmedigi icin MaybeNull (Warning) durustce raporlanir — ama
-    // fixpoint oncesi erken state ile "kesinlikle null" (Error) DEMEK
-    // yanlisti (motor regresyon testi).
+    // The cJSON parse_array pattern: cur is assigned on the then-branch
+    // in the first iteration and dereferenced on the else-branch in
+    // later ones. Since the head/cur correlation is not tracked,
+    // MaybeNull (Warning) is honestly reported — but calling it
+    // "definitely null" (Error) from the early pre-fixpoint state WAS
+    // wrong (engine regression test).
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct Node { Node* next; };
@@ -252,7 +253,7 @@ TEST(NullDerefRuleTest, LinkedListBuildLoop_WarningNotError) {
         }
     )");
     ASSERT_EQ(results.size(), 1);
-    EXPECT_EQ(results[0].severity, Severity::Warning);  // Error DEGIL
+    EXPECT_EQ(results[0].severity, Severity::Warning);  // NOT Error
 }
 
 TEST(NullDerefRuleTest, OpaqueFunctionReturn_Silent) {
@@ -267,11 +268,11 @@ TEST(NullDerefRuleTest, OpaqueFunctionReturn_Silent) {
     ASSERT_EQ(results.size(), 0);
 }
 
-// --- Hedefli yol duyarliligi (GuardedDisjuncts) ---
+// --- Targeted path sensitivity (GuardedDisjuncts) ---
 
 TEST(NullDerefPathSensitivityTest, CorrelatedGuards_AssignDeref_Clean) {
-    // Juliet int_07/08/09 kalibi: atama ve dereference ayni degismez
-    // kosul altinda — "may be null" FP'si dogmamali
+    // The Juliet int_07/08/09 pattern: assignment and dereference are
+    // under the same invariant condition — no "may be null" FP must arise
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int flag;
@@ -286,7 +287,8 @@ TEST(NullDerefPathSensitivityTest, CorrelatedGuards_AssignDeref_Clean) {
 }
 
 TEST(NullDerefPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
-    // Dereference yanlis dalda: flag==0 yolunda data kesin null
+    // Dereference on the wrong branch: on the flag==0 path data is
+    // definitely null
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int flag;
@@ -302,8 +304,8 @@ TEST(NullDerefPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
 }
 
 TEST(NullDerefPathSensitivityTest, PointerGuardStillWorks_WithFacts) {
-    // Int gercekleri pointer nullness iyilestirmesiyle birlikte calisir:
-    // hem flag korelasyonu hem if(p) guard'i ayni fonksiyonda
+    // Int facts work together with pointer nullness refinement:
+    // both the flag correlation and the if(p) guard in the same function
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int flag;
@@ -319,9 +321,9 @@ TEST(NullDerefPathSensitivityTest, PointerGuardStillWorks_WithFacts) {
 }
 
 TEST(NullDerefRuleTest, MultiDeclaration_SecondPointerTracked) {
-    // Eski "bilinen FN" notu gecersiz cikti: ince taneli CFG coklu
-    // bildirimi degisken basina sentetik DeclStmt'lere boler — ikinci
-    // pointer da izlenir. Regresyon testi olarak sabitlendi.
+    // The old "known FN" note turned out invalid: the fine-grained CFG
+    // splits a multi-declaration into per-variable synthetic DeclStmts —
+    // the second pointer is tracked too. Pinned as a regression test.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         void f() {
@@ -335,8 +337,9 @@ TEST(NullDerefRuleTest, MultiDeclaration_SecondPointerTracked) {
 }
 
 TEST(NullDerefTraceTest, GuardOnlyNull_TraceShowsCondition) {
-    // Iz v2: atama olmadan, salt guard'dan gelen kesin-null onceden
-    // IZSIZDI — simdi kosul noktasi "bu dalda null" notuyla gorunur
+    // Trace v2: a definite-null coming purely from a guard, with no
+    // assignment, used to have NO trace — now the condition point shows
+    // up with a "null on this branch" note
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         void f(int* p) {
@@ -351,6 +354,6 @@ TEST(NullDerefTraceTest, GuardOnlyNull_TraceShowsCondition) {
     ASSERT_FALSE(results[0].notes.empty());
     EXPECT_NE(results[0].notes[0].message.find("null on this branch"),
               std::string::npos);
-    // Not, kosulun satirini gostermeli (dereference'in degil)
+    // The note must point to the condition's line (not the dereference's)
     EXPECT_LT(results[0].notes[0].line, results[0].line);
 }

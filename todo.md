@@ -1,231 +1,244 @@
-# ZeroDefect — Yapılacaklar ve Notlar
+# ZeroDefect — To-Dos and Notes
 
-## 📅 Yarının planı (2026-07-10 oturumu için hazırlandı)
+## 📅 Tomorrow's plan (prepared for the 2026-07-10 session)
 
-Sıralama önerisi — her madde bağımsız bir PR turu:
+Suggested order — each item is an independent PR round:
 
-1. **Juliet rakam analizi + zayıf-CWE kural iyileştirmesi.** PR #16'nın
-   temsili rakamlarıyla başla (README'ye işlendi/işlenecek). Eşlemeli
-   precision hangi kuralda düşükse oraya odaklan:
-   - CWE415/416 good-fonksiyon FP'leri: Juliet good varyantlarının tipik
-     kalıpları (goodB2G/goodG2B çağrı zincirleri) hangi FP'yi üretiyor?
-     `findings_*.json`'daki `function` alanından iki-üç örnek dosya seç,
-     kalıbı çıkar, kurala test-önce düzeltme uygula.
-   - CWE369: adımlı örneklemeden sonra int varyantları görünür olacak;
-     rand()/fgets kaynaklı akışlarda muhafazakâr sessizlik doğru
-     (Unknown), `data=0` yerel akışları yakalanmalı.
-2. **Korpus bulgu sayısı sabitleme** (küçük tur): beklenen bulgu sayısı
-   dosyası + tolerans; korpus CI adımı sapmada kırmızı. Semantik
-   regresyonların erken yakalayıcısı.
-3. **MemLeak transfer'ını tepe-düğüm Effect desenine taşı** (orta tur):
-   UninitPtr'daki desen; değişken-başına classify döngüsü kalkar,
-   MemLeak Juliet koşusu da hızlanır.
-4. Vakit kalırsa: ortak koşul-yürüyüşü yardımcısı (NullDeref + DivByZero
-   applyCondition tekilleştirmesi) — davranış değişikliği yok, testler
-   sabit kalmalı.
+1. **Juliet number analysis + weak-CWE rule improvement.** Start from
+   PR #16's representative numbers (added/to be added to the README).
+   Focus wherever mapped precision is lowest:
+   - CWE415/416 good-function FPs: which FPs do the typical patterns of
+     the Juliet good variants (goodB2G/goodG2B call chains) produce?
+     Pick two or three sample files via the `function` field in
+     `findings_*.json`, extract the pattern, apply a test-first fix to
+     the rule.
+   - CWE369: after strided sampling the int variants will become
+     visible; conservative silence is correct for rand()/fgets-sourced
+     flows (Unknown), `data=0` local flows should be caught.
+2. **Pin corpus finding counts** (small round): an expected-finding-count
+   file + tolerance; the corpus CI step goes red on deviation. An early
+   catcher of semantic regressions.
+3. **Move MemLeak's transfer to the top-node Effect pattern** (medium
+   round): the pattern already in UninitPtr; the per-variable classify
+   loop goes away, the MemLeak Juliet run speeds up too.
+4. If time remains: a shared condition-walk helper (NullDeref +
+   DivByZero applyCondition deduplication) — no behavior change, tests
+   must stay unchanged.
 
-Açık kullanıcı kararları (yol haritası artifact'ındaki 4 madde):
-public v0.1 zamanlaması (önerim: Juliet rakamları README'de olduktan
-sonra), kontrat dili sözdizimi (Ufuk 3 öncesi birlikte tasarım),
-Juliet'in CI ağırlığı, proje adı kontrolü.
+Open user decisions (the 4 items in the roadmap artifact):
+public v0.1 timing (my suggestion: after the Juliet numbers are in the
+README), contract language syntax (co-design before Horizon 3),
+Juliet's CI weight, project name check.
 
-## Sıradaki Görevler (yol haritası: analiz-2026-07.md)
+## Upcoming Tasks (roadmap: ROADMAP.md)
 
-### Faz 1 kalanları
-- [x] Fonksiyon başına CFG önbelleği (engine/CfgCache: FunctionDecl*
-      anahtarlı memoize depo; TU sonunda açık temizlik + ctx-değişiminde
-      otomatik boşaltma; kurulum seçenekleri tek yerde). Fonksiyon başına
-      6+ inşa → 1. (Tek-geziş motor redesign'ı ayrı ufuk — gerekirse.)
-- [x] converged=false artık stderr'de görünür (AnalysisNotConverged,
-      4 kuralda; i18n'li)
-- [x] MemoryLeakRule tepe-düğüm Effect desenine taşındı
-      (classifyStmtEffects: ifade bir kez sınıflandırılır)
+### Phase 1 leftovers
+- [x] Per-function CFG cache (engine/CfgCache: memoized store keyed by
+      FunctionDecl*; explicit cleanup at TU end + automatic flush on ctx
+      change; build options in one place). 6+ builds per function → 1.
+      (A single-pass engine redesign is a separate horizon — if needed.)
+- [x] converged=false is now visible on stderr (AnalysisNotConverged,
+      in 4 rules; i18n'd)
+- [x] MemoryLeakRule moved to the top-node Effect pattern
+      (classifyStmtEffects: an expression is classified once)
 
-### Faz 2 kalanları
-- [x] NIST Juliet ölçüm altyapısı (haftalık workflow + juliet_eval;
-      gerçek rakamlar ilk koşudan sonra README'ye)
-- [x] Juliet ilk gerçek koşu tamam (PR #14) — rakamlar ve analiz
-      changelog'da (2026-07-09 girişi)
-- [x] **Juliet ölçüm doğruluğu turu**: adımlı örnekleme + eşlemeli
-      precision (`rprecision`) + double-free rule_id — 2026-07-10
-      changelog girişine bakınız. Bonus: tek-süreç koşuda global filtre
-      sızıntısı bulundu ve düzeltildi (~StaticAnalyzer RAII; CI'ya
-      tek-süreç test adımı eklendi).
-- [ ] Temsili rakamlar (bu PR'ın Juliet CI koşusundan) README'ye
-      benchmark bölümü olarak işlensin
-- [ ] CWE415/416 good-fonksiyon FP'lerini incele (eşlemeli precision
-      sonrası gerçek boyut belli olur); CWE401 dosya isabeti için
-      interprosedürel kaynak/lavabo akışı (bilinen v1 sınırı)
-- [x] Korpus bulgu sayılarını sabitle (corpus_expected.txt: cjson 111,
-      tinyxml2 9; %10+2 tolerans; sapma = kırmızı = semantik regresyon)
-- [x] Baseline v2: satır-bağımsız anahtar (satır içeriği FNV-1a hash'i;
-      multiset sayacı — özdeş bulgular tek tek; v1 dosyaları geriye uyumlu)
+### Phase 2 leftovers
+- [x] NIST Juliet measurement infrastructure (weekly workflow +
+      juliet_eval; real numbers into the README after the first run)
+- [x] First real Juliet run done (PR #14) — numbers and analysis in the
+      changelog (2026-07-09 entry)
+- [x] **Juliet measurement accuracy round**: strided sampling + mapped
+      precision (`rprecision`) + double-free rule_id — see the
+      2026-07-10 changelog entry. Bonus: a global filter leak was found
+      in the single-process run and fixed (~StaticAnalyzer RAII;
+      single-process test step added to CI).
+- [ ] Representative numbers (from this PR's Juliet CI run) to be added
+      to the README as a benchmark section
+- [ ] Examine the CWE415/416 good-function FPs (real size becomes clear
+      after mapped precision); interprocedural source/sink flow for the
+      CWE401 file hit rate (known v1 limit)
+- [x] Pin corpus finding counts (corpus_expected.txt: cjson 111,
+      tinyxml2 9; 10%+2 tolerance; deviation = red = semantic regression)
+- [x] Baseline v2: line-independent key (FNV-1a hash of the line
+      content; multiset counter — identical findings tracked one by one;
+      v1 files backward compatible)
 
-### Kural iyileştirme notları
-- ~~NullDeref çoklu bildirim FN'i~~ — deneyle geçersiz çıktı: ince
-  taneli CFG çoklu bildirimi değişken başına böler, ikinci pointer da
-  izleniyor (regresyon testleriyle sabitlendi, 2026-07-10).
-- ~~Ortak koşul-yürüyüşü~~ — yapıldı (engine/ConditionWalk.h):
-  walkCondition (genel iskelet: !, &&/||, değişken-solda normalizasyon) +
-  walkNullCondition (pointer-null domain'i). Dört istemci: NullDeref,
-  MemLeak, FunctionSummary (null), DivByZero (sıfır, genel iskelet).
+### Rule improvement notes
+- ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
+  fine-grained CFG splits a multi-declaration per variable, the second
+  pointer is tracked too (pinned with regression tests, 2026-07-10).
+- ~~Shared condition walk~~ — done (engine/ConditionWalk.h):
+  walkCondition (generic skeleton: !, &&/||, variable-on-left
+  normalization) + walkNullCondition (pointer-null domain). Four
+  clients: NullDeref, MemLeak, FunctionSummary (null), DivByZero (zero,
+  generic skeleton).
 
-### Faz 3 (AI döngüsü)
-- [x] Artımlı analiz primitifi: --function filtresi + analyze_diff.sh
-- [x] Artımlı v2: --lines aralıkları + hunk ayrıştırma (tam otomatik
-      "yalnızca dokunulan fonksiyonları analiz et" döngüsü)
-- [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
-- [x] MCP server modu (--serve; initialize / tools/list / tools/call analyze)
-- [x] İz v2: guard/refine olayları izlerde (onEdgeRefined motor kancası —
-      yalnız raporlama geçişinde, yalnız state değiştiren kenarlarda;
-      NullDeref "bu dalda null", DivByZero "bu dalda sıfır" notları)
-- [x] MCP v2: sıcak süreçte AST/derleme önbelleği (yol+build-path anahtarı,
-      boyut+mtime parmak izi — bayat AST asla servis edilmez; yalnız MCP
-      yolunda açık, CLI kapalı; tekrar çağrıda ~6x hız)
+### Phase 3 (AI loop)
+- [x] Incremental analysis primitive: --function filter + analyze_diff.sh
+- [x] Incremental v2: --lines ranges + hunk parsing (fully automatic
+      "analyze only the touched functions" loop)
+- [x] Dataflow traces on findings (TraceNote; console/JSON/SARIF
+      relatedLocations)
+- [x] MCP server mode (--serve; initialize / tools/list / tools/call
+      analyze)
+- [x] Trace v2: guard/refine events in traces (onEdgeRefined engine
+      hook — only in the reporting pass, only on state-changing edges;
+      NullDeref "null on this branch", DivByZero "zero on this branch"
+      notes)
+- [x] MCP v2: AST/compilation cache in the warm process
+      (path+build-path key, size+mtime fingerprint — a stale AST is
+      never served; enabled only on the MCP path, off in the CLI; ~6x
+      speed on repeat calls)
 
-### Arayüz (UI) — pratiklik + görsellik
-- [x] **HTML rapor**: `--html rapor.html` — tek, kendine yeten dosya;
-      özet kartları = filtre (severity/kural), metin süzme, izler kaynak
-      bağlamıyla (`<details>`), koyu/açık tema otomatik. Kaynak satırları
-      üretim anında gömülür — rapor taşınabilir.
-- [x] **Editör entegrasyonu belgesi**: README'ye SARIF rehberi — VS Code
-      SARIF Viewer (izler related locations olarak gezilebilir) + GitHub
-      code scanning upload-sarif YAML örneği. (Ekran görüntüsü bu
-      ortamdan alınamadı — istenirse kullanıcı ekleyebilir.)
-- [ ] **Trend paneli**: haftalık JULIET_RESULT/CORPUS_RESULT satırlarını
-      işleyen statik sayfa (GitHub Pages) — F1/precision zaman serisi.
-      Skor bekçisinin görsel yüzü.
-- [ ] (Değerlendirme) VS Code eklentisi: MCP/--serve üzerinden canlı
-      analiz + satır içi squiggle. En yüksek etki, en yüksek maliyet —
-      HTML rapor + SARIF deneyiminden gelen geri bildirimle karar.
+### UI — practicality + visuals
+- [x] **HTML report**: `--html rapor.html` — a single, self-contained
+      file; summary cards = filters (severity/rule), text filtering,
+      traces with source context (`<details>`), dark/light theme
+      automatic. Source lines are embedded at generation time — the
+      report is portable.
+- [x] **Editor integration doc**: SARIF guide in the README — VS Code
+      SARIF Viewer (traces navigable as related locations) + GitHub
+      code scanning upload-sarif YAML example. (A screenshot could not
+      be captured from this environment — the user can add one if
+      desired.)
+- [ ] **Trend panel**: a static page (GitHub Pages) processing the
+      weekly JULIET_RESULT/CORPUS_RESULT lines — F1/precision time
+      series. The visual face of the score guard.
+- [ ] (Evaluation) VS Code extension: live analysis via MCP/--serve +
+      inline squiggles. Highest impact, highest cost — decide with
+      feedback from the HTML report + SARIF experience.
 
-### Faz 4 (araştırma ufku)
-- [x] İnterprosedürel v1: fonksiyon özetleri (dönüş nullness + parametre
-      etkileri; sabit-nokta taraması, rekursiyon-güvenli)
-- [x] İnterprosedürel v2: alias izleme (kopya grafı + taint yayılımı;
-      imleç-desenli yıkıcılar Frees; kirli/çok-kaynaklı/adresli yereller
-      muhafazakâr)
-- [x] Dönüş-nullness dataflow'u: `return p;` yolları mini null-akışıyla
-      (runDataflow istemcisi) akış-duyarlı çözülür; param passthrough
-      Unknown kalır (parametre-duyarlı özet ayrı ufuk)
-- [x] Cross-TU özetler v1 (--whole-program iki geçişli mod; ad+arite
-      anahtarı, yalnız harici bağlantı, çakışmada muhafazakâr birleşim)
-- [x] Cross-TU v2: özetleri diske yaz/yükle (--summary-out/--summary-in;
-      sürümlü satır formatı, bozuk dosya bütünüyle red, çakışmada
-      muhafazakâr birleşim; hasat rules geçişinde — ikinci parse yok)
-- [x] Cross-TU v3 uçlar: analyze_diff.sh --summary-in (ek-arg iletimi
-      zaten vardı, belgelendi); MCP analyze aracına `summaries` argümanı
-- [x] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime → stderr
-      uyarısı; analiz durmaz, özetler yine kullanılır)
-- [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
-      (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
-- [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama
-      yolundan tüketiyor — doğrudan `x/f()` böleni bilinçli raporlanmıyor;
-      özet dosya formatı v2, v1 geriye uyumlu)
-- [x] Özet-diff v1 (--summary-diff eski yeni): sözleşme değişim raporu —
-      WEAKENED (güçlü iddia kaybı → çağıranlar etkilendi, exit 1 = CI
-      kapısı) / STRENGTHENED / CHANGED / ADDED / REMOVED. Semantik
-      regresyon sinyalinin çekirdeği; kontrat DİLİ tasarımı ayrı
-      (kullanıcıyla birlikte-tasarım oturumu).
-- [ ] Özet önbelleği v2: artımlı modda yalnızca değişen fonksiyon
-      tazelenir (diff'in üstüne inşa edilir)
+### Phase 4 (research horizon)
+- [x] Interprocedural v1: function summaries (return nullness +
+      parameter effects; fixed-point scan, recursion-safe)
+- [x] Interprocedural v2: alias tracking (copy graph + taint
+      propagation; cursor-style destructors are Frees;
+      dirty/multi-source/address-taken locals conservative)
+- [x] Return-nullness dataflow: `return p;` paths resolved
+      flow-sensitively with a mini null-flow (runDataflow client); param
+      passthrough stays Unknown (a parameter-sensitive summary is a
+      separate horizon)
+- [x] Cross-TU summaries v1 (--whole-program two-pass mode; name+arity
+      key, external linkage only, conservative merge on collision)
+- [x] Cross-TU v2: write/load summaries to disk
+      (--summary-out/--summary-in; versioned line format, corrupt file
+      rejected wholesale, conservative merge on conflict; harvest in the
+      rules pass — no second parse)
+- [x] Cross-TU v3 endpoints: analyze_diff.sh --summary-in (extra-arg
+      forwarding already existed, documented); `summaries` argument on
+      the MCP analyze tool
+- [x] Summary file staleness check (source mtime > summary mtime →
+      stderr warning; analysis does not stop, summaries are still used)
+- [ ] Juliet 61-family validation of return-flow: the weekly deep run
+      (cron limit=1600) should show it in the trend; check the first
+      cron result
+- [x] Int return zeroness summary (ReturnZeroness; DivByZero consumes it
+      via the assignment path — a direct `x/f()` divisor deliberately
+      not reported; summary file format v2, v1 backward compatible)
+- [x] Summary-diff v1 (--summary-diff old new): contract change report —
+      WEAKENED (loss of a strong claim → callers affected, exit 1 = CI
+      gate) / STRENGTHENED / CHANGED / ADDED / REMOVED. The core of the
+      semantic regression signal; contract LANGUAGE design is separate
+      (a co-design session with the user).
+- [ ] Summary cache v2: in incremental mode only the changed function is
+      refreshed (built on top of the diff)
 
-## Tamamlanan Görevler
+## Completed Tasks
 
-- [x] Core mimari (Diagnostic, Rule, SourceManager, RuleEngine, Reporter, Config, StaticAnalyzer)
-- [x] UninitPointerRule_Ex (CFG dataflow, 14 test)
-- [x] MemoryLeakRule_Ex (CFG dataflow, leak + double-free + escape, 13 test)
-- [x] DivByZeroRule (literal + CFG dataflow, 10 test)
-- [x] DataflowEngine template (ortak worklist altyapısı, SFINAE onStatement)
-- [x] string.h uyarısı çözümü (resource-dir + isysroot + isystem)
-- [x] GTest altyapısı (41/41 test)
-- [x] Durum tespiti + yol haritası dokümanı (analiz-2026-07.md)
-- [x] Linux header çözümleme düzeltmesi (isystem yalnızca macOS)
-- [x] CMake taşınabilirlik (Homebrew prefix yalnızca APPLE)
-- [x] Çapraz-TU bulgu tekilleştirme (operator== + std::unique)
-- [x] i18n: EN varsayılan + --lang tr (core/Messages)
-- [x] Assume edges: DataflowEngine refineOnEdge + DivByZero guard analizi (9 test)
-- [x] DivByZero merge düzeltmesi (Zero + Unknown = MaybeZero)
+- [x] Core architecture (Diagnostic, Rule, SourceManager, RuleEngine, Reporter, Config, StaticAnalyzer)
+- [x] UninitPointerRule_Ex (CFG dataflow, 14 tests)
+- [x] MemoryLeakRule_Ex (CFG dataflow, leak + double-free + escape, 13 tests)
+- [x] DivByZeroRule (literal + CFG dataflow, 10 tests)
+- [x] DataflowEngine template (shared worklist infrastructure, SFINAE onStatement)
+- [x] string.h warning fix (resource-dir + isysroot + isystem)
+- [x] GTest infrastructure (41/41 tests)
+- [x] Assessment + roadmap document (ROADMAP.md)
+- [x] Linux header resolution fix (isystem macOS-only)
+- [x] CMake portability (Homebrew prefix APPLE-only)
+- [x] Cross-TU finding deduplication (operator== + std::unique)
+- [x] i18n: EN default + --lang tr (core/Messages)
+- [x] Assume edges: DataflowEngine refineOnEdge + DivByZero guard analysis (9 tests)
+- [x] DivByZero merge fix (Zero + Unknown = MaybeZero)
 - [x] GitHub Actions CI (Ubuntu 24.04 + LLVM 18)
 - [x] README (EN) + LICENSE (Apache-2.0)
 - [x] GTest 52/52
-- [x] CFG granülerliği: setAllAlwaysAdd (alt ifadeler eleman — CSA paritesi)
-- [x] UninitPointerRule çarpım lattice + tepe-düğüm dyn_cast (tek koşu)
-- [x] İterasyon tavanı lattice yüksekliğine bağlandı (latticeHeight hook)
+- [x] CFG granularity: setAllAlwaysAdd (subexpressions as elements — CSA parity)
+- [x] UninitPointerRule product lattice + top-node dyn_cast (single run)
+- [x] Iteration ceiling tied to lattice height (latticeHeight hook)
 - [x] SARIF 2.1.0 reporter (--sarif, sarif_output=)
-- [x] Suppression yorumları (disable-line / disable-next-line, kural listesi)
-- [x] Use-after-free tespiti (MemLeak Freed state + dereference)
-- [x] Baseline desteği (--write-baseline / --baseline)
-- [x] NullDerefRule (NullState lattice + assume edges, 16 test)
+- [x] Suppression comments (disable-line / disable-next-line, rule list)
+- [x] Use-after-free detection (MemLeak Freed state + dereference)
+- [x] Baseline support (--write-baseline / --baseline)
+- [x] NullDerefRule (NullState lattice + assume edges, 16 tests)
 - [x] GTest 92/92
-- [x] Gerçek dünya korpusu CI'da (cJSON + tinyxml2, scripts/run_corpus.sh)
-- [x] Motor: fixpoint sonrası raporlama geçişi (erken-state severity hatası)
-- [x] Path kanonikleştirme + makro expansion loc (korpus bulguları)
-- [x] Best/worst-case stress süiti (17 test; belgelenmiş FN'ler dahil)
-- [x] MemLeak null-farkındalıklı refineOnEdge (malloc-başarısızlık FP'si)
-- [x] DivByZero onStatement tepe-düğüm sınıflandırması (ternary FP'si)
+- [x] Real-world corpus in CI (cJSON + tinyxml2, scripts/run_corpus.sh)
+- [x] Engine: post-fixpoint reporting pass (early-state severity bug)
+- [x] Path canonicalization + macro expansion loc (corpus findings)
+- [x] Best/worst-case stress suite (17 tests; documented FNs included)
+- [x] MemLeak null-aware refineOnEdge (malloc-failure FP)
+- [x] DivByZero onStatement top-node classification (ternary FP)
 - [x] GTest 110/110
 
-## Teknik Notlar (Aklında Tut)
+## Technical Notes (Keep in Mind)
 
-### Severity enum sırası bağımlılığı
-`StaticAnalyzer::run()` içindeki severity filtresi (`d.severity < config_.minSeverity()`) enum'un sırasına bağlı: `Info=0, Warning=1, Error=2`. Araya yeni seviye eklenirse hem `core/Diagnostic.h`'deki enum hem de bu karşılaştırma güncelleneli.
+### Severity enum order dependency
+The severity filter in `StaticAnalyzer::run()` (`d.severity < config_.minSeverity()`) depends on the enum order: `Info=0, Warning=1, Error=2`. If a new level is inserted in between, both the enum in `core/Diagnostic.h` and this comparison must be updated.
 
-### processAll callback — move güvenliği
-`SourceManager::processAll` callback'i kopya alıyor (move değil). Birden fazla kez çağrılabilir.
+### processAll callback — move safety
+The `SourceManager::processAll` callback is taken by copy (not move). It can be called more than once.
 
 ### FixedCompilationDatabase working directory
-Fallback durumunda `"."` olarak ayarlandı (`build_path_` değil).
+Set to `"."` in the fallback case (not `build_path_`).
 
 ### JSON string escaping
-`JsonReporter` elle JSON yazıyor. `escapeJson` helper'ı `"`, `\`, `\n`, `\r`, `\t` handle ediyor. İleride nlohmann/json'a geçilebilir.
+`JsonReporter` writes JSON by hand. The `escapeJson` helper handles `"`, `\`, `\n`, `\r`, `\t`. Could migrate to nlohmann/json later.
 
-### LLVM RTTI uyumu
-LLVM `-fno-rtti` ile derlenir. CMake'de `LLVM_ENABLE_RTTI` kontrolü var.
+### LLVM RTTI compatibility
+LLVM is built with `-fno-rtti`. There is an `LLVM_ENABLE_RTTI` check in CMake.
 
-### CMake C dili gereksinimi
-`project()` satırında `LANGUAGES C CXX` olmalı — LLVM'in `check_include_file` macro'su C gerektiriyor.
+### CMake C language requirement
+The `project()` line must say `LANGUAGES C CXX` — LLVM's `check_include_file` macro requires C.
 
-### StaticAnalyzer sourcePath — dosya vs dizin
-`is_directory` ile kontrol ediliyor: dizinse `scanDirectory`, dosyaysa `addSourceFile`.
+### StaticAnalyzer sourcePath — file vs directory
+Checked with `is_directory`: `scanDirectory` for a directory, `addSourceFile` for a file.
 
 ### DataflowEngine — Analysis duck typing
-Analysis sınıfı `State`, `initialState()`, `merge()`, `transfer()` sağlamalı. `onStatement()`, `refineOnEdge()` ve `latticeHeight()` opsiyonel (SFINAE ile `if constexpr`). `DataflowResult` `exitBlockID` içerir — exit block check için CFG rebuild gereksiz.
+The Analysis class must provide `State`, `initialState()`, `merge()`, `transfer()`. `onStatement()`, `refineOnEdge()` and `latticeHeight()` are optional (via SFINAE `if constexpr`). `DataflowResult` contains `exitBlockID` — no CFG rebuild is needed for the exit block check.
 
-### Motor sözleşmesi — transfer saf, raporlama fixpoint'te
-`transfer()` SAF olmalı (yalnızca state döndürür, yan etki üretmez) — worklist fazında defalarca çağrılır. Raporlama `onStatement()` içinde yapılır; motor onu yalnızca fixpoint SONRASI raporlama geçişinde çağırır. Erken state ile rapor üretmek yanlış severity verir (cJSON parse_array vakası, 2026-07-09).
+### Engine contract — transfer is pure, reporting happens at fixpoint
+`transfer()` must be PURE (only returns state, produces no side effects) — it is called many times during the worklist phase. Reporting is done inside `onStatement()`; the engine calls it only in the reporting pass AFTER the fixpoint. Producing reports from early state yields wrong severity (the cJSON parse_array case, 2026-07-09).
 
-### CFG granülerliği — setAllAlwaysAdd
-Motor CFG'yi `setAllAlwaysAdd` ile kurar: alt ifadeler değerlendirme sırasında ayrı elemanlardır (DumpCFG'deki gibi). Analizler her elemanın YALNIZCA tepe düğümüne bakmalı; findAll/descendant araması hem gereksiz hem mükerrer tetikler (aynı ifade hem kendi elemanı hem üst statement elemanı içinde görünür — rapor dedup'ları bu yüzden var).
+### CFG granularity — setAllAlwaysAdd
+The engine builds the CFG with `setAllAlwaysAdd`: subexpressions are separate elements in evaluation order (as in DumpCFG). Analyses must look ONLY at each element's top node; a findAll/descendant search is both unnecessary and double-triggers (the same expression appears both as its own element and inside the parent statement's element — that is why the report dedups exist).
 
-### Assume edges — kenar konvansiyonu
-İki ardıllı terminator'da (if/while/for) `succ[0]` = true dalı, `succ[1]` = false dalı (Clang CFG konvansiyonu). `refineOnEdge` yalnızca `succ_size() == 2` ve `trueSucc != falseSucc` iken çağrılır; switch gibi çok ardıllı terminatorlarda çağrılmaz. Iyileştirme predecessor'ın exit state kopyası üzerinde, merge'den önce yapılır.
+### Assume edges — edge convention
+On a two-successor terminator (if/while/for), `succ[0]` = the true branch, `succ[1]` = the false branch (Clang CFG convention). `refineOnEdge` is called only when `succ_size() == 2` and `trueSucc != falseSucc`; it is not called on multi-successor terminators such as switch. Refinement is applied on a copy of the predecessor's exit state, before the merge.
 
-### UninitPointerRule_Ex — bilinen sınırlamalar
+### UninitPointerRule_Ex — known limitations
 
-**ÇÖZÜLDÜ (2026-07): CFG cache / classify maliyeti.** Artık fonksiyon başına tek CFG + tek dataflow koşusu (çarpım lattice); classify tepe-düğüm `dyn_cast`, eleman başına O(1). `setAllAlwaysAdd` ile alt ifadeler kendi elemanları olduğundan nested arama gerekmez.
+**SOLVED (2026-07): CFG cache / classify cost.** Now a single CFG + a single dataflow run per function (product lattice); classify is top-node `dyn_cast`, O(1) per element. With `setAllAlwaysAdd` subexpressions are their own elements, so no nested search is needed.
 
-**Compound expression false negative:** `*p = (p = &x, 42)` — comma operator'da eval sırası sorunlu. Nadir.
+**Compound expression false negative:** `*p = (p = &x, 42)` — evaluation order with the comma operator is problematic. Rare.
 
-### MemoryLeakRule_Ex — bilinen sınırlamalar
+### MemoryLeakRule_Ex — known limitations
 
-**Koşullu double-free kaçırılıyor:** `if(c) delete p; delete p;` — merge `Freed + Allocated = Allocated`, ikinci delete yakalanmaz. Path-sensitive analiz gerekir. (Test olarak sabitlendi: `DocumentedLimitTest.ConditionalDoubleFree_KnownFN`)
+**Conditional double-free missed:** `if(c) delete p; delete p;` — merge `Freed + Allocated = Allocated`, the second delete is not caught. Requires path-sensitive analysis. (Pinned as a test: `DocumentedLimitTest.ConditionalDoubleFree_KnownFN`)
 
-**Null-farkındalık VAR (2026-07):** `p = malloc(); if (!p) return;` yolu artık leak DEĞİL — refineOnEdge null kenarında Allocated → None yapar.
+**Null-awareness EXISTS (2026-07):** the `p = malloc(); if (!p) return;` path is no longer a leak — refineOnEdge turns Allocated → None on the null edge.
 
-**realloc ikili doğası eksik:** `q = realloc(p, n)` durumunda eski p invalid — yakalayamıyoruz.
+**realloc's dual nature missing:** with `q = realloc(p, n)` the old p is invalid — we cannot catch it.
 
-**Conservative escape:** `foo(p)` → Escaped. Ownership almıyorsa false negative. Annotation sistemi gerekir.
+**Conservative escape:** `foo(p)` → Escaped. False negative if it does not take ownership. Needs an annotation system.
 
-### DivByZeroRule — bilinen sınırlamalar
+### DivByZeroRule — known limitations
 
-**Guard analizi VAR (2026-07):** `if (z != 0) { x = 1/z; }` artık temiz; `if (z == 0) 1/z` kesin hata. Desteklenen kalıplar: `z`, `!z`, `==`/`!=` (sıfır ve sıfır-olmayan sabit), `>`/`<`/`>=`/`<=` sıfır sabitiyle (ayna halleri dahil), `&&` true dalı, `||` false dalı. Desteklenmeyen: değişken-değişken karşılaştırma (`z != y`), aritmetik içeren koşullar.
+**Guard analysis EXISTS (2026-07):** `if (z != 0) { x = 1/z; }` is now clean; `if (z == 0) 1/z` is a definite error. Supported patterns: `z`, `!z`, `==`/`!=` (zero and non-zero constant), `>`/`<`/`>=`/`<=` with a zero constant (mirrored forms included), `&&` true branch, `||` false branch. Unsupported: variable-variable comparison (`z != y`), conditions containing arithmetic.
 
-**Expression-level constant folding yok:** `a / (b - b)` yakalayamaz. Sadece IntegerLiteral ve basit variable tracking.
+**No expression-level constant folding:** cannot catch `a / (b - b)`. Only IntegerLiteral and simple variable tracking.
 
-**Float division hariç:** IEEE 754'te `1.0/0.0 = inf`, UB değil. Bilinçli karar.
+**Float division excluded:** in IEEE 754 `1.0/0.0 = inf`, not UB. Deliberate decision.
 
-**Compound assignment izlenmiyor:** `z -= z` gibi ifadeler AssignsUnknown bile üretmez (BO_Assign değil) — state eski değerde kalır. Nadir ama yanlış yönde: ileride `CompoundAssignOperator` desteği eklenebilir.
+**Compound assignment not tracked:** expressions like `z -= z` do not even produce AssignsUnknown (not BO_Assign) — the state keeps the old value. Rare but wrong in direction: `CompoundAssignOperator` support could be added later.
 
-### string.h / header çözümleme — çözüm
-`ClangTool::appendArgumentsAdjuster()` ile `-resource-dir` (tüm platformlar), `-isysroot` + `-isystem /usr/include` (yalnızca macOS — `#ifdef __APPLE__`). Linux'ta `/usr/include`'u öne eklemek GCC libstdc++ `include_next` zincirini kırar (stdlib.h bulunamaz), resource-dir orada yeterli. macOS SDK path `xcrun --show-sdk-path` ile, Clang resource dir `clang -print-resource-dir` ile CMake'te bulunuyor.
+### string.h / header resolution — solution
+Via `ClangTool::appendArgumentsAdjuster()`: `-resource-dir` (all platforms), `-isysroot` + `-isystem /usr/include` (macOS only — `#ifdef __APPLE__`). On Linux, prepending `/usr/include` breaks the GCC libstdc++ `include_next` chain (stdlib.h cannot be found); resource-dir is sufficient there. The macOS SDK path is found with `xcrun --show-sdk-path`, the Clang resource dir with `clang -print-resource-dir` in CMake.

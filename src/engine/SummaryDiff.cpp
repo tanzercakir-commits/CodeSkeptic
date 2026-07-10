@@ -39,9 +39,9 @@ const char* peName(PE v) {
     return "Opaque";
 }
 
-// "Guclu" iddialar: cagiran tarafta analiz sonucu degistiren garantiler.
-// Kaybi/degisimi zayiflamadir — o iddiaya yaslanan cagiranlar yeniden
-// incelenmeli.
+// "Strong" claims: guarantees that change analysis results on the
+// caller side. Their loss/change is a weakening — callers leaning on
+// the claim must be re-examined.
 bool rnStrong(RN v) { return v == RN::NeverNull; }
 bool rzStrong(RZ v) { return v == RZ::NeverZero; }
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
@@ -92,9 +92,9 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
         classifyField(oldSum.returnZeroness, newSum.returnZeroness,
                       rzStrong, rzName, "returnZeroness", verdict, detail);
 
-        // Parametreler indeks bazinda; vektor boyu farkli olabilir
-        // (muhafazakar birlesim bosaltmis olabilir) — paramEffect()
-        // eksigi Opaque sayar
+        // Parameters are compared by index; vector sizes may differ
+        // (the conservative merge may have emptied one) — paramEffect()
+        // treats the missing ones as Opaque
         const size_t numParams =
             std::max(oldSum.params.size(), newSum.params.size());
         for (size_t i = 0; i < numParams; ++i) {
@@ -104,10 +104,10 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                           "param#" + std::to_string(i), verdict, detail);
         }
 
-        if (detail.empty()) continue;  // sozlesme ayni
+        if (detail.empty()) continue;  // contract unchanged
 
-        // Fonksiyon-duzeyi hukum: herhangi bir alan zayifladiysa
-        // WEAKENED (en kotu yon kazanir)
+        // Function-level verdict: if any field weakened, the whole is
+        // WEAKENED (the worst direction wins)
         if (verdict.weakened) {
             ++result.weakened;
             result.changes.push_back(
@@ -129,7 +129,7 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
         }
     }
 
-    // Weakened zaten onde (map sirali gezildi); kalanlar arkaya
+    // Weakened is already in front (map walked in order); rest go after
     result.changes.insert(result.changes.end(), nonWeakened.begin(),
                           nonWeakened.end());
     return result;
