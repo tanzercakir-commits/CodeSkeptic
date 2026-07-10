@@ -115,8 +115,8 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       muhafazakâr birleşim; hasat rules geçişinde — ikinci parse yok)
 - [x] Cross-TU v3 uçlar: analyze_diff.sh --summary-in (ek-arg iletimi
       zaten vardı, belgelendi); MCP analyze aracına `summaries` argümanı
-- [ ] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime uyarısı)
-      — düşük öncelik
+- [x] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime → stderr
+      uyarısı; analiz durmaz, özetler yine kullanılır)
 - [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
       (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
 - [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama

@@ -722,6 +722,8 @@ TEST(ReturnFlowTest, CrossTU_VarFlowMaybeNull_Warning) {
 #include "config/Config.h"
 #include "engine/FunctionSummary.h"
 
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 
 namespace {
@@ -1035,4 +1037,53 @@ TEST(InterprocZeroTest, CrossTU_ZeronessTravels) {
     )");
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
+    // Tazelik uyarisi: kaynak, ozet dosyasindan yeniyse stderr'de uyari
+    // — ama analiz durmaz ve ozetler yine kullanilir (muhafazakar yon:
+    // bayat ozet dogrulugu bozmaz, en fazla eksik/fazla iddia tasir)
+    GlobalStoreGuard guard;
+    auto sumPath = writePersistFile("sum_stale.txt",
+        "zerodefect-summaries v2\nfind/1\tM\t-\tU\n");
+    auto src = writePersistFile("sum_stale_caller.cpp", R"(
+        int* find(int c);
+        void f(int c) {
+            int* p = find(c);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    // Kaynagi ozetten ACIKCA yeni damgala (ayni-saniye flake'i olmasin)
+    namespace fs = std::filesystem;
+    fs::last_write_time(src,
+        fs::last_write_time(sumPath) + std::chrono::hours(1));
+
+    ::testing::internal::CaptureStderr();
+    {
+        Config config;
+        config.setSourcePath(src);
+        config.setSummaryIn(sumPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+        EXPECT_EQ(analyzer.diagnostics().size(), 1u);  // ozet yine islek
+    }
+    std::string err = ::testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("may be stale"), std::string::npos);
+
+    // Kontrol: ozet kaynaktan yeniyse uyari YOK
+    fs::last_write_time(sumPath,
+        fs::last_write_time(src) + std::chrono::hours(1));
+    ::testing::internal::CaptureStderr();
+    {
+        Config config;
+        config.setSourcePath(src);
+        config.setSummaryIn(sumPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+    err = ::testing::internal::GetCapturedStderr();
+    EXPECT_EQ(err.find("may be stale"), std::string::npos);
 }

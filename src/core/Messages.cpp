@@ -140,6 +140,11 @@ const MsgEntry kMessages[] = {
     // TraceAssumedZeroHere
     {"'{0}' is zero on this branch (per this condition)",
      "{0} bu dalda sifir (buradaki kosula gore)"},
+    // SummaryStaleWarning
+    {"[ZeroDefect] warning: summary file {0} is older than {1} — "
+     "summaries may be stale; re-run --summary-out to refresh",
+     "[ZeroDefect] uyari: ozet dosyasi {0}, {1} dosyasindan eski — "
+     "ozetler bayat olabilir; --summary-out ile tazeleyin"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

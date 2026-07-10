@@ -1,5 +1,19 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Özet dosyası tazelik uyarısı
+
+### Eklenen
+- `--summary-in` ile yüklenen özet dosyasından YENİ bir kaynak analiz
+  ediliyorsa stderr'de tek uyarı: "summaries may be stale; re-run
+  --summary-out". Analiz durmaz, özetler yine kullanılır (bayat özet
+  doğruluğu bozmaz — en fazla eksik/fazla iddia taşır; ama kullanıcı
+  tazelemeyi bilmeli). Test mtime'ları açıkça damgalar (aynı-saniye
+  flake'i yok) ve iki yönü de sabitler: bayat → uyarı + bulgular yine
+  gelir; taze → uyarı yok.
+
+### Doğrulama
+- 214/214 test (ctest + tek-süreç)
+
 ## 2026-07-10 — İz v2: guard olayları izlerde (onEdgeRefined)
 
 ### Eklenen

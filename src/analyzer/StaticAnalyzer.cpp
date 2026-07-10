@@ -89,6 +89,26 @@ int StaticAnalyzer::run() {
             std::cerr << msg(MsgId::SummariesLoaded,
                              std::to_string(registry.globalSize()),
                              config_.summaryIn()) << "\n";
+            // Tazelik: analiz edilen bir kaynak ozet dosyasindan YENIYSE
+            // ozetler o dosya icin bayat olabilir — analiz durmaz
+            // (muhafazakar yon: bayat ozet en fazla eksik/ekstra iddia
+            // tasir, dogrulugu anahtar degil) ama kullanici tazelemeyi
+            // bilmeli. Yalniz uyari, dosya basina degil bir kez.
+            std::error_code ec;
+            auto summaryTime = std::filesystem::last_write_time(
+                config_.summaryIn(), ec);
+            if (!ec) {
+                for (const auto& file : source_mgr_->files()) {
+                    std::error_code fec;
+                    auto srcTime =
+                        std::filesystem::last_write_time(file, fec);
+                    if (!fec && srcTime > summaryTime) {
+                        std::cerr << msg(MsgId::SummaryStaleWarning,
+                                         config_.summaryIn(), file) << "\n";
+                        break;
+                    }
+                }
+            }
         } else {
             std::cerr << msg(MsgId::SummaryLoadError, config_.summaryIn())
                       << "\n";
