@@ -4,6 +4,7 @@
 #include "analyzer/SuppressionFilter.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "reporter/ConsoleReporter.h"
 #include "reporter/HtmlReporter.h"
@@ -57,6 +58,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     // Ayni gerekce cross-TU ozet deposu icin: bir kosunun ozetleri
     // sonraki kosuya sizmasin (MCP server ayni surecte cok analiz kosar)
     SummaryRegistry::instance().clearGlobal();
+    CfgCache::instance().clear();
 }
 
 int StaticAnalyzer::run() {
@@ -130,6 +132,7 @@ int StaticAnalyzer::run() {
             registry.rebuild(ctx);
             registry.harvestGlobal();
             registry.clear();
+            CfgCache::instance().clear();
         });
     }
 

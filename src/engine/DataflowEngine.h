@@ -1,6 +1,8 @@
 #ifndef ZERODEFECT_DATAFLOW_ENGINE_H
 #define ZERODEFECT_DATAFLOW_ENGINE_H
 
+#include "engine/CfgCache.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Stmt.h>
 #include <clang/Analysis/CFG.h>
@@ -74,13 +76,9 @@ DataflowResult<Analysis> runDataflow(
 
     if (!func || !func->hasBody()) return result;
 
-    clang::CFG::BuildOptions opts;
-    // Alt ifadeler de degerlendirme sirasinda birer CFG elemani olsun
-    // (CSA ile ayni granulerlik). Boylece analizler her elemanin yalnizca
-    // tepe dugumune bakabilir; statement icinde nested arama gerekmez.
-    opts.setAllAlwaysAdd();
-    std::unique_ptr<clang::CFG> cfg = clang::CFG::buildCFG(
-        func, func->getBody(), &ctx, opts);
+    // CFG paylasimli onbellekten (fonksiyon basina bir insa; kurulum
+    // secenekleri — setAllAlwaysAdd dahil — CfgCache'te yasar)
+    clang::CFG* cfg = CfgCache::instance().get(func, ctx);
     if (!cfg) return result;
 
     const unsigned numBlocks = cfg->getNumBlockIDs();

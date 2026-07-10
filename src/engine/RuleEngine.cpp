@@ -1,5 +1,6 @@
 #include "engine/RuleEngine.h"
 
+#include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 
 namespace zerodefect {
@@ -31,7 +32,9 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
     if (harvest_global_) SummaryRegistry::instance().harvestGlobal();
 
     // FunctionDecl* anahtarlari bu TU'ya ozgu — sarkan pointer birakma
+    // (ozet tablosu ve CFG onbellegi ayni gerekceyle birlikte temizlenir)
     SummaryRegistry::instance().clear();
+    CfgCache::instance().clear();
     return results;
 }
 

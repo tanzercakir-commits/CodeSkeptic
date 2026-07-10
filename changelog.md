@@ -1,5 +1,28 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — CFG önbelleği: fonksiyon başına tek inşa
+
+### Eklenen
+- **engine/CfgCache**: FunctionDecl* anahtarlı memoize CFG deposu —
+  özet mini-akışlarının her taraması + 4 kural aynı fonksiyonun CFG'sini
+  artık paylaşıyor (önceden fonksiyon başına 6+ inşa; sayaç testi tam
+  sayımı sabitler: 2 fonksiyon = 2 miss, gerisi hit). Kurulum
+  seçenekleri (setAllAlwaysAdd) tek yere taşındı — tüketiciler aynı
+  granülerliği görmek ZORUNDA (iki fazlı raporlama sözleşmesi buna
+  dayanır), artık ayrışamaz.
+- **Geçerlilik iki korumalı** (bayat-asla-servis ilkesinin CFG hali):
+  TU sonunda açık temizlik (SummaryRegistry::clear ile aynı noktalar:
+  RuleEngine::runAll, TestHelper, whole-program hasadı, ~StaticAnalyzer)
+  + ASTContext değişiminde otomatik boşaltma (yedek emniyet — adres
+  yeniden kullanımı sahte isabete dönüşemez). Test TU-sonu boşluğunu da
+  sabitler: bu doğruluk koşulu, hijyen değil.
+- Ölçüm: 600-fonksiyonlu sentetikte uçtan uca ~%10-15 (parse dahil);
+  kazanç büyük fonksiyonlarda ve whole-program iki-geçişte büyür.
+
+### Doğrulama
+- 221/221 test (ctest + tek-süreç; +2 CfgCacheTest) — davranış korunumlu
+  (219 mevcut test hakem); korpus/Juliet bekçileri CI'da
+
 ## 2026-07-10 — Editör entegrasyonu rehberi (sıfır kod)
 
 ### Eklenen
