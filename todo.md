@@ -83,8 +83,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [x] İnterprosedürel v2: alias izleme (kopya grafı + taint yayılımı;
       imleç-desenli yıkıcılar Frees; kirli/çok-kaynaklı/adresli yereller
       muhafazakâr)
-- [ ] İnterprosedürel v2: dönüş nullness'inde parametre/dataflow desteği
-      (`return p;` yolları — şimdilik Unknown)
+- [x] Dönüş-nullness dataflow'u: `return p;` yolları mini null-akışıyla
+      (runDataflow istemcisi) akış-duyarlı çözülür; param passthrough
+      Unknown kalır (parametre-duyarlı özet ayrı ufuk)
 - [x] Cross-TU özetler v1 (--whole-program iki geçişli mod; ad+arite
       anahtarı, yalnız harici bağlantı, çakışmada muhafazakâr birleşim)
 - [ ] Cross-TU v2: özetleri diske yaz/yükle (artımlı whole-program)

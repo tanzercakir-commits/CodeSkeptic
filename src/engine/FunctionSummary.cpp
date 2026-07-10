@@ -1,5 +1,7 @@
 #include "engine/FunctionSummary.h"
 
+#include "engine/DataflowEngine.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
@@ -7,6 +9,7 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
 
+#include <algorithm>
 #include <set>
 #include <utility>
 #include <vector>
@@ -37,41 +40,252 @@ const FunctionSummary* lookupPrev(const SummaryTable& previous,
     return zerodefect::SummaryRegistry::instance().lookupGlobal(callee);
 }
 
-ReturnNullness evaluateReturnExpr(const Expr* expr,
-                                  const SummaryTable& previous) {
-    if (!expr) return ReturnNullness::Unknown;
+// Deger-duzeyi null durumu. NullDerefRule'un lattice'iyle ayni sekil;
+// ozet baglaminda yasar (TU-anonim, cakisma yok).
+enum class VState { Unknown, Null, NonNull, MaybeNull };
+
+VState mergeVState(VState a, VState b) {
+    if (a == b) return a;
+    bool anyNullInfo = a == VState::Null || a == VState::MaybeNull ||
+                       b == VState::Null || b == VState::MaybeNull;
+    return anyNullInfo ? VState::MaybeNull : VState::Unknown;
+}
+
+// Ifadenin null durumu: literal/new/&x/string dogrudan; cagri zinciri
+// onceki taramanin ozetleriyle (+ cross-TU depo) cozulur.
+VState vstateOf(const Expr* expr, const SummaryTable& previous) {
+    if (!expr) return VState::Unknown;
     expr = expr->IgnoreParenCasts();
 
-    if (isa<CXXNullPtrLiteralExpr>(expr)) return ReturnNullness::MaybeNull;
-    if (isa<GNUNullExpr>(expr)) return ReturnNullness::MaybeNull;
+    if (isa<CXXNullPtrLiteralExpr>(expr)) return VState::Null;
+    if (isa<GNUNullExpr>(expr)) return VState::Null;
     if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
-        return lit->getValue() == 0 ? ReturnNullness::MaybeNull
-                                    : ReturnNullness::NeverNull;
+        return lit->getValue() == 0 ? VState::Null : VState::NonNull;
     if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
-        if (unary->getOpcode() == UO_AddrOf)
-            return ReturnNullness::NeverNull;
+        if (unary->getOpcode() == UO_AddrOf) return VState::NonNull;
     }
-    if (isa<CXXNewExpr>(expr)) return ReturnNullness::NeverNull;
-    if (isa<StringLiteral>(expr)) return ReturnNullness::NeverNull;
+    if (isa<CXXNewExpr>(expr)) return VState::NonNull;
+    if (isa<StringLiteral>(expr)) return VState::NonNull;
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         if (const auto* summary =
-                lookupPrev(previous, call->getDirectCallee()))
-            return summary->returnNullness;
-        return ReturnNullness::Unknown;
+                lookupPrev(previous, call->getDirectCallee())) {
+            if (summary->returnNullness == ReturnNullness::NeverNull)
+                return VState::NonNull;
+            if (summary->returnNullness == ReturnNullness::MaybeNull)
+                return VState::MaybeNull;
+        }
+        return VState::Unknown;
     }
+    return VState::Unknown;
+}
+
+const VarDecl* exprAsVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+bool isNullLit(const Expr* expr) {
+    if (!expr) return false;
+    expr = expr->IgnoreParenCasts();
+    if (isa<CXXNullPtrLiteralExpr>(expr) || isa<GNUNullExpr>(expr))
+        return true;
+    if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
+        return lit->getValue() == 0;
+    return false;
+}
+
+// Kosul kenarlarinda pointer nullness iyilestirmesi — NullDerefRule'un
+// applyCondition'inin kompakt kopyasi (konsolide yardimci todo'da;
+// ozet katmani rules/'a bagimli olamayacagi icin simdilik yerel).
+void applyNullCond(const Expr* cond, bool isTrue,
+                   std::map<const VarDecl*, VState>& state) {
+    if (!cond) return;
+    cond = cond->IgnoreParenImpCasts();
+
+    if (const auto* var = exprAsVar(cond)) {
+        if (var->getType()->isPointerType()) {
+            auto it = state.find(var);
+            if (it != state.end())
+                it->second = isTrue ? VState::NonNull : VState::Null;
+        }
+        return;
+    }
+    if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
+        if (unary->getOpcode() == UO_LNot)
+            applyNullCond(unary->getSubExpr(), !isTrue, state);
+        return;
+    }
+    const auto* binOp = dyn_cast<BinaryOperator>(cond);
+    if (!binOp) return;
+    const BinaryOperatorKind opc = binOp->getOpcode();
+    if (opc == BO_LAnd) {
+        if (isTrue) {
+            applyNullCond(binOp->getLHS(), true, state);
+            applyNullCond(binOp->getRHS(), true, state);
+        }
+        return;
+    }
+    if (opc == BO_LOr) {
+        if (!isTrue) {
+            applyNullCond(binOp->getLHS(), false, state);
+            applyNullCond(binOp->getRHS(), false, state);
+        }
+        return;
+    }
+    if (opc != BO_EQ && opc != BO_NE) return;
+
+    const Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
+    const Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
+    const VarDecl* var = nullptr;
+    if (isNullLit(rhs)) var = exprAsVar(lhs);
+    else if (isNullLit(lhs)) var = exprAsVar(rhs);
+    if (!var || !var->getType()->isPointerType()) return;
+
+    bool eqHolds = (opc == BO_EQ) == isTrue;
+    auto it = state.find(var);
+    if (it != state.end())
+        it->second = eqHolds ? VState::Null : VState::NonNull;
+}
+
+// --- Degisken donduren yollar icin mini null-akisi ---
+//
+// `return p;` yollari yapisal degerlendirmeyle Unknown kaliyordu (v1
+// siniri). Simdi pointer yerelleri/parametreleri kendi motorumuzla
+// (runDataflow: iki fazli raporlama + assume-edge iyilestirmesi) akis-
+// DUYARLI izlenir ve her return elemani yakinsamis durumdan katki alir.
+// Akis-duyarsiz kestirme bilincli reddedildi: `p = NULL; p = &g;
+// return p;` kalibinda yanlis MaybeNull uretir, precision'i yakardi.
+//
+// Katki eslemesi: Null/MaybeNull -> "bu yol null dondurebilir";
+// NonNull -> NeverNull katkisi; Unknown -> Unknown. Fonksiyon toplami
+// eski kuralla ayni: herhangi bir null yolu -> MaybeNull; TUM yollar
+// NonNull -> NeverNull; aksi Unknown. CFG'nin ulasamadigi return'ler
+// (olu kod) katki vermez.
+class ReturnNullFlowAnalysis {
+public:
+    using State = std::map<const VarDecl*, VState>;
+
+    ReturnNullFlowAnalysis(std::vector<const VarDecl*> trackedVars,
+                           const SummaryTable& previous)
+        : previous_(previous) {
+        for (const auto* var : trackedVars)
+            initState_[var] = VState::Unknown;
+    }
+
+    State initialState() const { return initState_; }
+
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(initState_.size()) * 3 + 1;
+    }
+
+    State merge(const State& a, const State& b) const {
+        State result = a;
+        for (const auto& [var, sb] : b) {
+            auto it = result.find(var);
+            if (it == result.end()) result[var] = sb;
+            else it->second = mergeVState(it->second, sb);
+        }
+        return result;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& /*ctx*/) const {
+        if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+            State out = in;
+            for (const auto* decl : declStmt->decls()) {
+                if (const auto* vd = dyn_cast<VarDecl>(decl)) {
+                    auto it = out.find(vd);
+                    if (it != out.end() && vd->hasInit())
+                        it->second = vstateOf(vd->getInit(), previous_);
+                }
+            }
+            return out;
+        }
+        if (const auto* binOp = dyn_cast<BinaryOperator>(stmt)) {
+            if (binOp->getOpcode() != BO_Assign) return in;
+            const VarDecl* var = exprAsVar(binOp->getLHS());
+            auto it = var ? in.find(var) : in.end();
+            if (it == in.end()) return in;
+            State out = in;
+            out[var] = vstateOf(binOp->getRHS(), previous_);
+            return out;
+        }
+        if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            // &p bir fonksiyona gidiyorsa p degismis olabilir
+            if (unary->getOpcode() == UO_AddrOf) {
+                const VarDecl* var = exprAsVar(unary->getSubExpr());
+                auto it = var ? in.find(var) : in.end();
+                if (it == in.end()) return in;
+                State out = in;
+                out[var] = VState::Unknown;
+                return out;
+            }
+        }
+        return in;
+    }
+
+    void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
+                      ASTContext& /*ctx*/) const {
+        applyNullCond(dyn_cast<Expr>(cond), isTrueBranch, state);
+    }
+
+    // Fixpoint sonrasi: her ULASILABILIR return'un katkisi toplanir
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State& /*after*/, ASTContext& /*ctx*/) {
+        const auto* ret = dyn_cast<ReturnStmt>(stmt);
+        if (!ret || !ret->getRetValue()) return;
+
+        const Expr* expr = ret->getRetValue();
+        VState v;
+        if (const VarDecl* var = exprAsVar(expr)) {
+            auto it = before.find(var);
+            v = (it != before.end()) ? it->second
+                                     : vstateOf(expr, previous_);
+        } else {
+            v = vstateOf(expr, previous_);
+        }
+        contributions.push_back(v);
+    }
+
+    std::vector<VState> contributions;
+
+private:
+    const SummaryTable& previous_;
+    State initState_;
+};
+
+ReturnNullness aggregateContributions(const std::vector<VState>& contribs) {
+    if (contribs.empty()) return ReturnNullness::Unknown;
+    bool sawNull = false;
+    bool allNeverNull = true;
+    for (VState v : contribs) {
+        if (v == VState::Null || v == VState::MaybeNull) sawNull = true;
+        if (v != VState::NonNull) allNeverNull = false;
+    }
+    // Herhangi bir yol null dondurebiliyorsa MaybeNull — diger yollarin
+    // belirsizligi bunu zayiflatmaz. NeverNull ise TUM yollarin kesin
+    // non-null olmasini gerektirir (guclu iddia).
+    if (sawNull) return ReturnNullness::MaybeNull;
+    if (allNeverNull) return ReturnNullness::NeverNull;
     return ReturnNullness::Unknown;
 }
 
 ReturnNullness computeReturnNullness(const FunctionDecl* func,
+                                     ASTContext& ctx,
                                      const SummaryTable& previous) {
     if (!func->getReturnType()->isPointerType())
         return ReturnNullness::Unknown;
 
     struct ReturnCollector : RecursiveASTVisitor<ReturnCollector> {
         std::vector<const Expr*> returns;
+        bool anyVarReturn = false;
         bool VisitReturnStmt(ReturnStmt* ret) {
             returns.push_back(ret->getRetValue());
+            if (exprAsVar(ret->getRetValue())) anyVarReturn = true;
             return true;
         }
         // Ic ice fonksiyonlarin (lambda) return'leri sayilmasin
@@ -81,19 +295,35 @@ ReturnNullness computeReturnNullness(const FunctionDecl* func,
     collector.TraverseStmt(func->getBody());
     if (collector.returns.empty()) return ReturnNullness::Unknown;
 
-    bool sawNull = false;
-    bool allNeverNull = true;
-    for (const auto* ret : collector.returns) {
-        ReturnNullness r = evaluateReturnExpr(ret, previous);
-        if (r == ReturnNullness::MaybeNull) sawNull = true;
-        if (r != ReturnNullness::NeverNull) allNeverNull = false;
+    // Hizli yol: degisken donduren return yoksa CFG'siz yapisal
+    // degerlendirme yeterli (yaygin durum; dataflow maliyeti odenmez)
+    if (!collector.anyVarReturn) {
+        std::vector<VState> contribs;
+        contribs.reserve(collector.returns.size());
+        for (const auto* ret : collector.returns)
+            contribs.push_back(vstateOf(ret, previous));
+        return aggregateContributions(contribs);
     }
-    // Herhangi bir yol null dondurebiliyorsa MaybeNull — diger yollarin
-    // belirsizligi bunu zayiflatmaz. NeverNull ise TUM yollarin kesin
-    // non-null olmasini gerektirir (guclu iddia).
-    if (sawNull) return ReturnNullness::MaybeNull;
-    if (allNeverNull) return ReturnNullness::NeverNull;
-    return ReturnNullness::Unknown;
+
+    // Degisken donduren yol var: pointer yerelleri/parametreleri topla
+    // ve mini null-akisini kos
+    struct PtrVarCollector : RecursiveASTVisitor<PtrVarCollector> {
+        std::set<const VarDecl*> vars;
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->getType()->isPointerType()) vars.insert(vd);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    };
+    PtrVarCollector ptrVars;
+    ptrVars.TraverseStmt(func->getBody());
+    for (const auto* param : func->parameters())
+        if (param->getType()->isPointerType()) ptrVars.vars.insert(param);
+
+    ReturnNullFlowAnalysis analysis(
+        {ptrVars.vars.begin(), ptrVars.vars.end()}, previous);
+    zerodefect::runDataflow(func, ctx, analysis);
+    return aggregateContributions(analysis.contributions);
 }
 
 // --- Parametre etkileri (v2: alias izlemeli) ---
@@ -444,7 +674,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
         bool changed = false;
         for (const auto* func : collector.functions) {
             FunctionSummary summary;
-            summary.returnNullness = computeReturnNullness(func, current);
+            summary.returnNullness = computeReturnNullness(func, ctx, current);
             summary.params = computeParamEffects(func, current);
 
             const auto* key = func->getCanonicalDecl();

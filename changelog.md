@@ -1,5 +1,40 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Dönüş-nullness dataflow'u (özet v2'nin kalbi)
+
+### Eklenen
+- **`return p;` yolları artık akış-duyarlı** (`FunctionSummary`):
+  pointer yereller/parametreler fonksiyon başına mini null-akışıyla
+  izlenir — kendi motorumuzun (runDataflow) istemcisi olarak: iki fazlı
+  raporlama, assume-edge iyileştirmesi ve yükseklik tavanı hazır gelir.
+  Her ULAŞILABİLİR return, yakınsamış durumdan katkı alır (ölü koddaki
+  return katkı vermez); toplama kuralı eskisiyle aynı (herhangi null
+  yolu → MaybeNull; tüm yollar NonNull → NeverNull).
+- **Akış-duyarsız kestirme bilinçli reddedildi** (tasarım kaydı):
+  "değişkene bir yerde NULL atanmış mı" yaklaşımı `p = NULL; p = &g;
+  return p;` yaygın kalıbında yanlış MaybeNull üretir, precision
+  1.000'i yakardı. FP-katili regresyon testi: InitNullThenSet.
+- Erken-dönüş guard'ı doğru çözülür: `if (!p) return &fb; return p;`
+  → iki yol da NonNull → **NeverNull** (assume-edge sayesinde).
+- Juliet akış-varyantı kaynağı artık görünür: `badSource(data){ data =
+  NULL; return data; }` → MaybeNull → çağıranın korumasız kullanımı
+  uyarı (cross-TU ile birleşince 61/63/64 aileleri bağlanır).
+- Hızlı yol korundu: değişken döndüren return yoksa CFG kurulmaz
+  (yapısal değerlendirme — yaygın durum bedava kalır).
+
+### Bilinçli sınırlar
+- Parametre passthrough (`int* id(int* p){ return p; }`) Unknown kalır
+  — parametre-duyarlı özet (nullness'in argümana bağlı fonksiyonu)
+  ayrı bir ufuk; testle belgelendi.
+
+### Doğrulama
+- 188/188 test (8 yeni ReturnFlowTest: FP-katili, guard'lı fallthrough,
+  kesin-null, zincir yayılımı, Juliet badSource kalıbı, cross-TU akış,
+  param sınırı)
+- Mini-süit uçtan uca temiz; gerçek korpus/Juliet etkisi CI'dan
+  okunacak (korpus sayıları bilinçli değişebilir — bekçi yakalar,
+  pinler aynı PR'da gerekçeyle güncellenir)
+
 ## 2026-07-10 — Ufuk 2 açılışı: cross-TU özetler (--whole-program)
 
 ### Eklenen
