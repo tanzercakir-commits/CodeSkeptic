@@ -77,6 +77,23 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [ ] MCP v2: sıcak süreçte AST/derleme önbelleği (şu an her çağrı yeniden
       parse ediyor — kalıcı sürecin asıl hız kazancı burada)
 
+### Arayüz (UI) — son etap, pratiklik + görsellik
+- [ ] **HTML rapor**: `--html rapor.html` — tek, kendine yeten dosya
+      (bağımlılıksız, offline açılır). Bulgular kural/severity/dosya
+      filtresiyle; her bulgunun dataflow izi tıklanınca kaynak bağlamıyla
+      açılır; özet kartları (kural başına sayı, severity dağılımı).
+      En pratik ilk adım: kurulum yok, paylaşımı e-posta/PR eki kadar
+      kolay.
+- [ ] **Editör entegrasyonu belgesi**: SARIF çıktımız VS Code "SARIF
+      Viewer" ve GitHub code scanning ile bugün çalışıyor — README'ye
+      ekran görüntülü kısa rehber (sıfır kod, hazır kazanım).
+- [ ] **Trend paneli**: haftalık JULIET_RESULT/CORPUS_RESULT satırlarını
+      işleyen statik sayfa (GitHub Pages) — F1/precision zaman serisi.
+      Skor bekçisinin görsel yüzü.
+- [ ] (Değerlendirme) VS Code eklentisi: MCP/--serve üzerinden canlı
+      analiz + satır içi squiggle. En yüksek etki, en yüksek maliyet —
+      HTML rapor + SARIF deneyiminden gelen geri bildirimle karar.
+
 ### Faz 4 (araştırma ufku)
 - [x] İnterprosedürel v1: fonksiyon özetleri (dönüş nullness + parametre
       etkileri; sabit-nokta taraması, rekursiyon-güvenli)
