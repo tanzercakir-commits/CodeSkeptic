@@ -171,14 +171,36 @@ TEST(WorstCaseTest, LongElseIfChain_OneArmZero) {
 }
 
 TEST(WorstCaseTest, NestedLoopConditionalFree) {
-    // Ic dongude alloc, kosullu free: hem reassign-leak (2. iterasyonda
-    // eski Allocated uzerine new) hem exit-leak raporlanmali
+    // a,b,c fonksiyon icinde HIC degismiyor: tek is parcaciginda
+    // while(a)'dan cikis ancak a==0 ile mumkun — o yolda p hic allocate
+    // edilmez. Yol-duyarli analiz exit-leak raporlamamakta haklidir
+    // (eski 2. bulgu yol-duyarsizligin artefaktiydi). Dongu icindeki
+    // reassign-leak gercek ve raporlanir.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int a, int b, int c) {
             int* p = nullptr;
             while (a) {
                 while (b) {
+                    p = new int(1);
+                    if (c) delete p;
+                }
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(WorstCaseTest, NestedLoopConditionalFree_MutatedConds) {
+    // Gercekci dongu: kosullar degisiyor (a--, b--) → anahtarlanmazlar,
+    // cikis gercekten ulasilabilir → reassign-leak + exit-leak birlikte
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f(int a, int b, int c) {
+            int* p = nullptr;
+            while (a--) {
+                while (b--) {
                     p = new int(1);
                     if (c) delete p;
                 }

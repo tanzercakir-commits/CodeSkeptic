@@ -1,5 +1,61 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Hedefli yol duyarlılığı (guard'lı disjunktlar)
+
+### Teşhis (FP_SAMPLE verisiyle)
+Juliet FP'lerinin tamamına yakını TEK kalıba indi: aynı değişmez koşul
+iki kez test ediliyor (`if(globalFive==5) alloc; … if(globalFive==5)
+free;` — good varyantlarının 05/07/09/10/11 kontrol-akış aileleri).
+Join'de yollar karışınca "alloc olup free olmayan yol" hayaleti doğuyordu.
+memory-leak'in 92 FP'si + diğer CWE dosyalarındaki ~646 FP'si,
+uninit-ptr'ın 178'i, null-deref'in 241'i aynı kök nedene işaret ediyor.
+
+### Eklenen
+- **engine/PathFacts**: koşulları kanonik anahtara indirger
+  (`var REL literal`; NE/GT/GE tersleme ile EQ/LT/LE'ye normalize).
+  Yalnızca fonksiyon içinde atanmayan/adresi alınmayan, volatile
+  olmayan tamsayı değişkenler anahtarlanır; fonksiyon çağrıları ASLA
+  (rand() korelasyonu yanlış olur). `collectMutatedDecls` görücüsü.
+- **MemoryLeakRule State'i disjunkt kümesi oldu**: en fazla 4
+  (koşul-gerçekleri, var-durumları) çifti; refineOnEdge çelişen
+  disjunktı düşürür; tavan aşımında widening (facts kesişimi + var
+  birleşimi) bugünkü davranışa geri düşer. **Motor değişmedi** —
+  duck-typed State tasarımı disjunktif lattice'i analiz içinde taşıdı.
+- Raporlama düzleştirilmiş (flatten) görünümle bugünkü mantığın aynısı;
+  kazanç, düşürülen disjunktların birleşime hiç girmemesi.
+
+### Yan kazanımlar
+- Korelasyonlu double-free/UAF artık YAKALANIYOR (önceden FN):
+  `if(f) free(p); if(f) free(p);` ikinci gövdeye yalnızca Freed yolu girer.
+- `while(a)` gövdesinde a hiç değişmiyorsa çıkış yolu a==0 demektir —
+  eski exit-leak artefaktı kayboldu (NestedLoopConditionalFree testi
+  semantiğe göre güncellendi; gerçekçi mutasyonlu varyant eklendi).
+
+### Bilinçli sınırlar (dokümante + test)
+- İki guard arasındaki çağrı globali değiştirebilir → korelasyon gerçek
+  kusuru gizleyebilir (FN yönü; `CallBetweenCorrelatedGuards` testi).
+  Yerel/param koşullarda bu risk yok (adresi kaçmayan yerele çağrı
+  dokunamaz).
+
+### Doğrulama
+- 168/168 test (10 yeni PathSensitivity + &arg escape testi)
+- Mini-süit uçtan uca: goodB2G korelasyonlu guard fp=0, bad leak tp=1
+
+### Juliet etkisi (PR #17 ikinci koşu — ölçülen)
+| Kural | Önce | Sonra |
+|-------|------|-------|
+| memory-leak | 103 TP / 92 FP (p=0.528) | 103 TP / **61 FP** (p=0.628) |
+| double-free | 47 TP | **79 TP** (+32; korelasyonlu double-free FN'di) |
+| use-after-free | 99 TP | **174 TP** (+75; hitrate 0.247→0.435) |
+
+Yol duyarlılığı FP kesmenin ötesinde gizli TP açığa çıkardı — birleşik
+yol analizinde görünmeyen kusurlar disjunktlarla görünür oldu.
+Ek düzeltme: `sink(&data)` argümanı artık escape sayılıyor (Juliet 63x
+varyantı FP'si). Kalan FP aileleri: uninit-ptr 178 + null-deref 241
+(disjunkt portu — sıradaki tur); CWE401'de kalan 61 FP'nin bir kısmı
+farklı-global çiftleri (globalTrue/globalFalse değerleri TU dışında —
+dürüst sınır).
+
 ## 2026-07-10 — Juliet ölçüm doğruluğu + global filtre sızıntısı düzeltmesi
 
 ### Düzeltilen (ürün hatası — testlerin bulduğu)
