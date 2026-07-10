@@ -25,6 +25,15 @@ machine-readable findings with dataflow traces.
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
 
+**Targeted path-sensitivity:** the memory rules keep a small set of
+guarded states instead of one merged state, keyed by conditions on
+variables that provably don't change (`if (mode == 5) p = malloc(...);
+… if (mode == 5) free(p);` is clean — the two guards are correlated,
+so the "allocated but never freed" path is infeasible). Function-call
+conditions are never keyed (two `check()` calls may differ), mutated
+variables are never keyed, and the disjunct budget degrades gracefully
+to the classic merged analysis.
+
 **Interprocedural (v1):** functions with visible bodies are summarized
 before rules run — return nullness (a `find()`-style function that can
 return null makes unguarded dereferences of its result a warning, with

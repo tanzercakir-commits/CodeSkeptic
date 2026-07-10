@@ -1,5 +1,48 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Hedefli yol duyarlılığı (guard'lı disjunktlar)
+
+### Teşhis (FP_SAMPLE verisiyle)
+Juliet FP'lerinin tamamına yakını TEK kalıba indi: aynı değişmez koşul
+iki kez test ediliyor (`if(globalFive==5) alloc; … if(globalFive==5)
+free;` — good varyantlarının 05/07/09/10/11 kontrol-akış aileleri).
+Join'de yollar karışınca "alloc olup free olmayan yol" hayaleti doğuyordu.
+memory-leak'in 92 FP'si + diğer CWE dosyalarındaki ~646 FP'si,
+uninit-ptr'ın 178'i, null-deref'in 241'i aynı kök nedene işaret ediyor.
+
+### Eklenen
+- **engine/PathFacts**: koşulları kanonik anahtara indirger
+  (`var REL literal`; NE/GT/GE tersleme ile EQ/LT/LE'ye normalize).
+  Yalnızca fonksiyon içinde atanmayan/adresi alınmayan, volatile
+  olmayan tamsayı değişkenler anahtarlanır; fonksiyon çağrıları ASLA
+  (rand() korelasyonu yanlış olur). `collectMutatedDecls` görücüsü.
+- **MemoryLeakRule State'i disjunkt kümesi oldu**: en fazla 4
+  (koşul-gerçekleri, var-durumları) çifti; refineOnEdge çelişen
+  disjunktı düşürür; tavan aşımında widening (facts kesişimi + var
+  birleşimi) bugünkü davranışa geri düşer. **Motor değişmedi** —
+  duck-typed State tasarımı disjunktif lattice'i analiz içinde taşıdı.
+- Raporlama düzleştirilmiş (flatten) görünümle bugünkü mantığın aynısı;
+  kazanç, düşürülen disjunktların birleşime hiç girmemesi.
+
+### Yan kazanımlar
+- Korelasyonlu double-free/UAF artık YAKALANIYOR (önceden FN):
+  `if(f) free(p); if(f) free(p);` ikinci gövdeye yalnızca Freed yolu girer.
+- `while(a)` gövdesinde a hiç değişmiyorsa çıkış yolu a==0 demektir —
+  eski exit-leak artefaktı kayboldu (NestedLoopConditionalFree testi
+  semantiğe göre güncellendi; gerçekçi mutasyonlu varyant eklendi).
+
+### Bilinçli sınırlar (dokümante + test)
+- İki guard arasındaki çağrı globali değiştirebilir → korelasyon gerçek
+  kusuru gizleyebilir (FN yönü; `CallBetweenCorrelatedGuards` testi).
+  Yerel/param koşullarda bu risk yok (adresi kaçmayan yerele çağrı
+  dokunamaz).
+
+### Doğrulama
+- 167/167 test (10 yeni: Juliet kalıbı, olumsuzlama, karşıt-korelasyon,
+  mutasyon, çağrı-guard'ı, yeni-yakalanan double-free/UAF, döngü çifti)
+- Mini-süit uçtan uca: goodB2G korelasyonlu guard fp=0, bad leak tp=1
+- Gerçek etki bu PR'ın Juliet CI koşusundan okunacak
+
 ## 2026-07-10 — Juliet ölçüm doğruluğu + global filtre sızıntısı düzeltmesi
 
 ### Düzeltilen (ürün hatası — testlerin bulduğu)

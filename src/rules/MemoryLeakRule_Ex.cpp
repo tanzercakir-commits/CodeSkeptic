@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/PathFacts.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -293,54 +294,144 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
     if (eqHolds) markNullOnEdge(state, var);
 }
 
+// --- Guard'li disjunktlar (hedefli yol duyarliligi) ---
+//
+// Juliet FP avi (2026-07-10) tek kok neden gosterdi: ayni degismez
+// kosul iki kez test edildiginde ("if(g==5) alloc; ... if(g==5) free;")
+// join'de yollar karisiyor ve "alloc olup free olmayan yol" hayaleti
+// doguyordu. State artik az sayida (kosul-gercekleri, var-durumlari)
+// cifti halinde tutulur; ikinci testte celisen disjunkt dusurulur.
+// Motor degisikligi GEREKMEDI: State duck-typed oldugu icin disjunktif
+// lattice tamamen analiz icinde yasiyor.
+
+struct Disjunct {
+    std::map<zerodefect::FactKey, bool> facts;
+    VarState vars;
+
+    bool operator==(const Disjunct& o) const {
+        return facts == o.facts && vars == o.vars;
+    }
+    bool operator<(const Disjunct& o) const {
+        if (facts != o.facts) return facts < o.facts;
+        return vars < o.vars;
+    }
+};
+
+using DisjunctState = std::vector<Disjunct>;
+
+// Disjunkt tavani: asilirsa tek disjunkta genisletilir (widening) —
+// bugunku davranisa (tam join) geri dusus. Kucuk tutulur: hedef,
+// genel yol duyarliligi degil, korelasyonlu guard kalibi.
+constexpr size_t kMaxDisjuncts = 4;
+
+void mergeVarStates(VarState& into, const VarState& from) {
+    for (const auto& [var, s] : from) {
+        auto it = into.find(var);
+        if (it == into.end())
+            into[var] = s;
+        else
+            it->second = mergeAllocStates(it->second, s);
+    }
+}
+
+// Raporlama gorunumu: tum disjunktlarin pointwise birlesimi. Bugunku
+// tek-state davranisinin birebir karsiligi — raporlama mantigi degismez.
+VarState flattenState(const DisjunctState& state) {
+    VarState out;
+    for (const auto& d : state) mergeVarStates(out, d.vars);
+    return out;
+}
+
+// Kanonik form: sirali, ayni-facts disjunktlar birlesik, tavan asiminda
+// genisletilmis. Motorun != karsilastirmasi icin sira kararliligi sart.
+void normalizeDisjuncts(DisjunctState& state) {
+    std::sort(state.begin(), state.end());
+    DisjunctState merged;
+    for (auto& d : state) {
+        if (!merged.empty() && merged.back().facts == d.facts)
+            mergeVarStates(merged.back().vars, d.vars);
+        else
+            merged.push_back(std::move(d));
+    }
+    state = std::move(merged);
+
+    if (state.size() > kMaxDisjuncts) {
+        Disjunct widened = std::move(state.front());
+        for (size_t i = 1; i < state.size(); ++i) {
+            // Ortak gercekler kesisir (uyusmayan anahtar dusulur)
+            for (auto it = widened.facts.begin();
+                 it != widened.facts.end();) {
+                auto found = state[i].facts.find(it->first);
+                if (found == state[i].facts.end() ||
+                    found->second != it->second)
+                    it = widened.facts.erase(it);
+                else
+                    ++it;
+            }
+            mergeVarStates(widened.vars, state[i].vars);
+        }
+        state.clear();
+        state.push_back(std::move(widened));
+    }
+}
+
 // --- Analysis struct for DataflowEngine ---
 
 class MemLeakAnalysis {
 public:
-    using State = VarState;
+    using State = DisjunctState;
 
     MemLeakAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                    std::set<const ValueDecl*> mutatedDecls,
                     std::string funcName,
                     zerodefect::DiagnosticList& results)
-        : trackedVars_(trackedVars), funcName_(std::move(funcName)),
-          results_(results) {
+        : trackedVars_(trackedVars), mutated_(std::move(mutatedDecls)),
+          funcName_(std::move(funcName)), results_(results) {
+        Disjunct init;
         for (const auto* var : trackedVars_)
-            initState_[var] = AllocState::None;
+            init.vars[var] = AllocState::None;
+        initState_.push_back(std::move(init));
     }
 
     State initialState() const { return initState_; }
 
-    // Degisken basina AllocState zinciri en fazla 3 gecis yapar
+    // Degisken basina AllocState zinciri en fazla 3 gecis yapar;
+    // disjunkt sayisi yukseligi carpar (her disjunkt ayri yukselebilir)
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
+        return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
+                   static_cast<unsigned>(kMaxDisjuncts) + 4;
     }
 
     State merge(const State& a, const State& b) const {
         State result = a;
-        for (const auto& [var, stateB] : b) {
-            auto it = result.find(var);
-            if (it == result.end())
-                result[var] = stateB;
-            else
-                it->second = mergeAllocStates(it->second, stateB);
-        }
+        result.insert(result.end(), b.begin(), b.end());
+        normalizeDisjuncts(result);
         return result;
     }
 
     // Saf state gecisi — rapor uretmez. Raporlama, fixpoint sonrasi
     // gecis olan onStatement icindedir (engine garantisi).
     State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
-        State out = in;
+        // Etkiler state'ten bagimsiz: bir kez siniflandir, her disjunkta uygula
+        std::vector<std::pair<const VarDecl*, StmtEffect>> effects;
         for (const auto* var : trackedVars_) {
             StmtEffect effect = classifyStmt(stmt, var, ctx);
-            switch (effect) {
-                case StmtEffect::Allocates:
-                    out[var] = AllocState::Allocated; break;
-                case StmtEffect::Frees:
-                    out[var] = AllocState::Freed; break;
-                case StmtEffect::Escapes:
-                    out[var] = AllocState::Escaped; break;
-                case StmtEffect::None: break;
+            if (effect != StmtEffect::None) effects.emplace_back(var, effect);
+        }
+        if (effects.empty()) return in;
+
+        State out = in;
+        for (auto& d : out) {
+            for (const auto& [var, effect] : effects) {
+                switch (effect) {
+                    case StmtEffect::Allocates:
+                        d.vars[var] = AllocState::Allocated; break;
+                    case StmtEffect::Frees:
+                        d.vars[var] = AllocState::Freed; break;
+                    case StmtEffect::Escapes:
+                        d.vars[var] = AllocState::Escaped; break;
+                    case StmtEffect::None: break;
+                }
             }
         }
         return out;
@@ -348,13 +439,36 @@ public:
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
-        applyNullCondition(dyn_cast<Expr>(cond), isTrueBranch, state);
+        const auto* condExpr = dyn_cast<Expr>(cond);
+
+        // Kosul anahtarlanabiliyorsa: celisen disjunktlar bu kenarda
+        // olanaksizdir (dusur), kalanlara gercek islenir.
+        if (auto fact = zerodefect::conditionFact(condExpr, mutated_)) {
+            const bool value = isTrueBranch ? fact->second : !fact->second;
+            State kept;
+            for (auto& d : state) {
+                auto it = d.facts.find(fact->first);
+                if (it != d.facts.end() && it->second != value) continue;
+                d.facts[fact->first] = value;
+                kept.push_back(std::move(d));
+            }
+            state = std::move(kept);
+            normalizeDisjuncts(state);
+        }
+
+        for (auto& d : state)
+            applyNullCondition(condExpr, isTrueBranch, d.vars);
     }
 
     // Fixpoint sonrasi raporlama: reassignment leak, double free ve
     // use-after-free burada uretilir.
-    void onStatement(const Stmt* stmt, const State& before,
-                     const State& after, ASTContext& ctx) {
+    void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
+                     const State& afterDisjuncts, ASTContext& ctx) {
+        // Raporlama bugunku tek-state gorunumuyle calisir; yol
+        // duyarliliginin kazanci refineOnEdge'in dusurdugu disjunktlarin
+        // bu birlesime hic girmemesidir.
+        VarState before = flattenState(beforeDisjuncts);
+        VarState after = flattenState(afterDisjuncts);
         // Dataflow izi: state degistiren olaylari kaydet (alloc/free).
         // Notlar rapora kosu SONUNDA ilistirilir — raporlama gecisinin
         // blok sirasi kaynak sirasi degildir.
@@ -464,9 +578,10 @@ private:
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
+    std::set<const ValueDecl*> mutated_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
-    VarState initState_;
+    State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
 };
 
@@ -481,7 +596,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     if (trackedVars.empty()) return;
 
     MemLeakAnalysis analysis(
-        trackedVars, funcDecl->getQualifiedNameAsString(), results);
+        trackedVars, zerodefect::collectMutatedDecls(funcDecl),
+        funcDecl->getQualifiedNameAsString(), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
 
     // Exit block leak check
@@ -491,7 +607,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     const SourceManager& sm = ctx.getSourceManager();
     SourceLocation endLoc = funcDecl->getBody()->getEndLoc();
 
-    for (const auto& [var, state] : exitIt->second) {
+    const VarState exitVars = flattenState(exitIt->second);
+    for (const auto& [var, state] : exitVars) {
         if (state == AllocState::Allocated) {
             unsigned line = sm.getSpellingLineNumber(endLoc);
             if (analysis.reported().emplace(var, line).second) {
