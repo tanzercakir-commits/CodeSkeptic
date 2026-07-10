@@ -122,8 +122,13 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama
       yolundan tüketiyor — doğrudan `x/f()` böleni bilinçli raporlanmıyor;
       özet dosya formatı v2, v1 geriye uyumlu)
-- [ ] Özet önbelleği (artımlı modda yalnızca değişen fonksiyon tazelenir;
-      "özet değişti → çağıranlar etkilendi" = semantik regresyon sinyali)
+- [x] Özet-diff v1 (--summary-diff eski yeni): sözleşme değişim raporu —
+      WEAKENED (güçlü iddia kaybı → çağıranlar etkilendi, exit 1 = CI
+      kapısı) / STRENGTHENED / CHANGED / ADDED / REMOVED. Semantik
+      regresyon sinyalinin çekirdeği; kontrat DİLİ tasarımı ayrı
+      (kullanıcıyla birlikte-tasarım oturumu).
+- [ ] Özet önbelleği v2: artımlı modda yalnızca değişen fonksiyon
+      tazelenir (diff'in üstüne inşa edilir)
 
 ## Tamamlanan Görevler
 

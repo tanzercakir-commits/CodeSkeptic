@@ -875,7 +875,9 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
     return out.good();
 }
 
-bool SummaryRegistry::loadGlobal(const std::string& path) {
+bool SummaryRegistry::parseSummaryFile(
+    const std::string& path,
+    std::map<std::string, FunctionSummary>& out) {
     std::ifstream in(path);
     if (!in.is_open()) return false;
 
@@ -884,7 +886,7 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
     if (line != kSummaryFileHeader && line != kSummaryFileHeaderV1)
         return false;
 
-    // Once tumuyle ayristir, sonra depoya kat: bozuk dosya kismi durum
+    // Once tumuyle ayristir, sonra teslim et: bozuk dosya kismi durum
     // birakmadan reddedilir
     std::map<std::string, FunctionSummary> parsed;
     while (std::getline(in, line)) {
@@ -924,6 +926,14 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
         auto [it, inserted] = parsed.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);
     }
+
+    out = std::move(parsed);
+    return true;
+}
+
+bool SummaryRegistry::loadGlobal(const std::string& path) {
+    std::map<std::string, FunctionSummary> parsed;
+    if (!parseSummaryFile(path, parsed)) return false;
 
     for (const auto& [key, summary] : parsed) {
         auto [it, inserted] = globalStore_.emplace(key, summary);

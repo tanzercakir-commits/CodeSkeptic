@@ -85,6 +85,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
             summary_in_path_ = argv[++i];
         } else if (arg == "--summary-out" && i + 1 < argc) {
             summary_out_path_ = argv[++i];
+        } else if (arg == "--summary-diff" && i + 2 < argc) {
+            summary_diff_old_ = argv[++i];
+            summary_diff_new_ = argv[++i];
         } else if (arg == "--files" && i + 1 < argc) {
             // Liste dosyasi: satir basina bir kaynak dosya yolu.
             // Buyuk/secilmis kumeler icin (benchmark, ajan toplu istegi).
@@ -121,6 +124,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --summary-in <file>    Load function summaries saved earlier;\n"
                       << "                         analyze single files with whole-project\n"
                       << "                         knowledge (incremental whole-program)\n"
+                      << "  --summary-diff <old> <new>  Report contract changes between two\n"
+                      << "                         summary files instead of analyzing;\n"
+                      << "                         exits 1 if any contract weakened\n"
                       << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";
