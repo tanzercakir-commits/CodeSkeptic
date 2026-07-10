@@ -1,0 +1,9 @@
+# Korpus beklenen bulgu sayilari (run_corpus.sh dogrular, %10+2 tolerans).
+# Surumler sabit oldugu icin sapma semantik regresyon isaretidir:
+# dusus = sessiz bulgu kaybi, artis = FP patlamasi. Bilincli kural
+# degisikliklerinde bu dosya AYNI PR'da guncellenir (degisiklik gerekcesi
+# commit mesajinda gorunur olur).
+#
+# proje bulgu-sayisi
+cjson 111
+tinyxml2 9

@@ -55,7 +55,8 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [ ] CWE415/416 good-fonksiyon FP'lerini incele (eşlemeli precision
       sonrası gerçek boyut belli olur); CWE401 dosya isabeti için
       interprosedürel kaynak/lavabo akışı (bilinen v1 sınırı)
-- [ ] Korpus bulgu sayılarını sabitle (beklenen sayı dosyası + tolerans)
+- [x] Korpus bulgu sayılarını sabitle (corpus_expected.txt: cjson 111,
+      tinyxml2 9; %10+2 tolerans; sapma = kırmızı = semantik regresyon)
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
 ### Kural iyileştirme notları
