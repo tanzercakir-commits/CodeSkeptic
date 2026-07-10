@@ -1,5 +1,26 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Artımlı akışın uçları: MCP `summaries` + diff döngüsü belgesi
+
+### Eklenen
+- **MCP analyze aracına `summaries` argümanı**: --summary-out ile
+  yazılmış dosya MCP çağrısına verilir; ajan döngüsü tek dosyayı
+  tüm-proje bilgisiyle analiz eder (test: özetsiz sessiz, özetli
+  null-deref görünür — bilgiyi taşıyan tek şey dosya).
+- analyze_diff.sh zaten ek argümanları ilettiğinden `--summary-in`
+  oradan bugün çalışıyor — script başlığına ve README'ye belgelendi.
+  Artımlı hikaye tamam: hasat (bir kez) → diff döngüsü / MCP çağrısı
+  (her düzenlemede, tüm-proje bilgisiyle).
+
+### Değişen
+- README benchmark: CWE369 satırı PR #30 sonrası tazelendi
+  (18→21 TP, hitrate 0.045→0.053, F1 0.086→0.100, precision 1.000
+  sabit) + rakam yolculuğu paragrafına dönüş-sıfırlık cümlesi.
+
+### Doğrulama
+- 211/211 test (ctest + tek-süreç; +2: MCP summaries argümanı E2E,
+  tools/list şeması)
+
 ## 2026-07-10 — Dönüş sıfır-olabilirliği özeti (DivByZero fonksiyonlar arası)
 
 ### Eklenen

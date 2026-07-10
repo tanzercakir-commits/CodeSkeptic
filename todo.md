@@ -112,9 +112,10 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [x] Cross-TU v2: özetleri diske yaz/yükle (--summary-out/--summary-in;
       sürümlü satır formatı, bozuk dosya bütünüyle red, çakışmada
       muhafazakâr birleşim; hasat rules geçişinde — ikinci parse yok)
-- [ ] Cross-TU v3 fikirleri: analyze_diff.sh'a --summary-in entegrasyonu;
-      MCP analyze aracına summaries argümanı; özet dosyası tazelik
-      kontrolü (kaynak mtime > özet mtime uyarısı)
+- [x] Cross-TU v3 uçlar: analyze_diff.sh --summary-in (ek-arg iletimi
+      zaten vardı, belgelendi); MCP analyze aracına `summaries` argümanı
+- [ ] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime uyarısı)
+      — düşük öncelik
 - [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
       (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
 - [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama

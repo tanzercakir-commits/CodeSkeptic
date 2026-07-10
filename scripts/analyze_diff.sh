@@ -5,6 +5,11 @@
 #
 # Kullanim: scripts/analyze_diff.sh <zerodefect-binary> <git-ref> [ek args...]
 #   ornek:  scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
+#
+# Ek argumanlar binary'ye aynen iletilir; --summary-in ile diff dongusu
+# tum-proje bilgisine kavusur (baska dosyadaki callee ozetleri gorunur):
+#   scripts/analyze_diff.sh build/src/zerodefect origin/main \
+#       --summary-in .zerodefect-summaries
 set -euo pipefail
 
 ZD_BIN="${1:?usage: analyze_diff.sh <zerodefect-binary> <git-ref> [extra args...]}"
