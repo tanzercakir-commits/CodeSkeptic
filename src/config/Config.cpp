@@ -33,6 +33,10 @@ bool Config::loadFromFile(const std::string& path) {
             output_format_ = "sarif";
             sarif_output_path_ = value;
         }
+        else if (key == "html_output") {
+            output_format_ = "html";
+            html_output_path_ = value;
+        }
         else if (key == "min_severity")  min_severity_ = parseSeverity(value);
         else if (key == "lang")          lang_ = value;
         else if (key == "baseline")      baseline_path_ = value;
@@ -58,6 +62,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--sarif" && i + 1 < argc) {
             output_format_ = "sarif";
             sarif_output_path_ = argv[++i];
+        } else if (arg == "--html" && i + 1 < argc) {
+            output_format_ = "html";
+            html_output_path_ = argv[++i];
         } else if (arg == "--severity" && i + 1 < argc) {
             min_severity_ = parseSeverity(argv[++i]);
         } else if (arg == "--disable-rule" && i + 1 < argc) {
@@ -96,6 +103,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --build-path <path>    compile_commands.json directory\n"
                       << "  --json <file>          JSON output file\n"
                       << "  --sarif <file>         SARIF 2.1.0 output file\n"
+                      << "  --html <file>          Self-contained HTML report (filters,\n"
+                      << "                         dataflow traces with source context)\n"
                       << "  --severity <level>     Minimum severity (info/warning/error)\n"
                       << "  --disable-rule <id>    Disable a rule\n"
                       << "  --baseline <file>      Suppress findings recorded in baseline\n"

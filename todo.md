@@ -82,13 +82,11 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       boyut+mtime parmak izi — bayat AST asla servis edilmez; yalnız MCP
       yolunda açık, CLI kapalı; tekrar çağrıda ~6x hız)
 
-### Arayüz (UI) — son etap, pratiklik + görsellik
-- [ ] **HTML rapor**: `--html rapor.html` — tek, kendine yeten dosya
-      (bağımlılıksız, offline açılır). Bulgular kural/severity/dosya
-      filtresiyle; her bulgunun dataflow izi tıklanınca kaynak bağlamıyla
-      açılır; özet kartları (kural başına sayı, severity dağılımı).
-      En pratik ilk adım: kurulum yok, paylaşımı e-posta/PR eki kadar
-      kolay.
+### Arayüz (UI) — pratiklik + görsellik
+- [x] **HTML rapor**: `--html rapor.html` — tek, kendine yeten dosya;
+      özet kartları = filtre (severity/kural), metin süzme, izler kaynak
+      bağlamıyla (`<details>`), koyu/açık tema otomatik. Kaynak satırları
+      üretim anında gömülür — rapor taşınabilir.
 - [ ] **Editör entegrasyonu belgesi**: SARIF çıktımız VS Code "SARIF
       Viewer" ve GitHub code scanning ile bugün çalışıyor — README'ye
       ekran görüntülü kısa rehber (sıfır kod, hazır kazanım).
@@ -115,8 +113,8 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       muhafazakâr birleşim; hasat rules geçişinde — ikinci parse yok)
 - [x] Cross-TU v3 uçlar: analyze_diff.sh --summary-in (ek-arg iletimi
       zaten vardı, belgelendi); MCP analyze aracına `summaries` argümanı
-- [ ] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime uyarısı)
-      — düşük öncelik
+- [x] Özet dosyası tazelik kontrolü (kaynak mtime > özet mtime → stderr
+      uyarısı; analiz durmaz, özetler yine kullanılır)
 - [ ] Dönüş-akışının Juliet 61-ailesi doğrulaması: haftalık derin koşu
       (cron limit=1600) trendde göstermeli; ilk cron sonucunu kontrol et
 - [x] Int dönüş sıfır-olabilirliği özeti (ReturnZeroness; DivByZero atama

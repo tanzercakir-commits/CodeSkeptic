@@ -56,6 +56,7 @@ enum class MsgId {
     TraceAssignedMaybeZeroHere, // {0} = degisken adi (ozet: 0 donebilir)
     TraceAssumedNullHere,       // {0} = degisken adi (guard: bu dalda null)
     TraceAssumedZeroHere,       // {0} = degisken adi (guard: bu dalda sifir)
+    SummaryStaleWarning,        // {0} = ozet dosyasi, {1} = yeni kaynak
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.

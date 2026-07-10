@@ -1,5 +1,40 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — HTML rapor (`--html`): UI etabının ilk adımı
+
+### Eklenen
+- **HtmlReporter**: tek, kendine yeten HTML dosyası (harici kaynak yok
+  — test bunu "http:// içermez" ile sabitler; offline açılır, e-posta/PR
+  eki kadar kolay paylaşılır). Özet kartları aynı zamanda filtre
+  (severity + kural, tıkla-aç/kapa); metin kutusu dosya/fonksiyon/mesaj
+  süzer; her bulgunun dataflow izi `<details>` ile açılır ve hem iz
+  adımları hem bulgu noktası ±2 satır KAYNAK BAĞLAMIYLA, hedef satır
+  işaretli gömülür (üretim anında okunur — rapor taşındığında bağlam
+  kaybolmaz). Koyu/açık tema `prefers-color-scheme` ile otomatik.
+- **Güvenlik değişmezi**: tüm kullanıcı verisi HTML-escape'li — kaynak
+  koddaki `<script>` rapora sızamaz (testli).
+- `--html <file>` CLI bayrağı + `html_output=` config anahtarı.
+- Kaynak dosya yoksa bağlam atlanır, rapor yine üretilir (testli).
+
+### Doğrulama
+- 219/219 test (ctest + tek-süreç; +5 HtmlReporterTest)
+- CLI dumanı: 4 kural ailesinden 5 bulgulu demo raporu üretildi
+  (fonksiyonlar arası sıfırlık ve guard-null izleri dahil)
+
+## 2026-07-10 — Özet dosyası tazelik uyarısı
+
+### Eklenen
+- `--summary-in` ile yüklenen özet dosyasından YENİ bir kaynak analiz
+  ediliyorsa stderr'de tek uyarı: "summaries may be stale; re-run
+  --summary-out". Analiz durmaz, özetler yine kullanılır (bayat özet
+  doğruluğu bozmaz — en fazla eksik/fazla iddia taşır; ama kullanıcı
+  tazelemeyi bilmeli). Test mtime'ları açıkça damgalar (aynı-saniye
+  flake'i yok) ve iki yönü de sabitler: bayat → uyarı + bulgular yine
+  gelir; taze → uyarı yok.
+
+### Doğrulama
+- 214/214 test (ctest + tek-süreç)
+
 ## 2026-07-10 — İz v2: guard olayları izlerde (onEdgeRefined)
 
 ### Eklenen

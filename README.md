@@ -182,6 +182,9 @@ zerodefect <source_path> [options]
   --build-path <path>    compile_commands.json directory
   --json <file>          JSON output file
   --sarif <file>         SARIF 2.1.0 output file (GitHub code scanning)
+  --html <file>          Self-contained HTML report: summary cards double
+                         as filters, dataflow traces open with embedded
+                         source context, dark/light theme — works offline
   --severity <level>     Minimum severity (info/warning/error)
   --disable-rule <id>    Disable a rule
   --baseline <file>      Suppress findings recorded in the baseline

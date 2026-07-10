@@ -6,6 +6,7 @@ add_library(zerodefect_core STATIC
     engine/FunctionSummary.cpp
     engine/PathFacts.cpp
     reporter/ConsoleReporter.cpp
+    reporter/HtmlReporter.cpp
     reporter/JsonReporter.cpp
     reporter/SarifReporter.cpp
     config/Config.cpp

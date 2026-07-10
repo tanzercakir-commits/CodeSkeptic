@@ -17,6 +17,7 @@
 | ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Tamamlandı |
 | JsonReporter | `src/reporter/JsonReporter.h`, `.cpp` | Tamamlandı |
 | SarifReporter | `src/reporter/SarifReporter.h`, `.cpp` | Tamamlandı (SARIF 2.1.0) |
+| HtmlReporter | `src/reporter/HtmlReporter.h`, `.cpp` | Tamamlandı (tek dosya; filtreler + kaynak bağlamlı izler) |
 | SuppressionFilter | `src/analyzer/SuppressionFilter.h`, `.cpp` | Tamamlandı (disable-line / next-line) |
 | Baseline | `src/analyzer/Baseline.h`, `.cpp` | Tamamlandı (v2: satır-bağımsız içerik-hash anahtarı; v1 uyumlu) |
 | Config | `src/config/Config.h`, `.cpp` | Tamamlandı (`--lang` dahil) |
@@ -27,7 +28,7 @@
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Tamamlandı (NullState + assume edges + disjunktlar + dönüş-nullness özeti) |
 | main.cpp | `src/main.cpp` | Tamamlandı (4 kural kayıtlı, 5 rule_id) |
 | CMake build sistemi | `CMakeLists.txt`, `src/CMakeLists.txt` | Tamamlandı (Linux + macOS) |
-| GTest altyapısı | `tests/` | Tamamlandı (213/213; ctest + tek-süreç) |
+| GTest altyapısı | `tests/` | Tamamlandı (219/219; ctest + tek-süreç) |
 | CI | `.github/workflows/ci.yml` | Tamamlandı (build + test + smoke + korpus) |
 | Korpus scripti | `scripts/run_corpus.sh` | Tamamlandı (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Tam entegrasyon: F1 + skor bekçisi; her kod PR'ında koşar (draft hariç); rakamlar README'de |
