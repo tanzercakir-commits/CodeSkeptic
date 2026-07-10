@@ -124,7 +124,8 @@ PYEOF
         return 1
     fi
 
-    python3 "$SCRIPT_DIR/juliet_eval.py" "findings_$cwe.json" "$cwe" "$list"
+    python3 "$SCRIPT_DIR/juliet_eval.py" "findings_$cwe.json" "$cwe" \
+        "$list" "$SCRIPT_DIR/juliet_expected.txt"
 }
 
 overall=0

@@ -12,15 +12,22 @@ Iki gorunum raporlanir:
      (kuralin gercek kalitesi). Ornek: CWE416 dosyasindaki bir
      memory-leak uyarisi UAF kuralinin hanesine yazilmaz.
 
-Recall paydasi yaklasik olarak "bad fonksiyon iceren dosya sayisi"dir:
-her Juliet test dosyasi tam bir kusur baglami icerir. Dosya-bazli
-isabet orani (hit rate) = en az bir TP bulgusu olan dosya / tum dosyalar.
-Akis varyantlarinda (54a..54e gibi) kusur dosyalar arasi boldugu icin
-bu oran alt sinirdir — kesin fonksiyon-bazli ground truth v2'de
-(dokumante sinir).
+Vaka-bazli metrikler (F1'in temeli): her dosya bir vakadir — bad
+fonksiyonda eslesen bulgu varsa vaka-TP, good fonksiyonda varsa vaka-FP,
+bad'e hic bulgu yoksa FN (her Juliet dosyasi tam bir kusur baglami
+icerir). Vaka-precision + recall'dan F1 turetilir. Akis varyantlarinda
+(54a..54e) kusur dosyalar arasi bolundugu icin recall alt sinirdir.
+
+ROC BILINCLI YOK: analizci olasiliksal degil, kanit-temelli ikili —
+taranabilir esik olmadigi icin iki noktali "egri"den AUC yaniltici olur.
+Durust karsiligi iki isletim noktasi: tum bulgular vs yalniz Error.
+
+Beklenen tabanlar (4. arguman, opsiyonel): satir formati
+  <CWE-adi> <min-rprecision> <min-rhitrate>
+Taban ihlali exit 1 → CI kirmizi (Juliet skor bekcisi).
 
 Kullanim:
-  juliet_eval.py <findings.json> <cwe-adi> <taranan-dosya-listesi>
+  juliet_eval.py <findings.json> <cwe-adi> <dosya-listesi> [beklenen.txt]
 """
 
 import json
@@ -64,12 +71,26 @@ def precision(tp, fp):
     return (len(tp) / denom) if denom else 0.0
 
 
+def load_expected(path, cwe):
+    """Beklenen taban satirini (min_rprec, min_rhit) olarak dondurur."""
+    if not path or not os.path.exists(path):
+        return None
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) >= 3 and not line.startswith("#") and \
+                    cwe.startswith(parts[0]):
+                return float(parts[1]), float(parts[2])
+    return None
+
+
 def main() -> int:
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         print(__doc__)
         return 2
 
     findings_path, cwe, filelist_path = sys.argv[1], sys.argv[2], sys.argv[3]
+    expected_path = sys.argv[4] if len(sys.argv) == 5 else None
 
     with open(findings_path) as f:
         data = json.load(f)
@@ -92,6 +113,21 @@ def main() -> int:
     rfiles_with_tp = {d["file"] for d in rtp}
     rhit = (len(rfiles_with_tp) / total_files) if total_files else 0.0
 
+    # Vaka-bazli (dosya = vaka): F1 buradan turetilir
+    case_tp = len(rfiles_with_tp)
+    case_fp = len({d["file"] for d in rfp})
+    case_fn = total_files - case_tp
+    case_prec = (case_tp / (case_tp + case_fp)) if (case_tp + case_fp) \
+        else 0.0
+    case_rec = (case_tp / (case_tp + case_fn)) if (case_tp + case_fn) \
+        else 0.0
+    f1 = (2 * case_prec * case_rec / (case_prec + case_rec)) \
+        if (case_prec + case_rec) else 0.0
+
+    # Ikinci isletim noktasi: yalniz Error (kesin iddialar)
+    err = [d for d in matched if d.get("severity") == "error"]
+    etp, efp, _ = score(err)
+
     print(f"=== {cwe} ===")
     print(f"  taranan dosya       : {total_files}")
     print(f"  GENEL  TP/FP        : {len(tp)}/{len(fp)}"
@@ -99,6 +135,11 @@ def main() -> int:
     print(f"  ESLEMELI ({','.join(sorted(rules)) or '-'})")
     print(f"         TP/FP        : {len(rtp)}/{len(rfp)}"
           f"  precision={precision(rtp, rfp):.3f}  hitrate={rhit:.3f}")
+    print(f"  vaka (dosya) bazli  : TP={case_tp} FP={case_fp} FN={case_fn}"
+          f"  precision={case_prec:.3f}  recall={case_rec:.3f}"
+          f"  F1={f1:.3f}")
+    print(f"  yalniz-Error noktasi: TP/FP {len(etp)}/{len(efp)}"
+          f"  precision={precision(etp, efp):.3f}")
     print(f"  sayilmayan (diger)  : {len(other)}")
 
     # Kural bazinda kirilim: FP'nin hangi kuraldan geldigi gorunur olsun
@@ -138,7 +179,23 @@ def main() -> int:
     print(f"JULIET_RESULT {cwe} files={total_files} tp={len(tp)} "
           f"fp={len(fp)} precision={precision(tp, fp):.3f} "
           f"hitrate={hit_rate:.3f} rtp={len(rtp)} rfp={len(rfp)} "
-          f"rprecision={precision(rtp, rfp):.3f} rhitrate={rhit:.3f}")
+          f"rprecision={precision(rtp, rfp):.3f} rhitrate={rhit:.3f} "
+          f"rcaseprec={case_prec:.3f} rf1={f1:.3f} "
+          f"eprecision={precision(etp, efp):.3f}")
+
+    # Skor bekcisi: sabitlenen tabanlarin altina dusus = kirmizi.
+    # Tabanlar bilincli iyilestirme PR'larinda AYNI PR'da guncellenir.
+    bounds = load_expected(expected_path, cwe)
+    if bounds:
+        min_prec, min_hit = bounds
+        rprec = precision(rtp, rfp)
+        if rprec < min_prec or rhit < min_hit:
+            print(f"JULIET_GUARD_FAIL {cwe} rprecision={rprec:.3f} "
+                  f"(taban {min_prec}) rhitrate={rhit:.3f} "
+                  f"(taban {min_hit})")
+            return 1
+        print(f"[juliet] {cwe}: skor bekcisi OK "
+              f"(rprec>={min_prec}, rhit>={min_hit})")
     return 0
 
 

@@ -1,0 +1,11 @@
+# Juliet skor bekcisi tabanlari (juliet_eval.py dogrular; ihlal = kirmizi).
+# Format: <CWE-adi-oneki> <min-rprecision> <min-rhitrate>
+# Degerler 2026-07-10 kosusundan (PR #18) kucuk marjla sabitlendi:
+# rprecision'lar 1.000/0.640, rhitrate'ler 0.347/0.233/0.198/0.435/0.045.
+# Bilincli kural degisikliginde tabanlar AYNI PR'da guncellenir —
+# gerekce commit mesajinda gorunur olur.
+CWE476 0.95 0.30
+CWE401 0.55 0.20
+CWE415 0.95 0.17
+CWE416 0.95 0.38
+CWE369 0.95 0.03

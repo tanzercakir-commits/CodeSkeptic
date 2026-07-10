@@ -92,6 +92,16 @@ CWE-416 good function may genuinely leak, so a `memory-leak` finding
 there counts against the all-findings number while possibly being
 correct. The rule-matched columns are the sound metric.
 
+Beyond precision/hit-rate, the harness reports **case-level F1** (each
+file is a case: a matched finding in a `bad` function is a case-TP, in
+a `good` function a case-FP, a silent bad file an FN) and a second
+operating point restricted to `error`-severity findings. There is
+deliberately **no ROC curve**: the analyzer is evidence-based and
+binary, not probabilistic — with no sweepable threshold, an AUC from a
+two-point "curve" would be misleading. A **score guard**
+(`scripts/juliet_expected.txt`) pins per-CWE precision/hit-rate floors;
+any code PR that drops below them fails CI.
+
 Notes on reading these numbers honestly:
 
 - **Zero false positives on four of five rules** reflects the design

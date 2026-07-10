@@ -1,9 +1,9 @@
 name: Juliet benchmark
 
-# Agir kosum (indirme ~120MB + binlerce dosya) — her PR'da degil:
-# haftalik + elle tetikleme + benchmark altyapisina dokunan PR'lar
-# (harness degisikligi gercek kosuyla dogrulanmali). Sonuclar
-# JULIET_RESULT satirlarindan izlenir.
+# Juliet skor bekcisi: analiz koduna dokunan HER PR'da kosar
+# (suit cache'te, ~3.5 dk) ve juliet_expected.txt tabanlarinin altina
+# dusus job'i kirmizi yapar (JULIET_GUARD_FAIL). Docs-only PR'lar paths
+# filtresiyle muaf. Sonuclar JULIET_RESULT satirlarindan izlenir.
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +13,27 @@ on:
   schedule:
     - cron: "0 5 * * 1"  # pazartesi 05:00 UTC
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/juliet.yml"
       - "scripts/run_juliet.sh"
       - "scripts/juliet_eval.py"
+      - "scripts/juliet_expected.txt"
+      - "src/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+
+# Maliyet dengesi: ayni ref'e ust uste push eski kosumu iptal eder
+concurrency:
+  group: juliet-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   juliet:
+    # Draft'ta kosma: PR basina bekci bir kez, ready aninda calisir
+    # (build-and-test her push'ta kaliyor — hizli cekirdek sinyal).
+    if: github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

@@ -1,5 +1,27 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Dengeli metrikler (F1) + Juliet skor bekçisi
+
+### Eklenen
+- **Vaka-bazlı F1** (`juliet_eval.py`): her dosya bir vaka — bad
+  fonksiyonda eşleşen bulgu = vaka-TP, good'da = vaka-FP, sessiz bad
+  dosya = FN. `JULIET_RESULT` satırına `rcaseprec/rf1` alanları.
+- **İkinci işletim noktası**: yalnız-Error kesiti (`eprecision`) —
+  kesin iddiaların precision'ı ayrıca görünür.
+- **ROC bilinçli YOK** (README'de gerekçeli): analizci olasılıksal
+  değil kanıt-temelli ikili; taranabilir eşik olmadığından iki noktalı
+  "eğriden" AUC yanıltıcı olur. Dürüst karşılık: iki işletim noktası.
+- **Juliet skor bekçisi**: `scripts/juliet_expected.txt` CWE başına
+  rprecision/rhitrate tabanları; ihlal `JULIET_GUARD_FAIL` + exit 1 =
+  CI kırmızı. Workflow tetikleyicisi `src/**`, `tests/**` ve
+  CMakeLists'e genişletildi: analiz koduna dokunan HER PR'da benchmark
+  koşar (süit cache'te, ~3.5 dk) — "Juliet'in CI ağırlığı" kararı böylece
+  tam entegrasyonla kapandı; docs-only PR'lar muaf.
+
+### Doğrulama
+- Mini-süit: F1/eprecision satırları + bekçi OK yolu; sıkı tabanla
+  ihlal yolu (exit 1) borusuz doğrulandı.
+
 ## 2026-07-10 — Yol duyarlılığı tüm kurallara: GuardedDisjuncts bileşeni
 
 ### Değişen
