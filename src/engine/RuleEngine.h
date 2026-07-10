@@ -25,11 +25,17 @@ public:
     void enableRule(const std::string& rule_id, bool enabled);
     DiagnosticList runAll(clang::ASTContext& ctx);
 
+    // --summary-out icin: runAll TU-yerel ozet tablosunu temizlemeden
+    // once cross-TU depoya hasat etsin (tablo temizligi sarkan-pointer
+    // guvenligi geregi runAll icinde — hasat da orada olmali).
+    void enableGlobalHarvest(bool enabled) { harvest_global_ = enabled; }
+
     size_t ruleCount() const;
     std::vector<std::string> ruleIds() const;
 
 private:
     std::vector<std::unique_ptr<Rule>> rules_;
+    bool harvest_global_ = false;
 };
 
 } // namespace zerodefect

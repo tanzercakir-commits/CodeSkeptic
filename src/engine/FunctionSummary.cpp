@@ -11,6 +11,7 @@
 #include <clang/AST/Stmt.h>
 
 #include <algorithm>
+#include <fstream>
 #include <set>
 #include <utility>
 #include <vector>
@@ -675,6 +676,51 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
         if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
 }
 
+// --- Disk formati (v1) ---
+//
+// Baslik satiri + kayit basina bir satir: anahtar<TAB>donus<TAB>paramlar
+// Donus: U/N/M; parametreler O/R/F/S karakter dizisi, bos vektor "-".
+// Nitelikli adlar TAB/yenisatir iceremez — anahtar guvenli.
+constexpr const char* kSummaryFileHeader = "zerodefect-summaries v1";
+
+char rnToChar(ReturnNullness v) {
+    switch (v) {
+        case ReturnNullness::NeverNull: return 'N';
+        case ReturnNullness::MaybeNull: return 'M';
+        case ReturnNullness::Unknown:   break;
+    }
+    return 'U';
+}
+
+bool rnFromChar(char c, ReturnNullness& out) {
+    switch (c) {
+        case 'U': out = ReturnNullness::Unknown;   return true;
+        case 'N': out = ReturnNullness::NeverNull; return true;
+        case 'M': out = ReturnNullness::MaybeNull; return true;
+    }
+    return false;
+}
+
+char peToChar(ParamEffect v) {
+    switch (v) {
+        case ParamEffect::ReadsOnly: return 'R';
+        case ParamEffect::Frees:     return 'F';
+        case ParamEffect::Stores:    return 'S';
+        case ParamEffect::Opaque:    break;
+    }
+    return 'O';
+}
+
+bool peFromChar(char c, ParamEffect& out) {
+    switch (c) {
+        case 'O': out = ParamEffect::Opaque;    return true;
+        case 'R': out = ParamEffect::ReadsOnly; return true;
+        case 'F': out = ParamEffect::Frees;     return true;
+        case 'S': out = ParamEffect::Stores;    return true;
+    }
+    return false;
+}
+
 } // anonymous namespace
 
 void SummaryRegistry::harvestGlobal() {
@@ -695,5 +741,68 @@ SummaryRegistry::lookupGlobal(const clang::FunctionDecl* func) const {
 }
 
 void SummaryRegistry::clearGlobal() { globalStore_.clear(); }
+
+bool SummaryRegistry::saveGlobal(const std::string& path) const {
+    std::ofstream out(path);
+    if (!out.is_open()) return false;
+    out << kSummaryFileHeader << "\n";
+    // std::map sirali gezinir — cikti deterministik (diff'lenebilir;
+    // "ozet degisti mi" sorusu dosya karsilastirmasiyla cevaplanir)
+    for (const auto& [key, summary] : globalStore_) {
+        out << key << '\t' << rnToChar(summary.returnNullness) << '\t';
+        if (summary.params.empty()) {
+            out << '-';
+        } else {
+            for (ParamEffect effect : summary.params)
+                out << peToChar(effect);
+        }
+        out << '\n';
+    }
+    return out.good();
+}
+
+bool SummaryRegistry::loadGlobal(const std::string& path) {
+    std::ifstream in(path);
+    if (!in.is_open()) return false;
+
+    std::string line;
+    if (!std::getline(in, line) || line != kSummaryFileHeader)
+        return false;
+
+    // Once tumuyle ayristir, sonra depoya kat: bozuk dosya kismi durum
+    // birakmadan reddedilir
+    std::map<std::string, FunctionSummary> parsed;
+    while (std::getline(in, line)) {
+        if (line.empty()) continue;
+        const auto tab1 = line.find('\t');
+        const auto tab2 =
+            tab1 == std::string::npos ? tab1 : line.find('\t', tab1 + 1);
+        if (tab2 == std::string::npos) return false;
+
+        std::string key = line.substr(0, tab1);
+        const std::string rn = line.substr(tab1 + 1, tab2 - tab1 - 1);
+        const std::string pe = line.substr(tab2 + 1);
+        if (key.empty() || rn.size() != 1 || pe.empty()) return false;
+
+        FunctionSummary summary;
+        if (!rnFromChar(rn[0], summary.returnNullness)) return false;
+        if (pe != "-") {
+            summary.params.reserve(pe.size());
+            for (char c : pe) {
+                ParamEffect effect;
+                if (!peFromChar(c, effect)) return false;
+                summary.params.push_back(effect);
+            }
+        }
+        auto [it, inserted] = parsed.emplace(std::move(key), summary);
+        if (!inserted) mergeConservative(it->second, summary);
+    }
+
+    for (const auto& [key, summary] : parsed) {
+        auto [it, inserted] = globalStore_.emplace(key, summary);
+        if (!inserted) mergeConservative(it->second, summary);
+    }
+    return true;
+}
 
 } // namespace zerodefect

@@ -79,6 +79,22 @@ int StaticAnalyzer::run() {
                      std::to_string(source_mgr_->fileCount()),
                      std::to_string(engine_.ruleCount())) << "\n";
 
+    // Kayitli ozetleri yukle (Cross-TU v2): onceki bir kosunun hasadi
+    // depoya katilir — tek dosya, tum-proje bilgisiyle analiz edilir.
+    // Yukleme hatasi analizi DURDURMAZ ama sessiz de gecmez: ozetsiz
+    // kosu daha az bulgu verir, kullanici bunu bilmeli.
+    if (!config_.summaryIn().empty()) {
+        auto& registry = SummaryRegistry::instance();
+        if (registry.loadGlobal(config_.summaryIn())) {
+            std::cerr << msg(MsgId::SummariesLoaded,
+                             std::to_string(registry.globalSize()),
+                             config_.summaryIn()) << "\n";
+        } else {
+            std::cerr << msg(MsgId::SummaryLoadError, config_.summaryIn())
+                      << "\n";
+        }
+    }
+
     // Whole-program modu (Ufuk 2): 1. gecis tum TU'lardan harici
     // baglantili fonksiyon ozetlerini toplar; 2. gecisteki kurallar
     // dosyalar arasi cagrilarda Opaque yerine gercek ozeti gorur.
@@ -94,10 +110,28 @@ int StaticAnalyzer::run() {
         });
     }
 
+    // --summary-out: runAll'in TU basina kurdugu yerel tablodan hasat —
+    // whole-program'in ikinci parse bedeli odenmeden depo dolar
+    // (whole-program modunda ikinci hasat es-degerlerle birlesir,
+    // zararsiz)
+    if (!config_.summaryOut().empty()) engine_.enableGlobalHarvest(true);
+
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
+
+    if (!config_.summaryOut().empty()) {
+        auto& registry = SummaryRegistry::instance();
+        if (registry.saveGlobal(config_.summaryOut())) {
+            std::cerr << msg(MsgId::SummariesSaved,
+                             std::to_string(registry.globalSize()),
+                             config_.summaryOut()) << "\n";
+        } else {
+            std::cerr << msg(MsgId::SummarySaveError, config_.summaryOut())
+                      << "\n";
+        }
+    }
 
     // Ayni dosya farkli path'lerle gelebilir (compile DB'de "tests/../x.c"
     // gibi) — tekillestirme ve baseline anahtarlari icin kanonik path

@@ -26,6 +26,10 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
         }
     }
 
+    // Hasat, temizlikten ONCE: depo string-anahtarli (TU'dan bagimsiz),
+    // yerel tablo ise birazdan silinecek
+    if (harvest_global_) SummaryRegistry::instance().harvestGlobal();
+
     // FunctionDecl* anahtarlari bu TU'ya ozgu — sarkan pointer birakma
     SummaryRegistry::instance().clear();
     return results;

@@ -708,3 +708,183 @@ TEST(ReturnFlowTest, CrossTU_VarFlowMaybeNull_Warning) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// ===================================================================
+// Ozet kaliciligi (Cross-TU v2): saveGlobal / loadGlobal +
+// --summary-out / --summary-in uctan uca.
+// Degismezler: (1) yukleme davranis olarak hasatla es-deger, (2) bozuk
+// dosya butunuyle reddedilir — kismi veri guclu iddiaya donusemez,
+// (3) cakisan kayitlar muhafazakar birlesir.
+// ===================================================================
+
+#include "analyzer/StaticAnalyzer.h"
+#include "config/Config.h"
+#include "engine/FunctionSummary.h"
+
+#include <fstream>
+
+namespace {
+
+std::string writePersistFile(const std::string& name,
+                             const std::string& content) {
+    std::string path = ::testing::TempDir() + name;
+    std::ofstream file(path);
+    file << content;
+    return path;
+}
+
+std::string readWholeFile(const std::string& path) {
+    std::ifstream file(path);
+    return {std::istreambuf_iterator<char>(file),
+            std::istreambuf_iterator<char>()};
+}
+
+// Test izolasyonu: global depo surec-omurlu — her test temiz baslasin
+// ve temiz biraksin (tek-surec kosumda sizinti sonraki testleri bozar)
+struct GlobalStoreGuard {
+    GlobalStoreGuard() { SummaryRegistry::instance().clearGlobal(); }
+    ~GlobalStoreGuard() { SummaryRegistry::instance().clearGlobal(); }
+};
+
+} // anonymous namespace
+
+TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "zerodefect-summaries v1\n"
+        "alpha/1\tN\tR\n"
+        "beta/2\tM\tOF\n"
+        "gamma/0\tU\t-\n";
+    auto inPath = writePersistFile("sum_roundtrip_in.txt", content);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(inPath));
+    EXPECT_EQ(registry.globalSize(), 3u);
+
+    auto outPath = ::testing::TempDir() + "sum_roundtrip_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(outPath));
+    EXPECT_EQ(readWholeFile(outPath), content);
+}
+
+TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
+    GlobalStoreGuard guard;
+    auto pathA = writePersistFile("sum_conflict_a.txt",
+        "zerodefect-summaries v1\n"
+        "foo/1\tN\tR\n");
+    auto pathB = writePersistFile("sum_conflict_b.txt",
+        "zerodefect-summaries v1\n"
+        "foo/1\tM\tF\n");
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(pathA));
+    ASSERT_TRUE(registry.loadGlobal(pathB));
+    EXPECT_EQ(registry.globalSize(), 1u);
+
+    // Uyusmayan alanlar zayif iddiaya duser: N vs M -> U, R vs F -> O
+    auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(outPath));
+    EXPECT_EQ(readWholeFile(outPath),
+              "zerodefect-summaries v1\nfoo/1\tU\tO\n");
+}
+
+TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
+    GlobalStoreGuard guard;
+    auto& registry = SummaryRegistry::instance();
+
+    auto good = writePersistFile("sum_good.txt",
+        "zerodefect-summaries v1\n"
+        "keep/1\tN\tR\n");
+    ASSERT_TRUE(registry.loadGlobal(good));
+
+    // Yanlis baslik: reddet
+    auto badHeader = writePersistFile("sum_bad_header.txt",
+        "some-other-format v9\nfoo/1\tN\tR\n");
+    EXPECT_FALSE(registry.loadGlobal(badHeader));
+
+    // Gecerli baslik ama bozuk kayit (bilinmeyen etki karakteri):
+    // dosyanin TAMAMI reddedilir — onceki gecerli satiri da almayiz
+    auto badLine = writePersistFile("sum_bad_line.txt",
+        "zerodefect-summaries v1\n"
+        "bar/1\tN\tR\n"
+        "baz/1\tX\tqq\n");
+    EXPECT_FALSE(registry.loadGlobal(badLine));
+
+    // Eksik alanli satir: reddet
+    auto badFields = writePersistFile("sum_bad_fields.txt",
+        "zerodefect-summaries v1\n"
+        "noeffects/1\tN\n");
+    EXPECT_FALSE(registry.loadGlobal(badFields));
+
+    // Depo ilk yuklemeden beri degismemis olmali
+    EXPECT_EQ(registry.globalSize(), 1u);
+    auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(outPath));
+    EXPECT_EQ(readWholeFile(outPath),
+              "zerodefect-summaries v1\nkeep/1\tN\tR\n");
+}
+
+TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
+    GlobalStoreGuard guard;
+    EXPECT_FALSE(SummaryRegistry::instance().loadGlobal(
+        ::testing::TempDir() + "sum_no_such_file.txt"));
+    EXPECT_EQ(SummaryRegistry::instance().globalSize(), 0u);
+}
+
+TEST(SummaryPersistTest, EndToEnd_SummaryOutThenIn_CrossTUFinding) {
+    // Artimli whole-program hikayesinin tamami: 1. kosu callee
+    // dosyasindan ozet hasat edip diske yazar; 2. kosu YALNIZ caller
+    // dosyasini ozet dosyasiyla analiz eder ve cross-TU bulguyu verir.
+    // Analizorlerin dtor'u global depoyu temizler — bilgiyi 2. kosuya
+    // tasiyan tek sey DOSYAdir.
+    GlobalStoreGuard guard;
+    auto calleePath = writePersistFile("sumpersist_callee.cpp", R"(
+        int g;
+        int* find(int c) {
+            if (c) return &g;
+            return 0;
+        }
+    )");
+    auto callerPath = writePersistFile("sumpersist_caller.cpp", R"(
+        int* find(int c);
+        void f(int c) {
+            int* p = find(c);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "sumpersist_store.txt";
+
+    {
+        Config config;
+        config.setSourcePath(calleePath);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+    EXPECT_NE(readWholeFile(summaryPath).find("find/1\tM"),
+              std::string::npos);
+
+    // Kontrol: ozetsiz kosu muhafazakar — Opaque, sessiz
+    {
+        Config config;
+        config.setSourcePath(callerPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+        EXPECT_EQ(analyzer.diagnostics().size(), 0u);
+    }
+
+    // Ozet dosyasiyla: yalniz caller analiz edilir, bulgu gorunur
+    {
+        Config config;
+        config.setSourcePath(callerPath);
+        config.setSummaryIn(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+        ASSERT_EQ(analyzer.diagnostics().size(), 1u);
+        EXPECT_EQ(analyzer.diagnostics()[0].rule_id, "null-deref");
+        EXPECT_EQ(analyzer.diagnostics()[0].severity, Severity::Warning);
+    }
+}

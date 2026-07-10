@@ -183,6 +183,12 @@ zerodefect <source_path> [options]
                          plain or qualified names; repeatable)
   --lines <N-M,K>        Analyze only functions overlapping these line
                          ranges of the analyzed file
+  --whole-program        Two-pass mode: collect function summaries
+                         across all files first, then analyze
+  --summary-out <file>   Save harvested cross-file summaries to a file
+  --summary-in <file>    Load summaries saved earlier (incremental
+                         whole-program: single-file analysis with
+                         whole-project knowledge)
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
@@ -233,6 +239,21 @@ zerodefect src/parser.cpp --function Parser::parse
 # --lines per file, so untouched functions are skipped entirely
 scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
 ```
+
+Cross-file knowledge survives incremental runs via summary files:
+
+```bash
+# once (or nightly): harvest function summaries from the whole project
+zerodefect src/ --summary-out .zerodefect-summaries
+
+# then: analyze just the changed file WITH whole-project knowledge —
+# e.g. a callee in another file that may return null is still known
+zerodefect src/parser.cpp --summary-in .zerodefect-summaries
+```
+
+Stale or malformed summary files are rejected whole (analysis continues
+without them, conservatively); conflicting entries merge toward the
+weaker claim, so a wrong strong claim cannot enter through the file.
 
 ### MCP server (agent integration)
 

@@ -81,6 +81,19 @@ public:
     const FunctionSummary* lookupGlobal(
         const clang::FunctionDecl* func) const;
 
+    // --- Kalicilik (Cross-TU v2: artimli whole-program) ---
+    //
+    // Depo satir-tabanli surumlu metin olarak diske yazilir/yuklenir:
+    // bir kez tum projeden hasat et (--summary-out), sonra degisen
+    // dosyayi tek basina ama proje bilgisiyle analiz et (--summary-in).
+    //
+    // Yukleme MEVCUT depoya eklenir; anahtar cakismasinda hasatla ayni
+    // muhafazakar birlesim (uyusmayan alan zayif iddiaya duser). Bozuk
+    // dosya butunuyle REDDEDILIR (false; depo degismez) — kismi/yanlis
+    // veri sessizce guclu iddiaya donusemez.
+    bool saveGlobal(const std::string& path) const;
+    bool loadGlobal(const std::string& path);
+
     void clear();
     void clearGlobal();
     size_t size() const { return summaries_.size(); }

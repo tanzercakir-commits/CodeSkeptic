@@ -49,6 +49,10 @@ enum class MsgId {
     UsageError,
     WholeProgramPass,     // {0} = dosya sayisi
     AnalysisNotConverged, // {0} = fonksiyon adi
+    SummariesLoaded,      // {0} = ozet sayisi, {1} = dosya yolu
+    SummariesSaved,       // {0} = ozet sayisi, {1} = dosya yolu
+    SummaryLoadError,     // {0} = dosya yolu
+    SummarySaveError,     // {0} = dosya yolu
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.
