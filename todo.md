@@ -63,8 +63,10 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - ~~NullDeref çoklu bildirim FN'i~~ — deneyle geçersiz çıktı: ince
   taneli CFG çoklu bildirimi değişken başına böler, ikinci pointer da
   izleniyor (regresyon testleriyle sabitlendi, 2026-07-10).
-- NullDeref + DivByZero applyCondition yapısal olarak benzer — ortak
-  "koşul yürüyüşü" yardımcıya çıkarılabilir (iki domain, tek iskelet).
+- ~~Ortak koşul-yürüyüşü~~ — yapıldı (engine/ConditionWalk.h):
+  walkCondition (genel iskelet: !, &&/||, değişken-solda normalizasyon) +
+  walkNullCondition (pointer-null domain'i). Dört istemci: NullDeref,
+  MemLeak, FunctionSummary (null), DivByZero (sıfır, genel iskelet).
 
 ### Faz 3 (AI döngüsü)
 - [x] Artımlı analiz primitifi: --function filtresi + analyze_diff.sh

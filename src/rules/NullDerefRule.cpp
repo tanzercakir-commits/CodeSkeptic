@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
@@ -154,62 +155,14 @@ void setIfTracked(NullVarState& state, const VarDecl* var, NullState value) {
     if (it != state.end()) it->second = value;
 }
 
+// Ortak yuruyus iskeleti uzerinden (engine/ConditionWalk.h): `if (p)`,
+// `!p`, `p ==/!= nullptr/NULL/0`, && / || kisa devre.
 void applyCondition(const Expr* cond, bool isTrue, NullVarState& state) {
-    if (!cond) return;
-    cond = cond->IgnoreParenImpCasts();
-
-    // if (p) / while (p): truthiness
-    if (const auto* var = asVar(cond)) {
-        if (var->getType()->isPointerType())
+    zerodefect::walkNullCondition(
+        cond, isTrue, [&](const VarDecl* var, bool isNull) {
             setIfTracked(state, var,
-                         isTrue ? NullState::NonNull : NullState::Null);
-        return;
-    }
-
-    if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
-        if (unary->getOpcode() == UO_LNot)
-            applyCondition(unary->getSubExpr(), !isTrue, state);
-        return;
-    }
-
-    const auto* binOp = dyn_cast<BinaryOperator>(cond);
-    if (!binOp) return;
-
-    const BinaryOperatorKind opc = binOp->getOpcode();
-
-    if (opc == BO_LAnd) {
-        if (isTrue) {
-            applyCondition(binOp->getLHS(), true, state);
-            applyCondition(binOp->getRHS(), true, state);
-        }
-        return;
-    }
-    if (opc == BO_LOr) {
-        if (!isTrue) {
-            applyCondition(binOp->getLHS(), false, state);
-            applyCondition(binOp->getRHS(), false, state);
-        }
-        return;
-    }
-
-    if (opc != BO_EQ && opc != BO_NE) return;
-
-    // p == nullptr / nullptr == p (NULL ve 0 dahil)
-    const Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
-    const Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
-    const VarDecl* var = asVar(lhs);
-    const Expr* other = rhs;
-    if (!var) {
-        var = asVar(rhs);
-        other = lhs;
-    }
-    if (!var || !var->getType()->isPointerType()) return;
-    if (evaluateNullness(other) != NullState::Null) return;
-
-    // eqHolds: karsilastirmanin "esittir null" yorumu bu kenarda dogru mu
-    bool eqHolds = (opc == BO_EQ) == isTrue;
-    setIfTracked(state, var,
-                 eqHolds ? NullState::Null : NullState::NonNull);
+                         isNull ? NullState::Null : NullState::NonNull);
+        });
 }
 
 // --- Collect tracked pointer variables ---

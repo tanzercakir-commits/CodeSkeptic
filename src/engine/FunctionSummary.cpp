@@ -1,5 +1,6 @@
 #include "engine/FunctionSummary.h"
 
+#include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTContext.h>
@@ -88,67 +89,16 @@ const VarDecl* exprAsVar(const Expr* expr) {
     return nullptr;
 }
 
-bool isNullLit(const Expr* expr) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenCasts();
-    if (isa<CXXNullPtrLiteralExpr>(expr) || isa<GNUNullExpr>(expr))
-        return true;
-    if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
-        return lit->getValue() == 0;
-    return false;
-}
-
-// Kosul kenarlarinda pointer nullness iyilestirmesi — NullDerefRule'un
-// applyCondition'inin kompakt kopyasi (konsolide yardimci todo'da;
-// ozet katmani rules/'a bagimli olamayacagi icin simdilik yerel).
+// Kosul kenarlarinda pointer nullness iyilestirmesi — ortak yuruyus
+// iskeleti uzerinden (engine/ConditionWalk.h)
 void applyNullCond(const Expr* cond, bool isTrue,
                    std::map<const VarDecl*, VState>& state) {
-    if (!cond) return;
-    cond = cond->IgnoreParenImpCasts();
-
-    if (const auto* var = exprAsVar(cond)) {
-        if (var->getType()->isPointerType()) {
+    zerodefect::walkNullCondition(
+        cond, isTrue, [&](const VarDecl* var, bool isNull) {
             auto it = state.find(var);
             if (it != state.end())
-                it->second = isTrue ? VState::NonNull : VState::Null;
-        }
-        return;
-    }
-    if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
-        if (unary->getOpcode() == UO_LNot)
-            applyNullCond(unary->getSubExpr(), !isTrue, state);
-        return;
-    }
-    const auto* binOp = dyn_cast<BinaryOperator>(cond);
-    if (!binOp) return;
-    const BinaryOperatorKind opc = binOp->getOpcode();
-    if (opc == BO_LAnd) {
-        if (isTrue) {
-            applyNullCond(binOp->getLHS(), true, state);
-            applyNullCond(binOp->getRHS(), true, state);
-        }
-        return;
-    }
-    if (opc == BO_LOr) {
-        if (!isTrue) {
-            applyNullCond(binOp->getLHS(), false, state);
-            applyNullCond(binOp->getRHS(), false, state);
-        }
-        return;
-    }
-    if (opc != BO_EQ && opc != BO_NE) return;
-
-    const Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
-    const Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
-    const VarDecl* var = nullptr;
-    if (isNullLit(rhs)) var = exprAsVar(lhs);
-    else if (isNullLit(lhs)) var = exprAsVar(rhs);
-    if (!var || !var->getType()->isPointerType()) return;
-
-    bool eqHolds = (opc == BO_EQ) == isTrue;
-    auto it = state.find(var);
-    if (it != state.end())
-        it->second = eqHolds ? VState::Null : VState::NonNull;
+                it->second = isNull ? VState::Null : VState::NonNull;
+        });
 }
 
 // --- Degisken donduren yollar icin mini null-akisi ---

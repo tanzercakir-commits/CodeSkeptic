@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
@@ -245,76 +246,18 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
 
 using VarState = std::map<const VarDecl*, AllocState>;
 
-bool isNullLiteral(const Expr* expr) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenCasts();
-    if (isa<CXXNullPtrLiteralExpr>(expr)) return true;
-    if (isa<GNUNullExpr>(expr)) return true;
-    if (const auto* lit = dyn_cast<IntegerLiteral>(expr))
-        return lit->getValue() == 0;
-    return false;
-}
-
-void markNullOnEdge(VarState& state, const VarDecl* var) {
-    if (!var || !var->getType()->isPointerType()) return;
-    auto it = state.find(var);
-    if (it == state.end()) return;
-    // Null oldugu bilinen kenarda "allocation" yoktur: malloc/new
-    // basarisizlik yolu leak DEGILDIR (p = malloc; if (!p) return;)
-    if (it->second == AllocState::Allocated)
-        it->second = AllocState::None;
-}
-
-// p'nin null oldugu kenarlari tanir: `p` yanlis dali, `!p` dogru dali,
-// `p == nullptr/NULL/0` dogru dali, `p != ...` yanlis dali, && / ||
+// Null oldugu bilinen kenarda "allocation" yoktur: malloc/new
+// basarisizlik yolu leak DEGILDIR (p = malloc; if (!p) return;).
+// Yuruyus ortak iskeletten (engine/ConditionWalk.h); bu domain yalnizca
+// null kenariyla ilgilenir, non-null bilgisini yok sayar.
 void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
-    if (!cond) return;
-    cond = cond->IgnoreParenImpCasts();
-
-    if (const auto* ref = dyn_cast<DeclRefExpr>(cond)) {
-        if (!isTrue)
-            markNullOnEdge(state, dyn_cast<VarDecl>(ref->getDecl()));
-        return;
-    }
-    if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
-        if (unary->getOpcode() == UO_LNot)
-            applyNullCondition(unary->getSubExpr(), !isTrue, state);
-        return;
-    }
-    const auto* binOp = dyn_cast<BinaryOperator>(cond);
-    if (!binOp) return;
-    const BinaryOperatorKind opc = binOp->getOpcode();
-
-    if (opc == BO_LAnd) {
-        if (isTrue) {
-            applyNullCondition(binOp->getLHS(), true, state);
-            applyNullCondition(binOp->getRHS(), true, state);
-        }
-        return;
-    }
-    if (opc == BO_LOr) {
-        if (!isTrue) {
-            applyNullCondition(binOp->getLHS(), false, state);
-            applyNullCondition(binOp->getRHS(), false, state);
-        }
-        return;
-    }
-    if (opc != BO_EQ && opc != BO_NE) return;
-
-    const Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
-    const Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
-    const VarDecl* var = nullptr;
-    if (isNullLiteral(rhs)) {
-        if (const auto* ref = dyn_cast<DeclRefExpr>(lhs))
-            var = dyn_cast<VarDecl>(ref->getDecl());
-    } else if (isNullLiteral(lhs)) {
-        if (const auto* ref = dyn_cast<DeclRefExpr>(rhs))
-            var = dyn_cast<VarDecl>(ref->getDecl());
-    }
-    if (!var) return;
-
-    bool eqHolds = (opc == BO_EQ) == isTrue;  // bu kenarda "esittir null"
-    if (eqHolds) markNullOnEdge(state, var);
+    zerodefect::walkNullCondition(
+        cond, isTrue, [&](const VarDecl* var, bool isNull) {
+            if (!isNull) return;
+            auto it = state.find(var);
+            if (it != state.end() && it->second == AllocState::Allocated)
+                it->second = AllocState::None;
+        });
 }
 
 // --- Guard'li disjunktlar (hedefli yol duyarliligi) ---
