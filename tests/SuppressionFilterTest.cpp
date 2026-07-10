@@ -54,15 +54,15 @@ TEST(SuppressionMarkerTest, NextLineVariantDoesNotMatchLineMarker) {
 
 TEST(SuppressionMarkerTest, TrailingCommentAfterRuleList) {
     EXPECT_TRUE(markerSuppressesRule(
-        "// zerodefect-disable-line div-by-zero (kasitli: demo)",
+        "// zerodefect-disable-line div-by-zero (deliberate: demo)",
         "zerodefect-disable-line", "div-by-zero"));
     EXPECT_FALSE(markerSuppressesRule(
-        "// zerodefect-disable-line div-by-zero (kasitli: demo)",
+        "// zerodefect-disable-line div-by-zero (deliberate: demo)",
         "zerodefect-disable-line", "memory-leak"));
 }
 
 TEST(SuppressionMarkerTest, NoMarker_NoSuppression) {
-    EXPECT_FALSE(markerSuppressesRule("int x = 1/z; // normal yorum",
+    EXPECT_FALSE(markerSuppressesRule("int x = 1/z; // normal comment",
                                       "zerodefect-disable-line",
                                       "div-by-zero"));
 }

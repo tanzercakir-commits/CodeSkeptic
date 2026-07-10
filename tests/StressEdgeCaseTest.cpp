@@ -236,7 +236,7 @@ TEST(WorstCaseTest, DoWhileFirstIteration_UninitDeref) {
 }
 
 TEST(WorstCaseTest, GotoBackwardLoop) {
-    // goto ile kurulmus dongu: n <= 0 yolunda p hic init edilmiyor
+    // A loop built with goto: on the n <= 0 path p is never initialized
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int n) {
@@ -256,7 +256,7 @@ TEST(WorstCaseTest, GotoBackwardLoop) {
 }
 
 TEST(WorstCaseTest, SwitchWithoutDefault_MaybeUninit) {
-    // default'suz switch: hicbir case eslesmezse p uninit kalir
+    // A switch without default: if no case matches, p stays uninit
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int x) {
@@ -273,12 +273,12 @@ TEST(WorstCaseTest, SwitchWithoutDefault_MaybeUninit) {
 }
 
 // ===================================================================
-// BELGELENMIS SINIRLAR — bilinen FN'ler (davranis degisirse fark edelim)
+// DOCUMENTED LIMITS — known FNs (so we notice if the behavior changes)
 // ===================================================================
 
 TEST(DocumentedLimitTest, UnreachableCodeNotAnalyzed) {
-    // return sonrasi kod CFG'de erisimsiz — analiz edilmez (bilincli:
-    // olu koddaki "hatalar" calisan programi etkilemez)
+    // Code after return is unreachable in the CFG — not analyzed
+    // (deliberate: "bugs" in dead code do not affect a running program)
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f() {
@@ -292,8 +292,8 @@ TEST(DocumentedLimitTest, UnreachableCodeNotAnalyzed) {
 }
 
 TEST(DocumentedLimitTest, SelfAssignmentHidesUninit_KnownFN) {
-    // p = p atamasi p'yi "Init" isaretler — bilinen soundness acigi.
-    // Duzeltilirse bu test kirilir ve todo guncellenir.
+    // The p = p assignment marks p "Init" — a known soundness hole.
+    // If fixed, this test breaks and the todo gets updated.
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f() {
@@ -307,8 +307,9 @@ TEST(DocumentedLimitTest, SelfAssignmentHidesUninit_KnownFN) {
 }
 
 TEST(DocumentedLimitTest, CompoundAssignNotModeled_KnownFN) {
-    // z -= z sifir uretir ama CompoundAssignOperator izlenmiyor
-    // (todo'da: BO_Assign disindaki atamalar AssignsUnknown bile degil)
+    // z -= z produces zero but CompoundAssignOperator is not tracked
+    // (in the todo: assignments other than BO_Assign are not even
+    // AssignsUnknown)
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         int f() {
@@ -321,8 +322,8 @@ TEST(DocumentedLimitTest, CompoundAssignNotModeled_KnownFN) {
 }
 
 TEST(DocumentedLimitTest, ConditionalDoubleFree_KnownFN) {
-    // if(c) delete p; delete p; — merge Freed+Allocated=Allocated,
-    // ikinci delete yakalanmiyor. Path-sensitivity gerektirir (todo).
+    // if(c) delete p; delete p; — the merge Freed+Allocated=Allocated,
+    // the second delete is not caught. Requires path sensitivity (todo).
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int c) {
@@ -335,7 +336,7 @@ TEST(DocumentedLimitTest, ConditionalDoubleFree_KnownFN) {
 }
 
 // ===================================================================
-// DATAFLOW IZLERI — bulgular olay zinciriyle gelmeli
+// DATAFLOW TRACES — findings must come with their event chain
 // ===================================================================
 
 TEST(TraceTest, UseAfterFree_HasAllocAndFreeNotes) {
@@ -351,7 +352,7 @@ TEST(TraceTest, UseAfterFree_HasAllocAndFreeNotes) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "use-after-free");
     ASSERT_EQ(results[0].notes.size(), 2u);
-    // Notlar kaynak sirasina gore: once alloc (satir 3), sonra free (4)
+    // Notes in source order: alloc first (line 3), then free (4)
     EXPECT_EQ(results[0].notes[0].line, 3u);
     EXPECT_NE(results[0].notes[0].message.find("allocated"),
               std::string::npos);
