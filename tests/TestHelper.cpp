@@ -1,5 +1,6 @@
 #include "TestHelper.h"
 
+#include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTConsumer.h>
@@ -21,6 +22,7 @@ public:
         zerodefect::SummaryRegistry::instance().rebuild(ctx);
         rule_.check(ctx, results_);
         zerodefect::SummaryRegistry::instance().clear();
+        zerodefect::CfgCache::instance().clear();
     }
 
 private:
@@ -52,6 +54,7 @@ public:
         registry.rebuild(ctx);
         registry.harvestGlobal();
         registry.clear();
+        zerodefect::CfgCache::instance().clear();
     }
 };
 

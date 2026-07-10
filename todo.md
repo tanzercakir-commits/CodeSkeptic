@@ -32,9 +32,10 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 ## Sıradaki Görevler (yol haritası: analiz-2026-07.md)
 
 ### Faz 1 kalanları
-- [ ] Fonksiyon başına CFG önbelleği — kurallar arası paylaşım (şu an her
-      kural kendi CFG'sini kuruyor; fonksiyon başına 3 build). Kurallara
-      ortak bir analiz bağlamı geçirmek gerekir — mimari karar.
+- [x] Fonksiyon başına CFG önbelleği (engine/CfgCache: FunctionDecl*
+      anahtarlı memoize depo; TU sonunda açık temizlik + ctx-değişiminde
+      otomatik boşaltma; kurulum seçenekleri tek yerde). Fonksiyon başına
+      6+ inşa → 1. (Tek-geziş motor redesign'ı ayrı ufuk — gerekirse.)
 - [x] converged=false artık stderr'de görünür (AnalysisNotConverged,
       4 kuralda; i18n'li)
 - [x] MemoryLeakRule tepe-düğüm Effect desenine taşındı
