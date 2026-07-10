@@ -1,5 +1,23 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Ortak koşul-yürüyüşü iskeleti (ConditionWalk)
+
+### Değişen
+- **engine/ConditionWalk.h** (header-only): `walkCondition` — dallanma
+  koşulu yürüyüşünün ortak omurgası (`!` ters kenar, `&&` doğru kenarda
+  iki taraf, `||` yanlış kenarda iki taraf, karşılaştırmada değişken-
+  solda normalizasyon/aynalama) + `walkNullCondition` — pointer-null
+  domain'inin hazır özeti.
+- **Dört istemci tek iskelete geçti** (davranış korunumlu):
+  NullDerefRule, MemoryLeakRule (yalnız-null-kenarı), FunctionSummary
+  mini-akışı (null domain) ve DivByZeroRule (sıfır domain'i, genel
+  iskelet). Dönüş-nullness turunun üçe çıkardığı kopya sıfıra indi;
+  yeni kenar-bilgisi domain'i eklemek artık iki lambda.
+
+### Doğrulama
+- 188/188 test (ctest + tek-süreç) — saf yeniden düzenleme; korpus ve
+  Juliet bekçileri CI'da hakem
+
 ## 2026-07-10 — Dönüş-nullness dataflow'u (özet v2'nin kalbi)
 
 ### Eklenen
