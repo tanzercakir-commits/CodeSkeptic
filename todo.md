@@ -60,9 +60,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
 - [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
 
 ### Kural iyileştirme notları
-- NullDeref: çoklu bildirim (`int *a = nullptr, *b = nullptr;`) yalnızca
-  ilk pointer'ı işler — kalanlar Unknown başlar (bilinen FN, nadir).
-  Effect'i çoklu sonuç dönecek şekilde genişletilebilir.
+- ~~NullDeref çoklu bildirim FN'i~~ — deneyle geçersiz çıktı: ince
+  taneli CFG çoklu bildirimi değişken başına böler, ikinci pointer da
+  izleniyor (regresyon testleriyle sabitlendi, 2026-07-10).
 - NullDeref + DivByZero applyCondition yapısal olarak benzer — ortak
   "koşul yürüyüşü" yardımcıya çıkarılabilir (iki domain, tek iskelet).
 

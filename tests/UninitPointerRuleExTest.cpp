@@ -228,3 +228,18 @@ TEST(UninitPtrPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+TEST(UninitPointerRuleExTest, MultiDeclaration_SecondPointerTracked) {
+    // Coklu bildirimde ikinci init'siz pointer da izlenir (ince taneli
+    // CFG bolmesi) — regresyon testi
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int *p, *q;
+            int y = *q;
+            (void)y; (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "uninit-ptr");
+}
