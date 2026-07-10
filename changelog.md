@@ -1,5 +1,35 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Dönüş sıfır-olabilirliği özeti (DivByZero fonksiyonlar arası)
+
+### Eklenen
+- **ReturnZeroness özet alanı**: tamsayı dönen fonksiyonlar için
+  NeverZero/MaybeZero/Unknown — null'un aynası, aynı mini deger-akışı
+  şimdi domain-şablonlu (`ReturnFlowAnalysis<ValueOf, Refine>`;
+  vstateOf/zstateOf + applyNullCond/applyZeroCond). bool bilinçli hariç
+  (`return ok;` false'ları her yerde MaybeZero üretirdi).
+- **walkZeroCondition** ConditionWalk'a eklendi (null'un simetriği);
+  DivByZeroRule::applyCondition ve özet mini-akışı aynı yorumu paylaşır
+  (davranış korunumlu — DivByZero'nun kenar testleri sabit).
+- **DivByZero tüketimi atama yolundan**: `int d = badSource();` →
+  d MaybeZero → korumasız bölme uyarı + "possibly-zero value" iz notu;
+  guard'lar (`if (d != 0)`) mevcut kenar iyileştirmesiyle susturur.
+  Juliet CWE369 akış-varyantı kaynağı (`data = 0; ... return data;`)
+  artık fonksiyonlar/dosyalar arası görünür (cross-TU testli).
+- **Bilinçli sınır (testle sabit)**: doğrudan `x / f()` böleni
+  raporlanmaz — atanmamış çağrı sonucu guard'lanamaz (`if (f() != 0)
+  x / f()` taze çağrıdır), raporlamak gerçek kodda FP ailesi doğururdu.
+- **Özet dosya formatı v2** (4. sütun sıfırlık); v1 dosyaları yüklemede
+  tanınır (sıfırlık Unknown), fazla/eksik alan bütünüyle red.
+- FP-katili testler: kaynak içinde 0 sonra ezilirse NeverZero → sessiz
+  (akış-duyarsız kestirme burada yanlış uyarırdı).
+
+### Doğrulama
+- 209/209 test (ctest + tek-süreç; +8: sıfırlık davranışları 7 +
+  v1-dosya uyumu; persistence testleri v2 formatına taşındı)
+- Korpus lokalde koşulamadı (proxy tarball'ı engelliyor) — pin bekçisi
+  CI'da hakem; CWE369 hitrate etkisi PR Juliet koşusunda görülecek
+
 ## 2026-07-10 — Baseline v2: satır-bağımsız anahtar
 
 ### Değişen

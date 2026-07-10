@@ -37,10 +37,13 @@ to the classic merged analysis.
 **Interprocedural (v1):** functions with visible bodies are summarized
 before rules run — return nullness (a `find()`-style function that can
 return null makes unguarded dereferences of its result a warning, with
-a trace note) and parameter effects (free-wrappers count as frees, so
-double-free/use-after-free through wrappers is caught; read-only
-helpers no longer hide leaks behind them). Recursion-safe fixpoint;
-external and aliasing callees stay conservative. |
+a trace note), return zeroness (a callee that can return zero makes an
+unguarded division by the assigned result a warning — the classic
+`data = badSource(); 100 / data` split across functions or files) and
+parameter effects (free-wrappers count as frees, so double-free/
+use-after-free through wrappers is caught; read-only helpers no longer
+hide leaks behind them). Recursion-safe fixpoint; external and aliasing
+callees stay conservative. |
 
 Example:
 
