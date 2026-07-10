@@ -72,6 +72,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addLines(argv[++i]);
         } else if (arg == "--serve") {
             serve_ = true;
+        } else if (arg == "--whole-program") {
+            whole_program_ = true;
         } else if (arg == "--files" && i + 1 < argc) {
             // Liste dosyasi: satir basina bir kaynak dosya yolu.
             // Buyuk/secilmis kumeler icin (benchmark, ajan toplu istegi).
@@ -99,6 +101,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --lines <N-M,K>        Analyze only functions overlapping these\n"
                       << "                         line ranges of the analyzed file\n"
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
+                      << "  --whole-program        Two-pass mode: collect function summaries\n"
+                      << "                         across all files first, then analyze\n"
                       << "  --files <list>         Analyze files listed (one path per line)\n"
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --help                 Show this message\n";

@@ -40,6 +40,7 @@ public:
     void setOutputFormat(const std::string& format) { output_format_ = format; }
     void setMinSeverity(Severity severity) { min_severity_ = severity; }
     bool serve() const { return serve_; }
+    bool wholeProgram() const { return whole_program_; }
 
     // Programatik kapsam ayari (MCP server bunlari dogrudan kullanir)
     void addFunctions(const std::string& list);
@@ -60,6 +61,7 @@ private:
     std::set<std::string> functions_;
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
+    bool whole_program_ = false;
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;

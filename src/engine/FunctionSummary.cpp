@@ -26,6 +26,17 @@ using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
 // Donus ifadesinin null'lugu: literal/new/&x/string dogrudan; cagri
 // zinciri onceki taramanin ozetleriyle cozulur.
+// Cagrilan ozetini once TU-yerel tabloda, yoksa cross-TU depoda ara.
+// (Whole-program 1. gecisi depoyu doldurur; tek-TU modda depo bos,
+// davranis eskisiyle ayni.)
+const FunctionSummary* lookupPrev(const SummaryTable& previous,
+                                  const FunctionDecl* callee) {
+    if (!callee) return nullptr;
+    auto it = previous.find(callee->getCanonicalDecl());
+    if (it != previous.end()) return &it->second;
+    return zerodefect::SummaryRegistry::instance().lookupGlobal(callee);
+}
+
 ReturnNullness evaluateReturnExpr(const Expr* expr,
                                   const SummaryTable& previous) {
     if (!expr) return ReturnNullness::Unknown;
@@ -44,11 +55,9 @@ ReturnNullness evaluateReturnExpr(const Expr* expr,
     if (isa<StringLiteral>(expr)) return ReturnNullness::NeverNull;
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        if (const auto* callee = call->getDirectCallee()) {
-            auto it = previous.find(callee->getCanonicalDecl());
-            if (it != previous.end())
-                return it->second.returnNullness;
-        }
+        if (const auto* summary =
+                lookupPrev(previous, call->getDirectCallee()))
+            return summary->returnNullness;
         return ReturnNullness::Unknown;
     }
     return ReturnNullness::Unknown;
@@ -279,11 +288,7 @@ public:
     bool VisitCallExpr(CallExpr* call) {
         const FunctionDecl* callee = call->getDirectCallee();
         bool isFreeByName = calleeIdentifier(callee) == "free";
-        const FunctionSummary* summary = nullptr;
-        if (callee) {
-            auto it = previous_.find(callee->getCanonicalDecl());
-            if (it != previous_.end()) summary = &it->second;
-        }
+        const FunctionSummary* summary = lookupPrev(previous_, callee);
 
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
             const Expr* arg = call->getArg(i);
@@ -462,8 +467,53 @@ const SummaryRegistry::FunctionSummary*
 SummaryRegistry::lookup(const clang::FunctionDecl* func) const {
     if (!func) return nullptr;
     auto it = summaries_.find(func->getCanonicalDecl());
-    if (it == summaries_.end()) return nullptr;
+    if (it != summaries_.end()) return &it->second;
+    return lookupGlobal(func);
+}
+
+namespace {
+
+std::string globalKey(const FunctionDecl* func) {
+    return func->getQualifiedNameAsString() + "/" +
+           std::to_string(func->getNumParams());
+}
+
+// Ayni anahtara dusen farkli ozetler (C++ overload'lari) muhafazakar
+// birlesir: uyusmayan alan zayif iddiaya duser — yanlis guclu iddia
+// (NeverNull/Frees/ReadsOnly) cakismadan dogamaz.
+void mergeConservative(SummaryRegistry::FunctionSummary& into,
+                       const SummaryRegistry::FunctionSummary& from) {
+    using RN = SummaryRegistry::ReturnNullness;
+    using PE = SummaryRegistry::ParamEffect;
+    if (into.returnNullness != from.returnNullness)
+        into.returnNullness = RN::Unknown;
+    if (into.params.size() != from.params.size()) {
+        into.params.clear();  // paramEffect() varsayilani Opaque'tir
+        return;
+    }
+    for (size_t i = 0; i < into.params.size(); ++i)
+        if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
+}
+
+} // anonymous namespace
+
+void SummaryRegistry::harvestGlobal() {
+    for (const auto& [func, summary] : summaries_) {
+        if (!func->isExternallyVisible()) continue;
+        auto [it, inserted] = globalStore_.emplace(globalKey(func), summary);
+        if (!inserted) mergeConservative(it->second, summary);
+    }
+}
+
+const SummaryRegistry::FunctionSummary*
+SummaryRegistry::lookupGlobal(const clang::FunctionDecl* func) const {
+    if (!func || globalStore_.empty()) return nullptr;
+    if (!func->isExternallyVisible()) return nullptr;
+    auto it = globalStore_.find(globalKey(func));
+    if (it == globalStore_.end()) return nullptr;
     return &it->second;
 }
+
+void SummaryRegistry::clearGlobal() { globalStore_.clear(); }
 
 } // namespace zerodefect

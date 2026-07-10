@@ -1,5 +1,30 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Ufuk 2 açılışı: cross-TU özetler (--whole-program)
+
+### Eklenen
+- **SummaryRegistry'ye cross-TU depo**: nitelikli-ad+arite anahtarı,
+  YALNIZCA harici bağlantılı fonksiyonlar (static dosya-yereller
+  anahtarlanmaz — Juliet'te her dosyada aynı adla varlar, yanlış
+  eşleşme üretirdi; soundness testi `StaticCallee_NotShared`).
+  Anahtar çakışmasında (C++ overload) alanlar muhafazakâr birleşir:
+  returnNullness→Unknown, param→Opaque — yanlış güçlü iddia doğamaz.
+- **`--whole-program` iki geçişli mod**: 1. geçiş tüm TU'lardan özet
+  hasadı (`harvestGlobal`), 2. geçiş kurallar — dosyalar arası
+  çağrılarda Opaque yerine gerçek özet. Bedeli ikinci parse; bilinçli,
+  bayrakla açılır. Özet hesaplamasının kendisi de depoya düşer
+  (cross-TU nullness zincirleri çözülür).
+- MCP hijyeni: `~StaticAnalyzer` depoyu da temizler (filtre sızıntısı
+  dersinin uygulaması — koşular arası özet sızmaz).
+- Juliet harness `--whole-program` ile koşar: akış varyantları
+  (61/63/64...) kaynak/lavaboyu a/b dosyalarına böler — recall etkisi
+  bu PR'ın koşusundan ölçülecek.
+
+### Doğrulama
+- 178/178 test (5 yeni CrossTU testi: MaybeNull dönüş, free-wrapper
+  double-free, salt-okur-leak-görünür, static-paylaşılmaz, hasatsız
+  kontrol grubu)
+
 ## 2026-07-10 — Dengeli metrikler (F1) + Juliet skor bekçisi
 
 ### Eklenen

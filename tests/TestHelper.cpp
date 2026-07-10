@@ -44,6 +44,26 @@ private:
     zerodefect::DiagnosticList& results_;
 };
 
+// Whole-program 1. gecisin test karsiligi: yalnizca ozet hasadi
+class HarvestASTConsumer : public clang::ASTConsumer {
+public:
+    void HandleTranslationUnit(clang::ASTContext& ctx) override {
+        auto& registry = zerodefect::SummaryRegistry::instance();
+        registry.rebuild(ctx);
+        registry.harvestGlobal();
+        registry.clear();
+    }
+};
+
+class HarvestAction : public clang::ASTFrontendAction {
+public:
+    std::unique_ptr<clang::ASTConsumer>
+    CreateASTConsumer(clang::CompilerInstance& /*ci*/,
+                      llvm::StringRef /*file*/) override {
+        return std::make_unique<HarvestASTConsumer>();
+    }
+};
+
 } // anonymous namespace
 
 namespace zerodefect {
@@ -56,6 +76,19 @@ DiagnosticList runRule(Rule& rule, const std::string& code,
         std::make_unique<TestAction>(rule, results),
         code,
         filename);
+    return results;
+}
+
+DiagnosticList runRuleCrossTU(Rule& rule, const std::string& calleeTU,
+                              const std::string& callerTU) {
+    SummaryRegistry::instance().clearGlobal();
+    clang::tooling::runToolOnCode(std::make_unique<HarvestAction>(),
+                                  calleeTU, "callee_tu.cpp");
+    DiagnosticList results;
+    clang::tooling::runToolOnCode(
+        std::make_unique<TestAction>(rule, results),
+        callerTU, "caller_tu.cpp");
+    SummaryRegistry::instance().clearGlobal();
     return results;
 }
 

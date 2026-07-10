@@ -109,6 +109,9 @@ const MsgEntry kMessages[] = {
      "Hata: Kaynak dizin belirtilmedi.\n"
      "Kullanim: zerodefect <kaynak_yolu> [secenekler]\n"
      "Detay icin: zerodefect --help"},
+    // WholeProgramPass
+    {"[ZeroDefect] Whole-program pass: collecting summaries from {0} file(s)...",
+     "[ZeroDefect] Tum-program gecisi: {0} dosyadan ozetler toplaniyor..."},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

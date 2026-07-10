@@ -73,24 +73,27 @@ the rule itself. The **all-findings** column includes every rule's
 output on the same files (cross-rule noise; tracked separately as
 FP-hunting material).
 
-| CWE | Target rule | Rule precision | Rule hit rate | All-findings precision |
-|-----|-------------|---------------:|--------------:|-----------------------:|
-| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | 0.526 |
-| CWE-415 Double Free | `double-free` | **1.000** (79 TP / 0 FP) | 0.198 | 0.500 |
-| CWE-416 Use After Free | `use-after-free` | **1.000** (174 TP / 0 FP) | 0.435 | 0.321 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (18 TP / 0 FP) | 0.045 | 1.000 |
-| CWE-401 Memory Leak | `memory-leak` | 0.640 (96 TP / 54 FP) | 0.233 | 0.640 |
+| CWE | Target rule | Rule precision | Recall | Case F1 |
+|-----|-------------|---------------:|-------:|--------:|
+| CWE-416 Use After Free | `use-after-free` | **1.000** (174 TP / 0 FP) | 0.436 | **0.607** |
+| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | **0.516** |
+| CWE-415 Double Free | `double-free` | **1.000** (88 TP / 0 FP) | 0.220 | 0.361 |
+| CWE-401 Memory Leak | `memory-leak` | 0.653 (case-level) | 0.246 | 0.357 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (18 TP / 0 FP) | 0.045 | 0.086 |
 
-Targeted path-sensitivity (2026-07-10, all rules) both cut false
-positives (memory-leak 92 → 54, uninit-ptr 178 → 80, cross-file
-null-deref noise 241 → 129) and *surfaced previously missed true
-positives*: correlated-guard double frees (+32 TP) and use-after-frees
-(+75 TP, hit rate 0.247 → 0.435) were false negatives under the
-merged-path analysis. A caveat on the all-findings column: Juliet
+The journey these numbers took (all on 2026-07-10): targeted
+path-sensitivity cut false positives across rules (memory-leak
+92 → 61, uninit-ptr 178 → 84, cross-file null-deref noise 241 → 129)
+and *surfaced previously missed true positives* — correlated-guard
+double frees and use-after-frees (+107 TP combined) were false
+negatives under merged-path analysis. Cross-TU summaries
+(`--whole-program`) then connected source/sink flows split across
+files (double-free +9 TP, leak +5 TP, with variant-group sampling so
+a/b file pairs stay together). A caveat on cross-rule findings: Juliet
 `good` functions are only guaranteed free of the *tested* CWE — e.g. a
 CWE-416 good function may genuinely leak, so a `memory-leak` finding
-there counts against the all-findings number while possibly being
-correct. The rule-matched columns are the sound metric.
+there is counted against us while possibly being correct. The
+rule-matched columns are the sound metric.
 
 Beyond precision/hit-rate, the harness reports **case-level F1** (each
 file is a case: a matched finding in a `bad` function is a case-TP, in

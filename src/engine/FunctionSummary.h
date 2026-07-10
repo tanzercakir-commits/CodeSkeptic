@@ -2,6 +2,7 @@
 #define ZERODEFECT_FUNCTION_SUMMARY_H
 
 #include <map>
+#include <string>
 #include <vector>
 
 namespace clang {
@@ -57,14 +58,37 @@ public:
     // TAMAMEN temizler (sarkan pointer olmasin).
     void rebuild(clang::ASTContext& ctx);
 
-    // Ozet yoksa nullptr doner (govdesiz/TU disi fonksiyon).
+    // Ozet yoksa nullptr doner. Once TU-yerel tablo, sonra cross-TU
+    // deposu (yalnizca harici baglantili fonksiyonlar) denenir.
     const FunctionSummary* lookup(const clang::FunctionDecl* func) const;
 
+    // --- Cross-TU katmani (Ufuk 2: whole-program modu) ---
+    //
+    // Anahtar: nitelikli ad + "/" + parametre sayisi. Yalnizca HARICI
+    // baglantili fonksiyonlar depolanir/aranir — static (dosya-yerel)
+    // fonksiyonlar TU disindan cagrilamaz ve Juliet gibi korpuslarda
+    // ayni adla her dosyada bulunur; onlari anahtarlamak yanlis
+    // eslesme uretirdi. C++ overload'lari ayni anahtara dusebilir:
+    // cakismada alanlar muhafazakar birlesir (returnNullness -> Unknown,
+    // param -> Opaque) — belirsizlik her zaman kaybeder, yanlis guclu
+    // iddia dogamaz.
+
+    // TU-yerel tablodaki harici-baglantili ozetleri depoya katar
+    // (whole-program 1. gecisinde TU basina bir kez cagrilir).
+    void harvestGlobal();
+
+    // Depodan arama; yalnizca harici-baglantili decl'ler icin.
+    const FunctionSummary* lookupGlobal(
+        const clang::FunctionDecl* func) const;
+
     void clear();
+    void clearGlobal();
     size_t size() const { return summaries_.size(); }
+    size_t globalSize() const { return globalStore_.size(); }
 
 private:
     std::map<const clang::FunctionDecl*, FunctionSummary> summaries_;
+    std::map<std::string, FunctionSummary> globalStore_;
 };
 
 } // namespace zerodefect

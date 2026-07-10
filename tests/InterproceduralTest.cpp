@@ -439,3 +439,101 @@ TEST(InterprocLeakTest, DeleteWrapper_UAF) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "use-after-free");
 }
+
+// ===================================================================
+// Cross-TU ozetler (Ufuk 2: whole-program modu)
+// Cagrilan BASKA dosyada tanimli: ozet 1. geciste hasat edilir,
+// 2. gecis kurali cagiran dosyada Opaque yerine gercek ozeti gorur.
+// ===================================================================
+
+TEST(CrossTUTest, MaybeNullReturn_AcrossTU_Warning) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int* find(int c) {
+            static int v = 1;
+            if (c) return &v;
+            return 0;
+        }
+    )", R"(
+        int* find(int c);
+        void f(int c) {
+            int* p = find(c);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(CrossTUTest, FreeWrapper_AcrossTU_DoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        extern "C" void free(void*);
+        void my_free(int* p) { free(p); }
+    )", R"(
+        extern "C" void* malloc(unsigned long);
+        void my_free(int* p);
+        void f() {
+            int* q = (int*)malloc(4);
+            my_free(q);
+            my_free(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(CrossTUTest, ReadsOnlyCallee_AcrossTU_LeakVisible) {
+    // Baska dosyadaki salt-okur yardimci leak'i artik GIZLEMEZ
+    // (tek-TU modda Opaque -> Escapes -> sessizdi)
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void use(int* p) { int x = *p; (void)x; }
+    )", R"(
+        extern "C" void* malloc(unsigned long);
+        void use(int* p);
+        void f() {
+            int* q = (int*)malloc(4);
+            use(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CrossTUTest, StaticCallee_NotShared) {
+    // callee-TU'daki static (dosya-yerel) make ile caller-TU'nun
+    // extern bildirimi FARKLI fonksiyonlar — ozet TASINMAMALI.
+    // Tasinsaydi NeverNull... yerine null donebilirlik iddia edilirdi.
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        static int* make() { return 0; }
+        int* unused() { return make(); }
+    )", R"(
+        int* make();
+        void f() {
+            int* p = make();
+            int x = *p;
+            (void)x;
+        }
+    )");
+    // Opaque kalmali -> Unknown -> sessiz (muhafazakar)
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CrossTUTest, WithoutHarvest_StaysConservative) {
+    // Ayni cagiran kod TEK-TU modda (hasatsiz): Opaque -> sessiz.
+    // Cross-TU kazancinin kontrol grubu.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* find(int c);
+        void f(int c) {
+            int* p = find(c);
+            int x = *p;
+            (void)x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

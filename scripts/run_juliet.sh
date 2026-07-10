@@ -71,20 +71,36 @@ run_cwe() { # <cwe-adi>
     find "$dir" -type f \( -name '*.c' -o -name '*.cpp' \) \
         | grep -v -e 'w32' -e 'wchar_t' -e 'pthread' -e 'fscanf' -e 'socket' \
         | sort > "$list"
-    # Adimli (stride) ornekleme: head -N alfabetik ilk varyant ailesini
-    # secip yanlilik yaratiyordu (CWE369'da ilk 400 dosyanin tamami
-    # float_* cikti, kural float bolmeyi bilincli atlar → 0 bulgu).
-    # Liste boyunca esit araliklarla LIMIT dosya al — deterministik,
-    # tum varyant aileleri temsil edilir.
+    # GRUP-bazli adimli ornekleme. Iki ders birden:
+    #  1. head -N alfabetik ilk varyant ailesini secip yanlilik
+    #     yaratiyordu (CWE369: ilk 400 dosyanin tamami float_*).
+    #  2. Dosya-bazli stride, akis varyantlarinin a/b CIFTLERINI
+    #     kiriyordu (63a taranir, 63b atlanir) — cross-TU ozetlerin
+    #     baglayacagi cift kalmiyordu (whole-program etkisi olculemez).
+    # Cozum: dosyalar varyant grubuna indirgenir (sondaki harf eki
+    # atilir: 63a/63b -> 63), gruplar esit araliklarla ornekle-
+    # nir ve secilen grubun TUM dosyalari girer. Limit grup basinda
+    # denetlenir — grup asla bolunmez (hafif asim kabul).
     if [ "$LIMIT" -gt 0 ]; then
         awk -v limit="$LIMIT" '
-            NR == FNR { total++; next }
-            FNR == 1  { step = total / limit
-                        if (step < 1) step = 1
-                        next_line = 1 }
-            FNR >= next_line && picked < limit {
-                print; picked++
-                next_line += step
+            function base(p) { g = p; sub(/[a-e]?\.(c|cpp)$/, "", g)
+                               return g }
+            NR == FNR { b = base($0)
+                        if (!(b in seen)) { seen[b] = 1; ngroups++ }
+                        total++; next }
+            FNR == 1  { gstep = (ngroups * limit) / total
+                        gstep = ngroups / (gstep < 1 ? 1 : gstep)
+                        # hedef: ~limit dosya => limit*ngroups/total grup
+                        if (gstep < 1) gstep = 1
+                        next_g = 1; gi = 0; lastb = "" }
+            {
+                b = base($0)
+                if (b != lastb) {
+                    lastb = b; gi++
+                    pick = (gi >= next_g && picked < limit)
+                    if (pick) next_g += gstep
+                }
+                if (pick) { print; picked++ }
             }' "$list" "$list" > "$list.tmp" && mv "$list.tmp" "$list"
     fi
     local count
@@ -114,7 +130,9 @@ PYEOF
     echo "[juliet] $cwe: $count dosya taraniyor..."
     set +e
     # --files: yalnizca secilmis (elenmis + limitli) dosyalar analiz edilir
-    "$ZD_BIN" --files "$list" --build-path "$build" \
+    # --whole-program: akis varyantlari (61/63/64...) kaynak/lavaboyu
+    # a/b dosyalarina boler — cross-TU ozetler olmadan gorunmezler
+    "$ZD_BIN" --files "$list" --build-path "$build" --whole-program \
         --json "findings_$cwe.json" > /dev/null 2> "log_$cwe.txt"
     local code=$?
     set -e
