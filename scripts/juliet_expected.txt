@@ -5,7 +5,7 @@
 # Bilincli kural degisikliginde tabanlar AYNI PR'da guncellenir —
 # gerekce commit mesajinda gorunur olur.
 CWE476 0.95 0.30
-CWE401 0.55 0.20
-CWE415 0.95 0.17
+CWE401 0.55 0.22
+CWE415 0.95 0.20
 CWE416 0.95 0.38
 CWE369 0.95 0.03
