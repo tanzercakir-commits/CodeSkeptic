@@ -122,8 +122,8 @@ size_t Baseline::filter(DiagnosticList& diagnostics) const {
     diagnostics.erase(
         std::remove_if(diagnostics.begin(), diagnostics.end(),
                        [&](const Diagnostic& d) {
-                           // v1 once: eski (basliksiz) dosyalar eski
-                           // satir-numarali anlamiyla eslesmeye devam eder
+                           // v1 first: old (headerless) files keep
+                           // matching with their old line-number meaning
                            return consume(keyV1(d)) ||
                                   consume(keyV2Cached(d, cache));
                        }),

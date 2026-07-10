@@ -17,7 +17,7 @@ using namespace zerodefect;
 using namespace zerodefect::testing;
 
 // ===================================================================
-// Donus nullness'i
+// Return nullness
 // ===================================================================
 
 TEST(InterprocNullTest, MaybeNullReturn_UnguardedDeref_Warning) {
@@ -34,7 +34,7 @@ TEST(InterprocNullTest, MaybeNullReturn_UnguardedDeref_Warning) {
     )");
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
-    // Iz: olasi-null atamanin kaynagi gorunmeli
+    // Trace: the source of the possibly-null assignment must be shown
     ASSERT_EQ(results[0].notes.size(), 1u);
     EXPECT_NE(results[0].notes[0].message.find("possibly-null"),
               std::string::npos);
@@ -57,8 +57,8 @@ TEST(InterprocNullTest, MaybeNullReturn_Guarded_Clean) {
 }
 
 TEST(InterprocNullTest, NeverNullChain_Clean) {
-    // a() kesin non-null; b() a'yi zincirler → b de NeverNull.
-    // Korumasiz dereference sessiz kalmali.
+    // a() is definitely non-null; b() chains a → b is NeverNull too.
+    // The unguarded dereference must stay silent.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* a() { return new int(1); }
@@ -72,7 +72,8 @@ TEST(InterprocNullTest, NeverNullChain_Clean) {
 }
 
 TEST(InterprocNullTest, MaybeNullChain_TwoLevels_Warning) {
-    // Null donebilirlik zincirden sizmali: inner null donebilir → outer da
+    // May-return-null must leak through the chain: inner may return
+    // null → so may outer
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* inner(int k) {
@@ -90,8 +91,8 @@ TEST(InterprocNullTest, MaybeNullChain_TwoLevels_Warning) {
 }
 
 TEST(InterprocNullTest, RecursiveReturn_StaysUnknown_Silent) {
-    // Rekursif fonksiyon kendi ozetini gorur (Unknown baslar) —
-    // NeverNull iddiasi olusamaz ama MaybeNull de uydurulmaz → sessiz
+    // A recursive function sees its own summary (starts Unknown) —
+    // no NeverNull claim can form, but no MaybeNull is invented → silent
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* r(int n) {
@@ -107,7 +108,7 @@ TEST(InterprocNullTest, RecursiveReturn_StaysUnknown_Silent) {
 }
 
 TEST(InterprocNullTest, VariableReturn_Unknown_Silent) {
-    // Degisken donduren yol v1'de Unknown — sessiz (belgelenmis sinir)
+    // A path returning a variable is Unknown in v1 — silent (documented limit)
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         int* pick(int* a, int* b, int c) {
@@ -123,7 +124,7 @@ TEST(InterprocNullTest, VariableReturn_Unknown_Silent) {
 }
 
 // ===================================================================
-// Parametre etkileri
+// Parameter effects
 // ===================================================================
 
 TEST(InterprocLeakTest, FreeWrapper_DoubleFree_Error) {
@@ -143,7 +144,7 @@ TEST(InterprocLeakTest, FreeWrapper_DoubleFree_Error) {
 }
 
 TEST(InterprocLeakTest, GuardedFreeWrapper_StillFrees) {
-    // if (p) free(p) kalibi da Frees sayilir ("serbest birakabilir")
+    // The if (p) free(p) pattern also counts as Frees ("may free")
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -160,7 +161,7 @@ TEST(InterprocLeakTest, GuardedFreeWrapper_StillFrees) {
 }
 
 TEST(InterprocLeakTest, FreeWrapperChain_TwoLevels) {
-    // w2 → w1 → free zinciri sabit-nokta taramasiyla cozulmeli
+    // The w2 → w1 → free chain must be resolved by the fixed-point sweep
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -177,8 +178,8 @@ TEST(InterprocLeakTest, FreeWrapperChain_TwoLevels) {
 }
 
 TEST(InterprocLeakTest, ReadOnlyCallee_LeakVisible) {
-    // Salt-okur yardimci sahiplik almaz: arkasindaki leak GORUNMELI.
-    // (Onceden Escaped muhafazakarligi gizliyordu — yeni tespit.)
+    // A read-only helper takes no ownership: the leak behind it MUST be
+    // visible. (Escaped conservatism used to hide it — new detection.)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         int read_value(const int* p) { return *p; }
@@ -194,7 +195,7 @@ TEST(InterprocLeakTest, ReadOnlyCallee_LeakVisible) {
 }
 
 TEST(InterprocLeakTest, StoringCallee_NoLeakReport) {
-    // Saklayan cagri sahiplik devri olabilir → Escaped (bugunku davranis)
+    // A storing call may transfer ownership → Escaped (today's behavior)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         int* g_slot = nullptr;
@@ -208,9 +209,10 @@ TEST(InterprocLeakTest, StoringCallee_NoLeakReport) {
 }
 
 TEST(InterprocLeakTest, AliasingCallee_NowFrees_DoubleFree) {
-    // cJSON_Delete kalibi: parametre yerel imlece alinip free edilir.
-    // v2 alias izleme: cur, p'nin temiz alias'i → delete_list = Frees →
-    // cift cagri double-free. (v1'de muhafazakar sessizdi.)
+    // The cJSON_Delete pattern: the parameter is taken into a local
+    // cursor and freed. v2 alias tracking: cur is a clean alias of p →
+    // delete_list = Frees → the double call is a double-free. (v1 was
+    // conservatively silent.)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -230,13 +232,14 @@ TEST(InterprocLeakTest, AliasingCallee_NowFrees_DoubleFree) {
 }
 
 // ===================================================================
-// Alias izleme (v2)
+// Alias tracking (v2)
 // ===================================================================
 
 TEST(InterprocAliasTest, CursorLoopWalk_RealCJSONDeleteShape) {
-    // Gercek cJSON_Delete sekli: parametre dongude yeniden atanir,
-    // her iterasyonda free edilir. May-semantik: ilk iterasyon orijinali
-    // serbest birakir → Frees → wrapper sonrasi kullanim UAF.
+    // The real cJSON_Delete shape: the parameter is reassigned in a
+    // loop and freed on every iteration. May-semantics: the first
+    // iteration frees the original → Frees → use after the wrapper is
+    // a UAF.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -281,8 +284,8 @@ TEST(InterprocAliasTest, AliasChain_TwoHops_Frees) {
 }
 
 TEST(InterprocAliasTest, TaintedAlias_ImpureSource_Conservative) {
-    // Alias once p'den, sonra kirli kaynaktan besleniyor → izlenemez →
-    // Stores → sessiz (yanlis Frees iddiasi FP dogururdu)
+    // The alias is fed first from p, then from a tainted source → not
+    // trackable → Stores → silent (a false Frees claim would breed FPs)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -302,8 +305,8 @@ TEST(InterprocAliasTest, TaintedAlias_ImpureSource_Conservative) {
 }
 
 TEST(InterprocAliasTest, MultiParamAlias_Conservative) {
-    // Ayni yerel iki parametreden birden ulasilabiliyor → hicbirine
-    // guvenle baglanamaz → ikisi de Stores → sessiz
+    // The same local is reachable from two parameters at once → cannot
+    // be safely bound to either → both are Stores → silent
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -324,8 +327,9 @@ TEST(InterprocAliasTest, MultiParamAlias_Conservative) {
 }
 
 TEST(InterprocAliasTest, AliasStoredToGlobal_Stores) {
-    // Alias globale yaziliyor → sahiplik devri olabilir → Stores →
-    // cagiran tarafta leak raporu YOK (yanlis ReadsOnly FP'si engellendi)
+    // The alias is written to a global → ownership may transfer →
+    // Stores → NO leak report on the caller side (a false ReadsOnly FP
+    // is prevented)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         int* g_slot = nullptr;
@@ -358,7 +362,7 @@ TEST(InterprocAliasTest, AliasReturned_Stores) {
 }
 
 TEST(InterprocAliasTest, AddressTakenAlias_Conservative) {
-    // Alias'in adresi aliniyor → disaridan yazilabilir → izlenemez
+    // The alias's address is taken → writable from outside → not trackable
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" { void* malloc(unsigned long); void free(void*); }
@@ -378,8 +382,8 @@ TEST(InterprocAliasTest, AddressTakenAlias_Conservative) {
 }
 
 TEST(InterprocAliasTest, ReadOnlyThroughAlias_LeakVisible) {
-    // Salt-okur kullanim alias uzerinden de ReadsOnly kalmali:
-    // arkasindaki leak gorunur
+    // Read-only use must stay ReadsOnly through an alias as well:
+    // the leak behind it is visible
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         int peek(int* p) {
@@ -397,7 +401,8 @@ TEST(InterprocAliasTest, ReadOnlyThroughAlias_LeakVisible) {
 }
 
 TEST(InterprocLeakTest, ExternalCallee_StillEscapes) {
-    // Govdesi gorunmeyen fonksiyon Opaque → Escaped → sessiz (regresyon yok)
+    // A function with no visible body is Opaque → Escaped → silent (no
+    // regression)
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void unknown(int* p);
@@ -410,8 +415,8 @@ TEST(InterprocLeakTest, ExternalCallee_StillEscapes) {
 }
 
 TEST(InterprocLeakTest, MutualRecursionParam_Conservative_Silent) {
-    // Karsilikli rekursiyon: Opaque baslangic Stores'a oturur —
-    // guclu iddia (Frees/ReadsOnly) rekursiyondan sizamaz
+    // Mutual recursion: the Opaque start settles at Stores — a strong
+    // claim (Frees/ReadsOnly) cannot leak out of the recursion
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void r2(int* p, int n);
@@ -426,7 +431,7 @@ TEST(InterprocLeakTest, MutualRecursionParam_Conservative_Silent) {
 }
 
 TEST(InterprocLeakTest, DeleteWrapper_UAF) {
-    // C++ delete iceren wrapper da Frees
+    // A wrapper containing C++ delete is Frees too
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         void destroy(int* p) { delete p; }

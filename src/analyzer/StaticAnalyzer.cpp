@@ -49,14 +49,16 @@ StaticAnalyzer::StaticAnalyzer(Config config)
 }
 
 StaticAnalyzer::~StaticAnalyzer() {
-    // Global filtre durumu bu analizin omruyle sinirli kalsin: uzun
-    // omurlu surecte (MCP server) filtreli bir kosum sonrakileri sessizce
-    // budamasin. (Testlerde ayni sizinti InterproceduralTest'in 11
-    // testini dusurmustu — ctest'in surec-basina izolasyonu gizliyordu.)
+    // Keep global filter state bounded by this analysis's lifetime: in
+    // a long-lived process (MCP server) a filtered run must not
+    // silently prune later ones. (In tests the same leak broke 11 of
+    // InterproceduralTest's tests — ctest's per-process isolation had
+    // been hiding it.)
     setFunctionFilter({});
     setLineRanges({});
-    // Ayni gerekce cross-TU ozet deposu icin: bir kosunun ozetleri
-    // sonraki kosuya sizmasin (MCP server ayni surecte cok analiz kosar)
+    // Same rationale for the cross-TU summary store: one run's
+    // summaries must not leak into the next (the MCP server runs many
+    // analyses in the same process)
     SummaryRegistry::instance().clearGlobal();
     CfgCache::instance().clear();
 }
@@ -84,21 +86,23 @@ int StaticAnalyzer::run() {
                      std::to_string(source_mgr_->fileCount()),
                      std::to_string(engine_.ruleCount())) << "\n";
 
-    // Kayitli ozetleri yukle (Cross-TU v2): onceki bir kosunun hasadi
-    // depoya katilir — tek dosya, tum-proje bilgisiyle analiz edilir.
-    // Yukleme hatasi analizi DURDURMAZ ama sessiz de gecmez: ozetsiz
-    // kosu daha az bulgu verir, kullanici bunu bilmeli.
+    // Load saved summaries (Cross-TU v2): a previous run's harvest is
+    // merged into the store — a single file is analyzed with
+    // whole-project knowledge. A load failure does NOT stop the
+    // analysis, but it does not pass silently either: a summary-less
+    // run yields fewer findings, and the user must know that.
     if (!config_.summaryIn().empty()) {
         auto& registry = SummaryRegistry::instance();
         if (registry.loadGlobal(config_.summaryIn())) {
             std::cerr << msg(MsgId::SummariesLoaded,
                              std::to_string(registry.globalSize()),
                              config_.summaryIn()) << "\n";
-            // Tazelik: analiz edilen bir kaynak ozet dosyasindan YENIYSE
-            // ozetler o dosya icin bayat olabilir — analiz durmaz
-            // (muhafazakar yon: bayat ozet en fazla eksik/ekstra iddia
-            // tasir, dogrulugu anahtar degil) ama kullanici tazelemeyi
-            // bilmeli. Yalniz uyari, dosya basina degil bir kez.
+            // Freshness: if an analyzed source is NEWER than the
+            // summary file, summaries may be stale for that file — the
+            // analysis does not stop (conservative direction: a stale
+            // summary carries at most missing/extra claims, correctness
+            // is not at stake) but the user must know to refresh.
+            // Warning only, and once, not per file.
             std::error_code ec;
             auto summaryTime = std::filesystem::last_write_time(
                 config_.summaryIn(), ec);
@@ -120,10 +124,10 @@ int StaticAnalyzer::run() {
         }
     }
 
-    // Whole-program modu (Ufuk 2): 1. gecis tum TU'lardan harici
-    // baglantili fonksiyon ozetlerini toplar; 2. gecisteki kurallar
-    // dosyalar arasi cagrilarda Opaque yerine gercek ozeti gorur.
-    // Bedeli ikinci parse'tir — bilincli, bayrakla acilir.
+    // Whole-program mode (Horizon 2): pass 1 collects summaries of
+    // externally-linked functions from all TUs; rules in pass 2 see the
+    // real summary instead of Opaque at cross-file calls. The cost is a
+    // second parse — deliberate, enabled by flag.
     if (config_.wholeProgram()) {
         std::cerr << msg(MsgId::WholeProgramPass,
                          std::to_string(source_mgr_->fileCount())) << "\n";
@@ -136,10 +140,10 @@ int StaticAnalyzer::run() {
         });
     }
 
-    // --summary-out: runAll'in TU basina kurdugu yerel tablodan hasat —
-    // whole-program'in ikinci parse bedeli odenmeden depo dolar
-    // (whole-program modunda ikinci hasat es-degerlerle birlesir,
-    // zararsiz)
+    // --summary-out: harvest from the per-TU local table runAll builds —
+    // the store gets filled without paying whole-program's second-parse
+    // cost (in whole-program mode the second harvest merges with
+    // equivalent values, harmless)
     if (!config_.summaryOut().empty()) engine_.enableGlobalHarvest(true);
 
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
@@ -159,8 +163,9 @@ int StaticAnalyzer::run() {
         }
     }
 
-    // Ayni dosya farkli path'lerle gelebilir (compile DB'de "tests/../x.c"
-    // gibi) — tekillestirme ve baseline anahtarlari icin kanonik path
+    // The same file may arrive under different paths (e.g. "tests/../x.c"
+    // in the compile DB) — canonical path for deduplication and
+    // baseline keys
     for (auto& diag : diagnostics_) {
         if (diag.file.empty()) continue;
         std::error_code ec;
@@ -175,8 +180,8 @@ int StaticAnalyzer::run() {
                   << "\n";
     }
 
-    // Kayit modu: bulgular baseline'a yazilir, raporlama yapilmaz,
-    // temiz cikilir (CI'da baseline uretmek icin)
+    // Record mode: findings are written to the baseline, no reporting,
+    // exit clean (for producing a baseline in CI)
     if (!config_.writeBaselinePath().empty()) {
         if (Baseline::write(config_.writeBaselinePath(), diagnostics_)) {
             std::cerr << msg(MsgId::BaselineWritten,
@@ -208,8 +213,8 @@ int StaticAnalyzer::run() {
 
     std::sort(diagnostics_.begin(), diagnostics_.end());
 
-    // Header'da tanimli fonksiyonlar birden cok TU'da analiz edilir;
-    // ayni bulgu her TU'dan bir kez gelir — tekillestir.
+    // Functions defined in headers are analyzed in multiple TUs; the
+    // same finding arrives once per TU — deduplicate.
     diagnostics_.erase(
         std::unique(diagnostics_.begin(), diagnostics_.end()),
         diagnostics_.end());
