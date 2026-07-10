@@ -1,5 +1,42 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Yol duyarlılığı tüm kurallara: GuardedDisjuncts bileşeni
+
+### Değişen
+- **Disjunkt makinesi ortak şablona çıkarıldı**
+  (`engine/GuardedDisjuncts.h`, header-only): `Guarded<VarMap>` +
+  `GuardedState<VarMap>` + `mergeGuarded` / `flattenGuarded` /
+  `refineGuardedFacts` / `normalizeGuarded` — değer birleştiricisi
+  (mergeVal) parametrik. MemoryLeakRule yerel kopyadan şablona geçti
+  (davranış aynı, 168 test sabit).
+- **UninitPointerRule + NullDerefRule portu**: her iki kural da
+  GuardedState kullanır; NullDeref'te pointer-nullness iyileştirmesi
+  (applyCondition) disjunkt başına ayrıca işlenir — int gerçekleri ve
+  pointer guard'ları aynı fonksiyonda birlikte çalışır. Hedef FP
+  aileleri: uninit-ptr 178 (char_07/08 kalıbı), null-deref 241
+  (int_07/08/09 kalıbı) — gerçek etki bu PR'ın Juliet koşusundan.
+
+### Doğrulama
+- 173/173 test (5 yeni: uninit/null korelasyonlu + karşıt-korelasyonlu +
+  pointer-guard-ile-birlikte)
+- Mini-süit: üçlü guard zinciri (`if(t) malloc; if(t) deref; if(t) free`)
+  tüm kurallarda fp=0, tp korunuyor
+
+### Juliet etkisi (PR #18 koşusu — ölçülen)
+- uninit-ptr FP 178→**80**; null-deref CWE416 gürültüsü FP 241→**129**;
+  CWE476 genel precision 0.446→0.526. Eşlemeli precision'lar 1.000 sabit.
+- Tesadüfi "TP"ler de temizlendi (uninit 47→15, null-deref/416 140→65):
+  `if(staticTrue) data=NULL; if(staticTrue) *data` vakasında "atanmamış
+  olabilir" yanlış gerekçeydi, bad fonksiyona denk geldiği için TP
+  sayılıyordu — asıl kusuru null-deref yakalıyor (139 TP sabit).
+- Kalan FP aileleri üç ilkeli sınıra indi: çağrı-guard'ları (bilinçli
+  anahtarlanmaz), farklı-global çiftleri (değerler TU dışında —
+  cross-TU/Ufuk 2), C++ tmpData yerel alias'ları (yerel alias izleme).
+- Metodoloji notu README'ye eklendi: Juliet good fonksiyonları yalnızca
+  test edilen CWE'den arınmıştır — CWE416 good'undaki memory-leak
+  bulgusu "genel FP" sayılır ama gerçek leak olabilir; sağlam metrik
+  eşlemeli sütunlardır.
+
 ## 2026-07-10 — Hedefli yol duyarlılığı (guard'lı disjunktlar)
 
 ### Teşhis (FP_SAMPLE verisiyle)

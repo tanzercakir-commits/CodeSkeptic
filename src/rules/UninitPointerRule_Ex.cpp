@@ -3,6 +3,7 @@
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
+#include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -108,51 +109,64 @@ using PtrVarState = std::map<const VarDecl*, PtrState>;
 
 class UninitPtrAnalysis {
 public:
-    using State = PtrVarState;
+    // Guard'li disjunktlar (hedefli yol duyarliligi): Juliet char_07
+    // kalibi — `if(staticTrue) data = ...; ... if(staticTrue) use(data);`
+    // — korelasyonsuz analizde sahte "may not be assigned" uretiyordu.
+    // Ortak makine engine/GuardedDisjuncts.h'te.
+    using State = zerodefect::GuardedState<PtrVarState>;
 
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                      std::set<const ValueDecl*> mutatedDecls,
                       std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : funcName_(std::move(funcName)), results_(results) {
+        : mutated_(std::move(mutatedDecls)),
+          funcName_(std::move(funcName)), results_(results) {
+        zerodefect::Guarded<PtrVarState> init;
         for (const auto* var : trackedVars)
-            initState_[var] = PtrState::Uninit;
+            init.vars[var] = PtrState::Uninit;
+        initState_.push_back(std::move(init));
     }
 
     State initialState() const { return initState_; }
 
-    // Degisken basina zincir: Uninit -> MaybeInit -> Init (yukseklik 2)
+    // Degisken basina zincir: Uninit -> MaybeInit -> Init (yukseklik 2);
+    // disjunkt sayisi yukseligi carpar
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(initState_.size()) * 2 + 1;
+        return (static_cast<unsigned>(initState_.front().vars.size()) * 2 +
+                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
     }
 
     State merge(const State& a, const State& b) const {
-        State result = a;
-        for (const auto& [var, stateB] : b) {
-            auto it = result.find(var);
-            if (it == result.end())
-                result[var] = stateB;
-            else
-                it->second = mergePtrStates(it->second, stateB);
-        }
-        return result;
+        return zerodefect::mergeGuarded(a, b, mergePtrStates);
     }
 
     State transfer(const Stmt* stmt, const State& in,
                    ASTContext& /*ctx*/) const {
         Effect effect = classifyStmt(stmt);
         if (effect.kind != EffectKind::Assigns) return in;
-        if (in.find(effect.var) == in.end()) return in;  // izlenmiyor
 
         State out = in;
-        out[effect.var] = PtrState::Init;
+        for (auto& d : out) {
+            auto it = d.vars.find(effect.var);
+            if (it != d.vars.end()) it->second = PtrState::Init;
+        }
         return out;
     }
 
-    void onStatement(const Stmt* stmt, const State& before,
+    void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
+                      ASTContext& /*ctx*/) const {
+        zerodefect::refineGuardedFacts(state, dyn_cast<Expr>(cond),
+                                       isTrueBranch, mutated_,
+                                       mergePtrStates);
+    }
+
+    void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
                      const State& /*after*/, ASTContext& ctx) {
         Effect effect = classifyStmt(stmt);
         if (effect.kind != EffectKind::Dereferences) return;
 
+        PtrVarState before =
+            zerodefect::flattenGuarded(beforeDisjuncts, mergePtrStates);
         auto it = before.find(effect.var);
         if (it == before.end() || it->second == PtrState::Init) return;
 
@@ -189,9 +203,10 @@ public:
     }
 
 private:
+    std::set<const ValueDecl*> mutated_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
-    PtrVarState initState_;
+    State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
 };
 
@@ -215,7 +230,8 @@ public:
         if (trackedVars.empty()) return;
 
         UninitPtrAnalysis analysis(
-            trackedVars, func->getQualifiedNameAsString(), results_);
+            trackedVars, zerodefect::collectMutatedDecls(func),
+            func->getQualifiedNameAsString(), results_);
         zerodefect::runDataflow(func, *result.Context, analysis);
     }
 

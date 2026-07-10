@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -236,33 +237,36 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
 
 class NullDerefAnalysis {
 public:
-    using State = NullVarState;
+    // Guard'li disjunktlar (hedefli yol duyarliligi): Juliet int_07/08/09
+    // kalibi — `if(staticTrue) data = alloc; ... if(staticTrue) *data;`
+    // — korelasyonsuz analizde sahte "may be null" uretiyordu. Ortak
+    // makine engine/GuardedDisjuncts.h'te; pointer nullness iyilestirmesi
+    // (applyCondition) disjunkt basina ayrica islenir.
+    using State = zerodefect::GuardedState<NullVarState>;
 
     NullDerefAnalysis(const std::vector<const VarDecl*>& trackedVars,
+                      std::set<const ValueDecl*> mutatedDecls,
                       std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : funcName_(std::move(funcName)), results_(results) {
+        : mutated_(std::move(mutatedDecls)),
+          funcName_(std::move(funcName)), results_(results) {
+        zerodefect::Guarded<NullVarState> init;
         for (const auto* var : trackedVars)
-            initState_[var] = NullState::Unknown;
+            init.vars[var] = NullState::Unknown;
+        initState_.push_back(std::move(init));
     }
 
     State initialState() const { return initState_; }
 
-    // Degisken basina NullState zinciri en fazla 3 gecis yapar
+    // Degisken basina NullState zinciri en fazla 3 gecis yapar;
+    // disjunkt sayisi yukseligi carpar
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(initState_.size()) * 3 + 1;
+        return (static_cast<unsigned>(initState_.front().vars.size()) * 3 +
+                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
     }
 
     State merge(const State& a, const State& b) const {
-        State result = a;
-        for (const auto& [var, stateB] : b) {
-            auto it = result.find(var);
-            if (it == result.end())
-                result[var] = stateB;
-            else if (it->second != stateB)
-                it->second = mergeNullStates(it->second, stateB);
-        }
-        return result;
+        return zerodefect::mergeGuarded(a, b, mergeNullStates);
     }
 
     State transfer(const Stmt* stmt, const State& in,
@@ -271,22 +275,33 @@ public:
         if (effect.kind != EffectKind::Assign &&
             effect.kind != EffectKind::AssignUnknown)
             return in;
-        if (in.find(effect.var) == in.end()) return in;  // izlenmiyor
 
         State out = in;
-        out[effect.var] = (effect.kind == EffectKind::Assign)
-                              ? effect.value
-                              : NullState::Unknown;
+        for (auto& d : out) {
+            auto it = d.vars.find(effect.var);
+            if (it == d.vars.end()) continue;  // izlenmiyor
+            it->second = (effect.kind == EffectKind::Assign)
+                             ? effect.value
+                             : NullState::Unknown;
+        }
         return out;
     }
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
-        applyCondition(dyn_cast<Expr>(cond), isTrueBranch, state);
+        const auto* condExpr = dyn_cast<Expr>(cond);
+        zerodefect::refineGuardedFacts(state, condExpr, isTrueBranch,
+                                       mutated_, mergeNullStates);
+        for (auto& d : state)
+            applyCondition(condExpr, isTrueBranch, d.vars);
     }
 
-    void onStatement(const Stmt* stmt, const State& before,
-                     const State& after, ASTContext& ctx) {
+    void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
+                     const State& afterDisjuncts, ASTContext& ctx) {
+        NullVarState before =
+            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
+        NullVarState after =
+            zerodefect::flattenGuarded(afterDisjuncts, mergeNullStates);
         // Dataflow izi: null'a / olasi-null'a gecis olaylarini kaydet
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
@@ -364,9 +379,10 @@ private:
         list.push_back(std::move(note));
     }
 
+    std::set<const ValueDecl*> mutated_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
-    NullVarState initState_;
+    State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
@@ -392,7 +408,8 @@ public:
         if (trackedVars.empty()) return;
 
         NullDerefAnalysis analysis(
-            trackedVars, func->getQualifiedNameAsString(), results_);
+            trackedVars, zerodefect::collectMutatedDecls(func),
+            func->getQualifiedNameAsString(), results_);
         zerodefect::runDataflow(func, *result.Context, analysis);
         analysis.attachTraces();
     }
