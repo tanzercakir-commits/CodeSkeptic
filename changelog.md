@@ -1,5 +1,30 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Baseline v2: satır-bağımsız anahtar
+
+### Değişen
+- **Baseline anahtarı artık satır numarası içermiyor**: yerine bulgu
+  satırının kırpılmış METİN içeriğinin FNV-1a 64 hash'i (std::hash
+  değil — baseline repo'ya girer, farklı makinede üretilenle eşleşmek
+  zorunda; FNV platformlar arası sabit). Üste kod eklenip bulgu kayınca
+  baseline geçerli kalır (v1'in bilinen sınırlaması çözüldü); satırın
+  KENDİSİ değişirse bulgu yeniden görünür — bilinçli: değişen satır
+  yeniden gözden geçirilmeli. Kırpma sayesinde salt girinti değişimi
+  tazelemez.
+- **Multiset semantiği**: özdeş satır+mesajlı bulgular SAYIYLA izlenir —
+  iki ayrı `delete p;` satırından birini baseline'a almak diğerini
+  gizlemez (set semantiği ikisini de yutardı; sessiz FN kaynağı olurdu).
+- **Geriye uyum**: v2 dosyası sürümlü başlıkla yazılır; başlıksız eski
+  v1 dosyaları yüklemede tanınır ve eski satır-numaralı anlamıyla
+  eşleşmeye devam eder. filter const kaldı (sayaçlar yerel kopyada
+  tüketilir; tekrarlanan çağrılar bağımsız).
+
+### Doğrulama
+- 201/201 test (ctest + tek-süreç; +6: satır kayması, girinti, değişen
+  satır yeniden görünür, özdeş satır sayacı, v1 uyumu, başlık)
+- CLI dumanı: baseline yazıldı, dosyanın başına 2 satır eklendi,
+  yeniden analiz "1 known finding(s) filtered by baseline → Clean"
+
 ## 2026-07-10 — Cross-TU v2: özetler diske (artımlı whole-program)
 
 ### Eklenen

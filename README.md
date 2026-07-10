@@ -222,8 +222,15 @@ zerodefect src/ --write-baseline .zerodefect-baseline   # record & exit clean
 zerodefect src/ --baseline .zerodefect-baseline         # only NEW findings fail
 ```
 
-Baseline keys include the line number, so refresh the baseline after
-large refactors (known v1 limitation).
+Baseline keys are **line-independent**: instead of the line number they
+hash the (whitespace-trimmed) text of the finding's source line, so
+adding or removing code elsewhere in the file does not invalidate the
+baseline. If the flagged line itself changes, the finding resurfaces as
+new — deliberately, since a changed line deserves a fresh look.
+Identical findings on identical lines are tracked by count, so
+baselining one occurrence never hides a second one. Old (v1,
+line-numbered) baseline files keep working with their original meaning;
+rewrite with `--write-baseline` to migrate.
 
 ### Incremental analysis
 

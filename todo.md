@@ -57,7 +57,8 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       interprosedürel kaynak/lavabo akışı (bilinen v1 sınırı)
 - [x] Korpus bulgu sayılarını sabitle (corpus_expected.txt: cjson 111,
       tinyxml2 9; %10+2 tolerans; sapma = kırmızı = semantik regresyon)
-- [ ] Baseline v2: satır-bağımsız anahtar (mesaj + bağlam hash'i)
+- [x] Baseline v2: satır-bağımsız anahtar (satır içeriği FNV-1a hash'i;
+      multiset sayacı — özdeş bulgular tek tek; v1 dosyaları geriye uyumlu)
 
 ### Kural iyileştirme notları
 - ~~NullDeref çoklu bildirim FN'i~~ — deneyle geçersiz çıktı: ince
