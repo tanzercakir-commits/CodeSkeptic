@@ -1,5 +1,14 @@
 # ZeroDefect — Değişiklik Günlüğü
 
+## 2026-07-10 — Editör entegrasyonu rehberi (sıfır kod)
+
+### Eklenen
+- README'ye "Editor & code-scanning integration" bölümü: VS Code SARIF
+  Viewer akışı (izlerimiz related locations olarak adım adım gezilebilir)
+  ve GitHub code scanning upload-sarif YAML örneği (`|| true` notuyla —
+  bulguda exit 1 veriyoruz, gating'i code scanning yapar). Ekran
+  görüntüsü bu ortamdan alınamadı; metin rehber tam akışı veriyor.
+
 ## 2026-07-10 — HTML rapor (`--html`): UI etabının ilk adımı
 
 ### Eklenen

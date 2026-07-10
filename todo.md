@@ -87,9 +87,10 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       özet kartları = filtre (severity/kural), metin süzme, izler kaynak
       bağlamıyla (`<details>`), koyu/açık tema otomatik. Kaynak satırları
       üretim anında gömülür — rapor taşınabilir.
-- [ ] **Editör entegrasyonu belgesi**: SARIF çıktımız VS Code "SARIF
-      Viewer" ve GitHub code scanning ile bugün çalışıyor — README'ye
-      ekran görüntülü kısa rehber (sıfır kod, hazır kazanım).
+- [x] **Editör entegrasyonu belgesi**: README'ye SARIF rehberi — VS Code
+      SARIF Viewer (izler related locations olarak gezilebilir) + GitHub
+      code scanning upload-sarif YAML örneği. (Ekran görüntüsü bu
+      ortamdan alınamadı — istenirse kullanıcı ekleyebilir.)
 - [ ] **Trend paneli**: haftalık JULIET_RESULT/CORPUS_RESULT satırlarını
       işleyen statik sayfa (GitHub Pages) — F1/precision zaman serisi.
       Skor bekçisinin görsel yüzü.
