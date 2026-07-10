@@ -15,6 +15,7 @@
 #include <clang/ASTMatchers/ASTMatchers.h>
 
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <set>
 #include <vector>
@@ -70,32 +71,12 @@ bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     return false;
 }
 
-bool refersToVar(const Expr* expr, const VarDecl* targetVar) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenImpCasts();
-    if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
-        return ref->getDecl() == targetVar;
-    return false;
-}
-
 const VarDecl* asVar(const Expr* expr) {
     if (!expr) return nullptr;
     expr = expr->IgnoreParenImpCasts();
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
         return dyn_cast<VarDecl>(ref->getDecl());
     return nullptr;
-}
-
-// `&var` bicimindeki arguman: cagrilan fonksiyon pointer'i yeniden
-// atayabilir/serbest birakabilir — izleme burada durur (escape).
-// (Juliet 63x varyanti FP'si: sink(&data) gorunmeyince data Allocated
-// kaliyor ve sahte exit-leak doguyordu.)
-bool isAddrOfVar(const Expr* expr, const VarDecl* targetVar) {
-    if (!expr) return false;
-    expr = expr->IgnoreParenImpCasts();
-    const auto* unary = dyn_cast<UnaryOperator>(expr);
-    if (!unary || unary->getOpcode() != UO_AddrOf) return false;
-    return refersToVar(unary->getSubExpr(), targetVar);
 }
 
 // Dereference tespiti (use-after-free icin). CFG ince taneli oldugundan
@@ -116,66 +97,94 @@ const VarDecl* derefTarget(const Stmt* stmt) {
     return nullptr;
 }
 
-StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
-                         ASTContext& ctx) {
+// Tepe-dugum Effect deseni (UninitPtr'daki gibi): ifade BIR KEZ
+// siniflandirilir ve dokundugu izlenen degiskenlerin etkilerini kendisi
+// soyler — degisken basina yeniden tarama yok. Ince taneli CFG'de her
+// eleman kendi tepe dugumuyle gelir, nested arama gerekmez.
+using StmtEffects = std::vector<std::pair<const VarDecl*, StmtEffect>>;
+
+StmtEffects classifyStmtEffects(const Stmt* stmt,
+                                const std::set<const VarDecl*>& tracked,
+                                ASTContext& ctx) {
+    StmtEffects effects;
+
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (vd == targetVar && vd->hasInit()) {
-                    if (isAllocExpr(vd->getInit(), ctx))
-                        return StmtEffect::Allocates;
-                }
+                if (tracked.count(vd) && vd->hasInit() &&
+                    isAllocExpr(vd->getInit(), ctx))
+                    effects.emplace_back(vd, StmtEffect::Allocates);
             }
         }
-        return StmtEffect::None;
+        return effects;
     }
     if (const auto* binOp = dyn_cast<BinaryOperator>(stmt)) {
         if (binOp->getOpcode() == BO_Assign) {
-            if (refersToVar(binOp->getLHS(), targetVar) &&
+            const VarDecl* lhs = asVar(binOp->getLHS());
+            if (lhs && tracked.count(lhs) &&
                 isAllocExpr(binOp->getRHS(), ctx))
-                return StmtEffect::Allocates;
+                effects.emplace_back(lhs, StmtEffect::Allocates);
         }
+        return effects;
     }
     if (const auto* del = dyn_cast<CXXDeleteExpr>(stmt)) {
-        if (refersToVar(del->getArgument(), targetVar))
-            return StmtEffect::Frees;
+        const VarDecl* var = asVar(del->getArgument());
+        if (var && tracked.count(var))
+            effects.emplace_back(var, StmtEffect::Frees);
+        return effects;
     }
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
         const FunctionDecl* callee = call->getDirectCallee();
-        if (calleeName(callee) == "free" && call->getNumArgs() > 0) {
-            if (refersToVar(call->getArg(0), targetVar))
-                return StmtEffect::Frees;
-        }
-
-        // Interprosedurel: cagrilanin ozeti varsa parametre etkisine gore
-        // siniflandir — free-wrapper'lar Frees (double-free/UAF gorunur),
-        // salt-okur yardimcilar etkisiz (arkalarindaki leak gorunur).
-        // Ayni degisken birden fazla pozisyondaysa en muhafazakari kazanir.
+        const bool isFreeByName = calleeName(callee) == "free";
         const auto* summary =
             zerodefect::SummaryRegistry::instance().lookup(callee);
         using PE = zerodefect::SummaryRegistry::ParamEffect;
-        bool sawFrees = false;
-        bool sawReadsOnly = false;
+
+        // Ayni degisken birden fazla pozisyondaysa en muhafazakari
+        // kazanir: Escapes > Frees > ReadsOnly. &var her zaman Escapes
+        // (cagrilan yeniden atayabilir/serbest birakabilir).
+        struct VarCallEffect { bool escapes = false; bool frees = false; };
+        std::map<const VarDecl*, VarCallEffect> byVar;
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
-            if (isAddrOfVar(call->getArg(i), targetVar))
-                return StmtEffect::Escapes;
-            if (!refersToVar(call->getArg(i), targetVar)) continue;
+            const Expr* arg = call->getArg(i);
+            if (const auto* unary = dyn_cast<UnaryOperator>(
+                    arg->IgnoreParenImpCasts())) {
+                if (unary->getOpcode() == UO_AddrOf) {
+                    const VarDecl* var = asVar(unary->getSubExpr());
+                    if (var && tracked.count(var))
+                        byVar[var].escapes = true;
+                }
+                continue;
+            }
+            const VarDecl* var = asVar(arg);
+            if (!var || !tracked.count(var)) continue;
+            if (isFreeByName && i == 0) {
+                byVar[var].frees = true;
+                continue;
+            }
             PE effect = summary ? summary->paramEffect(i) : PE::Opaque;
             switch (effect) {
                 case PE::Stores:
-                case PE::Opaque:    return StmtEffect::Escapes;
-                case PE::Frees:     sawFrees = true; break;
-                case PE::ReadsOnly: sawReadsOnly = true; break;
+                case PE::Opaque:    byVar[var].escapes = true; break;
+                case PE::Frees:     byVar[var].frees = true; break;
+                case PE::ReadsOnly: byVar[var]; break;  // gorunur ol, etkisiz
             }
         }
-        if (sawFrees) return StmtEffect::Frees;
-        if (sawReadsOnly) return StmtEffect::None;
+        for (const auto& [var, e] : byVar) {
+            if (e.escapes)
+                effects.emplace_back(var, StmtEffect::Escapes);
+            else if (e.frees)
+                effects.emplace_back(var, StmtEffect::Frees);
+            // yalniz-ReadsOnly: etkisiz (leak gorunur kalir)
+        }
+        return effects;
     }
     if (const auto* ret = dyn_cast<ReturnStmt>(stmt)) {
-        if (refersToVar(ret->getRetValue(), targetVar))
-            return StmtEffect::Escapes;
+        const VarDecl* var = asVar(ret->getRetValue());
+        if (var && tracked.count(var))
+            effects.emplace_back(var, StmtEffect::Escapes);
     }
-    return StmtEffect::None;
+    return effects;
 }
 
 // --- Collect tracked pointer variables ---
@@ -332,7 +341,9 @@ public:
                     std::set<const ValueDecl*> mutatedDecls,
                     std::string funcName,
                     zerodefect::DiagnosticList& results)
-        : trackedVars_(trackedVars), mutated_(std::move(mutatedDecls)),
+        : trackedVars_(trackedVars),
+          trackedSet_(trackedVars.begin(), trackedVars.end()),
+          mutated_(std::move(mutatedDecls)),
           funcName_(std::move(funcName)), results_(results) {
         zerodefect::Guarded<VarState> init;
         for (const auto* var : trackedVars_)
@@ -357,11 +368,7 @@ public:
     // gecis olan onStatement icindedir (engine garantisi).
     State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
         // Etkiler state'ten bagimsiz: bir kez siniflandir, her disjunkta uygula
-        std::vector<std::pair<const VarDecl*, StmtEffect>> effects;
-        for (const auto* var : trackedVars_) {
-            StmtEffect effect = classifyStmt(stmt, var, ctx);
-            if (effect != StmtEffect::None) effects.emplace_back(var, effect);
-        }
+        StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
         if (effects.empty()) return in;
 
         State out = in;
@@ -413,8 +420,8 @@ public:
                             zerodefect::MsgId::TraceFreedHere);
         }
 
-        for (const auto* var : trackedVars_) {
-            StmtEffect effect = classifyStmt(stmt, var, ctx);
+        for (const auto& [var, effect] :
+             classifyStmtEffects(stmt, trackedSet_, ctx)) {
             auto it = before.find(var);
             if (it == before.end()) continue;
 
@@ -508,6 +515,7 @@ private:
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
+    std::set<const VarDecl*> trackedSet_;
     std::set<const ValueDecl*> mutated_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
@@ -529,6 +537,10 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         trackedVars, zerodefect::collectMutatedDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
+    if (!dfResult.converged)
+        std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,
+                                     funcDecl->getQualifiedNameAsString())
+                  << "\n";
 
     // Exit block leak check
     auto exitIt = dfResult.blockExitStates.find(dfResult.exitBlockID);

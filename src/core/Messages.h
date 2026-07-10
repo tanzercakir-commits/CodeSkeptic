@@ -48,6 +48,7 @@ enum class MsgId {
     DirScanError,         // {0} = hata mesaji
     UsageError,
     WholeProgramPass,     // {0} = dosya sayisi
+    AnalysisNotConverged, // {0} = fonksiyon adi
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.

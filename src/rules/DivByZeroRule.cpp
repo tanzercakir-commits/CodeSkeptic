@@ -13,6 +13,7 @@
 #include <clang/ASTMatchers/ASTMatchers.h>
 
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <set>
 #include <vector>
@@ -455,7 +456,11 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     DivByZeroAnalysis analysis(
         trackedVars, funcDecl->getQualifiedNameAsString(), results,
         reportedLines);
-    zerodefect::runDataflow(funcDecl, ctx, analysis);
+    auto df = zerodefect::runDataflow(funcDecl, ctx, analysis);
+    if (!df.converged)
+        std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,
+                                     funcDecl->getQualifiedNameAsString())
+                  << "\n";
     analysis.attachTraces();
 }
 

@@ -112,6 +112,11 @@ const MsgEntry kMessages[] = {
     // WholeProgramPass
     {"[ZeroDefect] Whole-program pass: collecting summaries from {0} file(s)...",
      "[ZeroDefect] Tum-program gecisi: {0} dosyadan ozetler toplaniyor..."},
+    // AnalysisNotConverged
+    {"[ZeroDefect] warning: dataflow did not converge in '{0}' "
+     "(iteration cap hit); findings in this function may be incomplete",
+     "[ZeroDefect] uyari: '{0}' icinde dataflow yakinsamadi (iterasyon "
+     "tavani); bu fonksiyondaki bulgular eksik olabilir"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
