@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Maliyet dengesi: ayni ref'e ust uste push eski kosumu iptal eder
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-24.04

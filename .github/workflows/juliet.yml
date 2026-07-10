@@ -13,6 +13,7 @@ on:
   schedule:
     - cron: "0 5 * * 1"  # pazartesi 05:00 UTC
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/juliet.yml"
       - "scripts/run_juliet.sh"
@@ -22,8 +23,17 @@ on:
       - "tests/**"
       - "CMakeLists.txt"
 
+# Maliyet dengesi: ayni ref'e ust uste push eski kosumu iptal eder
+concurrency:
+  group: juliet-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   juliet:
+    # Draft'ta kosma: PR basina bekci bir kez, ready aninda calisir
+    # (build-and-test her push'ta kaliyor — hizli cekirdek sinyal).
+    if: github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
