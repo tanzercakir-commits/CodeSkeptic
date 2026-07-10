@@ -317,3 +317,19 @@ TEST(NullDerefPathSensitivityTest, PointerGuardStillWorks_WithFacts) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(NullDerefRuleTest, MultiDeclaration_SecondPointerTracked) {
+    // Eski "bilinen FN" notu gecersiz cikti: ince taneli CFG coklu
+    // bildirimi degisken basina sentetik DeclStmt'lere boler — ikinci
+    // pointer da izlenir. Regresyon testi olarak sabitlendi.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int *a = nullptr, *b = nullptr;
+            int x = *b;
+            (void)x; (void)a;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
