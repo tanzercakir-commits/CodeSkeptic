@@ -196,3 +196,35 @@ TEST(UninitPointerRuleExTest, NestedIf_DeepMerge) {
     // Sadece x && y && z path'inde init var, diğer 7 path'te uninit
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- Hedefli yol duyarliligi (GuardedDisjuncts) ---
+
+TEST(UninitPtrPathSensitivityTest, CorrelatedGuards_InitUse_Clean) {
+    // Juliet char_07 kalibi: init ve kullanim ayni degismez kosul altinda
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int flag;
+        void f() {
+            int v = 1;
+            int* data;
+            if (flag == 5) data = &v;
+            if (flag == 5) { int x = *data; (void)x; }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(UninitPtrPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
+    // Init yanlis dalda: flag!=5 yolunda data init'siz dereference edilir
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int flag;
+        void f() {
+            int v = 1;
+            int* data;
+            if (flag == 5) data = &v;
+            if (flag != 5) { int x = *data; (void)x; }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}

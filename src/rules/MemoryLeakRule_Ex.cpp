@@ -4,7 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
-#include "engine/PathFacts.h"
+#include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -313,80 +313,13 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
 // Juliet FP avi (2026-07-10) tek kok neden gosterdi: ayni degismez
 // kosul iki kez test edildiginde ("if(g==5) alloc; ... if(g==5) free;")
 // join'de yollar karisiyor ve "alloc olup free olmayan yol" hayaleti
-// doguyordu. State artik az sayida (kosul-gercekleri, var-durumlari)
-// cifti halinde tutulur; ikinci testte celisen disjunkt dusurulur.
-// Motor degisikligi GEREKMEDI: State duck-typed oldugu icin disjunktif
-// lattice tamamen analiz icinde yasiyor.
+// doguyordu. Ortak makine engine/GuardedDisjuncts.h'te — burada yalnizca
+// AllocState birlestiricisiyle somutlanir.
 
-struct Disjunct {
-    std::map<zerodefect::FactKey, bool> facts;
-    VarState vars;
+using DisjunctState = zerodefect::GuardedState<VarState>;
 
-    bool operator==(const Disjunct& o) const {
-        return facts == o.facts && vars == o.vars;
-    }
-    bool operator<(const Disjunct& o) const {
-        if (facts != o.facts) return facts < o.facts;
-        return vars < o.vars;
-    }
-};
-
-using DisjunctState = std::vector<Disjunct>;
-
-// Disjunkt tavani: asilirsa tek disjunkta genisletilir (widening) —
-// bugunku davranisa (tam join) geri dusus. Kucuk tutulur: hedef,
-// genel yol duyarliligi degil, korelasyonlu guard kalibi.
-constexpr size_t kMaxDisjuncts = 4;
-
-void mergeVarStates(VarState& into, const VarState& from) {
-    for (const auto& [var, s] : from) {
-        auto it = into.find(var);
-        if (it == into.end())
-            into[var] = s;
-        else
-            it->second = mergeAllocStates(it->second, s);
-    }
-}
-
-// Raporlama gorunumu: tum disjunktlarin pointwise birlesimi. Bugunku
-// tek-state davranisinin birebir karsiligi — raporlama mantigi degismez.
 VarState flattenState(const DisjunctState& state) {
-    VarState out;
-    for (const auto& d : state) mergeVarStates(out, d.vars);
-    return out;
-}
-
-// Kanonik form: sirali, ayni-facts disjunktlar birlesik, tavan asiminda
-// genisletilmis. Motorun != karsilastirmasi icin sira kararliligi sart.
-void normalizeDisjuncts(DisjunctState& state) {
-    std::sort(state.begin(), state.end());
-    DisjunctState merged;
-    for (auto& d : state) {
-        if (!merged.empty() && merged.back().facts == d.facts)
-            mergeVarStates(merged.back().vars, d.vars);
-        else
-            merged.push_back(std::move(d));
-    }
-    state = std::move(merged);
-
-    if (state.size() > kMaxDisjuncts) {
-        Disjunct widened = std::move(state.front());
-        for (size_t i = 1; i < state.size(); ++i) {
-            // Ortak gercekler kesisir (uyusmayan anahtar dusulur)
-            for (auto it = widened.facts.begin();
-                 it != widened.facts.end();) {
-                auto found = state[i].facts.find(it->first);
-                if (found == state[i].facts.end() ||
-                    found->second != it->second)
-                    it = widened.facts.erase(it);
-                else
-                    ++it;
-            }
-            mergeVarStates(widened.vars, state[i].vars);
-        }
-        state.clear();
-        state.push_back(std::move(widened));
-    }
+    return zerodefect::flattenGuarded(state, mergeAllocStates);
 }
 
 // --- Analysis struct for DataflowEngine ---
@@ -401,7 +334,7 @@ public:
                     zerodefect::DiagnosticList& results)
         : trackedVars_(trackedVars), mutated_(std::move(mutatedDecls)),
           funcName_(std::move(funcName)), results_(results) {
-        Disjunct init;
+        zerodefect::Guarded<VarState> init;
         for (const auto* var : trackedVars_)
             init.vars[var] = AllocState::None;
         initState_.push_back(std::move(init));
@@ -413,14 +346,11 @@ public:
     // disjunkt sayisi yukseligi carpar (her disjunkt ayri yukselebilir)
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
-                   static_cast<unsigned>(kMaxDisjuncts) + 4;
+                   static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
     }
 
     State merge(const State& a, const State& b) const {
-        State result = a;
-        result.insert(result.end(), b.begin(), b.end());
-        normalizeDisjuncts(result);
-        return result;
+        return zerodefect::mergeGuarded(a, b, mergeAllocStates);
     }
 
     // Saf state gecisi — rapor uretmez. Raporlama, fixpoint sonrasi
@@ -454,22 +384,8 @@ public:
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-
-        // Kosul anahtarlanabiliyorsa: celisen disjunktlar bu kenarda
-        // olanaksizdir (dusur), kalanlara gercek islenir.
-        if (auto fact = zerodefect::conditionFact(condExpr, mutated_)) {
-            const bool value = isTrueBranch ? fact->second : !fact->second;
-            State kept;
-            for (auto& d : state) {
-                auto it = d.facts.find(fact->first);
-                if (it != d.facts.end() && it->second != value) continue;
-                d.facts[fact->first] = value;
-                kept.push_back(std::move(d));
-            }
-            state = std::move(kept);
-            normalizeDisjuncts(state);
-        }
-
+        zerodefect::refineGuardedFacts(state, condExpr, isTrueBranch,
+                                       mutated_, mergeAllocStates);
         for (auto& d : state)
             applyNullCondition(condExpr, isTrueBranch, d.vars);
     }

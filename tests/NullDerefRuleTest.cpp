@@ -266,3 +266,54 @@ TEST(NullDerefRuleTest, OpaqueFunctionReturn_Silent) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- Hedefli yol duyarliligi (GuardedDisjuncts) ---
+
+TEST(NullDerefPathSensitivityTest, CorrelatedGuards_AssignDeref_Clean) {
+    // Juliet int_07/08/09 kalibi: atama ve dereference ayni degismez
+    // kosul altinda — "may be null" FP'si dogmamali
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int flag;
+        void f() {
+            int v = 1;
+            int* data = nullptr;
+            if (flag) data = &v;
+            if (flag) { int x = *data; (void)x; }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(NullDerefPathSensitivityTest, AntiCorrelatedGuards_ErrorStays) {
+    // Dereference yanlis dalda: flag==0 yolunda data kesin null
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int flag;
+        void f() {
+            int v = 1;
+            int* data = nullptr;
+            if (flag) data = &v;
+            if (!flag) { int x = *data; (void)x; }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(NullDerefPathSensitivityTest, PointerGuardStillWorks_WithFacts) {
+    // Int gercekleri pointer nullness iyilestirmesiyle birlikte calisir:
+    // hem flag korelasyonu hem if(p) guard'i ayni fonksiyonda
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int flag;
+        int* make();
+        void f() {
+            int v = 1;
+            int* data = nullptr;
+            if (flag) data = &v;
+            if (data) { int x = *data; (void)x; }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
