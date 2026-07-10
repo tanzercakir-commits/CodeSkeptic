@@ -255,3 +255,23 @@ TEST(DivByZeroRuleTest, NoDivision_Clean) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(DivByZeroTraceTest, GuardOnlyZero_TraceShowsCondition) {
+    // Iz v2: `if (n == 0) 100 / n` bulgusunun "neden sifir" cevabi
+    // kosul noktasindaki guard notu
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int n) {
+            if (n == 0) {
+                return 100 / n;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    ASSERT_FALSE(results[0].notes.empty());
+    EXPECT_NE(results[0].notes[0].message.find("zero on this branch"),
+              std::string::npos);
+    EXPECT_LT(results[0].notes[0].line, results[0].line);
+}

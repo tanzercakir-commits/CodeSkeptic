@@ -250,6 +250,26 @@ public:
             applyCondition(condExpr, isTrueBranch, d.vars);
     }
 
+    // Guard izi (Iz v2): raporlama gecisinde, kenar iyilestirmesi bir
+    // degiskeni KESIN null yaptiysa kosul noktasina iz notu dusulur —
+    // `if (p == 0) { *p }` bulgusunun "neden null" sorusu artik cevapli
+    // (atama olmadan, salt guard'dan gelen null onceden izsizdi).
+    void onEdgeRefined(const Stmt* cond, bool /*isTrueBranch*/,
+                       const State& beforeDisjuncts,
+                       const State& afterDisjuncts, ASTContext& ctx) {
+        NullVarState before =
+            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
+        NullVarState after =
+            zerodefect::flattenGuarded(afterDisjuncts, mergeNullStates);
+        for (const auto& [var, afterState] : after) {
+            auto b = before.find(var);
+            if (b == before.end() || b->second == afterState) continue;
+            if (afterState == NullState::Null)
+                recordEvent(cond, var, ctx,
+                            zerodefect::MsgId::TraceAssumedNullHere);
+        }
+    }
+
     void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
                      const State& afterDisjuncts, ASTContext& ctx) {
         NullVarState before =

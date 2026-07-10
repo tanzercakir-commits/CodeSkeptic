@@ -75,8 +75,9 @@ Juliet'in CI ağırlığı, proje adı kontrolü.
       "yalnızca dokunulan fonksiyonları analiz et" döngüsü)
 - [x] Bulgulara dataflow izi (TraceNote; konsol/JSON/SARIF relatedLocations)
 - [x] MCP server modu (--serve; initialize / tools/list / tools/call analyze)
-- [ ] İz v2: guard/refine olayları da eklensin (kenar olayları onStatement'ta
-      görünmüyor — motor desteği gerekir)
+- [x] İz v2: guard/refine olayları izlerde (onEdgeRefined motor kancası —
+      yalnız raporlama geçişinde, yalnız state değiştiren kenarlarda;
+      NullDeref "bu dalda null", DivByZero "bu dalda sıfır" notları)
 - [x] MCP v2: sıcak süreçte AST/derleme önbelleği (yol+build-path anahtarı,
       boyut+mtime parmak izi — bayat AST asla servis edilmez; yalnız MCP
       yolunda açık, CLI kapalı; tekrar çağrıda ~6x hız)

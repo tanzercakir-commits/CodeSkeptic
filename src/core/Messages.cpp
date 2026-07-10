@@ -134,6 +134,12 @@ const MsgEntry kMessages[] = {
     // TraceAssignedMaybeZeroHere
     {"'{0}' assigned a possibly-zero value here (callee may return zero)",
      "{0} burada sifir olabilecek bir deger atandi (cagrilan sifir donebilir)"},
+    // TraceAssumedNullHere
+    {"'{0}' is null on this branch (per this condition)",
+     "{0} bu dalda null (buradaki kosula gore)"},
+    // TraceAssumedZeroHere
+    {"'{0}' is zero on this branch (per this condition)",
+     "{0} bu dalda sifir (buradaki kosula gore)"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

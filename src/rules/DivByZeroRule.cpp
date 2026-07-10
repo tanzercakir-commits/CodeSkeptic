@@ -305,6 +305,21 @@ public:
         applyCondition(dyn_cast<Expr>(cond), isTrueBranch, state);
     }
 
+    // Guard izi (Iz v2): kenar iyilestirmesi degiskeni KESIN sifir
+    // yaptiysa kosul noktasina iz notu — `if (n == 0) 100 / n`
+    // bulgusunun "neden sifir" sorusu artik cevapli
+    void onEdgeRefined(const Stmt* cond, bool /*isTrueBranch*/,
+                       const State& before, const State& after,
+                       ASTContext& ctx) {
+        for (const auto& [var, afterState] : after) {
+            auto b = before.find(var);
+            if (b == before.end() || b->second == afterState) continue;
+            if (afterState == ZeroState::Zero)
+                recordEvent(cond, var, ctx,
+                            zerodefect::MsgId::TraceAssumedZeroHere);
+        }
+    }
+
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
         // Dataflow izi: sifira / olasi-sifira gecis olaylarini kaydet

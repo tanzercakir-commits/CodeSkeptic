@@ -54,6 +54,8 @@ enum class MsgId {
     SummaryLoadError,     // {0} = dosya yolu
     SummarySaveError,     // {0} = dosya yolu
     TraceAssignedMaybeZeroHere, // {0} = degisken adi (ozet: 0 donebilir)
+    TraceAssumedNullHere,       // {0} = degisken adi (guard: bu dalda null)
+    TraceAssumedZeroHere,       // {0} = degisken adi (guard: bu dalda sifir)
 };
 
 // {0} ve {1} yer tutucularini argumanlarla degistirir.

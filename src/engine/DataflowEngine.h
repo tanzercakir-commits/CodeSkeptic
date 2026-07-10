@@ -50,6 +50,18 @@ struct HasRefineOnEdge<A, std::void_t<decltype(
         std::declval<typename A::State&>(),
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
+template <typename A, typename = void>
+struct HasOnEdgeRefined : std::false_type {};
+
+template <typename A>
+struct HasOnEdgeRefined<A, std::void_t<decltype(
+    std::declval<A>().onEdgeRefined(
+        std::declval<const clang::Stmt*>(),
+        bool{},
+        std::declval<const typename A::State&>(),
+        std::declval<const typename A::State&>(),
+        std::declval<clang::ASTContext&>()))>> : std::true_type {};
+
 } // namespace detail
 
 template <typename Analysis>
@@ -86,9 +98,13 @@ DataflowResult<Analysis> runDataflow(
 
     // Predecessor exit state'lerinden blok giris state'ini hesaplar
     // (assume-edge iyilestirmesi dahil). Hem worklist fazinda hem
-    // raporlama gecisinde ayni mantik kullanilir.
+    // raporlama gecisinde ayni mantik kullanilir. `reporting` yalnizca
+    // raporlama gecisinde true'dur: analiz onEdgeRefined sagliyorsa,
+    // iyilestirmenin state'i GERCEKTEN degistirdigi kenarlarda cagrilir
+    // — guard izleri boyle dogar. Faz 1'de cagrilmaz (erken state'le
+    // sahte olay uretirdi; onStatement'in fixpoint kuralinin aynisi).
     auto computeEntryState = [&](const clang::CFGBlock* block,
-                                 bool& hasPreds) -> State {
+                                 bool& hasPreds, bool reporting) -> State {
         State entryState = analysis.initialState();
         hasPreds = false;
         bool firstPred = true;
@@ -115,13 +131,28 @@ DataflowResult<Analysis> runDataflow(
                         ++succIt;
                         const clang::CFGBlock* falseSucc =
                             succIt->getReachableBlock();
-                        if (trueSucc != falseSucc) {
-                            if (block == trueSucc)
-                                analysis.refineOnEdge(cond, true,
+                        if (trueSucc != falseSucc &&
+                            (block == trueSucc || block == falseSucc)) {
+                            const bool edgeIsTrue = (block == trueSucc);
+                            if constexpr (
+                                detail::HasOnEdgeRefined<Analysis>::value) {
+                                if (reporting) {
+                                    State beforeRefine = predState;
+                                    analysis.refineOnEdge(cond, edgeIsTrue,
+                                                          predState, ctx);
+                                    if (predState != beforeRefine)
+                                        analysis.onEdgeRefined(
+                                            cond, edgeIsTrue, beforeRefine,
+                                            predState, ctx);
+                                } else {
+                                    analysis.refineOnEdge(cond, edgeIsTrue,
+                                                          predState, ctx);
+                                }
+                            } else {
+                                (void)reporting;
+                                analysis.refineOnEdge(cond, edgeIsTrue,
                                                       predState, ctx);
-                            else if (block == falseSucc)
-                                analysis.refineOnEdge(cond, false,
-                                                      predState, ctx);
+                            }
                         }
                     }
                 }
@@ -153,7 +184,8 @@ DataflowResult<Analysis> runDataflow(
         worklist.pop();
 
         bool hasPreds = false;
-        State entryState = computeEntryState(block, hasPreds);
+        State entryState = computeEntryState(block, hasPreds,
+                                             /*reporting=*/false);
         if (!hasPreds && block != &cfg->getEntry()) continue;
 
         State currentState = entryState;
@@ -192,7 +224,8 @@ DataflowResult<Analysis> runDataflow(
             if (!block) continue;
 
             bool hasPreds = false;
-            State entryState = computeEntryState(block, hasPreds);
+            State entryState = computeEntryState(block, hasPreds,
+                                                 /*reporting=*/true);
             if (!hasPreds && block != &cfg->getEntry()) continue;
 
             State currentState = entryState;
