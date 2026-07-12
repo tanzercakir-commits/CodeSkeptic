@@ -20,9 +20,12 @@
   decision (the Coverity kill-path model approach).
 - shadPS4 measured effect: 209 findings (round 1 start) → 195 after the
   call-boundary fixes (all 6 error-level FPs gone; the 3 remaining
-  errors are exactly the 3 real bugs). The
-  `--fatal-asserts assert_fail_impl` recount runs as this entry is
-  written — the measured number lands in a follow-up commit.
+  errors are exactly the 3 real bugs) → **97** with
+  `--fatal-asserts assert_fail_impl`. The ime_ui/ime_dialog_ui flood
+  (72 findings) vanished entirely; both div-by-zero warnings
+  (ASSERT_MSG-guarded folds) died with it. Largest remaining cluster is
+  the 25 repeats of the real internal__Foprep bug — the report-flood
+  dedup item in todo.md, not an FP.
 
 ### Verification
 - 263/263 tests (ctest + single-process; +7 FatalCallsTest: kill on
