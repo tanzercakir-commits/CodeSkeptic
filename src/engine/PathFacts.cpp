@@ -64,6 +64,20 @@ const ValueDecl* stableDeclRef(
     expr = expr->IgnoreParenImpCasts();
     const auto* ref = dyn_cast<DeclRefExpr>(expr);
     if (!ref) return nullptr;
+    // A non-type template parameter is a compile-time constant — the
+    // MOST stable key there is: it cannot be assigned or
+    // address-taken within the instantiation. Uninstantiated
+    // templates present `if constexpr (FUSE_OP == ...)` as an
+    // ordinary runtime branch, and the same-condition correlation
+    // (set under the flag, used under the flag) needs the key (the
+    // llama.cpp ggml rms_norm FP family, 2026-07-12).
+    if (const auto* ntp =
+            dyn_cast<NonTypeTemplateParmDecl>(ref->getDecl())) {
+        if (ntp->getType()->isIntegerType() ||
+            ntp->getType()->isEnumeralType())
+            return ntp;
+        return nullptr;
+    }
     const auto* vd = dyn_cast<VarDecl>(ref->getDecl());
     // Only variables (not function calls/enum constants) and only
     // integer-typed ones: pointer truthiness is null-refinement's

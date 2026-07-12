@@ -1,5 +1,34 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — llama triage round: mutation visibility + template-parameter facts
+
+### Changed
+- **DivByZeroRule sees `++z` / `z--` / `z += n`**: increments,
+  decrements and compound assignments now invalidate the zeroness
+  fact (were completely invisible — a counter initialized to 0 stayed
+  "definitely zero" forever). The llama.cpp ngram-cache
+  `++n_done; ... x / n_done` was reported as a CERTAIN division by
+  zero on a line that can never divide by zero.
+- **Non-type template parameters are fact keys** (stableDeclRef):
+  they are compile-time constants — unassignable, unaliasable — yet
+  uninstantiated `if constexpr (FUSE == ...)` reads as a runtime
+  branch, so "set under the flag, used under the flag" needs the
+  same-condition correlation like any flow variant. The llama.cpp
+  ggml rms_norm fused-op family (src1 set and used under the same
+  FUSE check) reported a certain null dereference.
+
+### Results
+- llama.cpp 25 -> 23 findings and — more importantly — ERROR-level
+  findings 2 -> 0: both "certain crash" claims were analyzer gaps,
+  found and killed during hand-triage before any upstream report was
+  drafted. The triage-before-reporting discipline paid for itself.
+
+### Verification
+- 329/329 tests in both modes (+5: incremented/compound counters
+  clean, untouched zero still a definite error, template-param
+  same-guard clean, different-guards still warns).
+- Juliet floors and corpus pins green (fresh replays).
+
 ## 2026-07-12 — Comparator-ladder case exhaustion (libgit2 triage round)
 
 ### Changed

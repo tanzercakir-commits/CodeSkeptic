@@ -137,12 +137,24 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
         if (binOp->getOpcode() == BO_Assign &&
             refersToVar(binOp->getLHS(), targetVar))
             return effectOfValue(evaluateAssignedValue(binOp->getRHS()));
+        // Compound assignments (`z += n`) change the value too —
+        // without this a counter initialized to 0 stayed "definitely
+        // zero" forever (the llama.cpp ngram-cache FP: `++n_done; ...
+        // x / n_done` was reported as certain division by zero).
+        if (binOp->isCompoundAssignmentOp() &&
+            refersToVar(binOp->getLHS(), targetVar))
+            return StmtEffect::AssignsUnknown;
         return StmtEffect::None;
     }
     // `f(&z)` may store into z: the fact is gone. The fine-grained CFG
     // presents the AddrOf as its own element.
     if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
         if (unary->getOpcode() == UO_AddrOf &&
+            refersToVar(unary->getSubExpr(), targetVar))
+            return StmtEffect::AssignsUnknown;
+        // `++z` / `z--`: the same visibility gap as compound
+        // assignment.
+        if (unary->isIncrementDecrementOp() &&
             refersToVar(unary->getSubExpr(), targetVar))
             return StmtEffect::AssignsUnknown;
         return StmtEffect::None;
