@@ -16,6 +16,7 @@ add_executable(zerodefect_tests
     SarifReporterTest.cpp
     HtmlReporterTest.cpp
     CfgCacheTest.cpp
+    FatalCallsTest.cpp
     SummaryDiffTest.cpp
     SuppressionFilterTest.cpp
     BaselineTest.cpp

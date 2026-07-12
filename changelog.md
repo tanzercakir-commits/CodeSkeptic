@@ -1,5 +1,40 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — shadPS4 round 2: --fatal-asserts (assert-opacity flood)
+
+### Added
+- **`--fatal-asserts <names>`** (CLI + `fatal_asserts` conf key): treat
+  the listed functions as never returning even though their
+  declarations lack `[[noreturn]]`. Engine-level kill: a dataflow path
+  ends at a call to a registered name — the block's exit state is never
+  recorded (phase 1) and nothing after the call is reported (phase 2),
+  exactly as if the CFG had pruned it. Registry cleared in
+  ~StaticAnalyzer (MCP-server safety, same lifecycle as the function
+  filter).
+- Why: projects with continue-able assert machinery (shadPS4's
+  `assert_fail_impl` — "sometimes we want to try to continue") defeat
+  the CFG's noreturn pruning; the failure path survives every
+  `ASSERT(x)` and each later dereference warns. ~170 of shadPS4's
+  findings were this one pattern. The default stays EMPTY — assuming
+  termination the code does not promise is a per-project, deliberate
+  decision (the Coverity kill-path model approach).
+- shadPS4 measured effect: 209 findings (round 1 start) → 195 after the
+  call-boundary fixes (all 6 error-level FPs gone; the 3 remaining
+  errors are exactly the 3 real bugs) → **97** with
+  `--fatal-asserts assert_fail_impl`. The ime_ui/ime_dialog_ui flood
+  (72 findings) vanished entirely; both div-by-zero warnings
+  (ASSERT_MSG-guarded folds) died with it. Largest remaining cluster is
+  the 25 repeats of the real internal__Foprep bug — the report-flood
+  dedup item in todo.md, not an FP.
+
+### Verification
+- 263/263 tests (ctest + single-process; +7 FatalCallsTest: kill on
+  null/zero/leak paths, dead-code non-reporting, unregistered-name
+  no-op pin, registry-cleanup pin). Corpus pins unchanged with the
+  default-empty registry (cjson 123, tinyxml2 9 — measured locally).
+  Juliet floors referee in CI (no fatal names registered there — zero
+  expected drift).
+
 ## 2026-07-12 — shadPS4 FP hunt round 1: call-boundary soundness
 
 ### Changed

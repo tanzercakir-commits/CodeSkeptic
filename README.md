@@ -193,6 +193,11 @@ zerodefect <source_path> [options]
                          plain or qualified names; repeatable)
   --lines <N-M,K>        Analyze only functions overlapping these line
                          ranges of the analyzed file
+  --fatal-asserts <names> Treat these functions as never returning
+                         (comma list). For projects whose assert-failure
+                         handler deliberately lacks [[noreturn]]: kills
+                         the failure path so guarded code stops warning
+                         (e.g. --fatal-asserts assert_fail_impl)
   --whole-program        Two-pass mode: collect function summaries
                          across all files first, then analyze
   --summary-out <file>   Save harvested cross-file summaries to a file
@@ -204,7 +209,8 @@ zerodefect <source_path> [options]
 
 Options can also be set in a `.zerodefect.conf` file (`key=value` lines:
 `source_path`, `build_path`, `output_format`, `json_output`,
-`sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`).
+`sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
+`function`, `fatal_asserts`).
 
 ### Suppressing findings
 
