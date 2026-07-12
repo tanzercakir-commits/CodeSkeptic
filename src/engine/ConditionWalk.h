@@ -86,6 +86,29 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
     if (!cond) return;
     cond = cond->IgnoreParenImpCasts();
 
+    // __builtin_expect(x, c) is branch-semantics-transparent: real-world
+    // likely()/unlikely() macros (absl ABSL_PREDICT_*, the Linux kernel)
+    // wrap REAL conditions in it. Without looking through it the edge
+    // refinement is lost — worse, the short-circuit value blocks INSIDE
+    // the call still refine, so a "null" fact born there leaks past the
+    // un-refined if-edge (the abseil ABSL_RAW_CHECK false-positive
+    // family, 2026-07-12).
+    if (const auto* call = llvm::dyn_cast<clang::CallExpr>(cond)) {
+        if (const auto* callee = call->getDirectCallee()) {
+            if (const auto* id = callee->getIdentifier()) {
+                const llvm::StringRef name = id->getName();
+                if ((name == "__builtin_expect" ||
+                     name == "__builtin_expect_with_probability") &&
+                    call->getNumArgs() >= 1) {
+                    walkCondition(call->getArg(0), isTrue,
+                                  std::forward<TruthFn>(onTruth),
+                                  std::forward<CompareFn>(onCompare));
+                    return;
+                }
+            }
+        }
+    }
+
     if (const clang::VarDecl* var = d::asVar(cond)) {
         onTruth(var, isTrue);
         return;

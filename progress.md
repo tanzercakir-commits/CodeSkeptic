@@ -30,7 +30,7 @@
 | CMake build system | `CMakeLists.txt`, `src/CMakeLists.txt` | Done (Linux + macOS) |
 | CfgCache | `src/engine/CfgCache.h`, `.cpp` | Done (one CFG per function; TU-end cleanup + ctx-change safety) |
 | SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Done (--summary-diff; WEAKENED = exit 1 CI gate) |
-| GTest infrastructure | `tests/` | Done (228/228; ctest + single-process) |
+| GTest infrastructure | `tests/` | Done (237/237; ctest + single-process) |
 | CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
 | Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |

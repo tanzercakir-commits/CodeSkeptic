@@ -1,5 +1,39 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Abseil FP hunt: three real-world false-positive families fixed
+
+### Changed
+- **Scanned abseil-cpp** (159 files, ~1m50s, zero crashes): 40 findings,
+  all warnings, triaged by hand. Three FP families found and fixed:
+  1. **`__builtin_expect` transparency** (ConditionWalk): ABSL_RAW_CHECK
+     wraps a negated conjunction in `__builtin_expect`; the short-circuit
+     value blocks inside the call refine "null" facts, and without
+     looking through the builtin the if-edges could not correct them —
+     the fact leaked into the continue path (8 findings from ONE check).
+     Applies to every likely()/unlikely() macro in the wild. The flip
+     side is pinned too: a non-terminating failure branch still warns.
+  2. **Static/global storage exempt from end-of-function leak**
+     (MemoryLeakRule): `static Mutex* mu = new Mutex;` is the deliberate
+     leak-on-purpose singleton (destruction-order fiasco dodge) —
+     program-long lifetime is not a function-local leak.
+  3. **Member-assign and method-receiver escapes** (MemoryLeakRule):
+     `slot_ = copy;` and `p->Track()` outlive/stash the pointer.
+     Local-to-local copies deliberately stay non-escaping (Juliet's
+     `dataCopy = data;` alias leaks must remain visible) and UAF through
+     a receiver is unaffected (pre-call state check) — both pinned.
+- Result: 40 → **12 findings** on abseil; the rest are invariant-checked
+  ("a thread identity exists, see above") or genuinely worth a look.
+- **abseil added to the corpus guard** (tag 20260526.0, pin 12) — deep
+  mode only (`CORPUS_DEEP=1`, weekly cron; ~2.5 min stays out of PR
+  runs for CI cost balance). run_corpus gained a compile-DB-driven `db`
+  mode; cjson/tinyxml2 keep their original scan mode and pins.
+
+### Verification
+- 237/237 tests (ctest + single-process; +8 AbseilFpTest FP-killers and
+  flip-side pins). Corpus pins (cjson/tinyxml2) and Juliet floors
+  referee the rule changes in CI — if the member-escape change moves
+  pinned numbers, the pins get updated in that same PR with rationale.
+
 ## 2026-07-10 — Summary-diff v1: contract change report (semantic regression gate)
 
 ### Added

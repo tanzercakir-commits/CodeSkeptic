@@ -126,6 +126,19 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             if (lhs && tracked.count(lhs) &&
                 isAllocExpr(binOp->getRHS(), ctx))
                 effects.emplace_back(lhs, StmtEffect::Allocates);
+
+            // Storing a tracked pointer into something that outlives the
+            // local scope is an escape: a class member (`slot_ = copy;`,
+            // the abseil CrcCordState pattern), a global, a deref/array
+            // target. A plain LOCAL-to-local copy is deliberately NOT an
+            // escape — Juliet's `dataCopy = data;` alias patterns must
+            // keep the leak visible on the original.
+            const VarDecl* rhsVar = asVar(binOp->getRHS());
+            if (rhsVar && tracked.count(rhsVar) && rhsVar != lhs) {
+                const bool lhsIsPlainLocal = lhs && lhs->hasLocalStorage();
+                if (!lhsIsPlainLocal)
+                    effects.emplace_back(rhsVar, StmtEffect::Escapes);
+            }
         }
         return effects;
     }
@@ -147,6 +160,18 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         // Escapes (the callee may reassign/free it).
         struct VarCallEffect { bool escapes = false; bool frees = false; };
         std::map<const VarDecl*, VarCallEffect> byVar;
+
+        // Method call: `p->Track()` may stash `this` anywhere (observer/
+        // registry registration — the abseil CordzInfo pattern). The
+        // receiver escapes conservatively. Use-after-free stays intact:
+        // the receiver's MemberExpr is its own (earlier) CFG element and
+        // is checked against the pre-call state.
+        if (const auto* memberCall = dyn_cast<CXXMemberCallExpr>(call)) {
+            if (const VarDecl* recv =
+                    asVar(memberCall->getImplicitObjectArgument()))
+                if (tracked.count(recv)) byVar[recv].escapes = true;
+        }
+
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
             const Expr* arg = call->getArg(i);
             if (const auto* unary = dyn_cast<UnaryOperator>(
@@ -224,20 +249,27 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
                 allocCallMatcher())))))
     );
 
+    // Only automatic-storage locals are tracked. A static local or a
+    // global assigned an allocation is NOT an end-of-function leak: its
+    // lifetime is program-long and the "leak on purpose" singleton
+    // (`static Mutex* mu = new Mutex;` — deliberate Google style to
+    // dodge destruction-order fiasco) is idiomatic real-world code.
+    auto trackable = [](const VarDecl* v) { return v->hasLocalStorage(); };
+
     auto declMatchers = {newInitMatcher, mallocInitMatcher, mallocInitDirect};
     for (const auto& m : declMatchers) {
         auto wrapper = functionDecl(equalsNode(funcDecl),
                                      forEachDescendant(m));
         for (const auto& result : match(wrapper, *funcDecl, ctx)) {
             if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                vars.insert(v);
+                if (trackable(v)) vars.insert(v);
         }
     }
     auto assignMatchers = {newAssignMatcher, mallocAssignMatcher};
     for (const auto& m : assignMatchers) {
         for (const auto& result : match(findAll(m), *funcDecl->getBody(), ctx)) {
             if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                vars.insert(v);
+                if (trackable(v)) vars.insert(v);
         }
     }
     return {vars.begin(), vars.end()};

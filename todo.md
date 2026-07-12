@@ -64,6 +64,15 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
+- [x] **Abseil FP hunt (2026-07-12)**: scanned abseil-cpp (159 files,
+      tag 20260526.0) — 40 findings triaged into 3 FP families, all
+      fixed with FP-killer tests: (1) `__builtin_expect` transparency in
+      walkCondition (ABSL_RAW_CHECK / likely-unlikely macros), (2)
+      static/global storage exempt from end-of-function leak (the
+      leak-on-purpose singleton idiom), (3) member-assign and
+      method-receiver escapes. 40 → 12 findings; the remaining 12 are
+      invariant-checked or genuinely-suspicious cases. abseil added to
+      the corpus guard (deep/weekly, pin 12).
 - ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
   fine-grained CFG splits a multi-declaration per variable, the second
   pointer is tracked too (pinned with regression tests, 2026-07-10).

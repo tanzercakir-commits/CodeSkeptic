@@ -357,3 +357,69 @@ TEST(NullDerefTraceTest, GuardOnlyNull_TraceShowsCondition) {
     // The note must point to the condition's line (not the dereference's)
     EXPECT_LT(results[0].notes[0].line, results[0].line);
 }
+
+TEST(AbseilFpTest, RawCheckShape_BuiltinExpect_Clean) {
+    // The abseil ABSL_RAW_CHECK family: __builtin_expect wraps a
+    // negated conjunction and the failure branch TERMINATES (RAW_LOG
+    // FATAL ends in a noreturn trap). The short-circuit value blocks
+    // inside the call refine "null" facts; without expect-transparency
+    // the if-edges could not correct them and the fact leaked into the
+    // continue path (8 findings from one check in low_level_alloc.cc).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void rawlog(const char* m);
+        int* getq();
+        int f(int* p) {
+            if (__builtin_expect(!(p != nullptr && p != getq()), 0)) {
+                rawlog("boom");
+                __builtin_trap();
+            }
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, RawCheckShape_NonTerminatingBranch_StillWarns) {
+    // The flip side: if the failure branch does NOT terminate, the
+    // null path genuinely reaches the dereference — the warning is
+    // correct and must stay.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void rawlog(const char* m);
+        int* getq();
+        int f(int* p) {
+            if (__builtin_expect(!(p != nullptr && p != getq()), 0)) {
+                rawlog("boom");
+            }
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(AbseilFpTest, BuiltinExpect_GuardStillRefines_BothDirections) {
+    // Transparency works in the positive direction too: unlikely(!p)
+    // early-return leaves p non-null afterwards; and the null branch
+    // is still caught when dereferenced inside.
+    NullDerefRule rule;
+    auto clean = runRule(rule, R"(
+        int f(int* p) {
+            if (__builtin_expect(p == nullptr, 0)) return -1;
+            return *p;
+        }
+    )");
+    EXPECT_EQ(clean.size(), 0);
+
+    auto bad = runRule(rule, R"(
+        int f(int* p) {
+            if (__builtin_expect(p == nullptr, 0)) {
+                return *p;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(bad.size(), 1);
+    EXPECT_EQ(bad[0].severity, Severity::Error);
+}

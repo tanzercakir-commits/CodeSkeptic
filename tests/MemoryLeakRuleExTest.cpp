@@ -422,3 +422,103 @@ TEST(MemoryLeakRuleExTest, AddrOfArg_Escapes_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// ===================================================================
+// Abseil FP hunt (2026-07-12): three real-world false-positive
+// families found by scanning abseil-cpp (159 files). Each test pins
+// the fix; the flip side (real leaks staying visible) is pinned too.
+// ===================================================================
+
+TEST(AbseilFpTest, StaticLocalSingleton_NoLeak) {
+    // `static T* x = new T;` is the deliberate leak-on-purpose
+    // singleton (destruction-order fiasco dodge). Static storage is
+    // program-long — not an end-of-function leak.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct M { int v; };
+        void f() {
+            static M* inst = new M;
+            (void)inst;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, GlobalAssignedAllocation_NoLeak) {
+    // The abseil mutex.cc deadlock_graph pattern: a file-scope global
+    // lazily assigned an allocation inside a function.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct G { int v; };
+        G* g_graph = nullptr;
+        void ensure() {
+            if (g_graph == nullptr) g_graph = new G;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, MemberAssign_Escapes_NoLeak) {
+    // The abseil CrcCordState pattern: a fresh allocation stored into a
+    // class member outlives the function — escape, not leak.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct R { int v; };
+        struct Holder {
+            R* slot;
+            void fill() {
+                R* copy = new R;
+                slot = copy;
+            }
+        };
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, MethodCallReceiver_Escapes_NoLeak) {
+    // The abseil CordzInfo pattern: `p->Track()` registers `this` in a
+    // global list — the receiver escapes conservatively.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Trk { void track(); };
+        void f() {
+            Trk* t = new Trk;
+            t->track();
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, MethodCallReceiver_AfterFree_StillUAF) {
+    // The flip side: receiver-escape must not mask use-after-free —
+    // the receiver's MemberExpr is checked against the pre-call state.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Trk { void track(); };
+        void f() {
+            Trk* t = new Trk;
+            delete t;
+            t->track();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AbseilFpTest, LocalToLocalCopy_LeakStaysVisible) {
+    // The flip side of member-assign escape: a plain local-to-local
+    // copy is NOT an escape — Juliet's `dataCopy = data;` alias
+    // patterns must keep the leak visible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        void f() {
+            int* data = (int*)malloc(4);
+            int* dataCopy;
+            dataCopy = data;
+            (void)dataCopy;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
