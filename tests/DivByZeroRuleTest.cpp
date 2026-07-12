@@ -322,3 +322,21 @@ TEST(ShadPS4FpTest, ValueParam_ZeroFactStaysReported) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- libgit2 FP hunt (2026-07-12): assignment inside condition ---
+
+TEST(LibGit2FpTest, AssignInCondition_ZeroGuard_Refines) {
+    // Same look-through in the zero domain:
+    // `if ((n = count()) == 0) return;` — n is non-zero afterwards.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int count();
+        int f(int a) {
+            int n;
+            if ((n = count()) == 0)
+                return -1;
+            return a / n;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

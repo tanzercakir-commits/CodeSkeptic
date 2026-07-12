@@ -94,6 +94,17 @@ Juliet's CI weight, project name check.
       calls to registered names (empty by default — per-project
       opt-in). shadPS4's ~170-finding ASSERT flood collapses with
       `--fatal-asserts assert_fail_impl`. 7 FatalCallsTest pins.
+- [ ] **Configurable allocators** (--alloc-functions/--free-functions,
+      libgit2 lesson 2026-07-12): git__malloc/git__free are invisible
+      to the fixed allocator list, so the leak rule tracked NOTHING in
+      libgit2 (zero leak findings — neither FP nor TP). The natural
+      sibling of --fatal-asserts; wire into isAllocExpr and the
+      free-by-name check in MemoryLeakRule.
+- [ ] libgit2 remaining ~101 null-deref triage (after the
+      assignment-in-condition + rewind fixes; was 149): sample clusters
+      suggest hashmap macro-generated code (GIT_HASHMAP_OID_SETUP
+      expansions attribute findings to the macro line) and
+      GIT_ERROR_CHECK_ALLOC interplay — next libgit2 round.
 - [ ] Address-of-member escape (found in shadPS4 round 2 triage):
       `TrackGeneratedGlyph(&boxed->glyph); *out = &boxed->glyph;` —
       handing out a member's address keeps the whole object reachable;

@@ -32,7 +32,7 @@
 | SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Done (--summary-diff; WEAKENED = exit 1 CI gate) |
 | CallRefArgs | `src/engine/CallRefArgs.h` | Done (non-const ref args invalidate facts; all four rules) |
 | FatalCalls | `src/engine/FatalCalls.h`, `.cpp` | Done (--fatal-asserts; engine-level path kill) |
-| GTest infrastructure | `tests/` | Done (263/263; ctest + single-process) |
+| GTest infrastructure | `tests/` | Done (271/271; ctest + single-process) |
 | CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
 | Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |

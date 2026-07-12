@@ -33,6 +33,17 @@ namespace condwalk_detail {
 inline const clang::VarDecl* asVar(const clang::Expr* expr) {
     if (!expr) return nullptr;
     expr = expr->IgnoreParenImpCasts();
+    // An assignment inside a condition tests the just-assigned value
+    // of its LHS — the classic C idiom `if ((p = alloc()) == NULL)`,
+    // `while ((e = next()) != NULL)`, `!(page = git__malloc(n))`.
+    // Refining the LHS variable on the edges is exactly right; without
+    // this look-through the guard is invisible and every use after it
+    // warns (the dominant libgit2 false-positive family, 2026-07-12).
+    // isAssignmentOp covers compound forms too (`(n -= 1) == 0`).
+    while (const auto* bin = llvm::dyn_cast<clang::BinaryOperator>(expr)) {
+        if (!bin->isAssignmentOp()) break;
+        expr = bin->getLHS()->IgnoreParenImpCasts();
+    }
     if (const auto* ref = llvm::dyn_cast<clang::DeclRefExpr>(expr))
         return llvm::dyn_cast<clang::VarDecl>(ref->getDecl());
     return nullptr;
