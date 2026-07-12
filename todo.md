@@ -78,6 +78,38 @@ Juliet's CI weight, project name check.
       method-receiver escapes. 40 → 12 findings; the remaining 12 are
       invariant-checked or genuinely-suspicious cases. abseil added to
       the corpus guard (deep/weekly, pin 12).
+- [x] **shadPS4 FP hunt round 1 (2026-07-12)**: scanned shadPS4 (377
+      src/ files, 209 findings). Fixed the call-boundary soundness
+      family across all four rules (engine/CallRefArgs.h): a variable
+      passed by NON-CONST REFERENCE must lose its dataflow fact — there
+      is no AddrOf node to see, only the parameter type reveals the
+      out-param. Also: explicit-cast transparency in MemoryLeak's
+      escape analysis (`(void*)copy` callback args,
+      `reinterpret_cast` out-params), member-of-reference-base
+      assignments, composite call arguments (aggregate initializers
+      wrapping the pointer), and DivByZero's missing `f(&z)`
+      invalidation.
+- [ ] **Assert-opacity flood (shadPS4 round 2 candidate)**: ~170 of the
+      209 shadPS4 findings trace to `ASSERT(x)` whose failure handler
+      (`assert_fail_impl`) is deliberately NOT noreturn — the null path
+      survives the macro and every later deref warns (43 findings in
+      one file from a handful of asserts). The warnings are technically
+      true but unusable. Design needed: configurable fatal-assert
+      function list (name-based noreturn assumption, off by default or
+      opt-out) — the industrial-standard approach.
+- [ ] **Report-flood dedup**: one root cause should not produce 25
+      reports (shadPS4 internal__Foprep: a single missing return -> 25
+      warnings on the same variable). Candidate: report only the FIRST
+      deref per (variable, fact-origin) pair; later derefs become trace
+      notes on the first finding.
+- [ ] **shadPS4 true positives worth reporting upstream**: (1)
+      savedata.cpp sceSaveDataMount/Mount2: `if (mount == nullptr &&
+      mount->dirName != nullptr)` derefs mount when it IS null (should
+      be `||`); (2) usb_backend.h GetMaxPacketSize: `desc = nullptr`
+      passed BY VALUE, callee cannot rebind it, then
+      `desc->bMaxPacketSize0` — definite null deref; (3)
+      libc_internal_io.cpp internal__Foprep: `if (file == nullptr)`
+      sets ENOMEM but does not return, then dereferences file.
 - ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
   fine-grained CFG splits a multi-declaration per variable, the second
   pointer is tracked too (pinned with regression tests, 2026-07-10).

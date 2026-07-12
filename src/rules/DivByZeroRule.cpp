@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
@@ -136,6 +137,25 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
         if (binOp->getOpcode() == BO_Assign &&
             refersToVar(binOp->getLHS(), targetVar))
             return effectOfValue(evaluateAssignedValue(binOp->getRHS()));
+        return StmtEffect::None;
+    }
+    // `f(&z)` may store into z: the fact is gone. The fine-grained CFG
+    // presents the AddrOf as its own element.
+    if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+        if (unary->getOpcode() == UO_AddrOf &&
+            refersToVar(unary->getSubExpr(), targetVar))
+            return StmtEffect::AssignsUnknown;
+        return StmtEffect::None;
+    }
+    // `f(z)` where the parameter is a non-const reference (`int&`):
+    // an out-param with no AddrOf node to observe — only the parameter
+    // type reveals that z may be reassigned by the callee.
+    if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+        bool invalidated = false;
+        zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+            if (refersToVar(arg, targetVar)) invalidated = true;
+        });
+        if (invalidated) return StmtEffect::AssignsUnknown;
     }
     return StmtEffect::None;
 }

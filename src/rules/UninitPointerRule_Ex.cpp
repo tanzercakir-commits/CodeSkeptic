@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CallRefArgs.h"
 #include "engine/DataflowEngine.h"
 #include "engine/GuardedDisjuncts.h"
 
@@ -143,6 +144,25 @@ public:
 
     State transfer(const Stmt* stmt, const State& in,
                    ASTContext& /*ctx*/) const {
+        // `f(p)` with a non-const reference parameter (`T*& p`) is an
+        // out-param assignment with no AddrOf node to observe — the
+        // callee may initialize p (same call-boundary rule as `f(&p)`).
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            State out = in;
+            bool changed = false;
+            zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+                const VarDecl* var = asVar(arg);
+                if (!var) return;
+                for (auto& d : out) {
+                    auto it = d.vars.find(var);
+                    if (it == d.vars.end()) continue;
+                    it->second = PtrState::Init;
+                    changed = true;
+                }
+            });
+            return changed ? out : in;
+        }
+
         Effect effect = classifyStmt(stmt);
         if (effect.kind != EffectKind::Assigns) return in;
 

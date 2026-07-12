@@ -276,3 +276,49 @@ TEST(DivByZeroTraceTest, GuardOnlyZero_TraceShowsCondition) {
               std::string::npos);
     EXPECT_LT(results[0].notes[0].line, results[0].line);
 }
+
+// --- shadPS4 FP hunt (2026-07-12): call-boundary soundness ---
+
+TEST(ShadPS4FpTest, RefOutParam_InvalidatesZeroFact) {
+    // `int z = 0; set(z);` where set takes `int&` — the callee may
+    // write z, so the zero fact must die at the call.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void set(int& out);
+        int f(int a) {
+            int z = 0;
+            set(z);
+            return a / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, AddrOfArg_InvalidatesZeroFact) {
+    // Same rule through the C spelling: `set(&z)`.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void set(int* out);
+        int f(int a) {
+            int z = 0;
+            set(&z);
+            return a / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, ValueParam_ZeroFactStaysReported) {
+    // Passing z by value cannot change it — the division is still by
+    // definite zero.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        void use(int v);
+        int f(int a) {
+            int z = 0;
+            use(z);
+            return a / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}

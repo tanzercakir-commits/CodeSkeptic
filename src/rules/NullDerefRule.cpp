@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
 
@@ -228,6 +229,28 @@ public:
 
     State transfer(const Stmt* stmt, const State& in,
                    ASTContext& /*ctx*/) const {
+        // A tracked pointer passed by non-const reference is an
+        // out-param: the callee may rebind it, so its fact drops to
+        // Unknown. There is no AddrOf node to see — only the parameter
+        // type reveals it (the shadPS4 ResolveEpollBinding FP family:
+        // `int* p = nullptr; f(id, p); *p` is NOT a definite null
+        // deref when f takes `int*&`).
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            State out = in;
+            bool changed = false;
+            zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+                const VarDecl* var = asVar(arg);
+                if (!var) return;
+                for (auto& d : out) {
+                    auto it = d.vars.find(var);
+                    if (it == d.vars.end()) continue;
+                    it->second = NullState::Unknown;
+                    changed = true;
+                }
+            });
+            return changed ? out : in;
+        }
+
         Effect effect = classifyStmt(stmt);
         if (effect.kind != EffectKind::Assign &&
             effect.kind != EffectKind::AssignUnknown)
