@@ -182,6 +182,14 @@ void Config::addFatalAsserts(const std::string& list) {
     addNamesTo(fatal_asserts_, list);
 }
 
+void Config::addAllocFunctions(const std::string& list) {
+    addNamesTo(alloc_functions_, list);
+}
+
+void Config::addFreeFunctions(const std::string& list) {
+    addNamesTo(free_functions_, list);
+}
+
 void Config::addNamesTo(std::set<std::string>& target,
                         const std::string& list) {
     std::string token;
