@@ -1043,3 +1043,32 @@ TEST(AliasEscapeTest, FreedThroughAlias_UnderGuard_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(AliasEscapeTest, ExitGuard_DoesNotDiluteFreedAlias) {
+    // `if (data == NULL) exit(-1);` — Clang wires the noreturn block
+    // straight to the CFG exit; its state must NOT vote there (Freed
+    // merged with the dead path's None used to dissolve into None and
+    // blind the freed-through-alias check).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        extern "C" [[noreturn]] void exit(int);
+        void printLL(long long v);
+        void f() {
+            long long* data = (long long*)malloc(800);
+            if (data == nullptr) { exit(-1); }
+            long long* tmpData;
+            data[0] = 5;
+            printLL(data[0]);
+            tmpData = (long long*)realloc(data, 130000);
+            if (tmpData != nullptr) {
+                data = tmpData;
+                data[0] = 10;
+            }
+            free(data);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
