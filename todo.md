@@ -89,14 +89,16 @@ Juliet's CI weight, project name check.
       assignments, composite call arguments (aggregate initializers
       wrapping the pointer), and DivByZero's missing `f(&z)`
       invalidation.
-- [ ] **Assert-opacity flood (shadPS4 round 2 candidate)**: ~170 of the
-      209 shadPS4 findings trace to `ASSERT(x)` whose failure handler
-      (`assert_fail_impl`) is deliberately NOT noreturn — the null path
-      survives the macro and every later deref warns (43 findings in
-      one file from a handful of asserts). The warnings are technically
-      true but unusable. Design needed: configurable fatal-assert
-      function list (name-based noreturn assumption, off by default or
-      opt-out) — the industrial-standard approach.
+- [x] **Assert-opacity flood — `--fatal-asserts` (2026-07-12)**:
+      configurable fatal-call list; engine kills dataflow paths at
+      calls to registered names (empty by default — per-project
+      opt-in). shadPS4's ~170-finding ASSERT flood collapses with
+      `--fatal-asserts assert_fail_impl`. 7 FatalCallsTest pins.
+- [ ] Address-of-member escape (found in shadPS4 round 2 triage):
+      `TrackGeneratedGlyph(&boxed->glyph); *out = &boxed->glyph;` —
+      handing out a member's address keeps the whole object reachable;
+      the leak report on `boxed` (font.cpp:1718) is an FP. Rule:
+      AddrOf of a MemberExpr whose base is tracked -> base escapes.
 - [ ] **Report-flood dedup**: one root cause should not produce 25
       reports (shadPS4 internal__Foprep: a single missing return -> 25
       warnings on the same variable). Candidate: report only the FIRST

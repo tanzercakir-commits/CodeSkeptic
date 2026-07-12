@@ -2,6 +2,7 @@
 #define ZERODEFECT_DATAFLOW_ENGINE_H
 
 #include "engine/CfgCache.h"
+#include "engine/FatalCalls.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Stmt.h>
@@ -189,13 +190,20 @@ DataflowResult<Analysis> runDataflow(
         if (!hasPreds && block != &cfg->getEntry()) continue;
 
         State currentState = entryState;
+        bool pathKilled = false;
         for (const clang::CFGElement& elem : *block) {
             auto cfgStmt = elem.getAs<clang::CFGStmt>();
             if (!cfgStmt) continue;
             const clang::Stmt* stmt = cfgStmt->getStmt();
             if (!stmt) continue;
+            // A registered fatal call (--fatal-asserts) ends the path
+            // here: the block's exit state is never recorded, so
+            // successors treat this edge like one from an unreachable
+            // predecessor. Elements after the call are dead code.
+            if (isFatalCall(stmt)) { pathKilled = true; break; }
             currentState = analysis.transfer(stmt, currentState, ctx);
         }
+        if (pathKilled) continue;
 
         // Update exit state, propagate if changed
         auto [it, inserted] = blockExitState.emplace(
@@ -234,6 +242,9 @@ DataflowResult<Analysis> runDataflow(
                 if (!cfgStmt) continue;
                 const clang::Stmt* stmt = cfgStmt->getStmt();
                 if (!stmt) continue;
+                // Same cut as phase 1: nothing after a fatal call
+                // executes, so nothing there is reported either.
+                if (isFatalCall(stmt)) break;
 
                 State before = currentState;
                 currentState = analysis.transfer(stmt, currentState, ctx);

@@ -41,6 +41,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "lang")          lang_ = value;
         else if (key == "baseline")      baseline_path_ = value;
         else if (key == "function")      addFunctions(value);
+        else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -75,6 +76,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             baseline_path_ = argv[++i];
         } else if (arg == "--function" && i + 1 < argc) {
             addFunctions(argv[++i]);
+        } else if (arg == "--fatal-asserts" && i + 1 < argc) {
+            addFatalAsserts(argv[++i]);
         } else if (arg == "--lines" && i + 1 < argc) {
             addLines(argv[++i]);
         } else if (arg == "--serve") {
@@ -116,6 +119,10 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         plain or qualified; repeatable)\n"
                       << "  --lines <N-M,K>        Analyze only functions overlapping these\n"
                       << "                         line ranges of the analyzed file\n"
+                      << "  --fatal-asserts <names> Treat these functions as never returning\n"
+                      << "                         (comma list; kills dataflow paths after\n"
+                      << "                         custom assert-failure handlers that lack\n"
+                      << "                         [[noreturn]])\n"
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --whole-program        Two-pass mode: collect function summaries\n"
                       << "                         across all files first, then analyze\n"
@@ -152,6 +159,19 @@ void Config::addFunctions(const std::string& list) {
         char c = (i < list.size()) ? list[i] : ',';
         if (c == ',') {
             if (!token.empty()) functions_.insert(token);
+            token.clear();
+        } else if (c != ' ') {
+            token += c;
+        }
+    }
+}
+
+void Config::addFatalAsserts(const std::string& list) {
+    std::string token;
+    for (size_t i = 0; i <= list.size(); ++i) {
+        char c = (i < list.size()) ? list[i] : ',';
+        if (c == ',') {
+            if (!token.empty()) fatal_asserts_.insert(token);
             token.clear();
         } else if (c != ' ') {
             token += c;

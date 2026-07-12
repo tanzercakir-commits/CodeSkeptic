@@ -67,6 +67,13 @@ public:
     void addFunctions(const std::string& list);
     void addLines(const std::string& list);
 
+    // Fatal-assert handlers (--fatal-asserts): user-declared noreturn
+    // functions; the engine kills dataflow paths at calls to them.
+    void addFatalAsserts(const std::string& list);
+    const std::set<std::string>& fatalAsserts() const {
+        return fatal_asserts_;
+    }
+
 private:
     Severity parseSeverity(const std::string& str) const;
 
@@ -81,6 +88,7 @@ private:
     std::string write_baseline_path_;
     std::string lang_;
     std::set<std::string> functions_;
+    std::set<std::string> fatal_asserts_;
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;
