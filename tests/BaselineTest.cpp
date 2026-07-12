@@ -215,3 +215,15 @@ TEST(BaselineV2Test, FileHeaderWritten) {
     std::getline(file, first);
     EXPECT_EQ(first, "# zerodefect-baseline v2");
 }
+
+// --- --files UX hardening (systemd lesson, 2026-07-12) ---
+
+#include "analyzer/StaticAnalyzer.h"
+
+TEST(FilesUxTest, ZeroAnalyzableFiles_IsAnError) {
+    // Analyzing nothing must not look like a clean pass.
+    zerodefect::Config config;
+    config.setSourcePath("/nonexistent/definitely/missing.c");
+    zerodefect::StaticAnalyzer analyzer(std::move(config));
+    EXPECT_EQ(analyzer.run(), 2);
+}

@@ -39,6 +39,20 @@ StaticAnalyzer::StaticAnalyzer(Config config)
         }
     }
     for (const auto& file : config_.sourceFiles()) {
+        // Meson compile DBs carry build-dir-relative paths
+        // (`../src/foo.c`). An entry that does not exist as given is
+        // retried relative to --build-path before being reported —
+        // without this, a meson-driven file list silently analyzed
+        // NOTHING (the systemd lesson, 2026-07-12).
+        namespace fs = std::filesystem;
+        if (!fs::exists(file) && fs::path(file).is_relative()) {
+            fs::path viaBuild = fs::path(config_.buildPath()) / file;
+            if (fs::exists(viaBuild)) {
+                source_mgr_->addSourceFile(
+                    fs::weakly_canonical(viaBuild).string());
+                continue;
+            }
+        }
         source_mgr_->addSourceFile(file);
     }
 
@@ -75,8 +89,11 @@ int StaticAnalyzer::run() {
     diagnostics_.clear();
 
     if (source_mgr_->fileCount() == 0) {
+        // Analyzing nothing must not look like a clean pass: a mistyped
+        // path or a relative-path file list would otherwise print
+        // "Clean!" with exit 0.
         std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
-        return 0;
+        return 2;
     }
 
     if (engine_.ruleCount() == 0) {

@@ -1,5 +1,44 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — systemd macro idioms + rtp2httpd scan
+
+### Changed
+- **Composite-RHS escape**: a statement expression or compound literal
+  assigned to ESCAPING storage walks its subtree for tracked pointers
+  (`*ret = TAKE_PTR(cs);`, `*ret = IOVEC_MAKE(buf, n);`). Local-lhs
+  stashes stay visible (the Juliet 66/67 pin).
+- **Bare-address alias escape**: storing a pointer's OWN address
+  (`_b = &(p);` — the free_and_replace macro) escapes conservatively
+  even into a local; a MEMBER address into an ignored local still
+  leaks (the fprime font pin holds — the two cases are distinguished).
+- systemd leaks 9 → **3** (the remaining trio is the local
+  compound-literal stash correlated with the aggregate's later use —
+  aliasing v2 territory, documented). Referees: Juliet floors and
+  corpus pins unchanged.
+- **rtp2httpd scanned** (27k lines): **4 findings** — 1 hand-verified
+  TP (configuration.c: `if (arg && ...)` admits arg may be NULL, the
+  very next block dereferences `arg[0]` unconditionally) + 3 FPs, all
+  the cross-variable correlation family. The disjuncts-v2b inventory
+  now spans FOUR codebases (fprime, Juliet flow variants, libgit2,
+  rtp2httpd).
+
+### Verification
+- 300/300 tests (+3 SystemdIdiomTest with the member-address
+  distinction preserved).
+
+## 2026-07-12 — --files UX hardening (the systemd lesson)
+
+### Changed
+- `--files` entries that do not exist as given are retried relative to
+  `--build-path` (meson compile DBs carry build-dir-relative paths like
+  `../src/foo.c` — a meson-driven list used to be skipped entirely).
+- Zero analyzable files is now exit 2, not a "Clean!" exit 0 —
+  analyzing nothing must not look like a clean pass.
+
+### Verification
+- 297/297 tests (+1 FilesUxTest zero-file pin); relative-path
+  resolution verified end-to-end against systemd's meson build dir.
+
 ## 2026-07-12 — Disjuncts v2a: constant-returning call guards
 
 ### Changed

@@ -194,9 +194,26 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (tracked.count(vd) && vd->hasInit() &&
-                    isAllocExpr(vd->getInit(), ctx))
+                if (!vd->hasInit()) continue;
+                if (tracked.count(vd) && isAllocExpr(vd->getInit(), ctx)) {
                     effects.emplace_back(vd, StmtEffect::Allocates);
+                    continue;
+                }
+                // `typeof(b) *_b = &(b);` — systemd's free_and_replace
+                // takes the pointer's OWN address in an INIT, not an
+                // assignment; same conservative escape as the
+                // assignment form (ownership can move through _b).
+                const Expr* init = vd->getInit()->IgnoreParenCasts();
+                if (const auto* u = dyn_cast<UnaryOperator>(init)) {
+                    if (u->getOpcode() == UO_AddrOf &&
+                        isa<DeclRefExpr>(
+                            u->getSubExpr()->IgnoreParenCasts())) {
+                        const VarDecl* src = addrOfMemberBase(init);
+                        if (src && tracked.count(src))
+                            effects.emplace_back(src,
+                                                 StmtEffect::Escapes);
+                    }
+                }
             }
         }
         return effects;
@@ -218,9 +235,48 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             //  - a member of a LOCAL aggregate (`myStruct.ptr = data;` —
             //    the aggregate itself dies at function end, the leak is
             //    real; the Juliet 66/67 struct-passing families).
+            // Does the LHS shape make the stored value outlive our
+            // view? (Independent of what the RHS turns out to be.)
+            const Expr* lhsExpr = binOp->getLHS()->IgnoreParenImpCasts();
+            bool lhsEscapes;
+            if (lhs) {
+                lhsEscapes = !lhs->hasLocalStorage();  // global/static
+            } else if (const auto* member =
+                           dyn_cast<MemberExpr>(lhsExpr)) {
+                if (member->isArrow()) {
+                    lhsEscapes = true;  // pointee may live anywhere
+                } else {
+                    const VarDecl* base = asVar(member->getBase());
+                    // local (non-param) aggregate: stays local;
+                    // param/global/this/complex base: escapes.
+                    // A reference base refers to storage owned
+                    // elsewhere (`ImGuiIO& io = GetIO();
+                    // io.UserData = bd;` — shadPS4 imgui backends),
+                    // so it escapes too.
+                    lhsEscapes = !(base && base->hasLocalStorage() &&
+                                   !isa<ParmVarDecl>(base) &&
+                                   !base->getType()->isReferenceType());
+                }
+            } else {
+                lhsEscapes = true;  // *p = q, arr[i] = q, this-member...
+            }
+
             const VarDecl* rhsVar = asVar(binOp->getRHS());
-            if (!rhsVar)
+            bool bareAddressTaken = false;
+            if (!rhsVar) {
                 rhsVar = addrOfMemberBase(binOp->getRHS());
+                // Distinguish `&p` (an alias to the POINTER itself —
+                // ownership can move through it, the free_and_replace
+                // macro) from `&p->member` (an alias INTO the pointee —
+                // storing it in an ignored local saves nothing, the
+                // fprime font pin).
+                if (rhsVar) {
+                    const Expr* r = binOp->getRHS()->IgnoreParenCasts();
+                    if (const auto* u = dyn_cast<UnaryOperator>(r))
+                        bareAddressTaken = isa<DeclRefExpr>(
+                            u->getSubExpr()->IgnoreParenCasts());
+                }
+            }
             if (!rhsVar) {
                 // Chained assignment: `*out = counts = git__calloc(...)`
                 // stores the same value the inner assignment gave to
@@ -232,31 +288,30 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                         rhsVar = asVar(inner->getLHS());
             }
             if (rhsVar && tracked.count(rhsVar) && rhsVar != lhs) {
-                const Expr* lhsExpr = binOp->getLHS()->IgnoreParenImpCasts();
-                bool escapes;
-                if (lhs) {
-                    escapes = !lhs->hasLocalStorage();  // global/static
-                } else if (const auto* member =
-                               dyn_cast<MemberExpr>(lhsExpr)) {
-                    if (member->isArrow()) {
-                        escapes = true;  // pointee may live anywhere
-                    } else {
-                        const VarDecl* base = asVar(member->getBase());
-                        // local (non-param) aggregate: stays local;
-                        // param/global/this/complex base: escapes.
-                        // A reference base refers to storage owned
-                        // elsewhere (`ImGuiIO& io = GetIO();
-                        // io.UserData = bd;` — shadPS4 imgui backends),
-                        // so it escapes too.
-                        escapes = !(base && base->hasLocalStorage() &&
-                                    !isa<ParmVarDecl>(base) &&
-                                    !base->getType()->isReferenceType());
-                    }
-                } else {
-                    escapes = true;  // *p = q, arr[i] = q, this-member...
-                }
-                if (escapes)
+                // Storing the pointer's OWN address creates an alias
+                // through which ownership can move even via a local
+                // (`_b = &(p); *_a = *_b;` — systemd's
+                // free_and_replace macro): conservative escape
+                // regardless of the LHS. A MEMBER address into an
+                // ignored local saves nothing (the fprime font pin
+                // stays a leak).
+                if (lhsEscapes || bareAddressTaken)
                     effects.emplace_back(rhsVar, StmtEffect::Escapes);
+            } else if (!rhsVar && lhsEscapes) {
+                // The pointer may ride INSIDE a composite RHS assigned
+                // to escaping storage: statement expressions
+                // (`*ret = TAKE_PTR(cs);`), compound literals
+                // (`*ret = IOVEC_MAKE(buf, n);`). Same subtree walk as
+                // composite call arguments. LOCAL-lhs stashes are
+                // deliberately NOT walked — `myStruct.ptr = data;`
+                // stays a visible leak (the Juliet 66/67 pin).
+                std::map<const VarDecl*, VarCallEffect> byVar;
+                collectNestedTrackedRefs(binOp->getRHS(), tracked, byVar);
+                for (const auto& [v, e] : byVar) {
+                    (void)e;
+                    if (v != lhs)
+                        effects.emplace_back(v, StmtEffect::Escapes);
+                }
             }
         }
         return effects;
