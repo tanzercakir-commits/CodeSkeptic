@@ -27,8 +27,10 @@
   the leak rule tracked nothing. Configurable allocators
   (--alloc-functions/--free-functions) recorded in todo as the natural
   sibling of --fatal-asserts.
-- **llama.cpp scan** (225 files): 511 findings before the rewind fix.
-  Post-fix numbers in the verification note.
+- **llama.cpp scan** (225 files): 511 findings before the fixes →
+  **47 after** (ops.cpp's 407-finding cluster collapsed to 3; the
+  remaining set is 37 null-deref / 9 memory-leak / 1 div-by-zero,
+  next-round triage material). libgit2: 149 → **101**.
 
 ### Verification
 - 271/271 tests (ctest + single-process; +5 LibGit2FpTest including the
