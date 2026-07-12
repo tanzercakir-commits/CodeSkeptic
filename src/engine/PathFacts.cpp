@@ -104,6 +104,26 @@ std::optional<std::pair<zerodefect::FactKey, bool>> normalizeCompare(
             default: break;  // EQ/NE are symmetric
         }
     }
+
+    // Unsigned identities against zero: `u <= 0` IS `u == 0` and
+    // `u > 0` IS `u != 0`. Without the canonicalization the same
+    // knowledge lives under two keys, disjuncts split on a phantom
+    // dimension (an "u <= 0 but u != 0" disjunct is unsatisfiable yet
+    // kept alive), and real functions blow the disjunct cap — the
+    // widening then erases the CORRELATED pointer fact (the fprime
+    // PriorityMemQueue FP, 2026-07-12; FwSizeType/size_t counters are
+    // everywhere in systemd too). `u < 0` (never true) and `u >= 0`
+    // (always true) carry no per-edge information — unkeyed.
+    if (var->getType()->isUnsignedIntegerType() && lit == 0) {
+        switch (opc) {
+            case BO_LE: opc = BO_EQ; break;
+            case BO_GT: opc = BO_NE; break;
+            case BO_LT:
+            case BO_GE: return std::nullopt;
+            default: break;
+        }
+    }
+
     switch (opc) {
         case BO_EQ: return {{K{var, BO_EQ, lit}, true}};
         case BO_NE: return {{K{var, BO_EQ, lit}, false}};
