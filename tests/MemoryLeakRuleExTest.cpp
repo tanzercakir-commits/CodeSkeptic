@@ -1167,3 +1167,22 @@ TEST(SystemdIdiomTest, AddressIntoLocalAlias_Escapes_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(SystemdIdiomTest, AddressIntoLocalViaInit_Escapes_NoLeak) {
+    // The real free_and_replace expansion takes the address in an
+    // INIT (`typeof(b)* _b = &(b);`), not an assignment.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" char* strdup(const char*);
+        extern "C" void free(void*);
+        void replace(char** slot, const char* s) {
+            char* t = strdup(s);
+            if (!t) { return; }
+            char** b = &t;
+            free(*slot);
+            *slot = *b;
+            *b = 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

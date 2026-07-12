@@ -194,9 +194,26 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (tracked.count(vd) && vd->hasInit() &&
-                    isAllocExpr(vd->getInit(), ctx))
+                if (!vd->hasInit()) continue;
+                if (tracked.count(vd) && isAllocExpr(vd->getInit(), ctx)) {
                     effects.emplace_back(vd, StmtEffect::Allocates);
+                    continue;
+                }
+                // `typeof(b) *_b = &(b);` — systemd's free_and_replace
+                // takes the pointer's OWN address in an INIT, not an
+                // assignment; same conservative escape as the
+                // assignment form (ownership can move through _b).
+                const Expr* init = vd->getInit()->IgnoreParenCasts();
+                if (const auto* u = dyn_cast<UnaryOperator>(init)) {
+                    if (u->getOpcode() == UO_AddrOf &&
+                        isa<DeclRefExpr>(
+                            u->getSubExpr()->IgnoreParenCasts())) {
+                        const VarDecl* src = addrOfMemberBase(init);
+                        if (src && tracked.count(src))
+                            effects.emplace_back(src,
+                                                 StmtEffect::Escapes);
+                    }
+                }
             }
         }
         return effects;
