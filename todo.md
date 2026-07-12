@@ -103,22 +103,28 @@ Juliet's CI weight, project name check.
       is the v2 design (fprime's remaining 7 findings are all this
       family). Candidate: disjunct guards keyed on the assert/branch
       condition with multi-variable refinement per disjunct.
-- [ ] **Configurable allocators** (--alloc-functions/--free-functions,
-      libgit2 lesson 2026-07-12): git__malloc/git__free are invisible
-      to the fixed allocator list, so the leak rule tracked NOTHING in
-      libgit2 (zero leak findings — neither FP nor TP). The natural
-      sibling of --fatal-asserts; wire into isAllocExpr and the
-      free-by-name check in MemoryLeakRule.
+- [x] **Configurable allocators — done (2026-07-12)**:
+      --alloc-functions/--free-functions + three escape refinements
+      (address-of-member, alias escape propagation, chained
+      assignment). libgit2 leak domain: 0 -> 31 -> 15 findings; the
+      merge.c multi-allocation OOM-path leak verified REAL by hand.
+- [ ] **libgit2 leak upstream candidates**: 15 remaining leak findings
+      match the verified merge.c class (earlier allocation leaks when
+      a later allocation's GIT_ERROR_CHECK_ALLOC returns -1). Verify
+      each by hand, then file upstream like the shadPS4 trio.
+- [ ] **Report-flood dedup (moved to its own round)**: one report per
+      (variable, function) for warning-severity null-derefs; later
+      sites become trace notes on the first finding (libc 25x,
+      fprime 5x floods).
 - [ ] libgit2 remaining ~101 null-deref triage (after the
       assignment-in-condition + rewind fixes; was 149): sample clusters
       suggest hashmap macro-generated code (GIT_HASHMAP_OID_SETUP
       expansions attribute findings to the macro line) and
       GIT_ERROR_CHECK_ALLOC interplay — next libgit2 round.
-- [ ] Address-of-member escape (found in shadPS4 round 2 triage):
-      `TrackGeneratedGlyph(&boxed->glyph); *out = &boxed->glyph;` —
-      handing out a member's address keeps the whole object reachable;
-      the leak report on `boxed` (font.cpp:1718) is an FP. Rule:
-      AddrOf of a MemberExpr whose base is tracked -> base escapes.
+- [x] Address-of-member escape — done (2026-07-12, with the
+      configurable-allocators round): AddrOf of member/self escapes
+      the base at assignment/call/return sites; fprime font.cpp FP
+      and the libgit2 iterator family both die.
 - [ ] **Report-flood dedup**: one root cause should not produce 25
       reports (shadPS4 internal__Foprep: a single missing return -> 25
       warnings on the same variable). Candidate: report only the FIRST

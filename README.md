@@ -198,6 +198,12 @@ zerodefect <source_path> [options]
                          handler deliberately lacks [[noreturn]]: kills
                          the failure path so guarded code stops warning
                          (e.g. --fatal-asserts assert_fail_impl)
+  --alloc-functions <names> Treat these functions as heap allocators
+                         (comma list). Extends leak/double-free/UAF
+                         analysis to project wrappers
+                         (e.g. --alloc-functions git__malloc,zmalloc)
+  --free-functions <names> Treat these functions as deallocators
+                         (their first argument is freed)
   --whole-program        Two-pass mode: collect function summaries
                          across all files first, then analyze
   --summary-out <file>   Save harvested cross-file summaries to a file
@@ -210,7 +216,7 @@ zerodefect <source_path> [options]
 Options can also be set in a `.zerodefect.conf` file (`key=value` lines:
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
-`function`, `fatal_asserts`).
+`function`, `fatal_asserts`, `alloc_functions`, `free_functions`).
 
 ### Suppressing findings
 
