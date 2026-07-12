@@ -908,3 +908,207 @@ TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- Disjuncts v2a (2026-07-12): constant-returning call guards ---
+
+TEST(CallGuardTest, ConstReturningHelper_CorrelatedGuards_Clean) {
+    // The Juliet flow-variant shape: alloc and free both guarded by
+    // the same constant-returning static helper — the disjunct pairing
+    // must recognize the correlation.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static int staticReturnsTrue() { return 1; }
+        void f() {
+            char* data = 0;
+            if (staticReturnsTrue()) {
+                data = (char*)malloc(16);
+            }
+            if (staticReturnsTrue()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CallGuardTest, BodylessExtern_NotKeyed_LeakStaysVisible) {
+    // The flip side: rand() has no visible body — two calls may
+    // return different values, so the phantom alloc-without-free path
+    // is REAL and must stay reported.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        extern "C" int rand();
+        void f() {
+            char* data = 0;
+            if (rand()) {
+                data = (char*)malloc(16);
+            }
+            if (rand()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(CallGuardTest, StateReadingBody_NotKeyed_LeakStaysVisible) {
+    // A helper that reads mutable state is not invariant between the
+    // two guards — not keyed, the leak path stays visible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int g_flag;
+        static int readsGlobal() { return g_flag; }
+        void f() {
+            char* data = 0;
+            if (readsGlobal()) {
+                data = (char*)malloc(16);
+            }
+            if (readsGlobal()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(AliasEscapeTest, FreedThroughAlias_NoLeak) {
+    // The Juliet malloc_realloc good1 shape: the allocation is freed
+    // under the alias's name.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* data = (int*)malloc(400);
+            int* tmpData = (int*)realloc(data, 130000);
+            if (tmpData != nullptr) {
+                data = tmpData;
+            }
+            free(data);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
+    // DOCUMENTED accepted FN of the exit-time alias-free check:
+    // reusing the alias variable for a SECOND allocation and freeing
+    // only that one leaks the first — the flow-insensitive group
+    // cannot tell the two apart. This test pins the trade-off; if a
+    // future flow-sensitive alias model fixes it, flip the count to 1.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            char* a = (char*)malloc(8);
+            char* b = a;
+            b = (char*)malloc(16);
+            free(b);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, FreedThroughAlias_UnderGuard_NoLeak) {
+    // The flow-variant version of the realloc shape: everything sits
+    // inside a keyed guard. The Freed alias lives in a DISJUNCT —
+    // flattening would dissolve it (Freed with None = None), so the
+    // suppression must check per disjunct.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        static int staticFive = 5;
+        void f() {
+            int* data = 0;
+            int* tmpData = 0;
+            if (staticFive == 5) {
+                data = (int*)malloc(400);
+                tmpData = (int*)realloc(data, 130000);
+                if (tmpData != nullptr) {
+                    data = tmpData;
+                }
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, ExitGuard_DoesNotDiluteFreedAlias) {
+    // `if (data == NULL) exit(-1);` — Clang wires the noreturn block
+    // straight to the CFG exit; its state must NOT vote there (Freed
+    // merged with the dead path's None used to dissolve into None and
+    // blind the freed-through-alias check).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        extern "C" [[noreturn]] void exit(int);
+        void printLL(long long v);
+        void f() {
+            long long* data = (long long*)malloc(800);
+            if (data == nullptr) { exit(-1); }
+            long long* tmpData;
+            data[0] = 5;
+            printLL(data[0]);
+            tmpData = (long long*)realloc(data, 130000);
+            if (tmpData != nullptr) {
+                data = tmpData;
+                data[0] = 10;
+            }
+            free(data);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+// --- systemd FP hunt (2026-07-12): __attribute__((cleanup)) ---
+
+TEST(CleanupAttrTest, CleanupVar_CannotLeak) {
+    // systemd's _cleanup_free_ / GLib's g_autofree: the compiler runs
+    // the cleanup function at every scope exit — no leak possible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static inline void freep(void* p) { free(*(void**)p); }
+        int f() {
+            __attribute__((cleanup(freep))) char* buf = 0;
+            buf = (char*)malloc(64);
+            if (!buf) { return -1; }
+            buf[0] = 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CleanupAttrTest, PlainNeighbor_StillTracked) {
+    // The flip side: a cleanup attribute on ONE variable exempts only
+    // that variable.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static inline void freep(void* p) { free(*(void**)p); }
+        int f() {
+            __attribute__((cleanup(freep))) char* safe = 0;
+            safe = (char*)malloc(8);
+            char* leaky = (char*)malloc(8);
+            (void)leaky;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}

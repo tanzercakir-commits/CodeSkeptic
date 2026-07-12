@@ -24,8 +24,15 @@
 # main-vs-PR local diff: every one of the +24 FPs is a realloc file;
 # 4 old FPs also disappeared (escape refinements). Wider coverage with
 # the same known limitation, not lost precision on covered code.
+# 2026-07-12 (PR #44, disjuncts v2a + noreturn path kill): CWE401
+# precision floor RAISED 0.55 -> 0.62 (measured 0.669 locally: the
+# constant-returning call-guard keys, the freed-through-alias
+# suppression and the noreturn dilution fix together removed most of
+# the realloc-family FPs). CWE416 recall floor RAISED 0.38 -> 0.44
+# (measured 0.476 — call-guard pairing restored UAF true positives).
+# CWE415 recall floor RAISED 0.20 -> 0.21 (measured 0.225).
 CWE476 0.95 0.30
-CWE401 0.55 0.18
-CWE415 0.95 0.20
-CWE416 0.95 0.38
+CWE401 0.62 0.18
+CWE415 0.95 0.21
+CWE416 0.95 0.44
 CWE369 0.95 0.03

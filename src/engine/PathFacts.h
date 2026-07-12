@@ -17,8 +17,12 @@
 // seen a second time, the contradicting disjunct is dropped.
 //
 // DELIBERATE LIMITS (precision-first):
-//  - Only DeclRef variable vs integer-constant comparisons are keyed
-//    (function calls NEVER — a rand() correlation would be wrong).
+//  - DeclRef variable vs integer-constant comparisons are keyed, plus
+//    ONE class of calls (2026-07-12): direct zero-argument calls whose
+//    entire visible body is `return <integer literal>;` — such a
+//    function cannot return anything else, so the correlation is
+//    sound. Anything weaker (rand(), extern declarations, bodies that
+//    read state) is NEVER keyed — that correlation would be wrong.
 //  - Variables assigned / address-taken inside the function are not
 //    keyed.
 //  - That calls may modify globals is ignored: if a call between two

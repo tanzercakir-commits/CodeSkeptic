@@ -64,6 +64,12 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
+- [ ] **--files UX hardening (systemd lesson, 2026-07-12)**: meson
+      compile DBs carry build-dir-relative paths; --files entries that
+      do not exist are skipped with a stderr note and the run prints
+      "Clean!" with exit 0 — silently analyzing NOTHING. Fix: resolve
+      non-absolute --files entries against --build-path too, and treat
+      "0 analyzable files" as an error exit, not a clean pass.
 - [ ] Juliet 44/45 families ("data passed via static global"): known FN
       after the escape refinement — storing an allocation into a
       global/static suppresses the local leak report by design.
@@ -106,16 +112,23 @@ Juliet's CI weight, project name check.
       ALSO needed: canonical keys for CALL conditions
       (staticReturnsTrue()/False() — the Juliet realloc-family FPs,
       ~24 findings, measured 2026-07-12): PathFacts only keys
-      variable conditions today.
+      variable conditions today. ALSO: pointer-identity correlation
+      (libgit2 blame_git small-buffer optimization: alloc under
+      `n >= bufsize`, free under `ptr != stackbuf` — semantically the
+      same condition, syntactically unrelatable today).
 - [x] **Configurable allocators — done (2026-07-12)**:
       --alloc-functions/--free-functions + three escape refinements
       (address-of-member, alias escape propagation, chained
       assignment). libgit2 leak domain: 0 -> 31 -> 15 findings; the
       merge.c multi-allocation OOM-path leak verified REAL by hand.
-- [ ] **libgit2 leak upstream candidates**: 15 remaining leak findings
-      match the verified merge.c class (earlier allocation leaks when
-      a later allocation's GIT_ERROR_CHECK_ALLOC returns -1). Verify
-      each by hand, then file upstream like the shadPS4 trio.
+- [x] **libgit2 leak findings hand-verified (2026-07-12)**: 15 findings
+      = 11 TP across 8 sites (all the GIT_ERROR_CHECK_ALLOC
+      early-return class), 2 FP (blame_git small-buffer pointer
+      identity -> disjuncts-v2 note; remote.c loop-free pattern),
+      2 unclear (filebuf, remote detail) excluded from the report.
+      Single class-issue drafted (libgit2_upstream_report.md, sent to
+      user) — one issue for the pattern, 8 permalinked sites, per
+      libgit2 convention. User files it.
 - [ ] **Report-flood dedup (moved to its own round)**: one report per
       (variable, function) for warning-severity null-derefs; later
       sites become trace notes on the first finding (libc 25x,

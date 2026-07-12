@@ -10,6 +10,7 @@
 #include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Attr.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
@@ -384,7 +385,16 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     // lifetime is program-long and the "leak on purpose" singleton
     // (`static Mutex* mu = new Mutex;` — deliberate Google style to
     // dodge destruction-order fiasco) is idiomatic real-world code.
-    auto trackable = [](const VarDecl* v) { return v->hasLocalStorage(); };
+    // A variable with __attribute__((cleanup(fn))) cannot leak by
+    // construction — the compiler runs fn at every scope exit
+    // (systemd's _cleanup_free_, GLib's g_autofree; 111 of systemd's
+    // findings were this shape). v1 excludes them from tracking
+    // entirely; modeling the cleanup as a scope-exit free (to catch
+    // `free(p)` double-frees under a cleanup attribute) is the v2
+    // design, noted in todo.
+    auto trackable = [](const VarDecl* v) {
+        return v->hasLocalStorage() && !v->hasAttr<CleanupAttr>();
+    };
 
     auto wrapper = functionDecl(equalsNode(funcDecl),
                                  forEachDescendant(candidateInit));
@@ -741,6 +751,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         (void)members;
         if (trackedSet.insert(var).second) trackedVars.push_back(var);
     }
+    // The exit-leak check below consults the groups too
+    const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
         trackedVars, zerodefect::collectMutatedDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
@@ -761,6 +773,43 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     const VarState exitVars = flattenState(exitIt->second);
     for (const auto& [var, state] : exitVars) {
         if (state == AllocState::Allocated) {
+            // Freed THROUGH a local alias? `tmpData = realloc(data, n);
+            // if (tmpData) data = tmpData; free(data);` frees the same
+            // allocation under the alias's name (the Juliet
+            // malloc_realloc good1 shape). Frees deliberately do not
+            // propagate through the flow-insensitive groups (that
+            // would fabricate double-frees) — but AT THE EXIT, a Freed
+            // group member means this allocation was released; only
+            // the leak REPORT is suppressed. Accepted FN: reusing an
+            // alias variable for a second allocation and leaking the
+            // first (pinned as documentation).
+            // The check runs PER DISJUNCT: flattening first would
+            // dissolve the alias's Freed into None on guarded paths
+            // (Freed ⊔ None = None) and hide exactly the correlation
+            // the disjuncts preserved. The variable leaks only if some
+            // disjunct holds it Allocated with NO group member Freed
+            // in that same disjunct.
+            auto group = aliasGroupsCopy.find(var);
+            bool leaksSomewhere = false;
+            for (const auto& d : exitIt->second) {
+                auto v = d.vars.find(var);
+                if (v == d.vars.end() ||
+                    v->second != AllocState::Allocated)
+                    continue;
+                bool freedHere = false;
+                if (group != aliasGroupsCopy.end()) {
+                    for (const VarDecl* member : group->second) {
+                        auto m = d.vars.find(member);
+                        if (m != d.vars.end() &&
+                            m->second == AllocState::Freed) {
+                            freedHere = true;
+                            break;
+                        }
+                    }
+                }
+                if (!freedHere) { leaksSomewhere = true; break; }
+            }
+            if (!leaksSomewhere) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);
             if (analysis.reported().emplace(var, line).second) {
                 zerodefect::Diagnostic diag;

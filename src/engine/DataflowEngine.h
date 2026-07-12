@@ -262,7 +262,16 @@ DataflowResult<Analysis> runDataflow(
             if (isFatalCall(stmt)) { pathKilled = true; break; }
             currentState = analysis.transfer(stmt, currentState, ctx);
         }
-        if (pathKilled) continue;
+        // Real [[noreturn]] calls (exit, abort, __assert_fail) get the
+        // same treatment as registered fatal calls: Clang wires such
+        // blocks straight to the CFG exit, and letting their state
+        // merge there DILUTES facts on the live paths — `if (!p)
+        // exit(-1);` fed a None into the exit block that dissolved a
+        // later Freed (Freed ⊔ None = None) and blinded the
+        // freed-through-alias check (the Juliet malloc_realloc family).
+        // The process dies on this path; it must not vote on
+        // end-of-function state.
+        if (pathKilled || block->hasNoReturnElement()) continue;
 
         // Update exit state, propagate if changed
         auto [it, inserted] = blockExitState.emplace(

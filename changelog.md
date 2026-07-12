@@ -1,5 +1,62 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Disjuncts v2a: constant-returning call guards
+
+### Changed
+- **PathFacts keys one class of CALL conditions**: direct zero-argument
+  calls whose entire visible body is `return <integer literal>;` key on
+  the callee (a FunctionDecl is a ValueDecl — the key structure is
+  unchanged). Such a helper CANNOT return anything else, so pairing the
+  two guards is sound — no purity guessing involved. Anything weaker
+  (rand(), extern declarations, bodies that read state) stays unkeyed;
+  both flip sides pinned.
+- Motivation: the Juliet flow variants (`static int staticReturnsTrue()
+  { return 1; }`) that produced the ~24 realloc-family FPs measured in
+  the previous round. Numbers in the verification note.
+
+### Changed (the measurement chain — each fix's replay exposed the next)
+- **Freed-through-alias suppression** (exit-time, per DISJUNCT): the
+  Juliet malloc_realloc good shape frees the allocation under the
+  alias's name; flattening first would dissolve the alias's Freed into
+  None on guarded paths, so the check runs per disjunct. Frees still
+  never propagate through the flow-insensitive groups (that would
+  fabricate double-frees). Accepted FN pinned: alias variable reused
+  for a second allocation.
+- **Noreturn calls kill dataflow paths** (DataflowEngine,
+  CFGBlock::hasNoReturnElement — the general form of --fatal-asserts):
+  Clang wires `exit(-1)` blocks straight to the CFG exit, and their
+  dead state DILUTED live-path facts there (Freed ⊔ None = None),
+  blinding the alias check across the whole family. A process-killing
+  path does not vote on end-of-function state.
+- **Debugging lesson recorded**: ConsoleReporter writes findings to
+  stderr — three "clean" replications during this hunt were grepping
+  stdout. Empiricism still beat theory (the file-list bisect exposed
+  the wrong assumption), but the stream mix-up cost an hour.
+
+### Measured (local mirrored-suite replay, floors raised in this PR)
+- CWE401 rprecision 0.559 (CI low) → **0.669**; floor 0.55 → **0.62**.
+- CWE416 rhitrate 0.436 → **0.476** (call-guard pairing restored UAF
+  TPs); floor 0.38 → **0.44**. CWE415 rhitrate 0.210 → 0.225; floor
+  0.20 → 0.21. CWE476 overall precision 0.549 → 0.602 (leak-FP side).
+- Corpus: cjson 55→54 (within pin tolerance), tinyxml2 9.
+
+### Changed (round 3 — systemd first light)
+- **Scanned systemd basic/core/shared** (494 files, ZERO parse errors
+  through the macro-heaviest C in the wild): 414 raw findings.
+  **`__attribute__((cleanup))` exemption** landed as v1: a variable the
+  compiler auto-releases at scope exit cannot end-of-function leak
+  (systemd `_cleanup_free_`, GLib `g_autofree`). Leaks 111 → **9**.
+  The v2 design (modeling cleanup as scope-exit free to catch
+  double-frees under the attribute) and the 302-null-deref triage are
+  next rounds. Also recorded: the --files UX hardening lesson (meson's
+  build-relative paths silently analyzed nothing with a "Clean!"
+  exit 0).
+
+### Verification
+- 296/296 tests (+3 CallGuardTest, +4 alias/guard/noreturn pins, +2
+  CleanupAttrTest with the plain-neighbor flip side). All five Juliet
+  floors green at the RAISED values (verified locally before push).
+
 ## 2026-07-12 — Report-flood dedup: one warning per variable
 
 ### Changed
