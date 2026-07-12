@@ -73,6 +73,13 @@ jobs:
           bash scripts/run_juliet.sh ./build/src/zerodefect juliet-work \
             "$LIMIT" | tee juliet-output.txt
 
+      - name: Deep corpus (abseil) — weekly only
+        # Real modern C++ FP net (CORPUS_DEEP gates the ~2.5 min abseil
+        # leg out of PR runs — CI cost balance). Guarded by the pinned
+        # count in corpus_expected.txt like the rest of the corpus.
+        if: github.event_name == 'schedule'
+        run: CORPUS_DEEP=1 bash scripts/run_corpus.sh ./build/src/zerodefect corpus-work
+
       - name: Summary
         if: always()
         run: |

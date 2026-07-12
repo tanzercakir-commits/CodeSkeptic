@@ -34,9 +34,21 @@ fetch() { # <dir> <url>
 # Pinned versions — keep finding counts comparable
 fetch cjson    "https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz"
 fetch tinyxml2 "https://github.com/leethomason/tinyxml2/archive/refs/tags/10.0.0.tar.gz"
+# abseil is DEEP-only (CORPUS_DEEP=1): ~2 min of analysis — weekly cron,
+# not every PR (CI cost balance). Real modern C++ (template-heavy,
+# RAW_CHECK/PREDICT macros, leak-on-purpose singletons) — the FP net
+# that Juliet cannot provide.
+if [ "${CORPUS_DEEP:-0}" = "1" ]; then
+    fetch abseil "https://github.com/abseil/abseil-cpp/archive/refs/tags/20260526.0.tar.gz"
+    fetch catch2 "https://github.com/catchorg/Catch2/archive/refs/tags/v3.15.2.tar.gz"
+fi
 
-run_one() { # <dir>
-    local dir="$1"
+run_one() { # <mode: scan|db> <dir> [extra cmake args...]
+    # scan: analyze the whole source tree (cjson/tinyxml2 pins were
+    #       measured this way — do not change their input set).
+    # db:   analyze exactly the compile-DB files (abseil's tree carries
+    #       test/tooling sources a directory scan would wrongly include).
+    local mode="$1" dir="$2"; shift 2 || true
     echo ""
     echo "=== [$dir] ==="
     # Build directory OUTSIDE the source TREE: the scanner must not see
@@ -45,12 +57,23 @@ run_one() { # <dir>
     # cmake_minimum_required values from erroring on CMake 4.x.
     cmake -S "$dir" -B "build-$dir" \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 > /dev/null
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@" > /dev/null
 
     # NO pipe: the exit code must belong to the analyzer, not the pipe
     # (the tee trap — this is how the fake green appeared on Juliet)
     set +e
-    "$ZD_BIN" "$dir" --build-path "build-$dir" > "out-$dir.txt" 2>&1
+    if [ "$mode" = "db" ]; then
+        python3 - "$dir" <<'PYEOF'
+import json, sys
+d = sys.argv[1]
+db = json.load(open(f"build-{d}/compile_commands.json"))
+open(f"files-{d}.txt", "w").write("\n".join(sorted({e["file"] for e in db})))
+PYEOF
+        "$ZD_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
+            > "out-$dir.txt" 2>&1
+    else
+        "$ZD_BIN" "$dir" --build-path "build-$dir" > "out-$dir.txt" 2>&1
+    fi
     local code=$?
     set -e
     cat "out-$dir.txt"
@@ -87,8 +110,15 @@ run_one() { # <dir>
     fi
 }
 
-run_one cjson
-run_one tinyxml2
+run_one scan cjson
+run_one scan tinyxml2
+if [ "${CORPUS_DEEP:-0}" = "1" ]; then
+    run_one db abseil -DCMAKE_CXX_STANDARD=17 -DABSL_BUILD_TESTING=OFF
+    # catch2 pins at ZERO findings: a clean modern-C++ codebase is the
+    # FP-explosion tripwire — any rule change that suddenly produces
+    # findings here turns the guard red.
+    run_one db catch2 -DCATCH_BUILD_TESTING=OFF -DCATCH_INSTALL_DOCS=OFF
+fi
 
 echo ""
-echo "[corpus] OK — both projects analyzed crash-free"
+echo "[corpus] OK — all projects analyzed crash-free"

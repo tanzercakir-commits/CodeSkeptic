@@ -126,6 +126,40 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             if (lhs && tracked.count(lhs) &&
                 isAllocExpr(binOp->getRHS(), ctx))
                 effects.emplace_back(lhs, StmtEffect::Allocates);
+
+            // Storing a tracked pointer into something that outlives the
+            // local scope is an escape: a `this` member (`slot_ = copy;`,
+            // the abseil CrcCordState pattern), a global/static, a
+            // param-reachable or deref/array target. Deliberately NOT
+            // escapes (Juliet guard taught this, 2026-07-12):
+            //  - a plain LOCAL-to-local copy (`dataCopy = data;` alias
+            //    leaks must stay visible on the original), and
+            //  - a member of a LOCAL aggregate (`myStruct.ptr = data;` —
+            //    the aggregate itself dies at function end, the leak is
+            //    real; the Juliet 66/67 struct-passing families).
+            const VarDecl* rhsVar = asVar(binOp->getRHS());
+            if (rhsVar && tracked.count(rhsVar) && rhsVar != lhs) {
+                const Expr* lhsExpr = binOp->getLHS()->IgnoreParenImpCasts();
+                bool escapes;
+                if (lhs) {
+                    escapes = !lhs->hasLocalStorage();  // global/static
+                } else if (const auto* member =
+                               dyn_cast<MemberExpr>(lhsExpr)) {
+                    if (member->isArrow()) {
+                        escapes = true;  // pointee may live anywhere
+                    } else {
+                        const VarDecl* base = asVar(member->getBase());
+                        // local (non-param) aggregate: stays local;
+                        // param/global/this/complex base: escapes
+                        escapes = !(base && base->hasLocalStorage() &&
+                                    !isa<ParmVarDecl>(base));
+                    }
+                } else {
+                    escapes = true;  // *p = q, arr[i] = q, this-member...
+                }
+                if (escapes)
+                    effects.emplace_back(rhsVar, StmtEffect::Escapes);
+            }
         }
         return effects;
     }
@@ -147,6 +181,18 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         // Escapes (the callee may reassign/free it).
         struct VarCallEffect { bool escapes = false; bool frees = false; };
         std::map<const VarDecl*, VarCallEffect> byVar;
+
+        // Method call: `p->Track()` may stash `this` anywhere (observer/
+        // registry registration — the abseil CordzInfo pattern). The
+        // receiver escapes conservatively. Use-after-free stays intact:
+        // the receiver's MemberExpr is its own (earlier) CFG element and
+        // is checked against the pre-call state.
+        if (const auto* memberCall = dyn_cast<CXXMemberCallExpr>(call)) {
+            if (const VarDecl* recv =
+                    asVar(memberCall->getImplicitObjectArgument()))
+                if (tracked.count(recv)) byVar[recv].escapes = true;
+        }
+
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
             const Expr* arg = call->getArg(i);
             if (const auto* unary = dyn_cast<UnaryOperator>(
@@ -224,20 +270,27 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
                 allocCallMatcher())))))
     );
 
+    // Only automatic-storage locals are tracked. A static local or a
+    // global assigned an allocation is NOT an end-of-function leak: its
+    // lifetime is program-long and the "leak on purpose" singleton
+    // (`static Mutex* mu = new Mutex;` — deliberate Google style to
+    // dodge destruction-order fiasco) is idiomatic real-world code.
+    auto trackable = [](const VarDecl* v) { return v->hasLocalStorage(); };
+
     auto declMatchers = {newInitMatcher, mallocInitMatcher, mallocInitDirect};
     for (const auto& m : declMatchers) {
         auto wrapper = functionDecl(equalsNode(funcDecl),
                                      forEachDescendant(m));
         for (const auto& result : match(wrapper, *funcDecl, ctx)) {
             if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                vars.insert(v);
+                if (trackable(v)) vars.insert(v);
         }
     }
     auto assignMatchers = {newAssignMatcher, mallocAssignMatcher};
     for (const auto& m : assignMatchers) {
         for (const auto& result : match(findAll(m), *funcDecl->getBody(), ctx)) {
             if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                vars.insert(v);
+                if (trackable(v)) vars.insert(v);
         }
     }
     return {vars.begin(), vars.end()};
