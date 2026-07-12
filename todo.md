@@ -104,14 +104,15 @@ Juliet's CI weight, project name check.
       warnings on the same variable). Candidate: report only the FIRST
       deref per (variable, fact-origin) pair; later derefs become trace
       notes on the first finding.
-- [ ] **shadPS4 true positives worth reporting upstream**: (1)
-      savedata.cpp sceSaveDataMount/Mount2: `if (mount == nullptr &&
-      mount->dirName != nullptr)` derefs mount when it IS null (should
-      be `||`); (2) usb_backend.h GetMaxPacketSize: `desc = nullptr`
-      passed BY VALUE, callee cannot rebind it, then
-      `desc->bMaxPacketSize0` — definite null deref; (3)
-      libc_internal_io.cpp internal__Foprep: `if (file == nullptr)`
-      sets ENOMEM but does not return, then dereferences file.
+- [x] **shadPS4 true positives REPORTED UPSTREAM (2026-07-12)** — the
+      analyzer's first public real-world validation: (1) savedata.cpp
+      sceSaveDataMount/Mount2 `&&`-vs-`||` null-check →
+      shadps4-emu/shadPS4#4696; (2) usb_backend.h GetMaxPacketSize
+      by-value nullptr desc (memcpy into null) →
+      shadps4-emu/shadPS4#4697; (3) libc_internal_io.cpp
+      internal__Foprep missing return after ENOMEM →
+      shadps4-emu/shadPS4#4698. If maintainers answer "PR welcome",
+      the three fix diffs are ready to draft (one-to-three-liners).
 - ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
   fine-grained CFG splits a multi-declaration per variable, the second
   pointer is tracked too (pinned with regression tests, 2026-07-10).
