@@ -4,6 +4,7 @@
 #include "analyzer/SuppressionFilter.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/AllocFunctions.h"
 #include "engine/CfgCache.h"
 #include "engine/FatalCalls.h"
 #include "engine/FunctionSummary.h"
@@ -24,6 +25,8 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setFunctionFilter(config_.functions());
     setLineRanges(config_.lines());
     setFatalCallNames(config_.fatalAsserts());
+    setAllocFunctionNames(config_.allocFunctions());
+    setFreeFunctionNames(config_.freeFunctions());
 
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);
@@ -59,6 +62,8 @@ StaticAnalyzer::~StaticAnalyzer() {
     setFunctionFilter({});
     setLineRanges({});
     setFatalCallNames({});
+    setAllocFunctionNames({});
+    setFreeFunctionNames({});
     // Same rationale for the cross-TU summary store: one run's
     // summaries must not leak into the next (the MCP server runs many
     // analyses in the same process)

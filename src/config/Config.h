@@ -74,8 +74,19 @@ public:
         return fatal_asserts_;
     }
 
+    // Custom allocator wrappers (--alloc-functions / --free-functions):
+    // extend the leak/double-free/UAF domain to project-specific heap
+    // wrappers (git__malloc, zmalloc, ...).
+    const std::set<std::string>& allocFunctions() const {
+        return alloc_functions_;
+    }
+    const std::set<std::string>& freeFunctions() const {
+        return free_functions_;
+    }
+
 private:
     Severity parseSeverity(const std::string& str) const;
+    void addNamesTo(std::set<std::string>& target, const std::string& list);
 
     std::string source_path_;
     std::vector<std::string> source_files_;
@@ -89,6 +100,8 @@ private:
     std::string lang_;
     std::set<std::string> functions_;
     std::set<std::string> fatal_asserts_;
+    std::set<std::string> alloc_functions_;
+    std::set<std::string> free_functions_;
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;

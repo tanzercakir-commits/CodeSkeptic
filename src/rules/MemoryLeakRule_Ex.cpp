@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/AllocFunctions.h"
 #include "engine/CallRefArgs.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
@@ -17,6 +18,7 @@
 #include <clang/ASTMatchers/ASTMatchers.h>
 
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <set>
@@ -47,11 +49,6 @@ AllocState mergeAllocStates(AllocState a, AllocState b) {
 
 enum class StmtEffect { None, Allocates, Frees, Escapes };
 
-auto allocCallMatcher() {
-    return callExpr(callee(functionDecl(
-        hasAnyName("malloc", "calloc", "strdup"))));
-}
-
 // getName() is invalid on operator overloads — safe access
 llvm::StringRef calleeName(const FunctionDecl* callee) {
     if (!callee) return {};
@@ -62,17 +59,31 @@ llvm::StringRef calleeName(const FunctionDecl* callee) {
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
-    // Placement new constructs into EXISTING storage — no allocation
-    // happens and nothing is leakable (the NASA fprime AtomicQueue
-    // slot-initialization loop, `new (&m_slots[i]) Slot()`).
-    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr))
-        return newExpr->getNumPlacementArgs() == 0;
+    // Placement new into EXISTING storage (`new (&m_slots[i]) Slot()`,
+    // the NASA fprime AtomicQueue loop) allocates nothing. But not
+    // every placement ARG means placement STORAGE: `new (std::nothrow)
+    // T` is a genuine heap allocation — only a POINTER-typed placement
+    // argument designates caller-provided memory.
+    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr)) {
+        for (unsigned i = 0; i < newExpr->getNumPlacementArgs(); ++i) {
+            QualType t = newExpr->getPlacementArg(i)->getType();
+            if (t->isPointerType()) return false;
+        }
+        return true;
+    }
     if (const auto* cast = dyn_cast<CastExpr>(expr))
         return isAllocExpr(cast->getSubExpr(), ctx);
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         auto name = calleeName(call->getDirectCallee());
-        return name == "malloc" || name == "calloc" ||
-               name == "strdup" || name == "realloc";
+        if (name == "malloc" || name == "calloc" ||
+            name == "strdup" || name == "realloc")
+            return true;
+        // Project wrappers registered via --alloc-functions
+        // (git__malloc, zmalloc, ...) — without them the whole
+        // leak/double-free/UAF domain is blind in wrapper-heavy
+        // codebases.
+        return !name.empty() &&
+               zerodefect::allocFunctionNames().count(name.str()) != 0;
     }
     return false;
 }
@@ -86,6 +97,32 @@ const VarDecl* asVar(const Expr* expr) {
     // alone hid the variable from the escape analysis.
     expr = expr->IgnoreParenCasts();
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+// `&var->member`, `&var.member`, `&var` (chained members/subscripts
+// included): taking the address of an object or of one of its members
+// keeps the WHOLE object reachable through the handed-out pointer —
+// the object escapes wherever that address escapes. The libgit2
+// iterator pattern (`*out = &it->parent;` — the caller later frees
+// through the parent pointer) and the fprime font pattern
+// (`*glyph_out = &boxed->glyph;`) are both this shape.
+const VarDecl* addrOfMemberBase(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenCasts();
+    const auto* unary = dyn_cast<UnaryOperator>(expr);
+    if (!unary || unary->getOpcode() != UO_AddrOf) return nullptr;
+    const Expr* inner = unary->getSubExpr()->IgnoreParenCasts();
+    while (true) {
+        if (const auto* member = dyn_cast<MemberExpr>(inner))
+            inner = member->getBase()->IgnoreParenCasts();
+        else if (const auto* sub = dyn_cast<ArraySubscriptExpr>(inner))
+            inner = sub->getBase()->IgnoreParenCasts();
+        else
+            break;
+    }
+    if (const auto* ref = dyn_cast<DeclRefExpr>(inner))
         return dyn_cast<VarDecl>(ref->getDecl());
     return nullptr;
 }
@@ -181,6 +218,18 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             //    the aggregate itself dies at function end, the leak is
             //    real; the Juliet 66/67 struct-passing families).
             const VarDecl* rhsVar = asVar(binOp->getRHS());
+            if (!rhsVar)
+                rhsVar = addrOfMemberBase(binOp->getRHS());
+            if (!rhsVar) {
+                // Chained assignment: `*out = counts = git__calloc(...)`
+                // stores the same value the inner assignment gave to
+                // `counts` — the escape applies to that variable (the
+                // libgit2 checkout out-param idiom).
+                const Expr* rhs = binOp->getRHS()->IgnoreParenCasts();
+                if (const auto* inner = dyn_cast<BinaryOperator>(rhs))
+                    if (inner->getOpcode() == BO_Assign)
+                        rhsVar = asVar(inner->getLHS());
+            }
             if (rhsVar && tracked.count(rhsVar) && rhsVar != lhs) {
                 const Expr* lhsExpr = binOp->getLHS()->IgnoreParenImpCasts();
                 bool escapes;
@@ -219,7 +268,11 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
     }
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
         const FunctionDecl* callee = call->getDirectCallee();
-        const bool isFreeByName = calleeName(callee) == "free";
+        const llvm::StringRef name = calleeName(callee);
+        const bool isFreeByName =
+            name == "free" ||
+            (!name.empty() &&
+             zerodefect::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
             zerodefect::SummaryRegistry::instance().lookup(callee);
         using PE = zerodefect::SummaryRegistry::ParamEffect;
@@ -252,7 +305,9 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             if (const auto* unary = dyn_cast<UnaryOperator>(
                     arg->IgnoreParenImpCasts())) {
                 if (unary->getOpcode() == UO_AddrOf) {
-                    const VarDecl* var = asVar(unary->getSubExpr());
+                    // &var AND &var->member both hand out a way to
+                    // reach (and free) the object.
+                    const VarDecl* var = addrOfMemberBase(arg);
                     if (var && tracked.count(var))
                         byVar[var].escapes = true;
                 }
@@ -294,6 +349,8 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
     }
     if (const auto* ret = dyn_cast<ReturnStmt>(stmt)) {
         const VarDecl* var = asVar(ret->getRetValue());
+        if (!var)
+            var = addrOfMemberBase(ret->getRetValue());
         if (var && tracked.count(var))
             effects.emplace_back(var, StmtEffect::Escapes);
     }
@@ -306,34 +363,21 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
                                                 ASTContext& ctx) {
     std::set<const VarDecl*> vars;
 
-    auto newInitMatcher = varDecl(
+    // The matchers only pre-select CANDIDATES (pointer var initialized /
+    // assigned from any expression); the real allocation test is
+    // isAllocExpr — one place that knows the built-in names, the
+    // --alloc-functions registry, casts and the placement-new
+    // exemption. The old per-name matcher list silently missed realloc
+    // and could never see registered wrappers.
+    auto candidateInit = varDecl(
         hasType(pointerType()),
-        hasInitializer(ignoringParenImpCasts(cxxNewExpr()))
+        hasInitializer(expr())
     ).bind("var");
-    auto mallocInitMatcher = varDecl(
-        hasType(pointerType()),
-        hasInitializer(ignoringParenImpCasts(
-            castExpr(hasSourceExpression(ignoringParenImpCasts(
-                allocCallMatcher())))))
-    ).bind("var");
-    auto mallocInitDirect = varDecl(
-        hasType(pointerType()),
-        hasInitializer(ignoringParenImpCasts(allocCallMatcher()))
-    ).bind("var");
-    auto newAssignMatcher = binaryOperator(
+    auto candidateAssign = binaryOperator(
         hasOperatorName("="),
         hasLHS(ignoringParenImpCasts(declRefExpr(
-            to(varDecl(hasType(pointerType())).bind("var"))))),
-        hasRHS(ignoringParenImpCasts(cxxNewExpr()))
-    );
-    auto mallocAssignMatcher = binaryOperator(
-        hasOperatorName("="),
-        hasLHS(ignoringParenImpCasts(declRefExpr(
-            to(varDecl(hasType(pointerType())).bind("var"))))),
-        hasRHS(ignoringParenImpCasts(
-            castExpr(hasSourceExpression(ignoringParenImpCasts(
-                allocCallMatcher())))))
-    );
+            to(varDecl(hasType(pointerType())).bind("var")))))
+    ).bind("assign");
 
     // Only automatic-storage locals are tracked. A static local or a
     // global assigned an allocation is NOT an end-of-function leak: its
@@ -342,23 +386,91 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     // dodge destruction-order fiasco) is idiomatic real-world code.
     auto trackable = [](const VarDecl* v) { return v->hasLocalStorage(); };
 
-    auto declMatchers = {newInitMatcher, mallocInitMatcher, mallocInitDirect};
-    for (const auto& m : declMatchers) {
-        auto wrapper = functionDecl(equalsNode(funcDecl),
-                                     forEachDescendant(m));
-        for (const auto& result : match(wrapper, *funcDecl, ctx)) {
-            if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                if (trackable(v)) vars.insert(v);
-        }
+    auto wrapper = functionDecl(equalsNode(funcDecl),
+                                 forEachDescendant(candidateInit));
+    for (const auto& result : match(wrapper, *funcDecl, ctx)) {
+        const auto* v = result.getNodeAs<VarDecl>("var");
+        if (v && trackable(v) && v->hasInit() &&
+            isAllocExpr(v->getInit(), ctx))
+            vars.insert(v);
     }
-    auto assignMatchers = {newAssignMatcher, mallocAssignMatcher};
-    for (const auto& m : assignMatchers) {
-        for (const auto& result : match(findAll(m), *funcDecl->getBody(), ctx)) {
-            if (const auto* v = result.getNodeAs<VarDecl>("var"))
-                if (trackable(v)) vars.insert(v);
-        }
+    for (const auto& result :
+         match(findAll(candidateAssign), *funcDecl->getBody(), ctx)) {
+        const auto* v = result.getNodeAs<VarDecl>("var");
+        const auto* assign = result.getNodeAs<BinaryOperator>("assign");
+        if (v && assign && trackable(v) &&
+            isAllocExpr(assign->getRHS(), ctx))
+            vars.insert(v);
     }
     return {vars.begin(), vars.end()};
+}
+
+// Flow-insensitive alias groups over direct local-to-local pointer
+// copies (`b = a;` / `T* b = a;` between tracked locals). Used ONLY to
+// propagate ESCAPES (see transfer): once one alias is handed out, the
+// allocation is reachable by the caller regardless of which name we
+// first saw it under.
+std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
+        const FunctionDecl* funcDecl, ASTContext& ctx,
+        const std::set<const VarDecl*>& tracked) {
+    std::map<const VarDecl*, const VarDecl*> parent;  // union-find
+    std::function<const VarDecl*(const VarDecl*)> find =
+        [&](const VarDecl* v) -> const VarDecl* {
+        auto it = parent.find(v);
+        if (it == parent.end() || it->second == v) return v;
+        return parent[v] = find(it->second);
+    };
+    auto unite = [&](const VarDecl* a, const VarDecl* b) {
+        // Register both nodes: the group materialization below walks
+        // the parent map's keys, so roots must appear there too.
+        parent.emplace(a, a);
+        parent.emplace(b, b);
+        const VarDecl* ra = find(a);
+        const VarDecl* rb = find(b);
+        if (ra != rb) parent[ra] = rb;
+    };
+
+    auto copyAssign = binaryOperator(
+        hasOperatorName("="),
+        hasLHS(ignoringParenImpCasts(declRefExpr(
+            to(varDecl(hasType(pointerType())).bind("lhs"))))),
+        hasRHS(ignoringParenCasts(declRefExpr(
+            to(varDecl(hasType(pointerType())).bind("rhs"))))));
+    for (const auto& result :
+         match(findAll(copyAssign), *funcDecl->getBody(), ctx)) {
+        const auto* l = result.getNodeAs<VarDecl>("lhs");
+        const auto* r = result.getNodeAs<VarDecl>("rhs");
+        if (l && r && l != r && l->hasLocalStorage() &&
+            (tracked.count(l) || tracked.count(r)))
+            unite(l, r);
+    }
+    auto copyInit = varDecl(
+        hasType(pointerType()),
+        hasInitializer(ignoringParenCasts(declRefExpr(
+            to(varDecl(hasType(pointerType())).bind("rhs")))))).bind("lhs");
+    auto wrapper = functionDecl(equalsNode(funcDecl),
+                                 forEachDescendant(copyInit));
+    for (const auto& result : match(wrapper, *funcDecl, ctx)) {
+        const auto* l = result.getNodeAs<VarDecl>("lhs");
+        const auto* r = result.getNodeAs<VarDecl>("rhs");
+        if (l && r && l != r && l->hasLocalStorage() &&
+            (tracked.count(l) || tracked.count(r)))
+            unite(l, r);
+    }
+
+    // Materialize: for each var, its group members (self excluded)
+    std::map<const VarDecl*, std::vector<const VarDecl*>> byRoot;
+    for (const auto& [v, _] : parent) byRoot[find(v)].push_back(v);
+    std::map<const VarDecl*, std::vector<const VarDecl*>> groups;
+    for (const auto& [root, members] : byRoot) {
+        if (members.size() < 2) continue;
+        for (const VarDecl* v : members) {
+            auto& list = groups[v];
+            for (const VarDecl* other : members)
+                if (other != v) list.push_back(other);
+        }
+    }
+    return groups;
 }
 
 // --- Branch condition refinement (assume edges) ---
@@ -403,10 +515,13 @@ public:
     MemLeakAnalysis(const std::vector<const VarDecl*>& trackedVars,
                     std::set<const ValueDecl*> mutatedDecls,
                     std::string funcName,
+                    std::map<const VarDecl*, std::vector<const VarDecl*>>
+                        aliasGroups,
                     zerodefect::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
           mutated_(std::move(mutatedDecls)),
+          aliasGroups_(std::move(aliasGroups)),
           funcName_(std::move(funcName)), results_(results) {
         zerodefect::Guarded<VarState> init;
         for (const auto* var : trackedVars_)
@@ -443,8 +558,24 @@ public:
                         d.vars[var] = AllocState::Allocated; break;
                     case StmtEffect::Frees:
                         d.vars[var] = AllocState::Freed; break;
-                    case StmtEffect::Escapes:
-                        d.vars[var] = AllocState::Escaped; break;
+                    case StmtEffect::Escapes: {
+                        // An escape travels through local aliases:
+                        // `dup = git__strdup(s); result = dup;
+                        // return result;` hands the SAME allocation
+                        // out, so dup escapes too (the libgit2
+                        // realpath copy-then-return shape). Escape is
+                        // the safe direction to propagate — it only
+                        // silences reports. Frees stay per-variable:
+                        // flow-insensitive groups would fabricate
+                        // double-frees for `b = a; b = other;
+                        // free(b); free(a)`.
+                        d.vars[var] = AllocState::Escaped;
+                        auto group = aliasGroups_.find(var);
+                        if (group != aliasGroups_.end())
+                            for (const VarDecl* member : group->second)
+                                d.vars[member] = AllocState::Escaped;
+                        break;
+                    }
                     case StmtEffect::None: break;
                 }
             }
@@ -582,6 +713,7 @@ private:
     const std::vector<const VarDecl*>& trackedVars_;
     std::set<const VarDecl*> trackedSet_;
     std::set<const ValueDecl*> mutated_;
+    std::map<const VarDecl*, std::vector<const VarDecl*>> aliasGroups_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
     State initState_;
@@ -598,9 +730,21 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     auto trackedVars = collectTrackedVars(funcDecl, ctx);
     if (trackedVars.empty()) return;
 
+    std::set<const VarDecl*> trackedSet(trackedVars.begin(),
+                                        trackedVars.end());
+    auto aliasGroups = collectAliasGroups(funcDecl, ctx, trackedSet);
+    // Alias-connected variables join the tracked set: their state
+    // starts None (they never produce leak reports of their own), but
+    // an escape THROUGH them (`result = dup; return result;`) must be
+    // visible so it can propagate to the allocation they alias.
+    for (const auto& [var, members] : aliasGroups) {
+        (void)members;
+        if (trackedSet.insert(var).second) trackedVars.push_back(var);
+    }
     MemLeakAnalysis analysis(
         trackedVars, zerodefect::collectMutatedDecls(funcDecl),
-        funcDecl->getQualifiedNameAsString(), results);
+        funcDecl->getQualifiedNameAsString(),
+        std::move(aliasGroups), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
         std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,

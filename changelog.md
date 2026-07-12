@@ -1,5 +1,65 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Configurable allocators: the leak domain learns project wrappers
+
+### Added
+- **`--alloc-functions` / `--free-functions`** (CLI + conf keys):
+  extend leak/double-free/UAF analysis to project heap wrappers
+  (git__malloc, zmalloc, ...). Without them the whole domain is BLIND
+  in wrapper-heavy codebases — libgit2 had produced literally zero
+  leak findings. Tracked-variable collection now funnels through
+  isAllocExpr (one place knowing built-ins, the registry, casts and
+  the placement-new exemption; the old matcher list silently missed
+  realloc). Registries share the fatal-calls lifecycle (cleared in
+  ~StaticAnalyzer).
+
+### Changed (escape refinements the libgit2 validation demanded)
+- **Address-of-member escape**: `*out = &it->parent;`,
+  `track(&boxed->glyph)`, `return &obj->member;` — handing out a
+  member's address keeps the whole object reachable. Closes the todo
+  item from the fprime font FP.
+- **Alias escape propagation**: flow-insensitive alias groups over
+  local pointer copies; an ESCAPE through any alias escapes the group
+  (`dup = git__strdup(s); result = dup; return result;` — the libgit2
+  realpath shape). Deliberately escape-only: frees stay per-variable
+  (flow-insensitive groups would fabricate double-frees), and a
+  non-escaping alias saves nothing (Juliet dataCopy pin re-stated).
+- **Chained-assignment escape**: `*out = counts = git__calloc(...)`
+  stores the allocation through the out-param (libgit2 checkout).
+- libgit2 leak-domain result: 0 → 31 findings on first light, → **15**
+  after the three refinements. Hand-verified sample: merge.c
+  `similarity_ours` leaks when `similarity_theirs`'s allocation fails
+  (GIT_ERROR_CHECK_ALLOC returns -1 without freeing the first buffer)
+  — a REAL OOM-path leak class; the remaining findings match the same
+  multi-allocation early-return shape (next-round triage / upstream
+  report candidates).
+
+### Changed (round 2 — the Juliet guard spoke, again)
+- **CWE401 precision floor 0.60 → 0.55, with a main-vs-PR diff as
+  evidence.** The guard flagged rprecision 0.559 (CI). Local replay
+  against a mirrored Juliet suite: main 78TP/36FP (0.684) vs PR
+  81TP/56FP (0.591 after the nothrow fix). Every one of the +24 FPs is
+  a realloc-family file — the old matcher list NEVER tracked realloc,
+  so those ~25 files were invisible; now visible, their good variants
+  hit the documented correlated-guard limitation
+  (staticReturnsTrue()/False() call conditions — PathFacts cannot key
+  disjuncts on calls; the guarded-disjuncts-v2 item). 4 old FPs also
+  vanished (escape refinements). Coverage widened, absolute TPs rose,
+  the ratio dipped on the newly visible files: floor adjusted in the
+  same PR, per policy.
+- **Nothrow-new regression caught and pinned**: the placement-new
+  exemption was excluding `new (std::nothrow) T` — a real heap
+  allocation. Only POINTER-typed placement args mean caller storage.
+  Worth 7 FPs of the CI drop (0.559 → 0.591).
+
+### Verification
+- 284/284 tests (ctest + single-process; +4 AllocFunctionsTest with
+  the unregistered-wrapper-invisible pin, +3 AddrOfMemberTest with the
+  local-alias flip side, +3 AliasEscapeTest with the Juliet dataCopy
+  re-pin). Corpus pins unchanged (cjson 123, tinyxml2 9). Juliet
+  floors referee in CI — the alias-escape direction only silences
+  reports, never invents them.
+
 ## 2026-07-12 — libgit2 + llama.cpp FP hunt: two C-idiom families
 
 ### Changed

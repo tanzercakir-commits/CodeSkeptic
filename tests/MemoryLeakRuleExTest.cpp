@@ -1,4 +1,5 @@
 #include "TestHelper.h"
+#include "engine/AllocFunctions.h"
 #include "rules/MemoryLeakRule_Ex.h"
 
 #include <gtest/gtest.h>
@@ -710,6 +711,199 @@ TEST(FprimeFpTest, PlainNew_StillTracked) {
         void f() {
             Slot* s = new Slot();
             s->v = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+// --- Configurable allocators (2026-07-12, the libgit2 lesson) ---
+
+namespace {
+// Process-global registries: always cleared on scope exit (the
+// single-process test run is what catches leaked state).
+class AllocScope {
+public:
+    AllocScope(std::set<std::string> allocs, std::set<std::string> frees) {
+        setAllocFunctionNames(std::move(allocs));
+        setFreeFunctionNames(std::move(frees));
+    }
+    ~AllocScope() {
+        setAllocFunctionNames({});
+        setFreeFunctionNames({});
+    }
+};
+} // namespace
+
+TEST(AllocFunctionsTest, WrapperLeak_VisibleWhenRegistered) {
+    AllocScope scope({"git__malloc"}, {"git__free"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* git__malloc(unsigned long);
+        void f() {
+            char* buf = (char*)git__malloc(64);
+            (void)buf;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_NE(results[0].message.find("leak"), std::string::npos);
+}
+
+TEST(AllocFunctionsTest, WrapperFree_ClosesTheLeak) {
+    AllocScope scope({"git__malloc"}, {"git__free"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* git__malloc(unsigned long);
+        extern "C" void git__free(void*);
+        void f() {
+            char* buf = (char*)git__malloc(64);
+            git__free(buf);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AllocFunctionsTest, WrapperDoubleFree_Caught) {
+    AllocScope scope({"git__malloc"}, {"git__free"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* git__malloc(unsigned long);
+        extern "C" void git__free(void*);
+        void f() {
+            char* buf = (char*)git__malloc(64);
+            git__free(buf);
+            git__free(buf);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(AllocFunctionsTest, Unregistered_WrapperStaysInvisible) {
+    // The flip side (and the pre-flag behavior pin): without
+    // registration a wrapper allocation is not tracked at all.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* git__malloc(unsigned long);
+        void f() {
+            char* buf = (char*)git__malloc(64);
+            (void)buf;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+// --- Address-of-member escape (libgit2 iterator / fprime font) ---
+
+TEST(AddrOfMemberTest, MemberAddressThroughOutParam_Escapes_NoLeak) {
+    // The libgit2 iterator pattern: `*out = &it->parent;` — the caller
+    // reaches (and frees) the whole object through the member address.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Parent { int x; };
+        struct Iter { Parent parent; int head; };
+        int make(Parent** out) {
+            Iter* it = new Iter();
+            it->head = 1;
+            *out = &it->parent;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AddrOfMemberTest, MemberAddressAsCallArg_Escapes_NoLeak) {
+    // The fprime font pattern: TrackGeneratedGlyph(&boxed->glyph);
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Glyph { int magic; };
+        struct Boxed { Glyph glyph; };
+        void track(Glyph* g);
+        void f() {
+            Boxed* boxed = new Boxed();
+            track(&boxed->glyph);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AddrOfMemberTest, MemberAddressIntoLocal_LeakStaysVisible) {
+    // The flip side: keeping the member address in a LOCAL alias does
+    // not save the object — nothing outlives the function.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Glyph { int magic; };
+        struct Boxed { Glyph glyph; };
+        void f() {
+            Boxed* boxed = new Boxed();
+            Glyph* alias;
+            alias = &boxed->glyph;
+            (void)alias;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+// --- Alias escape propagation (libgit2 realpath copy-then-return) ---
+
+TEST(AliasEscapeTest, CopyThenReturn_NoLeak) {
+    // `dup = strdup(s); result = dup; return result;` hands the SAME
+    // allocation out — dup escapes through its alias.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" char* strdup(const char*);
+        char* f(const char* s, char* result) {
+            char* dup = strdup(s);
+            result = dup;
+            return result;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, CopyNoEscape_LeakStaysVisible) {
+    // The flip side (and the Juliet dataCopy pin, re-stated): a local
+    // alias that never escapes saves nothing.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" char* strdup(const char*);
+        void f(const char* s) {
+            char* dup = strdup(s);
+            char* copy;
+            copy = dup;
+            (void)copy;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(AliasEscapeTest, ChainedAssignThroughOutParam_Escapes_NoLeak) {
+    // `*out = counts = calloc(...)` — the caller owns the allocation
+    // through the out-param (the libgit2 checkout idiom).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* calloc(unsigned long, unsigned long);
+        int f(unsigned long** out) {
+            unsigned long* counts = 0;
+            *out = counts = (unsigned long*)calloc(4, 8);
+            if (!counts) { return -1; }
+            counts[0] = 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
+    // `new (std::nothrow) T` carries a placement ARG but allocates from
+    // the heap — only a POINTER-typed placement argument designates
+    // caller-provided storage.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std { struct nothrow_t {}; extern const nothrow_t nothrow; }
+        void* operator new(unsigned long, const std::nothrow_t&) noexcept;
+        struct T { int v; };
+        void f() {
+            T* p = new (std::nothrow) T();
+            (void)p;
         }
     )");
     ASSERT_EQ(results.size(), 1);

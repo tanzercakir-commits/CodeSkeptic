@@ -2,6 +2,7 @@ add_library(zerodefect_core STATIC
     core/Messages.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
+    engine/AllocFunctions.cpp
     engine/CfgCache.cpp
     engine/FatalCalls.cpp
     engine/RuleEngine.cpp
