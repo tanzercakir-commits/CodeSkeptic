@@ -78,29 +78,30 @@ FP-hunting material).
 
 | CWE | Target rule | Rule precision | Recall | Case F1 |
 |-----|-------------|---------------:|-------:|--------:|
-| CWE-416 Use After Free | `use-after-free` | **1.000** (174 TP / 0 FP) | 0.436 | **0.607** |
-| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (139 TP / 0 FP) | 0.347 | **0.516** |
-| CWE-415 Double Free | `double-free` | **1.000** (88 TP / 0 FP) | 0.220 | 0.361 |
-| CWE-401 Memory Leak | `memory-leak` | 0.653 (case-level) | 0.246 | 0.357 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (21 TP / 0 FP) | 0.053 | 0.100 |
+| CWE-416 Use After Free | `use-after-free` | **1.000** (200 TP / 0 FP) | 0.501 | **0.668** |
+| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (141 TP / 0 FP) | 0.352 | **0.521** |
+| CWE-415 Double Free | `double-free` | **1.000** (95 TP / 0 FP) | 0.241 | 0.388 |
+| CWE-401 Memory Leak | `memory-leak` | 0.716 (case-level) | 0.195 | 0.306 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (20 TP / 0 FP) | 0.050 | 0.095 |
 
-The journey these numbers took (all on 2026-07-10): targeted
-path-sensitivity cut false positives across rules (memory-leak
-92 → 61, uninit-ptr 178 → 84, cross-file null-deref noise 241 → 129)
-and *surfaced previously missed true positives* — correlated-guard
-double frees and use-after-frees (+107 TP combined) were false
-negatives under merged-path analysis. Cross-TU summaries
-(`--whole-program`) then connected source/sink flows split across
-files (double-free +9 TP, leak +5 TP, with variant-group sampling so
-a/b file pairs stay together). Return-zeroness summaries lifted
-divide-by-zero across function boundaries (18 → 21 TP at precision
-1.000 in the PR sample; the `data = badSource(); 100 / data` pattern
-dominates CWE-369 and its source is almost never in the same
-function). A caveat on cross-rule findings: Juliet
-`good` functions are only guaranteed free of the *tested* CWE — e.g. a
-CWE-416 good function may genuinely leak, so a `memory-leak` finding
-there is counted against us while possibly being correct. The
-rule-matched columns are the sound metric.
+The journey these numbers took: targeted path-sensitivity
+(2026-07-10) cut false positives across rules (memory-leak 92 → 61,
+uninit-ptr 178 → 84, cross-file null-deref noise 241 → 129) and
+*surfaced previously missed true positives* — correlated-guard double
+frees and use-after-frees (+107 TP combined) were false negatives
+under merged-path analysis. Cross-TU summaries (`--whole-program`)
+connected source/sink flows split across files. Guarded disjuncts v2
+(2026-07-12) added call-condition keys, a flow-sensitive fact
+lifecycle with constant stamping and entailment, disjunction
+elimination for value-materialized asserts, and engine-level
+convergence widening — CWE-416 recall rose 0.436 → 0.501 and CWE-401
+precision 0.653 → 0.716 in the same step that removed hundreds of
+real-world false positives (see the scan table below). A caveat on
+cross-rule findings: Juliet `good` functions are only guaranteed free
+of the *tested* CWE — e.g. a CWE-416 good function may genuinely
+leak, so a `memory-leak` finding there is counted against us while
+possibly being correct. The rule-matched columns are the sound
+metric.
 
 Beyond precision/hit-rate, the harness reports **case-level F1** (each
 file is a case: a matched finding in a `bad` function is a case-TP, in
@@ -128,8 +129,46 @@ Notes on reading these numbers honestly:
   cross-rule noise on other CWEs' files) and is the current
   improvement target.
 
-Results are from the 2026-07-09 run; grep `JULIET_RESULT` in the
+Results are from the 2026-07-12 run; grep `JULIET_RESULT` in the
 weekly workflow logs for current numbers.
+
+## Real-world scans
+
+Synthetic benchmarks reward pattern coverage; real codebases punish
+every false positive. Each project below was built with its own build
+system, analyzed from its compilation database, and every surviving
+finding was triaged by hand. All numbers are from one analyzer build
+(2026-07-12); the "initial" column is what the same scan reported when
+the project was first tried, before the false-positive families it
+exposed were fixed.
+
+| Project | Scope | Initial → now | Hand-verified real bugs |
+|---------|-------|--------------:|------------------------|
+| [systemd](https://github.com/systemd/systemd) | 494 files (basic/core/shared) | 414 → **53** | 3 deliberate leak-shaped idioms, documented |
+| [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 confirmed, reported upstream** |
+| [libgit2](https://github.com/libgit2/libgit2) | 168 files | 149 → **44** | **11 confirmed OOM-path leaks** (one issue class, report drafted) |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | full build | 511 → **25** | triage in progress |
+| [rtp2httpd](https://github.com/stackia/rtp2httpd) | 27k lines | 4 → **3** | **1 confirmed NULL-contract bug**, report drafted |
+| [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **2** | triage in progress |
+| [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
+| [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
+
+Two things make these numbers move:
+
+- **Idiom support is configuration, not code**: project allocators
+  (`--alloc-functions git__malloc,... --free-functions git__free`),
+  fatal assert macros (`--fatal-asserts assert_fail_impl`), and
+  cleanup attributes (`_cleanup_free_`, `g_autofree`) are recognized
+  so the analysis sees the code the way the project means it.
+- **Every false-positive family became an engine feature with a
+  pinned test**: pointer-relational validity (systemd's
+  `FOREACH_ARRAY`, 235 findings from one root cause),
+  cross-variable correlation (flag/status guards, `assert(p || len
+  <= 0)` contracts), value-selection rewind (llama's defensive
+  ternary macros), escape analysis for macro idioms (`TAKE_PTR`,
+  `free_and_replace`, compound literals). The remaining findings per
+  project are classified and documented — nothing is hidden behind a
+  suppression list.
 
 ## Architecture
 

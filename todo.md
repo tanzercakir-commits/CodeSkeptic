@@ -135,6 +135,12 @@ Juliet's CI weight, project name check.
       LIST file was not found. (Cost 20 minutes of scan-diff confusion:
       the fallback positional-dir invocation scanned the whole 2372-file
       compile DB instead of the intended 493.)
+- [ ] llama.cpp non-convergence residue (2026-07-12): 72 warnings but
+      only 4 UNIQUE functions — all nlohmann/json.hpp header templates
+      (get_unchecked/get_checked/get_and_create/contains), re-counted
+      in every TU that includes the header. Down from 86 pre-widening.
+      Heavy recursive-template CFGs; candidates for a per-function
+      block-count bailout or a header-dedup on the warning itself.
 - [ ] Juliet 44/45 families ("data passed via static global"): known FN
       after the escape refinement — storing an allocation into a
       global/static suppresses the local leak report by design.
