@@ -14,10 +14,36 @@
   { return 1; }`) that produced the ~24 realloc-family FPs measured in
   the previous round. Numbers in the verification note.
 
+### Changed (the measurement chain — each fix's replay exposed the next)
+- **Freed-through-alias suppression** (exit-time, per DISJUNCT): the
+  Juliet malloc_realloc good shape frees the allocation under the
+  alias's name; flattening first would dissolve the alias's Freed into
+  None on guarded paths, so the check runs per disjunct. Frees still
+  never propagate through the flow-insensitive groups (that would
+  fabricate double-frees). Accepted FN pinned: alias variable reused
+  for a second allocation.
+- **Noreturn calls kill dataflow paths** (DataflowEngine,
+  CFGBlock::hasNoReturnElement — the general form of --fatal-asserts):
+  Clang wires `exit(-1)` blocks straight to the CFG exit, and their
+  dead state DILUTED live-path facts there (Freed ⊔ None = None),
+  blinding the alias check across the whole family. A process-killing
+  path does not vote on end-of-function state.
+- **Debugging lesson recorded**: ConsoleReporter writes findings to
+  stderr — three "clean" replications during this hunt were grepping
+  stdout. Empiricism still beat theory (the file-list bisect exposed
+  the wrong assumption), but the stream mix-up cost an hour.
+
+### Measured (local mirrored-suite replay, floors raised in this PR)
+- CWE401 rprecision 0.559 (CI low) → **0.669**; floor 0.55 → **0.62**.
+- CWE416 rhitrate 0.436 → **0.476** (call-guard pairing restored UAF
+  TPs); floor 0.38 → **0.44**. CWE415 rhitrate 0.210 → 0.225; floor
+  0.20 → 0.21. CWE476 overall precision 0.549 → 0.602 (leak-FP side).
+- Corpus: cjson 55→54 (within pin tolerance), tinyxml2 9.
+
 ### Verification
-- 290/290 tests (+3 CallGuardTest: correlated call guards pair up,
-  bodyless externs stay unkeyed, state-reading bodies stay unkeyed).
-  Corpus pins hold (cjson 55, tinyxml2 9 — measured locally).
+- 294/294 tests (+3 CallGuardTest, +4 alias/guard/noreturn pins across
+  AliasEscapeTest). All five Juliet floors green at the RAISED values
+  (verified locally before push).
 
 ## 2026-07-12 — Report-flood dedup: one warning per variable
 
