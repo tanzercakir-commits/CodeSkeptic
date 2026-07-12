@@ -64,6 +64,23 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
+- [ ] **Short-circuit condition-tree joins (THE dominant open FP
+      family — 110+ of systemd's 302 null-derefs, one macro)**:
+      FOREACH_ARRAY expands to `end = (i && m > 0) ? i + m : NULL;`.
+      The && splits the ternary condition into multiple CFG blocks;
+      the FALSE arm receives TWO edges (i-false and m>0-false), and
+      their pre-join merge dilutes `i: Null ⊔ NonNull = MaybeNull`
+      BEFORE the value-selection rewind can see the diamond (the
+      rewind requires single-pred arms). General principle: a join of
+      multiple SAME-DIRECTION edges of one short-circuit condition
+      tree is tautological — it should merge to refine(entry, C, dir),
+      exactly like the simple-diamond rewind. Engine design work;
+      candidate for the v2 design day (with cross-variable
+      correlation). Effort: max recommended.
+- [ ] **rtp2httpd TP for upstream** (verified 2026-07-12):
+      configuration.c:1342-1358 — `if (arg && arg[0] == '/')` admits
+      arg may be NULL; the next block dereferences `arg[0]`
+      unconditionally. Draft ready (rtp2httpd_upstream_report.md).
 - [x] **--files UX hardening — done (2026-07-12)**: non-absolute
       entries retried against --build-path; zero analyzable files is
       exit 2, not a clean pass.
