@@ -25,6 +25,29 @@ std::optional<int64_t> intLiteralValue(const Expr* expr) {
     return std::nullopt;
 }
 
+// A direct zero-argument call whose entire visible body is
+// `return <integer literal>;` is as invariant as a const variable —
+// the function CANNOT return anything else, so keying the condition
+// on the callee is sound (no purity guess involved). This is the
+// Juliet flow-variant shape (`static int staticReturnsTrue()
+// { return 1; }`) that produced ~24 realloc-family FPs once the
+// realloc coverage gap closed (2026-07-12). Anything weaker — extern
+// declarations (rand()), bodies reading globals — stays unkeyed.
+const FunctionDecl* constReturningCallee(const Expr* expr) {
+    const auto* call = dyn_cast<CallExpr>(expr);
+    if (!call || call->getNumArgs() != 0) return nullptr;
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!callee) return nullptr;
+    const FunctionDecl* def = nullptr;
+    if (!callee->hasBody(def) || !def) return nullptr;
+    const auto* body = dyn_cast<CompoundStmt>(def->getBody());
+    if (!body || body->size() != 1) return nullptr;
+    const auto* ret = dyn_cast<ReturnStmt>(body->body_front());
+    if (!ret) return nullptr;
+    if (!intLiteralValue(ret->getRetValue())) return nullptr;
+    return def->getCanonicalDecl();
+}
+
 const ValueDecl* stableDeclRef(
         const Expr* expr,
         const std::set<const ValueDecl*>& mutated) {
@@ -106,6 +129,11 @@ std::optional<std::pair<FactKey, bool>> conditionFact(
     // if (X): truthiness  ≡  (X == 0) is false
     if (const ValueDecl* var = stableDeclRef(cond, mutated))
         return {{FactKey{var, BO_EQ, 0}, false}};
+
+    // if (f()): constant-returning helpers key on the callee
+    // (FunctionDecl is a ValueDecl — the key structure is unchanged)
+    if (const FunctionDecl* callee = constReturningCallee(cond))
+        return {{FactKey{callee, BO_EQ, 0}, false}};
 
     if (const auto* unary = dyn_cast<UnaryOperator>(cond)) {
         if (unary->getOpcode() == UO_LNot) {

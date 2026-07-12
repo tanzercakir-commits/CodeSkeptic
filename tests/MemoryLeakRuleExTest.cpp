@@ -908,3 +908,71 @@ TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- Disjuncts v2a (2026-07-12): constant-returning call guards ---
+
+TEST(CallGuardTest, ConstReturningHelper_CorrelatedGuards_Clean) {
+    // The Juliet flow-variant shape: alloc and free both guarded by
+    // the same constant-returning static helper — the disjunct pairing
+    // must recognize the correlation.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static int staticReturnsTrue() { return 1; }
+        void f() {
+            char* data = 0;
+            if (staticReturnsTrue()) {
+                data = (char*)malloc(16);
+            }
+            if (staticReturnsTrue()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CallGuardTest, BodylessExtern_NotKeyed_LeakStaysVisible) {
+    // The flip side: rand() has no visible body — two calls may
+    // return different values, so the phantom alloc-without-free path
+    // is REAL and must stay reported.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        extern "C" int rand();
+        void f() {
+            char* data = 0;
+            if (rand()) {
+                data = (char*)malloc(16);
+            }
+            if (rand()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(CallGuardTest, StateReadingBody_NotKeyed_LeakStaysVisible) {
+    // A helper that reads mutable state is not invariant between the
+    // two guards — not keyed, the leak path stays visible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int g_flag;
+        static int readsGlobal() { return g_flag; }
+        void f() {
+            char* data = 0;
+            if (readsGlobal()) {
+                data = (char*)malloc(16);
+            }
+            if (readsGlobal()) {
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}

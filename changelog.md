@@ -1,5 +1,24 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Disjuncts v2a: constant-returning call guards
+
+### Changed
+- **PathFacts keys one class of CALL conditions**: direct zero-argument
+  calls whose entire visible body is `return <integer literal>;` key on
+  the callee (a FunctionDecl is a ValueDecl — the key structure is
+  unchanged). Such a helper CANNOT return anything else, so pairing the
+  two guards is sound — no purity guessing involved. Anything weaker
+  (rand(), extern declarations, bodies that read state) stays unkeyed;
+  both flip sides pinned.
+- Motivation: the Juliet flow variants (`static int staticReturnsTrue()
+  { return 1; }`) that produced the ~24 realloc-family FPs measured in
+  the previous round. Numbers in the verification note.
+
+### Verification
+- 290/290 tests (+3 CallGuardTest: correlated call guards pair up,
+  bodyless externs stay unkeyed, state-reading bodies stay unkeyed).
+  Corpus pins hold (cjson 55, tinyxml2 9 — measured locally).
+
 ## 2026-07-12 — Report-flood dedup: one warning per variable
 
 ### Changed
