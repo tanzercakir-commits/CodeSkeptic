@@ -377,7 +377,11 @@ every edit. Register it in `.mcp.json`:
 
 The `analyze` tool accepts `path` plus optional `build_path`,
 `functions` and `lines` — so an agent can scope the re-check to exactly
-the functions it just edited.
+the functions it just edited — and the project-idiom parameters
+(`fatal_asserts`, `alloc_functions`, `free_functions`) so the analysis
+sees custom assert handlers and allocator wrappers the same way the
+CLI flags do. Idiom registrations are per-call: nothing leaks into the
+next request of the long-lived server process.
 
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.

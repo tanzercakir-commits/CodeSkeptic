@@ -244,3 +244,60 @@ TEST(McpServerTest, UnknownTool_Error) {
         R"("params":{"name":"no_such_tool","arguments":{}}})");
     EXPECT_NE(response.find("-32602"), std::string::npos);
 }
+
+// --- Project-idiom parameters (fatal_asserts / alloc/free_functions) ---
+
+TEST(McpServerTest, ToolsListContainsIdiomParams) {
+    auto response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":11,"method":"tools/list"})");
+    EXPECT_NE(response.find("fatal_asserts"), std::string::npos);
+    EXPECT_NE(response.find("alloc_functions"), std::string::npos);
+    EXPECT_NE(response.find("free_functions"), std::string::npos);
+}
+
+TEST(McpServerTest, FatalAsserts_KillsPath_AndDoesNotLeakToNextCall) {
+    auto path = writeTempSource("mcp_fatal.cpp", R"(
+        void my_check_fail(const char*);
+        int f(int* p) {
+            if (!p) my_check_fail("p");
+            return *p;
+        }
+    )");
+
+    // With the handler registered the !p path dies at the call and the
+    // dereference is clean.
+    std::string withParam =
+        std::string(R"({"jsonrpc":"2.0","id":12,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","fatal_asserts":"my_check_fail"}}})";
+    auto response = handleMcpMessage(withParam);
+    EXPECT_NE(response.find("\\\"count\\\":0"), std::string::npos);
+
+    // Long-lived process: the registration must NOT survive into the
+    // next call — without the parameter the possible-null path is back.
+    std::string withoutParam =
+        std::string(R"({"jsonrpc":"2.0","id":13,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"("}}})";
+    response = handleMcpMessage(withoutParam);
+    EXPECT_NE(response.find("null-deref"), std::string::npos);
+}
+
+TEST(McpServerTest, AllocFunctions_ExtendLeakTracking) {
+    auto path = writeTempSource("mcp_alloc.cpp", R"(
+        void* my_pool_alloc(unsigned long);
+        void my_pool_free(void*);
+        void leaky(int c) {
+            void* p = my_pool_alloc(64);
+            if (c) my_pool_free(p);
+        }
+    )");
+
+    std::string request =
+        std::string(R"({"jsonrpc":"2.0","id":14,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","alloc_functions":"my_pool_alloc",)" +
+        R"("free_functions":"my_pool_free"}}})";
+    auto response = handleMcpMessage(request);
+    EXPECT_NE(response.find("memory-leak"), std::string::npos);
+}

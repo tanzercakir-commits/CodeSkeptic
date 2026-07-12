@@ -77,6 +77,8 @@ public:
     // Custom allocator wrappers (--alloc-functions / --free-functions):
     // extend the leak/double-free/UAF domain to project-specific heap
     // wrappers (git__malloc, zmalloc, ...).
+    void addAllocFunctions(const std::string& list);
+    void addFreeFunctions(const std::string& list);
     const std::set<std::string>& allocFunctions() const {
         return alloc_functions_;
     }

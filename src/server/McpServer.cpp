@@ -91,6 +91,27 @@ json::Value handleToolsList(const json::Value& id) {
                  "file analysis then sees cross-file function knowledge "
                  "(e.g. a callee in another file that may return null/zero)"},
             }},
+            {"fatal_asserts", json::Object{
+                {"type", "string"},
+                {"description",
+                 "Comma-separated names of project assert handlers that "
+                 "never return (e.g. \"assert_fail_impl\"); dataflow "
+                 "paths die at calls to them, so assert-guarded code "
+                 "stops producing impossible-path findings"},
+            }},
+            {"alloc_functions", json::Object{
+                {"type", "string"},
+                {"description",
+                 "Comma-separated project allocator wrappers (e.g. "
+                 "\"git__malloc,git__strdup\"); extends leak/double-free/"
+                 "use-after-free tracking to them"},
+            }},
+            {"free_functions", json::Object{
+                {"type", "string"},
+                {"description",
+                 "Comma-separated project deallocator wrappers (e.g. "
+                 "\"git__free\") paired with alloc_functions"},
+            }},
         }},
         {"required", json::Array{"path"}},
     };
@@ -123,6 +144,12 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addLines(lines->str());
     if (auto summaries = args->getString("summaries"))
         config.setSummaryIn(summaries->str());
+    if (auto fatalAsserts = args->getString("fatal_asserts"))
+        config.addFatalAsserts(fatalAsserts->str());
+    if (auto allocFns = args->getString("alloc_functions"))
+        config.addAllocFunctions(allocFns->str());
+    if (auto freeFns = args->getString("free_functions"))
+        config.addFreeFunctions(freeFns->str());
     // Long-lived process: parsed ASTs are kept warm between calls (the
     // fingerprint catches staleness — a stale AST is NEVER served)
     config.setWarmCache(true);
