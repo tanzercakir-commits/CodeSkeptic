@@ -64,19 +64,36 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
-- [ ] **Short-circuit condition-tree joins (THE dominant open FP
-      family — 110+ of systemd's 302 null-derefs, one macro)**:
-      FOREACH_ARRAY expands to `end = (i && m > 0) ? i + m : NULL;`.
-      The && splits the ternary condition into multiple CFG blocks;
-      the FALSE arm receives TWO edges (i-false and m>0-false), and
-      their pre-join merge dilutes `i: Null ⊔ NonNull = MaybeNull`
-      BEFORE the value-selection rewind can see the diamond (the
-      rewind requires single-pred arms). General principle: a join of
-      multiple SAME-DIRECTION edges of one short-circuit condition
-      tree is tautological — it should merge to refine(entry, C, dir),
-      exactly like the simple-diamond rewind. Engine design work;
-      candidate for the v2 design day (with cross-variable
-      correlation). Effort: max recommended.
+- [x] **FOREACH_ARRAY family — resolved via pointer-relational
+      validity, NOT join surgery (2026-07-12)**: full classification
+      showed the family was 235 of systemd's 302 null-derefs (the
+      "110+" undercount had matched only iterators literally named
+      `i`; the macro's first argument is the user-chosen name, and
+      FOREACH_ELEMENT expands to FOREACH_ARRAY). The fix that shipped
+      is one rule, not engine surgery: C11 6.5.8p5 makes `p < q`
+      defined only when both operands point into the same object, so
+      EVALUATING a pointer-pointer relational comparison proves both
+      sides non-null on both edges (`end && i < end` now proves `i`,
+      not just `end`). walkCondition additionally reports BOTH sides
+      of a comparison (variable-on-left normalization used to drop
+      the right side). Null-literal orderings excluded. 5 pin tests.
+- [ ] **Short-circuit condition-tree joins (general principle, urgency
+      dropped after the relational fix)**: a join of multiple
+      SAME-DIRECTION edges of one short-circuit condition tree is
+      tautological — it should merge to refine(entry, C, dir), like
+      the simple-diamond value-selection rewind but N-pred (the &&
+      gives the FALSE arm two edges, and their pre-join merge dilutes
+      `i: Null ⊔ NonNull = MaybeNull` before the rewind can see the
+      diamond). No longer carries a known FP family by itself; revisit
+      if a scan surfaces one. Effort: max (engine surgery).
+- [ ] **Ternary value FN (found while building the FOREACH repro,
+      2026-07-12)**: `q = (p && flag) ? p : NULL; q->value;` is NOT
+      reported — the ternary RESULT's nullness never reaches the
+      assigned variable (q stays Unknown). The analyzer currently
+      warns on the benign twin of this pattern (deref of the CONDITION
+      variable, now fixed) while missing the buggy one. Needs
+      value-level join at ConditionalOperator: q = join of arm
+      nullness. Candidate for the v2b design session.
 - [ ] **rtp2httpd TP for upstream** (verified 2026-07-12):
       configuration.c:1342-1358 — `if (arg && arg[0] == '/')` admits
       arg may be NULL; the next block dereferences `arg[0]`
@@ -84,6 +101,12 @@ Juliet's CI weight, project name check.
 - [x] **--files UX hardening — done (2026-07-12)**: non-absolute
       entries retried against --build-path; zero analyzable files is
       exit 2, not a clean pass.
+- [ ] **--files papercut (2026-07-12)**: `--files <nonexistent-path>`
+      silently leaves the list empty and the error surfaces as the
+      generic "no source path given" usage message — it should say the
+      LIST file was not found. (Cost 20 minutes of scan-diff confusion:
+      the fallback positional-dir invocation scanned the whole 2372-file
+      compile DB instead of the intended 493.)
 - [ ] Juliet 44/45 families ("data passed via static global"): known FN
       after the escape refinement — storing an allocation into a
       global/static suppresses the local leak report by design.
