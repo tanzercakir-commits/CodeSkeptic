@@ -1,5 +1,23 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — MCP idiom parameters
+
+### Changed
+- The MCP `analyze` tool accepts `fatal_asserts`, `alloc_functions`
+  and `free_functions` — the same project-idiom knowledge the CLI
+  flags carry (assert handlers that never return; custom allocator
+  wrappers), now available to agent loops. Config gains public
+  addAllocFunctions/addFreeFunctions.
+- Registrations are per-call: the long-lived server process does not
+  leak one request's idioms into the next (pinned — the same file
+  analyzed with and then without `fatal_asserts` flips back to
+  reporting).
+
+### Verification
+- 332/332 tests in both modes (+3 MCP tests: schema advertises the
+  params; fatal-assert path kill works through MCP and resets; custom
+  allocator leak tracking works through MCP).
+
 ## 2026-07-12 — llama triage round: mutation visibility + template-parameter facts
 
 ### Changed
