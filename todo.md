@@ -64,6 +64,11 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
+- [ ] Juliet 44/45 families ("data passed via static global"): known FN
+      after the escape refinement — storing an allocation into a
+      global/static suppresses the local leak report by design.
+      Catching it needs whole-program global-flow tracking (the summary
+      infrastructure is the natural host).
 - [x] **Abseil FP hunt (2026-07-12)**: scanned abseil-cpp (159 files,
       tag 20260526.0) — 40 findings triaged into 3 FP families, all
       fixed with FP-killer tests: (1) `__builtin_expect` transparency in

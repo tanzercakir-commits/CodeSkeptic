@@ -128,15 +128,36 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 effects.emplace_back(lhs, StmtEffect::Allocates);
 
             // Storing a tracked pointer into something that outlives the
-            // local scope is an escape: a class member (`slot_ = copy;`,
-            // the abseil CrcCordState pattern), a global, a deref/array
-            // target. A plain LOCAL-to-local copy is deliberately NOT an
-            // escape — Juliet's `dataCopy = data;` alias patterns must
-            // keep the leak visible on the original.
+            // local scope is an escape: a `this` member (`slot_ = copy;`,
+            // the abseil CrcCordState pattern), a global/static, a
+            // param-reachable or deref/array target. Deliberately NOT
+            // escapes (Juliet guard taught this, 2026-07-12):
+            //  - a plain LOCAL-to-local copy (`dataCopy = data;` alias
+            //    leaks must stay visible on the original), and
+            //  - a member of a LOCAL aggregate (`myStruct.ptr = data;` —
+            //    the aggregate itself dies at function end, the leak is
+            //    real; the Juliet 66/67 struct-passing families).
             const VarDecl* rhsVar = asVar(binOp->getRHS());
             if (rhsVar && tracked.count(rhsVar) && rhsVar != lhs) {
-                const bool lhsIsPlainLocal = lhs && lhs->hasLocalStorage();
-                if (!lhsIsPlainLocal)
+                const Expr* lhsExpr = binOp->getLHS()->IgnoreParenImpCasts();
+                bool escapes;
+                if (lhs) {
+                    escapes = !lhs->hasLocalStorage();  // global/static
+                } else if (const auto* member =
+                               dyn_cast<MemberExpr>(lhsExpr)) {
+                    if (member->isArrow()) {
+                        escapes = true;  // pointee may live anywhere
+                    } else {
+                        const VarDecl* base = asVar(member->getBase());
+                        // local (non-param) aggregate: stays local;
+                        // param/global/this/complex base: escapes
+                        escapes = !(base && base->hasLocalStorage() &&
+                                    !isa<ParmVarDecl>(base));
+                    }
+                } else {
+                    escapes = true;  // *p = q, arr[i] = q, this-member...
+                }
+                if (escapes)
                     effects.emplace_back(rhsVar, StmtEffect::Escapes);
             }
         }

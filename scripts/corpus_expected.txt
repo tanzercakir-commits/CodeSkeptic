@@ -11,3 +11,5 @@ tinyxml2 9
 # 12 = post-FP-hunt level (2026-07-12): builtin_expect transparency,
 # static/global exemption, member/receiver escape.
 abseil 12
+# catch2 (v3.15.2, deep-only): zero findings — the FP-explosion tripwire.
+catch2 0

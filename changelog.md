@@ -28,11 +28,29 @@
   runs for CI cost balance). run_corpus gained a compile-DB-driven `db`
   mode; cjson/tinyxml2 keep their original scan mode and pins.
 
+### Changed (round 2 — the Juliet guard spoke)
+- **JULIET_GUARD_FAIL CWE401** on the first CI run: recall 0.246→0.188
+  (floor 0.22) while precision ROSE 0.623→0.672. The guard did exactly
+  its job: the member-assign escape was too broad. Refined: a member of
+  a LOCAL aggregate (`myStruct.ptr = data;`) is NOT an escape — the
+  aggregate dies with the function, the leak is real (Juliet 66/67
+  struct-passing families restored). `this`-members, `->` members,
+  param-reachable aggregates, globals/statics still escape. abseil
+  stays at 12 (the CrcCordState fix is a this-member).
+- Known-FN note: the Juliet 44/45 "data passed via static global"
+  families remain suppressed by design (storing into a global is not a
+  function-local leak; tracking it needs whole-program global-flow —
+  todo). If CWE401 recall still sits under the floor after the
+  refinement, the floor gets adjusted with these numbers as rationale.
+- **Catch2 scanned too** (107 files, 42s): ZERO findings, zero crashes.
+  Added to the deep corpus pinned at 0 (v3.15.2) — a clean modern-C++
+  codebase is the FP-explosion tripwire.
+
 ### Verification
-- 237/237 tests (ctest + single-process; +8 AbseilFpTest FP-killers and
-  flip-side pins). Corpus pins (cjson/tinyxml2) and Juliet floors
-  referee the rule changes in CI — if the member-escape change moves
-  pinned numbers, the pins get updated in that same PR with rationale.
+- 239/239 tests (ctest + single-process; +8 AbseilFpTest FP-killers and
+  flip-side pins, +2 guard-taught refinement pins: local-struct-member
+  leak stays visible, param-struct-member escapes). Corpus pins
+  (cjson/tinyxml2 held on first CI run) and Juliet floors referee.
 
 ## 2026-07-10 — Summary-diff v1: contract change report (semantic regression gate)
 

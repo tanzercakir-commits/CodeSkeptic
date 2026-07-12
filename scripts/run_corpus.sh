@@ -40,6 +40,7 @@ fetch tinyxml2 "https://github.com/leethomason/tinyxml2/archive/refs/tags/10.0.0
 # that Juliet cannot provide.
 if [ "${CORPUS_DEEP:-0}" = "1" ]; then
     fetch abseil "https://github.com/abseil/abseil-cpp/archive/refs/tags/20260526.0.tar.gz"
+    fetch catch2 "https://github.com/catchorg/Catch2/archive/refs/tags/v3.15.2.tar.gz"
 fi
 
 run_one() { # <mode: scan|db> <dir> [extra cmake args...]
@@ -113,6 +114,10 @@ run_one scan cjson
 run_one scan tinyxml2
 if [ "${CORPUS_DEEP:-0}" = "1" ]; then
     run_one db abseil -DCMAKE_CXX_STANDARD=17 -DABSL_BUILD_TESTING=OFF
+    # catch2 pins at ZERO findings: a clean modern-C++ codebase is the
+    # FP-explosion tripwire — any rule change that suddenly produces
+    # findings here turns the guard red.
+    run_one db catch2 -DCATCH_BUILD_TESTING=OFF -DCATCH_INSTALL_DOCS=OFF
 fi
 
 echo ""

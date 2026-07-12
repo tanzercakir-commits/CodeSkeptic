@@ -522,3 +522,38 @@ TEST(AbseilFpTest, LocalToLocalCopy_LeakStaysVisible) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
+
+TEST(AbseilFpTest, LocalStructMemberAssign_LeakStaysVisible) {
+    // The Juliet guard caught this (CWE401 recall drop): a member of a
+    // LOCAL aggregate is still local storage — the allocation stored
+    // into it dies with the function. This is a real leak, not an
+    // escape (the 66/67 struct-passing families).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        struct Box { int* ptr; };
+        void f() {
+            int* data = (int*)malloc(4);
+            Box b;
+            b.ptr = data;
+            (void)b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AbseilFpTest, ParamStructMemberAssign_Escapes_NoLeak) {
+    // Storing into a caller-owned aggregate escapes for real: the
+    // caller can free it after we return.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        struct Box { int* ptr; };
+        void f(Box& out) {
+            int* data = (int*)malloc(4);
+            out.ptr = data;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
