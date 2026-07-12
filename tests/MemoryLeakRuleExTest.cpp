@@ -1112,3 +1112,58 @@ TEST(CleanupAttrTest, PlainNeighbor_StillTracked) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- systemd FP hunt round 2 (2026-07-12): macro idioms ---
+
+TEST(SystemdIdiomTest, CompoundLiteralThroughOutParam_Escapes_NoLeak) {
+    // iovec_alloc: `*ret = (struct iovec){ .iov_base = buf, ... };`
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        struct iovec { void* iov_base; unsigned long iov_len; };
+        int alloc_iov(unsigned long n, iovec* ret) {
+            void* buf = malloc(n ? n : 1);
+            if (!buf) { return -12; }
+            *ret = iovec{ buf, n };
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(SystemdIdiomTest, StatementExprTakePtr_Escapes_NoLeak) {
+    // conf-parser: `*ret = TAKE_PTR(cs);` — the RHS statement
+    // expression yields the pointer while nulling the source.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        struct CS { int line; };
+        int make(CS** ret) {
+            CS* cs = (CS*)malloc(sizeof(CS));
+            if (!cs) { return -12; }
+            *ret = ({ CS* t = cs; cs = 0; t; });
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(SystemdIdiomTest, AddressIntoLocalAlias_Escapes_NoLeak) {
+    // free_and_replace expansion: `_b = &(p); *_a = *_b; *_b = 0;` —
+    // once the address is stored we cannot follow the alias.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" char* strdup(const char*);
+        extern "C" void free(void*);
+        void replace(char** slot, const char* s) {
+            char* p = strdup(s);
+            if (!p) { return; }
+            char** b = 0;
+            b = &p;
+            free(*slot);
+            *slot = *b;
+            *b = 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
