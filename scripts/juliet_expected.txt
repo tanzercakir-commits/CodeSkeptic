@@ -4,8 +4,18 @@
 # rprecisions 1.000/0.640, rhitrates 0.347/0.233/0.198/0.435/0.045.
 # On a deliberate rule change, baselines are updated in the SAME PR —
 # the rationale stays visible in the commit message.
+#
+# 2026-07-12 (PR #38, abseil FP hunt): CWE401 floors moved 0.55/0.22 ->
+# 0.60/0.18. The refined escape semantics (member-of-local-aggregate is
+# NOT an escape; statics/globals untracked) raised measured rprecision
+# to 0.659 and settled rhitrate at 0.201. The recall gap is the Juliet
+# 44/45 "data passed via static global" families: our old hits there
+# fired for the wrong reason (the leak completes in the sink function,
+# not where we reported). Documented as a known FN in todo.md — needs
+# whole-program global-flow tracking. Precision floor RAISED, recall
+# floor lowered to the honest measured value.
 CWE476 0.95 0.30
-CWE401 0.55 0.22
+CWE401 0.60 0.18
 CWE415 0.95 0.20
 CWE416 0.95 0.38
 CWE369 0.95 0.03

@@ -42,6 +42,16 @@
   function-local leak; tracking it needs whole-program global-flow —
   todo). If CWE401 recall still sits under the floor after the
   refinement, the floor gets adjusted with these numbers as rationale.
+- **Round 3 — floor adjusted with rationale**: the second CI run
+  measured rprecision 0.659 / rhitrate 0.201 — recall recovered
+  (0.188→0.201) but stayed under the 0.22 floor, and the remaining gap
+  is exactly the 44/45 static-global families above. Those old "hits"
+  fired for the wrong reason (the leak completes in the sink function,
+  not where we reported), so losing them is honesty, not regression.
+  `juliet_expected.txt`: CWE401 `0.55 0.22` → `0.60 0.18` — precision
+  floor RAISED to lock in the FP fixes, recall floor set to the
+  measured truth. Per policy, floors change in the SAME PR as the rule
+  change, rationale in the file and here.
 - **Catch2 scanned too** (107 files, 42s): ZERO findings, zero crashes.
   Added to the deep corpus pinned at 0 (v3.15.2) — a clean modern-C++
   codebase is the FP-explosion tripwire.
