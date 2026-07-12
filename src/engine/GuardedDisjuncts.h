@@ -55,7 +55,11 @@ using GuardedState = std::vector<Guarded<VarMap>>;
 // Disjunct cap. Kept small: the goal is the correlated-guard pattern,
 // not general path sensitivity. On overflow, widening falls back to
 // today's (merged) behavior — no loss of soundness, some loss of
-// sharpness.
+// sharpness. Measured 2026-07-12: raising to 8 cost ~2.7x systemd
+// scan time for 2 fewer findings — the remaining correlation misses
+// cluster in functions with MANY interacting conditions, where the
+// right lever is fact-prioritized widening (keep pointer facts over
+// integer facts when collapsing), not a bigger cap.
 constexpr std::size_t kMaxDisjuncts = 4;
 
 template <typename VarMap, typename MergeVal>
@@ -67,6 +71,29 @@ void mergeVarMaps(VarMap& into, const VarMap& from, MergeVal mergeVal) {
         else
             it->second = mergeVal(it->second, s);
     }
+}
+
+// Collapse to a SINGLE disjunct: facts intersected (only unanimously
+// agreed facts survive), VarMaps merged. This is both the cap-overflow
+// fallback and the engine's convergence widening (see widen() in the
+// analyses): an upper approximation, so always sound to apply.
+template <typename VarMap, typename MergeVal>
+void widenGuarded(GuardedState<VarMap>& state, MergeVal mergeVal) {
+    if (state.size() <= 1) return;
+    Guarded<VarMap> widened = std::move(state.front());
+    for (std::size_t i = 1; i < state.size(); ++i) {
+        for (auto it = widened.facts.begin(); it != widened.facts.end();) {
+            auto found = state[i].facts.find(it->first);
+            if (found == state[i].facts.end() ||
+                found->second != it->second)
+                it = widened.facts.erase(it);
+            else
+                ++it;
+        }
+        mergeVarMaps(widened.vars, state[i].vars, mergeVal);
+    }
+    state.clear();
+    state.push_back(std::move(widened));
 }
 
 // Canonical form: sorted; same-facts disjuncts merged; widened on cap
@@ -83,23 +110,8 @@ void normalizeGuarded(GuardedState<VarMap>& state, MergeVal mergeVal) {
     }
     state = std::move(merged);
 
-    if (state.size() > kMaxDisjuncts) {
-        Guarded<VarMap> widened = std::move(state.front());
-        for (std::size_t i = 1; i < state.size(); ++i) {
-            for (auto it = widened.facts.begin();
-                 it != widened.facts.end();) {
-                auto found = state[i].facts.find(it->first);
-                if (found == state[i].facts.end() ||
-                    found->second != it->second)
-                    it = widened.facts.erase(it);
-                else
-                    ++it;
-            }
-            mergeVarMaps(widened.vars, state[i].vars, mergeVal);
-        }
-        state.clear();
-        state.push_back(std::move(widened));
-    }
+    if (state.size() > kMaxDisjuncts)
+        widenGuarded(state, mergeVal);
 }
 
 template <typename VarMap, typename MergeVal>
@@ -123,29 +135,227 @@ VarMap flattenGuarded(const GuardedState<VarMap>& state, MergeVal mergeVal) {
     return out;
 }
 
-// If the condition can be keyed: contradicting disjuncts are
-// impossible on this edge (dropped), the fact is recorded into the
-// rest. A condition that cannot be keyed is a no-op. If all disjuncts
-// drop, the state empties = the edge is infeasible (correct
-// semantics: no report is born from that edge).
-template <typename VarMap, typename MergeVal>
-void refineGuardedFacts(GuardedState<VarMap>& state,
-                        const clang::Expr* cond, bool isTrueBranch,
-                        const std::set<const clang::ValueDecl*>& mutated,
-                        MergeVal mergeVal) {
-    auto fact = conditionFact(cond, mutated);
-    if (!fact) return;
+// Structural, per-disjunct condition refinement (v2b, 2026-07-12).
+//
+// The walk mirrors walkCondition: `!` flips, __builtin_expect and the
+// comma operator pass through, `a && b` on its TRUE edge (and
+// `a || b` on its FALSE edge) hold BOTH operands — recurse into each.
+// At a decomposition leaf, conditionFact keys the expression:
+// contradicting disjuncts drop (factsContradict handles both exact
+// recordings and entailment from stamped equalities), the rest record.
+//
+// The genuinely new piece is the branch a walk cannot decide:
+// `a || b` on its TRUE edge. Whole-state refinement must give up (it
+// cannot know which operand held), but a DISJUNCT often can: if the
+// disjunct's own knowledge refutes one operand, the other operand
+// held ON THAT DISJUNCT and is applied to it alone. This is exactly
+// the systemd assert shape — `assert(s || l <= 0)` materialized as a
+// value (the `!!(!(...))` + __builtin_expect wrappers make Clang
+// join the operand paths BEFORE the branch), where the s-is-null
+// disjunct refutes the left operand, so (l <= 0) is recorded into it.
+// The refuter is analysis-supplied: refutes(disjunct, expr) answers
+// "is expr definitely FALSE here" from domain knowledge (pointer
+// nullness) — facts alone cannot see it.
+//
+// If all disjuncts drop, the state empties = the edge is infeasible
+// (correct semantics: no report is born from that edge).
+// Per-disjunct condition context: which decls may be keyed and how
+// leaves land on this disjunct. applyLeaf(d, leaf, leafIsTrue) must
+// return false when the disjunct contradicts the leaf (drop);
+// refutes(d, expr, wanted) answers "can expr be `wanted` here" with
+// false meaning DEFINITELY NOT (used for disjunction elimination).
+template <typename VarMap, typename RefuteFn, typename ApplyLeafFn>
+bool refineDisjunctCondition(Guarded<VarMap>& d, const clang::Expr* cond,
+                             bool isTrue, RefuteFn&& refutes,
+                             ApplyLeafFn&& applyLeaf) {
+    if (!cond) return true;
+    cond = cond->IgnoreParenImpCasts();
 
-    const bool value = isTrueBranch ? fact->second : !fact->second;
+    if (const auto* call = llvm::dyn_cast<clang::CallExpr>(cond)) {
+        const clang::FunctionDecl* callee = call->getDirectCallee();
+        const clang::IdentifierInfo* id =
+            callee ? callee->getIdentifier() : nullptr;
+        if (id && (id->getName() == "__builtin_expect" ||
+                   id->getName() == "__builtin_expect_with_probability") &&
+            call->getNumArgs() >= 1)
+            return refineDisjunctCondition(d, call->getArg(0), isTrue,
+                                           refutes, applyLeaf);
+        // fall through: a plain call may still be a keyable leaf
+    }
+    if (const auto* un = llvm::dyn_cast<clang::UnaryOperator>(cond)) {
+        if (un->getOpcode() == clang::UO_LNot)
+            return refineDisjunctCondition(d, un->getSubExpr(), !isTrue,
+                                           refutes, applyLeaf);
+    }
+    if (const auto* bo = llvm::dyn_cast<clang::BinaryOperator>(cond)) {
+        const clang::BinaryOperatorKind opc = bo->getOpcode();
+        if (opc == clang::BO_Comma)
+            return refineDisjunctCondition(d, bo->getRHS(), isTrue,
+                                           refutes, applyLeaf);
+        const bool bothHold = (opc == clang::BO_LAnd && isTrue) ||
+                              (opc == clang::BO_LOr && !isTrue);
+        const bool oneHolds = (opc == clang::BO_LOr && isTrue) ||
+                              (opc == clang::BO_LAnd && !isTrue);
+        if (bothHold) {
+            // On this edge both operands have a known value.
+            return refineDisjunctCondition(d, bo->getLHS(), isTrue,
+                                           refutes, applyLeaf) &&
+                   refineDisjunctCondition(d, bo->getRHS(), isTrue,
+                                           refutes, applyLeaf);
+        }
+        if (oneHolds) {
+            // Disjunction elimination: `a || b` true / `a && b` false
+            // — whole-state refinement cannot know which operand held,
+            // but a disjunct that REFUTES one operand knows the other
+            // held on it (the systemd assert shape: the s-is-null
+            // disjunct of `assert(s || l <= 0)` learns l <= 0).
+            const clang::Expr* lhs = bo->getLHS();
+            const clang::Expr* rhs = bo->getRHS();
+            const bool operandValue = (opc == clang::BO_LOr);
+            const bool lhsOut = refutes(d, lhs, operandValue);
+            const bool rhsOut = refutes(d, rhs, operandValue);
+            if (lhsOut && rhsOut) return false;  // edge infeasible here
+            if (lhsOut)
+                return refineDisjunctCondition(d, rhs, operandValue,
+                                               refutes, applyLeaf);
+            if (rhsOut)
+                return refineDisjunctCondition(d, lhs, operandValue,
+                                               refutes, applyLeaf);
+            return true;  // undecided: no information
+        }
+    }
+
+    return applyLeaf(d, cond, isTrue);
+}
+
+// Fact-level building blocks shared by every client. keyLeaf: record
+// or contradict one leaf on one disjunct. keyRefutes: can the leaf's
+// wanted value be ruled out from recorded/stamped facts alone.
+template <typename VarMap>
+bool applyFactLeaf(Guarded<VarMap>& d, const clang::Expr* leaf, bool isTrue,
+                   const std::set<const clang::ValueDecl*>& unkeyable,
+                   const std::set<const clang::ValueDecl*>& ptrKeyable) {
+    auto fact = conditionFact(leaf, unkeyable, ptrKeyable);
+    if (!fact) return true;
+    const bool value = isTrue ? fact->second : !fact->second;
+    if (factsContradict(d.facts, fact->first, value)) return false;
+    d.facts[fact->first] = value;
+    return true;
+}
+
+template <typename VarMap>
+bool factsRefute(const Guarded<VarMap>& d, const clang::Expr* expr,
+                 bool wanted,
+                 const std::set<const clang::ValueDecl*>& unkeyable,
+                 const std::set<const clang::ValueDecl*>& ptrKeyable) {
+    auto fact = conditionFact(expr, unkeyable, ptrKeyable);
+    if (!fact) return false;
+    const bool value = wanted ? fact->second : !fact->second;
+    return factsContradict(d.facts, fact->first, value);
+}
+
+// Whole-state wrapper with analysis-supplied hooks. extraRefutes may
+// add DOMAIN knowledge on top of the fact-based refuter (NullDeref:
+// a pointer whose var-state is Null refutes a truthiness operand);
+// extraApply lets the analysis refine its VarMap for exactly the
+// leaves (and eliminated-survivor operands) this disjunct is known to
+// satisfy.
+template <typename VarMap, typename MergeVal, typename ExtraRefuteFn,
+          typename ExtraApplyFn>
+void refineGuardedFactsWith(GuardedState<VarMap>& state,
+                            const clang::Expr* cond, bool isTrueBranch,
+                            const std::set<const clang::ValueDecl*>& unkeyable,
+                            const std::set<const clang::ValueDecl*>& ptrKeyable,
+                            MergeVal mergeVal, ExtraRefuteFn&& extraRefutes,
+                            ExtraApplyFn&& extraApply) {
+    if (!cond) return;
+    auto refutes = [&](const Guarded<VarMap>& d, const clang::Expr* e,
+                       bool wanted) {
+        return factsRefute(d, e, wanted, unkeyable, ptrKeyable) ||
+               extraRefutes(d, e, wanted);
+    };
+    auto applyLeaf = [&](Guarded<VarMap>& d, const clang::Expr* leaf,
+                         bool leafTrue) {
+        if (!applyFactLeaf(d, leaf, leafTrue, unkeyable, ptrKeyable))
+            return false;
+        extraApply(d, leaf, leafTrue);
+        return true;
+    };
     GuardedState<VarMap> kept;
     for (auto& d : state) {
-        auto it = d.facts.find(fact->first);
-        if (it != d.facts.end() && it->second != value) continue;
-        d.facts[fact->first] = value;
+        if (!refineDisjunctCondition(d, cond, isTrueBranch, refutes,
+                                     applyLeaf))
+            continue;
         kept.push_back(std::move(d));
     }
     state = std::move(kept);
     normalizeGuarded(state, mergeVal);
+}
+
+template <typename VarMap, typename MergeVal>
+void refineGuardedFacts(GuardedState<VarMap>& state,
+                        const clang::Expr* cond, bool isTrueBranch,
+                        const std::set<const clang::ValueDecl*>& unkeyable,
+                        MergeVal mergeVal) {
+    static const std::set<const clang::ValueDecl*> kNoPtrKeys;
+    refineGuardedFactsWith(
+        state, cond, isTrueBranch, unkeyable, kNoPtrKeys, mergeVal,
+        [](const Guarded<VarMap>&, const clang::Expr*, bool) {
+            return false;
+        },
+        [](Guarded<VarMap>&, const clang::Expr*, bool) {});
+}
+
+// Statement-level fact lifecycle (v2b, 2026-07-12). An assignment to
+// a local makes every fact keyed on it stale — they are ERASED from
+// all disjuncts (the old whole-function keying ban is gone; this is
+// its flow-sensitive replacement). When the assigned value is an
+// integer constant and the target is stamping-relevant
+// (collectFactDecls), the fresh truth (var EQ lit)=true is STAMPED —
+// at a later join, paths that assigned different constants stay
+// separate disjuncts, which is exactly the flag/status correlation
+// (`have = 1; ... if (have) use(x);`). Returns whether anything
+// changed.
+template <typename VarMap, typename MergeVal>
+bool applyStmtFacts(GuardedState<VarMap>& state, const clang::Stmt* stmt,
+                    const std::set<const clang::ValueDecl*>& stampable,
+                    const std::set<const clang::ValueDecl*>& ptrStampable,
+                    MergeVal mergeVal) {
+    const clang::ValueDecl* target = assignedDecl(stmt);
+    if (!target) return false;
+
+    auto lit = assignedIntLiteral(stmt);
+    // Integer stamp: any constant. Pointer stamp: only the null
+    // constant (`p = NULL;` — the fresh truth (p EQ 0)=true).
+    const bool stamp =
+        lit && (stampable.count(target) ||
+                (ptrStampable.count(target) && lit->second == 0));
+
+    bool changed = false;
+    for (auto& d : state) {
+        for (auto it = d.facts.begin(); it != d.facts.end();) {
+            if (it->first.var == target) {
+                it = d.facts.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+        if (stamp) {
+            d.facts[FactKey{target, clang::BO_EQ, lit->second}] = true;
+            changed = true;
+        }
+    }
+    if (changed) normalizeGuarded(state, mergeVal);
+    return changed;
+}
+
+template <typename VarMap, typename MergeVal>
+bool applyStmtFacts(GuardedState<VarMap>& state, const clang::Stmt* stmt,
+                    const std::set<const clang::ValueDecl*>& stampable,
+                    MergeVal mergeVal) {
+    static const std::set<const clang::ValueDecl*> kNoPtrs;
+    return applyStmtFacts(state, stmt, stampable, kNoPtrs, mergeVal);
 }
 
 } // namespace zerodefect

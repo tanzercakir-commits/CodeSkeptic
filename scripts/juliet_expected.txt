@@ -31,8 +31,16 @@
 # the realloc-family FPs). CWE416 recall floor RAISED 0.38 -> 0.44
 # (measured 0.476 — call-guard pairing restored UAF true positives).
 # CWE415 recall floor RAISED 0.20 -> 0.21 (measured 0.225).
+# 2026-07-12 (disjuncts v2b: fact lifecycle + stamping + entailment +
+# disjunction elimination + convergence widening): three floors RAISED
+# on stable local measurements (identical across three consecutive
+# replays): CWE401 precision 0.62 -> 0.66 (measured 0.692 — literal
+# stamps keep flag-correlated alloc/free paths separate), CWE415
+# recall 0.21 -> 0.23 (measured 0.241), CWE416 recall 0.44 -> 0.48
+# (measured 0.501 — flow-variant guards now key after local literal
+# assignments). CWE476 unchanged at 1.000/0.352.
 CWE476 0.95 0.30
-CWE401 0.62 0.18
-CWE415 0.95 0.21
-CWE416 0.95 0.44
+CWE401 0.66 0.18
+CWE415 0.95 0.23
+CWE416 0.95 0.48
 CWE369 0.95 0.03

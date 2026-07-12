@@ -1,5 +1,80 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Disjuncts v2b: cross-variable correlation (max-effort engine session)
+
+### Changed
+- **Fact lifecycle is now flow-sensitive**: the whole-function keying
+  ban on assigned variables is gone. Assignments to locals ERASE the
+  facts keyed on them at the assignment statement (applyStmtFacts, in
+  all three GuardedState rules' transfer); address-taken decls and
+  assigned globals stay permanently unkeyable (calls can change them
+  invisibly — the documented trade-off class is unchanged).
+- **Integer-constant stamping**: `have = 1` records (have EQ 1)=true
+  in every disjunct (gated to condition-relevant locals,
+  collectFactDecls; enum constants count). Paths that assigned
+  different constants stay SEPARATE disjuncts at joins — the
+  flag/status correlation family (rtp2httpd `if (have) use(x)`,
+  fprime `if (st == OK) b->size`) and the Juliet flow-variant guards.
+- **Entailment**: a stamped equality answers any later key on the same
+  variable ((x EQ 6)=true refutes (x EQ 5)=true) — dead-branch
+  sharpening for free (`x = 6; if (x == 5) *p;` is silent now).
+- **Disjunction elimination with gated pointer facts**: systemd's own
+  assert (`if (_unlikely_(!(expr))) log_assert_failed(...)`)
+  materializes `s || l <= 0` as a VALUE — Clang joins the operand
+  paths BEFORE the branch, so no per-leaf edge ever exists and only a
+  fact difference survives the merge. Pointer-nullness facts
+  ((s EQ 0), gated by collectPtrFactDecls to pointers sharing a
+  short-circuit operator with a keyable partner) keep the split;
+  refineDisjunctCondition then applies the surviving operand to the
+  disjunct that refutes the other one (fact-based refuter for every
+  rule + a nullness-domain refuter in NullDeref). Structural walk
+  also records facts from BOTH sides of `a && b` true edges.
+- **Convergence widening in the engine**: the guarded-disjunct domain
+  is not monotone (facts are erased, disjuncts dropped) and real code
+  OSCILLATES — rtp2httpd's parser functions cycled forever, an 8x
+  iteration budget changed nothing. After latticeHeight+2 visits a
+  block's entry is joined with the previous widened entry and
+  collapsed to one disjunct: flip-flopping facts die in the
+  intersection, var states only climb their finite lattice.
+  Memoryless widening was measurably NOT enough (single-disjunct
+  fact VALUES alternate across visits). Non-convergence warnings:
+  rtp2httpd 6 -> 0, systemd 17 -> 0, and the systemd scan got faster
+  (oscillating functions used to burn their whole iteration budget).
+- **kMaxDisjuncts stays 4 — measured**: raising to 8 cost ~2.7x
+  systemd scan time for 2 fewer findings. The remaining correlation
+  misses cluster in many-condition functions; the future lever is
+  fact-prioritized widening, not a bigger cap (noted in the header).
+
+### Results (same 494-file systemd scan, apples to apples)
+- systemd: 63 findings -> 53 (nulls 58 -> 50; both uninit findings
+  died — a flag-correlated pair; leaks stay at the 3 deliberate
+  residues). The assert pointer/length family went 18 -> 15 at cap 4
+  (the canonical nulstr-util shape is pinned as a test and dies when
+  disjunct pressure is low); the remaining 15 + 7 checked-cast macros
+  + 28 hard singletons are the documented residue.
+- rtp2httpd: 4 -> 3 (the verified TP stays; 1 correlation FP died;
+  the 2 survivors correlate through STRING CONTENT — out of scope,
+  documented).
+- NASA fprime: 7 -> 2 (five status/pointer correlations died; note:
+  an intermediate "7 -> 1" measurement was an artifact of scanning
+  with the wrong build dir — 214 files failed to find headers and
+  error-recovery ASTs produced a phantom finding; always check the
+  fatal-error count of a scan before comparing it).
+- cJSON: 54 -> 52 (two correlation FPs died; pin range holds).
+
+### Verification
+- 321/321 tests in both modes (+15: 12 DisjunctsV2bTest — three
+  rules' flag correlation, enum status, assert family incl. the
+  mutated-counter loop, stale-guard sharpening, compound-assign
+  safety, global-flag limit, cap-overflow soundness — and 3
+  systemd-assert value-materialized shapes incl. the
+  unprotected-deref-still-warns pin).
+- Local Juliet replay, three consecutive runs identical: CWE401
+  precision 0.669 -> 0.692, CWE415 recall 0.225 -> 0.241, CWE416
+  recall 0.476 -> 0.501, CWE476/CWE369 unchanged. Floors RAISED in
+  the same PR: CWE401 0.62 -> 0.66, CWE415 0.21 -> 0.23, CWE416
+  0.44 -> 0.48.
+
 ## 2026-07-12 — Pointer-relational validity (the FOREACH_ARRAY family)
 
 ### Changed

@@ -578,14 +578,16 @@ public:
     using State = DisjunctState;
 
     MemLeakAnalysis(const std::vector<const VarDecl*>& trackedVars,
-                    std::set<const ValueDecl*> mutatedDecls,
+                    std::set<const ValueDecl*> unkeyableDecls,
+                    std::set<const ValueDecl*> stampableDecls,
                     std::string funcName,
                     std::map<const VarDecl*, std::vector<const VarDecl*>>
                         aliasGroups,
                     zerodefect::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
-          mutated_(std::move(mutatedDecls)),
+          mutated_(std::move(unkeyableDecls)),
+          stampable_(std::move(stampableDecls)),
           aliasGroups_(std::move(aliasGroups)),
           funcName_(std::move(funcName)), results_(results) {
         zerodefect::Guarded<VarState> init;
@@ -601,8 +603,21 @@ public:
     // rise independently)
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
-                   static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
+                   static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
     }
+
+    // Fact records add lattice climbs the var-state formula above
+    // never counted (v2b); bounded so pathological functions do not
+    // explode the iteration cap.
+    unsigned factBudget() const {
+        auto n = static_cast<unsigned>(stampable_.size());
+        return (n > 16 ? 16u : n) * 2 *
+               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+    }
+
+    // Engine convergence hook: collapse the disjuncts when a block is
+    // revisited beyond any monotone explanation (see DataflowEngine).
+    void widen(State& s) const { zerodefect::widenGuarded(s, mergeAllocStates); }
 
     State merge(const State& a, const State& b) const {
         return zerodefect::mergeGuarded(a, b, mergeAllocStates);
@@ -610,7 +625,13 @@ public:
 
     // Pure state transition — produces no reports. Reporting lives in
     // onStatement, the post-fixpoint pass (an engine guarantee).
-    State transfer(const Stmt* stmt, const State& in, ASTContext& ctx) const {
+    State transfer(const Stmt* stmt, const State& inRaw,
+                   ASTContext& ctx) const {
+        // Fact lifecycle first (v2b): see NullDerefRule — erase facts
+        // on assigned locals, stamp integer-constant stores.
+        State in = inRaw;
+        zerodefect::applyStmtFacts(in, stmt, stampable_, mergeAllocStates);
+
         // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
         if (effects.empty()) return in;
@@ -778,6 +799,7 @@ private:
     const std::vector<const VarDecl*>& trackedVars_;
     std::set<const VarDecl*> trackedSet_;
     std::set<const ValueDecl*> mutated_;
+    std::set<const ValueDecl*> stampable_;
     std::map<const VarDecl*, std::vector<const VarDecl*>> aliasGroups_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
@@ -809,7 +831,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     // The exit-leak check below consults the groups too
     const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
-        trackedVars, zerodefect::collectMutatedDecls(funcDecl),
+        trackedVars, zerodefect::collectUnkeyableDecls(funcDecl),
+        zerodefect::collectFactDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
         std::move(aliasGroups), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);

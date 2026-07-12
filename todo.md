@@ -77,15 +77,43 @@ Juliet's CI weight, project name check.
       not just `end`). walkCondition additionally reports BOTH sides
       of a comparison (variable-on-left normalization used to drop
       the right side). Null-literal orderings excluded. 5 pin tests.
-- [ ] **Short-circuit condition-tree joins (general principle, urgency
-      dropped after the relational fix)**: a join of multiple
-      SAME-DIRECTION edges of one short-circuit condition tree is
-      tautological — it should merge to refine(entry, C, dir), like
-      the simple-diamond value-selection rewind but N-pred (the &&
-      gives the FALSE arm two edges, and their pre-join merge dilutes
-      `i: Null ⊔ NonNull = MaybeNull` before the rewind can see the
-      diamond). No longer carries a known FP family by itself; revisit
-      if a scan surfaces one. Effort: max (engine surgery).
+- [x] **Disjuncts v2b — cross-variable correlation (2026-07-12, max
+      session)**: five mechanisms shipped together. (1) Fact
+      LIFECYCLE: the whole-function mutation ban became flow-time —
+      assignments to locals ERASE the facts keyed on them
+      (applyStmtFacts, called from all three GuardedState rules);
+      address-taken decls and assigned globals stay permanently
+      unkeyable. (2) STAMPING: integer-constant stores on
+      condition-relevant locals record (var EQ lit)=true — paths that
+      assigned different constants stay separate disjuncts at joins
+      (the flag/status family: rtp2httpd, fprime). Enum constants
+      count as literals. (3) ENTAILMENT: factsContradict answers any
+      key on a var from a stamped equality ((x EQ 6)=true refutes
+      (x EQ 5)); gives constant-propagation sharpening for free.
+      (4) DISJUNCTION ELIMINATION with pointer facts: systemd's own
+      assert (`if (_unlikely_(!(expr))) log_assert_failed(...)`)
+      materializes `s || l <= 0` as a VALUE — Clang joins the operand
+      paths BEFORE the branch, so only a fact difference survives the
+      merge. Narrowly-gated pointer-nullness facts
+      (collectPtrFactDecls: pointers sharing a short-circuit operator
+      with a keyable partner) keep the split; per-disjunct
+      refineDisjunctCondition applies the surviving operand to the
+      disjunct that refutes the other one (fact-based + domain
+      refuter). (5) CONVERGENCE WIDENING in the engine: the domain is
+      not monotone (erase/drop), and real code oscillates
+      (rtp2httpd's parsers cycled at 8x budget); after latticeHeight+2
+      visits a block's entry is joined with the previous widened entry
+      and collapsed to one disjunct — unstable facts die in the
+      intersection, var states only climb. Memoryless widening was NOT
+      enough (fact VALUES flip across visits). systemd non-convergence
+      warnings 17 -> 0 while scan time halved.
+- [ ] **Short-circuit condition-tree joins (general principle,
+      urgency dropped after the relational fix + v2b)**: a join of
+      multiple SAME-DIRECTION edges of one short-circuit condition
+      tree is tautological — it should merge to refine(entry, C, dir),
+      like the simple-diamond value-selection rewind but N-pred. No
+      longer carries a known FP family; revisit if a scan surfaces
+      one. Effort: max (engine surgery).
 - [ ] **Ternary value FN (found while building the FOREACH repro,
       2026-07-12)**: `q = (p && flag) ? p : NULL; q->value;` is NOT
       reported — the ternary RESULT's nullness never reaches the
