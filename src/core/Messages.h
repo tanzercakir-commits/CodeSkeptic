@@ -57,6 +57,7 @@ enum class MsgId {
     TraceAssumedNullHere,       // {0} = variable name (guard: null on this branch)
     TraceAssumedZeroHere,       // {0} = variable name (guard: zero on this branch)
     SummaryStaleWarning,        // {0} = summary file, {1} = newer source
+    TraceAlsoDerefHere,         // {0} = variable name (dedup: same origin)
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

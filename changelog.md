@@ -1,5 +1,27 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Report-flood dedup: one warning per variable
+
+### Changed
+- **Warning-severity null-derefs report ONCE per (variable, function)**;
+  every later dereference of the same variable becomes an "also
+  dereferenced here" trace note on the first finding (notes capped at
+  10). Definite (error) reports keep per-line granularity — they are
+  rare and each site matters. The motivating floods: shadPS4
+  internal__Foprep (one missing return = 25 identical warnings),
+  fprime PriorityMemQueue (5x queueConfigs).
+- Corpus pins re-measured in the same PR: cjson 123 → **55**,
+  abseil 12 → **5** (same-variable floods collapsed); tinyxml2 9 and
+  catch2 0 unchanged (distinct variables / nothing to report). Local
+  Juliet replay: ALL FIVE floors green — case-level metrics are
+  preserved by construction (each flooding variable still carries one
+  report).
+
+### Verification
+- 287/287 tests (ctest + single-process; +3 ReportDedupTest: flood →
+  one finding with notes, independent variables stay separate, errors
+  keep per-line granularity).
+
 ## 2026-07-12 — Configurable allocators: the leak domain learns project wrappers
 
 ### Added

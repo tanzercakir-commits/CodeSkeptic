@@ -329,13 +329,37 @@ public:
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reported_.emplace(effect.var, line).second) return;
 
+        const bool definite = (it->second == NullState::Null);
+
+        // Report-flood dedup (warnings only): one MaybeNull origin can
+        // reach dozens of dereferences (shadPS4 internal__Foprep: a
+        // single missing return produced 25 identical warnings). The
+        // FIRST dereference carries the report; the rest become "also
+        // dereferenced here" trace notes on it. Definite (error)
+        // reports keep per-line granularity — they are rare and each
+        // site matters.
+        if (!definite) {
+            auto first = firstWarnIndex_.find(effect.var);
+            if (first != firstWarnIndex_.end()) {
+                zerodefect::TraceNote note;
+                note.file = sm.getFilename(loc).str();
+                note.line = line;
+                note.column = sm.getSpellingColumnNumber(loc);
+                note.message = zerodefect::msg(
+                    zerodefect::MsgId::TraceAlsoDerefHere,
+                    effect.var->getNameAsString());
+                alsoDerefs_[effect.var].push_back(std::move(note));
+                return;
+            }
+        }
+
         zerodefect::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "null-deref";
         diag.function = funcName_;
-        if (it->second == NullState::Null) {
+        if (definite) {
             diag.severity = zerodefect::Severity::Error;
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::NullDerefDefinite,
@@ -347,20 +371,36 @@ public:
                 effect.var->getNameAsString());
         }
         results_.push_back(diag);
+        if (!definite)
+            firstWarnIndex_[effect.var] = results_.size() - 1;
         noteTargets_.emplace_back(results_.size() - 1, effect.var);
     }
 
-    // After the run finishes: attach the null-assignment traces to reports
+    // After the run finishes: attach the null-assignment traces to
+    // reports, then the deduplicated "also dereferenced here" sites.
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
+            std::vector<zerodefect::TraceNote> notes;
             auto it = events_.find(var);
-            if (it == events_.end()) continue;
-            auto notes = it->second;
-            std::sort(notes.begin(), notes.end());
-            if (notes.size() > 6) notes.resize(6);
-            results_[index].notes = std::move(notes);
+            if (it != events_.end()) {
+                notes = it->second;
+                std::sort(notes.begin(), notes.end());
+                if (notes.size() > 6) notes.resize(6);
+            }
+            auto also = alsoDerefs_.find(var);
+            if (also != alsoDerefs_.end()) {
+                auto extra = also->second;
+                std::sort(extra.begin(), extra.end());
+                for (auto& n : extra) {
+                    if (notes.size() >= 10) break;
+                    notes.push_back(std::move(n));
+                }
+            }
+            if (!notes.empty()) results_[index].notes = std::move(notes);
         }
         noteTargets_.clear();
+        firstWarnIndex_.clear();
+        alsoDerefs_.clear();
     }
 
 private:
@@ -387,6 +427,8 @@ private:
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
+    std::map<const VarDecl*, size_t> firstWarnIndex_;
+    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> alsoDerefs_;
 };
 
 // --- Matcher callback ---

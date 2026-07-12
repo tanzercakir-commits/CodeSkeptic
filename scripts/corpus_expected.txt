@@ -4,12 +4,20 @@
 # changes this file is updated in the SAME PR (the rationale stays
 # visible in the commit message).
 #
+# 2026-07-12 (report-flood dedup): warning-severity null-derefs report
+# once per (variable, function); later sites become trace notes on the
+# first finding. Same-variable floods collapse: cjson 123 -> 55,
+# abseil 12 -> 5. tinyxml2 (9, distinct variables) and catch2 (0)
+# unchanged. Case-level Juliet metrics preserved (verified locally:
+# all five floors green).
+#
 # project finding-count
-cjson 123
+cjson 55
 tinyxml2 9
 # abseil runs only with CORPUS_DEEP=1 (weekly cron; tag 20260526.0).
-# 12 = post-FP-hunt level (2026-07-12): builtin_expect transparency,
-# static/global exemption, member/receiver escape.
-abseil 12
+# 5 = post-dedup level; 12 was the post-FP-hunt level (2026-07-12):
+# builtin_expect transparency, static/global exemption,
+# member/receiver escape.
+abseil 5
 # catch2 (v3.15.2, deep-only): zero findings — the FP-explosion tripwire.
 catch2 0

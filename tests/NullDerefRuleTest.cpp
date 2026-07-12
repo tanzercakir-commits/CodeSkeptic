@@ -622,3 +622,62 @@ TEST(LlamaFpTest, TernaryArmDeref_NotFlagged) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- Report-flood dedup (2026-07-12): one warning per variable ---
+
+TEST(ReportDedupTest, WarningFlood_CollapsesToOneFinding) {
+    // The internal__Foprep shape: one MaybeNull origin, many derefs —
+    // ONE report; the rest become "also dereferenced here" notes.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct F { int a; int b; int c; };
+        void set_err();
+        int f(F* file) {
+            if (file == nullptr) {
+                set_err();
+            }
+            int x = file->a;
+            int y = file->b;
+            int z = file->c;
+            return x + y + z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+    bool hasAlso = false;
+    for (const auto& n : results[0].notes)
+        if (n.message.find("also dereferenced") != std::string::npos)
+            hasAlso = true;
+    EXPECT_TRUE(hasAlso);
+}
+
+TEST(ReportDedupTest, IndependentVariables_StillTwoFindings) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct F { int a; };
+        void warn();
+        int f(F* p, F* q) {
+            if (p == nullptr) { warn(); }
+            if (q == nullptr) { warn(); }
+            return p->a + q->a;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2);
+}
+
+TEST(ReportDedupTest, DefiniteErrors_KeepPerLineGranularity) {
+    // Errors are rare and each site matters — no dedup.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct F { int a; int b; };
+        int f() {
+            F* p = nullptr;
+            int x = p->a;
+            int y = p->b;
+            return x + y;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[1].severity, Severity::Error);
+}
