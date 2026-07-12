@@ -34,8 +34,26 @@
   multi-allocation early-return shape (next-round triage / upstream
   report candidates).
 
+### Changed (round 2 — the Juliet guard spoke, again)
+- **CWE401 precision floor 0.60 → 0.55, with a main-vs-PR diff as
+  evidence.** The guard flagged rprecision 0.559 (CI). Local replay
+  against a mirrored Juliet suite: main 78TP/36FP (0.684) vs PR
+  81TP/56FP (0.591 after the nothrow fix). Every one of the +24 FPs is
+  a realloc-family file — the old matcher list NEVER tracked realloc,
+  so those ~25 files were invisible; now visible, their good variants
+  hit the documented correlated-guard limitation
+  (staticReturnsTrue()/False() call conditions — PathFacts cannot key
+  disjuncts on calls; the guarded-disjuncts-v2 item). 4 old FPs also
+  vanished (escape refinements). Coverage widened, absolute TPs rose,
+  the ratio dipped on the newly visible files: floor adjusted in the
+  same PR, per policy.
+- **Nothrow-new regression caught and pinned**: the placement-new
+  exemption was excluding `new (std::nothrow) T` — a real heap
+  allocation. Only POINTER-typed placement args mean caller storage.
+  Worth 7 FPs of the CI drop (0.559 → 0.591).
+
 ### Verification
-- 283/283 tests (ctest + single-process; +4 AllocFunctionsTest with
+- 284/284 tests (ctest + single-process; +4 AllocFunctionsTest with
   the unregistered-wrapper-invisible pin, +3 AddrOfMemberTest with the
   local-alias flip side, +3 AliasEscapeTest with the Juliet dataCopy
   re-pin). Corpus pins unchanged (cjson 123, tinyxml2 9). Juliet

@@ -103,6 +103,10 @@ Juliet's CI weight, project name check.
       is the v2 design (fprime's remaining 7 findings are all this
       family). Candidate: disjunct guards keyed on the assert/branch
       condition with multi-variable refinement per disjunct.
+      ALSO needed: canonical keys for CALL conditions
+      (staticReturnsTrue()/False() — the Juliet realloc-family FPs,
+      ~24 findings, measured 2026-07-12): PathFacts only keys
+      variable conditions today.
 - [x] **Configurable allocators — done (2026-07-12)**:
       --alloc-functions/--free-functions + three escape refinements
       (address-of-member, alias escape propagation, chained

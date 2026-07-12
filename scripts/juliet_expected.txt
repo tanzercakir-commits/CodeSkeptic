@@ -14,8 +14,18 @@
 # not where we reported). Documented as a known FN in todo.md — needs
 # whole-program global-flow tracking. Precision floor RAISED, recall
 # floor lowered to the honest measured value.
+# 2026-07-12 (PR #42, configurable allocators): CWE401 precision floor
+# 0.60 -> 0.55. Tracking realloc closed a SILENT COVERAGE GAP (the old
+# matcher list never included it), making ~25 realloc-family files
+# visible for the first time: +3 absolute TPs, but their good variants
+# hit the documented correlated-guard limitation (staticReturnsTrue()/
+# staticReturnsFalse() call conditions — PathFacts cannot key disjuncts
+# on calls; the guarded-disjuncts-v2 design item). Measured via a
+# main-vs-PR local diff: every one of the +24 FPs is a realloc file;
+# 4 old FPs also disappeared (escape refinements). Wider coverage with
+# the same known limitation, not lost precision on covered code.
 CWE476 0.95 0.30
-CWE401 0.60 0.18
+CWE401 0.55 0.18
 CWE415 0.95 0.20
 CWE416 0.95 0.38
 CWE369 0.95 0.03
