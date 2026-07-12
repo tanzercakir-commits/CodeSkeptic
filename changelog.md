@@ -1,5 +1,18 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — --files UX hardening (the systemd lesson)
+
+### Changed
+- `--files` entries that do not exist as given are retried relative to
+  `--build-path` (meson compile DBs carry build-dir-relative paths like
+  `../src/foo.c` — a meson-driven list used to be skipped entirely).
+- Zero analyzable files is now exit 2, not a "Clean!" exit 0 —
+  analyzing nothing must not look like a clean pass.
+
+### Verification
+- 297/297 tests (+1 FilesUxTest zero-file pin); relative-path
+  resolution verified end-to-end against systemd's meson build dir.
+
 ## 2026-07-12 — Disjuncts v2a: constant-returning call guards
 
 ### Changed

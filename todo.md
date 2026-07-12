@@ -64,12 +64,9 @@ Juliet's CI weight, project name check.
       v1 files backward compatible)
 
 ### Rule improvement notes
-- [ ] **--files UX hardening (systemd lesson, 2026-07-12)**: meson
-      compile DBs carry build-dir-relative paths; --files entries that
-      do not exist are skipped with a stderr note and the run prints
-      "Clean!" with exit 0 — silently analyzing NOTHING. Fix: resolve
-      non-absolute --files entries against --build-path too, and treat
-      "0 analyzable files" as an error exit, not a clean pass.
+- [x] **--files UX hardening — done (2026-07-12)**: non-absolute
+      entries retried against --build-path; zero analyzable files is
+      exit 2, not a clean pass.
 - [ ] Juliet 44/45 families ("data passed via static global"): known FN
       after the escape refinement — storing an allocation into a
       global/static suppresses the local leak report by design.
