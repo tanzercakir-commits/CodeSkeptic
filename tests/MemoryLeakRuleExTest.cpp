@@ -1072,3 +1072,43 @@ TEST(AliasEscapeTest, ExitGuard_DoesNotDiluteFreedAlias) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- systemd FP hunt (2026-07-12): __attribute__((cleanup)) ---
+
+TEST(CleanupAttrTest, CleanupVar_CannotLeak) {
+    // systemd's _cleanup_free_ / GLib's g_autofree: the compiler runs
+    // the cleanup function at every scope exit — no leak possible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static inline void freep(void* p) { free(*(void**)p); }
+        int f() {
+            __attribute__((cleanup(freep))) char* buf = 0;
+            buf = (char*)malloc(64);
+            if (!buf) { return -1; }
+            buf[0] = 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CleanupAttrTest, PlainNeighbor_StillTracked) {
+    // The flip side: a cleanup attribute on ONE variable exempts only
+    // that variable.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        static inline void freep(void* p) { free(*(void**)p); }
+        int f() {
+            __attribute__((cleanup(freep))) char* safe = 0;
+            safe = (char*)malloc(8);
+            char* leaky = (char*)malloc(8);
+            (void)leaky;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}

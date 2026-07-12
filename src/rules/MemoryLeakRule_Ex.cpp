@@ -10,6 +10,7 @@
 #include "engine/GuardedDisjuncts.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Attr.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
@@ -384,7 +385,16 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     // lifetime is program-long and the "leak on purpose" singleton
     // (`static Mutex* mu = new Mutex;` — deliberate Google style to
     // dodge destruction-order fiasco) is idiomatic real-world code.
-    auto trackable = [](const VarDecl* v) { return v->hasLocalStorage(); };
+    // A variable with __attribute__((cleanup(fn))) cannot leak by
+    // construction — the compiler runs fn at every scope exit
+    // (systemd's _cleanup_free_, GLib's g_autofree; 111 of systemd's
+    // findings were this shape). v1 excludes them from tracking
+    // entirely; modeling the cleanup as a scope-exit free (to catch
+    // `free(p)` double-frees under a cleanup attribute) is the v2
+    // design, noted in todo.
+    auto trackable = [](const VarDecl* v) {
+        return v->hasLocalStorage() && !v->hasAttr<CleanupAttr>();
+    };
 
     auto wrapper = functionDecl(equalsNode(funcDecl),
                                  forEachDescendant(candidateInit));
