@@ -458,3 +458,56 @@ TEST(DisjunctsV2bTest, TemplateParam_DifferentGuards_StillWarns) {
     )");
     EXPECT_GE(results.size(), 1);
 }
+
+// --- Unsigned zero-identities (the NASA fprime PriorityMemQueue FP) ---
+//
+// For an unsigned counter, `u <= 0` IS `u == 0` and `u > 0` IS
+// `u != 0`. Un-canonicalized they split disjuncts on a phantom
+// dimension (an "u <= 0 but u != 0" disjunct is unsatisfiable), real
+// functions blow the disjunct cap, and the overflow widening erases
+// exactly the correlated pointer fact the assert established.
+
+TEST(DisjunctsV2bTest, UnsignedZeroIdentity_FprimeShape) {
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kAssertPrelude) + R"(
+        typedef unsigned long FwSizeType;
+        struct Cfg { FwSizeType numPriorities; };
+        void* alloc_mem(FwSizeType);
+        int configure(Cfg *cfgs, FwSizeType num, bool required) {
+            myassert((cfgs != nullptr) || (num == 0));
+            myassert(!(required && num == 0));
+            if (num > 0) {
+                void *used = alloc_mem(num);
+                myassert(used != nullptr);
+            }
+            int total = 0;
+            if (num > 0) {
+                for (FwSizeType i = 0; i < num; ++i)
+                    total += (int)cfgs[i].numPriorities;
+            }
+            return total;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DisjunctsV2bTest, UnsignedNeverNegative_StillReported) {
+    // `u < 0` is never true, so the guarded assignment never happens
+    // and the deref IS a null dereference. The canonicalization keys
+    // no fact for it (no per-edge information), so the report stays
+    // at the conservative maybe-null severity — pruning the
+    // impossible branch outright (upgrading this to a definite error)
+    // is a possible future sharpening, pinned here as-is.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int *make();
+        int f(unsigned n) {
+            int *p = 0;
+            if (n < 0)
+                p = make();
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}

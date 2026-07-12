@@ -1,5 +1,43 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Unsigned zero-identities (the fprime PriorityMemQueue FP)
+
+### Changed
+- **normalizeCompare canonicalizes unsigned comparisons against
+  zero**: for an unsigned variable `u <= 0` IS `u == 0` and `u > 0`
+  IS `u != 0` — both now key as (u EQ 0). Un-canonicalized, the same
+  knowledge lived under two keys, disjuncts split on a phantom
+  dimension (an "u <= 0 but u != 0" disjunct is unsatisfiable yet
+  stayed alive), real functions blew the disjunct cap, and the
+  overflow widening erased exactly the correlated pointer fact the
+  assert had established. `u < 0` (never true) and `u >= 0` (always
+  true) carry no per-edge information and are no longer keyed.
+- Root-caused by DELETION-based delta debugging on a faithful
+  standalone copy of NASA fprime's PriorityMemQueue::configure: the
+  warning needed BOTH the `required` assert (doubling disjuncts on a
+  bool fact) AND the first `num > 0` block (splitting again) — five
+  disjuncts at the join, cap 4, widen-to-one, correlation gone.
+  (Construction-based repro attempts had missed it twice; the
+  deletion direction found it in one round. Also: a stub overload
+  mismatch in the copy produced an error-recovery AST whose phantom
+  warning briefly pointed the wrong way — check compile errors in a
+  repro before trusting it.)
+
+### Results
+- NASA fprime with `--fatal-asserts SwAssert`: CLEAN (0 findings) —
+  the README table row (2) awaits correction to 0 with the flag
+  documented.
+- systemd 50 -> 51 nulls: one conservative loss (fstab-util.c
+  flag-correlation) from unkeying always-false/always-true unsigned
+  orderings — queued for a single-file bisect; direction is
+  FP-conservative, not unsound.
+
+### Verification
+- 334/334 tests in both modes (+2: the fprime shape end-to-end, and
+  the `u < 0` phantom-branch pin documenting the conservative
+  severity).
+- Juliet floors and corpus pins green on fresh replays.
+
 ## 2026-07-12 — MCP idiom parameters
 
 ### Changed
