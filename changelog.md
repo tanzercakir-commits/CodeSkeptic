@@ -1,5 +1,37 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Comparator-ladder case exhaustion (libgit2 triage round)
+
+### Changed
+- **Pointer-pointer pairs now gate pointer facts too**
+  (collectPtrFactDecls): a bare-pointer operand qualifies when its
+  short-circuit partner is EITHER integer-keyable (the assert shape)
+  OR another bare-pointer nullness operand. The comparator-ladder
+  family falls out of the existing v2b machinery: after
+  `if (!a && !b) ... if (!a && b) ... if (a && !b) ...` falls
+  through, disjunction elimination over the split disjuncts proves
+  both pointers non-null. Self-guards (`p && p->x`) stay ungated —
+  the member side is not a bare pointer operand, so ordinary guards
+  do not burn the disjunct cap.
+
+### Results
+- libgit2 nulls 29 -> 23 (checkout/status/merge cmp ladders died;
+  index.c's pair survives — its correlation travels through a
+  call-result int, documented). cJSON 52 -> 50, abseil 5 -> 4; both
+  pins re-centered in this PR.
+- libgit2 triage completed (29 nulls): 8 cmp-ladder (fixed here),
+  2 member-field guard correlation (`hdr->chunks == 0` early-return
+  proves a parse loop runs — member-expr fact keys are a v3 idea),
+  19 callee-may-return-null sites for later per-site reading.
+  0 new real bugs (the 11 verified OOM-path leaks stand).
+
+### Verification
+- 324/324 tests in both modes (+3: both ladder forms clean, and the
+  over-blessing guard — a surviving null path through a fallen rung
+  still warns).
+- Juliet floors green at the RAISED v2b values (0.66/0.23/0.48);
+  metrics unchanged.
+
 ## 2026-07-12 — Disjuncts v2b: cross-variable correlation (max-effort engine session)
 
 ### Changed

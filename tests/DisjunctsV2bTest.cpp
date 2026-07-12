@@ -340,3 +340,66 @@ TEST(DisjunctsV2bTest, SystemdAssertShape_UnprotectedDerefStillWarns) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- Comparator-ladder case exhaustion (libgit2 cmp functions) ---
+//
+// `if (!a && !b) ... if (!a && b) ... if (a && !b) ...` — falling
+// through all three proves a AND b. Requires BOTH pointers to split
+// disjuncts, so collectPtrFactDecls also gates pointer-pointer pairs
+// sharing a short-circuit operator (self-guards like `p && p->x` stay
+// ungated — the member side is not a bare pointer operand).
+
+TEST(DisjunctsV2bTest, CmpLadder_FallthroughProvesBoth) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct D { const char *path; };
+        int cmp(const char *, const char *);
+        int f(const D *a, const D *b) {
+            if (!a && !b) return 0;
+            if (!a && b) return -1;
+            if (a && !b) return 1;
+            return cmp(a->path, b->path);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DisjunctsV2bTest, CmpLadder_ElseIfForm) {
+    // The checkout.c shape: else-if chain instead of early returns.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct D { const char *path; };
+        int cmp(const char *, const char *);
+        int f(const D *a, const D *b) {
+            if (!a && !b)
+                return 0;
+            else if (!a && b)
+                return -1;
+            else if (a && !b)
+                return 1;
+            else
+                return cmp(a->path, b->path);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DisjunctsV2bTest, CmpLadder_SurvivingNullPathStillWarns) {
+    // Over-blessing guard: when a b-is-null path SURVIVES to the
+    // dereference (the b==0 rung falls through because a was
+    // non-null), the gated pointer facts must not silence it. (An
+    // INCOMPLETE ladder whose null-evidence paths all return stays
+    // silent by design — parameters are Unknown without surviving
+    // in-function evidence.)
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct D { int x; };
+        int f(const D *a, const D *b) {
+            if (b == 0 && a == 0)
+                return 0;
+            return b->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}

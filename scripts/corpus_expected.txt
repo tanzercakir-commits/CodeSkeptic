@@ -11,13 +11,18 @@
 # unchanged. Case-level Juliet metrics preserved (verified locally:
 # all five floors green).
 #
+# 2026-07-12 (disjuncts v2b + comparator-ladder gating): cjson
+# 55 -> 50 (flag/status correlations and two cmp-ladder shapes died);
+# abseil 5 -> 4. Pins re-centered so the tolerance band tracks the
+# improved level instead of sagging toward its lower edge.
+#
 # project finding-count
-cjson 55
+cjson 50
 tinyxml2 9
 # abseil runs only with CORPUS_DEEP=1 (weekly cron; tag 20260526.0).
-# 5 = post-dedup level; 12 was the post-FP-hunt level (2026-07-12):
-# builtin_expect transparency, static/global exemption,
+# 4 = post-v2b level; 5 was post-dedup; 12 was the post-FP-hunt level
+# (2026-07-12): builtin_expect transparency, static/global exemption,
 # member/receiver escape.
-abseil 5
+abseil 4
 # catch2 (v3.15.2, deep-only): zero findings — the FP-explosion tripwire.
 catch2 0
