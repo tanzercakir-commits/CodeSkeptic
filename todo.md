@@ -94,6 +94,26 @@ Juliet's CI weight, project name check.
       calls to registered names (empty by default — per-project
       opt-in). shadPS4's ~170-finding ASSERT flood collapses with
       `--fatal-asserts assert_fail_impl`. 7 FatalCallsTest pins.
+- [ ] **Correlated guards across variables — guarded disjuncts v2**
+      (NASA fprime lesson, 2026-07-12): `FW_ASSERT(ptr != nullptr ||
+      count == 0)` establishes ptr↔count correlation; later derefs sit
+      inside `if (count > 0)`. Same shape with status codes:
+      allocations checked via `status == OP_OK`. Our disjuncts key on
+      single-variable conditions; correlating facts BETWEEN variables
+      is the v2 design (fprime's remaining 7 findings are all this
+      family). Candidate: disjunct guards keyed on the assert/branch
+      condition with multi-variable refinement per disjunct.
+- [ ] **Configurable allocators** (--alloc-functions/--free-functions,
+      libgit2 lesson 2026-07-12): git__malloc/git__free are invisible
+      to the fixed allocator list, so the leak rule tracked NOTHING in
+      libgit2 (zero leak findings — neither FP nor TP). The natural
+      sibling of --fatal-asserts; wire into isAllocExpr and the
+      free-by-name check in MemoryLeakRule.
+- [ ] libgit2 remaining ~101 null-deref triage (after the
+      assignment-in-condition + rewind fixes; was 149): sample clusters
+      suggest hashmap macro-generated code (GIT_HASHMAP_OID_SETUP
+      expansions attribute findings to the macro line) and
+      GIT_ERROR_CHECK_ALLOC interplay — next libgit2 round.
 - [ ] Address-of-member escape (found in shadPS4 round 2 triage):
       `TrackGeneratedGlyph(&boxed->glyph); *out = &boxed->glyph;` —
       handing out a member's address keeps the whole object reachable;

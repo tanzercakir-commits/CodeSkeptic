@@ -5,6 +5,7 @@
 #include "engine/FatalCalls.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/Expr.h>
 #include <clang/AST/Stmt.h>
 #include <clang/Analysis/CFG.h>
 
@@ -108,6 +109,64 @@ DataflowResult<Analysis> runDataflow(
         State entryState = analysis.initialState();
         hasPreds = false;
         bool firstPred = true;
+
+        // Value-selection rewind. A ternary refines its ARMS (`z ?
+        // 100/z : 0` — z is NonZero inside the true arm), but the facts
+        // it contributes are tautological ONCE THE ARMS REJOIN: "p is
+        // null or non-null" must not downgrade the pre-ternary state to
+        // a reportable MaybeNull for the rest of the function (the
+        // GGML_TENSOR_LOCALS defensive-macro shape, `ne0 = p ? p->x :
+        // 0`, produced ~90% of llama.cpp's findings). Detection: the
+        // join's two predecessors are the two arms of one
+        // ConditionalOperator diamond and each arm's exit equals the
+        // PURE refinement of the condition block's exit — the arms
+        // changed nothing themselves — so the join re-enters with the
+        // condition block's state. An arm with a real effect (an
+        // assignment) fails the equality and merges normally.
+        if constexpr (detail::HasRefineOnEdge<Analysis>::value) {
+            if (block->pred_size() == 2) {
+                auto predIt = block->pred_begin();
+                const clang::CFGBlock* arm1 = predIt->getReachableBlock();
+                ++predIt;
+                const clang::CFGBlock* arm2 = predIt->getReachableBlock();
+                if (arm1 && arm2 && arm1 != arm2 &&
+                    arm1->pred_size() == 1 && arm2->pred_size() == 1) {
+                    const clang::CFGBlock* g1 =
+                        arm1->pred_begin()->getReachableBlock();
+                    const clang::CFGBlock* g2 =
+                        arm2->pred_begin()->getReachableBlock();
+                    const clang::Stmt* term =
+                        g1 ? g1->getTerminatorStmt() : nullptr;
+                    if (g1 && g1 == g2 && term &&
+                        (llvm::isa<clang::ConditionalOperator>(term) ||
+                         llvm::isa<clang::BinaryConditionalOperator>(term))) {
+                        auto gExit = blockExitState.find(g1->getBlockID());
+                        auto e1 = blockExitState.find(arm1->getBlockID());
+                        auto e2 = blockExitState.find(arm2->getBlockID());
+                        const clang::Stmt* cond = g1->getTerminatorCondition();
+                        if (cond && gExit != blockExitState.end() &&
+                            e1 != blockExitState.end() &&
+                            e2 != blockExitState.end()) {
+                            const clang::CFGBlock* trueSucc =
+                                g1->succ_begin()->getReachableBlock();
+                            State rTrue = gExit->second;
+                            analysis.refineOnEdge(cond, true, rTrue, ctx);
+                            State rFalse = gExit->second;
+                            analysis.refineOnEdge(cond, false, rFalse, ctx);
+                            const State& trueExit =
+                                (arm1 == trueSucc) ? e1->second : e2->second;
+                            const State& falseExit =
+                                (arm1 == trueSucc) ? e2->second : e1->second;
+                            if (!(trueExit != rTrue) &&
+                                !(falseExit != rFalse)) {
+                                hasPreds = true;
+                                return gExit->second;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         for (auto it = block->pred_begin(); it != block->pred_end(); ++it) {
             const clang::CFGBlock* pred = it->getReachableBlock();

@@ -495,3 +495,130 @@ TEST(ShadPS4FpTest, DerefInsideAndGuard_StillCaught) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
+
+// --- libgit2 FP hunt (2026-07-12): assignment inside condition ---
+
+TEST(LibGit2FpTest, AssignInCondition_EqNull_Refines) {
+    // The dominant libgit2 pattern: `if ((dup = f()) == NULL) return;`
+    // — the guard tests the just-assigned value; after it, dup is
+    // non-null on the continue path.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g;
+        int* f(int c) {
+            if (c) return nullptr;
+            return &g;
+        }
+        int use(int c) {
+            int* dup;
+            if ((dup = f(c)) == nullptr)
+                return -1;
+            return *dup;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(LibGit2FpTest, AssignInCondition_BangForm_Refines) {
+    // The pool.c shape: `if (over || !(page = alloc())) return NULL;`
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Page { int size; };
+        Page* alloc(unsigned long n);
+        int f(bool over, unsigned long n) {
+            Page* page;
+            if (over || !(page = alloc(n)))
+                return -1;
+            return page->size;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(LibGit2FpTest, AssignInCondition_WhileForm_Refines) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Entry { int v; };
+        Entry* next();
+        int sum() {
+            Entry* e;
+            int total = 0;
+            while ((e = next()) != nullptr) {
+                total += e->v;
+            }
+            return total;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(LibGit2FpTest, AssignInCondition_NullBranchDeref_StillCaught) {
+    // The flip side: inside the == NULL branch the variable IS null —
+    // a dereference there must stay a definite error.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int g;
+        int* f(int c) {
+            if (c) return nullptr;
+            return &g;
+        }
+        int use(int c) {
+            int* p;
+            if ((p = f(c)) == nullptr)
+                return *p;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+// --- llama.cpp FP hunt (2026-07-12): defensive ternary is not a guard ---
+
+TEST(LlamaFpTest, DefensiveTernary_NoMaybeNullAfterJoin) {
+    // The GGML_TENSOR_LOCALS shape: `ne0 = p ? p->x : 0;` — a value
+    // selection, not a guard. Its edges carry tautological information
+    // ("p is null or non-null"); after the immediate rejoin they must
+    // not downgrade Unknown to a reportable MaybeNull.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { long ne[4]; char* data; };
+        long f(T* src0) {
+            const long ne00 = (src0) ? (src0)->ne[0] : 0;
+            return ne00 + (long)*src0->data;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(LlamaFpTest, IfGuard_CheckThenUse_StillWarns) {
+    // The flip side: a real statement-level guard keeps refining.
+    // Check-then-unguarded-use stays reportable.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        void log_warn();
+        int f(T* p) {
+            if (p == nullptr) {
+                log_warn();
+            }
+            return p->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(LlamaFpTest, TernaryArmDeref_NotFlagged) {
+    // Inside the arms the variable is Unknown (no refinement) — the
+    // true arm's own dereference stays silent, as before.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { long ne[4]; };
+        long f(T* p, bool c) {
+            long a = c ? 1 : 2;
+            long b = (p) ? (p)->ne[1] : 0;
+            return a + b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

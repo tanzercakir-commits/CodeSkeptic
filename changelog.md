@@ -1,5 +1,58 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — libgit2 + llama.cpp FP hunt: two C-idiom families
+
+### Changed
+- **Assignment inside a condition refines its LHS** (ConditionWalk):
+  `if ((p = alloc()) == NULL) return;`, `while ((e = next()) != NULL)`,
+  `!(page = git__malloc(n))` — the guard tests the just-assigned value,
+  but the variable extraction only saw bare DeclRefExprs, so the whole
+  guard was invisible and every use after it warned. One look-through
+  (isAssignmentOp, compound forms included) serves both the null and
+  zero domains. This was libgit2's dominant FP family.
+- **Value-selection rewind** (DataflowEngine): a ternary refines its
+  ARMS (`z ? 100/z : 0` keeps z NonZero inside the true arm — pinned
+  since the stress suite), but once the arms REJOIN its edge facts are
+  tautological ("p is null or non-null") and must not downgrade the
+  pre-ternary state to a reportable MaybeNull. The defensive macro
+  shape `ne0 = p ? p->ne[0] : 0` (GGML_TENSOR_LOCALS) produced ~90% of
+  llama.cpp's 511 findings. Detection: the join's two predecessors form
+  one ConditionalOperator diamond and each arm's exit state equals the
+  PURE refinement of the condition block's exit — then the join
+  re-enters with the condition block's state; an arm with a real effect
+  fails the equality and merges normally.
+- **libgit2 scan** (168 files, pure C): 149 findings, ALL null-deref —
+  and ZERO memory-leak, which is itself a finding about the analyzer:
+  git__malloc/git__free are invisible to the fixed allocator list, so
+  the leak rule tracked nothing. Configurable allocators
+  (--alloc-functions/--free-functions) recorded in todo as the natural
+  sibling of --fatal-asserts.
+- **llama.cpp scan** (225 files): 511 findings before the fixes →
+  **47 after** (ops.cpp's 407-finding cluster collapsed to 3; the
+  remaining set is 37 null-deref / 9 memory-leak / 1 div-by-zero,
+  next-round triage material). libgit2: 149 → **101**.
+
+### Changed (round 2 — NASA fprime)
+- **Scanned NASA F´ flight-software framework** (216 hand-written files
+  after a full fprime-util build generated the FPP autocoder headers):
+  **10 findings**, triaged to the last one. Fixed here: **placement new
+  is not an allocation** (MemoryLeak isAllocExpr — the AtomicQueue
+  slot-initialization loop `new (&m_slots[i]) Slot()` produced 2 FPs;
+  plain new keeps full tracking, pinned). `--fatal-asserts SwAssert`
+  killed the TlmChan FW_ASSERT-opacity warning — the feature's second
+  real-world validation. Remaining 7: one family, cross-VARIABLE
+  correlated guards (`FW_ASSERT(ptr != nullptr || count == 0)` then
+  derefs inside `if (count > 0)`) — recorded in todo as the guarded
+  disjuncts v2 design item.
+
+### Verification
+- 273/273 tests (ctest + single-process; +5 LibGit2FpTest including the
+  null-branch flip side, +3 LlamaFpTest including the
+  check-then-unguarded-use flip side that must KEEP warning, +2
+  FprimeFpTest placement-new pins). The two BestCaseTest ternary-guard
+  pins from the stress suite hold — the rewind preserves arm-internal
+  refinement by construction.
+
 ## 2026-07-12 — shadPS4 round 2: --fatal-asserts (assert-opacity flood)
 
 ### Added

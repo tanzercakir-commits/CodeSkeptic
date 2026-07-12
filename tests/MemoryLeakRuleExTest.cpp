@@ -680,3 +680,37 @@ TEST(ShadPS4FpTest, NonConstRefArg_Escapes_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- NASA fprime FP hunt (2026-07-12): placement new ---
+
+TEST(FprimeFpTest, PlacementNew_IsNotAnAllocation) {
+    // The AtomicQueue slot-initialization loop: placement new
+    // constructs into existing storage — reassigning the cursor
+    // pointer across iterations leaks nothing.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Slot { int v; Slot() : v(0) {} };
+        void init(void* mem, int n) {
+            Slot* slots = static_cast<Slot*>(mem);
+            for (int i = 0; i < n; ++i) {
+                Slot* slot = new (&slots[i]) Slot();
+                slot->v = i;
+            }
+        }
+        void* operator new(unsigned long, void* p) noexcept;
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(FprimeFpTest, PlainNew_StillTracked) {
+    // The flip side: ordinary new keeps full leak tracking.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Slot { int v; };
+        void f() {
+            Slot* s = new Slot();
+            s->v = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
