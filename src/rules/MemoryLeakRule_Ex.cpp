@@ -59,11 +59,18 @@ llvm::StringRef calleeName(const FunctionDecl* callee) {
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
-    // Placement new constructs into EXISTING storage — no allocation
-    // happens and nothing is leakable (the NASA fprime AtomicQueue
-    // slot-initialization loop, `new (&m_slots[i]) Slot()`).
-    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr))
-        return newExpr->getNumPlacementArgs() == 0;
+    // Placement new into EXISTING storage (`new (&m_slots[i]) Slot()`,
+    // the NASA fprime AtomicQueue loop) allocates nothing. But not
+    // every placement ARG means placement STORAGE: `new (std::nothrow)
+    // T` is a genuine heap allocation — only a POINTER-typed placement
+    // argument designates caller-provided memory.
+    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr)) {
+        for (unsigned i = 0; i < newExpr->getNumPlacementArgs(); ++i) {
+            QualType t = newExpr->getPlacementArg(i)->getType();
+            if (t->isPointerType()) return false;
+        }
+        return true;
+    }
     if (const auto* cast = dyn_cast<CastExpr>(expr))
         return isAllocExpr(cast->getSubExpr(), ctx);
     if (const auto* call = dyn_cast<CallExpr>(expr)) {

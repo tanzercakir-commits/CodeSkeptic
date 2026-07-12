@@ -891,3 +891,20 @@ TEST(AliasEscapeTest, ChainedAssignThroughOutParam_Escapes_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
+    // `new (std::nothrow) T` carries a placement ARG but allocates from
+    // the heap — only a POINTER-typed placement argument designates
+    // caller-provided storage.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std { struct nothrow_t {}; extern const nothrow_t nothrow; }
+        void* operator new(unsigned long, const std::nothrow_t&) noexcept;
+        struct T { int v; };
+        void f() {
+            T* p = new (std::nothrow) T();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
