@@ -403,3 +403,58 @@ TEST(DisjunctsV2bTest, CmpLadder_SurvivingNullPathStillWarns) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- Template-parameter facts (llama.cpp ggml rms_norm FP) ---
+//
+// A non-type template parameter is a compile-time constant — the most
+// stable fact key possible. Uninstantiated `if constexpr` reads as a
+// runtime branch, so "set under the flag, used under the flag" needs
+// the same-condition correlation just like any Juliet flow variant.
+
+TEST(DisjunctsV2bTest, TemplateParam_SameGuardTwice_NoWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Tensor { float *data; };
+        template <int FUSE>
+        float f(Tensor *a, Tensor *b) {
+            Tensor *src1 = nullptr;
+            if (FUSE == 1) {
+                src1 = b;
+            }
+            float acc = a->data[0];
+            if (FUSE == 1) {
+                acc += src1->data[0];
+            }
+            return acc;
+        }
+        float use(Tensor *a, Tensor *b) {
+            return f<0>(a, b) + f<1>(a, b);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DisjunctsV2bTest, TemplateParam_DifferentGuards_StillWarns) {
+    // Set under FUSE == 1 but used under FUSE != 2 — no correlation,
+    // the possible-null dereference must stay reported.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Tensor { float *data; };
+        template <int FUSE>
+        float f(Tensor *a, Tensor *b) {
+            Tensor *src1 = nullptr;
+            if (FUSE == 1) {
+                src1 = b;
+            }
+            float acc = a->data[0];
+            if (FUSE != 2) {
+                acc += src1->data[0];
+            }
+            return acc;
+        }
+        float use(Tensor *a, Tensor *b) {
+            return f<0>(a, b) + f<1>(a, b);
+        }
+    )");
+    EXPECT_GE(results.size(), 1);
+}

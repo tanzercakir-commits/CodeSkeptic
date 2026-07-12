@@ -340,3 +340,55 @@ TEST(LibGit2FpTest, AssignInCondition_ZeroGuard_Refines) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- Mutation visibility (llama.cpp ngram-cache FP, 2026-07-12) ---
+
+TEST(DivByZeroMutationTest, IncrementedCounter_NotDefinitelyZero) {
+    // `++n_done` before the division: the increment must not be
+    // invisible, or the zero fact from the initializer survives
+    // forever and the division reports a certain crash that cannot
+    // happen.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        long f(long total, long elapsed, int steps) {
+            long n = 0;
+            for (int i = 0; i < steps; ++i) {
+                ++n;
+                if (n % 10000000 == 0) {
+                    long eta = (total - n) * elapsed / n;
+                    (void)eta;
+                }
+            }
+            return n;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroMutationTest, CompoundAssign_AlsoVisible) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x, int step) {
+            int n = 0;
+            n += step;
+            if (n != 0)
+                return x / n;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroMutationTest, UntouchedZero_StillDefinite) {
+    // The sharp end must stay sharp: no mutation between init and use
+    // keeps the certain-crash error.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x) {
+            int z = 0;
+            return x / z;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
