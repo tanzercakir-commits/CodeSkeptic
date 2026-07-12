@@ -203,10 +203,14 @@ public:
     using State = zerodefect::GuardedState<NullVarState>;
 
     NullDerefAnalysis(const std::vector<const VarDecl*>& trackedVars,
-                      std::set<const ValueDecl*> mutatedDecls,
+                      std::set<const ValueDecl*> unkeyableDecls,
+                      std::set<const ValueDecl*> stampableDecls,
+                      std::set<const ValueDecl*> ptrFactDecls,
                       std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : mutated_(std::move(mutatedDecls)),
+        : mutated_(std::move(unkeyableDecls)),
+          stampable_(std::move(stampableDecls)),
+          ptrFacts_(std::move(ptrFactDecls)),
           funcName_(std::move(funcName)), results_(results) {
         zerodefect::Guarded<NullVarState> init;
         for (const auto* var : trackedVars)
@@ -220,15 +224,35 @@ public:
     // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 3 +
-                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
+                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
     }
+
+    // Fact records add lattice climbs the var-state formula above
+    // never counted (v2b); bounded so pathological functions do not
+    // explode the iteration cap.
+    unsigned factBudget() const {
+        auto n = static_cast<unsigned>(stampable_.size());
+        return (n > 16 ? 16u : n) * 2 *
+               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+    }
+
+    // Engine convergence hook: collapse the disjuncts when a block is
+    // revisited beyond any monotone explanation (see DataflowEngine).
+    void widen(State& s) const { zerodefect::widenGuarded(s, mergeNullStates); }
 
     State merge(const State& a, const State& b) const {
         return zerodefect::mergeGuarded(a, b, mergeNullStates);
     }
 
-    State transfer(const Stmt* stmt, const State& in,
+    State transfer(const Stmt* stmt, const State& inRaw,
                    ASTContext& /*ctx*/) const {
+        // Fact lifecycle first (v2b): assignments to locals erase the
+        // facts keyed on them; integer-constant stores stamp the new
+        // truth. Domain logic below then reads the fact-current state.
+        State in = inRaw;
+        zerodefect::applyStmtFacts(in, stmt, stampable_, ptrFacts_,
+                                   mergeNullStates);
+
         // A tracked pointer passed by non-const reference is an
         // out-param: the callee may rebind it, so its fact drops to
         // Unknown. There is no AddrOf node to see — only the parameter
@@ -270,10 +294,33 @@ public:
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        zerodefect::refineGuardedFacts(state, condExpr, isTrueBranch,
-                                       mutated_, mergeNullStates);
-        for (auto& d : state)
-            applyCondition(condExpr, isTrueBranch, d.vars);
+        zerodefect::refineGuardedFactsWith(
+            state, condExpr, isTrueBranch, mutated_, ptrFacts_,
+            mergeNullStates,
+            // Domain refuter for disjunction elimination: an operand
+            // whose REQUIRED nullness contradicts this disjunct's var
+            // state cannot have held here (walkNullCondition yields
+            // the operand's necessary conditions).
+            [](const zerodefect::Guarded<NullVarState>& d, const Expr* e,
+               bool wanted) {
+                bool refuted = false;
+                zerodefect::walkNullCondition(
+                    e, wanted, [&](const VarDecl* var, bool isNull) {
+                        auto it = d.vars.find(var);
+                        if (it == d.vars.end()) return;
+                        if (isNull && it->second == NullState::NonNull)
+                            refuted = true;
+                        if (!isNull && it->second == NullState::Null)
+                            refuted = true;
+                    });
+                return refuted;
+            },
+            // Per-disjunct var refinement of every leaf this disjunct
+            // is known to satisfy (including survivors of an
+            // eliminated disjunction — whole-state applyCondition
+            // never sees those).
+            [](zerodefect::Guarded<NullVarState>& d, const Expr* leaf,
+               bool leafTrue) { applyCondition(leaf, leafTrue, d.vars); });
     }
 
     // Guard trace (Trace v2): during the reporting pass, if the edge
@@ -421,6 +468,8 @@ private:
     }
 
     std::set<const ValueDecl*> mutated_;
+    std::set<const ValueDecl*> stampable_;
+    std::set<const ValueDecl*> ptrFacts_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
     State initState_;
@@ -451,7 +500,9 @@ public:
         if (trackedVars.empty()) return;
 
         NullDerefAnalysis analysis(
-            trackedVars, zerodefect::collectMutatedDecls(func),
+            trackedVars, zerodefect::collectUnkeyableDecls(func),
+            zerodefect::collectFactDecls(func),
+            zerodefect::collectPtrFactDecls(func),
             func->getQualifiedNameAsString(), results_);
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)

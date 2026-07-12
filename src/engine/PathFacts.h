@@ -35,6 +35,7 @@
 #include <clang/AST/OperationKinds.h>
 
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -61,17 +62,70 @@ struct FactKey {
 // Reduces a condition to a (key, value) pair: the returned bool is the
 // key's value WHEN THE CONDITION IS TRUE. Example: `X != 5` gives
 // {(X,EQ,5), false}. On a false edge the caller flips the value. A
-// condition that cannot be keyed -> nullopt. `mutated`: decls
-// assigned/address-taken inside the function (excluded from keying).
+// condition that cannot be keyed -> nullopt. `unkeyable`: decls whose
+// value can change invisibly (see collectUnkeyableDecls) — never keyed.
+//
+// `ptrKeyable`: POINTER variables that may additionally be keyed as
+// (var EQ 0) — truthiness and null-constant comparisons. Pointer keys
+// exist to keep disjuncts SPLIT across the value-joins Clang builds
+// for negated short-circuit conditions (the systemd assert shape:
+// `if (_unlikely_(!(s || l <= 0)))` merges the s-path and the l-path
+// BEFORE the branch, and only a fact difference survives that merge).
+// The set is deliberately narrow (collectPtrFactDecls) — keying every
+// pointer check would burn the disjunct cap on ordinary guards.
 std::optional<std::pair<FactKey, bool>> conditionFact(
     const clang::Expr* cond,
-    const std::set<const clang::ValueDecl*>& mutated);
+    const std::set<const clang::ValueDecl*>& unkeyable,
+    const std::set<const clang::ValueDecl*>& ptrKeyable);
 
-// Collects decls that are assigned, ++/--'d, or address-taken in the
-// body. Conditions based on these decls can change between two tests
-// — they are not keyed.
-std::set<const clang::ValueDecl*> collectMutatedDecls(
+std::optional<std::pair<FactKey, bool>> conditionFact(
+    const clang::Expr* cond,
+    const std::set<const clang::ValueDecl*>& unkeyable);
+
+// PERMANENT keying bans — decls whose value can change without a
+// visible assignment statement: address-taken locals (any call may
+// write through the pointer) and assigned non-locals (globals/statics
+// mutate through calls too; for the UNASSIGNED global the existing
+// deliberate limit applies — see header comment). Plain assignments to
+// LOCALS are no longer a ban: facts about them are erased/re-stamped
+// flow-sensitively at the assignment statement (applyStmtFacts in
+// GuardedDisjuncts.h) — v2b, 2026-07-12.
+std::set<const clang::ValueDecl*> collectUnkeyableDecls(
     const clang::FunctionDecl* func);
+
+// Stamping relevance: integer-typed LOCAL decls that appear in a
+// keyable condition position somewhere in the function (compared with
+// an integer constant, or used as a bare truth value). Only these are
+// worth stamping at literal assignments — stamping every `n = 0`
+// would burn the disjunct cap for nothing.
+std::set<const clang::ValueDecl*> collectFactDecls(
+    const clang::FunctionDecl* func);
+
+// Pointer-keying relevance: pointer locals/params that share a
+// short-circuit operator with an integer-keyable partner
+// (`assert(s || l <= 0)` — s qualifies). See the ptrKeyable note on
+// conditionFact for why this set stays narrow.
+std::set<const clang::ValueDecl*> collectPtrFactDecls(
+    const clang::FunctionDecl* func);
+
+// The decl a statement ASSIGNS (=, compound, ++/--), if the target is
+// a plain variable reference. DeclStmt initializations count. Facts
+// keyed on it are stale after this statement.
+const clang::ValueDecl* assignedDecl(const clang::Stmt* stmt);
+
+// The (decl, value) pair when the statement assigns an integer
+// constant to a plain variable: `x = 3`, `x = SOME_ENUM`,
+// `int x = 0;`. nullopt for anything else.
+std::optional<std::pair<const clang::ValueDecl*, int64_t>>
+assignedIntLiteral(const clang::Stmt* stmt);
+
+// Whether existing facts contradict `key = wanted`. Exact-key facts
+// compare directly; a stamped equality (var EQ a)=true additionally
+// ANSWERS any key on the same var by evaluating `a REL lit` — this is
+// how `have = 1` (stamped) decides a later `if (have)` (asked as
+// (have EQ 0)=false). Unknown -> no contradiction.
+bool factsContradict(const std::map<FactKey, bool>& facts,
+                     const FactKey& key, bool wanted);
 
 } // namespace zerodefect
 

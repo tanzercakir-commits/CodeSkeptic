@@ -20,6 +20,7 @@ add_executable(zerodefect_tests
     SummaryDiffTest.cpp
     SuppressionFilterTest.cpp
     BaselineTest.cpp
+    DisjunctsV2bTest.cpp
     StressEdgeCaseTest.cpp
     FunctionFilterTest.cpp
     McpServerTest.cpp

@@ -10,8 +10,8 @@
 | SourceManager | `src/source_manager/SourceManager.h`, `.cpp` | Done (Linux header fix + warm AST cache, MCP path) |
 | RuleEngine | `src/engine/RuleEngine.h`, `.cpp` | Done |
 | DataflowEngine | `src/engine/DataflowEngine.h` | Done (template + assume edges + latticeHeight + fine-grained CFG + two-phase reporting) |
-| PathFacts | `src/engine/PathFacts.h`, `.cpp` | Done (condition→canonical key; mutation visitor) |
-| GuardedDisjuncts | `src/engine/GuardedDisjuncts.h` | Done (guarded disjunct template — used by 3 rules) |
+| PathFacts | `src/engine/PathFacts.h`, `.cpp` | Done (canonical keys; v2b: flow-time fact lifecycle, literal/enum stamping, entailment, gated pointer keys) |
+| GuardedDisjuncts | `src/engine/GuardedDisjuncts.h` | Done (guarded disjuncts + v2b disjunction-aware per-disjunct refinement + widening — used by 3 rules) |
 | FunctionSummary | `src/engine/FunctionSummary.h`, `.cpp` | Done (TU-local + cross-TU store; --whole-program; write/load to disk) |
 | Reporter (abstract) | `src/reporter/Reporter.h` | Done |
 | ConsoleReporter | `src/reporter/ConsoleReporter.h`, `.cpp` | Done |
@@ -33,7 +33,7 @@
 | CallRefArgs | `src/engine/CallRefArgs.h` | Done (non-const ref args invalidate facts; all four rules) |
 | FatalCalls | `src/engine/FatalCalls.h`, `.cpp` | Done (--fatal-asserts; engine-level path kill) |
 | AllocFunctions | `src/engine/AllocFunctions.h`, `.cpp` | Done (--alloc-functions/--free-functions) |
-| GTest infrastructure | `tests/` | Done (306/306; ctest + single-process) |
+| GTest infrastructure | `tests/` | Done (321/321; ctest + single-process) |
 | CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
 | Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |

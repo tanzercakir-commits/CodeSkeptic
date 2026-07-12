@@ -55,6 +55,14 @@ struct HasRefineOnEdge<A, std::void_t<decltype(
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
 template <typename A, typename = void>
+struct HasWiden : std::false_type {};
+
+template <typename A>
+struct HasWiden<A, std::void_t<decltype(
+    std::declval<const A&>().widen(
+        std::declval<typename A::State&>()))>> : std::true_type {};
+
+template <typename A, typename = void>
 struct HasOnEdgeRefined : std::false_type {};
 
 template <typename A>
@@ -65,6 +73,71 @@ struct HasOnEdgeRefined<A, std::void_t<decltype(
         std::declval<const typename A::State&>(),
         std::declval<const typename A::State&>(),
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
+
+// The condition actually EVALUATED in this block, with its edge
+// polarity. For a short-circuit tree (`if (s || l <= 0)`,
+// `if (_unlikely_(!(s || l <= 0)))` — the systemd assert), Clang
+// gives the final decision block a terminator of the WHOLE
+// IfStmt/ternary; getTerminatorCondition() then returns the full
+// tree, which no domain can use: the true edge of an || says nothing
+// about either operand alone, so both the nullness walk and
+// conditionFact went home empty-handed (2026-07-12).
+//
+// The wrappers between a branch decision and the condition TREE it
+// actually tests carry only polarity: `!` flips, `__builtin_expect`
+// and the comma operator pass through. The tree itself (including
+// `&&`/`||` structure) is handed to the analysis — walkCondition
+// decomposes conjunctions structurally, and the disjunction-aware
+// per-disjunct refinement (GuardedDisjuncts) handles the branches a
+// walk cannot decide. Clang materializes negated short-circuit
+// conditions as VALUES (`if (!!(!(s || l <= 0)))` — the systemd
+// assert): the operand paths merge BEFORE the single branch, so the
+// per-leaf edges seen in plain `if (a || b)` CFGs do not exist there
+// — whoever consumes the condition must reason about the whole tree
+// per disjunct.
+struct EdgeCondition {
+    const clang::Stmt* leaf = nullptr;
+    bool flip = false;
+};
+
+inline EdgeCondition edgeCondition(const clang::CFGBlock* block) {
+    EdgeCondition out;
+    out.leaf = block->getTerminatorCondition();
+    const auto* e = llvm::dyn_cast_or_null<clang::Expr>(out.leaf);
+    while (e) {
+        e = e->IgnoreParenImpCasts();
+        if (const auto* call = llvm::dyn_cast<clang::CallExpr>(e)) {
+            const clang::FunctionDecl* callee = call->getDirectCallee();
+            const clang::IdentifierInfo* id =
+                callee ? callee->getIdentifier() : nullptr;
+            if (id && (id->getName() == "__builtin_expect" ||
+                       id->getName() ==
+                           "__builtin_expect_with_probability") &&
+                call->getNumArgs() >= 1) {
+                e = call->getArg(0);
+                continue;
+            }
+            break;
+        }
+        if (const auto* un = llvm::dyn_cast<clang::UnaryOperator>(e)) {
+            if (un->getOpcode() == clang::UO_LNot) {
+                out.flip = !out.flip;
+                e = un->getSubExpr();
+                continue;
+            }
+            break;
+        }
+        if (const auto* bo = llvm::dyn_cast<clang::BinaryOperator>(e)) {
+            if (bo->getOpcode() == clang::BO_Comma) {
+                e = bo->getRHS();
+                continue;
+            }
+        }
+        break;
+    }
+    if (e) out.leaf = e;
+    return out;
+}
 
 } // namespace detail
 
@@ -143,16 +216,21 @@ DataflowResult<Analysis> runDataflow(
                         auto gExit = blockExitState.find(g1->getBlockID());
                         auto e1 = blockExitState.find(arm1->getBlockID());
                         auto e2 = blockExitState.find(arm2->getBlockID());
-                        const clang::Stmt* cond = g1->getTerminatorCondition();
-                        if (cond && gExit != blockExitState.end() &&
+                        // Same per-block leaf condition the arms' entry
+                        // refinement used — the exit-equality test
+                        // below compares like with like.
+                        detail::EdgeCondition cond = detail::edgeCondition(g1);
+                        if (cond.leaf && gExit != blockExitState.end() &&
                             e1 != blockExitState.end() &&
                             e2 != blockExitState.end()) {
                             const clang::CFGBlock* trueSucc =
                                 g1->succ_begin()->getReachableBlock();
                             State rTrue = gExit->second;
-                            analysis.refineOnEdge(cond, true, rTrue, ctx);
+                            analysis.refineOnEdge(cond.leaf, !cond.flip,
+                                                  rTrue, ctx);
                             State rFalse = gExit->second;
-                            analysis.refineOnEdge(cond, false, rFalse, ctx);
+                            analysis.refineOnEdge(cond.leaf, cond.flip,
+                                                  rFalse, ctx);
                             const State& trueExit =
                                 (arm1 == trueSucc) ? e1->second : e2->second;
                             const State& falseExit =
@@ -183,8 +261,8 @@ DataflowResult<Analysis> runDataflow(
             // CFG convention).
             if constexpr (detail::HasRefineOnEdge<Analysis>::value) {
                 if (pred->succ_size() == 2) {
-                    if (const clang::Stmt* cond =
-                            pred->getTerminatorCondition()) {
+                    detail::EdgeCondition cond = detail::edgeCondition(pred);
+                    if (cond.leaf) {
                         auto succIt = pred->succ_begin();
                         const clang::CFGBlock* trueSucc =
                             succIt->getReachableBlock();
@@ -193,24 +271,27 @@ DataflowResult<Analysis> runDataflow(
                             succIt->getReachableBlock();
                         if (trueSucc != falseSucc &&
                             (block == trueSucc || block == falseSucc)) {
-                            const bool edgeIsTrue = (block == trueSucc);
+                            const bool edgeIsTrue =
+                                (block == trueSucc) != cond.flip;
                             if constexpr (
                                 detail::HasOnEdgeRefined<Analysis>::value) {
                                 if (reporting) {
                                     State beforeRefine = predState;
-                                    analysis.refineOnEdge(cond, edgeIsTrue,
+                                    analysis.refineOnEdge(cond.leaf,
+                                                          edgeIsTrue,
                                                           predState, ctx);
                                     if (predState != beforeRefine)
                                         analysis.onEdgeRefined(
-                                            cond, edgeIsTrue, beforeRefine,
-                                            predState, ctx);
+                                            cond.leaf, edgeIsTrue,
+                                            beforeRefine, predState, ctx);
                                 } else {
-                                    analysis.refineOnEdge(cond, edgeIsTrue,
+                                    analysis.refineOnEdge(cond.leaf,
+                                                          edgeIsTrue,
                                                           predState, ctx);
                                 }
                             } else {
                                 (void)reporting;
-                                analysis.refineOnEdge(cond, edgeIsTrue,
+                                analysis.refineOnEdge(cond.leaf, edgeIsTrue,
                                                       predState, ctx);
                             }
                         }
@@ -238,6 +319,25 @@ DataflowResult<Analysis> runDataflow(
     worklist.push(&cfg->getEntry());
     unsigned iterations = 0;
 
+    // Convergence widening. The guarded-disjunct domain is not a clean
+    // lattice: facts are recorded, ERASED (assignments), and disjuncts
+    // are DROPPED (contradictions) — transfer is not monotone, and
+    // real code does oscillate (rtp2httpd's parser functions cycled
+    // forever; an 8x iteration budget changed nothing, 2026-07-12).
+    // The classical fix, WITH time memory: once a block has been
+    // visited more often than any monotone climb could explain, its
+    // entry is joined with the previous widened entry and collapsed to
+    // a single disjunct (analysis-provided upper approximation). Facts
+    // that flip between visits disagree in the join and are erased by
+    // the collapse; var states only climb their finite lattice — the
+    // sequence stabilizes. Memoryless widening is NOT enough: a
+    // single-disjunct state can still alternate fact VALUES across
+    // visits (merge_query_strings kept cycling until the join-with-
+    // previous was added).
+    std::vector<unsigned> visitCounts(numBlocks, 0);
+    std::map<unsigned, State> widenMemory;
+    const unsigned widenAfter = latticeHeight + 2;
+
     while (!worklist.empty() && iterations < maxIterations) {
         ++iterations;
         const clang::CFGBlock* block = worklist.front();
@@ -247,6 +347,17 @@ DataflowResult<Analysis> runDataflow(
         State entryState = computeEntryState(block, hasPreds,
                                              /*reporting=*/false);
         if (!hasPreds && block != &cfg->getEntry()) continue;
+
+        if constexpr (detail::HasWiden<Analysis>::value) {
+            const unsigned id = block->getBlockID();
+            if (++visitCounts[id] > widenAfter) {
+                auto mem = widenMemory.find(id);
+                if (mem != widenMemory.end())
+                    entryState = analysis.merge(mem->second, entryState);
+                analysis.widen(entryState);
+                widenMemory[id] = entryState;
+            }
+        }
 
         State currentState = entryState;
         bool pathKilled = false;

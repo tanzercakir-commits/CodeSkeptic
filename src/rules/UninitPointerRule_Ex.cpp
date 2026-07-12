@@ -118,10 +118,12 @@ public:
     using State = zerodefect::GuardedState<PtrVarState>;
 
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
-                      std::set<const ValueDecl*> mutatedDecls,
+                      std::set<const ValueDecl*> unkeyableDecls,
+                      std::set<const ValueDecl*> stampableDecls,
                       std::string funcName,
                       zerodefect::DiagnosticList& results)
-        : mutated_(std::move(mutatedDecls)),
+        : mutated_(std::move(unkeyableDecls)),
+          stampable_(std::move(stampableDecls)),
           funcName_(std::move(funcName)), results_(results) {
         zerodefect::Guarded<PtrVarState> init;
         for (const auto* var : trackedVars)
@@ -135,15 +137,33 @@ public:
     // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 2 +
-                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4;
+                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
     }
+
+    // Fact records add lattice climbs the var-state formula above
+    // never counted (v2b); bounded so pathological functions do not
+    // explode the iteration cap.
+    unsigned factBudget() const {
+        auto n = static_cast<unsigned>(stampable_.size());
+        return (n > 16 ? 16u : n) * 2 *
+               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+    }
+
+    // Engine convergence hook: collapse the disjuncts when a block is
+    // revisited beyond any monotone explanation (see DataflowEngine).
+    void widen(State& s) const { zerodefect::widenGuarded(s, mergePtrStates); }
 
     State merge(const State& a, const State& b) const {
         return zerodefect::mergeGuarded(a, b, mergePtrStates);
     }
 
-    State transfer(const Stmt* stmt, const State& in,
+    State transfer(const Stmt* stmt, const State& inRaw,
                    ASTContext& /*ctx*/) const {
+        // Fact lifecycle first (v2b): see NullDerefRule — erase facts
+        // on assigned locals, stamp integer-constant stores.
+        State in = inRaw;
+        zerodefect::applyStmtFacts(in, stmt, stampable_, mergePtrStates);
+
         // `f(p)` with a non-const reference parameter (`T*& p`) is an
         // out-param assignment with no AddrOf node to observe — the
         // callee may initialize p (same call-boundary rule as `f(&p)`).
@@ -225,6 +245,7 @@ public:
 
 private:
     std::set<const ValueDecl*> mutated_;
+    std::set<const ValueDecl*> stampable_;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
     State initState_;
@@ -251,7 +272,8 @@ public:
         if (trackedVars.empty()) return;
 
         UninitPtrAnalysis analysis(
-            trackedVars, zerodefect::collectMutatedDecls(func),
+            trackedVars, zerodefect::collectUnkeyableDecls(func),
+            zerodefect::collectFactDecls(func),
             func->getQualifiedNameAsString(), results_);
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
