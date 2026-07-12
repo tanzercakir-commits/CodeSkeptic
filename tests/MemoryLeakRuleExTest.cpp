@@ -557,3 +557,126 @@ TEST(AbseilFpTest, ParamStructMemberAssign_Escapes_NoLeak) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- shadPS4 FP hunt (2026-07-12): casts and composite arguments ---
+
+TEST(ShadPS4FpTest, VoidCastCallbackArg_Escapes_NoLeak) {
+    // The SDL_AddTimer pattern: `(void*)copy` handed to an opaque
+    // callback registry. The explicit cast must not hide the variable
+    // from the escape analysis.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int (*Callback)(void*, unsigned int);
+        void addTimer(int ms, Callback cb, void* param);
+        unsigned int onTimer(void*, unsigned int);
+        void f() {
+            int* copy = new int(42);
+            addTimer(33, onTimer, (void*)copy);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, ReinterpretCastThroughOutParam_Escapes_NoLeak) {
+    // The usb OpenDevice pattern: `*out = reinterpret_cast<T*>(h);`.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Handle { int fd; };
+        int open(void** out) {
+            Handle* h = new Handle;
+            *out = reinterpret_cast<void*>(h);
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, MemberOfReferenceBase_Escapes_NoLeak) {
+    // The imgui backend pattern: `io.UserData = (void*)bd;` where io
+    // is a reference to storage owned elsewhere.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct IO { void* userData; };
+        IO& getIO();
+        void f() {
+            int* bd = new int(1);
+            IO& io = getIO();
+            io.userData = (void*)bd;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, AggregateCallArg_Escapes_NoLeak) {
+    // The audio3d pattern: the pointer rides inside a composite
+    // argument (`push(Data{(unsigned char*)m})`) — the receiving
+    // object outlives our view of it.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Data { unsigned char* buf; };
+        void push(Data d);
+        void f() {
+            short* m = new short[64];
+            push(Data{reinterpret_cast<unsigned char*>(m)});
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, DerefArg_LeakStaysVisible) {
+    // The flip side: `printInt(*d)` reads the POINTEE — the pointer is
+    // not handed over, the leak must stay visible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void printInt(int v);
+        void f() {
+            int* d = new int(7);
+            printInt(*d);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_NE(results[0].message.find("leak"), std::string::npos);
+}
+
+TEST(ShadPS4FpTest, CastLocalToLocalCopy_LeakStaysVisible) {
+    // The flip side of cast transparency: a cast alias copy between
+    // two locals is still a local copy — the alias leak stays visible.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            char* data = new char[16];
+            void* dataCopy;
+            dataCopy = (void*)data;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ShadPS4FpTest, FreeThroughCast_NoLeak) {
+    // `free((void*)p)` is a free of p — cast transparency makes the
+    // deallocation visible too.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void free(void*);
+        extern "C" void* malloc(unsigned long);
+        void f() {
+            char* p = (char*)malloc(16);
+            free((void*)p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, NonConstRefArg_Escapes_NoLeak) {
+    // A `T*&` parameter lets the callee reassign or stash the
+    // caller's pointer — always an escape.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void take(char*& p);
+        void f() {
+            char* data = new char[8];
+            take(data);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

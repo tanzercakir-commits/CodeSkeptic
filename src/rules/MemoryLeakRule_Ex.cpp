@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CallRefArgs.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
 #include "engine/ConditionWalk.h"
@@ -74,7 +75,12 @@ bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
 
 const VarDecl* asVar(const Expr* expr) {
     if (!expr) return nullptr;
-    expr = expr->IgnoreParenImpCasts();
+    // Explicit casts included: `(void*)copy` handed to a callback
+    // registry and `reinterpret_cast<T*>(handle)` stored through an
+    // out-param are still uses of the SAME pointer (shadPS4
+    // SDL_AddTimer / OpenDevice FP families) — IgnoreParenImpCasts
+    // alone hid the variable from the escape analysis.
+    expr = expr->IgnoreParenCasts();
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
         return dyn_cast<VarDecl>(ref->getDecl());
     return nullptr;
@@ -96,6 +102,39 @@ const VarDecl* derefTarget(const Stmt* stmt) {
     if (const auto* subscript = dyn_cast<ArraySubscriptExpr>(stmt))
         return asVar(subscript->getBase());
     return nullptr;
+}
+
+// If the same variable appears in multiple call positions the most
+// conservative wins: Escapes > Frees > ReadsOnly.
+struct VarCallEffect { bool escapes = false; bool frees = false; };
+
+// Marks every tracked variable referenced anywhere inside a composite
+// call argument as escaping (aggregate initializers, constructor
+// arguments wrapping the pointer). Bare-variable arguments are handled
+// separately with summary-driven precision.
+void collectNestedTrackedRefs(const Stmt* stmt,
+                              const std::set<const VarDecl*>& tracked,
+                              std::map<const VarDecl*, VarCallEffect>& byVar) {
+    if (!stmt) return;
+    if (const auto* ref = dyn_cast<DeclRefExpr>(stmt)) {
+        if (const auto* var = dyn_cast<VarDecl>(ref->getDecl()))
+            if (tracked.count(var)) byVar[var].escapes = true;
+        return;
+    }
+    // Do not descend through a dereference: `f(*data)` / `f(data->x)`
+    // reads the POINTEE — the pointer itself is not handed over, the
+    // leak must stay visible (Juliet print-the-value sinks).
+    if (const auto* unary = dyn_cast<UnaryOperator>(stmt))
+        if (unary->getOpcode() == UO_Deref) return;
+    if (const auto* member = dyn_cast<MemberExpr>(stmt))
+        if (member->isArrow()) return;
+    if (isa<ArraySubscriptExpr>(stmt)) return;
+    // Nested calls are their own fine-grained CFG elements and get the
+    // summary-driven treatment there — descending would override a
+    // ReadsOnly verdict with a blanket escape.
+    if (isa<CallExpr>(stmt)) return;
+    for (const Stmt* child : stmt->children())
+        collectNestedTrackedRefs(child, tracked, byVar);
 }
 
 // Top-node Effect pattern (as in UninitPtr): the expression is
@@ -150,9 +189,14 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                     } else {
                         const VarDecl* base = asVar(member->getBase());
                         // local (non-param) aggregate: stays local;
-                        // param/global/this/complex base: escapes
+                        // param/global/this/complex base: escapes.
+                        // A reference base refers to storage owned
+                        // elsewhere (`ImGuiIO& io = GetIO();
+                        // io.UserData = bd;` — shadPS4 imgui backends),
+                        // so it escapes too.
                         escapes = !(base && base->hasLocalStorage() &&
-                                    !isa<ParmVarDecl>(base));
+                                    !isa<ParmVarDecl>(base) &&
+                                    !base->getType()->isReferenceType());
                     }
                 } else {
                     escapes = true;  // *p = q, arr[i] = q, this-member...
@@ -176,10 +220,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             zerodefect::SummaryRegistry::instance().lookup(callee);
         using PE = zerodefect::SummaryRegistry::ParamEffect;
 
-        // If the same variable appears in multiple positions the most
-        // conservative wins: Escapes > Frees > ReadsOnly. &var is always
-        // Escapes (the callee may reassign/free it).
-        struct VarCallEffect { bool escapes = false; bool frees = false; };
+        // &var is always Escapes (the callee may reassign/free it).
         std::map<const VarDecl*, VarCallEffect> byVar;
 
         // Method call: `p->Track()` may stash `this` anywhere (observer/
@@ -193,6 +234,15 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 if (tracked.count(recv)) byVar[recv].escapes = true;
         }
 
+        // An argument bound to a NON-CONST reference parameter
+        // (`T*& handle`) lets the callee reassign or stash the
+        // caller's pointer — always an escape, whatever the summary
+        // says about by-value semantics.
+        zerodefect::forEachNonConstRefArg(call, [&](const Expr* refArg) {
+            const VarDecl* var = asVar(refArg);
+            if (var && tracked.count(var)) byVar[var].escapes = true;
+        });
+
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
             const Expr* arg = call->getArg(i);
             if (const auto* unary = dyn_cast<UnaryOperator>(
@@ -205,7 +255,18 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 continue;
             }
             const VarDecl* var = asVar(arg);
-            if (!var || !tracked.count(var)) continue;
+            if (!var || !tracked.count(var)) {
+                // The pointer may sit INSIDE a composite argument:
+                // `push_back(AudioData{.buf = cast(mix_s16), ...})`
+                // (shadPS4 audio3d). Any tracked variable referenced
+                // anywhere within the argument subtree escapes —
+                // the receiving object outlives our view of it.
+                // Bare-variable args keep the summary-driven logic
+                // below, so Juliet's `printLine(data)` sinks are
+                // unaffected.
+                collectNestedTrackedRefs(arg, tracked, byVar);
+                continue;
+            }
             if (isFreeByName && i == 0) {
                 byVar[var].frees = true;
                 continue;

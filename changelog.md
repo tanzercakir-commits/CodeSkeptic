@@ -1,5 +1,41 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — shadPS4 FP hunt round 1: call-boundary soundness
+
+### Changed
+- **Scanned shadPS4** (PS4 emulator, 377 src/ files from a 2236-entry
+  compile DB; C++20, zero crashes): 209 findings. Triage found 3 REAL
+  bugs (savedata `&&`-guard derefs the pointer it just null-checked ×2;
+  usb GetMaxPacketSize passes `desc = nullptr` BY VALUE then derefs it;
+  libc internal__Foprep checks `file == nullptr`, sets ENOMEM and falls
+  through to the deref) and two analyzer defects fixed here:
+  1. **Non-const reference arguments invalidate facts**
+     (engine/CallRefArgs.h, wired into ALL FOUR rules): `f(id, p)`
+     where f takes `int*&` may rebind p — keeping "definitely null"
+     across the call produced 6 error-level FPs (http.cpp
+     ResolveEpollBinding). There is no AddrOf node to observe; only the
+     parameter type reveals the out-param. NullDeref/DivByZero/
+     UninitPtr drop the fact to Unknown/Init; MemoryLeak escapes.
+     DivByZero also gained the missing `f(&z)` AddrOf invalidation.
+  2. **Escape analysis sees through explicit casts and composite
+     arguments** (MemoryLeak): `addTimer(33, cb, (void*)copy)`,
+     `*out = reinterpret_cast<T*>(h)`, `io.UserData = bd` (reference
+     base = storage owned elsewhere) and `push_back(Data{cast(m)})`
+     (pointer riding inside an aggregate argument) all escape now.
+     `free((void*)p)` is also finally visible as a free. Flip sides
+     pinned: `f(*d)` reads the pointee (leak stays visible), cast
+     local-to-local copies stay non-escaping, value/const-ref passes
+     keep their facts.
+- The ~170-finding assert-opacity flood (ASSERT whose failure handler
+  deliberately returns) is documented as the round-2 design item in
+  todo.md — not patched ad hoc here.
+
+### Verification
+- 256/256 tests (ctest + single-process; +17 ShadPS4FpTest across all
+  four rule suites, each FP fix with its flip-side pin). Corpus pins
+  hold exactly (cjson 123, tinyxml2 9). Juliet floors + deep-corpus
+  pins (abseil 12, catch2 0) referee in CI.
+
 ## 2026-07-12 — Abseil FP hunt: three real-world false-positive families fixed
 
 ### Changed

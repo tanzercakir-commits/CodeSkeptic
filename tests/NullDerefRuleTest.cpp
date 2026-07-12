@@ -423,3 +423,75 @@ TEST(AbseilFpTest, BuiltinExpect_GuardStillRefines_BothDirections) {
     ASSERT_EQ(bad.size(), 1);
     EXPECT_EQ(bad[0].severity, Severity::Error);
 }
+
+// --- shadPS4 FP hunt (2026-07-12): call-boundary soundness ---
+
+TEST(ShadPS4FpTest, RefOutParam_InvalidatesNullFact) {
+    // The ResolveEpollBinding pattern: `int* p = nullptr; f(id, p);`
+    // where f takes `int*&` — the callee may rebind p, so the
+    // "definitely null" fact must die at the call.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        bool resolve(int id, int*& out);
+        int f(int id) {
+            int* p = nullptr;
+            if (!resolve(id, p)) {
+                return -1;
+            }
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, ValueParam_DefiniteNullStaysReported) {
+    // The flip side (and a REAL shadPS4 bug, usb_backend.h): passing a
+    // null pointer BY VALUE cannot rebind the caller's variable — the
+    // deref after the call is still definitely null.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Desc { int maxPacket; };
+        int fill(Desc* d);
+        int f() {
+            Desc* desc = nullptr;
+            int r = fill(desc);
+            if (r < 0) { return -1; }
+            return desc->maxPacket;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ShadPS4FpTest, ConstRefParam_DefiniteNullStaysReported) {
+    // A const reference cannot rebind the argument either.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void peek(int* const& p);
+        int f() {
+            int* p = nullptr;
+            peek(p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ShadPS4FpTest, DerefInsideAndGuard_StillCaught) {
+    // A REAL shadPS4 bug (savedata.cpp): `if (m == nullptr &&
+    // m->dirName != nullptr)` — when m IS null the && evaluates
+    // m->dirName. The short-circuit true-edge makes it definite.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Mount { const char* dirName; };
+        int f(const Mount* mount) {
+            if (mount == nullptr && mount->dirName != nullptr) {
+                return -1;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}

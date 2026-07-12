@@ -244,3 +244,35 @@ TEST(UninitPointerRuleExTest, MultiDeclaration_SecondPointerTracked) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "uninit-ptr");
 }
+
+// --- shadPS4 FP hunt (2026-07-12): call-boundary soundness ---
+
+TEST(ShadPS4FpTest, RefOutParam_CountsAsInit) {
+    // `alloc(p)` with `char*& p` initializes p — no AddrOf node
+    // exists, only the parameter type reveals the out-param.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void alloc(char*& out);
+        char f() {
+            char* p;
+            alloc(p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ShadPS4FpTest, ValueParam_StaysUninit) {
+    // Passing by value initializes nothing.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void use(char* p);
+        char f() {
+            char* p;
+            use(p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "uninit-ptr");
+}
