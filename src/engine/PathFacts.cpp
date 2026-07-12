@@ -335,11 +335,20 @@ public:
         const Expr* lhs = op->getLHS();
         const Expr* rhs = op->getRHS();
         // A pointer operand qualifies only when its PARTNER operand is
-        // integer-keyable — that is the correlation worth splitting on.
-        if (const VarDecl* p = ptrOperandVar(lhs))
-            if (conditionFact(rhs, kNone, kNone)) relevant.insert(p);
-        if (const VarDecl* p = ptrOperandVar(rhs))
-            if (conditionFact(lhs, kNone, kNone)) relevant.insert(p);
+        // itself keyable — an integer condition (`assert(s || l <= 0)`)
+        // or ANOTHER bare-pointer nullness operand (`!a && b`, the
+        // comparator-ladder case exhaustion: after `if (!a && !b) ...
+        // if (!a && b) ... if (a && !b) ...` falls through, both are
+        // provably non-null, but only if both sides split disjuncts).
+        // `p && p->x` self-guards do NOT qualify (the member side is
+        // not a bare pointer var) — keying every plain guard would
+        // burn the disjunct cap.
+        const VarDecl* lp = ptrOperandVar(lhs);
+        const VarDecl* rp = ptrOperandVar(rhs);
+        if (lp && (rp || conditionFact(rhs, kNone, kNone)))
+            relevant.insert(lp);
+        if (rp && (lp || conditionFact(lhs, kNone, kNone)))
+            relevant.insert(rp);
         return true;
     }
 };
