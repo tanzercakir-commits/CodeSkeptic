@@ -145,6 +145,9 @@ const MsgEntry kMessages[] = {
      "summaries may be stale; re-run --summary-out to refresh",
      "[ZeroDefect] uyari: ozet dosyasi {0}, {1} dosyasindan eski — "
      "ozetler bayat olabilir; --summary-out ile tazeleyin"},
+    // TraceAlsoDerefHere
+    {"'{0}' is also dereferenced here (same origin)",
+     "{0} burada da dereference ediliyor (ayni kaynak)"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
