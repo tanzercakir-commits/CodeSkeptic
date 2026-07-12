@@ -773,19 +773,33 @@ void analyzeFunction(const FunctionDecl* funcDecl,
             // the leak REPORT is suppressed. Accepted FN: reusing an
             // alias variable for a second allocation and leaking the
             // first (pinned as documentation).
-            bool freedViaAlias = false;
+            // The check runs PER DISJUNCT: flattening first would
+            // dissolve the alias's Freed into None on guarded paths
+            // (Freed ⊔ None = None) and hide exactly the correlation
+            // the disjuncts preserved. The variable leaks only if some
+            // disjunct holds it Allocated with NO group member Freed
+            // in that same disjunct.
             auto group = aliasGroupsCopy.find(var);
-            if (group != aliasGroupsCopy.end()) {
-                for (const VarDecl* member : group->second) {
-                    auto m = exitVars.find(member);
-                    if (m != exitVars.end() &&
-                        m->second == AllocState::Freed) {
-                        freedViaAlias = true;
-                        break;
+            bool leaksSomewhere = false;
+            for (const auto& d : exitIt->second) {
+                auto v = d.vars.find(var);
+                if (v == d.vars.end() ||
+                    v->second != AllocState::Allocated)
+                    continue;
+                bool freedHere = false;
+                if (group != aliasGroupsCopy.end()) {
+                    for (const VarDecl* member : group->second) {
+                        auto m = d.vars.find(member);
+                        if (m != d.vars.end() &&
+                            m->second == AllocState::Freed) {
+                            freedHere = true;
+                            break;
+                        }
                     }
                 }
+                if (!freedHere) { leaksSomewhere = true; break; }
             }
-            if (freedViaAlias) continue;
+            if (!leaksSomewhere) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);
             if (analysis.reported().emplace(var, line).second) {
                 zerodefect::Diagnostic diag;

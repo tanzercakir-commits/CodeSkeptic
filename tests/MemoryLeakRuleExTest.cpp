@@ -1016,3 +1016,30 @@ TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+TEST(AliasEscapeTest, FreedThroughAlias_UnderGuard_NoLeak) {
+    // The flow-variant version of the realloc shape: everything sits
+    // inside a keyed guard. The Freed alias lives in a DISJUNCT —
+    // flattening would dissolve it (Freed with None = None), so the
+    // suppression must check per disjunct.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        static int staticFive = 5;
+        void f() {
+            int* data = 0;
+            int* tmpData = 0;
+            if (staticFive == 5) {
+                data = (int*)malloc(400);
+                tmpData = (int*)realloc(data, 130000);
+                if (tmpData != nullptr) {
+                    data = tmpData;
+                }
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
