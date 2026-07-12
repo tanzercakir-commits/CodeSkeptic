@@ -40,10 +40,22 @@
   0.20 → 0.21. CWE476 overall precision 0.549 → 0.602 (leak-FP side).
 - Corpus: cjson 55→54 (within pin tolerance), tinyxml2 9.
 
+### Changed (round 3 — systemd first light)
+- **Scanned systemd basic/core/shared** (494 files, ZERO parse errors
+  through the macro-heaviest C in the wild): 414 raw findings.
+  **`__attribute__((cleanup))` exemption** landed as v1: a variable the
+  compiler auto-releases at scope exit cannot end-of-function leak
+  (systemd `_cleanup_free_`, GLib `g_autofree`). Leaks 111 → **9**.
+  The v2 design (modeling cleanup as scope-exit free to catch
+  double-frees under the attribute) and the 302-null-deref triage are
+  next rounds. Also recorded: the --files UX hardening lesson (meson's
+  build-relative paths silently analyzed nothing with a "Clean!"
+  exit 0).
+
 ### Verification
-- 294/294 tests (+3 CallGuardTest, +4 alias/guard/noreturn pins across
-  AliasEscapeTest). All five Juliet floors green at the RAISED values
-  (verified locally before push).
+- 296/296 tests (+3 CallGuardTest, +4 alias/guard/noreturn pins, +2
+  CleanupAttrTest with the plain-neighbor flip side). All five Juliet
+  floors green at the RAISED values (verified locally before push).
 
 ## 2026-07-12 — Report-flood dedup: one warning per variable
 
