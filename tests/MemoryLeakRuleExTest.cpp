@@ -976,3 +976,43 @@ TEST(CallGuardTest, StateReadingBody_NotKeyed_LeakStaysVisible) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+TEST(AliasEscapeTest, FreedThroughAlias_NoLeak) {
+    // The Juliet malloc_realloc good1 shape: the allocation is freed
+    // under the alias's name.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* data = (int*)malloc(400);
+            int* tmpData = (int*)realloc(data, 130000);
+            if (tmpData != nullptr) {
+                data = tmpData;
+            }
+            free(data);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
+    // DOCUMENTED accepted FN of the exit-time alias-free check:
+    // reusing the alias variable for a SECOND allocation and freeing
+    // only that one leaks the first — the flow-insensitive group
+    // cannot tell the two apart. This test pins the trade-off; if a
+    // future flow-sensitive alias model fixes it, flip the count to 1.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            char* a = (char*)malloc(8);
+            char* b = a;
+            b = (char*)malloc(16);
+            free(b);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

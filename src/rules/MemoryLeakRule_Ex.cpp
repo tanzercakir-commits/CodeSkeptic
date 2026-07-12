@@ -741,6 +741,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         (void)members;
         if (trackedSet.insert(var).second) trackedVars.push_back(var);
     }
+    // The exit-leak check below consults the groups too
+    const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
         trackedVars, zerodefect::collectMutatedDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
@@ -761,6 +763,29 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     const VarState exitVars = flattenState(exitIt->second);
     for (const auto& [var, state] : exitVars) {
         if (state == AllocState::Allocated) {
+            // Freed THROUGH a local alias? `tmpData = realloc(data, n);
+            // if (tmpData) data = tmpData; free(data);` frees the same
+            // allocation under the alias's name (the Juliet
+            // malloc_realloc good1 shape). Frees deliberately do not
+            // propagate through the flow-insensitive groups (that
+            // would fabricate double-frees) — but AT THE EXIT, a Freed
+            // group member means this allocation was released; only
+            // the leak REPORT is suppressed. Accepted FN: reusing an
+            // alias variable for a second allocation and leaking the
+            // first (pinned as documentation).
+            bool freedViaAlias = false;
+            auto group = aliasGroupsCopy.find(var);
+            if (group != aliasGroupsCopy.end()) {
+                for (const VarDecl* member : group->second) {
+                    auto m = exitVars.find(member);
+                    if (m != exitVars.end() &&
+                        m->second == AllocState::Freed) {
+                        freedViaAlias = true;
+                        break;
+                    }
+                }
+            }
+            if (freedViaAlias) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);
             if (analysis.reported().emplace(var, line).second) {
                 zerodefect::Diagnostic diag;
