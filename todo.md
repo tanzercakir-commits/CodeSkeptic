@@ -94,6 +94,15 @@ Juliet's CI weight, project name check.
       calls to registered names (empty by default — per-project
       opt-in). shadPS4's ~170-finding ASSERT flood collapses with
       `--fatal-asserts assert_fail_impl`. 7 FatalCallsTest pins.
+- [ ] **Correlated guards across variables — guarded disjuncts v2**
+      (NASA fprime lesson, 2026-07-12): `FW_ASSERT(ptr != nullptr ||
+      count == 0)` establishes ptr↔count correlation; later derefs sit
+      inside `if (count > 0)`. Same shape with status codes:
+      allocations checked via `status == OP_OK`. Our disjuncts key on
+      single-variable conditions; correlating facts BETWEEN variables
+      is the v2 design (fprime's remaining 7 findings are all this
+      family). Candidate: disjunct guards keyed on the assert/branch
+      condition with multi-variable refinement per disjunct.
 - [ ] **Configurable allocators** (--alloc-functions/--free-functions,
       libgit2 lesson 2026-07-12): git__malloc/git__free are invisible
       to the fixed allocator list, so the leak rule tracked NOTHING in

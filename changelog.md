@@ -32,12 +32,26 @@
   remaining set is 37 null-deref / 9 memory-leak / 1 div-by-zero,
   next-round triage material). libgit2: 149 → **101**.
 
+### Changed (round 2 — NASA fprime)
+- **Scanned NASA F´ flight-software framework** (216 hand-written files
+  after a full fprime-util build generated the FPP autocoder headers):
+  **10 findings**, triaged to the last one. Fixed here: **placement new
+  is not an allocation** (MemoryLeak isAllocExpr — the AtomicQueue
+  slot-initialization loop `new (&m_slots[i]) Slot()` produced 2 FPs;
+  plain new keeps full tracking, pinned). `--fatal-asserts SwAssert`
+  killed the TlmChan FW_ASSERT-opacity warning — the feature's second
+  real-world validation. Remaining 7: one family, cross-VARIABLE
+  correlated guards (`FW_ASSERT(ptr != nullptr || count == 0)` then
+  derefs inside `if (count > 0)`) — recorded in todo as the guarded
+  disjuncts v2 design item.
+
 ### Verification
-- 271/271 tests (ctest + single-process; +5 LibGit2FpTest including the
+- 273/273 tests (ctest + single-process; +5 LibGit2FpTest including the
   null-branch flip side, +3 LlamaFpTest including the
-  check-then-unguarded-use flip side that must KEEP warning). The two
-  BestCaseTest ternary-guard pins from the stress suite hold — the
-  rewind preserves arm-internal refinement by construction.
+  check-then-unguarded-use flip side that must KEEP warning, +2
+  FprimeFpTest placement-new pins). The two BestCaseTest ternary-guard
+  pins from the stress suite hold — the rewind preserves arm-internal
+  refinement by construction.
 
 ## 2026-07-12 — shadPS4 round 2: --fatal-asserts (assert-opacity flood)
 

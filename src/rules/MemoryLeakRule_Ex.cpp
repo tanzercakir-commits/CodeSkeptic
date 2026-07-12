@@ -62,7 +62,11 @@ llvm::StringRef calleeName(const FunctionDecl* callee) {
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
-    if (isa<CXXNewExpr>(expr)) return true;
+    // Placement new constructs into EXISTING storage — no allocation
+    // happens and nothing is leakable (the NASA fprime AtomicQueue
+    // slot-initialization loop, `new (&m_slots[i]) Slot()`).
+    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr))
+        return newExpr->getNumPlacementArgs() == 0;
     if (const auto* cast = dyn_cast<CastExpr>(expr))
         return isAllocExpr(cast->getSubExpr(), ctx);
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
