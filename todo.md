@@ -135,6 +135,15 @@ Juliet's CI weight, project name check.
       LIST file was not found. (Cost 20 minutes of scan-diff confusion:
       the fallback positional-dir invocation scanned the whole 2372-file
       compile DB instead of the intended 493.)
+- [ ] fprime residual (2026-07-12, with --fatal-asserts SwAssert the
+      count is 1, not the README's 2): PriorityMemQueue::configure —
+      FW_ASSERT((queueConfigs != nullptr) || (numQueueConfigs == 0))
+      then deref under numQueueConfigs > 0. Exactly the v2b assert
+      family and the pins pass on the isolated shape; the real
+      function (two interleaved num>0 blocks, static-global writes,
+      method calls, loop subscript) still warns. Needs a minimal repro
+      to find which step drops the split. Also update the README
+      real-world table fprime row 2 -> 1 (proper flags) when fixed.
 - [ ] llama.cpp non-convergence residue (2026-07-12): 72 warnings but
       only 4 UNIQUE functions — all nlohmann/json.hpp header templates
       (get_unchecked/get_checked/get_and_create/contains), re-counted
