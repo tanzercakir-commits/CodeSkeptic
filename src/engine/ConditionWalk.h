@@ -151,18 +151,18 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
 
     const clang::Expr* lhs = binOp->getLHS()->IgnoreParenImpCasts();
     const clang::Expr* rhs = binOp->getRHS()->IgnoreParenImpCasts();
-    if (const clang::VarDecl* var = d::asVar(lhs)) {
-        onCompare(var, opc, rhs, isTrue);
-        return;
-    }
-    if (const clang::VarDecl* var = d::asVar(rhs)) {
-        onCompare(var, d::mirror(opc), lhs, isTrue);
-    }
+    // Both sides get a callback when both are variables (`i < end`
+    // informs about i AND end); clients filter what they can't use.
+    const clang::VarDecl* lhsVar = d::asVar(lhs);
+    const clang::VarDecl* rhsVar = d::asVar(rhs);
+    if (lhsVar) onCompare(lhsVar, opc, rhs, isTrue);
+    if (rhsVar && rhsVar != lhsVar) onCompare(rhsVar, d::mirror(opc), lhs, isTrue);
 }
 
 // Pointer-nullness domain: setNull(var, isNullOnEdge) — the fact that
 // on this edge var is surely null (true) or surely non-null (false).
-// Only pointer-typed variables and null-literal comparisons.
+// Pointer-typed variables; null-literal equality comparisons; and
+// pointer-pointer relational comparisons (see below).
 template <typename SetNullFn>
 void walkNullCondition(const clang::Expr* cond, bool isTrue,
                        SetNullFn&& setNull) {
@@ -175,8 +175,27 @@ void walkNullCondition(const clang::Expr* cond, bool isTrue,
         },
         [&](const clang::VarDecl* var, clang::BinaryOperatorKind opc,
             const clang::Expr* other, bool edgeTrue) {
-            if (opc != clang::BO_EQ && opc != clang::BO_NE) return;
             if (!var->getType()->isPointerType()) return;
+
+            // Relational pointer comparison: C11 6.5.8p5 defines
+            // `p < q` only when both point into (one past the end of)
+            // the same object — which a null pointer never does. So
+            // EVALUATING the comparison proves both operands non-null,
+            // on BOTH edges; the result direction carries no nullness
+            // information at all. This is the FOREACH_ARRAY family
+            // (systemd, 235 of 302 null findings): in
+            // `end && i < end` the truthiness conjunct refines only
+            // `end`; `i` is proven by this rule.
+            if (opc == clang::BO_LT || opc == clang::BO_GT ||
+                opc == clang::BO_LE || opc == clang::BO_GE) {
+                const clang::Expr* o = other->IgnoreParenImpCasts();
+                if (!o->getType()->isPointerType()) return;
+                if (d::isNullLiteral(o)) return;
+                setNull(var, false);
+                return;
+            }
+
+            if (opc != clang::BO_EQ && opc != clang::BO_NE) return;
             if (!d::isNullLiteral(other)) return;
             bool eqHolds = (opc == clang::BO_EQ) == edgeTrue;
             setNull(var, eqHolds);

@@ -681,3 +681,93 @@ TEST(ReportDedupTest, DefiniteErrors_KeepPerLineGranularity) {
     EXPECT_EQ(results[0].severity, Severity::Error);
     EXPECT_EQ(results[1].severity, Severity::Error);
 }
+
+// --- Pointer relational comparison proves validity (systemd FOREACH_ARRAY) ---
+//
+// C11 6.5.8p5: `p < q` is defined only when both point into (one past)
+// the same object; null never does. Evaluating the comparison therefore
+// proves both operands non-null — on both edges. systemd's FOREACH_ARRAY
+// loop condition `end && i < end` was the dominant scan FP family
+// (235 of 302 null findings): the macro's own defensive `i &&` check
+// creates the may-be-null evidence, the ternary join keeps it, and the
+// loop condition used to refine only `end`.
+
+TEST(ForeachArrayFpTest, ExactMacroShape_NoWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct item { int value; };
+        int sum(item* items, int n) {
+            int total = 0;
+            for (__typeof__(items[0])* i = (items), *_end_ = ({
+                         __typeof__(n) _m_ = (n);
+                         (i && _m_ > 0) ? i + _m_ : nullptr;
+                 }); _end_ && i < _end_; i++)
+                total += i->value;
+            return total;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ForeachArrayFpTest, OpenCodedShape_NoWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct item { int value; };
+        int sum(item* items, int n) {
+            int total = 0;
+            for (item* i = items, *end = (i && n > 0) ? i + n : nullptr;
+                 end && i < end; i++)
+                total += i->value;
+            return total;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ForeachArrayFpTest, RelationalProvesBothOperands) {
+    // The walk reports BOTH sides of `a < b` (variable-on-left
+    // normalization used to drop the right side entirely).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int f(int* a, int* b) {
+            if (!a || !b) { }
+            if (a < b) return *a + *b;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ForeachArrayFpTest, NullLiteralOrdering_DoesNotBless) {
+    // Ordering against the null constant carries no validity proof —
+    // the definite-null error must survive.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int f(int* p) {
+            if (p == nullptr) {
+                if (p > (int*)0) return *p;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ForeachArrayFpTest, PostLoopDeref_StillWarns) {
+    // The proof holds only on paths THROUGH the comparison. The
+    // zero-iteration path (end == nullptr short-circuits, `i < end`
+    // never evaluated) keeps i possibly-null after the loop.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct item { int value; };
+        int f(item* arr, int n) {
+            item* i = arr;
+            item* end = (i && n > 0) ? i + n : nullptr;
+            while (end && i < end) i++;
+            return i->value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}

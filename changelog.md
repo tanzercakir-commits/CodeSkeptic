@@ -1,5 +1,50 @@
 # ZeroDefect — Changelog
 
+## 2026-07-12 — Pointer-relational validity (the FOREACH_ARRAY family)
+
+### Changed
+- **Pointer-pointer relational comparisons prove validity**: C11
+  6.5.8p5 defines `p < q` only when both operands point into (one past
+  the end of) the same object — which a null pointer never does. So
+  EVALUATING the comparison now proves both operands non-null, on both
+  edges; the result direction carries no nullness information.
+  Orderings against the null constant are excluded (they carry no
+  proof, and `if (p == 0) { if (p > (int*)0) *p; }` must keep its
+  definite-null error).
+- **walkCondition reports BOTH sides of a comparison**: the
+  variable-on-left normalization used to drop the right side entirely
+  (`i < end` never informed about `end`). All existing clients filter
+  by literal on the other side, so the extra callback is free for them.
+- **systemd null-derefs 302 → 58 (−81%)** on the same 494-file
+  basic/core/shared scan. Full-family classification (programmatic,
+  all 302): 235 were FOREACH_ARRAY/FOREACH_ELEMENT expansions — the
+  macro's own defensive `i &&` check creates the may-be-null evidence,
+  the ternary join keeps it, and the loop condition `end && i < end`
+  used to refine only `end`. Zero survivors of the family after the
+  fix; 9 misc singletons also cleared. Remaining 58: 18 assert
+  pointer/length correlation + 7 checked-cast macros (both the
+  disjuncts-v2b design inventory) + 33 hard singletons.
+- **New FN discovered while building the repro (documented, not
+  fixed)**: `q = (p && flag) ? p : NULL; q->value;` is not reported —
+  the ternary result's nullness never reaches the assigned variable.
+  The v2b design session inherits it (value-level join at
+  ConditionalOperator).
+
+### Verification
+- 306/306 tests in both modes (+5 ForeachArrayFpTest: exact macro
+  shape with statement expression, open-coded shape, both-operand
+  proof, null-literal-ordering exclusion, post-loop deref still
+  warns on the zero-iteration path).
+- Local Juliet replay: all five CWE metrics IDENTICAL to pre-fix
+  (CWE476 1.000/0.352 — the proof costs nothing on the benchmark).
+  Corpus pins hold (cjson 54, tinyxml2 9).
+
+### Debugging lesson
+- Piping a referee run through `tail` in a background task truncates
+  the log the notification later points at (two referees had to be
+  re-derived from workdir artifacts). Capture full output to a file;
+  filter at read time.
+
 ## 2026-07-12 — systemd macro idioms + rtp2httpd scan
 
 ### Changed
