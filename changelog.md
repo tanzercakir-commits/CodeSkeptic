@@ -1,5 +1,31 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Summary-diff gate flag + README truth fixes
+
+### Added
+- **`--gate error|warn`** (CONTRACTS.md §5, the last unimplemented
+  spec row): `--gate warn` (or `summary_diff_gate = warn` in
+  .zerodefect.conf) keeps the full WEAKENED report but exits 0 — the
+  adoption ramp for projects not ready to break CI on
+  inferred-contract drift. Default stays `error` (exit 1). An
+  unreadable summary file is exit 2 REGARDLESS of the gate: a gate
+  that cannot read its input must never look green. Invalid gate
+  values are rejected at argument parsing.
+
+### Fixed
+- README real-world table: the fprime row now shows the verified end
+  state — 10 -> 0, clean with `--fatal-asserts SwAssert` (the
+  delta-debugging round of 2026-07-12/13 eliminated the last two:
+  unsigned zero-identities + the assert-handler declaration).
+
+### Verification
+- 390/390 tests in both modes (+1: gate-warn reports-but-exits-zero,
+  unreadable-input stays exit 2 under warn).
+- CLI smoke: default exit 1, `--gate warn` exit 0 with identical
+  report text, `--gate bogus` rejected with a usage message.
+- Juliet floors and corpus pins green (the gate lives in the
+  summary-diff mode, before any analysis path).
+
 ## 2026-07-13 — Contracts Round E: policies + sidecars — v1 complete
 
 ### Added

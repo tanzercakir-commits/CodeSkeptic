@@ -170,8 +170,8 @@ Juliet's CI weight, project name check.
       compile DB instead of the intended 493.)
 - [x] fprime residual — SOLVED (2026-07-12 night): unsigned
       zero-identity canonicalization (u<=0 IS u==0); fprime is CLEAN
-      with --fatal-asserts SwAssert. README row update pending (0
-      with the flag documented).
+      with --fatal-asserts SwAssert. README row updated 2026-07-13
+      (10 -> 0, flag documented).
 - [ ] fstab-util.c:261 (+1 from the unsigned round): flag/pointer
       correlation lost — single-file bisect to find which removed key
       (u<0 / u>=0) was doing the pruning; direction conservative.

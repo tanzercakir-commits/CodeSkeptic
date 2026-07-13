@@ -151,7 +151,7 @@ exposed were fixed.
 | [libgit2](https://github.com/libgit2/libgit2) | 168 files | 149 → **44** | **11 confirmed OOM-path leaks** (one issue class, report drafted) |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | full build | 511 → **25** | triage in progress |
 | [rtp2httpd](https://github.com/stackia/rtp2httpd) | 27k lines | 4 → **3** | **1 confirmed NULL-contract bug**, report drafted |
-| [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **2** | triage in progress |
+| [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **0** | clean (with `--fatal-asserts SwAssert` declaring F´'s assert handler) |
 | [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
 
@@ -358,6 +358,13 @@ function contracts; the callers deserve a look*. Gained claims report
 as `STRENGTHENED` (informational), directionless drifts as `CHANGED`,
 and signature changes appear as `REMOVED`+`ADDED` (the key includes
 arity — an arity change breaks callers anyway).
+
+The gate is configurable for adoption: `--gate warn` (or
+`summary_diff_gate = warn` in `.zerodefect.conf`) keeps the full
+report but exits `0`, so a project can watch its contract drift
+before letting it break CI. The default stays `error` — and an
+unreadable summary file is exit `2` regardless: a gate that cannot
+read its input never looks green.
 
 ### MCP server (agent integration)
 

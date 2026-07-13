@@ -91,6 +91,10 @@ public:
     // activation stays in `// zd:policy` comments.
     const std::set<std::string>& policies() const { return policies_; }
 
+    // Summary-diff gate (CONTRACTS.md §5): "error" (default) exits 1
+    // on WEAKENED; "warn" reports but exits 0 (adoption ramp).
+    const std::string& summaryDiffGate() const { return summary_diff_gate_; }
+
 private:
     Severity parseSeverity(const std::string& str) const;
     void addNamesTo(std::set<std::string>& target, const std::string& list);
@@ -110,6 +114,7 @@ private:
     std::set<std::string> alloc_functions_;
     std::set<std::string> free_functions_;
     std::set<std::string> policies_;
+    std::string summary_diff_gate_ = "error";
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;
