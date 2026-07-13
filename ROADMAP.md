@@ -1,245 +1,173 @@
-# ZeroDefect — Assessment & Roadmap (2026-07)
+# ZeroDefect — Assessment & Roadmap (updated 2026-07-13)
 
-This document is a technical analysis of the project made with an
-independent eye, its positioning within the industry, and the roadmap
-proposed for what lies ahead. Every "verified" statement in here was
-confirmed during this analysis by actually building and running on Linux
-(Ubuntu 24.04, LLVM 18.1.3).
+This document tracks the project's verified state, its positioning, and
+the decisions that remain. The previous revision (2026-07) described a
+pre-public prototype; almost everything it planned has since shipped.
+History lives in `changelog.md`; the maintenance backlog lives in
+`todo.md`. This file is for STRATEGY: what is true today, and which
+forks in the road are still open.
 
 ---
 
-## 1. Assessment
-
-### 1.1 Verified state
+## 1. Verified state (2026-07-13)
 
 | Topic | Result |
 |-------|--------|
-| Linux build | Successful — `cmake -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18` + `llvm-18-dev libclang-18-dev libzstd-dev` |
-| Test suite | **41/41 passed** (0.79 s) — verified outside macOS for the first time |
-| Smoke test | uninit-ptr, reassignment leak, exit-block leak, double-free correctly caught; exit code correct (1 when there are findings) |
-| Guarded division (parameter) | `if (z != 0) return 100/z;` — NO false positive (because the parameter stays Unknown) |
+| Test suite | **334/334** in both modes (ctest AND single-process — the second catches global-state leaks) |
+| CI | Ubuntu 24.04 + LLVM 18: build + tests + smoke + corpus on every PR; Juliet benchmark on every code PR; weekly deep run |
+| Score guards | Three independent referees gate every merge: the test suite, per-CWE Juliet precision/recall floors (`scripts/juliet_expected.txt`), and corpus finding-count pins (`scripts/corpus_expected.txt`). Deliberate rule changes must move the floors IN THE SAME PR with written rationale. |
+| Juliet (NIST) | CWE-476/415/416/369 at rule precision **1.000**; CWE-416 recall 0.501, CWE-476 0.352; CWE-401 case precision 0.716 |
+| Real-world scans | Eight codebases measured on one analyzer build (see README table): systemd 414→53, shadPS4 209→22, libgit2 149→38, llama.cpp 511→23, fprime 10→**0**, Catch2 0, Redis first scan 80 (idioms not yet learned) |
+| Upstream reports | 3 shadPS4 issues FILED (confirmed real bugs); libgit2 (11 verified OOM-path leaks), rtp2httpd and Redis NULL-contract drafts delivered, awaiting filing |
+| Non-convergence | 0 on systemd/libgit2/rtp2httpd/fprime after engine convergence widening (llama residue: 4 nlohmann header templates, documented) |
 
-### 1.2 The project's real level
+Everything in the previous roadmap's Phases 0–3 — and most of Phase 4 —
+has shipped: the dataflow engine with targeted path sensitivity,
+5 rules, interprocedural summaries (intra- and cross-TU, on-disk),
+summary-diff as a semantic-regression CI gate, SARIF/HTML/JSON
+reporting with dataflow traces, suppression + baseline, incremental
+analysis (function/line-scoped, diff-driven), an MCP server with
+per-call idiom parameters, and configurable project idioms
+(allocators, fatal asserts, cleanup attributes).
 
-The project is not "a linter with three rules"; it is **the core of a
-general-purpose dataflow analysis framework**. The critical architectural
-decisions were made correctly:
+## 2. What the analysis core is now
 
-- **DataflowEngine** (template, duck-typed Analysis, worklist + merge):
-  this abstraction is exactly what turns a pile of rules into an analysis
-  framework. The conceptual core of the Clang Static Analyzer is the same.
-  Writing a new rule has come down to the level of "define a lattice +
-  write a transfer".
-- The layered architecture (SourceManager → RuleEngine → Rules → Reporter)
-  is clean, dependencies are one-directional, testability is high.
-- The honest limitation list in `todo.md` (known FPs/FNs) is a rare and
-  very valuable engineering habit.
-- The reflex of validating against a real-world corpus (cJSON, tinyxml2)
-  is right.
+The engine is a worklist dataflow framework (duck-typed Analysis over
+Clang CFGs) with **targeted path sensitivity**: analysis states are
+small sets of guarded disjuncts (condition-facts × variable states,
+cap 4) rather than one merged state. The fact machinery (v2, 2026-07-12)
+carries:
 
-### 1.3 New problems found in this analysis
+- canonical condition keys (var/enum/template-param vs integer
+  constant, constant-returning callees, gated pointer-nullness keys),
+- a flow-sensitive fact lifecycle (assignments erase, constant stores
+  stamp, stamped equalities entail answers to later keys),
+- disjunction elimination for value-materialized short-circuit
+  conditions (the systemd assert shape),
+- unsigned zero-identities (`u <= 0` ≡ `u == 0`),
+- engine-level convergence widening with time memory (the domain is
+  deliberately non-monotone; real code oscillates without it).
 
-**(a) Header resolution failure on Linux — verified.**
-The unconditional `-isystem /usr/include` addition in
-`SourceManager::processAll`, a side effect of the fix made for macOS,
-breaks GCC libstdc++'s `#include_next <stdlib.h>` chain on Linux:
+Each mechanism exists because a real codebase demonstrated the need,
+and each is pinned by tests plus the three referees. This
+evidence-first loop — scan, triage every finding by hand, turn each
+false-positive family into an engine feature with a pin — is the
+project's actual method, and it has held up across eight codebases.
 
-```
-/usr/include/c++/13/cstdlib:79:15: fatal error: 'stdlib.h' file not found
-```
+## 3. Positioning (updated)
 
-Once `/usr/include` is prepended to the include search order,
-`include_next` has nowhere left to go. On Linux `-resource-dir` is already
-sufficient; `/usr/include` should either not be added at all or be
-conditional on the platform. Because the analysis continues with a partial
-AST, findings silently go missing (the double-free in the demo file was
-missed for this reason) — **silent incomplete analysis means a wrong
-"clean" report**; this is the most critical fix before a public release.
+The 2026-07 analysis identified three differentiators for the "an
+agent writes the code, someone in the loop verifies the semantics"
+workflow. Status:
 
-**(b) DataflowEngine's fixed iteration ceiling.**
-`maxIterations = numBlocks * 4` is not a theoretical fixpoint guarantee.
-With a monotone transfer + a finite-height lattice, convergence is already
-guaranteed; the ceiling should only be a safety fuse. Right now, if the
-ceiling is hit, `converged=false` is set but **the results are still
-used** and nobody is warned — in loop-heavy functions there is a risk of
-reporting with incomplete state. Make the ceiling `numBlocks × lattice
-height`, and if it is exceeded, report that function as "could not be
-analyzed".
+1. **In-loop gate — SHIPPED.** MCP server with warm AST cache,
+   function/line-scoped incremental analysis in milliseconds, findings
+   with machine-readable dataflow traces (the explanation an LLM needs
+   to fix its own bug).
+2. **Diff-aware semantic regression — SHIPPED (v1).** Function
+   summaries (nullability, zeroness, parameter effects) are compared
+   as contracts; a WEAKENED verdict is a CI-failing event
+   (`--summary-diff`).
+3. **Contract layer (intent verification) — OPEN.** The remaining
+   differentiator, and the largest open decision below.
 
-**(c) Architectural inconsistency across rules.**
-MemoryLeakRule_Ex uses the right pattern: all variables in a single
-product lattice (`map<VarDecl*, AllocState>`), a single dataflow run,
-fast `dyn_cast`-based classify. UninitPointerRule_Ex, however, runs a
-separate CFG + separate run per variable + 5-6 ASTMatchers per
-statement — O(variables × statements × matchers). Consolidating both onto
-the same pattern (product lattice + dyn_cast) gains both speed and code
-simplicity.
+The competitive observation stands: clang-tidy cannot reach this
+depth, CSA/CodeQL cannot reach this speed/position, Infer is
+unmaintained. What has CHANGED since the first analysis: the engine
+is no longer the risk item — eight real-world scans and the guard
+infrastructure are evidence the core holds. The remaining risk is
+PRODUCT, not engine: the contract language and the distribution
+story.
 
-**(d) Unknown's absorbing behavior in the DivByZero lattice.**
-Because `merge(Zero, Unknown) = Unknown`, the following case silently
-slips through (verified):
+## 4. Open architectural decisions
 
-```cpp
-int d = 0;
-if (z > 0) d = z;
-return 100 / d;   // on the z <= 0 path d == 0 — NO report
-```
+Three forks require a human decision. Everything else in the backlog
+is maintenance.
 
-Deliberate conservatism to avoid FPs, but `Zero + Unknown = MaybeZero`
-(at least at Info level) would be a more accurate signal. This should be
-handled together with guard analysis (below).
+### 4.A Contract language (intent verification) — the keystone
 
-**(e) Cross-TU duplicate finding risk.**
-Diagnostics are collected per TU and merged; if a function defined in a
-header is analyzed in multiple TUs, the same finding is reported N times.
-There is sorting but no deduplication — global dedup over
-`(file, line, rule_id)` is needed.
+Everything shipped so far hunts UNIVERSAL bugs (null, leaks, UB). The
+founding pain — "we said it was done, and it crashed anyway" — is
+about INTENT: the code does not do what it was supposed to do. The
+plan: a lightweight annotation language (ownership, nullability,
+ranges, relations between parameters); the LLM emits code AND
+contract; ZeroDefect verifies one against the other, deterministically.
 
-### 1.4 Gaps for a public release
+Design questions that need co-design (user + assistant, max effort):
+- **Surface syntax**: attributes (`[[zd::nonnull]]`), structured
+  comments (`// @zd: returns nonnull unless n == 0`), or a sidecar
+  file? Trade-off: attributes are toolable but invasive; comments are
+  adoptable on any codebase including C89; sidecars never touch
+  upstream code (works for scanning third-party projects).
+- **Semantic scope of v1**: the existing summary machinery already
+  infers return-nullness, zeroness and parameter effects — v1
+  contracts should be CHECKABLE BY THE EXISTING ENGINE (declare what
+  we can already verify), then grow with the engine. The
+  `assert(p || n == 0)` conditional-contract shape from systemd/fprime
+  is the natural first relational form.
+- **Failure semantics**: is a contract violation an error (code is
+  wrong) or a contract-diff event (intent changed — summary-diff
+  semantics)? Probably both, distinguished by who authored the
+  contract.
+- **LLM ergonomics**: the contract must be cheap for a model to emit
+  correctly next to the code it writes, and the violation message must
+  be self-repair fuel (trace + violated clause).
 
-- **README is 12 bytes** — the project has no storefront.
-- **No LICENSE** — a repo without a license is legally "all rights
-  reserved"; nobody can use it or contribute. (Suggestion: Apache-2.0 —
-  the patent clause matters for analysis tools.)
-- **No CI** — the "41/41 passing" claim exists only locally. A GitHub
-  Actions matrix with Ubuntu + LLVM 18 is a one-day job (the recipe was
-  verified in this analysis).
-- **Diagnostic messages are Turkish only** and clipped to ASCII
-  ("sizintisi"). If public is the target, English by default + `--lang tr`
-  is the right balance.
-- **No SARIF output** — GitHub code scanning and all modern CI
-  integration speak SARIF; a custom JSON format is an integration wall.
-- **No suppression mechanism** (`// NOLINT`-style + a baseline file) —
-  the precondition of gradual adoption on a real project.
+### 4.B Engine philosophy: evolve vs rewrite
 
----
+Question: keep evolving targeted path sensitivity, or rewrite as a
+single-pass path-sensitive (symbolic) engine à la CSA?
 
-## 2. Industry Positioning — "Don't let similar projects discourage us"
+Evidence gathered 2026-07-12 favors EVOLUTION: the disjunct machinery
+absorbed five major mechanisms in one day without destabilizing
+(334 tests, floors RAISED twice); the measured cost knee is the
+disjunct cap (cap 8 = ~2.7× systemd scan time for −2 findings), and
+the identified lever is smarter (fact-prioritized) widening, not a
+bigger engine. A symbolic rewrite would buy generality we have not
+yet needed, at the cost of the speed that makes the in-loop position
+possible, plus months of re-validation of everything the referees
+currently pin.
 
-The honest table:
+**Recommendation: evolve.** Revisit ONLY if the contract language
+(4.A) demands relational reasoning (e.g. `len(buf) >= n` arithmetic
+between variables) that provably cannot be hosted in the fact
+machinery. Decision should therefore FOLLOW 4.A, not precede it.
 
-| Tool | Approach | Strength | Weakness |
-|------|----------|----------|----------|
-| clang-tidy | AST patterns | Ecosystem, speed | No flow analysis in most checks |
-| Clang Static Analyzer | Symbolic execution, path-sensitive | Depth | Slow, hard to extend, intra-TU |
-| Infer (Meta) | Separation logic, interprocedural | **Diff-aware mode** | Heavy, OCaml, maintenance declined |
-| CodeQL | Datalog queries | Expressive power | Batch/CI-scale, takes minutes |
-| cppcheck | Its own parser | Easy installation | No Clang AST, limited depth |
+### 4.C Distribution & idiom profiles
 
-The critical observation: **none of these tools was designed for the
-workflow "an agent is writing the code, and someone inside the loop needs
-to verify the semantics."** Trying to beat CSA at path-sensitivity is a
-20-person-year war and unnecessary; the gap is not in the engine, it is
-in the **position within the workflow**.
+How does the tool actually enter someone's AI loop? Candidate
+surfaces, not mutually exclusive: CLI (exists), MCP server (exists),
+GitHub Action + code-scanning via SARIF (exists as output, not as a
+packaged action), VS Code extension (evaluated, deferred), pre-built
+binaries vs build-from-source.
 
-The pain you voiced — "we said it's done, and a bug showed up again" —
-is the industry's most expensive problem right now: as the production
-cost of code drops to zero, its **verification cost** has become the
-bottleneck. ZeroDefect's thesis sits exactly in that gap:
+The scan campaign produced a second product insight: **idioms are
+configuration** — every codebase needed its own allocator/assert/
+cleanup vocabulary before the analysis saw the code the way the
+project means it. That configuration is shippable: per-project
+"idiom profiles" (a `zerodefect.conf` for systemd, redis, libgit2,
+...) maintained in-repo, doubling as documentation of what the
+analyzer understands. Decision needed on packaging priority order
+once the repo is public.
 
-1. **In-loop gate:** the moment an LLM changes a function, a tool that —
-   within milliseconds — analyzes only that function (and its callers)
-   and returns the finding **together with its dataflow trace** (which
-   path the faulty value came from) in a machine-readable format. The
-   trace is precisely the explanation the LLM needs to correct itself.
-   CSA/CodeQL cannot get down to that speed; clang-tidy cannot get up to
-   that depth.
+## 5. Near-term plan (week of 2026-07-13)
 
-2. **Contract layer (intent verification):** general UB hunting finds
-   "universal" bugs, but your problem is **intent** semantics. A
-   lightweight annotation language (ownership, nonnull, ranges) → the LLM
-   produces the code AND the contract → ZeroDefect verifies the code
-   against the contract. This is what directly targets the "semantic
-   debugging" gap.
+- **Thu**: GitHub settings session (user + assistant), v0.1.0 tag +
+  Release (notes ready), user files the libgit2 / rtp2httpd / Redis
+  upstream reports (drafts delivered).
+- **Fri**: public flip (user), contract-language co-design session
+  (4.A, max effort).
+- Rolling maintenance from `todo.md` (fstab-util correlation loss,
+  llama header-template non-convergence residue, ternary-value FN,
+  Redis idiom round 2) — each is an ordinary PR round guarded by the
+  three referees.
 
-3. **Diff-aware semantic regression:** on every change, compare function
-   summaries (nullability, ownership, may-be-zero) before/after; if a
-   property callers rely on has silently changed, raise an alarm. This
-   was Infer's killer feature at Meta; nobody in the open ecosystem does
-   it well. "We said it's done, then it broke" is exactly a semantic
-   regression problem.
-
-The discipline that finished an LALR parser from scratch in two years is
-the right profile for this work: analysis frameworks are the same class
-of deep infrastructure craft — there is no shortcut, but each layer
-accumulates on top of the next, and the competitors' inertia (heavy,
-general-purpose, out-of-loop) is our agility.
-
----
-
-## 3. Roadmap
-
-### Phase 0 — Public preparation (low effort, high visibility)
-- [ ] Linux header resolution fix (§1.3a) — **first task; it is producing silent incomplete analysis**
-- [ ] README (English: what, why, architecture diagram, sample output, build recipe)
-- [ ] LICENSE (Apache-2.0 suggested)
-- [ ] GitHub Actions CI: Ubuntu 24.04 + LLVM 18, build + ctest
-- [ ] Diagnostic messages English by default, `--lang tr` option
-- [ ] Cross-TU finding deduplication (§1.3e)
-
-### Phase 1 — Deepening the analysis core
-- [ ] **Branch-condition refinement (assume edges):** apply the CFG
-      terminator condition to the state on the true/false successor edges
-      (`if (p) → p NonNull`, `if (z != 0) → z NonZero`). On its own it
-      kills the biggest FP class and solves the known guard FP in
-      DivByZero. **The technical step with the highest value/effort
-      ratio.**
-- [ ] Move UninitPointerRule to the product lattice + dyn_cast pattern (§1.3c)
-- [ ] Per-function CFG cache (single build, shared by all rules)
-- [ ] Tie the iteration ceiling to the lattice height; report a function
-      that does not converge (§1.3b)
-- [ ] Revisit the `Zero + Unknown` merge decision together with guard analysis (§1.3d)
-
-### Phase 2 — Real-world usability
-- [ ] SARIF reporter (free integration with GitHub code scanning)
-- [ ] `// zerodefect-disable-line <rule>` suppression + a baseline file
-- [ ] Measurement infrastructure: precision/recall numbers with the NIST
-      Juliet test suite — "let's state our claim with numbers". Make the
-      cJSON/tinyxml2 runs a regression test in CI.
-- [ ] New rules (the framework now makes them cheap): use-after-free (the
-      Freed state already exists, add a dereference check), null-deref
-      (meaningful after assume edges), overflow-prone loop bounds
-
-### Phase 3 — AI loop integration (the vision differentiator)
-- [ ] Incremental mode: analysis of a single function / changed functions
-      (from the diff)
-- [ ] Add dataflow traces to findings: "p, allocated at line 12 → if-false
-      path at 15 → freed again at 19" — the explanation format the LLM
-      will consume
-- [ ] MCP server / JSON-RPC mode: a persistent process that Claude Code
-      and similar agents call after every edit (the AST cache stays warm)
-- [ ] Diff-aware semantic summary comparison (§2.3)
-
-### Phase 4 — Research horizon
-- [ ] Interprocedural analysis with function summaries
-      (ownership/nullability summaries — turns Escaped conservatism into
-      real transfer knowledge)
-- [ ] Lightweight contract/annotation language + verifier (§2.2)
-- [ ] Gradual transition to path-sensitivity (at first only in guarded
-      regions)
-
-### Rationale for the ordering
-Phase 0 builds trust (a state that can go public), Phase 1 takes the tool
-past the "not a toy" threshold (without guard analysis the signal/noise
-ratio holds on no real project), Phase 2 brings measurability and
-adoption, and Phase 3 takes the seat nobody is sitting in. A note against
-the temptation to pull Phase 3 forward: putting a tool with no traces and
-high FPs into the loop misleads the LLM too — core quality (Phase 1) is
-the precondition of the vision.
-
----
-
-## 4. The Linux build recipe used in this analysis
+## 6. Build recipe (unchanged since 2026-07)
 
 ```bash
 apt-get install -y llvm-18-dev libclang-18-dev libzstd-dev zlib1g-dev
 cmake -B build -G Ninja -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18 -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-ctest --test-dir build          # 41/41
+ctest --test-dir build          # 334/334
+./build/tests/zerodefect_tests  # single-process mode, same 334
 ```
-
-Note: without `libzstd-dev`, LLVM 18's CMake exports cannot find the
-`zstd::libzstd_shared` target and blow up at the configure stage. This
-recipe can be used as the basis when the CI workflow is written; the
-Homebrew `CMAKE_PREFIX_PATH` default should be restricted to the `APPLE`
-condition only.
