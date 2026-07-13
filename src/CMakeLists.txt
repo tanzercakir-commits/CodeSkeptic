@@ -22,6 +22,8 @@ add_library(zerodefect_core STATIC
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp
     rules/NullDerefRule.cpp
+    rules/ContractRule.cpp
+    contracts/ContractParser.cpp
 )
 
 add_executable(zerodefect main.cpp)

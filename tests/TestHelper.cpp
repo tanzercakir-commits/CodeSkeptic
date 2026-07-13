@@ -76,9 +76,10 @@ namespace testing {
 DiagnosticList runRule(Rule& rule, const std::string& code,
                        const std::string& filename) {
     DiagnosticList results;
-    clang::tooling::runToolOnCode(
+    clang::tooling::runToolOnCodeWithArgs(
         std::make_unique<TestAction>(rule, results),
         code,
+        {"-fparse-all-comments"},
         filename);
     return results;
 }

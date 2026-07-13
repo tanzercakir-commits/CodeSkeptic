@@ -5,6 +5,7 @@
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
+#include "rules/ContractRule.h"
 #include "rules/UninitPointerRule_Ex.h"
 
 #include <llvm/Support/JSON.h>
@@ -159,6 +160,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
     analyzer.addRule<zerodefect::DivByZeroRule>();
     analyzer.addRule<zerodefect::NullDerefRule>();
+    analyzer.addRule<zerodefect::ContractRule>();
     analyzer.run();
 
     json::Array findings;

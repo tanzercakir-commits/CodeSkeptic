@@ -63,6 +63,19 @@ Juliet's CI weight, project name check.
       content; multiset counter — identical findings tracked one by one;
       v1 files backward compatible)
 
+### Contracts (CONTRACTS.md; Round B shipped 2026-07-13)
+- [ ] Round C: `requires p != null` — callee-side seeding (contract
+      carries the proof burden; derefs of p stop warning) +
+      caller-side violation at visible call sites; relational
+      requires (`p != null || n == 0`) via fact keys.
+- [ ] Round D: guarded ensures (`if n != 0`) per-disjunct return
+      checking; ownership effects vs param-effect summaries
+      (`owns/borrows/returns owned`); violation traces (which return,
+      which path) attached to contract findings.
+- [ ] Round E: `zd:policy` engine with `no-absolute-paths` first;
+      `.zdc` sidecar loading (anchored entries only); profile-level
+      policies in zerodefect.conf; README contracts section.
+
 ### Rule improvement notes
 - [x] **FOREACH_ARRAY family — resolved via pointer-relational
       validity, NOT join surgery (2026-07-12)**: full classification

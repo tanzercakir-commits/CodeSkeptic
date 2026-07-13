@@ -58,6 +58,12 @@ enum class MsgId {
     TraceAssumedZeroHere,       // {0} = variable name (guard: zero on this branch)
     SummaryStaleWarning,        // {0} = summary file, {1} = newer source
     TraceAlsoDerefHere,         // {0} = variable name (dedup: same origin)
+
+    // Contracts (CONTRACTS.md)
+    ContractViolated,           // {0} = clause text
+    ContractSyntaxError,        // {0} = offending line text
+    ContractUnsupported,        // {0} = clause text (outside v1 subset)
+    ContractUnverified,         // {0} = clause text (engine cannot prove yet)
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

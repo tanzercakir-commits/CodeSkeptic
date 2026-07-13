@@ -148,6 +148,18 @@ const MsgEntry kMessages[] = {
     // TraceAlsoDerefHere
     {"'{0}' is also dereferenced here (same origin)",
      "{0} burada da dereference ediliyor (ayni kaynak)"},
+    // ContractViolated
+    {"contract violated: '{0}'",
+     "sozlesme ihlal edildi: '{0}'"},
+    // ContractSyntaxError
+    {"invalid contract syntax: '{0}'",
+     "gecersiz sozlesme sozdizimi: '{0}'"},
+    // ContractUnsupported
+    {"contract is outside the v1 checkable subset (not checked): '{0}'",
+     "sozlesme v1 dogrulanabilir alt kumesinin disinda (kontrol edilmedi): '{0}'"},
+    // ContractUnverified
+    {"contract could not be verified yet (engine limit): '{0}'",
+     "sozlesme henuz dogrulanamadi (motor siniri): '{0}'"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

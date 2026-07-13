@@ -1,5 +1,38 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Contracts v1 Round B: the intent layer opens
+
+### Added
+- **CONTRACTS.md** — the contract-language design spec from the
+  co-design session: a contract is a DECLARED function summary,
+  checked by the same dataflow that infers summaries.
+- **Contract parser** (`contracts/ContractParser`): `zd:` /
+  `zd:ai` structured line comments, one expression grammar
+  (`ensures return != null if n != 0`, `requires p != null || n == 0`),
+  effect keywords (`owns/borrows/returns owned`), `zd:policy` names.
+  Hand-written recursive descent; parse errors are NEVER silent.
+- **ContractRule** (rule_id `contract`): Round B checks unconditional
+  return postconditions (`ensures return != null` / `!= 0`) against
+  the inferred return-nullness/zeroness summaries. Violation of a
+  bare `zd:` contract is an ERROR (CI breaks — the friction is the
+  product); a `zd:ai` proposal violating downgrades to warning.
+  Unparseable lines are `contract-syntax` errors; parseable but
+  not-yet/never-checkable clauses get explicit `contract-unsupported`
+  warnings — a contract is never silently "accepted".
+- `-fparse-all-comments` in both the product tool and the test
+  harness (ordinary `//` comments otherwise never reach the AST).
+- First dogfood: the founding-pain shape (`ensures return != null`
+  + a later early `return NULL;`) is caught at the contract line.
+
+### Verification
+- 348/348 tests in both modes (+14: 5 parser units incl. the
+  never-silent syntax pin, 9 rule pins incl. severity split,
+  attachment, unverified-not-silent, param-vs-param unsupported,
+  multi-clause independence).
+- Juliet floors and corpus pins green with the new rule active
+  (Juliet has no contracts; the rule adds zero noise by construction
+  and the referees confirm it).
+
 ## 2026-07-12 — Unsigned zero-identities (the fprime PriorityMemQueue FP)
 
 ### Changed
