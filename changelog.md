@@ -1,5 +1,18 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Second upstream finding MERGED (shadPS4 #4703)
+
+A second shadPS4 finding was fixed and merged upstream: issue #4696
+(`sceSaveDataMount/Mount2` null-checked a pointer with `&&` where it
+needed `||`, so the guard fell through and dereferenced the pointer
+it had just checked for null) closed via PR #4703 — the canonical
+looks-right-reads-wrong bug. Two of the three shadPS4 findings are now
+merged (#4702 internal__Foprep, #4703 sceSaveDataMount); #4697
+(usb_backend GetMaxPacketSize) still open. Proof points updated:
+README real-world table (shadPS4 -> "2 merged (#4702, #4703)") + the
+"Confirmed in the wild" callout now leads with the &&/|| bug;
+RELEASE_NOTES.md and both v0.1.0 drafts likewise.
+
 ## 2026-07-13 — Kyty scan: clean of real bugs, one engine-v2 repro captured
 
 Scanned Kyty (PS4/PS5 emulator, InoriRus) — 104 core files, clean
