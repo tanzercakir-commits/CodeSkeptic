@@ -63,11 +63,17 @@ Juliet's CI weight, project name check.
       content; multiset counter — identical findings tracked one by one;
       v1 files backward compatible)
 
-### Contracts (CONTRACTS.md; Round B shipped 2026-07-13)
-- [ ] Round C: `requires p != null` — callee-side seeding (contract
-      carries the proof burden; derefs of p stop warning) +
-      caller-side violation at visible call sites; relational
-      requires (`p != null || n == 0`) via fact keys.
+### Contracts (CONTRACTS.md; Rounds B+C shipped 2026-07-13)
+- [x] Round C: `requires p != null` / `requires n != 0` — callee-side
+      seeding (contract carries the proof burden) + caller-side
+      violation checks at every visible call site (NullDeref owns the
+      null domain, DivByZero the zero domain; the shared recognizer is
+      contracts/ContractInfo). Relational requires
+      (`p != null || n <= 0`) seeds a split initial state via fact
+      keys and honors literal escape arguments at call sites.
+      Residual (noted in CONTRACTS.md §7): non-literal escape
+      arguments stay conservative (silent); caller-side state for the
+      escape param could refine that in a later round.
 - [ ] Round D: guarded ensures (`if n != 0`) per-disjunct return
       checking; ownership effects vs param-effect summaries
       (`owns/borrows/returns owned`); violation traces (which return,

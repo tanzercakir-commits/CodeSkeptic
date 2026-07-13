@@ -1,12 +1,12 @@
 #include "rules/ContractRule.h"
 
+#include "contracts/ContractInfo.h"
 #include "contracts/ContractParser.h"
 #include "core/Messages.h"
 #include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
-#include <clang/AST/RawCommentList.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 #include <clang/Basic/SourceManager.h>
@@ -105,19 +105,12 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
         const auto* func = match.getNodeAs<FunctionDecl>("func");
         if (!func || !func->hasBody()) continue;
 
-        const RawComment* comment = ctx.getRawCommentForDeclNoCache(func);
-        if (!comment) continue;
-
-        const std::string text = comment->getRawText(sm).str();
-        if (text.find("zd:") == std::string::npos) continue;
-
-        ParsedContracts parsed = parseContractComment(text);
+        unsigned commentLine = 0;
+        std::string file;
+        ParsedContracts parsed = contractsForDecl(func, ctx, &commentLine,
+                                                  &file);
         if (parsed.empty()) continue;
 
-        const unsigned commentLine =
-            sm.getSpellingLineNumber(comment->getBeginLoc());
-        const std::string file =
-            sm.getFilename(sm.getExpansionLoc(comment->getBeginLoc())).str();
         const std::string funcName = func->getQualifiedNameAsString();
 
         auto makeDiag = [&](unsigned lineInBlock, const std::string& ruleId,
@@ -140,10 +133,26 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
 
         if (parsed.clauses.empty()) continue;
 
+        // Round C: requires clauses the dataflow rules enforce
+        // (NullDeref: non-null, DivByZero: non-zero). Those clauses are
+        // NOT unverified — callee seeding + caller-side checks cover
+        // them — so they are skipped below. A requires clause naming a
+        // parameter the function does not have can never bind: that is
+        // a contract error, not a later-round feature.
+        const RequiresAnalysis req = analyzeRequires(parsed, func);
+        for (const auto& unknown : req.unknownParams)
+            makeDiag(unknown.line, "contract-syntax", Severity::Error,
+                     MsgId::ContractSyntaxError, unknown.text);
+
         const SummaryRegistry::FunctionSummary* summary =
             SummaryRegistry::instance().lookup(func);
 
         for (const auto& clause : parsed.clauses) {
+            if (req.enforcedLines.count(clause.line)) continue;
+            bool isUnknownParam = false;
+            for (const auto& unknown : req.unknownParams)
+                if (unknown.line == clause.line) isUnknownParam = true;
+            if (isUnknownParam) continue;
             switch (classifyAndCheck(clause, summary)) {
                 case ClauseStatus::Satisfied:
                     break;

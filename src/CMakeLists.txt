@@ -24,6 +24,7 @@ add_library(zerodefect_core STATIC
     rules/NullDerefRule.cpp
     rules/ContractRule.cpp
     contracts/ContractParser.cpp
+    contracts/ContractInfo.cpp
 )
 
 add_executable(zerodefect main.cpp)
