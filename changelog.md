@@ -1,5 +1,23 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Pre-release sweep: --files papercut + todo truth pass
+
+### Fixed
+- **--files papercut**: a missing list file is now its own error
+  ("--files list not found: <path>", exit 1) instead of silently
+  leaving the set empty and surfacing as the generic usage message
+  (the systemd 20-minute scan-diff hunt, immortalized).
+
+### Changed
+- todo.md truth pass before going public: shipped items checked off
+  with what/when (README benchmark section, correlated-guards v2b,
+  both report-flood dedup entries), the 2026-07-10 session plan
+  archived, libgit2 triage numbers refreshed to the current 44, the
+  rtp2httpd draft annotated with the Thursday filing plan.
+
+### Verification
+- 390/390 tests both modes; corpus pins exact; Juliet floors green.
+
 ## 2026-07-13 — Summary-diff gate flag + README truth fixes
 
 ### Added
