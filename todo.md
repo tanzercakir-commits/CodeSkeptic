@@ -173,8 +173,16 @@ Juliet's CI weight, project name check.
       with --fatal-asserts SwAssert. README row updated 2026-07-13
       (10 -> 0, flag documented).
 - [ ] fstab-util.c:261 (+1 from the unsigned round): flag/pointer
-      correlation lost — single-file bisect to find which removed key
-      (u<0 / u>=0) was doing the pruning; direction conservative.
+      correlation lost — direction conservative. Diagnosis narrowed
+      (2026-07-13, single-file rerun still exactly 1 warning): the
+      shape is `found`-flag / `x`-pointer correlation through
+      STRV_FOREACH/NULSTR_FOREACH; the function body has NO direct
+      unsigned-vs-0 comparison, so the lost key lives in a macro
+      expansion or in the `u > 0 -> NE` rewrite weakening a stamped
+      fact (EQ-false answers less than LE-false: it loses the
+      sign half). Full root-cause needs a conditionFact debug-print
+      build over this file — engine-v2 queue, not worth it for one
+      conservative warning now.
 - [x] **Redis null round 2 — CLASSIFIED, no engine change
       (2026-07-13)**: fresh scan on the contracts-complete build is
       byte-stable (80 findings, 66 null warnings; contracts added
