@@ -57,5 +57,11 @@ jobs:
           ./build/src/zerodefect /tmp/smoke.cpp || code=$?
           test "$code" -eq 1
 
+      - name: Self-scan (dogfood gate)
+        # The analyzer analyzes its own sources — with the founding
+        # policy active. Any finding (or a hard-coded absolute path)
+        # fails CI: exit 0 means clean.
+        run: ./build/src/zerodefect src/ --build-path build --policy no-absolute-paths
+
       - name: Real-world corpus (cJSON + tinyxml2)
         run: bash scripts/run_corpus.sh ./build/src/zerodefect /tmp/corpus
