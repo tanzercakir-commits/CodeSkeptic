@@ -1,5 +1,18 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Self-scan dogfood gate in CI
+
+### Added
+- **CI self-scan step**: the analyzer analyzes its own 30 source
+  files on every PR, with `--policy no-absolute-paths` active (the
+  founding policy applied to ourselves). Exit 0 required — any
+  finding, including a hard-coded absolute path, fails CI. First
+  run: clean (0 findings, 0 fatal errors). Known residue: 2 unique
+  template functions in the guarded-disjunct machinery emit
+  non-convergence warnings across instantiations — the same
+  template-instantiation shape as llama's nlohmann residue (stderr
+  only, FN direction, engine-v2 queue).
+
 ## 2026-07-13 — Pre-release sweep: --files papercut + todo truth pass
 
 ### Fixed
