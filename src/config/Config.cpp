@@ -113,7 +113,17 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--files" && i + 1 < argc) {
             // List file: one source file path per line.
             // For large/hand-picked sets (benchmarks, agent batch requests).
-            std::ifstream listFile(argv[++i]);
+            const char* listPath = argv[++i];
+            std::ifstream listFile(listPath);
+            // A missing LIST file must say so — silently leaving the
+            // set empty surfaced as the generic "no source path"
+            // usage message and cost a 20-minute scan-diff hunt
+            // (2026-07-12).
+            if (!listFile) {
+                std::cerr << "[ZeroDefect] --files list not found: "
+                          << listPath << "\n";
+                return false;
+            }
             std::string fileLine;
             while (std::getline(listFile, fileLine)) {
                 if (!fileLine.empty()) source_files_.push_back(fileLine);

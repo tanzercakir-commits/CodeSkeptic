@@ -1,6 +1,6 @@
 # ZeroDefect — To-Dos and Notes
 
-## 📅 Tomorrow's plan (prepared for the 2026-07-10 session)
+## 📅 2026-07-10 session plan (ARCHIVED — all four items shipped that week)
 
 Suggested order — each item is an independent PR round:
 
@@ -52,8 +52,8 @@ Juliet's CI weight, project name check.
       2026-07-10 changelog entry. Bonus: a global filter leak was found
       in the single-process run and fixed (~StaticAnalyzer RAII;
       single-process test step added to CI).
-- [ ] Representative numbers (from this PR's Juliet CI run) to be added
-      to the README as a benchmark section
+- [x] Representative numbers added to the README as a benchmark
+      section (2026-07-12 round, with the real-world scan table)
 - [ ] Examine the CWE415/416 good-function FPs (real size becomes clear
       after mapped precision); interprocedural source/sink flow for the
       CWE401 file hit rate (known v1 limit)
@@ -158,16 +158,15 @@ Juliet's CI weight, project name check.
 - [ ] **rtp2httpd TP for upstream** (verified 2026-07-12):
       configuration.c:1342-1358 — `if (arg && arg[0] == '/')` admits
       arg may be NULL; the next block dereferences `arg[0]`
-      unconditionally. Draft ready (rtp2httpd_upstream_report.md).
+      unconditionally. Draft ready (rtp2httpd_upstream_report.md);
+      user files it Thursday together with libgit2 + Redis.
 - [x] **--files UX hardening — done (2026-07-12)**: non-absolute
       entries retried against --build-path; zero analyzable files is
       exit 2, not a clean pass.
-- [ ] **--files papercut (2026-07-12)**: `--files <nonexistent-path>`
-      silently leaves the list empty and the error surfaces as the
-      generic "no source path given" usage message — it should say the
-      LIST file was not found. (Cost 20 minutes of scan-diff confusion:
-      the fallback positional-dir invocation scanned the whole 2372-file
-      compile DB instead of the intended 493.)
+- [x] **--files papercut — fixed (2026-07-13)**: a missing list file
+      is now its own error ("--files list not found: <path>", exit 1)
+      instead of the generic usage message. (Had cost 20 minutes of
+      scan-diff confusion on systemd.)
 - [x] fprime residual — SOLVED (2026-07-12 night): unsigned
       zero-identity canonicalization (u<=0 IS u==0); fprime is CLEAN
       with --fatal-asserts SwAssert. README row updated 2026-07-13
@@ -251,15 +250,12 @@ Juliet's CI weight, project name check.
       calls to registered names (empty by default — per-project
       opt-in). shadPS4's ~170-finding ASSERT flood collapses with
       `--fatal-asserts assert_fail_impl`. 7 FatalCallsTest pins.
-- [ ] **Correlated guards across variables — guarded disjuncts v2**
-      (NASA fprime lesson, 2026-07-12): `FW_ASSERT(ptr != nullptr ||
-      count == 0)` establishes ptr↔count correlation; later derefs sit
-      inside `if (count > 0)`. Same shape with status codes:
-      allocations checked via `status == OP_OK`. Our disjuncts key on
-      single-variable conditions; correlating facts BETWEEN variables
-      is the v2 design (fprime's remaining 7 findings are all this
-      family). Candidate: disjunct guards keyed on the assert/branch
-      condition with multi-variable refinement per disjunct.
+- [x] **Correlated guards across variables — SHIPPED as disjuncts
+      v2b + unsigned identities + relational requires (2026-07-12/13)**:
+      the `FW_ASSERT(ptr != nullptr || count == 0)` family died —
+      fprime is 0 findings with --fatal-asserts SwAssert; the same
+      correlation is now also DECLARABLE as a contract
+      (`requires p != null || n <= 0`, Round C).
       ALSO needed: canonical keys for CALL conditions
       (staticReturnsTrue()/False() — the Juliet realloc-family FPs,
       ~24 findings, measured 2026-07-12): PathFacts only keys
@@ -280,24 +276,23 @@ Juliet's CI weight, project name check.
       Single class-issue drafted (libgit2_upstream_report.md, sent to
       user) — one issue for the pattern, 8 permalinked sites, per
       libgit2 convention. User files it.
-- [ ] **Report-flood dedup (moved to its own round)**: one report per
+- [x] **Report-flood dedup — shipped (2026-07-12)**: one report per
       (variable, function) for warning-severity null-derefs; later
-      sites become trace notes on the first finding (libc 25x,
-      fprime 5x floods).
-- [ ] libgit2 remaining ~101 null-deref triage (after the
-      assignment-in-condition + rewind fixes; was 149): sample clusters
-      suggest hashmap macro-generated code (GIT_HASHMAP_OID_SETUP
-      expansions attribute findings to the macro line) and
-      GIT_ERROR_CHECK_ALLOC interplay — next libgit2 round.
+      sites attach as "also dereferenced here" trace notes.
+- [ ] libgit2 remaining null-deref triage — numbers refreshed
+      2026-07-13: current total is 44 findings (was 149 initially);
+      the 11 confirmed OOM-path leaks are drafted for upstream. The
+      remaining null warnings cluster around hashmap macro-generated
+      code (GIT_HASHMAP_OID_SETUP) and GIT_ERROR_CHECK_ALLOC
+      interplay — post-public round, likely the same macro-behavior
+      family as redis quicklist.
 - [x] Address-of-member escape — done (2026-07-12, with the
       configurable-allocators round): AddrOf of member/self escapes
       the base at assignment/call/return sites; fprime font.cpp FP
       and the libgit2 iterator family both die.
-- [ ] **Report-flood dedup**: one root cause should not produce 25
-      reports (shadPS4 internal__Foprep: a single missing return -> 25
-      warnings on the same variable). Candidate: report only the FIRST
-      deref per (variable, fact-origin) pair; later derefs become trace
-      notes on the first finding.
+- [x] **Report-flood dedup** (duplicate of the entry above — same
+      mechanism shipped 2026-07-12; shadPS4 internal__Foprep's 25x
+      flood collapses to 1 finding + trace notes).
 - [x] **shadPS4 true positives REPORTED UPSTREAM (2026-07-12)** — the
       analyzer's first public real-world validation: (1) savedata.cpp
       sceSaveDataMount/Mount2 `&&`-vs-`||` null-check →
