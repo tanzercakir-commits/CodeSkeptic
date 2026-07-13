@@ -86,6 +86,11 @@ public:
         return free_functions_;
     }
 
+    // Project-wide policies (CONTRACTS.md Round E): `policy = <name>`
+    // in .zerodefect.conf or --policy on the CLI; file-scoped
+    // activation stays in `// zd:policy` comments.
+    const std::set<std::string>& policies() const { return policies_; }
+
 private:
     Severity parseSeverity(const std::string& str) const;
     void addNamesTo(std::set<std::string>& target, const std::string& list);
@@ -104,6 +109,7 @@ private:
     std::set<std::string> fatal_asserts_;
     std::set<std::string> alloc_functions_;
     std::set<std::string> free_functions_;
+    std::set<std::string> policies_;
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;

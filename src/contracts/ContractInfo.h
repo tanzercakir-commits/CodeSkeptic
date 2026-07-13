@@ -33,6 +33,14 @@ ParsedContracts contractsForDecl(const clang::FunctionDecl* func,
                                  unsigned* commentLine = nullptr,
                                  std::string* commentFile = nullptr);
 
+// Inline comment clauses MERGED with the declaring file's .zdc
+// sidecar clauses (Round E): what the ENFORCING rules consume —
+// seeding and call-site checks must not care where a contract was
+// written. ContractRule keeps the two sources separate for reporting
+// (their line numbers map to different files).
+ParsedContracts allContractClausesForDecl(const clang::FunctionDecl* func,
+                                          clang::ASTContext& ctx);
+
 // One enforced `requires` clause.
 struct RequiresInfo {
     enum class Kind {

@@ -44,6 +44,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
+        else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -84,6 +85,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addNamesTo(alloc_functions_, argv[++i]);
         } else if (arg == "--free-functions" && i + 1 < argc) {
             addNamesTo(free_functions_, argv[++i]);
+        } else if (arg == "--policy" && i + 1 < argc) {
+            addNamesTo(policies_, argv[++i]);
         } else if (arg == "--lines" && i + 1 < argc) {
             addLines(argv[++i]);
         } else if (arg == "--serve") {

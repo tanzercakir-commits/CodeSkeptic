@@ -1,5 +1,7 @@
 #include "contracts/ContractInfo.h"
 
+#include "contracts/Sidecar.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
@@ -33,6 +35,17 @@ ParsedContracts contractsForDecl(const FunctionDecl* func, ASTContext& ctx,
         *commentFile =
             sm.getFilename(sm.getExpansionLoc(comment->getBeginLoc())).str();
     return parseContractComment(text);
+}
+
+ParsedContracts allContractClausesForDecl(const FunctionDecl* func,
+                                          ASTContext& ctx) {
+    ParsedContracts merged = contractsForDecl(func, ctx);
+    ParsedContracts sidecar = sidecarContractsForDecl(func, ctx);
+    for (auto& clause : sidecar.clauses)
+        merged.clauses.push_back(std::move(clause));
+    // Sidecar syntax errors are ContractRule's to report (with the
+    // .zdc file attached) — enforcement only reads clauses.
+    return merged;
 }
 
 namespace {

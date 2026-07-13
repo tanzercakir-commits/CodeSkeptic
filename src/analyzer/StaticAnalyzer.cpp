@@ -4,6 +4,8 @@
 #include "analyzer/SuppressionFilter.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "contracts/Policy.h"
+#include "contracts/Sidecar.h"
 #include "engine/AllocFunctions.h"
 #include "engine/CfgCache.h"
 #include "engine/FatalCalls.h"
@@ -27,6 +29,11 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setFatalCallNames(config_.fatalAsserts());
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
+    setProfilePolicies(config_.policies());
+    // Sidecar contracts are cached per file path for the process
+    // lifetime; a new analyzer run re-reads them (the MCP server
+    // lives long — an edited .zdc must be seen).
+    clearSidecarCache();
 
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);

@@ -1,10 +1,15 @@
 #include "TestHelper.h"
 #include "contracts/ContractParser.h"
+#include "contracts/Policy.h"
+#include "contracts/Sidecar.h"
 #include "rules/ContractRule.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/NullDerefRule.h"
+#include "rules/PolicyRule.h"
 
 #include <gtest/gtest.h>
+
+#include <fstream>
 
 using namespace zerodefect;
 using namespace zerodefect::testing;
@@ -593,4 +598,193 @@ TEST(ContractRoundDTest, CallSiteViolation_HasTrace) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "contract");
     EXPECT_FALSE(results[0].notes.empty());
+}
+
+// --- Round E: policies + sidecar files ---
+// Policies are AST-level pattern prohibitions under the shared zd:
+// surface; v1 ships no-absolute-paths (the founding Ruledsl release
+// incident). Sidecars (.zdc) carry contracts for code you cannot
+// annotate — every entry explicitly anchored to a function name.
+
+TEST(PolicyTest, AbsolutePathHeuristic) {
+    EXPECT_TRUE(looksLikeAbsolutePath("/etc/app.conf"));
+    EXPECT_TRUE(looksLikeAbsolutePath("/home/user/rules.dsl"));
+    EXPECT_TRUE(looksLikeAbsolutePath("C:\\Users\\x\\cfg.ini"));
+    EXPECT_FALSE(looksLikeAbsolutePath("/"));
+    EXPECT_FALSE(looksLikeAbsolutePath("/tmp"));           // one segment
+    EXPECT_FALSE(looksLikeAbsolutePath("config/app.conf")); // relative
+    EXPECT_FALSE(looksLikeAbsolutePath("either / or that"));
+    EXPECT_FALSE(looksLikeAbsolutePath("http://x/y"));
+}
+
+TEST(PolicyRuleTest, FileComment_CatchesAbsolutePath) {
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        // zd:policy no-absolute-paths
+        const char *config_path() { return "/etc/app/config.ini"; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "policy");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("/etc/app/config.ini"),
+              std::string::npos);
+}
+
+TEST(PolicyRuleTest, NoPolicy_NoNoise) {
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        const char *config_path() { return "/etc/app/config.ini"; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(PolicyRuleTest, PathLikeButNotAbsolute_Silent) {
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        // zd:policy no-absolute-paths
+        const char *a() { return "config/app.ini"; }
+        const char *b() { return "/"; }
+        const char *c() { return "use / to divide"; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(PolicyRuleTest, UnknownPolicyName_IsContractSyntax) {
+    // A policy that silently fails to activate would be a false
+    // comfort — unknown names are errors.
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        // zd:policy no-such-policy
+        int f() { return 0; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract-syntax");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(PolicyRuleTest, ProfilePolicy_ActsProjectWide) {
+    setProfilePolicies({"no-absolute-paths"});
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        const char *config_path() { return "/etc/app/config.ini"; }
+    )");
+    setProfilePolicies({});
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "policy");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(PolicyRuleTest, MachineProposedActivation_IsWarning) {
+    PolicyRule rule;
+    auto results = runRule(rule, R"(
+        // zd:ai policy no-absolute-paths
+        const char *config_path() { return "/etc/app/config.ini"; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(SidecarTest, ParseText_EntriesAndIssues) {
+    std::vector<SidecarEntry> entries;
+    std::vector<ContractSyntaxIssue> issues;
+    parseSidecarText(
+        "# comment line\n"
+        "\n"
+        "find_config: ensures return != null\n"
+        "push_back/2: borrows(item)\n"
+        "a prose line without anchor\n",
+        entries, issues);
+    ASSERT_EQ(entries.size(), 2u);
+    EXPECT_EQ(entries[0].anchor, "find_config");
+    EXPECT_EQ(entries[0].line, 3u);
+    EXPECT_EQ(entries[1].anchor, "push_back/2");
+    ASSERT_EQ(issues.size(), 1u);
+    EXPECT_EQ(issues[0].line, 5u);
+}
+
+namespace {
+// Writes a sidecar next to the virtual source name and returns the
+// pair of paths. Unique names per test — the suite also runs as
+// parallel ctest processes.
+std::string writeSidecar(const std::string& srcName,
+                         const std::string& content) {
+    const std::string src = ::testing::TempDir() + srcName;
+    std::ofstream(src + ".zdc") << content;
+    return src;
+}
+} // namespace
+
+TEST(SidecarTest, RequiresFromSidecar_CallSiteViolation) {
+    NullDerefRule rule;
+    const std::string src = writeSidecar(
+        "zd_sc_req.cc", "f: requires p != null\n");
+    auto results = runRule(rule, R"(
+        int f(int *p);
+        int g() { return f(nullptr); }
+    )", src);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtZdcFile) {
+    ContractRule rule;
+    const std::string src = writeSidecar(
+        "zd_sc_ens.cc", "find: ensures return != null\n");
+    auto results = runRule(rule, R"(
+        int *find(int c) {
+            if (c) return nullptr;
+            static int g;
+            return &g;
+        }
+    )", src);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].file.find(".zdc"), std::string::npos);
+    EXPECT_EQ(results[0].line, 1u);
+}
+
+TEST(SidecarTest, ArityAnchor_Binds) {
+    NullDerefRule rule;
+    const std::string src = writeSidecar(
+        "zd_sc_arity.cc", "f/2: requires p != null\n");
+    auto results = runRule(rule, R"(
+        int f(int *p, int n);
+        int g() { return f(nullptr, 3); }
+    )", src);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+}
+
+TEST(SidecarTest, MalformedLines_AreContractSyntaxErrors) {
+    ContractRule rule;
+    const std::string src = writeSidecar(
+        "zd_sc_bad.cc",
+        "prose without an anchor\n"
+        "find: ensure return != null\n");  // typo'd clause
+    auto results = runRule(rule, R"(
+        int *find(int c) {
+            if (c) return nullptr;
+            static int g;
+            return &g;
+        }
+    )", src);
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].rule_id, "contract-syntax");
+    EXPECT_EQ(results[1].rule_id, "contract-syntax");
+    for (const auto& r : results)
+        EXPECT_NE(r.file.find(".zdc"), std::string::npos);
+}
+
+TEST(SidecarTest, NoSidecarFile_NoEffect) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        int *find(int c) {
+            if (c) return nullptr;
+            static int g;
+            return &g;
+        }
+    )", ::testing::TempDir() + "zd_sc_none.cc");
+    EXPECT_EQ(results.size(), 0u);
 }
