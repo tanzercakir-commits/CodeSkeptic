@@ -1,5 +1,20 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — First upstream finding MERGED (shadPS4 #4702)
+
+The `internal__Foprep` null-dereference we reported to shadPS4
+(issue #4698) was fixed and merged upstream (PR #4702): the function
+set `ENOMEM` on file-table exhaustion but fell through without a
+`return`, dereferencing the null `FILE*` — exactly the shape the
+dataflow trace described. The maintainers added the missing
+`return nullptr;`. Recorded as a proof point:
+- README real-world table: shadPS4 row now reads "3 reported
+  upstream — 1 merged (#4702)", plus a "Confirmed in the wild"
+  callout under the table.
+- RELEASE_NOTES.md: a "Confirmed in the wild" section.
+- Both v0.1.0 release-note drafts (contracts-headline / -preview)
+  carry the same proof point.
+
 ## 2026-07-13 — Self-scan dogfood gate in CI
 
 ### Added

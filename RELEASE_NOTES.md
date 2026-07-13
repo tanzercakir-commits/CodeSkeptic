@@ -49,6 +49,18 @@ the README's Benchmark section).
   invalidate them), suppression comments, severity filtering, English
   or Turkish diagnostics (`--lang tr`).
 
+## Confirmed in the wild
+
+The analyzer has already found a real bug that the upstream maintainers
+fixed: shadPS4's `internal__Foprep` set `ENOMEM` on file-table
+exhaustion but fell through without a `return`, dereferencing the null
+`FILE*` on the next line. The one-line fix — a `return nullptr;` after
+the error is set — was merged
+([shadps4-emu/shadPS4#4702](https://github.com/shadps4-emu/shadPS4/pull/4702)).
+Two more findings from the same scan are reported upstream. See the
+README's Real-world scans section for the full table (systemd, Redis,
+libgit2, llama.cpp, NASA fprime, abseil, Catch2).
+
 ## Quality gates behind this release
 
 - 228 unit/integration tests, run both under ctest isolation and as a
