@@ -300,8 +300,12 @@ Juliet's CI weight, project name check.
       by-value nullptr desc (memcpy into null) →
       shadps4-emu/shadPS4#4697; (3) libc_internal_io.cpp
       internal__Foprep missing return after ENOMEM →
-      shadps4-emu/shadPS4#4698. If maintainers answer "PR welcome",
-      the three fix diffs are ready to draft (one-to-three-liners).
+      shadps4-emu/shadPS4#4698. **MERGED 2026-07-13**: #4698 fixed and
+      closed via PR #4702 (`return nullptr;` after the ENOMEM set,
+      exactly the trace's shape); maintainer "it appears ok", 11
+      checks passed. First sahada-onaylanmış bulgu — captured in the
+      README, RELEASE_NOTES, and both v0.1.0 drafts. #4696/#4697 still
+      open.
 - ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
   fine-grained CFG splits a multi-declaration per variable, the second
   pointer is tracked too (pinned with regression tests, 2026-07-10).

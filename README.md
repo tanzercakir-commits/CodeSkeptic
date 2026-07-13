@@ -147,13 +147,24 @@ exposed were fixed.
 | Project | Scope | Initial → now | Hand-verified real bugs |
 |---------|-------|--------------:|------------------------|
 | [systemd](https://github.com/systemd/systemd) | 494 files (basic/core/shared) | 414 → **53** | 3 deliberate leak-shaped idioms, documented |
-| [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 confirmed, reported upstream** |
+| [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 reported upstream — 1 [merged](https://github.com/shadps4-emu/shadPS4/pull/4702)** |
 | [libgit2](https://github.com/libgit2/libgit2) | 168 files | 149 → **44** | **11 confirmed OOM-path leaks** (one issue class, report drafted) |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | full build | 511 → **25** | triage in progress |
 | [rtp2httpd](https://github.com/stackia/rtp2httpd) | 27k lines | 4 → **3** | **1 confirmed NULL-contract bug**, report drafted |
 | [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **0** | clean (with `--fatal-asserts SwAssert` declaring F´'s assert handler) |
 | [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
+
+**Confirmed in the wild.** The first of these findings has been fixed
+upstream: shadPS4's `internal__Foprep` set `ENOMEM` on file-table
+exhaustion but fell through without a `return`, dereferencing the null
+`FILE*` on the next line — exactly what the analyzer's dataflow trace
+pointed at. The maintainers merged the one-line fix
+([shadps4-emu/shadPS4#4702](https://github.com/shadps4-emu/shadPS4/pull/4702),
+closing [#4698](https://github.com/shadps4-emu/shadPS4/issues/4698)):
+a `return nullptr;` after the error is set. A real bug, in a real
+project, found from a compilation database and accepted by the people
+who own the code.
 
 Two things make these numbers move:
 
