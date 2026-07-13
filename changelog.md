@@ -1,5 +1,54 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Contracts Round C: requires — assume/guarantee
+
+### Added
+- **Shared requires recognizer** (`contracts/ContractInfo`):
+  `contractsForDecl` (works on bodyless declarations too — that is
+  how callers see out-of-TU callees) + `analyzeRequires` classifying
+  the enforced forms: `requires p != null`, `requires n != 0`, and
+  the relational `requires p != null || <n REL lit>`. One recognizer,
+  consumed by both dataflow rules and ContractRule — "which clauses
+  are enforced" cannot drift.
+- **Callee-side seeding**: NullDeref seeds a declared non-null
+  parameter NonNull at entry (the contract carries the proof burden);
+  the relational form seeds a SPLIT initial state via fact keys —
+  escape disjunct leaves p free, the other pins it NonNull, so
+  `if (n > 0) *p;` is provably safe under
+  `requires p != null || n <= 0`. DivByZero seeds declared non-zero
+  parameters NonZero.
+- **Caller-side checks at every visible call site**: a NULL-literal
+  or definitely-null argument into `requires p != null` is an ERROR
+  (warning for `zd:ai`); possibly-null is a warning; a guarded
+  argument is silent. Same in the zero domain: literal `0` or a
+  zero-state variable into `requires n != 0` (DivByZero tracks
+  variables passed at contract positions even when they are never
+  divisors, and a caller with no pointer variables of its own still
+  gets the pass — `g() { f(NULL); }` is exactly the target shape).
+  Relational escapes honor integer-literal condition arguments
+  (`f(NULL, 0)` under `|| n <= 0` is satisfied); non-literal escapes
+  stay conservative (silent).
+- **ContractRule now delegates**: enforced requires clauses are no
+  longer reported as unverified; a requires clause naming a
+  parameter the function does not have is a `contract-syntax` error
+  (it can never bind — that is a contract bug, not a later round).
+- `compareFact` exported from PathFacts: the contract layer builds
+  canonical fact keys without an Expr in hand (same unsigned
+  zero-identities as conditions).
+
+### Verification
+- 363/363 tests in both modes (+15 Round C: seeding silences the
+  callee deref, error/warning/zd:ai severity split at call sites,
+  guarded-caller silence, relational escape satisfied/violated/
+  callee-split, zero-domain literal + tracked-var + maybe + guarded,
+  unknown-param contract-syntax, enforced-not-unverified).
+- Juliet floors and corpus pins green (contracts add checks only
+  where `zd:` comments exist; the referees confirm zero drift).
+- Dogfood: `load_config(NULL)` under `requires path != null` → error
+  at the call line; a maybe-null argument → warning; `average(100,
+  count)` with a zero counter under `requires n != 0` → error; the
+  contracted callee's own `*s` stays silent.
+
 ## 2026-07-13 — Contracts v1 Round B: the intent layer opens
 
 ### Added

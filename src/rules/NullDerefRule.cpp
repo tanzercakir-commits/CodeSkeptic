@@ -7,6 +7,7 @@
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
+#include "contracts/ContractInfo.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -190,6 +191,29 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     return {vars.begin(), vars.end()};
 }
 
+// Whether any call in the body targets a callee with an enforced
+// non-null requires clause (CONTRACTS.md Round C). A function with no
+// pointer variables of its own still needs the dataflow pass then —
+// `g() { f(NULL); }` is exactly the call-site violation the contract
+// exists to catch.
+bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
+    auto callMatcher = callExpr().bind("call");
+    for (const auto& result :
+         match(findAll(callMatcher), *funcDecl->getBody(), ctx)) {
+        const auto* call = result.getNodeAs<CallExpr>("call");
+        if (!call) continue;
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (!callee) continue;
+        auto parsed = zerodefect::contractsForDecl(callee, ctx);
+        if (parsed.clauses.empty()) continue;
+        auto req = zerodefect::analyzeRequires(parsed, callee);
+        for (const auto& info : req.enforced)
+            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+                return true;
+    }
+    return false;
+}
+
 // --- Analysis struct for DataflowEngine ---
 
 class NullDerefAnalysis {
@@ -219,6 +243,57 @@ public:
     }
 
     State initialState() const { return initState_; }
+
+    // Callee-side contract seeding (CONTRACTS.md Round C): a declared
+    // `requires p != null` carries the proof burden — p starts NonNull
+    // inside the body (callers are checked at every visible call
+    // site). The relational form seeds a SPLIT initial state: the
+    // escape-condition disjunct leaves p unconstrained, the other
+    // pins it NonNull.
+    void seedRequires(const FunctionDecl* func,
+                      const std::vector<zerodefect::RequiresInfo>& infos) {
+        for (const auto& info : infos) {
+            if (info.paramIndex >= func->getNumParams()) continue;
+            const ParmVarDecl* p = func->getParamDecl(info.paramIndex);
+            if (info.kind == zerodefect::RequiresInfo::Kind::NonNullParam) {
+                for (auto& d : initState_) setIfTracked(d.vars, p,
+                                                        NullState::NonNull);
+            } else if (info.kind ==
+                       zerodefect::RequiresInfo::Kind::NonNullUnlessCond) {
+                if (info.condParamIndex >= func->getNumParams()) continue;
+                const ParmVarDecl* c =
+                    func->getParamDecl(info.condParamIndex);
+                if (mutated_.count(c)) continue;  // unkeyable: no seed
+                auto fact = zerodefect::compareFact(
+                    c, toBinOp(info.condOp), info.condLiteral);
+                if (!fact) continue;
+                State next;
+                for (auto& d : initState_) {
+                    auto escape = d;             // cond TRUE: p free
+                    escape.facts[fact->first] = fact->second;
+                    auto pinned = d;             // cond FALSE: p NonNull
+                    pinned.facts[fact->first] = !fact->second;
+                    setIfTracked(pinned.vars, p, NullState::NonNull);
+                    next.push_back(std::move(escape));
+                    next.push_back(std::move(pinned));
+                }
+                initState_ = std::move(next);
+                zerodefect::normalizeGuarded(initState_, mergeNullStates);
+            }
+        }
+    }
+
+    static clang::BinaryOperatorKind toBinOp(zerodefect::ContractCmpOp op) {
+        switch (op) {
+            case zerodefect::ContractCmpOp::EQ: return BO_EQ;
+            case zerodefect::ContractCmpOp::NE: return BO_NE;
+            case zerodefect::ContractCmpOp::LT: return BO_LT;
+            case zerodefect::ContractCmpOp::LE: return BO_LE;
+            case zerodefect::ContractCmpOp::GT: return BO_GT;
+            case zerodefect::ContractCmpOp::GE: return BO_GE;
+        }
+        return BO_EQ;
+    }
 
     // The per-variable NullState chain makes at most 3 transitions;
     // the number of disjuncts multiplies the height
@@ -323,6 +398,76 @@ public:
                bool leafTrue) { applyCondition(leaf, leafTrue, d.vars); });
     }
 
+    // Caller-side contract check (CONTRACTS.md Round C): every
+    // visible call into a function with a declared `requires` on a
+    // pointer parameter is checked against the caller's own nullness
+    // state. Null literal / definitely-null argument -> error
+    // (warning for zd:ai); possibly-null -> warning. The relational
+    // escape is honored when the condition argument is an integer
+    // literal; a non-literal escape stays conservative (silent).
+    void checkCallContracts(const CallExpr* call, const State& before,
+                            ASTContext& ctx) {
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (!callee) return;
+        auto parsed = zerodefect::contractsForDecl(callee, ctx);
+        if (parsed.clauses.empty()) return;
+        auto req = zerodefect::analyzeRequires(parsed, callee);
+        if (req.enforced.empty()) return;
+
+        NullVarState flat =
+            zerodefect::flattenGuarded(before, mergeNullStates);
+
+        for (const auto& info : req.enforced) {
+            if (info.kind == zerodefect::RequiresInfo::Kind::NonZeroParam)
+                continue;  // DivByZero owns the zero domain
+            if (info.paramIndex >= call->getNumArgs()) continue;
+            const Expr* arg = call->getArg(info.paramIndex);
+
+            if (info.kind ==
+                zerodefect::RequiresInfo::Kind::NonNullUnlessCond) {
+                if (info.condParamIndex >= call->getNumArgs()) continue;
+                auto lit = zerodefect::intLiteralArg(
+                    call->getArg(info.condParamIndex));
+                if (!lit) continue;  // non-literal escape: conservative
+                if (zerodefect::evalCmp(*lit, info.condOp,
+                                        info.condLiteral))
+                    continue;  // escape holds, contract satisfied
+            }
+
+            bool definite = false;
+            bool maybe = false;
+            if (zerodefect::isNullPointerArg(arg)) {
+                definite = true;
+            } else if (const VarDecl* var = asVar(arg)) {
+                auto it = flat.find(var);
+                if (it != flat.end()) {
+                    definite = (it->second == NullState::Null);
+                    maybe = (it->second == NullState::MaybeNull);
+                }
+            }
+            if (!definite && !maybe) continue;
+
+            const SourceManager& sm = ctx.getSourceManager();
+            SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+            const unsigned line = sm.getSpellingLineNumber(loc);
+            if (!reportedContracts_.emplace(line, info.text).second)
+                continue;
+
+            zerodefect::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "contract";
+            diag.severity = (definite && !info.machineProposed)
+                                ? zerodefect::Severity::Error
+                                : zerodefect::Severity::Warning;
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::ContractViolated, info.text);
+            diag.function = funcName_;
+            results_.push_back(std::move(diag));
+        }
+    }
+
     // Guard trace (Trace v2): during the reporting pass, if the edge
     // refinement made a variable DEFINITELY null, a trace note is added
     // at the condition point — the "why null" question for the
@@ -346,6 +491,9 @@ public:
 
     void onStatement(const Stmt* stmt, const State& beforeDisjuncts,
                      const State& afterDisjuncts, ASTContext& ctx) {
+        if (const auto* call = dyn_cast<CallExpr>(stmt))
+            checkCallContracts(call, beforeDisjuncts, ctx);
+
         NullVarState before =
             zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
         NullVarState after =
@@ -478,6 +626,7 @@ private:
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
     std::map<const VarDecl*, size_t> firstWarnIndex_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> alsoDerefs_;
+    std::set<std::pair<unsigned, std::string>> reportedContracts_;
 };
 
 // --- Matcher callback ---
@@ -497,13 +646,23 @@ public:
         if (!zerodefect::lineFilterAllows(*func, sm)) return;
 
         auto trackedVars = collectTrackedVars(func, *result.Context);
-        if (trackedVars.empty()) return;
+        if (trackedVars.empty() &&
+            !hasNonNullContractCalls(func, *result.Context))
+            return;
 
         NullDerefAnalysis analysis(
             trackedVars, zerodefect::collectUnkeyableDecls(func),
             zerodefect::collectFactDecls(func),
             zerodefect::collectPtrFactDecls(func),
             func->getQualifiedNameAsString(), results_);
+        {
+            auto parsed = zerodefect::contractsForDecl(func, *result.Context);
+            if (!parsed.clauses.empty()) {
+                auto req = zerodefect::analyzeRequires(parsed, func);
+                if (!req.enforced.empty())
+                    analysis.seedRequires(func, req.enforced);
+            }
+        }
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
             std::cerr << zerodefect::msg(

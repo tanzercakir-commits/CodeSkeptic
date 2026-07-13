@@ -1,5 +1,6 @@
 #include "rules/DivByZeroRule.h"
 
+#include "contracts/ContractInfo.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "engine/CallRefArgs.h"
@@ -105,6 +106,39 @@ std::set<const VarDecl*> collectDivisorVars(const FunctionDecl* funcDecl,
             vars.insert(var);
     }
     return vars;
+}
+
+// Variables passed at `requires n != 0` positions of contracted callees
+// (CONTRACTS.md Round C): tracking them lets the caller-side check see
+// `int z = 0; f(z);` as a definite violation, not just literal zeros.
+// Returns whether ANY such call site exists — a function with no
+// divisions but a contracted call still needs the dataflow pass for the
+// literal-argument check in onStatement.
+bool addContractArgVars(const FunctionDecl* funcDecl, ASTContext& ctx,
+                        std::set<const VarDecl*>& vars) {
+    bool anyContractCall = false;
+    auto callMatcher = callExpr().bind("call");
+    for (const auto& result :
+         match(findAll(callMatcher), *funcDecl->getBody(), ctx)) {
+        const auto* call = result.getNodeAs<CallExpr>("call");
+        if (!call) continue;
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (!callee) continue;
+        zerodefect::ParsedContracts parsed =
+            zerodefect::contractsForDecl(callee, ctx);
+        if (parsed.clauses.empty()) continue;
+        auto req = zerodefect::analyzeRequires(parsed, callee);
+        for (const auto& info : req.enforced) {
+            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+                continue;
+            if (info.paramIndex >= call->getNumArgs()) continue;
+            anyContractCall = true;
+            if (const auto* var =
+                    getReferencedVar(call->getArg(info.paramIndex)))
+                vars.insert(var);
+        }
+    }
+    return anyContractCall;
 }
 
 // --- Statement classification ---
@@ -287,6 +321,21 @@ public:
 
     State initialState() const { return initState_; }
 
+    // Declared `requires n != 0` (CONTRACTS.md Round C): the parameter
+    // enters the function NonZero — the proof burden moved to the
+    // contract, and every visible call site is checked instead
+    // (checkCallContracts below).
+    void seedRequires(const FunctionDecl* func,
+                      const std::vector<zerodefect::RequiresInfo>& infos) {
+        for (const auto& info : infos) {
+            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+                continue;
+            if (info.paramIndex >= func->getNumParams()) continue;
+            auto it = initState_.find(func->getParamDecl(info.paramIndex));
+            if (it != initState_.end()) it->second = ZeroState::NonZero;
+        }
+    }
+
     // The per-variable ZeroState chain makes at most 3 transitions
     unsigned latticeHeight() const {
         return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
@@ -359,6 +408,9 @@ public:
 
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
+        if (const auto* call = dyn_cast<CallExpr>(stmt))
+            checkCallContracts(call, before, ctx);
+
         // Dataflow trace: record transitions to zero / possibly-zero
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
@@ -432,6 +484,60 @@ public:
     }
 
 private:
+    // Caller side of `requires n != 0` (CONTRACTS.md Round C). Only the
+    // zero domain — NullDeref owns the non-null clauses. A literal 0
+    // argument or a tracked variable in Zero state is a definite
+    // violation; MaybeZero is a possible one. Anything the state cannot
+    // decide stays silent — evidence-per-path, as everywhere else.
+    void checkCallContracts(const CallExpr* call, const State& before,
+                            ASTContext& ctx) {
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (!callee) return;
+        zerodefect::ParsedContracts parsed =
+            zerodefect::contractsForDecl(callee, ctx);
+        if (parsed.clauses.empty()) return;
+        auto req = zerodefect::analyzeRequires(parsed, callee);
+
+        const SourceManager& sm = ctx.getSourceManager();
+        SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+        const unsigned line = sm.getSpellingLineNumber(loc);
+
+        for (const auto& info : req.enforced) {
+            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+                continue;
+            if (info.paramIndex >= call->getNumArgs()) continue;
+            const Expr* arg = call->getArg(info.paramIndex);
+
+            bool definite = false;
+            bool maybe = false;
+            if (auto lit = zerodefect::intLiteralArg(arg)) {
+                definite = (*lit == 0);
+            } else if (const VarDecl* var = getReferencedVar(arg)) {
+                auto it = before.find(var);
+                if (it != before.end()) {
+                    definite = it->second == ZeroState::Zero;
+                    maybe = it->second == ZeroState::MaybeZero;
+                }
+            }
+            if (!definite && !maybe) continue;
+            if (!reportedContracts_.insert({line, info.text}).second)
+                continue;
+
+            zerodefect::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "contract";
+            diag.function = funcName_;
+            diag.severity = (definite && !info.machineProposed)
+                                ? zerodefect::Severity::Error
+                                : zerodefect::Severity::Warning;
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::ContractViolated, info.text);
+            results_.push_back(std::move(diag));
+        }
+    }
+
     void recordEvent(const Stmt* stmt, const VarDecl* var,
                      ASTContext& ctx, zerodefect::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
@@ -455,6 +561,7 @@ private:
     VarState initState_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
+    std::set<std::pair<unsigned, std::string>> reportedContracts_;
 };
 
 // --- Function-level analysis ---
@@ -492,11 +599,19 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     // Phase 2: Variable divisor analysis via DataflowEngine
     auto trackedVars = collectDivisorVars(funcDecl, ctx);
-    if (trackedVars.empty()) return;
+    const bool hasContractCalls = addContractArgVars(funcDecl, ctx,
+                                                     trackedVars);
+    if (trackedVars.empty() && !hasContractCalls) return;
 
     DivByZeroAnalysis analysis(
         trackedVars, funcDecl->getQualifiedNameAsString(), results,
         reportedLines);
+    zerodefect::ParsedContracts ownContracts =
+        zerodefect::contractsForDecl(funcDecl, ctx);
+    if (!ownContracts.clauses.empty()) {
+        auto req = zerodefect::analyzeRequires(ownContracts, funcDecl);
+        analysis.seedRequires(funcDecl, req.enforced);
+    }
     auto df = zerodefect::runDataflow(funcDecl, ctx, analysis);
     if (!df.converged)
         std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,

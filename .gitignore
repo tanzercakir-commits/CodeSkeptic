@@ -3,4 +3,5 @@ Testing/
 .DS_Store
 test_projects/
 corpus-work/
+juliet-work/
 __pycache__/

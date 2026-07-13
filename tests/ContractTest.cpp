@@ -1,6 +1,8 @@
 #include "TestHelper.h"
 #include "contracts/ContractParser.h"
 #include "rules/ContractRule.h"
+#include "rules/DivByZeroRule.h"
+#include "rules/NullDerefRule.h"
 
 #include <gtest/gtest.h>
 
@@ -143,12 +145,12 @@ TEST(ContractRuleTest, SyntaxError_IsContractSyntaxError) {
 }
 
 TEST(ContractRuleTest, LaterRoundClause_ReportedNotSilent) {
-    // `requires` lands in Round C: until then the contract is
+    // Ownership effects land in Round D: until then the contract is
     // explicitly reported as unverified — never silently "accepted".
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
-        int deref(int *p) { return *p; }
+        // zd: owns(p)
+        void take(int *p) { }
     )");
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "contract-unsupported");
@@ -194,4 +196,210 @@ TEST(ContractRuleTest, MultipleClauses_CheckedIndependently) {
     ASSERT_EQ(results.size(), 2u);
     EXPECT_EQ(results[0].rule_id, "contract");
     EXPECT_EQ(results[1].rule_id, "contract-unsupported");
+}
+
+// --- Round C: requires — callee seeding + caller-side checks ---
+// Assume/guarantee split: the callee ASSUMES its declared requires
+// (parameters seeded), every visible call site is CHECKED against the
+// caller's own dataflow state. NullDeref owns the non-null clauses,
+// DivByZero the non-zero ones; ContractRule no longer reports enforced
+// clauses as unverified.
+
+TEST(ContractRoundCTest, EnforcedRequires_NotReportedUnverified) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int deref(int *p) { return *p; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, UnknownParamName_IsContractSyntax) {
+    // A requires clause naming a parameter the function does not have
+    // can never bind — that is a contract error, not a later round.
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires q != null
+        int deref(int *p) { return p ? *p : 0; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract-syntax");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRoundCTest, RequiresNonNull_CalleeSeeded_NoNoise) {
+    // The contract carries the proof burden: inside the body p is
+    // NonNull, the dereference is silent.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int deref(int *p) { return *p; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, CallSite_NullLiteral_IsError) {
+    // The caller has no pointer variables of its own — the contract
+    // call alone must wake the dataflow pass.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int f(int *p);
+        int g() { return f(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("p != null"), std::string::npos);
+}
+
+TEST(ContractRoundCTest, CallSite_MaybeNullVar_IsWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int f(int *p);
+        int *mk();
+        int g(int c) {
+            int *q = nullptr;
+            if (c) q = mk();
+            return f(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundCTest, CallSite_GuardedVar_Silent) {
+    // The caller honors the contract: q is checked before the call.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int f(int *p);
+        int *mk();
+        int g() {
+            int *q = mk();
+            if (!q) return -1;
+            return f(q);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, CallSite_MachineProposed_IsWarning) {
+    // zd:ai contracts never produce errors — a machine guess must not
+    // block a build.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd:ai requires p != null
+        int f(int *p);
+        int g() { return f(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundCTest, RelationalEscape_Satisfied_Silent) {
+    // `p != null || n <= 0`: a literal escape argument that holds
+    // releases the pointer — null is allowed on this call.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null || n <= 0
+        int f(int *p, int n);
+        int g() { return f(nullptr, 0); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, RelationalEscape_Violated_IsError) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null || n <= 0
+        int f(int *p, int n);
+        int g() { return f(nullptr, 5); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRoundCTest, RelationalEscape_CalleeSplitSeed_NoNoise) {
+    // Callee side of the relational form: the escape disjunct leaves p
+    // free, the pinned disjunct makes it NonNull; the guarded
+    // dereference stays silent.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null || n <= 0
+        int f(int *p, int n) {
+            if (n > 0) return *p;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, RequiresNonZero_ZeroLiteral_IsError) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires n != 0
+        int divide(int a, int n);
+        int g() { return divide(10, 0); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("n != 0"), std::string::npos);
+}
+
+TEST(ContractRoundCTest, RequiresNonZero_TrackedZeroVar_IsError) {
+    // z is not a divisor anywhere in g — only the contract call makes
+    // it tracked.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires n != 0
+        int divide(int a, int n);
+        int g() { int z = 0; return divide(10, z); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRoundCTest, RequiresNonZero_MaybeZeroVar_IsWarning) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires n != 0
+        int divide(int a, int n);
+        int g(int c) {
+            int z = 0;
+            if (c) z = 4;
+            return divide(10, z);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundCTest, RequiresNonZero_GuardedVar_Silent) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires n != 0
+        int divide(int a, int n);
+        int g(int z) {
+            if (z == 0) return -1;
+            return divide(10, z);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundCTest, RequiresNonZero_CalleeSeeded_NoNoise) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires n != 0
+        int divide(int a, int n) { return a / n; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
 }

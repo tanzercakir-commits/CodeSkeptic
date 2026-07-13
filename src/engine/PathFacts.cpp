@@ -317,6 +317,12 @@ std::optional<std::pair<FactKey, bool>> conditionFact(
     return conditionFact(cond, unkeyable, kNone);
 }
 
+std::optional<std::pair<FactKey, bool>> compareFact(
+        const ValueDecl* var, BinaryOperatorKind opc, int64_t literal) {
+    if (!var) return std::nullopt;
+    return normalizeCompare(var, opc, literal, /*varOnLeft=*/true);
+}
+
 std::set<const ValueDecl*> collectUnkeyableDecls(const FunctionDecl* func) {
     UnkeyableDeclCollector collector;
     if (func && func->hasBody())

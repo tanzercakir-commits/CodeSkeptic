@@ -119,6 +119,15 @@ const clang::ValueDecl* assignedDecl(const clang::Stmt* stmt);
 std::optional<std::pair<const clang::ValueDecl*, int64_t>>
 assignedIntLiteral(const clang::Stmt* stmt);
 
+// Public builder for a (var REL literal) fact key — the contract
+// layer constructs keys for declared guards without an Expr in hand.
+// Same canonicalization as conditionFact (EQ/LT/LE base + unsigned
+// zero-identities). nullopt when the form carries no information
+// (e.g. `u < 0` for unsigned u).
+std::optional<std::pair<FactKey, bool>> compareFact(
+    const clang::ValueDecl* var, clang::BinaryOperatorKind opc,
+    int64_t literal);
+
 // Whether existing facts contradict `key = wanted`. Exact-key facts
 // compare directly; a stamped equality (var EQ a)=true additionally
 // ANSWERS any key on the same var by evaluating `a REL lit` — this is
