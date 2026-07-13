@@ -44,7 +44,8 @@ int main(int argc, char* argv[]) {
     // regression CI gate.
     if (!config.summaryDiffOld().empty()) {
         return zerodefect::reportSummaryDiff(
-            config.summaryDiffOld(), config.summaryDiffNew(), std::cout);
+            config.summaryDiffOld(), config.summaryDiffNew(), std::cout,
+            config.summaryDiffGate() != "warn");
     }
 
     if (config.sourcePath().empty() && config.sourceFiles().empty()) {

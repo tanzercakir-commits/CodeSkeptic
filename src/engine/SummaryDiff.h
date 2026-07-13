@@ -52,8 +52,14 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
 // Parses the two files, writes the diff to `out` (machine-greppable
 // "SUMMARY_DIFF <KIND> <key> <detail>" lines + a summary). Exit code:
 // 0 = no weakening, 1 = has WEAKENED (CI gate), 2 = file unreadable.
+// gateWeakened=false (--gate warn, CONTRACTS.md §5): WEAKENED is
+// still fully reported but exits 0 — the adoption ramp for projects
+// not ready to break CI on inferred-contract drift. Unreadable files
+// stay exit 2 regardless: a gate that can't read its input must
+// never look green.
 int reportSummaryDiff(const std::string& oldPath,
-                      const std::string& newPath, std::ostream& out);
+                      const std::string& newPath, std::ostream& out,
+                      bool gateWeakened = true);
 
 } // namespace zerodefect
 

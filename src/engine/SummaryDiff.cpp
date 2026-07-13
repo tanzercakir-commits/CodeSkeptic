@@ -151,7 +151,8 @@ const char* kindName(ChangeKind kind) {
 } // anonymous namespace
 
 int reportSummaryDiff(const std::string& oldPath,
-                      const std::string& newPath, std::ostream& out) {
+                      const std::string& newPath, std::ostream& out,
+                      bool gateWeakened) {
     SummaryMap oldMap;
     SummaryMap newMap;
     if (!SummaryRegistry::parseSummaryFile(oldPath, oldMap)) {
@@ -182,7 +183,7 @@ int reportSummaryDiff(const std::string& oldPath,
     if (result.weakened > 0) {
         out << "[ZeroDefect] weakened contracts: callers relying on "
                "them must be re-checked\n";
-        return 1;
+        return gateWeakened ? 1 : 0;
     }
     return 0;
 }

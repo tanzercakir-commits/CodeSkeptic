@@ -122,3 +122,26 @@ TEST(SummaryDiffTest, ReportEndToEnd_ExitCodes) {
     std::ostringstream out3;
     EXPECT_EQ(reportSummaryDiff("/no/such.txt", newPathSame, out3), 2);
 }
+
+TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
+    // --gate warn (CONTRACTS.md §5): the adoption ramp — WEAKENED is
+    // still fully visible in the output, only the exit code relaxes.
+    auto oldPath = writeFile("sd_gate_old.txt",
+        "zerodefect-summaries v2\n"
+        "find/1\tN\t-\tU\n");
+    auto newPathWeak = writeFile("sd_gate_new.txt",
+        "zerodefect-summaries v2\n"
+        "find/1\tM\t-\tU\n");
+
+    std::ostringstream out;
+    EXPECT_EQ(reportSummaryDiff(oldPath, newPathWeak, out,
+                                /*gateWeakened=*/false), 0);
+    EXPECT_NE(out.str().find("SUMMARY_DIFF WEAKENED find/1"),
+              std::string::npos);
+
+    // An unreadable input is exit 2 REGARDLESS of the gate: a gate
+    // that cannot read its input must never look green.
+    std::ostringstream out2;
+    EXPECT_EQ(reportSummaryDiff("/no/such.txt", newPathWeak, out2,
+                                /*gateWeakened=*/false), 2);
+}
