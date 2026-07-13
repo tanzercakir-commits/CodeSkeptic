@@ -510,9 +510,10 @@ private:
 
             bool definite = false;
             bool maybe = false;
+            const VarDecl* var = nullptr;
             if (auto lit = zerodefect::intLiteralArg(arg)) {
                 definite = (*lit == 0);
-            } else if (const VarDecl* var = getReferencedVar(arg)) {
+            } else if ((var = getReferencedVar(arg))) {
                 auto it = before.find(var);
                 if (it != before.end()) {
                     definite = it->second == ZeroState::Zero;
@@ -535,6 +536,8 @@ private:
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::ContractViolated, info.text);
             results_.push_back(std::move(diag));
+            // Violation trace (Round D): why is the argument zero?
+            if (var) noteTargets_.emplace_back(results_.size() - 1, var);
         }
     }
 

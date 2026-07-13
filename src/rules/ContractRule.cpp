@@ -24,7 +24,17 @@ enum class ClauseStatus {
     Violated,
     Unverified,   // in the v1 spec, not yet checked by the engine
     Unsupported,  // outside what the engine will be able to key
+    UnknownParam, // names a parameter the function does not have
 };
+
+std::optional<unsigned> paramIndexByName(const FunctionDecl* func,
+                                         const std::string& name) {
+    for (unsigned i = 0; i < func->getNumParams(); ++i) {
+        const ParmVarDecl* p = func->getParamDecl(i);
+        if (p && p->getName() == name) return i;
+    }
+    return std::nullopt;
+}
 
 bool isReturnVsNull(const ContractPred& p) {
     return p.kind == ContractPred::Cmp &&
@@ -55,9 +65,43 @@ bool containsParamVsParam(const ContractPred& p) {
 }
 
 ClauseStatus classifyAndCheck(const ContractClause& clause,
-                              const SummaryRegistry::FunctionSummary* summary) {
+                              const SummaryRegistry::FunctionSummary* summary,
+                              const FunctionDecl* func) {
     using RN = SummaryRegistry::ReturnNullness;
     using RZ = SummaryRegistry::ReturnZeroness;
+    using PE = SummaryRegistry::ParamEffect;
+
+    // Ownership effects vs the inferred parameter effects (Round D).
+    // `owns(p)`: the callee claims to take ownership — a body that
+    // provably only READS the parameter makes that claim false (the
+    // caller hands off and the memory leaks). `borrows(p)`: the
+    // callee claims NOT to take ownership — a body that frees the
+    // parameter breaks the caller's ownership (double-free shape).
+    // Stores/Opaque stay explicitly unverified: an escaped pointer's
+    // fate is unknown, and no strong claim is made on ambiguity.
+    if (clause.kind == ContractClauseKind::Owns ||
+        clause.kind == ContractClauseKind::Borrows) {
+        auto idx = paramIndexByName(func, clause.paramName);
+        if (!idx) return ClauseStatus::UnknownParam;
+        if (!summary) return ClauseStatus::Unverified;
+        PE effect = summary->paramEffect(*idx);
+        if (clause.kind == ContractClauseKind::Owns) {
+            switch (effect) {
+                case PE::Frees:
+                case PE::Stores:    return ClauseStatus::Satisfied;
+                case PE::ReadsOnly: return ClauseStatus::Violated;
+                case PE::Opaque:    return ClauseStatus::Unverified;
+            }
+        } else {
+            switch (effect) {
+                case PE::ReadsOnly: return ClauseStatus::Satisfied;
+                case PE::Frees:     return ClauseStatus::Violated;
+                case PE::Stores:
+                case PE::Opaque:    return ClauseStatus::Unverified;
+            }
+        }
+        return ClauseStatus::Unverified;
+    }
 
     if (clause.kind == ContractClauseKind::Ensures && !clause.hasGuard) {
         if (isReturnVsNull(clause.pred)) {
@@ -133,13 +177,15 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
 
         if (parsed.clauses.empty()) continue;
 
-        // Round C: requires clauses the dataflow rules enforce
-        // (NullDeref: non-null, DivByZero: non-zero). Those clauses are
-        // NOT unverified — callee seeding + caller-side checks cover
-        // them — so they are skipped below. A requires clause naming a
-        // parameter the function does not have can never bind: that is
-        // a contract error, not a later-round feature.
+        // Rounds C+D: clauses the dataflow rules enforce (requires in
+        // NullDeref/DivByZero, guarded null-postconditions in
+        // NullDeref) are NOT unverified — they are skipped below. A
+        // requires clause naming a parameter the function does not
+        // have can never bind: that is a contract error, not a
+        // later-round feature.
         const RequiresAnalysis req = analyzeRequires(parsed, func);
+        const GuardedEnsuresAnalysis guarded =
+            analyzeNullEnsuresGuards(parsed, func);
         for (const auto& unknown : req.unknownParams)
             makeDiag(unknown.line, "contract-syntax", Severity::Error,
                      MsgId::ContractSyntaxError, unknown.text);
@@ -149,11 +195,12 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
 
         for (const auto& clause : parsed.clauses) {
             if (req.enforcedLines.count(clause.line)) continue;
+            if (guarded.enforcedLines.count(clause.line)) continue;
             bool isUnknownParam = false;
             for (const auto& unknown : req.unknownParams)
                 if (unknown.line == clause.line) isUnknownParam = true;
             if (isUnknownParam) continue;
-            switch (classifyAndCheck(clause, summary)) {
+            switch (classifyAndCheck(clause, summary, func)) {
                 case ClauseStatus::Satisfied:
                     break;
                 case ClauseStatus::Violated:
@@ -170,6 +217,11 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
                 case ClauseStatus::Unsupported:
                     makeDiag(clause.line, "contract-unsupported",
                              Severity::Warning, MsgId::ContractUnsupported,
+                             clause.text);
+                    break;
+                case ClauseStatus::UnknownParam:
+                    makeDiag(clause.line, "contract-syntax",
+                             Severity::Error, MsgId::ContractSyntaxError,
                              clause.text);
                     break;
             }

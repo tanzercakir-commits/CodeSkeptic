@@ -265,7 +265,8 @@ public:
                     func->getParamDecl(info.condParamIndex);
                 if (mutated_.count(c)) continue;  // unkeyable: no seed
                 auto fact = zerodefect::compareFact(
-                    c, toBinOp(info.condOp), info.condLiteral);
+                    c, zerodefect::toBinaryOp(info.condOp),
+                    info.condLiteral);
                 if (!fact) continue;
                 State next;
                 for (auto& d : initState_) {
@@ -283,16 +284,11 @@ public:
         }
     }
 
-    static clang::BinaryOperatorKind toBinOp(zerodefect::ContractCmpOp op) {
-        switch (op) {
-            case zerodefect::ContractCmpOp::EQ: return BO_EQ;
-            case zerodefect::ContractCmpOp::NE: return BO_NE;
-            case zerodefect::ContractCmpOp::LT: return BO_LT;
-            case zerodefect::ContractCmpOp::LE: return BO_LE;
-            case zerodefect::ContractCmpOp::GT: return BO_GT;
-            case zerodefect::ContractCmpOp::GE: return BO_GE;
-        }
-        return BO_EQ;
+    // Guarded postconditions of THIS function (CONTRACTS.md Round D):
+    // `ensures return != null if <g>` — checked per disjunct at every
+    // return statement (checkGuardedEnsures).
+    void setGuardedEnsures(std::vector<zerodefect::GuardedEnsuresInfo> v) {
+        guardedEnsures_ = std::move(v);
     }
 
     // The per-variable NullState chain makes at most 3 transitions;
@@ -465,6 +461,70 @@ public:
                 zerodefect::MsgId::ContractViolated, info.text);
             diag.function = funcName_;
             results_.push_back(std::move(diag));
+            // Violation trace (Round D): why is the argument null?
+            if (const VarDecl* var = asVar(arg))
+                noteTargets_.emplace_back(results_.size() - 1, var);
+        }
+    }
+
+    // Guarded postcondition check (CONTRACTS.md Round D): at a return
+    // statement, every disjunct that does not REFUTE the guard must
+    // satisfy the postcondition. A disjunct that PROVES the guard and
+    // returns definite null is a violation (error for bare zd:); null
+    // under an undecided guard, or possibly-null, is a warning —
+    // evidence-per-path, the same ladder as everywhere else.
+    void checkGuardedEnsures(const ReturnStmt* ret, const State& before,
+                             ASTContext& ctx) {
+        if (guardedEnsures_.empty()) return;
+        const Expr* val = ret->getRetValue();
+        if (!val) return;
+        const NullState literal = evaluateNullness(val);
+        const VarDecl* var = asVar(val);
+        if (literal == NullState::Unknown && !var) return;
+
+        for (const auto& info : guardedEnsures_) {
+            bool definite = false;
+            bool maybe = false;
+            for (const auto& d : before) {
+                // Guard provably false on this path: exempt.
+                if (zerodefect::factsContradict(d.facts, info.guardKey,
+                                                info.guardWanted))
+                    continue;
+                bool guardProven = zerodefect::factsContradict(
+                    d.facts, info.guardKey, !info.guardWanted);
+                NullState v = literal;
+                if (v == NullState::Unknown) {
+                    auto it = d.vars.find(var);
+                    if (it == d.vars.end()) continue;
+                    v = it->second;
+                }
+                if (v == NullState::Null)
+                    (guardProven ? definite : maybe) = true;
+                else if (v == NullState::MaybeNull)
+                    maybe = true;
+            }
+            if (!definite && !maybe) continue;
+
+            const SourceManager& sm = ctx.getSourceManager();
+            SourceLocation loc = sm.getExpansionLoc(ret->getBeginLoc());
+            const unsigned line = sm.getSpellingLineNumber(loc);
+            if (!reportedContracts_.emplace(line, info.text).second)
+                continue;
+
+            zerodefect::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "contract";
+            diag.severity = (definite && !info.machineProposed)
+                                ? zerodefect::Severity::Error
+                                : zerodefect::Severity::Warning;
+            diag.message = zerodefect::msg(
+                zerodefect::MsgId::ContractViolated, info.text);
+            diag.function = funcName_;
+            results_.push_back(std::move(diag));
+            if (var)
+                noteTargets_.emplace_back(results_.size() - 1, var);
         }
     }
 
@@ -493,6 +553,8 @@ public:
                      const State& afterDisjuncts, ASTContext& ctx) {
         if (const auto* call = dyn_cast<CallExpr>(stmt))
             checkCallContracts(call, beforeDisjuncts, ctx);
+        if (const auto* ret = dyn_cast<ReturnStmt>(stmt))
+            checkGuardedEnsures(ret, beforeDisjuncts, ctx);
 
         NullVarState before =
             zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
@@ -627,6 +689,7 @@ private:
     std::map<const VarDecl*, size_t> firstWarnIndex_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> alsoDerefs_;
     std::set<std::pair<unsigned, std::string>> reportedContracts_;
+    std::vector<zerodefect::GuardedEnsuresInfo> guardedEnsures_;
 };
 
 // --- Matcher callback ---
@@ -645,8 +708,16 @@ public:
         if (!zerodefect::functionFilterAllows(*func)) return;
         if (!zerodefect::lineFilterAllows(*func, sm)) return;
 
+        auto parsed = zerodefect::contractsForDecl(func, *result.Context);
+        auto guardedEnsures =
+            zerodefect::analyzeNullEnsuresGuards(parsed, func);
+
         auto trackedVars = collectTrackedVars(func, *result.Context);
-        if (trackedVars.empty() &&
+        // A function with no pointer variables still needs the pass
+        // when a contract must be checked in it: a call into a
+        // contracted callee, or its own guarded postcondition
+        // (`return NULL;` needs no variable).
+        if (trackedVars.empty() && guardedEnsures.enforced.empty() &&
             !hasNonNullContractCalls(func, *result.Context))
             return;
 
@@ -655,13 +726,13 @@ public:
             zerodefect::collectFactDecls(func),
             zerodefect::collectPtrFactDecls(func),
             func->getQualifiedNameAsString(), results_);
-        {
-            auto parsed = zerodefect::contractsForDecl(func, *result.Context);
-            if (!parsed.clauses.empty()) {
-                auto req = zerodefect::analyzeRequires(parsed, func);
-                if (!req.enforced.empty())
-                    analysis.seedRequires(func, req.enforced);
-            }
+        if (!parsed.clauses.empty()) {
+            auto req = zerodefect::analyzeRequires(parsed, func);
+            if (!req.enforced.empty())
+                analysis.seedRequires(func, req.enforced);
+            if (!guardedEnsures.enforced.empty())
+                analysis.setGuardedEnsures(
+                    std::move(guardedEnsures.enforced));
         }
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
