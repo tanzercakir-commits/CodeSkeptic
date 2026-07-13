@@ -23,8 +23,11 @@ add_library(zerodefect_core STATIC
     rules/DivByZeroRule.cpp
     rules/NullDerefRule.cpp
     rules/ContractRule.cpp
+    rules/PolicyRule.cpp
     contracts/ContractParser.cpp
     contracts/ContractInfo.cpp
+    contracts/Policy.cpp
+    contracts/Sidecar.cpp
 )
 
 add_executable(zerodefect main.cpp)

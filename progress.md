@@ -31,12 +31,14 @@
 | ContractParser | `src/contracts/ContractParser.h`, `.cpp` | Done (zd:/zd:ai grammar, recursive descent) |
 | ContractRule | `src/rules/ContractRule.h`, `.cpp` | Done (Round B: return postconditions vs inferred summaries) |
 | ContractInfo | `src/contracts/ContractInfo.h`, `.cpp` | Done (Rounds C+D: shared requires + guarded-ensures recognizers; seeding, call-site and per-disjunct return checks) |
+| Policy engine | `src/contracts/Policy.*`, `src/rules/PolicyRule.*` | Done (Round E: no-absolute-paths; file comments + profile activation) |
+| Sidecar contracts | `src/contracts/Sidecar.h`, `.cpp` | Done (Round E: anchored .zdc entries merged into enforcement) |
 | CfgCache | `src/engine/CfgCache.h`, `.cpp` | Done (one CFG per function; TU-end cleanup + ctx-change safety) |
 | SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Done (--summary-diff; WEAKENED = exit 1 CI gate) |
 | CallRefArgs | `src/engine/CallRefArgs.h` | Done (non-const ref args invalidate facts; all four rules) |
 | FatalCalls | `src/engine/FatalCalls.h`, `.cpp` | Done (--fatal-asserts; engine-level path kill) |
 | AllocFunctions | `src/engine/AllocFunctions.h`, `.cpp` | Done (--alloc-functions/--free-functions) |
-| GTest infrastructure | `tests/` | Done (376/376; ctest + single-process) |
+| GTest infrastructure | `tests/` | Done (389/389; ctest + single-process) |
 | CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
 | Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |

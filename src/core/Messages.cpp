@@ -160,6 +160,12 @@ const MsgEntry kMessages[] = {
     // ContractUnverified
     {"contract could not be verified yet (engine limit): '{0}'",
      "sozlesme henuz dogrulanamadi (motor siniri): '{0}'"},
+    // PolicyAbsolutePath
+    {"policy 'no-absolute-paths': hard-coded absolute path {0}",
+     "'no-absolute-paths' politikasi: sabit kodlanmis mutlak yol {0}"},
+    // PolicyUnknownName
+    {"unknown policy name: '{0}'",
+     "bilinmeyen politika adi: '{0}'"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

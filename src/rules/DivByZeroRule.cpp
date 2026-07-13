@@ -125,7 +125,7 @@ bool addContractArgVars(const FunctionDecl* funcDecl, ASTContext& ctx,
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
         zerodefect::ParsedContracts parsed =
-            zerodefect::contractsForDecl(callee, ctx);
+            zerodefect::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) continue;
         auto req = zerodefect::analyzeRequires(parsed, callee);
         for (const auto& info : req.enforced) {
@@ -494,7 +494,7 @@ private:
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) return;
         zerodefect::ParsedContracts parsed =
-            zerodefect::contractsForDecl(callee, ctx);
+            zerodefect::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) return;
         auto req = zerodefect::analyzeRequires(parsed, callee);
 
@@ -610,7 +610,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         trackedVars, funcDecl->getQualifiedNameAsString(), results,
         reportedLines);
     zerodefect::ParsedContracts ownContracts =
-        zerodefect::contractsForDecl(funcDecl, ctx);
+        zerodefect::allContractClausesForDecl(funcDecl, ctx);
     if (!ownContracts.clauses.empty()) {
         auto req = zerodefect::analyzeRequires(ownContracts, funcDecl);
         analysis.seedRequires(funcDecl, req.enforced);

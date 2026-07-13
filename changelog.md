@@ -1,5 +1,59 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Contracts Round E: policies + sidecars — v1 complete
+
+### Added
+- **Policy engine** (rule_id `policy`): `zd:policy` pattern
+  prohibitions under the shared contract surface. v1 ships
+  `no-absolute-paths` — a hard-coded absolute path in a string
+  literal is an error. The founding Ruledsl release incident (a
+  hard-coded rules path that crashed every machine but the dev box)
+  is now a machine-checked rule. Activation: a `// zd:policy` comment
+  scopes to its file; `policy = <name>` in .zerodefect.conf or
+  `--policy` activates project-wide. Unknown policy names are
+  contract-syntax errors (a policy that silently fails to activate
+  would be a false comfort); `zd:ai policy` activation downgrades
+  violations to warnings. The path heuristic is conservative (>= 2
+  segments, no whitespace, or a Windows drive root); macro-born
+  literals (__FILE__) are skipped.
+- **Sidecar contracts** (`src/core.c` -> `src/core.c.zdc`): contracts
+  for code you cannot annotate. Every entry is EXPLICITLY anchored
+  (`vendor_find: requires id != 0`; optional `/arity` for overloads)
+  — position-based mapping is forbidden by design. Sidecar clauses
+  merge into the same enforcement pipeline (`allContractClausesForDecl`):
+  requires seeding, call-site checks and guarded-ensures checks work
+  identically; ContractRule reports sidecar findings AT the .zdc
+  file/line, and malformed sidecar lines are contract-syntax errors,
+  never silently dropped. The cache is process-lifetime with a
+  per-run clear (the MCP server must see an edited .zdc).
+- **README contracts section** + contract/policy rows in the rules
+  table.
+
+### Verification
+- 389/389 tests in both modes (+13 Round E: path heuristic unit,
+  file-comment activation, no-policy silence, non-path literals
+  silent, unknown-name syntax error, profile-wide activation, zd:ai
+  downgrade, sidecar text parse unit, sidecar requires at call site,
+  sidecar ensures pointing at the .zdc line, arity anchor, malformed
+  lines reported, missing sidecar no-effect).
+- Juliet floors and corpus pins green (byte-identical; policies and
+  sidecars activate only where declared).
+- Dogfood: the founding incident itself —
+  `fopen("/home/tanzer/projects/ruledsl/rules.dsl", "r")` under
+  `zd:policy no-absolute-paths` -> error at the literal; a sidecar
+  `requires id != 0` on unannotatable third-party code fires at the
+  caller's `vendor_find(0)`.
+
+### Residuals (recorded in todo.md)
+- Caller-side CONSUMPTION of declared ensures (treating a contracted
+  callee's return as NonNull/MaybeNull per guard at call sites) is
+  not implemented — ensures are verified against the callee only.
+- Unenforced sidecar clauses on BODYLESS declarations are not
+  reported as unverified (ContractRule only visits definitions); the
+  enforced forms still work at call sites.
+- Whole-program sidecar anchor coverage check (a typo'd anchor that
+  matches nothing anywhere is currently silent).
+
 ## 2026-07-13 — Contracts Round D: guarded ensures + ownership effects
 
 ### Added

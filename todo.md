@@ -63,7 +63,7 @@ Juliet's CI weight, project name check.
       content; multiset counter — identical findings tracked one by one;
       v1 files backward compatible)
 
-### Contracts (CONTRACTS.md; Rounds B+C shipped 2026-07-13)
+### Contracts (CONTRACTS.md; v1 COMPLETE — Rounds B/C/D/E shipped 2026-07-13)
 - [x] Round C: `requires p != null` / `requires n != 0` — callee-side
       seeding (contract carries the proof burden) + caller-side
       violation checks at every visible call site (NullDeref owns the
@@ -84,9 +84,17 @@ Juliet's CI weight, project name check.
       (stays contract-unsupported); zero-domain guarded ensures
       (`ensures return != 0 if g`) needs disjuncts in DivByZero
       (stays contract-unsupported).
-- [ ] Round E: `zd:policy` engine with `no-absolute-paths` first;
-      `.zdc` sidecar loading (anchored entries only); profile-level
-      policies in zerodefect.conf; README contracts section.
+- [x] Round E: `zd:policy` engine with `no-absolute-paths` first
+      (the Ruledsl homage — shipped); `.zdc` sidecar loading
+      (anchored entries only, /arity overload disambiguation,
+      malformed lines = contract-syntax); profile-level policies
+      (conf `policy =` + `--policy`); README contracts section.
+- [ ] Contracts post-v1 residuals: caller-side consumption of
+      declared ensures (contracted callee's return as
+      NonNull/MaybeNull per guard); unverified reporting for sidecar
+      clauses on bodyless declarations; whole-program sidecar anchor
+      coverage check (typo'd anchors); zero-domain guarded ensures;
+      `returns owned` (needs return-ownership summary).
 
 ### Rule improvement notes
 - [x] **FOREACH_ARRAY family — resolved via pointer-relational

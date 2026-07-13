@@ -2,6 +2,7 @@
 
 #include "contracts/ContractInfo.h"
 #include "contracts/ContractParser.h"
+#include "contracts/Sidecar.h"
 #include "core/Messages.h"
 #include "engine/FunctionSummary.h"
 
@@ -149,83 +150,115 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
         const auto* func = match.getNodeAs<FunctionDecl>("func");
         if (!func || !func->hasBody()) continue;
 
-        unsigned commentLine = 0;
-        std::string file;
-        ParsedContracts parsed = contractsForDecl(func, ctx, &commentLine,
-                                                  &file);
-        if (parsed.empty()) continue;
-
         const std::string funcName = func->getQualifiedNameAsString();
-
-        auto makeDiag = [&](unsigned lineInBlock, const std::string& ruleId,
-                            Severity sev, MsgId msgId,
-                            const std::string& arg) {
-            Diagnostic diag;
-            diag.file = file;
-            diag.line = commentLine + (lineInBlock > 0 ? lineInBlock - 1 : 0);
-            diag.column = 1;
-            diag.rule_id = ruleId;
-            diag.severity = sev;
-            diag.message = msg(msgId, arg);
-            diag.function = funcName;
-            results.push_back(std::move(diag));
-        };
-
-        for (const auto& err : parsed.syntaxErrors)
-            makeDiag(err.line, "contract-syntax", Severity::Error,
-                     MsgId::ContractSyntaxError, err.text);
-
-        if (parsed.clauses.empty()) continue;
-
-        // Rounds C+D: clauses the dataflow rules enforce (requires in
-        // NullDeref/DivByZero, guarded null-postconditions in
-        // NullDeref) are NOT unverified — they are skipped below. A
-        // requires clause naming a parameter the function does not
-        // have can never bind: that is a contract error, not a
-        // later-round feature.
-        const RequiresAnalysis req = analyzeRequires(parsed, func);
-        const GuardedEnsuresAnalysis guarded =
-            analyzeNullEnsuresGuards(parsed, func);
-        for (const auto& unknown : req.unknownParams)
-            makeDiag(unknown.line, "contract-syntax", Severity::Error,
-                     MsgId::ContractSyntaxError, unknown.text);
-
         const SummaryRegistry::FunctionSummary* summary =
             SummaryRegistry::instance().lookup(func);
 
-        for (const auto& clause : parsed.clauses) {
-            if (req.enforcedLines.count(clause.line)) continue;
-            if (guarded.enforcedLines.count(clause.line)) continue;
-            bool isUnknownParam = false;
+        // One reporting pass per SOURCE: inline comment lines map
+        // through the comment-block base line; sidecar lines are
+        // absolute in the .zdc file. The verdict logic is shared —
+        // the two sources cannot drift.
+        auto processSource = [&](const ParsedContracts& parsed,
+                                 const std::string& diagFile,
+                                 unsigned lineBase) {
+            auto makeDiag = [&](unsigned clauseLine,
+                                const std::string& ruleId, Severity sev,
+                                MsgId msgId, const std::string& arg) {
+                Diagnostic diag;
+                diag.file = diagFile;
+                diag.line = lineBase > 0
+                                ? lineBase +
+                                      (clauseLine > 0 ? clauseLine - 1 : 0)
+                                : clauseLine;
+                diag.column = 1;
+                diag.rule_id = ruleId;
+                diag.severity = sev;
+                diag.message = msg(msgId, arg);
+                diag.function = funcName;
+                results.push_back(std::move(diag));
+            };
+
+            for (const auto& err : parsed.syntaxErrors)
+                makeDiag(err.line, "contract-syntax", Severity::Error,
+                         MsgId::ContractSyntaxError, err.text);
+
+            if (parsed.clauses.empty()) return;
+
+            // Rounds C+D: clauses the dataflow rules enforce
+            // (requires in NullDeref/DivByZero, guarded
+            // null-postconditions in NullDeref) are NOT unverified —
+            // they are skipped below. A requires clause naming a
+            // parameter the function does not have can never bind:
+            // that is a contract error, not a later-round feature.
+            const RequiresAnalysis req = analyzeRequires(parsed, func);
+            const GuardedEnsuresAnalysis guarded =
+                analyzeNullEnsuresGuards(parsed, func);
             for (const auto& unknown : req.unknownParams)
-                if (unknown.line == clause.line) isUnknownParam = true;
-            if (isUnknownParam) continue;
-            switch (classifyAndCheck(clause, summary, func)) {
-                case ClauseStatus::Satisfied:
-                    break;
-                case ClauseStatus::Violated:
-                    makeDiag(clause.line, "contract",
-                             clause.machineProposed ? Severity::Warning
-                                                    : Severity::Error,
-                             MsgId::ContractViolated, clause.text);
-                    break;
-                case ClauseStatus::Unverified:
-                    makeDiag(clause.line, "contract-unsupported",
-                             Severity::Warning, MsgId::ContractUnverified,
-                             clause.text);
-                    break;
-                case ClauseStatus::Unsupported:
-                    makeDiag(clause.line, "contract-unsupported",
-                             Severity::Warning, MsgId::ContractUnsupported,
-                             clause.text);
-                    break;
-                case ClauseStatus::UnknownParam:
-                    makeDiag(clause.line, "contract-syntax",
-                             Severity::Error, MsgId::ContractSyntaxError,
-                             clause.text);
-                    break;
+                makeDiag(unknown.line, "contract-syntax", Severity::Error,
+                         MsgId::ContractSyntaxError, unknown.text);
+
+            for (const auto& clause : parsed.clauses) {
+                // Policies are PolicyRule's engine (Round E).
+                if (clause.kind == ContractClauseKind::Policy) continue;
+                if (req.enforcedLines.count(clause.line)) continue;
+                if (guarded.enforcedLines.count(clause.line)) continue;
+                bool isUnknownParam = false;
+                for (const auto& unknown : req.unknownParams)
+                    if (unknown.line == clause.line) isUnknownParam = true;
+                if (isUnknownParam) continue;
+                switch (classifyAndCheck(clause, summary, func)) {
+                    case ClauseStatus::Satisfied:
+                        break;
+                    case ClauseStatus::Violated:
+                        makeDiag(clause.line, "contract",
+                                 clause.machineProposed ? Severity::Warning
+                                                        : Severity::Error,
+                                 MsgId::ContractViolated, clause.text);
+                        break;
+                    case ClauseStatus::Unverified:
+                        makeDiag(clause.line, "contract-unsupported",
+                                 Severity::Warning,
+                                 MsgId::ContractUnverified, clause.text);
+                        break;
+                    case ClauseStatus::Unsupported:
+                        makeDiag(clause.line, "contract-unsupported",
+                                 Severity::Warning,
+                                 MsgId::ContractUnsupported, clause.text);
+                        break;
+                    case ClauseStatus::UnknownParam:
+                        makeDiag(clause.line, "contract-syntax",
+                                 Severity::Error, MsgId::ContractSyntaxError,
+                                 clause.text);
+                        break;
+                }
             }
-        }
+        };
+
+        unsigned commentLine = 0;
+        std::string file;
+        ParsedContracts inlineParsed =
+            contractsForDecl(func, ctx, &commentLine, &file);
+        if (!inlineParsed.empty())
+            processSource(inlineParsed, file, commentLine);
+
+        std::string zdcFile;
+        ParsedContracts sidecarParsed =
+            sidecarContractsForDecl(func, ctx, &zdcFile);
+        if (!sidecarParsed.empty())
+            processSource(sidecarParsed, zdcFile, /*lineBase=*/0);
+    }
+
+    // Malformed sidecar LINES (no anchor colon): reported once per
+    // load, at the .zdc file — never silently dropped.
+    for (const auto& [zdcFile, issue] : takeSidecarIssues()) {
+        Diagnostic diag;
+        diag.file = zdcFile;
+        diag.line = issue.line;
+        diag.column = 1;
+        diag.rule_id = "contract-syntax";
+        diag.severity = Severity::Error;
+        diag.message = msg(MsgId::ContractSyntaxError, issue.text);
+        results.push_back(std::move(diag));
     }
 }
 

@@ -64,6 +64,8 @@ enum class MsgId {
     ContractSyntaxError,        // {0} = offending line text
     ContractUnsupported,        // {0} = clause text (outside v1 subset)
     ContractUnverified,         // {0} = clause text (engine cannot prove yet)
+    PolicyAbsolutePath,         // {0} = the offending string literal
+    PolicyUnknownName,          // {0} = the unknown policy name
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

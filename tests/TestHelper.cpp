@@ -1,5 +1,6 @@
 #include "TestHelper.h"
 
+#include "contracts/Sidecar.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 
@@ -24,6 +25,7 @@ public:
         rule_.check(ctx, results_);
         zerodefect::SummaryRegistry::instance().clear();
         zerodefect::CfgCache::instance().clear();
+        zerodefect::clearSidecarCache();
     }
 
 private:

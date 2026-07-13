@@ -24,6 +24,8 @@ machine-readable findings with dataflow traces.
 | Use after free | `use-after-free` | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
+| Contract verification | `contract` | Violations of declared `// zd:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries; `contract-syntax` / `contract-unsupported` keep unparseable or unverifiable contracts visible |
+| Policy enforcement | `policy` | `zd:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
 
 **Targeted path-sensitivity:** the memory rules keep a small set of
 guarded states instead of one merged state, keyed by conditions on
@@ -420,6 +422,64 @@ its own gating.)
 
 For a shareable, tool-free view of the same findings, use `--html` —
 one self-contained file with filters and source-context traces.
+
+## Contracts (`zd:`)
+
+ZeroDefect's rules infer what a function does. Contracts pin what it
+is SUPPOSED to do — a contract is a **declared function summary**,
+written as a structured comment and checked by the same dataflow that
+does the inference:
+
+```c
+// zd: requires p != null
+// zd: ensures return != null if n != 0
+// zd: owns(cfg)
+char *find_config(struct Cfg *cfg, const char *p, int n);
+```
+
+When AI-generated (or human) code later breaks the promise, the diff
+between declared and actual behavior is a finding at the exact line
+that broke it.
+
+What is enforced today:
+
+- `requires p != null` / `requires n != 0` — **assume/guarantee**:
+  inside the callee the parameter is trusted (the contract carries the
+  proof burden); every visible call site is checked against the
+  caller's own dataflow state. `f(NULL)` into a non-null contract is
+  an error, a possibly-null argument is a warning, a guarded argument
+  is silent. Relational escapes (`requires p != null || n <= 0`) are
+  honored.
+- `ensures return != null` / `!= 0` — checked against the inferred
+  return summaries; the guarded form (`... if n != 0`) is checked
+  per path at every return statement, and the violating return
+  carries a dataflow trace.
+- `owns(p)` / `borrows(p)` — checked against the inferred parameter
+  effects: `owns` with a provably read-only body and `borrows` with a
+  freeing body are violations (leak and double-free shapes).
+- `zd:policy no-absolute-paths` — AST-level pattern prohibition: a
+  hard-coded absolute path in a string literal is an error. Activate
+  per file with the comment, or project-wide via `policy =
+  no-absolute-paths` in `.zerodefect.conf` (or `--policy`).
+
+Failure semantics are deliberate: a violated bare `zd:` contract is an
+**error** (CI fails — that friction is the point; changing the `zd:`
+line in review IS the audit trail of changed intent). `zd:ai` marks a
+machine-proposed contract: same grammar, violations downgrade to
+warnings — tools propose, humans adopt by deleting three characters.
+Unparseable lines are `contract-syntax` errors and anything outside
+the checkable subset is an explicit `contract-unsupported` warning —
+a contract is never silently accepted.
+
+For third-party code you cannot annotate, contracts live in a sidecar
+file (`src/core.c` → `src/core.c.zdc`), every entry explicitly
+anchored to its function (`git_commit_create: requires repo != null`,
+optional `/arity` for overloads). Position-based mapping is forbidden
+by design: a silently shifted mapping would attach guarantees to the
+wrong functions.
+
+The full design (grammar, checkable subset, failure semantics,
+rationale) is in [`CONTRACTS.md`](CONTRACTS.md).
 
 ## Roadmap
 

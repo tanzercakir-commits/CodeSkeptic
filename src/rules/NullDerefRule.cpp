@@ -204,7 +204,7 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
-        auto parsed = zerodefect::contractsForDecl(callee, ctx);
+        auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) continue;
         auto req = zerodefect::analyzeRequires(parsed, callee);
         for (const auto& info : req.enforced)
@@ -405,7 +405,7 @@ public:
                             ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) return;
-        auto parsed = zerodefect::contractsForDecl(callee, ctx);
+        auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) return;
         auto req = zerodefect::analyzeRequires(parsed, callee);
         if (req.enforced.empty()) return;
@@ -708,7 +708,7 @@ public:
         if (!zerodefect::functionFilterAllows(*func)) return;
         if (!zerodefect::lineFilterAllows(*func, sm)) return;
 
-        auto parsed = zerodefect::contractsForDecl(func, *result.Context);
+        auto parsed = zerodefect::allContractClausesForDecl(func, *result.Context);
         auto guardedEnsures =
             zerodefect::analyzeNullEnsuresGuards(parsed, func);
 
