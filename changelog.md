@@ -1,5 +1,19 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Kyty scan: clean of real bugs, one engine-v2 repro captured
+
+Scanned Kyty (PS4/PS5 emulator, InoriRus) — 104 core files, clean
+run (2 fatal errors were just missing generated/vendored headers,
+isolated to 2 files; the project's `analyzer_noreturn` exit handlers
+declared via `--fatal-asserts` collapsed the potential EXIT_IF
+flood). No real bug: the 3 findings were all false positives (1 in
+3rdparty stb, 2 twin FPs in Kyty's JSON parser). The two JSON FPs
+trace to one clean, minimal limitation — **passthrough/identity
+nullness** (`skip(p)` returns null iff `p` is null, but our
+ReturnNullness lattice can't express it) — recorded in todo.md as an
+engine-v2 summary-extension repro. No upstream report filed: no real
+bug, and reporting an FP would burn credibility.
+
 ## 2026-07-13 — First upstream finding MERGED (shadPS4 #4702)
 
 The `internal__Foprep` null-dereference we reported to shadPS4
