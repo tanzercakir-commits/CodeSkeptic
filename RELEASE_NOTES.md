@@ -51,13 +51,19 @@ the README's Benchmark section).
 
 ## Confirmed in the wild
 
-The analyzer has already found a real bug that the upstream maintainers
-fixed: shadPS4's `internal__Foprep` set `ENOMEM` on file-table
-exhaustion but fell through without a `return`, dereferencing the null
-`FILE*` on the next line. The one-line fix — a `return nullptr;` after
-the error is set — was merged
-([shadps4-emu/shadPS4#4702](https://github.com/shadps4-emu/shadPS4/pull/4702)).
-Two more findings from the same scan are reported upstream. See the
+The analyzer has already found real bugs that the upstream maintainers
+fixed and merged — two, from the shadPS4 emulator:
+
+- a `sceSaveDataMount/Mount2` guard that used `&&` where it needed
+  `||` and dereferenced the pointer it had just null-checked
+  ([shadps4-emu/shadPS4#4703](https://github.com/shadps4-emu/shadPS4/pull/4703)) —
+  the canonical looks-right-reads-wrong bug;
+- `internal__Foprep` setting `ENOMEM` on file-table exhaustion but
+  falling through without a `return` and dereferencing the null
+  `FILE*`
+  ([#4702](https://github.com/shadps4-emu/shadPS4/pull/4702)).
+
+A third finding from the same scan is reported upstream. See the
 README's Real-world scans section for the full table (systemd, Redis,
 libgit2, llama.cpp, NASA fprime, abseil, Catch2).
 
