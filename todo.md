@@ -214,6 +214,33 @@ Juliet's CI weight, project name check.
       measures exactly the engine-v2 features (value correlation,
       macro-behavior summaries, wider pointer keying). Feed into the
       ROADMAP §4.B evolve-vs-rewrite decision.
+- [ ] **Passthrough / identity nullness — engine-v2 summary
+      extension (minimal real-world repro from Kyty, 2026-07-13)**.
+      Kyty (PS4 emulator) scanned clean of real bugs, but its JSON
+      parser gave two twin FPs (JsonReader parse_array:118,
+      parse_object:171) tracing to ONE limitation:
+
+          static const char32_t* skip(const char32_t* in) {
+              if (in == nullptr) return nullptr;   // only null path
+              while (*in && Char::IsSpace(*in)) in++;
+              return in;                           // null IFF in null
+          }
+          // caller: value points at '[' (guaranteed by a prior deref)
+          value = skip(value + 1);   // value+1 provably non-null
+          if (*value == U']') ...    // FP: value flagged MaybeNull
+
+      Root cause: ReturnNullness is {Unknown, NeverNull, MaybeNull} —
+      it cannot say "returns null IFF parameter N is null", so
+      skip()'s `return nullptr` path poisons every call result to
+      MaybeNull regardless of the argument. Fix direction (EVOLVE,
+      not rewrite): add a conditional summary point
+      (e.g. ReturnNullness::NullIffParam(n)) inferred when every
+      null-return is dominated by a `param == null` check and the
+      non-null return is the (possibly offset) param; consumed at
+      call sites by forwarding the argument's own nullness. Clean,
+      bounded, and it retires a whole FP family (skip/trim/advance
+      helpers are everywhere). Kyty took no upstream report — no real
+      bug, and reporting an FP would burn credibility.
 - [ ] llama.cpp non-convergence residue (2026-07-12): 72 warnings but
       only 4 UNIQUE functions — all nlohmann/json.hpp header templates
       (get_unchecked/get_checked/get_and_create/contains), re-counted
