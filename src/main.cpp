@@ -5,6 +5,7 @@
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
+#include "rules/ContractRule.h"
 #include "rules/UninitPointerRule_Ex.h"
 #include "server/McpServer.h"
 
@@ -56,6 +57,7 @@ int main(int argc, char* argv[]) {
     analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
     analyzer.addRule<zerodefect::DivByZeroRule>();
     analyzer.addRule<zerodefect::NullDerefRule>();
+    analyzer.addRule<zerodefect::ContractRule>();
 
     int findings = analyzer.run();
 

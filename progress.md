@@ -26,14 +26,16 @@
 | MemoryLeakRule_Ex | `src/rules/MemoryLeakRule_Ex.h`, `.cpp` | Done (leak + double-free + UAF; disjuncts + Effect pattern + summary consumption) |
 | DivByZeroRule | `src/rules/DivByZeroRule.h`, `.cpp` | Done (literal + CFG + guard analysis) |
 | NullDerefRule | `src/rules/NullDerefRule.h`, `.cpp` | Done (NullState + assume edges + disjuncts + return-nullness summary) |
-| main.cpp | `src/main.cpp` | Done (4 rules registered, 5 rule_ids) |
+| main.cpp | `src/main.cpp` | Done (5 rules registered incl. contracts) |
 | CMake build system | `CMakeLists.txt`, `src/CMakeLists.txt` | Done (Linux + macOS) |
+| ContractParser | `src/contracts/ContractParser.h`, `.cpp` | Done (zd:/zd:ai grammar, recursive descent) |
+| ContractRule | `src/rules/ContractRule.h`, `.cpp` | Done (Round B: return postconditions vs inferred summaries) |
 | CfgCache | `src/engine/CfgCache.h`, `.cpp` | Done (one CFG per function; TU-end cleanup + ctx-change safety) |
 | SummaryDiff | `src/engine/SummaryDiff.h`, `.cpp` | Done (--summary-diff; WEAKENED = exit 1 CI gate) |
 | CallRefArgs | `src/engine/CallRefArgs.h` | Done (non-const ref args invalidate facts; all four rules) |
 | FatalCalls | `src/engine/FatalCalls.h`, `.cpp` | Done (--fatal-asserts; engine-level path kill) |
 | AllocFunctions | `src/engine/AllocFunctions.h`, `.cpp` | Done (--alloc-functions/--free-functions) |
-| GTest infrastructure | `tests/` | Done (321/321; ctest + single-process) |
+| GTest infrastructure | `tests/` | Done (348/348; ctest + single-process) |
 | CI | `.github/workflows/ci.yml` | Done (build + test + smoke + corpus) |
 | Corpus script | `scripts/run_corpus.sh` | Done (cJSON v1.7.18 + tinyxml2 10.0.0) |
 | Juliet benchmark | `scripts/run_juliet.sh`, `juliet_eval.py`, `juliet.yml` | Full integration: F1 + score guard; runs on every code PR (drafts excluded); numbers in the README |

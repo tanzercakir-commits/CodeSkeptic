@@ -112,6 +112,13 @@ void SourceManager::scanDirectory(const std::string& dir_path) {
 namespace {
 
 void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
+    // Contracts live in ordinary line comments; without this flag the
+    // AST keeps only doc-comments and getRawCommentForDeclNoCache
+    // returns nothing for `// zd:` blocks (CONTRACTS.md).
+    tool.appendArgumentsAdjuster(
+        clang::tooling::getInsertArgumentAdjuster(
+            {"-fparse-all-comments"},
+            clang::tooling::ArgumentInsertPosition::BEGIN));
 #ifdef __APPLE__
     // macOS: SDK headers come via isysroot; extra system paths are needed.
     // On Linux, prepending these paths breaks GCC libstdc++'s include_next
