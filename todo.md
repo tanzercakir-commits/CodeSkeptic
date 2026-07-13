@@ -175,6 +175,38 @@ Juliet's CI weight, project name check.
 - [ ] fstab-util.c:261 (+1 from the unsigned round): flag/pointer
       correlation lost — single-file bisect to find which removed key
       (u<0 / u>=0) was doing the pruning; direction conservative.
+- [x] **Redis null round 2 — CLASSIFIED, no engine change
+      (2026-07-13)**: fresh scan on the contracts-complete build is
+      byte-stable (80 findings, 66 null warnings; contracts added
+      zero noise). Site-by-site families:
+      (a) quicklist (12): defensive guards INSIDE utility macros
+      (quicklistDecompressNode's `if ((_n) && ...)`) vs function-top
+      length invariants — an attempted "macro-born null evidence is
+      not caller evidence" rule was REVERTED: the
+      SystemdAssertShape_UnprotectedDerefStillWarns pin proved it
+      lexically indistinguishable from caller-authored assert
+      predicates (`myassert(s || l <= 0)`) — both expand to
+      body-authored tests over arg-spelled variables; discrimination
+      needs macro-behavior awareness (engine v2 input, ROADMAP §4.B).
+      Plus _quicklistListpackMerge keep/nokeep: if/else-if with no
+      else, invariant carried by lpMerge's postcondition — locally a
+      genuinely suspicious shape; contract material only when "one of
+      two outputs is null" becomes expressible.
+      (b) redis-cli (11): lazy arrays correlated with heap-field loop
+      bounds (`types = NULL` until `keys->elements > 0`; the deref
+      loop is bounded by the SAME field) — value correlation on heap
+      fields, beyond v1 keying.
+      (c) t_stream (8): flag/pointer correlation where the flag is a
+      HEAP pointer (`if (groups) consumer = ...; ... if (groups)
+      consumer->...`) — ptrKeyable is deliberately narrow
+      (short-circuit partners only); widening it re-opens the
+      disjunct-budget tradeoff measured at kMaxDisjuncts.
+      (d) rax (5) + tail: conditional allocation under size
+      computations, same correlation class.
+      CONCLUSION: no lexical idiom flags left in redis — the residue
+      measures exactly the engine-v2 features (value correlation,
+      macro-behavior summaries, wider pointer keying). Feed into the
+      ROADMAP §4.B evolve-vs-rewrite decision.
 - [ ] llama.cpp non-convergence residue (2026-07-12): 72 warnings but
       only 4 UNIQUE functions — all nlohmann/json.hpp header templates
       (get_unchecked/get_checked/get_and_create/contains), re-counted
