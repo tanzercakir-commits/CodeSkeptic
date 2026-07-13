@@ -8,6 +8,7 @@
 // "which clauses are enforced" can never drift between rules.
 
 #include "contracts/ContractParser.h"
+#include "engine/PathFacts.h"
 
 #include <optional>
 #include <set>
@@ -63,12 +64,44 @@ struct RequiresAnalysis {
 RequiresAnalysis analyzeRequires(const ParsedContracts& parsed,
                                  const clang::FunctionDecl* func);
 
+// One enforced guarded postcondition:
+// `ensures return != null if <param REL lit>` (CONTRACTS.md Round D).
+// The guard is reduced to a canonical fact key — checking happens
+// per-disjunct at return statements inside NullDeref.
+struct GuardedEnsuresInfo {
+    FactKey guardKey;
+    bool guardWanted = true;  // key value WHEN THE GUARD IS TRUE
+    bool machineProposed = false;
+    std::string text;
+    unsigned line = 0;
+};
+
+struct GuardedEnsuresAnalysis {
+    std::vector<GuardedEnsuresInfo> enforced;
+    // ContractRule must not report these lines as unverified.
+    std::set<unsigned> enforcedLines;
+};
+
+// Recognizes the enforceable guarded null-postconditions of `func`:
+// pred must be `return != null`, the guard a single
+// parameter-vs-integer-literal comparison whose parameter is KEYABLE
+// (not address-taken/assigned-nonlocal — collectUnkeyableDecls — and
+// canonicalizable by compareFact). Everything else stays unenforced,
+// and ContractRule keeps reporting it as unverified: keyability is
+// decided HERE so the two sides can never disagree silently.
+GuardedEnsuresAnalysis analyzeNullEnsuresGuards(
+    const ParsedContracts& parsed, const clang::FunctionDecl* func);
+
 // Call-site argument helpers for the caller-side checks.
 bool isNullPointerArg(const clang::Expr* arg);
 std::optional<long long> intLiteralArg(const clang::Expr* arg);
 
 // Evaluates `value REL literal` for the NonNullUnlessCond escape.
 bool evalCmp(long long value, ContractCmpOp op, long long literal);
+
+// Contract comparison operator -> the clang BinaryOperatorKind that
+// compareFact/normalizeCompare canonicalize.
+clang::BinaryOperatorKind toBinaryOp(ContractCmpOp op);
 
 } // namespace zerodefect
 

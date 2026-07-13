@@ -74,10 +74,16 @@ Juliet's CI weight, project name check.
       Residual (noted in CONTRACTS.md §7): non-literal escape
       arguments stay conservative (silent); caller-side state for the
       escape param could refine that in a later round.
-- [ ] Round D: guarded ensures (`if n != 0`) per-disjunct return
-      checking; ownership effects vs param-effect summaries
-      (`owns/borrows/returns owned`); violation traces (which return,
-      which path) attached to contract findings.
+- [x] Round D: guarded ensures (`ensures return != null if g`)
+      per-disjunct return checking (guard keyability decided in
+      ContractInfo, shared with ContractRule — no silent hole);
+      `owns/borrows` vs param-effect summaries (ReadsOnly violates
+      owns, Frees violates borrows; Stores/Opaque explicitly
+      unverified); violation traces attached to contract findings.
+      Residuals: `returns owned` needs a return-ownership summary
+      (stays contract-unsupported); zero-domain guarded ensures
+      (`ensures return != 0 if g`) needs disjuncts in DivByZero
+      (stays contract-unsupported).
 - [ ] Round E: `zd:policy` engine with `no-absolute-paths` first;
       `.zdc` sidecar loading (anchored entries only); profile-level
       policies in zerodefect.conf; README contracts section.

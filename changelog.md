@@ -1,5 +1,48 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Contracts Round D: guarded ensures + ownership effects
+
+### Added
+- **Guarded postconditions enforced**
+  (`ensures return != null if <g>`): checked per disjunct at every
+  return statement inside NullDeref. A path that REFUTES the guard is
+  exempt (returning null there is exactly what the guard licenses); a
+  path that PROVES the guard and returns definite null is an ERROR
+  (warning for `zd:ai`); null under an undecided guard, or
+  possibly-null, is a warning. The guard must be fact-keyable — the
+  keyability decision lives in `analyzeNullEnsuresGuards`
+  (ContractInfo), shared by NullDeref and ContractRule, so an
+  unkeyable guard (address-taken parameter) falls back to the
+  explicit `contract-unsupported` warning instead of opening a
+  silent hole.
+- **Ownership effects checked** (`owns(p)` / `borrows(p)` vs the
+  inferred parameter effects): `owns` with a provably read-only body
+  is a violation (ownership claimed, handoff leaks); `borrows` with a
+  body that frees is a violation (caller's ownership broken — the
+  double-free shape). Stores/Opaque stay explicitly unverified — no
+  strong claim on ambiguity. Unknown parameter names in
+  `owns/borrows` are `contract-syntax` errors. `returns owned` stays
+  explicitly unverified (no return-ownership summary yet — residual).
+  Caller-side leak suppression for `owns` needed no code: passing to
+  a callee already conservatively escapes the pointer.
+- **Violation traces on contract findings**: caller-side violations
+  (Round C) and guarded-ensures violations now carry the existing
+  "why null / why zero" dataflow traces (which assignment, which
+  guard) — the LLM self-repair fuel of CONTRACTS.md §6.
+
+### Verification
+- 376/376 tests in both modes (+13 Round D: guard-true violation,
+  guard-false licensed silence, undecided-guard warning, zd:ai
+  downgrade, trace attachment, enforced-not-unverified, unkeyable
+  guard stays reported, borrows-frees error, borrows-readonly
+  silence, owns-readonly error, owns-frees silence, owns unknown
+  param syntax error, call-site trace).
+- Juliet floors and corpus pins green (cjson 50, tinyxml2 9 exact).
+- Dogfood: the conditional promise (`ensures return != null if
+  id != 0` + `if (id != 0) return NULL;`) is caught AT the violating
+  return; `owns` on a read-only body and `borrows` on a freeing body
+  both fire at the contract line.
+
 ## 2026-07-13 — Contracts Round C: requires — assume/guarantee
 
 ### Added

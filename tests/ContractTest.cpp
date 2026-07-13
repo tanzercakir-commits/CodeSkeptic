@@ -145,12 +145,14 @@ TEST(ContractRuleTest, SyntaxError_IsContractSyntaxError) {
 }
 
 TEST(ContractRuleTest, LaterRoundClause_ReportedNotSilent) {
-    // Ownership effects land in Round D: until then the contract is
-    // explicitly reported as unverified — never silently "accepted".
+    // `returns owned` needs a return-ownership summary the engine
+    // does not infer yet: until then the contract is explicitly
+    // reported as unverified — never silently "accepted".
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: owns(p)
-        void take(int *p) { }
+        char *dup(const char *s);
+        // zd: returns owned
+        char *make_name(const char *base) { return dup(base); }
     )");
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "contract-unsupported");
@@ -402,4 +404,193 @@ TEST(ContractRoundCTest, RequiresNonZero_CalleeSeeded_NoNoise) {
         int divide(int a, int n) { return a / n; }
     )");
     EXPECT_EQ(results.size(), 0u);
+}
+
+// --- Round D: guarded ensures + ownership effects + traces ---
+// `ensures return != null if <g>` is checked per disjunct at every
+// return: paths that REFUTE the guard are exempt, a path that PROVES
+// it and returns null is a violation. owns/borrows are checked
+// against the inferred parameter effects.
+
+TEST(ContractRoundDTest, GuardedEnsures_ViolatedOnGuardTruePath_IsError) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) {
+            static int g;
+            if (n != 0) return 0;   // exactly the promised case
+            return &g;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("if n != 0"), std::string::npos);
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_NullOnGuardFalsePath_Silent) {
+    // The guard-refuting path is exactly what the guard licenses.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) {
+            static int g;
+            if (n == 0) return 0;   // licensed: guard is false here
+            return &g;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_NullUnderUndecidedGuard_IsWarning) {
+    // No branch ever decides n: the null return MAY fall under the
+    // guard — evidence is partial, so a warning, not an error.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) { return 0; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_MachineProposed_IsWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd:ai ensures return != null if n != 0
+        int *lookup(int n) {
+            static int g;
+            if (n != 0) return 0;
+            return &g;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_ViolatingVarReturn_HasTrace) {
+    // The violation carries the "why null" trace (which assignment).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) {
+            int *r = 0;
+            if (n != 0) return r;
+            static int g;
+            return &g;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_FALSE(results[0].notes.empty());
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_EnforcedLine_NotUnverified) {
+    // ContractRule no longer reports the enforced guarded clause.
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) {
+            static int g;
+            if (n != 0) return 0;
+            return &g;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundDTest, GuardedEnsures_UnkeyableGuard_StaysUnverified) {
+    // The guard parameter is address-taken (unkeyable): NullDeref
+    // cannot enforce, so ContractRule must keep reporting — the
+    // keyability decision is shared, a silent hole cannot open.
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        void touch(int *p);
+        // zd: ensures return != null if n != 0
+        int *lookup(int n) {
+            touch(&n);
+            static int g;
+            if (n != 0) return 0;
+            return &g;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract-unsupported");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ContractRoundDTest, Borrows_CalleeFrees_IsError) {
+    // Declared borrowed, provably freed: the caller's ownership is
+    // broken (double-free shape).
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        void free(void *);
+        // zd: borrows(buf)
+        void use(char *buf) { free(buf); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("borrows(buf)"), std::string::npos);
+}
+
+TEST(ContractRoundDTest, Borrows_ReadOnlyBody_Silent) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: borrows(buf)
+        int use(const char *buf) { return buf[0]; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundDTest, Owns_ReadOnlyBody_IsError) {
+    // Ownership claimed, parameter provably only read: the handoff
+    // leaks — the claim is false.
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: owns(cfg)
+        int consume(char *cfg) { return cfg[0]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRoundDTest, Owns_CalleeFrees_Silent) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        void free(void *);
+        // zd: owns(cfg)
+        void consume(char *cfg) { free(cfg); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRoundDTest, Owns_UnknownParamName_IsContractSyntax) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        // zd: owns(config)
+        int consume(char *cfg) { return cfg[0]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract-syntax");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRoundDTest, CallSiteViolation_HasTrace) {
+    // Round C's caller-side finding now carries the "why null" trace.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        // zd: requires p != null
+        int f(int *p);
+        int g() {
+            int *q = 0;
+            return f(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_FALSE(results[0].notes.empty());
 }

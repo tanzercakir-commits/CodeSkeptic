@@ -115,6 +115,63 @@ bool evalCmp(long long value, ContractCmpOp op, long long literal) {
     return false;
 }
 
+BinaryOperatorKind toBinaryOp(ContractCmpOp op) {
+    switch (op) {
+        case ContractCmpOp::EQ: return BO_EQ;
+        case ContractCmpOp::NE: return BO_NE;
+        case ContractCmpOp::LT: return BO_LT;
+        case ContractCmpOp::LE: return BO_LE;
+        case ContractCmpOp::GT: return BO_GT;
+        case ContractCmpOp::GE: return BO_GE;
+    }
+    return BO_EQ;
+}
+
+GuardedEnsuresAnalysis analyzeNullEnsuresGuards(
+    const ParsedContracts& parsed, const clang::FunctionDecl* func) {
+    GuardedEnsuresAnalysis out;
+    if (!func || !func->getReturnType()->isPointerType()) return out;
+
+    // Computed lazily — most functions carry no guarded clauses.
+    std::optional<std::set<const ValueDecl*>> unkeyable;
+
+    for (const auto& clause : parsed.clauses) {
+        if (clause.kind != ContractClauseKind::Ensures || !clause.hasGuard)
+            continue;
+        // Pred: return != null (the only per-disjunct form in v1).
+        const ContractPred& p = clause.pred;
+        if (p.kind != ContractPred::Cmp || p.op != ContractCmpOp::NE ||
+            p.lhs.kind != ContractOperandKind::Return ||
+            p.rhs.kind != ContractOperandKind::Null)
+            continue;
+        // Guard: single param-vs-int-literal comparison.
+        std::string guardName;
+        ContractCmpOp guardOp;
+        long long guardLit;
+        if (!isParamVsInt(clause.guard, &guardName, &guardOp, &guardLit))
+            continue;
+        auto idx = paramIndexByName(func, guardName);
+        if (!idx) continue;  // reported via ensures? keep unverified
+        const ParmVarDecl* guardParam = func->getParamDecl(*idx);
+
+        if (!unkeyable) unkeyable = collectUnkeyableDecls(func);
+        if (unkeyable->count(guardParam)) continue;  // stays unverified
+
+        auto fact = compareFact(guardParam, toBinaryOp(guardOp), guardLit);
+        if (!fact) continue;  // e.g. unsigned u < 0: no information
+
+        GuardedEnsuresInfo info;
+        info.guardKey = fact->first;
+        info.guardWanted = fact->second;
+        info.machineProposed = clause.machineProposed;
+        info.text = clause.text;
+        info.line = clause.line;
+        out.enforced.push_back(info);
+        out.enforcedLines.insert(clause.line);
+    }
+    return out;
+}
+
 RequiresAnalysis analyzeRequires(const ParsedContracts& parsed,
                                  const FunctionDecl* func) {
     RequiresAnalysis out;
