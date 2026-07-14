@@ -90,10 +90,18 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
                                                 ASTContext& ctx) {
     std::set<const VarDecl*> vars;
 
+    // Static- and thread-storage-duration pointers are NOT tracked as
+    // uninitialized: C zero-initializes them (`static char *buf;`
+    // starts as NULL — defined, not indeterminate). Their null-ness
+    // is NullDeref's domain, not this rule's. Only automatic-storage
+    // locals without an initializer are genuinely uninitialized.
+    // (tmux screen_print/buf FP, 2026-07-13.)
     auto uninitPtrMatcher = varDecl(
         hasType(pointerType()),
         unless(hasInitializer(anything())),
-        unless(parmVarDecl())
+        unless(parmVarDecl()),
+        unless(hasStaticStorageDuration()),
+        unless(hasThreadStorageDuration())
     ).bind("var");
 
     auto wrapper = functionDecl(equalsNode(funcDecl),

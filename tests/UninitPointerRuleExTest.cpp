@@ -276,3 +276,49 @@ TEST(ShadPS4FpTest, ValueParam_StaysUninit) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "uninit-ptr");
 }
+
+TEST(UninitPtrStorageTest, StaticPointer_ZeroInitialized_NoWarn) {
+    // C zero-initializes static-storage-duration objects: `static
+    // char *buf;` starts as NULL (defined), NOT uninitialized. The
+    // tmux screen_print/buf shape (2026-07-13): a static pointer
+    // behind an `if (buf == NULL) buf = xmalloc(...)` guard was
+    // falsely flagged as uninitialized-use.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        char *alloc(unsigned);
+        char f() {
+            static char *buf;
+            if (buf == 0)
+                buf = alloc(16);
+            return buf[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(UninitPtrStorageTest, ThreadLocalPointer_ZeroInitialized_NoWarn) {
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        char *alloc(unsigned);
+        char f() {
+            static __thread char *buf;
+            if (buf == 0)
+                buf = alloc(16);
+            return buf[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(UninitPtrStorageTest, AutomaticPointer_StillWarns) {
+    // The fix must NOT silence genuine automatic-storage uninit use.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        char f() {
+            char *p;
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "uninit-ptr");
+}

@@ -214,6 +214,23 @@ Juliet's CI weight, project name check.
       measures exactly the engine-v2 features (value correlation,
       macro-behavior summaries, wider pointer keying). Feed into the
       ROADMAP §4.B evolve-vs-rewrite decision.
+- [x] **tmux scan — two precision fixes shipped, one engine-v2
+      note (2026-07-13)**. tmux (mature C) clean of real bugs; the
+      triage produced two near-term FIXES (both landed test-first):
+      (1) static/thread-local pointers no longer flagged uninit (C
+      zero-inits them; screen_print/buf); (2) DivByZero refinement
+      generalized to any zero-excluding bound `var <op> c`, c>=0
+      (layout_spread_cell `if (n <= 1) return;`). Remaining tmux
+      residue: `tty_add_features`/`tf` — pointer assigned in a loop
+      bounded by `nitems()` (compile-time array size > 0); the
+      analyzer walks the impossible zero-iteration path. Needs
+      value-range knowledge that the loop runs >= 1 time (engine-v2,
+      same family as bounded-loop reasoning). Also a scan-hygiene
+      note: scanning a whole source dir pulls in non-compiled
+      platform/compat files (tmux compat/setenv.c: undeclared
+      `environ` under fallback flags → error-recovery AST → phantom
+      uninit). Prefer restricting real-world scans to files present
+      in the compile DB.
 - [ ] **Passthrough / identity nullness — engine-v2 summary
       extension (minimal real-world repro from Kyty, 2026-07-13)**.
       Kyty (PS4 emulator) scanned clean of real bugs, but its JSON

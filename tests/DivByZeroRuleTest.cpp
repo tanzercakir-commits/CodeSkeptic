@@ -392,3 +392,84 @@ TEST(DivByZeroMutationTest, UntouchedZero_StillDefinite) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
+
+TEST(DivByZeroBoundTest, LeOneGuard_ProvesNonZero) {
+    // tmux layout_spread_cell (2026-07-13): `if (n <= 1) return;`
+    // leaves n > 1 on the fall-through — never zero. The refinement
+    // used to only understand comparisons against 0, so this warned.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int size, unsigned number) {
+            number = 0;
+            for (int i = 0; i < size; i++)
+                number++;
+            if (number <= 1)
+                return 0;
+            return size / number;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroBoundTest, LtTwoGuard_ProvesNonZero) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a, int n) {
+            n = 0;
+            if (a) n = a;
+            if (n < 2)
+                return 0;
+            return a / n;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroBoundTest, GeOneGuard_ProvesNonZero) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a, int n) {
+            n = 0;
+            if (a) n = a;
+            if (n >= 1)
+                return a / n;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroBoundTest, ZeroConstantOrderings_StillWork) {
+    // Regression: the generalized rule must preserve the original
+    // zero-constant behavior. `n > 0` true edge proves NonZero.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a, int n) {
+            n = 0;
+            if (a) n = a;
+            if (n > 0)
+                return a / n;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroBoundTest, LeOneUnprovenPath_StillWarns) {
+    // The bound only exempts the excluded-zero edge. Here nothing
+    // rules out zero before the division, so the warning stays.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a, int n) {
+            n = 0;
+            if (a) n = a;
+            if (n <= 1) {
+                /* n could be 0 here */
+                return a / n;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}

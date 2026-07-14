@@ -1,5 +1,41 @@
 # ZeroDefect — Changelog
 
+## 2026-07-13 — Two precision fixes surfaced by the tmux scan
+
+Scanned tmux (mature, heavily-audited C) — clean of real bugs, but
+it surfaced two clean, near-term false-positive classes, both fixed
+test-first:
+
+### Fixed
+- **Static/thread-local pointers are no longer treated as
+  uninitialized** (UninitPointerRule): C zero-initializes
+  static-storage-duration objects, so `static char *buf;` starts as
+  NULL (defined), not indeterminate — its null-ness is NullDeref's
+  domain. The matcher now excludes static and thread storage
+  duration; only automatic-storage locals without an initializer are
+  tracked. (tmux `screen_print`/`buf` behind an `if (buf == NULL)`
+  guard: 5 FPs → 0.)
+- **DivByZero refinement generalized to any zero-excluding bound**
+  (not just comparisons against 0): on a branch edge the holding
+  constraint `var <op> c` proves `var != 0` whenever 0 does not
+  satisfy it — so `if (n <= 1) return;` now leaves `n` NonZero on the
+  fall-through. Subsumes the old zero-constant behavior; restricted
+  to `c >= 0` so the signed 0-vs-c test matches the real (possibly
+  unsigned) comparison. (tmux `layout_spread_cell`/`number`: 1 FP → 0.)
+
+### Verification
+- 398/398 tests both modes (+8: static-pointer no-warn ×2 +
+  automatic-still-warns; divzero `<=1`/`<2`/`>=1` bounds, zero-const
+  regression, unproven-path still-warns).
+- Juliet floors byte-identical (CWE369 1.000/0.050 unchanged — the
+  generalization is behavior-preserving); corpus pins exact.
+- tmux re-scan: 72 → 66 findings (the 6 fixed FPs gone). Remaining:
+  1 loop-bound-is-array-size FP (`nitems()`, value-range, engine-v2)
+  and 5 error-recovery artifacts in compat/setenv.c (undeclared
+  `environ` under fallback flags — scanned out of its build context;
+  a scan-hygiene note, not an analyzer FP). No upstream report: no
+  real bug.
+
 ## 2026-07-13 — Second upstream finding MERGED (shadPS4 #4703)
 
 A second shadPS4 finding was fixed and merged upstream: issue #4696

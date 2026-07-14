@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -69,6 +70,44 @@ ZeroState evaluateAssignedValue(const Expr* expr) {
         }
     }
     return ZeroState::Unknown;
+}
+
+// The concrete integer value of a literal expression (with a leading
+// unary minus), if any. Used to refine zero-ness against non-zero
+// bounds (`if (n <= 1) return;` proves n != 0 on the fall-through).
+std::optional<long long> constIntValue(const Expr* expr) {
+    if (!expr) return std::nullopt;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* lit = dyn_cast<IntegerLiteral>(expr)) {
+        if (lit->getValue().getSignificantBits() > 63) return std::nullopt;
+        return lit->getValue().getSExtValue();
+    }
+    if (const auto* unary = dyn_cast<UnaryOperator>(expr))
+        if (unary->getOpcode() == UO_Minus)
+            if (auto v = constIntValue(unary->getSubExpr())) return -*v;
+    return std::nullopt;
+}
+
+// Does 0 satisfy `0 <opc> c`? (opc arrives variable-on-the-left, so
+// this asks whether the value 0 lies in the constraint region.)
+bool zeroSatisfies(BinaryOperatorKind opc, long long c) {
+    switch (opc) {
+        case BO_LT: return 0 < c;
+        case BO_LE: return 0 <= c;
+        case BO_GT: return 0 > c;
+        case BO_GE: return 0 >= c;
+        default:    return true;  // non-ordering: no exclusion
+    }
+}
+
+BinaryOperatorKind negateOrdering(BinaryOperatorKind opc) {
+    switch (opc) {
+        case BO_LT: return BO_GE;
+        case BO_LE: return BO_GT;
+        case BO_GT: return BO_LE;
+        case BO_GE: return BO_LT;
+        default:    return opc;
+    }
 }
 
 // --- Helpers ---
@@ -282,24 +321,21 @@ void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
                 return;
             }
 
-            // Orderings only against the zero constant: infer NonZero in
-            // the direction where the inequality excludes zero (opc
-            // arrives variable-on-the-left)
-            if (litState != ZeroState::Zero) return;
-            switch (opc) {
-                case BO_GT:  // z > 0
-                case BO_LT:  // z < 0
-                    if (edgeTrue)
-                        setIfTracked(state, var, ZeroState::NonZero);
-                    break;
-                case BO_GE:  // z >= 0: if false then z < 0 → NonZero
-                case BO_LE:  // z <= 0: if false then z > 0 → NonZero
-                    if (!edgeTrue)
-                        setIfTracked(state, var, ZeroState::NonZero);
-                    break;
-                default:
-                    break;
-            }
+            // Orderings against ANY non-negative constant: on a given
+            // edge the constraint `var <effOp> c` holds; if 0 does NOT
+            // satisfy it, var cannot be zero there. This subsumes the
+            // zero-constant cases (`z > 0` true → NonZero) AND catches
+            // non-zero bounds: `if (n <= 1) return;` leaves `n > 1` on
+            // the fall-through, and 0 fails `0 > 1`, so n is NonZero
+            // (the tmux layout_spread_cell FP, 2026-07-13). Restricted
+            // to c >= 0 so the signed comparison of 0 vs c matches the
+            // real (possibly unsigned) comparison — a negative bound
+            // would need signedness the fact layer doesn't carry here.
+            auto c = constIntValue(other);
+            if (!c || *c < 0) return;
+            BinaryOperatorKind effOp = edgeTrue ? opc : negateOrdering(opc);
+            if (!zeroSatisfies(effOp, *c))
+                setIfTracked(state, var, ZeroState::NonZero);
         });
 }
 
