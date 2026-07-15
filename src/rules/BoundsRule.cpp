@@ -158,7 +158,8 @@ private:
 namespace zerodefect {
 
 void BoundsRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
-    ParamIntervalMap paramMap = buildParamIntervals(ctx);
+    const ParamIntervalMap& paramMap =
+        ParamIntervalCache::instance().get(ctx);
 
     MatchFinder finder;
     BoundsCallback callback(paramMap, results);

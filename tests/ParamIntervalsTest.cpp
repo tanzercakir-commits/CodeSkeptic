@@ -99,3 +99,23 @@ TEST(ParamIntervalsTest, UncalledStaticIsTop) {
         "static int g(int n){ return n; } int f(void){ return 0; }", "g");
     EXPECT_TRUE(n.isTop());
 }
+
+// --- v0.2 (two-pass): caller local dataflow, not just literals ---
+
+TEST(ParamIntervalsTest, BoundedLocalCallerNarrows) {
+    // The argument is a LOCAL (k), not a literal — v0.2 reads the caller's
+    // interval state at the call, where k is proven [5,5].
+    Interval n = entryOfFirstParam(
+        "static int g(int n){ return n; } "
+        "int f(void){ int k = 5; return g(k); }", "g");
+    EXPECT_EQ(n, Interval::constant(5));
+}
+
+TEST(ParamIntervalsTest, GuardBoundedCallerNarrows) {
+    // x is refined to [0,10] by the caller's guards before the call.
+    Interval n = entryOfFirstParam(
+        "static int g(int n){ return n; } "
+        "int f(int x){ if (x < 0) return 0; if (x > 10) return 0; "
+        "return g(x); }", "g");
+    EXPECT_EQ(n, Interval::range(0, 10));
+}

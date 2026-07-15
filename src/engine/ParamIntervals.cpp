@@ -1,5 +1,7 @@
 #include "engine/ParamIntervals.h"
 
+#include "engine/DataflowEngine.h"
+#include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
 
 #include <clang/AST/ASTContext.h>
@@ -8,6 +10,7 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 
 #include <set>
+#include <vector>
 
 using namespace clang;
 
@@ -15,60 +18,74 @@ namespace zerodefect {
 
 namespace {
 
-// One TU walk: collects internal-linkage function definitions, the
-// direct-callee DeclRefExprs (call positions), every function-valued
-// DeclRefExpr (to detect address-taken), and every call site.
-struct TuVisitor : RecursiveASTVisitor<TuVisitor> {
-    // Candidate functions (canonical): internal linkage + has body.
-    std::set<const FunctionDecl*> candidates;
-    // Functions whose address is taken (canonical) — used as a value
-    // somewhere other than a direct call callee.
-    std::set<const FunctionDecl*> addressTaken;
-    // DeclRefExprs that ARE a call's direct callee (so referencing the
-    // function there is NOT taking its address).
-    std::set<const Expr*> calleeRefs;
-    // Call sites: (callee canonical, the call expr).
-    std::vector<std::pair<const FunctionDecl*, const CallExpr*>> calls;
+const FunctionDecl* candidate(const FunctionDecl* fn) {
+    if (!fn) return nullptr;
+    fn = fn->getCanonicalDecl();
+    // Internal linkage: cannot be called from another TU, so every caller
+    // is visible here. External functions stay unconstrained (top).
+    if (fn->isExternallyVisible()) return nullptr;
+    return fn;
+}
 
-    static const FunctionDecl* canonicalCandidate(const FunctionDecl* fn) {
-        if (!fn) return nullptr;
-        fn = fn->getCanonicalDecl();
-        // Internal linkage: cannot be called from another TU, so every
-        // caller is visible here. External functions stay unconstrained.
-        if (fn->isExternallyVisible()) return nullptr;
-        return fn;
-    }
+// One TU walk: candidate definitions, address-taken candidates, and the
+// call-callee references (so a function reference at a call is NOT counted
+// as taking the address).
+struct TuVisitor : RecursiveASTVisitor<TuVisitor> {
+    std::set<const FunctionDecl*> candidates;
+    std::set<const FunctionDecl*> addressTaken;
+    std::set<const Expr*> calleeRefs;
 
     bool VisitFunctionDecl(FunctionDecl* fn) {
         if (fn->isThisDeclarationADefinition() && fn->hasBody())
-            if (const auto* c = canonicalCandidate(fn)) candidates.insert(c);
+            if (const auto* c = candidate(fn)) candidates.insert(c);
         return true;
     }
-
     bool VisitCallExpr(CallExpr* call) {
-        if (const auto* callee = call->getDirectCallee()) {
-            if (const auto* c = canonicalCandidate(callee))
-                calls.emplace_back(c, call);
-            // The callee reference is a call, not an address-of.
-            if (const auto* ref =
-                    dyn_cast<DeclRefExpr>(call->getCallee()->IgnoreParenImpCasts()))
+        if (call->getDirectCallee())
+            if (const auto* ref = dyn_cast<DeclRefExpr>(
+                    call->getCallee()->IgnoreParenImpCasts()))
                 calleeRefs.insert(ref);
-        }
         return true;
     }
-
     bool VisitDeclRefExpr(DeclRefExpr* ref) {
-        const auto* fn = dyn_cast<FunctionDecl>(ref->getDecl());
-        if (!fn) return true;
-        const auto* c = canonicalCandidate(fn);
-        if (!c) return true;
-        // A reference to the function that is NOT a direct-call callee
-        // means its address escapes — an indirect call could reach it
-        // with arguments we never see.
-        if (!calleeRefs.count(ref)) addressTaken.insert(c);
+        if (const auto* fn = dyn_cast<FunctionDecl>(ref->getDecl()))
+            if (const auto* c = candidate(fn))
+                if (!calleeRefs.count(ref)) addressTaken.insert(c);
         return true;
     }
 };
+
+// Integer locals + parameters of a function (the IntervalAnalysis domain).
+std::set<const VarDecl*> intVars(const FunctionDecl* fn) {
+    struct V : RecursiveASTVisitor<V> {
+        std::set<const VarDecl*> vars;
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->getType()->isIntegerType()) vars.insert(vd);
+            return true;
+        }
+    } v;
+    v.TraverseStmt(fn->getBody());
+    for (const auto* p : fn->parameters())
+        if (p->getType()->isIntegerType()) v.vars.insert(p);
+    return v.vars;
+}
+
+// Calls to a candidate callee inside one function body.
+std::vector<const CallExpr*> callsToCandidates(
+    const FunctionDecl* fn, const std::set<const FunctionDecl*>& tracked) {
+    struct V : RecursiveASTVisitor<V> {
+        const std::set<const FunctionDecl*>* tracked;
+        std::vector<const CallExpr*> calls;
+        bool VisitCallExpr(CallExpr* call) {
+            if (const auto* c = candidate(call->getDirectCallee()))
+                if (tracked->count(c)) calls.push_back(call);
+            return true;
+        }
+    } v;
+    v.tracked = &tracked;
+    v.TraverseStmt(fn->getBody());
+    return v.calls;
+}
 
 } // namespace
 
@@ -76,34 +93,59 @@ ParamIntervalMap buildParamIntervals(ASTContext& ctx) {
     TuVisitor v;
     v.TraverseDecl(ctx.getTranslationUnitDecl());
 
+    // Tracked = candidate (internal linkage, has body) and address never
+    // taken. Its parameters start at bottom(); each call site joins in an
+    // argument interval.
+    std::set<const FunctionDecl*> tracked;
     ParamIntervalMap map;
-    const IntervalMap empty;  // v0: only literals/constants evaluate bounded
-
-    // Seed every tracked function's parameters to bottom() (⊥); each call
-    // site joins in an argument interval, and any parameter left ⊥ (no
-    // constraining call) or widened by an unknown argument ends at top().
     for (const auto* fn : v.candidates) {
-        if (v.addressTaken.count(fn)) continue;  // address escapes -> top
+        if (v.addressTaken.count(fn)) continue;
+        tracked.insert(fn);
         map[fn] = std::vector<Interval>(fn->getNumParams(), Interval::bottom());
     }
+    if (tracked.empty()) return map;
 
-    for (const auto& [callee, call] : v.calls) {
-        auto it = map.find(callee);
-        if (it == map.end()) continue;  // address-taken or not a candidate
-        std::vector<Interval>& entry = it->second;
-        const unsigned nArgs = call->getNumArgs();
-        for (unsigned i = 0; i < entry.size(); ++i) {
-            // A parameter this call does not cover (fewer args / variadic
-            // / default) could hold its default/unknown value -> top().
-            Interval argIv = (i < nArgs)
-                                 ? evalInterval(call->getArg(i), empty)
-                                 : Interval::top();
-            entry[i] = Interval::join(entry[i], argIv);
+    // Pass 1: over every function that calls a tracked callee, run the
+    // interval dataflow (parameters = top, no seeding — so there is no
+    // fixpoint and no optimistic recursion) and evaluate each call's
+    // arguments in the CALLER's local state at that call site.
+    struct FnCollector : RecursiveASTVisitor<FnCollector> {
+        std::vector<const FunctionDecl*> fns;
+        bool VisitFunctionDecl(FunctionDecl* fn) {
+            if (fn->isThisDeclarationADefinition() && fn->hasBody())
+                fns.push_back(fn);
+            return true;
+        }
+    } fc;
+    fc.TraverseDecl(ctx.getTranslationUnitDecl());
+
+    for (const auto* caller : fc.fns) {
+        auto calls = callsToCandidates(caller, tracked);
+        if (calls.empty()) continue;
+
+        IntervalAnalysis analysis(intVars(caller));
+        runDataflow(caller, ctx, analysis);
+
+        for (const auto* call : calls) {
+            const FunctionDecl* callee = candidate(call->getDirectCallee());
+            auto it = map.find(callee);
+            if (it == map.end()) continue;
+            std::vector<Interval>& entry = it->second;
+            const IntervalMap* st = analysis.stateAt(call);
+            const unsigned nArgs = call->getNumArgs();
+            for (unsigned i = 0; i < entry.size(); ++i) {
+                // A parameter this call does not cover, or one we cannot
+                // evaluate (no recorded state), holds an unknown value.
+                Interval argIv = (i < nArgs && st)
+                                     ? evalInterval(call->getArg(i), *st)
+                                     : Interval::top();
+                entry[i] = Interval::join(entry[i], argIv);
+            }
         }
     }
 
-    // A parameter never constrained by a call site stays ⊥ after the
-    // join loop; lift it to top() — uncalled here means unconstrained.
+    // A parameter never constrained by a call site stays bottom(); lift it
+    // to top() — uncalled here means unconstrained.
     for (auto& [fn, entry] : map)
         for (Interval& iv : entry)
             if (iv.isEmpty()) iv = Interval::top();
@@ -130,6 +172,24 @@ std::map<const VarDecl*, Interval> paramSeeds(const ParamIntervalMap& map,
             seeds[fn->getParamDecl(i)] = iv;
     }
     return seeds;
+}
+
+ParamIntervalCache& ParamIntervalCache::instance() {
+    static ParamIntervalCache cache;
+    return cache;
+}
+
+const ParamIntervalMap& ParamIntervalCache::get(ASTContext& ctx) {
+    if (!built_) {
+        map_ = buildParamIntervals(ctx);
+        built_ = true;
+    }
+    return map_;
+}
+
+void ParamIntervalCache::clear() {
+    map_.clear();
+    built_ = false;
 }
 
 } // namespace zerodefect
