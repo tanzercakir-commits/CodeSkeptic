@@ -6,6 +6,7 @@
 #include "engine/DataflowEngine.h"
 #include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
+#include "engine/ParamIntervals.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -74,6 +75,7 @@ std::vector<MulSite> collectSignedMuls(const FunctionDecl* fn,
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
+                     const zerodefect::ParamIntervalMap& paramMap,
                      zerodefect::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
@@ -82,8 +84,12 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
     // Run the shared interval dataflow observationally, then read back
     // the proven range at each multiplication. IntervalAnalysis never
-    // reports — the report/suppress decision is owned entirely here.
-    zerodefect::IntervalAnalysis analysis(collectIntVars(fn));
+    // reports — the report/suppress decision is owned entirely here. The
+    // seed map (C3) starts parameters with visible, closed callers at a
+    // proven range instead of top() — that is what carries a caller's
+    // bounded argument into this function's overflow check.
+    zerodefect::IntervalAnalysis analysis(collectIntVars(fn),
+                                          zerodefect::paramSeeds(paramMap, fn));
     auto df = zerodefect::runDataflow(fn, ctx, analysis);
     if (!df.converged)
         zerodefect::CoverageReport::instance().recordNonConvergence(
@@ -127,8 +133,9 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
 class IntOverflowCallback : public MatchFinder::MatchCallback {
 public:
-    explicit IntOverflowCallback(zerodefect::DiagnosticList& results)
-        : results_(results) {}
+    IntOverflowCallback(const zerodefect::ParamIntervalMap& paramMap,
+                        zerodefect::DiagnosticList& results)
+        : paramMap_(paramMap), results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
         const auto* fn = result.Nodes.getNodeAs<FunctionDecl>("func");
@@ -139,10 +146,11 @@ public:
         if (!zerodefect::functionFilterAllows(*fn)) return;
         if (!zerodefect::lineFilterAllows(*fn, sm)) return;
 
-        analyzeFunction(fn, *result.Context, results_);
+        analyzeFunction(fn, *result.Context, paramMap_, results_);
     }
 
 private:
+    const zerodefect::ParamIntervalMap& paramMap_;
     zerodefect::DiagnosticList& results_;
 };
 
@@ -151,8 +159,10 @@ private:
 namespace zerodefect {
 
 void IntOverflowRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
+    ParamIntervalMap paramMap = buildParamIntervals(ctx);
+
     MatchFinder finder;
-    IntOverflowCallback callback(results);
+    IntOverflowCallback callback(paramMap, results);
 
     auto matcher =
         functionDecl(isDefinition(), hasBody(anything())).bind("func");

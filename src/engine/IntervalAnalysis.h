@@ -32,12 +32,21 @@ class IntervalAnalysis {
 public:
     using State = IntervalMap;
 
-    explicit IntervalAnalysis(std::set<const clang::VarDecl*> vars)
-        : vars_(std::move(vars)) {}
+    explicit IntervalAnalysis(std::set<const clang::VarDecl*> vars,
+                              std::map<const clang::VarDecl*, Interval> seeds =
+                                  {})
+        : vars_(std::move(vars)), seeds_(std::move(seeds)) {}
 
     State initialState() const {
         State s;
-        for (const auto* v : vars_) s[v] = Interval::top();  // caller-unknown
+        for (const auto* v : vars_) {
+            // Interprocedural seed (C3): a parameter whose callers are all
+            // visible (internal linkage, address-not-taken) may start at a
+            // proven range instead of top(). Everything else is
+            // caller-unknown -> top().
+            auto it = seeds_.find(v);
+            s[v] = (it == seeds_.end()) ? Interval::top() : it->second;
+        }
         return s;
     }
 
@@ -108,6 +117,7 @@ public:
 
 private:
     std::set<const clang::VarDecl*> vars_;
+    std::map<const clang::VarDecl*, Interval> seeds_;
     std::map<const clang::Stmt*, IntervalMap> atStmt_;
 };
 

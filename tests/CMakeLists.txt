@@ -20,6 +20,7 @@ add_executable(zerodefect_tests
     CfgCacheTest.cpp
     IntervalTest.cpp
     IntervalAnalysisTest.cpp
+    ParamIntervalsTest.cpp
     CoverageReportTest.cpp
     AssumptionRuleTest.cpp
     FatalCallsTest.cpp
