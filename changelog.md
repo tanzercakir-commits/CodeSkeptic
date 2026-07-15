@@ -1,5 +1,37 @@
 # ZeroDefect — Changelog
 
+## 2026-07-14 — Interval lattice v0: the numeric foundation opens
+
+The engine's lattices were all SYMBOLIC (null? freed? zero?); none
+numeric. Spatial safety (buffer/heap overflow) and integer overflow
+are quantitative, so they were architecturally out of reach. This is
+the foundation for reaching them (CAPABILITY_REPORT: value-range is
+the keystone).
+
+### Added
+- **`engine/Interval`** — a sound over-approximating integer interval
+  `[lo,hi]` with ±∞ endpoints and an empty (⊥) case. Soundness is
+  absolute: an Interval contains EVERY real value; any operation that
+  cannot preserve that cheaply returns top() (never a too-narrow
+  interval — a false "safe" is worse than a miss). Lattice ops
+  (join/meet/widen), saturating arithmetic (add/sub/mul/negate; any
+  int64 overflow collapses to top(), so wraparound can never fool a
+  bound), guard refinement (constrain lt/le/gt/ge/eq/ne), and the two
+  consumer queries the next rounds need: `isKnownNonZero()`
+  (div-by-zero) and `fitsSignedBits(n)` (integer overflow).
+- 28 unit tests pinning the soundness invariant, incl. overflow
+  collapse (INT64_MAX+1 → top, not a wrapped small number), the
+  malloc(a*b) product query, and loop-widening termination.
+
+### Not yet wired
+- No rule consumes intervals yet — analysis behavior is byte-identical
+  (Juliet floors + corpus pins unaffected by construction). The
+  consumers land next: IntervalAnalysis, then sharpened div-by-zero,
+  then the int-overflow and bounds rules.
+
+### Verification
+- 398 → 426 tests both modes (+28 interval units); corpus pins exact.
+
 ## 2026-07-13 — Two precision fixes surfaced by the tmux scan
 
 Scanned tmux (mature, heavily-audited C) — clean of real bugs, but

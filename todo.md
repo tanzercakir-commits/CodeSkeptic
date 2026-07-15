@@ -348,8 +348,17 @@ Juliet's CI weight, project name check.
       via PR #4702 (`return nullptr;` after the ENOMEM set); #4696
       (sceSaveDataMount &&-vs-|| null-check) fixed via PR #4703 — the
       canonical looks-right-reads-wrong bug. Both exactly the traces'
-      shapes. #4697 (usb_backend GetMaxPacketSize) still open. Proof
-      captured in README, RELEASE_NOTES, and both v0.1.0 drafts.
+      shapes. #4697 (usb_backend GetMaxPacketSize desc=nullptr by
+      value -> memcpy into null) now ALSO has a fix PR: #4712
+      (fix(usbd): resolve null pointer dereference and heap overflow)
+      — OPEN as of 2026-07-14, CI red only on clang-format
+      (cosmetic; C++ macos tests green). Notably the fix PR caught a
+      SECOND bug (heap overflow / "hidden heap corruption") while
+      resolving our null-deref. So all 3 shadPS4 findings are now
+      actioned upstream: 2 merged (#4702, #4703), 1 fix PR in review
+      (#4712). Bump the README shadPS4 row to "3 merged" once #4712
+      lands. Proof (2 merged) captured in README, RELEASE_NOTES, and
+      both v0.1.0 drafts.
 - ~~NullDeref multi-declaration FN~~ — invalidated by experiment: the
   fine-grained CFG splits a multi-declaration per variable, the second
   pointer is tracked too (pinned with regression tests, 2026-07-10).
