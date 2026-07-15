@@ -12,6 +12,7 @@ add_library(zerodefect_core STATIC
     engine/Interval.cpp
     engine/IntervalEval.cpp
     engine/ExtentMap.cpp
+    engine/CoverageReport.cpp
     reporter/ConsoleReporter.cpp
     reporter/HtmlReporter.cpp
     reporter/JsonReporter.cpp

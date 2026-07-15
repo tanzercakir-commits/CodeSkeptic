@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CoverageReport.h"
 #include "engine/AllocFunctions.h"
 #include "engine/CallRefArgs.h"
 #include "engine/DataflowEngine.h"
@@ -837,9 +838,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         std::move(aliasGroups), results);
     auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
-        std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,
-                                     funcDecl->getQualifiedNameAsString())
-                  << "\n";
+        zerodefect::CoverageReport::instance().recordNonConvergence(
+            funcDecl->getQualifiedNameAsString());
 
     // Exit block leak check
     auto exitIt = dfResult.blockExitStates.find(dfResult.exitBlockID);
