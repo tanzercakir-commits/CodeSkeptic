@@ -3,6 +3,7 @@
 #include "contracts/ContractInfo.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CoverageReport.h"
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
@@ -653,9 +654,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     }
     auto df = zerodefect::runDataflow(funcDecl, ctx, analysis);
     if (!df.converged)
-        std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,
-                                     funcDecl->getQualifiedNameAsString())
-                  << "\n";
+        zerodefect::CoverageReport::instance().recordNonConvergence(
+            funcDecl->getQualifiedNameAsString());
     analysis.attachTraces();
 }
 

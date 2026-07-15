@@ -174,6 +174,11 @@ const MsgEntry kMessages[] = {
      "array bound [0, {1})",
      "dizi sinirlari disinda erisim: ispatlanan indeks araligi {0}, dizi "
      "siniri [0, {1}) disinda"},
+    // CoverageIncomplete
+    {"[ZeroDefect] analysis coverage: {0} function(s) hit the iteration cap "
+     "and were not fully analyzed; their findings may be incomplete:",
+     "[ZeroDefect] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
+     "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

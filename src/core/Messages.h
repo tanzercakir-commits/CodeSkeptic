@@ -68,6 +68,7 @@ enum class MsgId {
     PolicyUnknownName,          // {0} = the unknown policy name
     IntOverflowMul,             // {0} = the arithmetic type name
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
+    CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

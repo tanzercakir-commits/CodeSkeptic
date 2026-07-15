@@ -8,6 +8,7 @@
 #include "contracts/Sidecar.h"
 #include "engine/AllocFunctions.h"
 #include "engine/CfgCache.h"
+#include "engine/CoverageReport.h"
 #include "engine/FatalCalls.h"
 #include "engine/FunctionSummary.h"
 #include "reporter/ConsoleReporter.h"
@@ -34,6 +35,9 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     // lifetime; a new analyzer run re-reads them (the MCP server
     // lives long — an edited .zdc must be seen).
     clearSidecarCache();
+    // Coverage gaps belong to a single run; a long-lived process (the
+    // MCP server) must not inherit the previous run's non-convergence.
+    CoverageReport::instance().clear();
 
     source_mgr_ = std::make_unique<SourceManager>(config_.buildPath());
     if (config_.warmCache()) source_mgr_->enableWarmCache(true);
@@ -90,6 +94,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     // analyses in the same process)
     SummaryRegistry::instance().clearGlobal();
     CfgCache::instance().clear();
+    CoverageReport::instance().clear();
 }
 
 int StaticAnalyzer::run() {
@@ -182,6 +187,18 @@ int StaticAnalyzer::run() {
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
+
+    // Coverage: surface the functions the dataflow could not drive to a
+    // fixpoint (iteration cap). "No warning" in these is NOT "proven
+    // safe" — one honest summary, deduplicated across all rules, instead
+    // of six scattered per-rule stderr lines.
+    const auto& coverage = CoverageReport::instance();
+    if (coverage.incompleteCount() > 0) {
+        std::cerr << msg(MsgId::CoverageIncomplete,
+                         std::to_string(coverage.incompleteCount())) << "\n";
+        for (const auto& entry : coverage.entries())
+            std::cerr << "  - " << entry.function << "\n";
+    }
 
     if (!config_.summaryOut().empty()) {
         auto& registry = SummaryRegistry::instance();

@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
@@ -85,9 +86,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     zerodefect::IntervalAnalysis analysis(collectIntVars(fn));
     auto df = zerodefect::runDataflow(fn, ctx, analysis);
     if (!df.converged)
-        std::cerr << zerodefect::msg(zerodefect::MsgId::AnalysisNotConverged,
-                                     fn->getQualifiedNameAsString())
-                  << "\n";
+        zerodefect::CoverageReport::instance().recordNonConvergence(
+            fn->getQualifiedNameAsString());
 
     const SourceManager& sm = ctx.getSourceManager();
     std::set<unsigned> reportedLines;

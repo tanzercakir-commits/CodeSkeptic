@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
 #include "engine/CallRefArgs.h"
@@ -736,9 +737,8 @@ public:
         }
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
-            std::cerr << zerodefect::msg(
-                zerodefect::MsgId::AnalysisNotConverged,
-                func->getQualifiedNameAsString()) << "\n";
+            zerodefect::CoverageReport::instance().recordNonConvergence(
+                func->getQualifiedNameAsString());
         analysis.attachTraces();
     }
 
