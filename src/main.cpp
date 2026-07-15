@@ -5,6 +5,7 @@
 #include "rules/DivByZeroRule.h"
 #include "rules/IntOverflowRule.h"
 #include "rules/BoundsRule.h"
+#include "rules/AssumptionRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
 #include "rules/ContractRule.h"
@@ -62,6 +63,7 @@ int main(int argc, char* argv[]) {
     analyzer.addRule<zerodefect::DivByZeroRule>();
     analyzer.addRule<zerodefect::IntOverflowRule>();
     analyzer.addRule<zerodefect::BoundsRule>();
+    analyzer.addRule<zerodefect::AssumptionRule>();
     analyzer.addRule<zerodefect::NullDerefRule>();
     analyzer.addRule<zerodefect::ContractRule>();
     analyzer.addRule<zerodefect::PolicyRule>();

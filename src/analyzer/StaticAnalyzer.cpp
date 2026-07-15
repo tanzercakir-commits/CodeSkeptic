@@ -7,6 +7,7 @@
 #include "contracts/Policy.h"
 #include "contracts/Sidecar.h"
 #include "engine/AllocFunctions.h"
+#include "engine/AssumptionMode.h"
 #include "engine/CfgCache.h"
 #include "engine/CoverageReport.h"
 #include "engine/FatalCalls.h"
@@ -31,6 +32,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
     setProfilePolicies(config_.policies());
+    setAssumptionMode(config_.assumptions());
     // Sidecar contracts are cached per file path for the process
     // lifetime; a new analyzer run re-reads them (the MCP server
     // lives long — an edited .zdc must be seen).
@@ -89,6 +91,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     setFatalCallNames({});
     setAllocFunctionNames({});
     setFreeFunctionNames({});
+    setAssumptionMode(false);
     // Same rationale for the cross-TU summary store: one run's
     // summaries must not leak into the next (the MCP server runs many
     // analyses in the same process)

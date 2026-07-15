@@ -21,6 +21,7 @@ add_executable(zerodefect_tests
     IntervalTest.cpp
     IntervalAnalysisTest.cpp
     CoverageReportTest.cpp
+    AssumptionRuleTest.cpp
     FatalCallsTest.cpp
     SummaryDiffTest.cpp
     SuppressionFilterTest.cpp

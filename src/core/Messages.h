@@ -69,6 +69,7 @@ enum class MsgId {
     IntOverflowMul,             // {0} = the arithmetic type name
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
+    AssumptionNonNullParam,     // {0} = parameter name
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

@@ -103,6 +103,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             serve_ = true;
         } else if (arg == "--whole-program") {
             whole_program_ = true;
+        } else if (arg == "--assumptions") {
+            assumptions_ = true;
         } else if (arg == "--summary-in" && i + 1 < argc) {
             summary_in_path_ = argv[++i];
         } else if (arg == "--summary-out" && i + 1 < argc) {
