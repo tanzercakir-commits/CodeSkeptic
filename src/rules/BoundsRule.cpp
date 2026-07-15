@@ -7,6 +7,7 @@
 #include "engine/ExtentMap.h"
 #include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
+#include "engine/ParamIntervals.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -65,6 +66,7 @@ std::vector<const ArraySubscriptExpr*> collectSubscripts(
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
+                     const zerodefect::ParamIntervalMap& paramMap,
                      zerodefect::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
@@ -74,7 +76,10 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     auto subs = collectSubscripts(fn);
     if (subs.empty()) return;
 
-    zerodefect::IntervalAnalysis analysis(collectIntVars(fn));
+    // Seed parameters with visible, closed callers (C3) at their proven
+    // entry range, so a caller's bounded index argument reaches the check.
+    zerodefect::IntervalAnalysis analysis(collectIntVars(fn),
+                                          zerodefect::paramSeeds(paramMap, fn));
     auto df = zerodefect::runDataflow(fn, ctx, analysis);
     if (!df.converged)
         zerodefect::CoverageReport::instance().recordNonConvergence(
@@ -127,8 +132,9 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
 class BoundsCallback : public MatchFinder::MatchCallback {
 public:
-    explicit BoundsCallback(zerodefect::DiagnosticList& results)
-        : results_(results) {}
+    BoundsCallback(const zerodefect::ParamIntervalMap& paramMap,
+                   zerodefect::DiagnosticList& results)
+        : paramMap_(paramMap), results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
         const auto* fn = result.Nodes.getNodeAs<FunctionDecl>("func");
@@ -139,10 +145,11 @@ public:
         if (!zerodefect::functionFilterAllows(*fn)) return;
         if (!zerodefect::lineFilterAllows(*fn, sm)) return;
 
-        analyzeFunction(fn, *result.Context, results_);
+        analyzeFunction(fn, *result.Context, paramMap_, results_);
     }
 
 private:
+    const zerodefect::ParamIntervalMap& paramMap_;
     zerodefect::DiagnosticList& results_;
 };
 
@@ -151,8 +158,10 @@ private:
 namespace zerodefect {
 
 void BoundsRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
+    ParamIntervalMap paramMap = buildParamIntervals(ctx);
+
     MatchFinder finder;
-    BoundsCallback callback(results);
+    BoundsCallback callback(paramMap, results);
 
     auto matcher =
         functionDecl(isDefinition(), hasBody(anything())).bind("func");

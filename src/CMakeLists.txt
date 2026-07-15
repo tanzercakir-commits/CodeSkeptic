@@ -12,6 +12,7 @@ add_library(zerodefect_core STATIC
     engine/Interval.cpp
     engine/IntervalEval.cpp
     engine/ExtentMap.cpp
+    engine/ParamIntervals.cpp
     engine/CoverageReport.cpp
     engine/AssumptionMode.cpp
     reporter/ConsoleReporter.cpp

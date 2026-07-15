@@ -120,6 +120,29 @@ TEST(BoundsRuleTest, GuardedIndexInRangeClean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- Interprocedural (C3): parameter entry intervals ---
+
+TEST(BoundsRuleTest, StaticHelperOutOfRangeIndexFromCaller) {
+    // `at` is static and called only with 20, so i enters as [20,20] —
+    // past a[10]. The caller's constant index reaches the bounds check.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        static int at(int i) { int a[10]; return a[i]; }
+        int f(void) { return at(20); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, StaticHelperInRangeIndexFromCallerClean) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        static int at(int i) { int a[10]; return a[i]; }
+        int f(void) { return at(3); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(BoundsRuleTest, PointerParamHasNoExtentSilent) {
     // A pointer parameter has no ConstantArrayType — extent unknown, so
     // even a large constant index proves nothing.

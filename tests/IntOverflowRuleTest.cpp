@@ -117,6 +117,52 @@ TEST(IntOverflowRuleTest, UnsignedNotReported) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- Interprocedural (C3): parameter entry intervals ---
+
+TEST(IntOverflowRuleTest, StaticHelperBoundedLiteralOverflows) {
+    // scale is static (closed call graph) and called only with 100000,
+    // so n enters as [100000,100000] and n*65536 overflows int.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        static int scale(int n) { return n * 65536; }
+        int f(void) { return scale(100000); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(IntOverflowRuleTest, StaticHelperMixedCallerIsTopSilent) {
+    // One caller passes an unknown value → the entry interval joins to
+    // top() → nothing proven (sound).
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        static int scale(int n) { return n * 65536; }
+        int f(int x) { return scale(100000) + scale(x); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, ExternalFunctionNotSeeded) {
+    // Non-static: a caller in another TU could pass anything, so the
+    // parameter stays top() even with a bounded local caller.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int scale(int n) { return n * 65536; }
+        int f(void) { return scale(100000); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, StaticHelperBoundedButSafeClean) {
+    // 1000 * 65536 = 6.5e7, comfortably inside int — seeded but no overflow.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        static int scale(int n) { return n * 65536; }
+        int f(void) { return scale(1000); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(IntOverflowRuleTest, SixtyFourBitProductNotReported) {
     // A 64-bit product that overflows int64 collapses to top() in the
     // interval math and is soundly, silently dropped.
