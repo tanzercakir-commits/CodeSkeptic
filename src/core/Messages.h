@@ -67,6 +67,7 @@ enum class MsgId {
     PolicyAbsolutePath,         // {0} = the offending string literal
     PolicyUnknownName,          // {0} = the unknown policy name
     IntOverflowMul,             // {0} = the arithmetic type name
+    BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

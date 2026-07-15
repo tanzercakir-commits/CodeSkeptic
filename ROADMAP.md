@@ -162,7 +162,62 @@ once the repo is public.
   Redis idiom round 2) — each is an ordinary PR round guarded by the
   three referees.
 
-## 6. Build recipe (unchanged since 2026-07)
+## 6. "Ideal analyzer" spec — adopted vs parked (2026-07-15)
+
+A 30-section design spec for the *ideal* AI-era C/C++ analyzer was
+reviewed (source: user-supplied `ideal_statik_cpp_kod_analizcisi`). Its
+core thesis — **produce proof / counterexample / "unknown", never a bare
+warning; "no warning" ≠ "correct"** — is already this project's operating
+discipline (soundness invariant, precision-first). The spec is a VISION,
+explicitly not a feature checklist (its own §29); treating it as a to-do
+list would spread us too thin to be sound anywhere. Decision: adopt its
+*philosophy*, execute its Phase-1 list (which matches our roadmap), pull
+two high-leverage AI-era items early, and DECLARE what we will not chase.
+
+**Adopted early (uniquely enabled by our Clang/LibTooling base):**
+- **Three-valued output + coverage report** (spec §1/§21.9/§27) — say
+  "proven / counterexample / unknown-because-X", and surface what was
+  *not* analyzed soundly. Task #62. No mainstream tool does this.
+- **Hallucinated-symbol detection** (spec §20.4) — nonexistent
+  header/API/overload/signature, made-up flag/env/config/error-code.
+  The front-end already resolves symbols; this is near-free and a real
+  AI-era wedge. Task #63.
+- **Assumption-extraction** (spec §20.2, the doc's own #1 idea) — infer
+  the implicit contract a function relies on and ask "where is this
+  verified?". Natural extension of Contracts v1. Task #64 (medium-term,
+  research-heavy, FP-risk — calibrate).
+
+**Parked deliberately — NOT "can't", but "not where a Clang-AST tool can
+be sound":**
+- Binary analysis / source-binary verification / ABI matrix (spec §13,
+  §23.6) — needs a separate DWARF/disassembler stack; different product.
+- Concurrency model checking / thread-interleaving counterexamples
+  (spec §11, §23.4) — needs a model checker; our whole architecture is
+  per-function flow-sensitive dataflow, not interleaving exploration.
+  The single hardest domain in the spec. Hard defer.
+- Supply-chain / SBOM / dependency risk (spec §19) — a dependency-graph +
+  registry-query tool (OpenSSF Scorecard territory), not C/C++ semantics.
+- Full symbolic execution + SMT (spec §23.3) — where true concrete
+  counterexamples come from (KLEE/CBMC), a multi-year effort; we
+  approximate with abstract interpretation and say "unknown" honestly
+  rather than overpromise "proven".
+
+**Honesty guardrail (from the spec's own warning):** the "proven" verdict
+may only ever be stamped where we are genuinely sound — otherwise we
+become the "convincing but wrong" artifact the spec critiques. Executable
+specs stay the aspirational apex, but the tool must deliver value at ZERO
+spec (find real bugs today) and reward those who add contracts with
+deeper proofs — never require a spec to be useful.
+
+### Numeric capability — progress (the quantitative foundation)
+The engine's lattices were all SYMBOLIC (null?/freed?/zero?); none
+QUANTITATIVE. The interval sub-project closes that: `Interval` value type
+(#57, merged), `IntervalAnalysis` dataflow (#58, merged), int-overflow
+rule as the first consumer (#60/PR #70, merged 2026-07-15). Next: extent
+map + bounds rule (#61) — the OOB / heap-overflow class, targeting the
+shadPS4 #4712 heap-overflow shape and Juliet CWE121/122/124/126.
+
+## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
 apt-get install -y llvm-18-dev libclang-18-dev libzstd-dev zlib1g-dev

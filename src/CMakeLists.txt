@@ -11,6 +11,7 @@ add_library(zerodefect_core STATIC
     engine/PathFacts.cpp
     engine/Interval.cpp
     engine/IntervalEval.cpp
+    engine/ExtentMap.cpp
     reporter/ConsoleReporter.cpp
     reporter/HtmlReporter.cpp
     reporter/JsonReporter.cpp
@@ -24,6 +25,7 @@ add_library(zerodefect_core STATIC
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp
     rules/IntOverflowRule.cpp
+    rules/BoundsRule.cpp
     rules/NullDerefRule.cpp
     rules/ContractRule.cpp
     rules/PolicyRule.cpp

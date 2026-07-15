@@ -13,6 +13,7 @@ add_executable(zerodefect_tests
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
     IntOverflowRuleTest.cpp
+    BoundsRuleTest.cpp
     NullDerefRuleTest.cpp
     SarifReporterTest.cpp
     HtmlReporterTest.cpp
