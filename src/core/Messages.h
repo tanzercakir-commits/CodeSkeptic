@@ -66,6 +66,7 @@ enum class MsgId {
     ContractUnverified,         // {0} = clause text (engine cannot prove yet)
     PolicyAbsolutePath,         // {0} = the offending string literal
     PolicyUnknownName,          // {0} = the unknown policy name
+    IntOverflowMul,             // {0} = the arithmetic type name
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.

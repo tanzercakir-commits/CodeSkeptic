@@ -166,6 +166,9 @@ const MsgEntry kMessages[] = {
     // PolicyUnknownName
     {"unknown policy name: '{0}'",
      "bilinmeyen politika adi: '{0}'"},
+    // IntOverflowMul
+    {"possible integer overflow: this multiplication can exceed '{0}'",
+     "olasi tamsayi tasmasi: bu carpma '{0}' sinirini asabilir"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
