@@ -23,6 +23,7 @@ add_library(zerodefect_core STATIC
     rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp
+    rules/IntOverflowRule.cpp
     rules/NullDerefRule.cpp
     rules/ContractRule.cpp
     rules/PolicyRule.cpp
