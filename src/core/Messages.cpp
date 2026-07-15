@@ -179,6 +179,13 @@ const MsgEntry kMessages[] = {
      "and were not fully analyzed; their findings may be incomplete:",
      "[ZeroDefect] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
      "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
+    // AssumptionNonNullParam
+    {"inferred assumption: parameter '{0}' is assumed non-null "
+     "(dereferenced, never checked); this precondition is undeclared "
+     "(consider a contract: requires {0} != null)",
+     "cikarilan varsayim: '{0}' parametresi null-degil kabul ediliyor "
+     "(dereference ediliyor, hic kontrol edilmiyor); bu onkosul "
+     "bildirilmemis (sozlesme onerisi: requires {0} != null)"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

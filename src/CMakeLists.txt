@@ -13,6 +13,7 @@ add_library(zerodefect_core STATIC
     engine/IntervalEval.cpp
     engine/ExtentMap.cpp
     engine/CoverageReport.cpp
+    engine/AssumptionMode.cpp
     reporter/ConsoleReporter.cpp
     reporter/HtmlReporter.cpp
     reporter/JsonReporter.cpp
@@ -27,6 +28,7 @@ add_library(zerodefect_core STATIC
     rules/DivByZeroRule.cpp
     rules/IntOverflowRule.cpp
     rules/BoundsRule.cpp
+    rules/AssumptionRule.cpp
     rules/NullDerefRule.cpp
     rules/ContractRule.cpp
     rules/PolicyRule.cpp

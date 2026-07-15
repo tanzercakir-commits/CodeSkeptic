@@ -42,6 +42,10 @@ public:
     void setMinSeverity(Severity severity) { min_severity_ = severity; }
     bool serve() const { return serve_; }
     bool wholeProgram() const { return whole_program_; }
+    // --assumptions: opt-in intent-debt report of inferred, undeclared
+    // preconditions (AssumptionRule). Off by default — it is high-volume
+    // by nature and must not perturb the normal finding stream.
+    bool assumptions() const { return assumptions_; }
 
     // Summary persistence (Cross-TU v2): --summary-out writes the
     // harvested store to disk; --summary-in loads it into the store
@@ -118,6 +122,7 @@ private:
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;
+    bool assumptions_ = false;
     bool warm_cache_ = false;
     std::string summary_in_path_;
     std::string summary_out_path_;
