@@ -9,6 +9,7 @@ add_library(zerodefect_core STATIC
     engine/SummaryDiff.cpp
     engine/FunctionSummary.cpp
     engine/PathFacts.cpp
+    engine/Interval.cpp
     reporter/ConsoleReporter.cpp
     reporter/HtmlReporter.cpp
     reporter/JsonReporter.cpp
