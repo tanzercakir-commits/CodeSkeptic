@@ -177,15 +177,15 @@ two high-leverage AI-era items early, and DECLARE what we will not chase.
 **Adopted early (uniquely enabled by our Clang/LibTooling base):**
 - **Three-valued output + coverage report** (spec §1/§21.9/§27) — say
   "proven / counterexample / unknown-because-X", and surface what was
-  *not* analyzed soundly. Task #62. No mainstream tool does this.
-- **Hallucinated-symbol detection** (spec §20.4) — nonexistent
-  header/API/overload/signature, made-up flag/env/config/error-code.
-  The front-end already resolves symbols; this is near-free and a real
-  AI-era wedge. Task #63.
+  *not* analyzed soundly. Task #62 — SHIPPED (coverage report, PR #72).
 - **Assumption-extraction** (spec §20.2, the doc's own #1 idea) — infer
   the implicit contract a function relies on and ask "where is this
   verified?". Natural extension of Contracts v1. Task #64 (medium-term,
   research-heavy, FP-risk — calibrate).
+
+Note (2026-07-15): **Hallucinated-symbol detection** (spec §20.4) was
+initially adopted but MOVED TO PARKED after a feasibility probe (see
+below) — my earlier "near-free" claim was wrong.
 
 **Parked deliberately — NOT "can't", but "not where a Clang-AST tool can
 be sound":**
@@ -201,6 +201,25 @@ be sound":**
   counterexamples come from (KLEE/CBMC), a multi-year effort; we
   approximate with abstract interpretation and say "unknown" honestly
   rather than overpromise "proven".
+- **Hallucinated / nonexistent-symbol detection** (spec §20.4) — parked
+  after a feasibility probe (2026-07-15). Evidence: in C11+ a call to an
+  undeclared function is a compile ERROR (`-Wimplicit-function-
+  declaration`), and every §20.4 shape (nonexistent header / function /
+  overload / signature / enum) is likewise a hard compile error. Since
+  we analyze the AST of code that already COMPILES (compile_commands.json),
+  the compiler has already rejected these before they reach us — our
+  value-add is zero. The residue splits two ways, neither a clean
+  static-AST v0: (a) symbols that COMPILE but are semantically wrong
+  (old-version / wrong-platform / wrong-library same-name, made-up
+  env-var / error-code) need a VERSIONED, dated knowledge base (spec
+  §20.5 says so explicitly) — a data problem, like supply-chain; (b) the
+  one genuine cross-TU niche — "declared in a project header, called, but
+  defined in no TU" — is irreducibly FP-prone (libc and third-party libs
+  are declared-not-defined-in-our-TUs yet link fine), so it violates
+  precision-first without heavy opt-in gating. Honest reclassification:
+  a knowledge-base problem, not a static-AST one. (My initial "near-free
+  wedge" claim was wrong; corrected here rather than shipped as a
+  compiler echo or an FP generator.)
 
 **Honesty guardrail (from the spec's own warning):** the "proven" verdict
 may only ever be stamped where we are genuinely sound — otherwise we
