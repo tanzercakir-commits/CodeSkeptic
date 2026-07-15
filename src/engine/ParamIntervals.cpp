@@ -126,18 +126,29 @@ ParamIntervalMap buildParamIntervals(ASTContext& ctx) {
         IntervalAnalysis analysis(intVars(caller));
         runDataflow(caller, ctx, analysis);
 
+        const IntervalMap empty;
         for (const auto* call : calls) {
             const FunctionDecl* callee = candidate(call->getDirectCallee());
             auto it = map.find(callee);
             if (it == map.end()) continue;
             std::vector<Interval>& entry = it->second;
+            // The caller's interval state at this call site refines a
+            // VARIABLE argument to its proven range. When the call is not
+            // a recorded CFG element (fine-grained CFG shape varies by
+            // libclang version), fall back to an empty state: a literal or
+            // constant argument still evaluates exactly, a variable widens
+            // to top() (sound). Evaluating with an empty state is the v0
+            // behaviour, so a missing call state can only LOSE precision,
+            // never soundness — and it keeps the result deterministic
+            // across toolchains.
             const IntervalMap* st = analysis.stateAt(call);
+            const IntervalMap& state = st ? *st : empty;
             const unsigned nArgs = call->getNumArgs();
             for (unsigned i = 0; i < entry.size(); ++i) {
-                // A parameter this call does not cover, or one we cannot
-                // evaluate (no recorded state), holds an unknown value.
-                Interval argIv = (i < nArgs && st)
-                                     ? evalInterval(call->getArg(i), *st)
+                // A parameter this call does not cover (variadic / default
+                // / fewer args) holds an unknown value.
+                Interval argIv = (i < nArgs)
+                                     ? evalInterval(call->getArg(i), state)
                                      : Interval::top();
                 entry[i] = Interval::join(entry[i], argIv);
             }
