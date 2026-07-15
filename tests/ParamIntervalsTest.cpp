@@ -1,5 +1,7 @@
 #include "engine/ParamIntervals.h"
 
+#include "engine/CfgCache.h"
+
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -35,6 +37,11 @@ Interval entryOfFirstParam(const std::string& code, const std::string& fnName) {
         Interval* out;
         Consumer(std::string w, Interval* o) : want(std::move(w)), out(o) {}
         void HandleTranslationUnit(ASTContext& ctx) override {
+            // buildParamIntervals runs the dataflow directly; honor the
+            // CfgCache clear contract (see IntervalAnalysisTest) — the
+            // per-function CFG cache is keyed by FunctionDecl* and must
+            // not serve a stale CFG from a prior test's reused context.
+            zerodefect::CfgCache::instance().clear();
             V v; v.want = want;
             v.TraverseDecl(ctx.getTranslationUnitDecl());
             auto map = zerodefect::buildParamIntervals(ctx);
