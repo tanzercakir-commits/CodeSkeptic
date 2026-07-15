@@ -20,12 +20,14 @@
 // address-taken function keeps ALL parameters at top() (today's
 // behaviour) — a caller we cannot see could pass anything.
 //
-// v0 evaluates each call argument with an EMPTY interval state, so only
-// literals and constant expressions yield a bounded interval; a variable
-// argument evaluates to top() and (soundly) widens the entry. Seeding
-// from the caller's local dataflow (a variable argument proven bounded)
-// is the v0.2 two-pass extension. A parameter a call site does not cover
-// (variadic / default argument / fewer args) also widens to top().
+// v0.2 (two-pass) evaluates each call argument with the CALLER's local
+// interval state at the call site: pass 1 runs IntervalAnalysis
+// (parameters = top, so no fixpoint and no optimistic recursion) over
+// every function that calls a candidate, records the state at each call,
+// and evaluates the arguments there — so a caller's bounded local
+// (`int n = 5; helper(n)`) or guard-bounded value reaches the callee, not
+// just a literal. A parameter a call site does not cover (variadic /
+// default argument / fewer args) still widens to top().
 
 #include "engine/Interval.h"
 
@@ -60,6 +62,22 @@ Interval paramEntryInterval(const ParamIntervalMap& map,
 // — the value IntervalAnalysis consumes to start a parameter below top().
 std::map<const clang::VarDecl*, Interval> paramSeeds(
     const ParamIntervalMap& map, const clang::FunctionDecl* fn);
+
+// Per-TU cache. The two-pass build runs a dataflow over every caller, so
+// it is computed ONCE per TU and shared by every consuming rule
+// (int-overflow, bounds). Built lazily on first access, cleared per TU
+// alongside the summary/CFG caches (RuleEngine::runAll and the test
+// harness) — the FunctionDecl* keys are TU-specific.
+class ParamIntervalCache {
+public:
+    static ParamIntervalCache& instance();
+    const ParamIntervalMap& get(clang::ASTContext& ctx);
+    void clear();
+
+private:
+    ParamIntervalMap map_;
+    bool built_ = false;
+};
 
 } // namespace zerodefect
 

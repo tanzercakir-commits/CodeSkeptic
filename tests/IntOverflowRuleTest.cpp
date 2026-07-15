@@ -131,6 +131,18 @@ TEST(IntOverflowRuleTest, StaticHelperBoundedLiteralOverflows) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
+TEST(IntOverflowRuleTest, StaticHelperBoundedLocalOverflows) {
+    // v0.2: the caller passes a bounded LOCAL (not a literal); the two-pass
+    // reads k = [100000,100000] from the caller's dataflow.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        static int scale(int n) { return n * 65536; }
+        int f(void) { int k = 100000; return scale(k); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
 TEST(IntOverflowRuleTest, StaticHelperMixedCallerIsTopSilent) {
     // One caller passes an unknown value → the entry interval joins to
     // top() → nothing proven (sound).

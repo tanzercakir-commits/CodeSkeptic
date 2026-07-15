@@ -159,7 +159,8 @@ private:
 namespace zerodefect {
 
 void IntOverflowRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
-    ParamIntervalMap paramMap = buildParamIntervals(ctx);
+    const ParamIntervalMap& paramMap =
+        ParamIntervalCache::instance().get(ctx);
 
     MatchFinder finder;
     IntOverflowCallback callback(paramMap, results);

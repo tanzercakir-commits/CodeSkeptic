@@ -1,5 +1,6 @@
 #include "engine/IntervalAnalysis.h"
 
+#include "engine/CfgCache.h"
 #include "engine/DataflowEngine.h"
 
 #include <clang/AST/ASTConsumer.h>
@@ -73,6 +74,13 @@ class Consumer : public ASTConsumer {
 public:
     explicit Consumer(Result& out) : out_(out) {}
     void HandleTranslationUnit(ASTContext& ctx) override {
+        // This harness runs the dataflow directly, outside RuleEngine, so
+        // it must honor the CfgCache clear contract itself: the cache is
+        // keyed by FunctionDecl* and its auto-flush only fires when the
+        // ASTContext POINTER changes — a freed context reallocated at the
+        // same address would otherwise serve a stale CFG (address reuse,
+        // hence order/ASLR-dependent flakiness). Clear before use.
+        zerodefect::CfgCache::instance().clear();
         struct V : RecursiveASTVisitor<V> {
             const FunctionDecl* fn = nullptr;
             bool VisitFunctionDecl(FunctionDecl* f) {

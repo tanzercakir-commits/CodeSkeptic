@@ -2,6 +2,7 @@
 
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ParamIntervals.h"
 
 namespace zerodefect {
 
@@ -36,6 +37,7 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
     // the same reason)
     SummaryRegistry::instance().clear();
     CfgCache::instance().clear();
+    ParamIntervalCache::instance().clear();
     return results;
 }
 

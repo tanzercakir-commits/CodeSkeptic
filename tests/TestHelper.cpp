@@ -3,6 +3,7 @@
 #include "contracts/Sidecar.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ParamIntervals.h"
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -25,6 +26,7 @@ public:
         rule_.check(ctx, results_);
         zerodefect::SummaryRegistry::instance().clear();
         zerodefect::CfgCache::instance().clear();
+        zerodefect::ParamIntervalCache::instance().clear();
         zerodefect::clearSidecarCache();
     }
 
