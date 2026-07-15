@@ -1,5 +1,42 @@
 # ZeroDefect — Changelog
 
+## 2026-07-14 — IntervalEval + IntervalAnalysis: the numeric dataflow
+
+### Added
+- **`engine/IntervalEval`** — reusable interval evaluation over the
+  AST: `evalInterval` (expression → interval; literals, tracked reads,
+  unary +/-, binary + - *), `applyIntervalAssign` (assignment
+  transfer), `refineIntervalOnEdge` (guard constrain via the shared
+  ConditionWalk skeleton). Soundness carries from Interval: unknown
+  forms and unmodeled assignments → top(); a NARROWING integral cast
+  → top() (it can wrap, so its value set is not a subset — passing it
+  through would be unsound).
+- **`engine/IntervalAnalysis`** — the interval lattice run over a
+  function's CFG via the shared DataflowEngine, recording the entry
+  range-state at every statement so consumers can ask "what range does
+  v hold at s?". Convergence via widening (a re-visited loop value not
+  pinned to a constant collapses to top(); the post-loop guard edge
+  then re-narrows the branch). Purely observational — it never
+  reports; consumers own all reporting.
+- 7 direct analysis tests (constant/arithmetic/branch-join/guard
+  lower-bound/guard-range/unknown-top/loop-widening-terminates) +
+  the IntervalEval logic exercised through them.
+
+### Not wired into a rule yet — and why div-by-zero was NOT the consumer
+- The first planned consumer was div-by-zero, but it produces **no
+  measurable change**: ZeroState's generalized bound refinement (the
+  tmux round) already covers the zero domain, and arithmetic drives
+  ZeroState to Unknown (silent) rather than a false MaybeZero — so
+  there is no false alarm for an interval to suppress. Adding a second
+  per-function pass for zero net effect would be dead weight, so it
+  was dropped. The interval's real payoff is RANGES: the integer-
+  overflow rule (next) and the bounds rule (heap-overflow class) are
+  the genuine consumers.
+
+### Verification
+- 426 → 433 tests both modes; corpus pins exact; analysis behavior
+  byte-identical (no consumer yet).
+
 ## 2026-07-14 — Interval lattice v0: the numeric foundation opens
 
 The engine's lattices were all SYMBOLIC (null? freed? zero?); none

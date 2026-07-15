@@ -17,6 +17,7 @@ add_executable(zerodefect_tests
     HtmlReporterTest.cpp
     CfgCacheTest.cpp
     IntervalTest.cpp
+    IntervalAnalysisTest.cpp
     FatalCallsTest.cpp
     SummaryDiffTest.cpp
     SuppressionFilterTest.cpp
