@@ -16,8 +16,16 @@
 # abseil 5 -> 4. Pins re-centered so the tolerance band tracks the
 # improved level instead of sagging toward its lower edge.
 #
+# 2026-07-15 (bounds rule v0): cjson 50 -> 53. The +3 are TRUE POSITIVES,
+# all the same real bug: cJSON vendors the Unity test framework, whose
+# tutorial file tests/unity/examples/example_{1,2,3}/src/ProductionCode.c
+# ships FindFunction_WhichIsBroken with a deliberate off-by-one — missing
+# braces run the `if` after `while (i <= 8)`, so NumbersToFind[9] reads
+# one past a 9-element array. The bounds rule proves i in [9,+inf] on loop
+# exit and flags the definite OOB. Pin raised to track the correct level.
+#
 # project finding-count
-cjson 50
+cjson 53
 tinyxml2 9
 # abseil runs only with CORPUS_DEEP=1 (weekly cron; tag 20260526.0).
 # 4 = post-v2b level; 5 was post-dedup; 12 was the post-FP-hunt level

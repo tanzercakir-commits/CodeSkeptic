@@ -169,6 +169,11 @@ const MsgEntry kMessages[] = {
     // IntOverflowMul
     {"possible integer overflow: this multiplication can exceed '{0}'",
      "olasi tamsayi tasmasi: bu carpma '{0}' sinirini asabilir"},
+    // BoundsArrayDefinite
+    {"out-of-bounds array access: proven index range {0} lies outside the "
+     "array bound [0, {1})",
+     "dizi sinirlari disinda erisim: ispatlanan indeks araligi {0}, dizi "
+     "siniri [0, {1}) disinda"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
