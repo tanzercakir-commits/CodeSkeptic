@@ -1,10 +1,15 @@
 #include "engine/ExtentMap.h"
 
+#include "engine/CallRefArgs.h"
+#include "engine/IntervalEval.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Type.h>
+
+#include <set>
 
 using namespace clang;
 
@@ -26,25 +31,150 @@ bool fixedExtent(const VarDecl* vd, ASTContext& ctx, int64_t* out) {
     return true;
 }
 
+const VarDecl* refVar(const Expr* e) {
+    if (!e) return nullptr;
+    e = e->IgnoreParenImpCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(e))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+// Byte-size interval of an allocation-size expression. Extends the plain
+// interval evaluator with sizeof(T): so `n * sizeof(int)` evaluates
+// (n's interval) * 4, and a constant byte size evaluates exactly. A
+// variable factor with no dataflow here stays top() — v0 proves heap
+// extents from constant/sizeof sizes; seeding the size from the caller's
+// dataflow is the follow-up.
+Interval sizeInterval(const Expr* e, ASTContext& ctx) {
+    if (!e) return Interval::top();
+    e = e->IgnoreParenImpCasts();
+    if (const auto* uett = dyn_cast<UnaryExprOrTypeTraitExpr>(e)) {
+        if (uett->getKind() == UETT_SizeOf && !uett->isValueDependent()) {
+            QualType t = uett->getTypeOfArgument();
+            if (!t->isIncompleteType() && !t->isDependentType())
+                return Interval::constant(
+                    ctx.getTypeSizeInChars(t).getQuantity());
+        }
+        return Interval::top();
+    }
+    if (const auto* bo = dyn_cast<BinaryOperator>(e)) {
+        Interval l = sizeInterval(bo->getLHS(), ctx);
+        Interval r = sizeInterval(bo->getRHS(), ctx);
+        switch (bo->getOpcode()) {
+            case BO_Mul: return Interval::mul(l, r);
+            case BO_Add: return Interval::add(l, r);
+            case BO_Sub: return Interval::sub(l, r);
+            default:     return Interval::top();
+        }
+    }
+    // Literals fall through to the shared evaluator; variables → top().
+    return evalInterval(e, IntervalMap{});
+}
+
+// Floor-divide a (non-negative size) interval by a positive constant —
+// element count = bytes / element-size. Floor is sound for an upper
+// bound: index i is out of bounds once i >= floor(bytes/size).
+Interval divByPositive(const Interval& iv, int64_t d) {
+    if (d <= 0 || iv.isEmpty()) return Interval::top();
+    if (iv.loIsInf() && iv.hiIsInf()) return Interval::top();
+    if (iv.loIsInf()) return Interval::atMost(iv.hi() / d);
+    if (iv.hiIsInf()) return Interval::atLeast(iv.lo() / d);
+    return Interval::range(iv.lo() / d, iv.hi() / d);
+}
+
+// If `init` is a malloc/calloc call, the element count for a buffer of
+// `pointee` elements. malloc(bytes) → bytes / sizeof(pointee);
+// calloc(n, sz) → (n * sz) / sizeof(pointee). Returns false when the
+// shape is not a recognized allocation or the element count cannot be
+// determined (leaving the pointer without a proven extent — sound).
+bool heapElementCount(const Expr* init, QualType pointee, ASTContext& ctx,
+                      Interval* out) {
+    if (!init || pointee.isNull() || pointee->isIncompleteType()) return false;
+    const Expr* e = init->IgnoreParenImpCasts();
+    // The result is cast to the pointer type; look through that cast.
+    if (const auto* cast = dyn_cast<CastExpr>(e))
+        e = cast->getSubExpr()->IgnoreParenImpCasts();
+    const auto* call = dyn_cast<CallExpr>(e);
+    if (!call) return false;
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!callee || !callee->getIdentifier()) return false;
+    const llvm::StringRef name = callee->getName();
+
+    const int64_t elemBytes = ctx.getTypeSizeInChars(pointee).getQuantity();
+    if (elemBytes <= 0) return false;
+
+    Interval bytes;
+    if (name == "malloc" && call->getNumArgs() == 1) {
+        bytes = sizeInterval(call->getArg(0), ctx);
+    } else if (name == "calloc" && call->getNumArgs() == 2) {
+        bytes = Interval::mul(sizeInterval(call->getArg(0), ctx),
+                              sizeInterval(call->getArg(1), ctx));
+    } else {
+        return false;
+    }
+    if (bytes.isTop() || bytes.isEmpty()) return false;  // nothing proven
+    *out = divByPositive(bytes, elemBytes);
+    return !out->isTop();
+}
+
+// Pointers whose value may change after the initializer — reassigned,
+// address-taken, or handed to an out-parameter. Their declared malloc
+// extent can no longer be trusted at a later subscript, so they are
+// excluded from the heap extent map (a fixed-array extent, by contrast,
+// is a property of the type and never invalidated).
+struct Invalidations : RecursiveASTVisitor<Invalidations> {
+    std::set<const VarDecl*> vars;
+    bool VisitBinaryOperator(BinaryOperator* b) {
+        if (b->isAssignmentOp())
+            if (const auto* v = refVar(b->getLHS())) vars.insert(v);
+        return true;
+    }
+    bool VisitUnaryOperator(UnaryOperator* u) {
+        if (u->getOpcode() == UO_AddrOf)
+            if (const auto* v = refVar(u->getSubExpr())) vars.insert(v);
+        if (u->isIncrementDecrementOp())
+            if (const auto* v = refVar(u->getSubExpr())) vars.insert(v);
+        return true;
+    }
+    bool VisitCallExpr(CallExpr* call) {
+        forEachNonConstRefArg(call, [&](const Expr* arg) {
+            if (const auto* v = refVar(arg)) vars.insert(v);
+        });
+        return true;
+    }
+};
+
 struct ExtentCollector : RecursiveASTVisitor<ExtentCollector> {
     ASTContext& ctx;
+    const std::set<const VarDecl*>& invalidated;
     ExtentMap map;
-    explicit ExtentCollector(ASTContext& c) : ctx(c) {}
+    ExtentCollector(ASTContext& c, const std::set<const VarDecl*>& inv)
+        : ctx(c), invalidated(inv) {}
 
-    void record(const VarDecl* vd) {
-        int64_t n;
-        if (fixedExtent(vd, ctx, &n))
-            map.emplace(vd, Interval::constant(n));
-    }
-
-    // Local fixed arrays are declared inside the body.
     bool VisitVarDecl(VarDecl* vd) {
-        record(vd);
+        // Fixed-size array (extent is a property of the type — always safe).
+        int64_t n;
+        if (fixedExtent(vd, ctx, &n)) {
+            map.emplace(vd, Interval::constant(n));
+            return true;
+        }
+        // Heap buffer: a pointer whose SOLE definition is its malloc/calloc
+        // initializer (never reassigned / address-taken afterwards).
+        if (vd->getType()->isPointerType() && vd->hasInit() &&
+            !invalidated.count(vd)) {
+            Interval elems;
+            if (heapElementCount(vd->getInit(),
+                                 vd->getType()->getPointeeType(), ctx, &elems))
+                map.emplace(vd, elems);
+        }
         return true;
     }
     // Global / static fixed arrays are reached through their uses.
     bool VisitDeclRefExpr(DeclRefExpr* dre) {
-        record(dyn_cast<VarDecl>(dre->getDecl()));
+        if (const auto* vd = dyn_cast<VarDecl>(dre->getDecl())) {
+            int64_t n;
+            if (fixedExtent(vd, ctx, &n)) map.emplace(vd, Interval::constant(n));
+        }
         return true;
     }
 };
@@ -52,8 +182,11 @@ struct ExtentCollector : RecursiveASTVisitor<ExtentCollector> {
 } // namespace
 
 ExtentMap buildExtentMap(const FunctionDecl* fn, ASTContext& ctx) {
-    ExtentCollector c(ctx);
-    if (fn->hasBody()) c.TraverseStmt(fn->getBody());
+    if (!fn->hasBody()) return {};
+    Invalidations inv;
+    inv.TraverseStmt(fn->getBody());
+    ExtentCollector c(ctx, inv.vars);
+    c.TraverseStmt(fn->getBody());
     return std::move(c.map);
 }
 
