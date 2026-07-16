@@ -372,6 +372,55 @@ the zero-C++-risk layering — agents can run review_diff.sh directly.
 Fixture grew to 7 phases (assumption catch + exclude, with a
 no-exclude control).
 
+## 6.8 TensorFlow Lite stress hunt (2026-07-16)
+
+Scale test on the biggest tractable target: TensorFlow Lite via its
+official CMake build (configure-only compile DB — full TF is
+Bazel-locked). 285 TUs of production template-heavy C++ (kernels,
+delegates, control flow), plus third-party headers pulled in by them
+(Eigen, protobuf, abseil).
+
+**Crash found and fixed (the hunt's biggest win, PR #82):**
+neon_tensor_utils.cc drove getTypeInfoImpl 104,611 frames deep through
+our own bufferExtent size query — SIGSEGV. Fixed with two layers:
+64MB analysis worker thread (paths we don't control) +
+boundedTypeSizeInChars structural budget (rule-side queries answer
+"unknown" for pathological types — relax-only, no false findings
+possible). The crashing TU now analyzes in 2.1s; the full 285-TU scan
+completed with ZERO crashes (~25 min, sequential).
+
+**Scan results: 106 findings, triaged by cluster:**
+- **uninit-ptr, 24 errors — a NEW characterized FP class** (21 in
+  TFLite's resize_bilinear.h, 3 in protobuf arena_impl.h): the pointer
+  is assigned inside a CONSTANT-TRIP-COUNT loop (`for (c = 0; c < 8;
+  ++c)`) that provably executes, and used after it; the engine keeps a
+  loop-skip path alive that is infeasible for constant bounds. An
+  ERROR-severity FP class — worst kind under our discipline. Targeted
+  fix candidate: the uninit rule consuming IntervalAnalysis loop-entry
+  facts (guaranteed first iteration when lo(init) < lo(bound)).
+  Tracked as task #74.
+- **null-deref, 71 warnings**: overwhelmingly the accessor-nullability
+  shape (`subgraph->tensor(...)` may return null per its summary;
+  deref follows). Honest "may" claims at warning severity; TFLite
+  mediates these with TF_LITE_ENSURE macros (not noreturn), so
+  assert-opacity flags (--fatal-asserts) would clear most — the
+  shadPS4 round-2 lesson applies unchanged.
+- **memory-leak, 10 warnings**: early-return error paths in kernels
+  (rfft2d/irfft2d `fft_input_output`, interpreter
+  `affine_quantization`) — the libgit2-class candidate set; each needs
+  hand verification before any upstream report.
+- **div-by-zero, 1 error — analyzer CORRECT, library deliberate**:
+  Eigen's raise_div_by_zero divides by zero ON PURPOSE (volatile, to
+  force SIGFPE); the "definitely zero" proof is exactly right, and the
+  finding is the showcase for suppression comments / third-party path
+  filtering, not a bug on either side.
+
+Honest coverage: 67 of 285 TUs failed to PARSE (configure-only DB —
+flatbuffer schema headers are generated at build time and absent);
+those TUs are reported as errors by the tool and simply not analyzed,
+never silently counted as clean. 12 functions hit the iteration cap
+(abseil str_format internals) and are listed by the coverage report.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
