@@ -1074,3 +1074,131 @@ TEST(GuardImplicationTest, UncheckedAllocUnderGuard_Warns) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+TEST(GuardImplicationTest, RealTgaLoader_ImplicationWitness_Clean) {
+    // The verbatim-shape stbi__tga_load pin (#84, the #70 residual).
+    // The reduced tga shapes above pass WITHOUT the implication-
+    // witness rule in the miner; this one does not: its prologue
+    // tests `indexed` early (comp selection), so by the mid-loop
+    // collapses every disjunct that still RECORDS an indexed fact
+    // records `indexed == 0` — the indexed-side survives only inside
+    // already-mined implications. A miner that demands a fresh
+    // explicit recording as its witness discards the implication at
+    // every such collapse, and the guarded deref in the pixel loop
+    // decays to a spurious "may be null" (stb_image.h:6004, our
+    // longest-lived real-world FP). Implication-carrying inputs count
+    // as witnesses now; the FP is pinned dead.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        extern void skip(int n);
+        extern int getn(unsigned char *p, int n);
+        extern int get_comp(int bits, int grey, int *rgb16);
+
+        int tga_load(int req_comp) {
+            int offset = get();
+            int indexed = get();
+            int image_type = get();
+            int is_rle = 0;
+            int palette_start = get();
+            int palette_len = get();
+            int palette_bits = get();
+            int width = get();
+            int height = get();
+            int bpp = get();
+            int comp, rgb16 = 0;
+            int inverted = get();
+            unsigned char *data;
+            unsigned char *palette = 0;
+            int i, j;
+            unsigned char raw[4] = {0};
+            int rle_count = 0, rle_repeating = 0, read_next = 1;
+
+            if (image_type >= 8) { image_type -= 8; is_rle = 1; }
+            inverted = 1 - ((inverted >> 5) & 1);
+
+            if (indexed) comp = get_comp(palette_bits, 0, &rgb16);
+            else comp = get_comp(bpp, image_type == 3, &rgb16);
+            if (!comp) return -1;
+
+            data = (unsigned char *)malloc(width * height * comp);
+            if (!data) return -2;
+            skip(offset);
+
+            if (!indexed && !is_rle && !rgb16) {
+                for (i = 0; i < height; ++i)
+                    getn(data + i * width * comp, width * comp);
+            } else {
+                if (indexed) {
+                    if (palette_len == 0) { free(data); return -3; }
+                    skip(palette_start);
+                    palette = (unsigned char *)malloc(palette_len * comp);
+                    if (!palette) { free(data); return -4; }
+                    if (rgb16) {
+                        unsigned char *pal_entry = palette;
+                        for (i = 0; i < palette_len; ++i) {
+                            if (get()) pal_entry[0] = 1;
+                            pal_entry += comp;
+                        }
+                    } else if (!getn(palette, palette_len * comp)) {
+                        free(data); free(palette); return -5;
+                    }
+                }
+                for (i = 0; i < width * height; ++i) {
+                    if (is_rle) {
+                        if (rle_count == 0) {
+                            int cmd = get();
+                            rle_count = 1 + (cmd & 127);
+                            rle_repeating = cmd >> 7;
+                            read_next = 1;
+                        } else if (!rle_repeating) {
+                            read_next = 1;
+                        }
+                    } else {
+                        read_next = 1;
+                    }
+                    if (read_next) {
+                        if (indexed) {
+                            int pal_idx = (bpp == 8) ? get() : get();
+                            if (pal_idx >= palette_len) pal_idx = 0;
+                            pal_idx *= comp;
+                            for (j = 0; j < comp; ++j)
+                                raw[j] = palette[pal_idx + j];
+                        } else if (rgb16) {
+                            raw[0] = (unsigned char)get();
+                        } else {
+                            for (j = 0; j < comp; ++j)
+                                raw[j] = (unsigned char)get();
+                        }
+                        read_next = 0;
+                    }
+                    for (j = 0; j < comp; ++j) data[i * comp + j] = raw[j];
+                    --rle_count;
+                }
+                if (inverted) {
+                    for (j = 0; j * 2 < height; ++j) {
+                        int index1 = j * width * comp;
+                        int index2 = (height - 1 - j) * width * comp;
+                        for (i = width * comp; i > 0; --i) {
+                            unsigned char temp = data[index1];
+                            data[index1] = data[index2];
+                            data[index2] = temp;
+                            ++index1; ++index2;
+                        }
+                    }
+                }
+                if (palette != 0) free(palette);
+            }
+            if (comp >= 3 && !rgb16) {
+                unsigned char *pixel = data;
+                for (i = 0; i < width * height; ++i) {
+                    unsigned char temp = pixel[0];
+                    pixel[0] = pixel[2]; pixel[2] = temp;
+                    pixel += comp;
+                }
+            }
+            free(data);
+            return req_comp;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}

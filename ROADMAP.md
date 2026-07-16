@@ -874,6 +874,58 @@ engine task: a NARROWING (descending) pass after the widened
 fixpoint, or provenance-carrying implications (valid-from-block +
 dominance check at activation).
 
+## 6.19 #84 implication witness (2026-07-16) — the residual, dead by ablation
+
+The #70 residual (verbatim `stbi__tga_load` still warning) fell to a
+diagnose-then-ablate session worth recording for its METHOD as much as
+its fix.
+
+**Two principled ideas failed first, with receipts.** The 6.18 hunch —
+"accumulative widening mixes immature iterates; add a narrowing pass"
+— was implemented (descending re-propagation of the plain flow
+equations from the widened fixpoint, budgeted, wholesale fallback) and
+measured: the descent STABILIZED IN ONE SWEEP with the FP intact. The
+widened solution was self-consistent — temporal blending, once folded
+in, satisfies the very equations a narrowing pass re-checks. A
+two-stage widening (memoryless collapse first, accumulative join only
+as escalation) also changed nothing. Both were REMOVED from the
+branch: the discipline is that a mechanism ships with a receipt or
+not at all.
+
+**The actual chain, pinned by disjunct-level tracing** (env-gated
+dumps at every collapse, phase- and block-stamped): the miner's
+non-vacuousness gate demanded an EXPLICIT `key=wanted` recording among
+the collapse inputs. In the tga loader the prologue tests `indexed`
+early (comp selection), so by the mid-loop collapses every disjunct
+still carrying an explicit indexed fact carried `indexed == 0` — the
+indexed-SIDE existed only inside already-mined implications. The gate
+refused the witness, the implication died at every such collapse
+(1585 of 1591), and the guarded deref decayed to MaybeNull.
+
+**Fix: an implication-carrying input IS a witness** — proof a real
+partition mined it upstream; preserving it is not vacuous. One
+condition in the miner. Ablation matrix over three candidate fixes
+(refinement-keeps-implication, leaf-level domain-refuter drop,
+witness): witness alone is NECESSARY AND SUFFICIENT for the receipt;
+the other two moved nothing and were dropped from the diff. Both
+remain honest candidates: the leaf-refute drop kills a real phantom
+(a `{flag==0, palette Null}` disjunct surviving a `palette != NULL`
+true edge as `{flag==0, NonNull}` — path-empty hybrid), but with no
+measured receipt it stays out per the same discipline.
+
+**Receipts**: verbatim stbi__tga_load standalone 1 → 0; stb corpus
+tu_image.c 1 → 0 (stb_image.h:6004, our longest-lived real-world FP,
+dead); tu_resize.c 2 → 2 (last_decoded/info — a different, pre-#70
+class, untouched); all 8 #70 negative controls still warn; the full
+trimmed loader is pinned as a regression test that FAILS without the
+witness clause (verified against the pre-fix binary). 552/552 ctest,
+12/12 shuffle seeds.
+
+Measurement honesty note: multi-file positional invocations analyze
+only the FIRST file (the "stb corpus 1→1" line in PR #90 was
+first-file-only). Per-TU scans are the honest form; recorded here so
+future receipts don't repeat the mistake.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

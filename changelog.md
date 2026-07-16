@@ -1,5 +1,35 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — #84: implication witness — the #70 residual is dead
+
+### Fixed
+- **The verbatim `stbi__tga_load` false positive (stb_image.h:6004,
+  our longest-lived real-world FP) is gone.** The #70 miner's
+  non-vacuousness gate accepted only an EXPLICIT `key=wanted`
+  recording as its witness; in the tga loader the guard's
+  "wanted" side survived the mid-loop collapses only INSIDE
+  already-mined implications (the prologue tests `indexed` early, so
+  explicit recordings all carried `indexed == 0`), and the gate
+  silently discarded a still-valid implication at 1585 of 1591
+  collapses. An implication-carrying input now counts as a witness —
+  it is proof a real partition mined the implication upstream.
+- One-condition diff by ablation: two other principled candidates
+  (refinement-keeps-implication; leaf-level domain-refuter disjunct
+  drop) and two engine mechanisms built along the way (narrowing pass
+  after the widened fixpoint; two-stage widening) were each measured
+  to contribute NOTHING to the receipt and were dropped — mechanisms
+  ship with receipts or not at all. The narrowing experiment's lesson
+  is recorded in ROADMAP 6.19: temporal blends are self-consistent,
+  so a descending pass cannot undo them.
+
+### Receipts
+- Verbatim stbi__tga_load standalone: 1 → 0. stb corpus per-TU:
+  tu_image.c 1 → 0; tu_resize.c 2 → 2 (different, pre-#70 class —
+  honest residual); all 8 #70 negative controls still warn.
+- The full trimmed loader is pinned as a regression test that fails
+  without the witness clause (verified against the pre-fix binary).
+- 552/552 ctest, 551 single-process, 12/12 shuffle seeds.
+
 ## 2026-07-16 — #70: guard-implication mining (independent guards stop cross-multiplying)
 
 ### Added

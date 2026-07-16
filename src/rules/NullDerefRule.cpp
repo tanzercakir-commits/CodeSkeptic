@@ -317,27 +317,43 @@ void mineGuardImplications(
         if (val.st != NullState::MaybeNull || val.fact) continue;
         for (const auto& key : candidates) {
             for (bool wanted : {true, false}) {
-                bool sawExact = false;
+                // The witness keeps the implication non-vacuous (#84):
+                // either a disjunct that RECORDED key=wanted, or one
+                // that already CARRIES this implication — proof a real
+                // partition mined it upstream. The second clause is
+                // load-bearing at collapses where every key=wanted-
+                // recording disjunct has already been folded into
+                // implication-carrying form (the mid-loop joins of
+                // stbi__tga_load: only explicit `indexed == 0`
+                // recordings remained, the indexed-side lived on
+                // solely inside implications). Demanding a fresh
+                // explicit recording there silently discarded a
+                // still-valid implication at every such collapse —
+                // the exact last link of the #70 residual FP.
+                bool sawWitness = false;
                 bool allNonNull = true;
                 for (const auto& d : pre) {
                     auto f = d.facts.find(key);
                     const bool exact =
                         f != d.facts.end() && f->second == wanted;
                     const bool compatible = exact || f == d.facts.end();
-                    if (exact) sawExact = true;
+                    if (exact) sawWitness = true;
                     if (!compatible) continue;
                     auto it = d.vars.find(var);
+                    const bool viaImpl =
+                        it != d.vars.end() && it->second.fact &&
+                        *it->second.fact == key &&
+                        it->second.factVal == wanted;
+                    if (viaImpl) sawWitness = true;
                     const bool nonNull =
                         it != d.vars.end() &&
-                        (it->second.st == NullState::NonNull ||
-                         (it->second.fact && *it->second.fact == key &&
-                          it->second.factVal == wanted));
+                        (it->second.st == NullState::NonNull || viaImpl);
                     if (!nonNull) {
                         allNonNull = false;
                         break;
                     }
                 }
-                if (sawExact && allNonNull) {
+                if (sawWitness && allNonNull) {
                     val.fact = key;
                     val.factVal = wanted;
                     break;
