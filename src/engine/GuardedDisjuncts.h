@@ -97,6 +97,68 @@ void widenGuarded(GuardedState<VarMap>& state, MergeVal mergeVal) {
     state.push_back(std::move(widened));
 }
 
+// Bundled value hooks for a CORRELATION-MINING analysis (#70).
+//
+//  - mergeVal(a, b): plain pairwise upper bound, as everywhere else.
+//  - meetVal(facts, a, b): pairwise combine of two disjuncts that
+//    share the SAME fact map — the shared facts are passed so the
+//    analysis can keep information the facts prove vacuous. The
+//    motivating case: a guard implication "flag != 0 ⟹ ptr NonNull"
+//    meeting a definitely-null value under shared fact flag == 0.
+//    The condition is ruled out on every path either side represents,
+//    so the implication holds vacuously and survives; a fact-blind
+//    merge had to drop it, and that drop was the poison that spread
+//    MaybeNull-without-implication through every later join
+//    (measured on stb_image's tga loader).
+//  - mine(preCollapse, widened): the widening correlation miner; see
+//    widenGuarded below.
+template <typename MergeVal, typename MeetVal, typename MineFn>
+struct GuardedOps {
+    MergeVal mergeVal;
+    MeetVal meetVal;
+    MineFn mine;
+};
+
+template <typename MergeVal, typename MeetVal, typename MineFn>
+GuardedOps<MergeVal, MeetVal, MineFn> makeGuardedOps(MergeVal mergeVal,
+                                                     MeetVal meetVal,
+                                                     MineFn mine) {
+    return {mergeVal, meetVal, mine};
+}
+
+// Widening with a CORRELATION MINER (#70). Same collapse as above,
+// but the pre-collapse disjunct set is offered to
+// `mine(preCollapse, widened)` before the state is replaced, so the
+// analysis can preserve per-variable guard implications (e.g.
+// "flag != 0 ⟹ ptr NonNull") that the fact intersection is about to
+// erase. This is what breaks the guard cross-product: N independently
+// guarded variables need N implications in ONE disjunct, not 2^N
+// disjuncts (the stb_image tga_palette wall). The miner must only
+// record information valid on EVERY path the collapsed disjunct
+// represents — it sharpens the collapse, never the truth.
+// (Cross-disjunct var merging uses plain mergeVal: members have
+// DIFFERENT fact maps, so no shared-fact context exists — the miner
+// re-derives what the merge had to drop.)
+template <typename VarMap, typename Ops>
+void widenGuardedOps(GuardedState<VarMap>& state, const Ops& ops) {
+    if (state.size() <= 1) return;
+    Guarded<VarMap> widened = state.front();  // copy: `state` must
+    for (std::size_t i = 1; i < state.size(); ++i) {  // survive for mine()
+        for (auto it = widened.facts.begin(); it != widened.facts.end();) {
+            auto found = state[i].facts.find(it->first);
+            if (found == state[i].facts.end() ||
+                found->second != it->second)
+                it = widened.facts.erase(it);
+            else
+                ++it;
+        }
+        mergeVarMaps(widened.vars, state[i].vars, ops.mergeVal);
+    }
+    ops.mine(static_cast<const GuardedState<VarMap>&>(state), widened);
+    state.clear();
+    state.push_back(std::move(widened));
+}
+
 // Canonical form: sorted; same-facts disjuncts merged; widened on cap
 // overflow. Order stability is required for the engine's != comparison.
 template <typename VarMap, typename MergeVal>
@@ -115,6 +177,33 @@ void normalizeGuarded(GuardedState<VarMap>& state, MergeVal mergeVal) {
         widenGuarded(state, mergeVal);
 }
 
+// Ops-aware canonical form: same-facts merges combine values UNDER
+// the shared fact map (ops.meetVal), and the cap-overflow collapse
+// runs the correlation miner.
+template <typename VarMap, typename Ops>
+void normalizeGuardedOps(GuardedState<VarMap>& state, const Ops& ops) {
+    std::sort(state.begin(), state.end());
+    GuardedState<VarMap> merged;
+    for (auto& d : state) {
+        if (!merged.empty() && merged.back().facts == d.facts) {
+            auto& into = merged.back();
+            for (const auto& [var, s] : d.vars) {
+                auto it = into.vars.find(var);
+                if (it == into.vars.end())
+                    into.vars.emplace(var, s);
+                else
+                    it->second = ops.meetVal(into.facts, it->second, s);
+            }
+        } else {
+            merged.push_back(std::move(d));
+        }
+    }
+    state = std::move(merged);
+
+    if (state.size() > kMaxDisjuncts)
+        widenGuardedOps(state, ops);
+}
+
 template <typename VarMap, typename MergeVal>
 GuardedState<VarMap> mergeGuarded(const GuardedState<VarMap>& a,
                                   const GuardedState<VarMap>& b,
@@ -122,6 +211,20 @@ GuardedState<VarMap> mergeGuarded(const GuardedState<VarMap>& a,
     GuardedState<VarMap> result = a;
     result.insert(result.end(), b.begin(), b.end());
     normalizeGuarded(result, mergeVal);
+    return result;
+}
+
+// Ops-aware join: the cap-overflow collapse inside the join is the
+// COMMON widening point (loop-body joins overflow long before the
+// engine's convergence widening kicks in), so a mining analysis must
+// route its merge() through this overload too.
+template <typename VarMap, typename Ops>
+GuardedState<VarMap> mergeGuardedOps(const GuardedState<VarMap>& a,
+                                     const GuardedState<VarMap>& b,
+                                     const Ops& ops) {
+    GuardedState<VarMap> result = a;
+    result.insert(result.end(), b.begin(), b.end());
+    normalizeGuardedOps(result, ops);
     return result;
 }
 
@@ -293,6 +396,42 @@ void refineGuardedFactsWith(GuardedState<VarMap>& state,
     normalizeGuarded(state, mergeVal);
 }
 
+// Ops-aware refinement: identical walk, but the trailing
+// normalization combines same-facts disjuncts under their shared fact
+// map (refinement is a fact-RECORDING step, so freshly equalized fact
+// maps meet here first).
+template <typename VarMap, typename Ops, typename ExtraRefuteFn,
+          typename ExtraApplyFn>
+void refineGuardedFactsOps(GuardedState<VarMap>& state,
+                           const clang::Expr* cond, bool isTrueBranch,
+                           const std::set<const clang::ValueDecl*>& unkeyable,
+                           const std::set<const clang::ValueDecl*>& ptrKeyable,
+                           const Ops& ops, ExtraRefuteFn&& extraRefutes,
+                           ExtraApplyFn&& extraApply) {
+    if (!cond) return;
+    auto refutes = [&](const Guarded<VarMap>& d, const clang::Expr* e,
+                       bool wanted) {
+        return factsRefute(d, e, wanted, unkeyable, ptrKeyable) ||
+               extraRefutes(d, e, wanted);
+    };
+    auto applyLeaf = [&](Guarded<VarMap>& d, const clang::Expr* leaf,
+                         bool leafTrue) {
+        if (!applyFactLeaf(d, leaf, leafTrue, unkeyable, ptrKeyable))
+            return false;
+        extraApply(d, leaf, leafTrue);
+        return true;
+    };
+    GuardedState<VarMap> kept;
+    for (auto& d : state) {
+        if (!refineDisjunctCondition(d, cond, isTrueBranch, refutes,
+                                     applyLeaf))
+            continue;
+        kept.push_back(std::move(d));
+    }
+    state = std::move(kept);
+    normalizeGuardedOps(state, ops);
+}
+
 template <typename VarMap, typename MergeVal>
 void refineGuardedFacts(GuardedState<VarMap>& state,
                         const clang::Expr* cond, bool isTrueBranch,
@@ -357,6 +496,41 @@ bool applyStmtFacts(GuardedState<VarMap>& state, const clang::Stmt* stmt,
                     MergeVal mergeVal) {
     static const std::set<const clang::ValueDecl*> kNoPtrs;
     return applyStmtFacts(state, stmt, stampable, kNoPtrs, mergeVal);
+}
+
+// Ops-aware fact lifecycle: fact ERASURE equalizes fact maps, so the
+// same-facts merges right after it are a prime implication-drop site
+// without the shared-fact meet.
+template <typename VarMap, typename Ops>
+bool applyStmtFactsOps(GuardedState<VarMap>& state, const clang::Stmt* stmt,
+                       const std::set<const clang::ValueDecl*>& stampable,
+                       const std::set<const clang::ValueDecl*>& ptrStampable,
+                       const Ops& ops) {
+    const clang::ValueDecl* target = assignedDecl(stmt);
+    if (!target) return false;
+
+    auto lit = assignedIntLiteral(stmt);
+    const bool stamp =
+        lit && (stampable.count(target) ||
+                (ptrStampable.count(target) && lit->second == 0));
+
+    bool changed = false;
+    for (auto& d : state) {
+        for (auto it = d.facts.begin(); it != d.facts.end();) {
+            if (it->first.var == target) {
+                it = d.facts.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+        if (stamp) {
+            d.facts[FactKey{target, clang::BO_EQ, lit->second}] = true;
+            changed = true;
+        }
+    }
+    if (changed) normalizeGuardedOps(state, ops);
+    return changed;
 }
 
 } // namespace zerodefect

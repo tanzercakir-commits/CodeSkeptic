@@ -1,5 +1,60 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — #70: guard-implication mining (independent guards stop cross-multiplying)
+
+### Added
+- **Widening correlation miner**: the moment a disjunct collapse is
+  about to erase a guard correlation, the miner records it as a
+  per-variable implication — `flag != 0 ⟹ ptr NonNull` — on the
+  collapsed value (`NullVal.fact`/`factVal`). N independently guarded
+  pointers now cost N implications inside ONE disjunct instead of 2^N
+  disjuncts, which `kMaxDisjuncts = 4` could never hold. Mining rule:
+  a fact F and value v qualify when EVERY pre-collapse disjunct
+  compatible with F=v (recorded F=v, or F unrecorded — such a
+  disjunct's paths may carry either value, so it must qualify on both
+  sides it joins) knows the pointer NonNull, directly or via the same
+  implication. Consumption on assume-edges: a disjunct that records
+  F=v sharpens the pointer to NonNull. Invalidation mirrors the fact
+  lifecycle: assignment to the pointer or to the guard variable drops
+  the implication.
+- **Fact-aware same-facts meet** (`GuardedOps.meetVal`): two disjuncts
+  with an identical fact map now combine UNDER that map — an
+  implication whose condition the shared facts contradict holds
+  vacuously and survives. The fact-blind merge had to drop it, and
+  one such drop re-merged into every later join until no implication
+  survived anywhere (13 seed drops → ~1300 downstream on stb_image's
+  tga loader).
+- Shared machinery: `GuardedOps` bundle + `widenGuardedOps` /
+  `normalizeGuardedOps` / `mergeGuardedOps` / `applyStmtFactsOps` /
+  `refineGuardedFactsOps` in engine/GuardedDisjuncts.h. The plain
+  variants are untouched — MemoryLeak/DivByZero behavior unchanged.
+
+### Receipts
+- **Repro battery** (scratchpad fp70): the 4-independently-guarded-
+  pointer scale shape **5 warnings → 0**; the single-guard TGA shape
+  with RLE/read-next loop noise → 0; call-initialized and
+  assignment-derived guard flags → 0. Negative controls all still
+  warn: wrong guard, guard reassigned in loop, pointer nulled in
+  loop, unguarded deref.
+- **Recall win**: `if (fa) a = alloc(); if (fa) return a[0];` with NO
+  failure check was silent before (false negative) — the sharper
+  disjuncts now carry the MaybeNull to the deref and it warns.
+- **Honest residual**: the full stbi__tga_load function STILL yields
+  its 1 warning (stb corpus 1 → 1 vs main). The verbatim-extracted
+  function reproduces it; the mechanism is NOT the guard cross-product
+  (that is fixed — the reduced shapes are clean) but iterate-mixing in
+  the engine's ACCUMULATIVE widening: widenMemory joins states from
+  different fixpoint iterations, one of which lost the implication
+  before it matured, and the poisoned copy re-enters every later
+  collapse. Measured evidence: deleting the post-deref inverted-swap
+  loop (or merely renaming its reused `i`/`j` counters) makes the
+  warning vanish — the report is order/iterate-dependent, not
+  value-domain-dependent. Next lever recorded in ROADMAP: a narrowing
+  (descending) pass after the widened fixpoint, or provenance-carrying
+  implications.
+- 8 new GuardImplicationTest units; 551/551 ctest, 12/12 shuffle
+  seeds; stb 5-TU corpus scan time 1.8 s → 1.3 s (no perf cost).
+
 ## 2026-07-16 — #69b: value-conditioned null-return summaries
 
 ### Added
