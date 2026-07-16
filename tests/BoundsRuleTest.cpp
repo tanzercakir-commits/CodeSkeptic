@@ -257,6 +257,32 @@ TEST(BoundsRuleTest, MemcpyInRangeClean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(BoundsRuleTest, MemcpySizeofOversizedType) {
+    // memcpy(buf16, s, sizeof(Big)) with Big = 64 bytes — the classic
+    // "sizeof the wrong thing" overflow (Juliet CWE122 shape).
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "struct Big { char x[64]; };\n"
+        "void f(const void* s){ char buf[16]; memcpy(buf, s, sizeof(struct Big)); }"));
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpyCountTimesSizeofOverflow) {
+    // 8 * sizeof(int) == 32 bytes into a 16-byte buffer.
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char buf[16]; memcpy(buf, s, 8 * sizeof(int)); }"));
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpySizeofSelfClean) {
+    // memcpy(buf, s, sizeof(buf)) copies exactly the destination size.
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char buf[16]; memcpy(buf, s, sizeof(buf)); }"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
 // --- Interprocedural (C3): parameter entry intervals ---
 
 TEST(BoundsRuleTest, StaticHelperOutOfRangeIndexFromCaller) {

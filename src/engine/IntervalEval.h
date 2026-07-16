@@ -29,6 +29,17 @@ using IntervalMap = std::map<const clang::VarDecl*, Interval>;
 // else (calls, unknown vars, bitwise, division, …) is top().
 Interval evalInterval(const clang::Expr* expr, const IntervalMap& state);
 
+// Evaluate an allocation/copy SIZE expression to a BYTE interval. Extends
+// evalInterval with `sizeof(T)` (a compile-time constant) and constant
+// arithmetic over it, so `n * sizeof(int)`, `sizeof(struct X)`, and plain
+// byte counts evaluate; a variable factor uses `state`. Value-preserving
+// casts (lvalue-load / no-op / WIDENING integral) are transparent; a
+// NARROWING cast stops (→ top), so a size is never over-estimated into a
+// false overflow. Needs ASTContext for type sizes. The one place size
+// semantics live — shared by the extent map and the copy-size check.
+Interval evalSizeInterval(const clang::Expr* expr, clang::ASTContext& ctx,
+                          const IntervalMap& state);
+
 // If `stmt` assigns one of `vars`, update its interval in `state`.
 // DeclStmt initializers and plain `=` take the RHS interval; compound
 // assignment, ++/--, address-of, and non-const-reference call arguments

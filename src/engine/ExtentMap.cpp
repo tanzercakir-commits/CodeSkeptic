@@ -39,38 +39,6 @@ const VarDecl* refVar(const Expr* e) {
     return nullptr;
 }
 
-// Byte-size interval of an allocation-size expression. Extends the plain
-// interval evaluator with sizeof(T): so `n * sizeof(int)` evaluates
-// (n's interval) * 4, and a constant byte size evaluates exactly. A
-// variable factor with no dataflow here stays top() — v0 proves heap
-// extents from constant/sizeof sizes; seeding the size from the caller's
-// dataflow is the follow-up.
-Interval sizeInterval(const Expr* e, ASTContext& ctx) {
-    if (!e) return Interval::top();
-    e = e->IgnoreParenImpCasts();
-    if (const auto* uett = dyn_cast<UnaryExprOrTypeTraitExpr>(e)) {
-        if (uett->getKind() == UETT_SizeOf && !uett->isValueDependent()) {
-            QualType t = uett->getTypeOfArgument();
-            if (!t->isIncompleteType() && !t->isDependentType())
-                return Interval::constant(
-                    ctx.getTypeSizeInChars(t).getQuantity());
-        }
-        return Interval::top();
-    }
-    if (const auto* bo = dyn_cast<BinaryOperator>(e)) {
-        Interval l = sizeInterval(bo->getLHS(), ctx);
-        Interval r = sizeInterval(bo->getRHS(), ctx);
-        switch (bo->getOpcode()) {
-            case BO_Mul: return Interval::mul(l, r);
-            case BO_Add: return Interval::add(l, r);
-            case BO_Sub: return Interval::sub(l, r);
-            default:     return Interval::top();
-        }
-    }
-    // Literals fall through to the shared evaluator; variables → top().
-    return evalInterval(e, IntervalMap{});
-}
-
 // Floor-divide a (non-negative size) interval by a positive constant —
 // element count = bytes / element-size. Floor is sound for an upper
 // bound: index i is out of bounds once i >= floor(bytes/size).
@@ -103,12 +71,13 @@ bool heapElementCount(const Expr* init, QualType pointee, ASTContext& ctx,
     const int64_t elemBytes = ctx.getTypeSizeInChars(pointee).getQuantity();
     if (elemBytes <= 0) return false;
 
+    const IntervalMap empty;
     Interval bytes;
     if (name == "malloc" && call->getNumArgs() == 1) {
-        bytes = sizeInterval(call->getArg(0), ctx);
+        bytes = evalSizeInterval(call->getArg(0), ctx, empty);
     } else if (name == "calloc" && call->getNumArgs() == 2) {
-        bytes = Interval::mul(sizeInterval(call->getArg(0), ctx),
-                              sizeInterval(call->getArg(1), ctx));
+        bytes = Interval::mul(evalSizeInterval(call->getArg(0), ctx, empty),
+                              evalSizeInterval(call->getArg(1), ctx, empty));
     } else {
         return false;
     }
