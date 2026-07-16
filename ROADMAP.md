@@ -322,6 +322,43 @@ consequences of a change need --summary-in/whole-program (v0.5
 candidate: auto-harvest summaries for the review pair). MCP `review`
 tool and GitHub Action packaging are follow-ups.
 
+## 6.7 (c1) trial on real upstream history — cJSON (2026-07-16)
+
+The review flow was trialed on REAL external history: five recent cJSON
+security/bug fixes (type confusion #1006, CWE-476 null deref #991,
+stack-depth #984, wrong index check #957, wrong counter increment),
+each reviewed in BOTH directions — the fix as a PR (forward) and the
+buggy parent as a PR against the fixed base (reverse = "would we have
+caught the bug at review time?").
+
+Mechanics: 12 single-commit reviews at 0-2 s each, a 116-commit /
+14-TU range review in 2 s, zero crashes, zero false gate-failures in
+the forward (fix) direction. The flow holds up on a real repo with a
+cmake compile DB.
+
+**Key discovery — assumptions x delta.** The reverse review of the
+CWE-476 fix (#991) with `-- --assumptions` forwarded caught the
+vulnerability EXACTLY: one single new finding, "parameter 'object' is
+assumed non-null (dereferenced, never checked)" at the right
+function/line. The assumption engine (task #64) was parked as
+high-volume by nature; the review DELTA bounds that volume to the
+change — the pairing dissolves the adoption problem and is the
+strongest catch-a-real-CVE-shape story the tool has. v0.5: make
+assumption-delta a first-class review option.
+
+Honest gap map from the same five (reverse direction, default rules):
+1/5 caught (the CWE-476, via assumptions). Missed and why: type
+confusion (needs a type-tag domain we do not model), recursion-depth
+DoS (stack-depth domain), wrong-check and wrong-counter logic bugs
+(spec-dependent — invisible to any analyzer without a contract to
+check against). Recorded as rule-roadmap input, not spun.
+
+v0.5 wart list from the trial: test/example-path findings dominate
+range reviews (7 of 8 warnings in tests/ + readme_examples.c) — add a
+path-exclude filter; the "New findings (N error, M warning)" label
+says "warning" for info-severity items (cosmetic); consider assumption
+delta on-by-default in review mode.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
