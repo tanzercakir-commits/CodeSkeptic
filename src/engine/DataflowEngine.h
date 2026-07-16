@@ -2,6 +2,7 @@
 #define ZERODEFECT_DATAFLOW_ENGINE_H
 
 #include "engine/CfgCache.h"
+#include "engine/ConditionWalk.h"
 #include "engine/FatalCalls.h"
 
 #include <clang/AST/ASTContext.h>
@@ -106,6 +107,12 @@ inline EdgeCondition edgeCondition(const clang::CFGBlock* block) {
     const auto* e = llvm::dyn_cast_or_null<clang::Expr>(out.leaf);
     while (e) {
         e = e->IgnoreParenImpCasts();
+        // `static_cast<bool>(...)` (glibc's C++ assert) is another
+        // polarity-free wrapper — see stripBoolPreservingCasts.
+        {
+            const clang::Expr* stripped = stripBoolPreservingCasts(e);
+            if (stripped != e) { e = stripped; continue; }
+        }
         if (const auto* call = llvm::dyn_cast<clang::CallExpr>(e)) {
             const clang::FunctionDecl* callee = call->getDirectCallee();
             const clang::IdentifierInfo* id =

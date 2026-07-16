@@ -28,6 +28,41 @@
 
 namespace zerodefect {
 
+// glibc's C++ assert wraps its condition in `static_cast<bool>(...)`
+// (an EXPLICIT cast, invisible to IgnoreParenImpCasts). A condition
+// digest that stops at the cast refines NOTHING — and the maybe-null
+// disjunct born on the `&&`'s short-circuit edge then sails past the
+// ternary's noreturn arm into the code the assert was guarding (the
+// ImGui SetCurrentFont FP family, 2026-07-16; same transparency class
+// as __builtin_expect).
+//
+// Only truthiness-PRESERVING casts may be stripped, and the test must
+// be TYPE-based, not CastKind-based: Clang gives the explicit node
+// itself CK_NoOp and hides the real conversion in implicit
+// `part_of_explicit_cast` children, so `(char)x` LOOKS like a no-op
+// while actually narrowing (x=256 is truthy, (char)x is not).
+// getSubExprAsWritten() skips exactly those interior casts. Safe cases:
+//   1. destination type is bool — EVERY standard conversion to bool
+//      maps zero/null to false and everything else to true, so the
+//      as-written operand's truthiness is preserved by construction;
+//   2. a pure no-op (same canonical unqualified type as written) —
+//      the value itself is unchanged (const_cast and friends).
+inline const clang::Expr* stripBoolPreservingCasts(const clang::Expr* e) {
+    while (e) {
+        const auto* cast = llvm::dyn_cast<clang::ExplicitCastExpr>(e);
+        if (!cast) break;
+        const clang::Expr* written = cast->getSubExprAsWritten();
+        if (!written) break;
+        const bool toBool = cast->getType()->isBooleanType();
+        const bool pureNoOp =
+            cast->getType().getCanonicalType().getUnqualifiedType() ==
+            written->getType().getCanonicalType().getUnqualifiedType();
+        if (!toBool && !pureNoOp) break;
+        e = written->IgnoreParens();
+    }
+    return e;
+}
+
 namespace condwalk_detail {
 
 inline const clang::VarDecl* asVar(const clang::Expr* expr) {
@@ -95,7 +130,7 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
                    TruthFn&& onTruth, CompareFn&& onCompare) {
     namespace d = condwalk_detail;
     if (!cond) return;
-    cond = cond->IgnoreParenImpCasts();
+    cond = stripBoolPreservingCasts(cond->IgnoreParenImpCasts());
 
     // __builtin_expect(x, c) is branch-semantics-transparent: real-world
     // likely()/unlikely() macros (absl ABSL_PREDICT_*, the Linux kernel)

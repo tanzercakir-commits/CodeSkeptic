@@ -473,3 +473,26 @@ TEST(DivByZeroBoundTest, LeOneUnprovenPath_StillWarns) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- #79 negative control: narrowing casts stay OPAQUE ---
+//
+// Clang hides the real conversion of `(char)x` in an implicit
+// part_of_explicit_cast child and marks the explicit node CK_NoOp —
+// a CastKind-based strip would see it as transparent and refine
+// `!(char)x` as `!x`, "proving" x zero when x=256 also takes the
+// branch. The type-based strip must keep it opaque: NO definite
+// division-by-zero may be reported here.
+TEST(DivByZeroRuleTest, NarrowingCastCondition_NoFalseProof) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x) {
+            if (!(char)x) {
+                return 10 / x;
+            }
+            return 0;
+        }
+    )");
+    for (const auto& r : results)
+        EXPECT_NE(r.severity, Severity::Error)
+            << "narrowing cast refined as transparent: " << r.message;
+}
