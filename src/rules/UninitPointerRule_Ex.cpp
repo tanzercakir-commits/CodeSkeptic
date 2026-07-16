@@ -10,10 +10,12 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <set>
@@ -85,6 +87,140 @@ Effect classifyStmt(const Stmt* stmt) {
     return {};
 }
 
+// --- Structural must-assign filter ---
+//
+// The TFLite resize_bilinear lesson (2026-07-16): a pointer assigned
+// unconditionally inside `for (int c = 0; c < 8; ++c)` IS assigned
+// when a later statement runs — the loop provably executes — but the
+// dataflow cannot keep that proof: the zero-trip path's infeasibility
+// lives in a literal-stamped fact disjunct, and in large functions the
+// kMaxDisjuncts collapse erases it (24 false ERROR reports). No local
+// collapse heuristic can know which fact a later edge will need, so
+// the proof is re-established STRUCTURALLY at report time, the same
+// way Java's definite-assignment (JLS 16) reasons: suppression-only,
+// and only when every obligation is discharged —
+//   * the function has no goto/label/switch (no unstructured entry);
+//   * a for-loop L: `for (int i = A; i </<= B; ...)` with integer
+//     literals A < B (first trip guaranteed), whose body contains a
+//     TOP-LEVEL `var = ...` and NO break/continue/return/goto anywhere
+//     (the assignment cannot be bypassed);
+//   * the dereference sits in a LATER SIBLING of L in the same
+//     compound — structured flow reaches it only through L.
+// Anything unproven keeps its report.
+
+bool hasUnstructuredFlow(const Stmt* body) {
+    struct V : RecursiveASTVisitor<V> {
+        bool bad = false;
+        bool VisitGotoStmt(GotoStmt*) { bad = true; return false; }
+        bool VisitIndirectGotoStmt(IndirectGotoStmt*) {
+            bad = true; return false;
+        }
+        bool VisitLabelStmt(LabelStmt*) { bad = true; return false; }
+        bool VisitSwitchStmt(SwitchStmt*) { bad = true; return false; }
+    } v;
+    v.TraverseStmt(const_cast<Stmt*>(body));
+    return v.bad;
+}
+
+bool hasEarlyExit(const Stmt* s) {
+    struct V : RecursiveASTVisitor<V> {
+        bool bad = false;
+        bool VisitBreakStmt(BreakStmt*) { bad = true; return false; }
+        bool VisitContinueStmt(ContinueStmt*) { bad = true; return false; }
+        bool VisitReturnStmt(ReturnStmt*) { bad = true; return false; }
+        bool VisitGotoStmt(GotoStmt*) { bad = true; return false; }
+    } v;
+    v.TraverseStmt(const_cast<Stmt*>(s));
+    return v.bad;
+}
+
+bool subtreeContains(const Stmt* root, const Stmt* needle) {
+    if (!root) return false;
+    if (root == needle) return true;
+    for (const Stmt* c : root->children())
+        if (subtreeContains(c, needle)) return true;
+    return false;
+}
+
+// `for (int i = A; i < B; ...)` / `<=` with integer literals and A
+// below B: the body runs at least once on every execution of the loop
+// statement.
+bool guaranteedFirstTrip(const ForStmt* loop) {
+    const auto* ds = dyn_cast_or_null<DeclStmt>(loop->getInit());
+    if (!ds || !ds->isSingleDecl()) return false;
+    const auto* iv = dyn_cast<VarDecl>(ds->getSingleDecl());
+    if (!iv || !iv->hasInit()) return false;
+    const auto* initLit =
+        dyn_cast<IntegerLiteral>(iv->getInit()->IgnoreParenImpCasts());
+    if (!initLit) return false;
+
+    const auto* cond = dyn_cast_or_null<BinaryOperator>(loop->getCond());
+    if (!cond ||
+        (cond->getOpcode() != BO_LT && cond->getOpcode() != BO_LE))
+        return false;
+    const auto* lhs =
+        dyn_cast<DeclRefExpr>(cond->getLHS()->IgnoreParenImpCasts());
+    if (!lhs || lhs->getDecl() != iv) return false;
+    const auto* boundLit =
+        dyn_cast<IntegerLiteral>(cond->getRHS()->IgnoreParenImpCasts());
+    if (!boundLit) return false;
+
+    // Plain literals are non-negative (a negative constant is a
+    // UnaryOperator and fails the cast above), so unsigned compare.
+    llvm::APInt a = initLit->getValue();
+    llvm::APInt b = boundLit->getValue();
+    const unsigned w = std::max(a.getBitWidth(), b.getBitWidth());
+    a = a.zext(w);
+    b = b.zext(w);
+    return cond->getOpcode() == BO_LT ? a.ult(b) : a.ule(b);
+}
+
+// The loop body assigns `var` as a top-level statement and contains no
+// way to bypass it (conservative: no early exit anywhere in the body).
+bool bodyAssignsUnconditionally(const ForStmt* loop, const VarDecl* var) {
+    const auto* body = dyn_cast_or_null<CompoundStmt>(loop->getBody());
+    if (!body) return false;
+    bool found = false;
+    for (const Stmt* s : body->body()) {
+        if (const auto* bin = dyn_cast<BinaryOperator>(s))
+            if (bin->getOpcode() == BO_Assign && asVar(bin->getLHS()) == var) {
+                found = true;
+                break;
+            }
+    }
+    return found && !hasEarlyExit(loop->getBody());
+}
+
+bool provenAssignedBefore(const FunctionDecl* fn, const VarDecl* var,
+                          const Stmt* use) {
+    const Stmt* body = fn ? fn->getBody() : nullptr;
+    if (!body || hasUnstructuredFlow(body)) return false;
+
+    struct V : RecursiveASTVisitor<V> {
+        const VarDecl* var = nullptr;
+        const Stmt* use = nullptr;
+        bool proven = false;
+        bool VisitCompoundStmt(CompoundStmt* cs) {
+            bool sawQualifying = false;
+            for (const Stmt* s : cs->body()) {
+                if (sawQualifying && subtreeContains(s, use)) {
+                    proven = true;
+                    return false;
+                }
+                if (const auto* fs = dyn_cast<ForStmt>(s))
+                    if (guaranteedFirstTrip(fs) &&
+                        bodyAssignsUnconditionally(fs, var))
+                        sawQualifying = true;
+            }
+            return true;
+        }
+    } v;
+    v.var = var;
+    v.use = use;
+    v.TraverseStmt(const_cast<Stmt*>(body));
+    return v.proven;
+}
+
 // --- Collect tracked pointer variables ---
 
 std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
@@ -129,11 +265,11 @@ public:
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
                       std::set<const ValueDecl*> unkeyableDecls,
                       std::set<const ValueDecl*> stampableDecls,
-                      std::string funcName,
+                      const FunctionDecl* func,
                       zerodefect::DiagnosticList& results)
         : mutated_(std::move(unkeyableDecls)),
-          stampable_(std::move(stampableDecls)),
-          funcName_(std::move(funcName)), results_(results) {
+          stampable_(std::move(stampableDecls)), func_(func),
+          funcName_(func->getQualifiedNameAsString()), results_(results) {
         zerodefect::Guarded<PtrVarState> init;
         for (const auto* var : trackedVars)
             init.vars[var] = PtrState::Uninit;
@@ -220,13 +356,24 @@ public:
         auto it = before.find(effect.var);
         if (it == before.end() || it->second == PtrState::Init) return;
 
+        // Structural must-assign proof beats the dataflow's "maybe":
+        // see provenAssignedBefore above (suppression-only).
+        if (provenAssignedBefore(func_, effect.var, stmt)) return;
+
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
 
         if (reported_.emplace(effect.var, line).second) {
             zerodefect::Diagnostic diag;
-            diag.severity = zerodefect::Severity::Error;
+            // Evidence ladder (aligned with every other rule,
+            // 2026-07-16): unassigned on ALL paths = proven = Error;
+            // unassigned on SOME path = "may" = Warning. Reporting the
+            // maybe-class as Error made every imprecision in this rule
+            // a false PROOF — the worst defect our own spec names.
+            diag.severity = (it->second == PtrState::Uninit)
+                                ? zerodefect::Severity::Error
+                                : zerodefect::Severity::Warning;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
@@ -255,6 +402,7 @@ public:
 private:
     std::set<const ValueDecl*> mutated_;
     std::set<const ValueDecl*> stampable_;
+    const FunctionDecl* func_ = nullptr;
     std::string funcName_;
     zerodefect::DiagnosticList& results_;
     State initState_;
@@ -282,8 +430,7 @@ public:
 
         UninitPtrAnalysis analysis(
             trackedVars, zerodefect::collectUnkeyableDecls(func),
-            zerodefect::collectFactDecls(func),
-            func->getQualifiedNameAsString(), results_);
+            zerodefect::collectFactDecls(func), func, results_);
         auto df = zerodefect::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
             zerodefect::CoverageReport::instance().recordNonConvergence(

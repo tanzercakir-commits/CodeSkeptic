@@ -126,7 +126,8 @@ TEST(BestCaseTest, CommaOperatorOrdering_Clean) {
 TEST(WorstCaseTest, DeepNesting_OnePathInits) {
     // 8 levels of nested ifs; only the innermost path initializes.
     // 255/256 paths are uninit — a report is a MUST, the analysis must
-    // converge.
+    // converge. It IS initialized on one path, so the honest severity
+    // is Warning ("may be uninitialized"), not a false Error proof.
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int a, int b, int c, int d, int e, int g, int h, int k) {
@@ -140,7 +141,7 @@ TEST(WorstCaseTest, DeepNesting_OnePathInits) {
         }
     )");
     ASSERT_EQ(results.size(), 1);
-    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
 TEST(WorstCaseTest, WideProductLattice_AllLeaksFound) {
