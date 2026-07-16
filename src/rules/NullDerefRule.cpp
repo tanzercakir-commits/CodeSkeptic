@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -46,6 +47,89 @@ NullState mergeNullStates(NullState a, NullState b) {
     bool anyNullInfo = a == NullState::Null || a == NullState::MaybeNull ||
                        b == NullState::Null || b == NullState::MaybeNull;
     return anyNullInfo ? NullState::MaybeNull : NullState::Unknown;
+}
+
+// Per-variable value with an optional GUARD IMPLICATION (#70): on
+// paths where `fact` holds with value `factVal`, this pointer is
+// NonNull. Implications are mined the moment widening collapses the
+// disjunct set — they are what survives the collapse when more
+// independent guards exist than kMaxDisjuncts can hold as explicit
+// path splits (stb_image TGA: `tga_palette` is guarded by
+// `tga_indexed`, but the loop's RLE/read-next noise conditions
+// cross-multiply the disjuncts and the collapse used to erase the
+// correlation). Linear by construction: four guarded pointers are
+// four implications inside ONE disjunct, never 2^4 disjuncts.
+//
+// Lifecycle: CREATED only by the widening miner (or kept by the merge
+// meet below); CONSUMED on assume-edges — a disjunct that records the
+// matching fact sharpens st to NonNull; DROPPED by any direct set
+// (assignment, out-param, refinement — the implicit NullState
+// constructor makes a fresh unannotated value, which is exactly the
+// sound default) and when the guard variable itself is reassigned.
+struct NullVal {
+    NullState st = NullState::Unknown;
+    std::optional<zerodefect::FactKey> fact;
+    bool factVal = true;
+
+    NullVal() = default;
+    /*implicit*/ NullVal(NullState s) : st(s) {}
+
+    bool operator==(const NullVal& o) const {
+        if (st != o.st || fact.has_value() != o.fact.has_value())
+            return false;
+        return !fact || (*fact == *o.fact && factVal == o.factVal);
+    }
+    bool operator!=(const NullVal& o) const { return !(*this == o); }
+    bool operator<(const NullVal& o) const {
+        if (st != o.st) return st < o.st;
+        if (fact.has_value() != o.fact.has_value())
+            return !fact.has_value();
+        if (!fact) return false;
+        if (!(*fact == *o.fact)) return *fact < *o.fact;
+        return factVal < o.factVal;
+    }
+};
+
+NullVal mergeNullVals(const NullVal& a, const NullVal& b) {
+    NullVal out(mergeNullStates(a.st, b.st));
+    // Implication meet: (F=v ⟹ NonNull) survives the join when each
+    // side either carries the SAME implication or is NonNull outright
+    // (a NonNull side satisfies any NonNull implication trivially).
+    const NullVal* impl = a.fact ? &a : (b.fact ? &b : nullptr);
+    if (impl) {
+        const NullVal& other = (impl == &a) ? b : a;
+        const bool otherOk =
+            other.st == NullState::NonNull ||
+            (other.fact && *other.fact == *impl->fact &&
+             other.factVal == impl->factVal);
+        if (otherOk) {
+            out.fact = impl->fact;
+            out.factVal = impl->factVal;
+        }
+    }
+    return out;
+}
+
+// Same-facts meet (#70): when two disjuncts with an IDENTICAL fact
+// map merge, an implication additionally survives if the shared facts
+// CONTRADICT its condition — no path either side represents can have
+// F = v, so "F=v ⟹ NonNull" holds vacuously. This is the poison
+// antidote: `{indexed==0, MaybeNull+impl}` meeting
+// `{indexed==0, Null}` used to drop the implication (the Null side
+// cannot prove it value-only), and that one drop re-merged into every
+// later join until no implication survived anywhere (measured: 13
+// such drops seeded ~1300 downstream ones on stb_image's tga loader).
+NullVal meetNullVals(const std::map<zerodefect::FactKey, bool>& facts,
+                     const NullVal& a, const NullVal& b) {
+    NullVal out = mergeNullVals(a, b);
+    if (out.fact) return out;
+    const NullVal* impl = a.fact ? &a : (b.fact ? &b : nullptr);
+    if (impl &&
+        zerodefect::factsContradict(facts, *impl->fact, impl->factVal)) {
+        out.fact = impl->fact;
+        out.factVal = impl->factVal;
+    }
+    return out;
 }
 
 // --- Expression null-ness evaluation ---
@@ -200,12 +284,68 @@ Effect classifyStmt(const Stmt* stmt) {
 
 // --- Branch condition refinement (assume edges) ---
 
-using NullVarState = std::map<const VarDecl*, NullState>;
+using NullVarState = std::map<const VarDecl*, NullVal>;
 
 void setIfTracked(NullVarState& state, const VarDecl* var, NullState value) {
     if (!var) return;
     auto it = state.find(var);
-    if (it != state.end()) it->second = value;
+    if (it != state.end()) it->second = value;  // fresh NullVal: any
+}                                               // implication drops
+
+// The correlation miner (#70), run by widenGuarded/normalizeGuarded at
+// the moment the disjunct set is about to collapse. For each pointer
+// whose collapsed state decays to MaybeNull, look for a fact F and a
+// value v such that EVERY pre-collapse disjunct compatible with F=v
+// knows the pointer NonNull — directly, or via the same implication it
+// already carries (repeated widenings re-offer their own product).
+// A disjunct that never recorded F is compatible with BOTH values of F
+// (its paths may carry either), so it must pass the check on both
+// sides it joins. Soundness: facts recorded in a disjunct are true on
+// every path it represents, and stale facts are erased on assignment
+// (applyStmtFacts) — so "all F=v-compatible disjuncts are NonNull"
+// really does mean "every path reaching this point with F=v has the
+// pointer NonNull".
+void mineGuardImplications(
+    const zerodefect::GuardedState<NullVarState>& pre,
+    zerodefect::Guarded<NullVarState>& widened) {
+    std::set<zerodefect::FactKey> candidates;
+    for (const auto& d : pre)
+        for (const auto& [key, value] : d.facts) candidates.insert(key);
+    if (candidates.empty()) return;
+
+    for (auto& [var, val] : widened.vars) {
+        if (val.st != NullState::MaybeNull || val.fact) continue;
+        for (const auto& key : candidates) {
+            for (bool wanted : {true, false}) {
+                bool sawExact = false;
+                bool allNonNull = true;
+                for (const auto& d : pre) {
+                    auto f = d.facts.find(key);
+                    const bool exact =
+                        f != d.facts.end() && f->second == wanted;
+                    const bool compatible = exact || f == d.facts.end();
+                    if (exact) sawExact = true;
+                    if (!compatible) continue;
+                    auto it = d.vars.find(var);
+                    const bool nonNull =
+                        it != d.vars.end() &&
+                        (it->second.st == NullState::NonNull ||
+                         (it->second.fact && *it->second.fact == key &&
+                          it->second.factVal == wanted));
+                    if (!nonNull) {
+                        allNonNull = false;
+                        break;
+                    }
+                }
+                if (sawExact && allNonNull) {
+                    val.fact = key;
+                    val.factVal = wanted;
+                    break;
+                }
+            }
+            if (val.fact) break;
+        }
+    }
 }
 
 // Via the shared walk skeleton (engine/ConditionWalk.h): `if (p)`,
@@ -329,7 +469,7 @@ public:
                     next.push_back(std::move(pinned));
                 }
                 initState_ = std::move(next);
-                zerodefect::normalizeGuarded(initState_, mergeNullStates);
+                zerodefect::normalizeGuarded(initState_, mergeNullVals);
             }
         }
     }
@@ -359,10 +499,19 @@ public:
 
     // Engine convergence hook: collapse the disjuncts when a block is
     // revisited beyond any monotone explanation (see DataflowEngine).
-    void widen(State& s) const { zerodefect::widenGuarded(s, mergeNullStates); }
+    // Both collapse points run the #70 correlation miner, so a guard
+    // implication survives where the explicit path split cannot; the
+    // fact-aware meet keeps vacuous implications alive across
+    // same-facts merges (see meetNullVals).
+    static auto ops() {
+        return zerodefect::makeGuardedOps(mergeNullVals, meetNullVals,
+                                          mineGuardImplications);
+    }
+
+    void widen(State& s) const { zerodefect::widenGuardedOps(s, ops()); }
 
     State merge(const State& a, const State& b) const {
-        return zerodefect::mergeGuarded(a, b, mergeNullStates);
+        return zerodefect::mergeGuardedOps(a, b, ops());
     }
 
     State transfer(const Stmt* stmt, const State& inRaw,
@@ -371,8 +520,17 @@ public:
         // facts keyed on them; integer-constant stores stamp the new
         // truth. Domain logic below then reads the fact-current state.
         State in = inRaw;
-        zerodefect::applyStmtFacts(in, stmt, stampable_, ptrFacts_,
-                                   mergeNullStates);
+        zerodefect::applyStmtFactsOps(in, stmt, stampable_, ptrFacts_,
+                                      ops());
+        // #70: an assignment to a guard variable stales every
+        // implication keyed on it — the exact mirror of the fact
+        // erasure applyStmtFacts just performed.
+        if (const clang::ValueDecl* target = zerodefect::assignedDecl(stmt)) {
+            for (auto& d : in)
+                for (auto& [var, val] : d.vars)
+                    if (val.fact && val.fact->var == target)
+                        val.fact.reset();
+        }
 
         // A tracked pointer passed by non-const reference is an
         // out-param: the callee may rebind it, so its fact drops to
@@ -415,9 +573,9 @@ public:
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        zerodefect::refineGuardedFactsWith(
+        zerodefect::refineGuardedFactsOps(
             state, condExpr, isTrueBranch, mutated_, ptrFacts_,
-            mergeNullStates,
+            ops(),
             // Domain refuter for disjunction elimination: an operand
             // whose REQUIRED nullness contradicts this disjunct's var
             // state cannot have held here (walkNullCondition yields
@@ -429,9 +587,9 @@ public:
                     e, wanted, [&](const VarDecl* var, bool isNull) {
                         auto it = d.vars.find(var);
                         if (it == d.vars.end()) return;
-                        if (isNull && it->second == NullState::NonNull)
+                        if (isNull && it->second.st == NullState::NonNull)
                             refuted = true;
-                        if (!isNull && it->second == NullState::Null)
+                        if (!isNull && it->second.st == NullState::Null)
                             refuted = true;
                     });
                 return refuted;
@@ -441,7 +599,24 @@ public:
             // eliminated disjunction — whole-state applyCondition
             // never sees those).
             [](zerodefect::Guarded<NullVarState>& d, const Expr* leaf,
-               bool leafTrue) { applyCondition(leaf, leafTrue, d.vars); });
+               bool leafTrue) {
+                applyCondition(leaf, leafTrue, d.vars);
+                // #70: the leaf's fact was just recorded into d.facts
+                // (applyFactLeaf runs before this hook) — a recorded
+                // fact ACTIVATES every matching guard implication.
+                // Null stays Null: sharpening a definitely-null
+                // disjunct would hide its report, and if the
+                // implication proves that path infeasible, dropping
+                // the warning is the engine's call, not this hook's.
+                for (auto& [var, val] : d.vars) {
+                    if (!val.fact || val.st == NullState::NonNull ||
+                        val.st == NullState::Null)
+                        continue;
+                    auto f = d.facts.find(*val.fact);
+                    if (f != d.facts.end() && f->second == val.factVal)
+                        val.st = NullState::NonNull;
+                }
+            });
     }
 
     // Caller-side contract check (CONTRACTS.md Round C): every
@@ -461,7 +636,7 @@ public:
         if (req.enforced.empty()) return;
 
         NullVarState flat =
-            zerodefect::flattenGuarded(before, mergeNullStates);
+            zerodefect::flattenGuarded(before, mergeNullVals);
 
         for (const auto& info : req.enforced) {
             if (info.kind == zerodefect::RequiresInfo::Kind::NonZeroParam)
@@ -487,8 +662,8 @@ public:
             } else if (const VarDecl* var = asVar(arg)) {
                 auto it = flat.find(var);
                 if (it != flat.end()) {
-                    definite = (it->second == NullState::Null);
-                    maybe = (it->second == NullState::MaybeNull);
+                    definite = (it->second.st == NullState::Null);
+                    maybe = (it->second.st == NullState::MaybeNull);
                 }
             }
             if (!definite && !maybe) continue;
@@ -546,7 +721,7 @@ public:
                 if (v == NullState::Unknown) {
                     auto it = d.vars.find(var);
                     if (it == d.vars.end()) continue;
-                    v = it->second;
+                    v = it->second.st;
                 }
                 if (v == NullState::Null)
                     (guardProven ? definite : maybe) = true;
@@ -587,13 +762,13 @@ public:
                        const State& beforeDisjuncts,
                        const State& afterDisjuncts, ASTContext& ctx) {
         NullVarState before =
-            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
+            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullVals);
         NullVarState after =
-            zerodefect::flattenGuarded(afterDisjuncts, mergeNullStates);
+            zerodefect::flattenGuarded(afterDisjuncts, mergeNullVals);
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
-            if (afterState == NullState::Null)
+            if (afterState.st == NullState::Null)
                 recordEvent(cond, var, ctx,
                             zerodefect::MsgId::TraceAssumedNullHere);
         }
@@ -607,17 +782,17 @@ public:
             checkGuardedEnsures(ret, beforeDisjuncts, ctx);
 
         NullVarState before =
-            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullStates);
+            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullVals);
         NullVarState after =
-            zerodefect::flattenGuarded(afterDisjuncts, mergeNullStates);
+            zerodefect::flattenGuarded(afterDisjuncts, mergeNullVals);
         // Dataflow trace: record transitions to null / possibly-null
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
-            if (afterState == NullState::Null)
+            if (afterState.st == NullState::Null)
                 recordEvent(stmt, var, ctx,
                             zerodefect::MsgId::TraceAssignedNullHere);
-            else if (afterState == NullState::MaybeNull)
+            else if (afterState.st == NullState::MaybeNull)
                 recordEvent(stmt, var, ctx,
                             zerodefect::MsgId::TraceAssignedMaybeNullHere);
         }
@@ -627,8 +802,8 @@ public:
 
         auto it = before.find(effect.var);
         if (it == before.end()) return;
-        if (it->second != NullState::Null &&
-            it->second != NullState::MaybeNull)
+        if (it->second.st != NullState::Null &&
+            it->second.st != NullState::MaybeNull)
             return;
 
         const SourceManager& sm = ctx.getSourceManager();
@@ -636,7 +811,7 @@ public:
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reported_.emplace(effect.var, line).second) return;
 
-        const bool definite = (it->second == NullState::Null);
+        const bool definite = (it->second.st == NullState::Null);
 
         // Report-flood dedup (warnings only): one MaybeNull origin can
         // reach dozens of dereferences (shadPS4 internal__Foprep: a

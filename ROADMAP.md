@@ -827,6 +827,53 @@ harvest a condition from. Different mechanism, different task.
 Disk format v3 (condition column), version-strict parsing, merge drops
 conditions on cross-TU disagreement. Gate: CWE476 Juliet floor.
 
+## 6.18 #70 guard-implication mining (2026-07-16) — the cross-product wall, half torn down
+
+The stb_image `tga_palette` FP's mechanism (§ scan of 2026-07-15) was
+DISJUNCT-BUDGET EXHAUSTION: ≥4 independently guarded pointers need
+2^4 disjuncts to keep every guard correlation as an explicit path
+split; `kMaxDisjuncts = 4` forces `widenGuarded` to collapse, and the
+collapse erased ALL correlations. The fix is the ROADMAP's own
+prescription — a per-variable guard representation:
+
+1. **Mined implications.** At every collapse point (cap-overflow in
+   joins AND the engine's convergence widening) a miner scans the
+   pre-collapse disjuncts: if every disjunct compatible with fact F=v
+   knows pointer p NonNull, the collapsed value carries
+   `F=v ⟹ p NonNull`. Linear: N guards = N implications in one
+   disjunct. An assume-edge that records F=v activates the
+   implication; assignment to p or to F's variable drops it.
+2. **Fact-aware meets.** Same-facts disjunct merges combine values
+   UNDER the shared fact map (`GuardedOps.meetVal`): an implication
+   whose condition the shared facts CONTRADICT holds vacuously and
+   survives the meet. Without this, one fact-blind drop re-merged
+   into every later join — measured on the tga loader: 13 seed drops
+   cascaded into ~1300, leaving no implication alive anywhere.
+
+Receipts: the 4-pointer scale repro 5→0; every reduced tga shape
+(single guard + RLE/read-next noise, call-initialized flag,
+assignment-derived flag) clean; all five negative controls still
+warn; a measured FALSE NEGATIVE fixed for free (`if (fa) a = alloc();
+if (fa) a[0]` with no failure check now warns — sharper disjuncts
+carry the MaybeNull); 551/551 tests; no perf cost (stb corpus 1.8 s →
+1.3 s).
+
+**Honest residual, precisely diagnosed:** the verbatim
+`stbi__tga_load` still yields its warning (stb corpus 1→1 vs main).
+Bisection receipts: deleting the POST-deref inverted-swap loop
+silences it, and so does merely RENAMING that loop's reused `i`/`j`
+counters — the report depends on iteration order, not on the value
+domain. Root: ACCUMULATIVE widening (`widenMemory` joins each visit's
+entry with the previous widened entry) mixes iterates; an
+early-iteration state that lost the implication before it matured
+keeps re-entering every later collapse, and the miner cannot
+re-derive it once a MaybeNull-without-implication copy sits in the
+group. This is a known cost of widening-without-narrowing. Two
+candidate levers, both out of #70's scope, recorded as the next
+engine task: a NARROWING (descending) pass after the widened
+fixpoint, or provenance-carrying implications (valid-from-block +
+dominance check at activation).
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

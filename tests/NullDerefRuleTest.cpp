@@ -849,3 +849,228 @@ TEST(AssertTernaryTest, AssertOnOtherVar_LeakStaysVisible) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// --- #70: loop-invariant guard correlation at scale ---
+//
+// A pointer allocated + null-checked only under a flag, dereferenced
+// later under the SAME flag, inside a loop whose body carries several
+// independent conditions. The disjunct budget (kMaxDisjuncts) cannot
+// hold the guard cross-product as explicit path splits; the widening
+// correlation miner records "flag != 0 => ptr NonNull" as a
+// per-variable implication instead, and the deref guard's assume-edge
+// activates it. Clean/dirty pairs pin both directions.
+
+namespace {
+constexpr const char* kGuardPrelude = R"(
+    extern "C" void* malloc(unsigned long);
+    extern "C" void free(void*);
+    extern int get(void);
+)";
+}
+
+TEST(GuardImplicationTest, TgaShape_SingleGuardWithLoopNoise_Clean) {
+    // The stb_image TGA loader shape (reduced): palette exists only
+    // when `indexed`; the loop's RLE/read-next conditions used to
+    // cross-multiply the disjuncts past the cap and the collapse
+    // erased the correlation (7 spurious warnings from a 4-pointer
+    // variant before the miner existed).
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int indexed, int is_rle, int rgb16, int n) {
+            unsigned char *palette = 0;
+            int rle_count = 0, read_next = 1, sum = 0, i;
+            if (indexed) {
+                palette = (unsigned char *)malloc(256);
+                if (!palette) return -1;
+            }
+            for (i = 0; i < n; ++i) {
+                if (is_rle) {
+                    if (rle_count == 0) { rle_count = get(); read_next = 1; }
+                } else {
+                    read_next = 1;
+                }
+                if (read_next) {
+                    if (indexed) {
+                        sum += palette[i & 255];
+                    } else if (rgb16) {
+                        sum += get();
+                    }
+                    read_next = 0;
+                }
+                --rle_count;
+            }
+            if (palette) free(palette);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(GuardImplicationTest, FourIndependentGuards_Clean) {
+    // 4 independently guarded pointers = 2^4 fact combinations — far
+    // past kMaxDisjuncts. Four implications in ONE disjunct instead.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int fa, int fb, int fc, int fd, int n) {
+            int *a = 0, *b = 0, *c = 0, *d = 0;
+            int i, sum = 0;
+            if (fa) { a = (int *)malloc(4); if (!a) return -1; }
+            if (fb) { b = (int *)malloc(4); if (!b) return -1; }
+            if (fc) { c = (int *)malloc(4); if (!c) return -1; }
+            if (fd) { d = (int *)malloc(4); if (!d) return -1; }
+            for (i = 0; i < n; ++i) {
+                if (fa) sum += a[0];
+                if (fb) sum += b[0];
+                if (fc) sum += c[0];
+                if (fd) sum += d[0];
+            }
+            free(a); free(b); free(c); free(d);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(GuardImplicationTest, CallInitializedGuardFlag_Clean) {
+    // The guard flag is a local initialized from an opaque call (the
+    // real TGA header parse), not a parameter — still keyable.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int n) {
+            int indexed = get();
+            int is_rle = get();
+            unsigned char *palette = 0;
+            int read_next = 1, sum = 0, i;
+            if (indexed) {
+                palette = (unsigned char *)malloc(256);
+                if (!palette) return -1;
+            }
+            for (i = 0; i < n; ++i) {
+                if (is_rle) { if (get()) sum += get(); }
+                else read_next = 1;
+                if (read_next) {
+                    if (indexed) sum += palette[i & 255];
+                    read_next = 0;
+                }
+            }
+            free(palette);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(GuardImplicationTest, WrongGuard_StillWarns) {
+    // b is guarded by fb but dereferenced under fa — a REAL bug the
+    // miner must not silence (no fact partitions b's nullness on fa).
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int fa, int fb, int n) {
+            int *a = 0, *b = 0;
+            int i, sum = 0;
+            if (fa) { a = (int *)malloc(4); if (!a) return -1; }
+            if (fb) { b = (int *)malloc(4); if (!b) return -1; }
+            for (i = 0; i < n; ++i) {
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (fa) sum += b[0];
+            }
+            free(a); free(b);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(GuardImplicationTest, GuardReassignedInLoop_StillWarns) {
+    // The guard variable changes between the check and the deref: the
+    // implication is keyed on the assigned decl and must go stale.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int fa, int n) {
+            int *a = 0;
+            int i, sum = 0;
+            if (fa) { a = (int *)malloc(4); if (!a) return -1; }
+            for (i = 0; i < n; ++i) {
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (get()) sum += get();
+                fa = get();
+                if (fa) sum += a[0];
+            }
+            free(a);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(GuardImplicationTest, PointerReassignedInLoop_StillWarns) {
+    // The pointer itself is nulled on a loop path: any implication on
+    // it drops with the assignment.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int fa, int n) {
+            int *a = 0;
+            int i, sum = 0;
+            if (fa) { a = (int *)malloc(4); if (!a) return -1; }
+            for (i = 0; i < n; ++i) {
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (fa) sum += a[0];
+                if (get() > 7) a = 0;
+            }
+            free(a);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(GuardImplicationTest, NoGuardAfterNoise_StillWarns) {
+    // Unguarded deref after the same loop noise: nothing to activate.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int f(int fa, int n) {
+            int *a = 0;
+            int i, sum = 0;
+            if (fa) { a = (int *)malloc(4); if (!a) return -1; }
+            for (i = 0; i < n; ++i) {
+                if (get()) sum += get();
+                if (get()) sum += get();
+                if (get()) sum += get();
+                sum += a[0];
+            }
+            free(a);
+            return sum;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(GuardImplicationTest, UncheckedAllocUnderGuard_Warns) {
+    // A maybe-null allocation with NO failure check: the guarded
+    // deref is genuinely MaybeNull — the miner has no NonNull group
+    // to mine from, so the warning must survive. This shape was
+    // silent BEFORE #70 (a measured false negative on the CLI
+    // pipeline); the sharper disjuncts now carry the MaybeNull to
+    // the deref.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kGuardPrelude) + R"(
+        int* mk() {
+            if (get()) return nullptr;
+            return new int(5);
+        }
+        int f(int fa) {
+            int *a = 0;
+            if (fa) a = mk();
+            if (fa) return a[0];
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
