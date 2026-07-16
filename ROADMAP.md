@@ -238,30 +238,47 @@ shadPS4 #4712 heap-overflow shape and Juliet CWE121/122/124/126.
 
 ## 6.5 Real-world spatial-rule validation (2026-07-16)
 
-After landing the bounds rule's three deepenings — heap extents (#76),
+After landing the bounds rule's deepenings — heap extents (#76),
 copy-size overflow (#77), sizeof-aware sizes (#78), fixed-size array
-MEMBERS as buffers (#79) — the spatial rules were hunted on six FRESH,
-zero-dependency, buffer-heavy codecs (perfect compile DB, no build deps):
-qoi, qoa, pl_mpeg, stb_vorbis, stb_image, dr_flac (~1.0 MB of decoder
-code, the canonical CWE-125/787 domain — "AI writes a parser").
+MEMBERS as buffers (#79) — the spatial rules were hunted on SIXTEEN
+FRESH, zero-dependency, buffer-heavy translation units (perfect compile
+DB, no build deps), the canonical CWE-125/787 domain — "AI writes a
+parser/codec":
+  - image/media: qoi, qoa, pl_mpeg, stb_vorbis, stb_image, stb_truetype,
+    picojpeg, nanosvg;
+  - parsers: cgltf, jsmn, parson, microtar;
+  - compression: lz4, fastlz, heatshrink, dr_flac.
+(~2 MB of decoder/parser code total.)
 
-- **Spatial/bounds rules: 0 findings, 0 false positives.** Correct: a
-  sound bounds rule fires only on a WHOLE-RANGE definite OOB, which
-  shipping decoders do not contain. A definite-OOB + struct-member-copy
-  CANARY appended to the stb_vorbis TU was caught (index [20,20] outside
-  [0,8); copy [116,116] > 16-byte member), proving the rule was EXERCISED
-  on this code, not silently skipped. Precision confirmed on the most
-  FP-hostile input class (heavy fixed arrays, memcpy, sizeof arithmetic).
-- **Null-deref rule: 1 finding = FALSE POSITIVE** (stb_image TGA decoder,
-  `tga_palette` at 6004). Root cause: a loop-invariant int guard
-  (`tga_indexed`, read once, never reassigned) gates BOTH the palette
-  malloc+null-check and the later deref, with the pixel loop between them.
-  The engine loses the null-vs-guard correlation across the loop's
-  widening. This is the path-sensitivity/loop frontier that Coverity and
-  the Clang Static Analyzer also struggle with; logged as a known
-  precision limitation, NOT a soundness bug. (shadPS4 was the original
-  target; its full compile DB — 42 submodules + Vulkan/Qt/SDL — is
-  infeasible in the sandbox, so the hunt pivoted to zero-dep codecs.)
+- **Spatial/bounds + int-overflow rules: 0 findings, 0 false positives.**
+  Correct: a sound bounds rule fires only on a WHOLE-RANGE definite OOB,
+  which shipping decoders do not contain. A definite-OOB + struct-member-
+  copy CANARY appended to the stb_vorbis TU was caught (index [20,20]
+  outside [0,8); copy [116,116] > 16-byte member), proving the rules were
+  EXERCISED, not silently skipped. Precision confirmed on the most
+  FP-hostile input class (heavy fixed arrays, memcpy, sizeof, bit math).
+- **Null-deref rule: 2 findings, both FALSE POSITIVES** — the mature
+  null-deref rule, orthogonal to the new spatial work. Two distinct
+  precision mechanisms, both well-understood, neither a soundness bug:
+    1. stb_image TGA (`tga_palette`): a loop-invariant int guard
+       (`tga_indexed`, read once, never reassigned) gates BOTH the palette
+       malloc+null-check and the later deref, with the pixel loop between.
+       The engine loses the null-vs-guard correlation across the loop's
+       widening — the path-sensitivity/loop frontier Coverity and the
+       Clang Static Analyzer also struggle with.
+    2. picojpeg (`pHuffVal`): `getHuffVal(idx)` returns null only in its
+       default case (idx ∉ {0,1,2,3}); the caller's `idx =
+       ((x>>3)&2)+(x&1)` provably ∈ {0,1,2,3}, so the null path is
+       infeasible — but the interval evaluator returns top() for bitwise
+       `&`/`>>`, so the argument's in-range value is not proven, and the
+       "callee-may-return-null" summary fires. Two cheap sound levers
+       exist (model `x & c → [0,c]` for constant mask c≥0; value-condition
+       the null-return summary on the argument interval), tracked as
+       future precision work.
+
+  (shadPS4 was the original target; its full compile DB — 42 submodules +
+  Vulkan/Qt/SDL — is infeasible in the sandbox, so the hunt used zero-dep
+  codecs instead.)
 
 ## 7. Build recipe (unchanged since 2026-07)
 
