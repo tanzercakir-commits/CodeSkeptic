@@ -460,6 +460,34 @@ split. Referees: ctest 508/508, single-process 507/507, 12 shuffle
 seeds 0 failures, corpus on-pin (cjson 53, tinyxml2 9). No Juliet floor
 covers uninit-ptr, so the measured CWEs are unaffected by construction.
 
+## 6.10 TFLite harvest to value (2026-07-16)
+
+The 106-finding scan converted into outcomes; full rescan with the
+#82+#83 binary: **106 -> 85 findings, uninit-ptr 24 -> 3** (the 21
+resize_bilinear FPs gone; 3 protobuf arena_impl.h residuals remain —
+out-param-under-short-circuit shape, third-party header, 1 error + 2
+warnings under the new ladder — a separate look someday).
+
+**Leak triage (10 candidates): 2 REAL, hand-verified** —
+rfft2d.cc/irfft2d.cc leak the FFT work buffer on TF_LITE_ENSURE_OK
+early returns (macro verified as `return s;`; delete[] only at the
+end; no upstream duplicate found). Upstream issue text prepared and
+handed to the user (session GitHub scope cannot post outside the
+project repo). The 8 FPs fall into 4 mechanisms: unique_ptr-adoption
+escape (x2) and lambda-capture escape (x3) — both cheap leak-rule
+levers, task #75; aggregate-return escape (x1) and pointer-arithmetic
+ownership (Eigen aligned malloc, x2) — harder residuals.
+
+**Null-deref cluster (71): honest self-correction of §6.8.** Sampling
+falsified the TF_LITE_ENSURE-opacity guess: these sites have NO check
+at all — control-flow kernels (while/if/case) dereference
+`subgraph->tensor(...)` bare, with null-safety resting on the
+graph-validity invariant. So they are honest "may" warnings of exactly
+the ASSUMPTION class; the right consumer-side treatment is a contract
+on `tensor()` (zd: ensures) or a baseline — not fatal-asserts. That
+our own assumption engine names precisely this gap is a coherence
+data point for the AI-era thesis.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
