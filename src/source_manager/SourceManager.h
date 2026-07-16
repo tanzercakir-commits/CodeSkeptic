@@ -43,6 +43,11 @@ public:
     const std::vector<std::string>& files() const;
 
 private:
+    // The body of processAll, run on a large-stack worker thread (deep
+    // metaprogram-generated types overflow a default stack — see the
+    // comment in processAll).
+    int processAllOnWorker(ASTCallback callback);
+
     std::string build_path_;
     std::vector<std::string> source_files_;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;

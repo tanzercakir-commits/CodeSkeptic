@@ -341,6 +341,44 @@ TEST(BoundsRuleTest, MemcpyStructMemberInRangeClean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- Pathological type depth (TFLite hardening) ---
+// clang's getTypeInfo recurses once per type-nesting level; a
+// metaprogram-generated type can be deep enough to smash the stack
+// (TensorFlow Lite's neon_tensor_utils.cc: 104k frames -> SIGSEGV).
+// boundedTypeSizeInChars walks the structure under a depth budget
+// first: a too-deep type yields "size unknown" and the rule stays
+// SILENT (sound) instead of crashing or guessing.
+
+TEST(BoundsRuleTest, PathologicallyDeepTypeStaysSilentNotCrash) {
+    // 400 nested array levels (> the 128-depth budget): the definite
+    // OOB a[5] would be reportable if the size were computed, but the
+    // budget says "unknown" — no crash, no finding.
+    std::string code = "typedef int A0[2];\n";
+    for (int i = 1; i <= 400; ++i)
+        code += "typedef A" + std::to_string(i - 1) + " A" +
+                std::to_string(i) + "[2];\n";
+    code += "int* f(){ static A400 a; return &a[5][0]";
+    for (int i = 0; i < 399; ++i) code += "[0]";
+    code += "; }\n";
+
+    BoundsRule rule;
+    auto results = runRule(rule, code);
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, ShallowNestedTypeStillReports) {
+    // The budget must NOT eat legitimate nesting: 3 levels, definite OOB.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef int A0[2];
+        typedef A0 A1[2];
+        typedef A1 A2[4];
+        int f(){ A2 a; return a[9][0][0]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
 // --- Interprocedural (C3): parameter entry intervals ---
 
 TEST(BoundsRuleTest, StaticHelperOutOfRangeIndexFromCaller) {

@@ -17,7 +17,9 @@
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 
+#include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 
 namespace zerodefect {
@@ -28,6 +30,18 @@ using IntervalMap = std::map<const clang::VarDecl*, Interval>;
 // variable reads, unary +/-, and binary + - * are modeled; everything
 // else (calls, unknown vars, bitwise, division, …) is top().
 Interval evalInterval(const clang::Expr* expr, const IntervalMap& state);
+
+// Byte size of a type, guarded by a STRUCTURAL BUDGET. Clang's
+// getTypeInfo recurses once per nesting level (array element, record
+// field, base class), and metaprogram-generated types in real code can
+// nest deep enough to smash the stack (TensorFlow Lite's
+// neon_tensor_utils.cc drove getTypeInfoImpl 104k frames deep —
+// SIGSEGV). This helper walks the type's structure first, with a depth
+// and node budget; a type too deep/large to walk safely yields
+// nullopt, which callers treat as "size unknown" (rules stay sound via
+// top()). ALL rule-side type-size queries go through here.
+std::optional<int64_t> boundedTypeSizeInChars(clang::ASTContext& ctx,
+                                              clang::QualType type);
 
 // Evaluate an allocation/copy SIZE expression to a BYTE interval. Extends
 // evalInterval with `sizeof(T)` (a compile-time constant) and constant

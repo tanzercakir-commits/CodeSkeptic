@@ -68,7 +68,8 @@ bool heapElementCount(const Expr* init, QualType pointee, ASTContext& ctx,
     if (!callee || !callee->getIdentifier()) return false;
     const llvm::StringRef name = callee->getName();
 
-    const int64_t elemBytes = ctx.getTypeSizeInChars(pointee).getQuantity();
+    const int64_t elemBytes =
+        boundedTypeSizeInChars(ctx, pointee).value_or(0);
     if (elemBytes <= 0) return false;
 
     const IntervalMap empty;
