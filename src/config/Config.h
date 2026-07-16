@@ -90,6 +90,14 @@ public:
         return free_functions_;
     }
 
+    // Project owning-smart-pointer wrappers (--owning-pointers): raw
+    // pointers adopted by construction into these types escape the leak
+    // domain (Ref<T>, RefPtr<T>, scoped_refptr<T>, ...).
+    void addOwningPointers(const std::string& list);
+    const std::set<std::string>& owningPointers() const {
+        return owning_pointers_;
+    }
+
     // Project-wide policies (CONTRACTS.md Round E): `policy = <name>`
     // in .zerodefect.conf or --policy on the CLI; file-scoped
     // activation stays in `// zd:policy` comments.
@@ -117,6 +125,7 @@ private:
     std::set<std::string> fatal_asserts_;
     std::set<std::string> alloc_functions_;
     std::set<std::string> free_functions_;
+    std::set<std::string> owning_pointers_;
     std::set<std::string> policies_;
     std::string summary_diff_gate_ = "error";
     std::vector<std::pair<unsigned, unsigned>> lines_;

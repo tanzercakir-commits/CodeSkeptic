@@ -264,6 +264,11 @@ zerodefect <source_path> [options]
                          (e.g. --alloc-functions git__malloc,zmalloc)
   --free-functions <names> Treat these functions as deallocators
                          (their first argument is freed)
+  --owning-pointers <names> Treat these class templates as owning smart
+                         pointers (comma list). A raw pointer adopted by
+                         constructing one is no longer leaked;
+                         std::unique_ptr/shared_ptr are built in
+                         (e.g. --owning-pointers Ref,RefPtr,scoped_refptr)
   --whole-program        Two-pass mode: collect function summaries
                          across all files first, then analyze
   --summary-out <file>   Save harvested cross-file summaries to a file

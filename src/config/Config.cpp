@@ -44,6 +44,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
+        else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
         else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "summary_diff_gate") summary_diff_gate_ = value;
         else if (key == "enable_rule")   enabled_rules_.insert(value);
@@ -86,6 +87,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addNamesTo(alloc_functions_, argv[++i]);
         } else if (arg == "--free-functions" && i + 1 < argc) {
             addNamesTo(free_functions_, argv[++i]);
+        } else if (arg == "--owning-pointers" && i + 1 < argc) {
+            addNamesTo(owning_pointers_, argv[++i]);
         } else if (arg == "--policy" && i + 1 < argc) {
             addNamesTo(policies_, argv[++i]);
         } else if (arg == "--gate" && i + 1 < argc) {
@@ -160,6 +163,12 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         wrappers like git__malloc, zmalloc)\n"
                       << "  --free-functions <names> Treat these functions as deallocators\n"
                       << "                         (first argument is freed)\n"
+                      << "  --owning-pointers <names> Treat these class templates as\n"
+                      << "                         owning smart pointers (comma list;\n"
+                      << "                         a raw pointer adopted by constructing\n"
+                      << "                         one — Ref, RefPtr, scoped_refptr — is\n"
+                      << "                         no longer leaked; std::unique_ptr/\n"
+                      << "                         shared_ptr are built in)\n"
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --whole-program        Two-pass mode: collect function summaries\n"
                       << "                         across all files first, then analyze\n"
@@ -213,6 +222,10 @@ void Config::addAllocFunctions(const std::string& list) {
 
 void Config::addFreeFunctions(const std::string& list) {
     addNamesTo(free_functions_, list);
+}
+
+void Config::addOwningPointers(const std::string& list) {
+    addNamesTo(owning_pointers_, list);
 }
 
 void Config::addNamesTo(std::set<std::string>& target,
