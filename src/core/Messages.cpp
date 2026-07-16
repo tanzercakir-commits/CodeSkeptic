@@ -186,6 +186,11 @@ const MsgEntry kMessages[] = {
      "cikarilan varsayim: '{0}' parametresi null-degil kabul ediliyor "
      "(dereference ediliyor, hic kontrol edilmiyor); bu onkosul "
      "bildirilmemis (sozlesme onerisi: requires {0} != null)"},
+    // BoundsCopyOverflow
+    {"buffer overflow: copy size {0} exceeds the destination's capacity of "
+     "{1} byte(s)",
+     "tampon tasmasi: {0} baytlik kopya, hedefin {1} baytlik kapasitesini "
+     "asiyor"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

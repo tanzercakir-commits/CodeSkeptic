@@ -65,6 +65,76 @@ std::vector<const ArraySubscriptExpr*> collectSubscripts(
     return v.subs;
 }
 
+// The fixed byte-copy family: dst is arg 0, byte count is arg 2. All
+// write exactly `n` bytes into dst[0 .. n-1], so an `n` past the
+// destination's capacity is a definite overflow (CWE-787). strcpy/strcat
+// (no explicit size) and strncpy/strncat (append/pad semantics) are out
+// of v0 scope.
+std::vector<const CallExpr*> collectCopyCalls(const FunctionDecl* fn) {
+    struct V : RecursiveASTVisitor<V> {
+        std::vector<const CallExpr*> calls;
+        bool VisitCallExpr(CallExpr* call) {
+            const FunctionDecl* callee = call->getDirectCallee();
+            if (!callee || !callee->getIdentifier()) return true;
+            const llvm::StringRef n = callee->getName();
+            if ((n == "memcpy" || n == "memmove" || n == "memset") &&
+                call->getNumArgs() == 3)
+                calls.push_back(call);
+            return true;
+        }
+    } v;
+    v.TraverseStmt(fn->getBody());
+    return v.calls;
+}
+
+// The proven byte-count interval of a copy's size argument. The argument
+// is implicitly cast to size_t, which evalInterval (soundly) treats as
+// top() — so first see through a VALUE-PRESERVING widening integral cast
+// (dest width >= source width preserves a non-negative value; a narrowing
+// cast is NOT stripped, so we never over-estimate the size and raise a
+// false overflow). A sizeof-based size still evaluates to top() here and
+// stays silent — that follow-up shares the allocator's sizeof evaluator.
+zerodefect::Interval copySizeInterval(const Expr* arg,
+                                      const zerodefect::IntervalMap& state,
+                                      ASTContext& ctx) {
+    const Expr* e = arg->IgnoreParens();
+    while (const auto* cast = dyn_cast<ImplicitCastExpr>(e)) {
+        const CastKind k = cast->getCastKind();
+        if (k == CK_LValueToRValue || k == CK_NoOp) {
+            e = cast->getSubExpr();
+            continue;
+        }
+        if (k == CK_IntegralCast &&
+            cast->getType()->isIntegerType() &&
+            cast->getSubExpr()->getType()->isIntegerType() &&
+            ctx.getIntWidth(cast->getType()) >=
+                ctx.getIntWidth(cast->getSubExpr()->getType())) {
+            e = cast->getSubExpr();  // widening — value preserved
+            continue;
+        }
+        break;  // narrowing / other cast: evaluate here (likely top())
+    }
+    return zerodefect::evalInterval(e, state);
+}
+
+// Byte size of one element of a buffer variable — the factor that turns
+// the ExtentMap's element count into a byte capacity. 0 when unknown.
+int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
+    QualType t = vd->getType();
+    if (const auto* arr = ctx.getAsConstantArrayType(t)) {
+        QualType el = arr->getElementType();
+        if (!el->isIncompleteType())
+            return ctx.getTypeSizeInChars(el).getQuantity();
+        return 0;
+    }
+    if (t->isPointerType()) {
+        QualType p = t->getPointeeType();
+        if (!p->isIncompleteType() && !p->isVoidType())
+            return ctx.getTypeSizeInChars(p).getQuantity();
+    }
+    return 0;
+}
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const zerodefect::ParamIntervalMap& paramMap,
                      zerodefect::DiagnosticList& results) {
@@ -74,7 +144,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     if (extents.empty()) return;
 
     auto subs = collectSubscripts(fn);
-    if (subs.empty()) return;
+    auto copies = collectCopyCalls(fn);
+    if (subs.empty() && copies.empty()) return;
 
     // Seed parameters with visible, closed callers (C3) at their proven
     // entry range, so a caller's bounded index argument reaches the check.
@@ -126,6 +197,47 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.severity = zerodefect::Severity::Error;
         diag.message = zerodefect::msg(zerodefect::MsgId::BoundsArrayDefinite,
                                        idx.toString(), extentStr);
+        results.push_back(std::move(diag));
+    }
+
+    // Copy-size overflow: memcpy/memmove/memset(dst, ..., n) writes n
+    // bytes into dst. When dst has a proven byte capacity and n's proven
+    // minimum exceeds even the largest possible capacity, it definitely
+    // overflows (CWE-787). Byte capacity = element count (ExtentMap) *
+    // element size.
+    const zerodefect::IntervalMap emptyState;
+    for (const auto* call : copies) {
+        const VarDecl* dst = referencedVar(call->getArg(0));
+        if (!dst) continue;
+        auto extentIt = extents.find(dst);
+        if (extentIt == extents.end()) continue;
+        const int64_t elemSize = destElemSize(dst, ctx);
+        if (elemSize <= 0) continue;
+        zerodefect::Interval capacity =
+            zerodefect::Interval::mul(extentIt->second,
+                                      zerodefect::Interval::constant(elemSize));
+        if (capacity.hiIsInf()) continue;  // unbounded capacity — prove nothing
+
+        const zerodefect::IntervalMap* st = analysis.stateAt(call);
+        zerodefect::Interval sz =
+            copySizeInterval(call->getArg(2), st ? *st : emptyState, ctx);
+        // Definite overflow: every byte count exceeds the capacity.
+        if (sz.isEmpty() || sz.loIsInf() || sz.lo() <= capacity.hi()) continue;
+
+        SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+        unsigned line = sm.getSpellingLineNumber(loc);
+        if (!reportedLines.insert(line).second) continue;
+
+        zerodefect::Diagnostic diag;
+        diag.file = sm.getFilename(loc).str();
+        diag.line = line;
+        diag.column = sm.getSpellingColumnNumber(loc);
+        diag.rule_id = "bounds";
+        diag.function = fn->getQualifiedNameAsString();
+        diag.severity = zerodefect::Severity::Error;
+        diag.message = zerodefect::msg(zerodefect::MsgId::BoundsCopyOverflow,
+                                       sz.toString(),
+                                       std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
     }
 }

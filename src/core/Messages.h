@@ -70,6 +70,7 @@ enum class MsgId {
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
     AssumptionNonNullParam,     // {0} = parameter name
+    BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
 };
 
 // Replaces the {0} and {1} placeholders with the arguments.
