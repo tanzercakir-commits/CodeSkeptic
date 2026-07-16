@@ -4,9 +4,12 @@
 #include "engine/ConditionWalk.h"
 
 #include <clang/AST/ASTContext.h>
+#include <clang/AST/DeclCXX.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/Stmt.h>
 #include <clang/AST/Type.h>
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/SmallVector.h>
 #include <cstdint>
 #include <optional>
 
@@ -64,6 +67,58 @@ Interval constrainBy(const Interval& iv, BinaryOperatorKind op, int64_t c) {
 }
 
 } // namespace
+
+std::optional<int64_t> boundedTypeSizeInChars(ASTContext& ctx,
+                                              QualType type) {
+    if (type.isNull()) return std::nullopt;
+    // getTypeInfo's stack usage scales with type NESTING DEPTH (array
+    // element / field / base chains), not breadth, so the budget is a
+    // depth cap plus a total-node runaway guard. 128 is far beyond any
+    // hand-written type and far below what threatens even a default
+    // stack; wide (but shallow) generated structs stay well inside the
+    // node budget because shared canonical types are visited once.
+    constexpr unsigned kMaxDepth = 128;
+    constexpr unsigned kMaxNodes = 4096;
+
+    llvm::SmallVector<std::pair<const clang::Type*, unsigned>, 32> work;
+    llvm::SmallPtrSet<const clang::Type*, 32> seen;
+    work.push_back({type.getCanonicalType().getTypePtr(), 0});
+    unsigned nodes = 0;
+
+    auto push = [&](QualType t, unsigned depth) {
+        const clang::Type* ty = t.getCanonicalType().getTypePtr();
+        if (seen.insert(ty).second) work.push_back({ty, depth});
+    };
+
+    while (!work.empty()) {
+        auto [ty, depth] = work.pop_back_val();
+        if (!ty) return std::nullopt;
+        if (depth > kMaxDepth || ++nodes > kMaxNodes) return std::nullopt;
+        if (ty->isIncompleteType() || ty->isDependentType())
+            return std::nullopt;
+
+        if (const auto* arr = dyn_cast<clang::ConstantArrayType>(ty)) {
+            push(arr->getElementType(), depth + 1);
+        } else if (const auto* vec = dyn_cast<clang::VectorType>(ty)) {
+            push(vec->getElementType(), depth + 1);
+        } else if (const auto* cx = dyn_cast<clang::ComplexType>(ty)) {
+            push(cx->getElementType(), depth + 1);
+        } else if (const auto* at = dyn_cast<clang::AtomicType>(ty)) {
+            push(at->getValueType(), depth + 1);
+        } else if (const auto* rec = ty->getAs<clang::RecordType>()) {
+            const clang::RecordDecl* rd = rec->getDecl()->getDefinition();
+            if (!rd) return std::nullopt;
+            if (const auto* cxx = dyn_cast<clang::CXXRecordDecl>(rd))
+                for (const auto& base : cxx->bases())
+                    push(base.getType(), depth + 1);
+            for (const auto* field : rd->fields())
+                push(field->getType(), depth + 1);
+        }
+        // Pointers, references, builtins, enums: leaves — their size
+        // does not depend on any pointee's layout.
+    }
+    return ctx.getTypeSizeInChars(type).getQuantity();
+}
 
 Interval evalInterval(const Expr* expr, const IntervalMap& state) {
     if (!expr) return Interval::top();
@@ -201,9 +256,8 @@ Interval evalSizeInterval(const Expr* e, ASTContext& ctx,
     if (const auto* uett = dyn_cast<UnaryExprOrTypeTraitExpr>(e)) {
         if (uett->getKind() == UETT_SizeOf && !uett->isValueDependent()) {
             QualType t = uett->getTypeOfArgument();
-            if (!t->isIncompleteType() && !t->isDependentType())
-                return Interval::constant(
-                    ctx.getTypeSizeInChars(t).getQuantity());
+            if (auto sz = boundedTypeSizeInChars(ctx, t))
+                return Interval::constant(*sz);
         }
         return Interval::top();
     }

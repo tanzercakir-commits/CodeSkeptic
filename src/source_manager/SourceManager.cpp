@@ -14,6 +14,7 @@
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/thread.h>
 
 namespace fs = std::filesystem;
 
@@ -190,6 +191,27 @@ void SourceManager::clearWarmCache() {
 }
 
 int SourceManager::processAll(ASTCallback callback) {
+    // The whole per-TU pipeline (parse + rules) runs on a worker thread
+    // with a LARGE stack. Clang type queries recurse per nesting level
+    // of the type, and metaprogram-generated types in real code go deep
+    // enough to smash a default 8MB stack (TensorFlow Lite's
+    // neon_tensor_utils.cc: getTypeInfoImpl 104k frames deep =
+    // SIGSEGV). 64MB gives an ~8x margin over the worst type observed;
+    // rule-side queries are additionally budget-capped (IntervalEval's
+    // boundedTypeSizeInChars), so this guard is for the paths we do NOT
+    // control. Sequential (one thread at a time) — the engine's global
+    // caches see no concurrency.
+    int result = 0;
+    llvm::thread worker(
+        std::optional<unsigned>(64u << 20),
+        [this, &result, cb = std::move(callback)]() mutable {
+            result = processAllOnWorker(std::move(cb));
+        });
+    worker.join();
+    return result;
+}
+
+int SourceManager::processAllOnWorker(ASTCallback callback) {
     if (source_files_.empty()) return 0;
 
     if (warm_cache_) {

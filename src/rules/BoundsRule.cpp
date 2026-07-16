@@ -80,19 +80,19 @@ std::vector<const CallExpr*> collectCopyCalls(const FunctionDecl* fn) {
 }
 
 // Byte size of one element of a buffer variable — the factor that turns
-// the ExtentMap's element count into a byte capacity. 0 when unknown.
+// the ExtentMap's element count into a byte capacity. 0 when unknown
+// (including a type too deep for the size budget — see
+// boundedTypeSizeInChars).
 int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
     QualType t = vd->getType();
     if (const auto* arr = ctx.getAsConstantArrayType(t)) {
-        QualType el = arr->getElementType();
-        if (!el->isIncompleteType())
-            return ctx.getTypeSizeInChars(el).getQuantity();
-        return 0;
+        return zerodefect::boundedTypeSizeInChars(ctx, arr->getElementType())
+            .value_or(0);
     }
     if (t->isPointerType()) {
         QualType p = t->getPointeeType();
-        if (!p->isIncompleteType() && !p->isVoidType())
-            return ctx.getTypeSizeInChars(p).getQuantity();
+        if (!p->isVoidType())
+            return zerodefect::boundedTypeSizeInChars(ctx, p).value_or(0);
     }
     return 0;
 }
@@ -136,12 +136,13 @@ BufExtent bufferExtent(const Expr* e, const zerodefect::ExtentMap& extents,
         if (!arr) return r;
         const llvm::APInt& n = arr->getSize();
         if (n.getActiveBits() > 63) return r;
-        QualType el = arr->getElementType();
-        if (el->isIncompleteType()) return r;
+        auto elemBytes =
+            zerodefect::boundedTypeSizeInChars(ctx, arr->getElementType());
+        if (!elemBytes || *elemBytes <= 0) return r;
         r.elements =
             zerodefect::Interval::constant(static_cast<int64_t>(n.getZExtValue()));
-        r.elemBytes = ctx.getTypeSizeInChars(el).getQuantity();
-        r.ok = r.elemBytes > 0;
+        r.elemBytes = *elemBytes;
+        r.ok = true;
         return r;
     }
     return r;
