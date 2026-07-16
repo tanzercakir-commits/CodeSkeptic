@@ -283,6 +283,64 @@ TEST(BoundsRuleTest, MemcpySizeofSelfClean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- Struct-member array destinations (b2) ---
+
+TEST(BoundsRuleTest, StructMemberSubscriptPastEnd) {
+    // s->buf[20] on a 16-element member array — the extent is a property
+    // of the field's type, regardless of the object.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        struct S { char buf[16]; };
+        char f(struct S* s){ return s->buf[20]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, StructMemberSubscriptInRangeClean) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        struct S { char buf[16]; };
+        char f(struct S* s){ return s->buf[5]; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, StructMemberByValueSubscript) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        struct T { char buf[8]; };
+        char f(struct T t){ return t.buf[9]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpyStructMemberOverflow) {
+    // The Juliet CWE122 shape: copy sizeof(the whole struct) into a small
+    // member buffer.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        void* memcpy(void*, const void*, unsigned long);
+        struct S { char charFirst[16]; void* second; };
+        void f(struct S* s, const void* src){
+            memcpy(s->charFirst, src, sizeof(struct S));
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpyStructMemberInRangeClean) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        void* memcpy(void*, const void*, unsigned long);
+        struct S { char buf[16]; };
+        void f(struct S* s, const void* src){
+            memcpy(s->buf, src, sizeof(s->buf));
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 // --- Interprocedural (C3): parameter entry intervals ---
 
 TEST(BoundsRuleTest, StaticHelperOutOfRangeIndexFromCaller) {

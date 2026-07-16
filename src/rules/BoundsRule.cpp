@@ -44,14 +44,6 @@ std::set<const VarDecl*> collectIntVars(const FunctionDecl* fn) {
     return v.vars;
 }
 
-const VarDecl* referencedVar(const Expr* expr) {
-    if (!expr) return nullptr;
-    expr = expr->IgnoreParenImpCasts();
-    if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
-        return dyn_cast<VarDecl>(ref->getDecl());
-    return nullptr;
-}
-
 std::vector<const ArraySubscriptExpr*> collectSubscripts(
     const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
@@ -105,13 +97,65 @@ int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
     return 0;
 }
 
+// The proven extent of the buffer that `e` names, as a subscript base or
+// a copy destination. Two sources: a variable buffer (fixed array or heap
+// pointer) tracked by the ExtentMap, and a FIXED-SIZE ARRAY MEMBER
+// (`s->buf` / `s.buf`) — whose extent is a property of the field's type,
+// so it holds regardless of the object it belongs to (the real-world
+// heap-overflow shape: a small buffer inside a struct). Unprovable →
+// {ok = false}.
+struct BufExtent {
+    zerodefect::Interval elements;  // element count
+    int64_t elemBytes = 0;          // byte size of one element
+    bool ok = false;
+};
+
+BufExtent bufferExtent(const Expr* e, const zerodefect::ExtentMap& extents,
+                       ASTContext& ctx) {
+    BufExtent r;
+    if (!e) return r;
+    e = e->IgnoreParenImpCasts();
+
+    if (const auto* ref = dyn_cast<DeclRefExpr>(e)) {
+        const auto* vd = dyn_cast<VarDecl>(ref->getDecl());
+        if (!vd) return r;
+        auto it = extents.find(vd);
+        if (it == extents.end()) return r;
+        const int64_t es = destElemSize(vd, ctx);
+        if (es <= 0) return r;
+        r.elements = it->second;
+        r.elemBytes = es;
+        r.ok = true;
+        return r;
+    }
+
+    if (const auto* mem = dyn_cast<MemberExpr>(e)) {
+        const auto* field = dyn_cast<FieldDecl>(mem->getMemberDecl());
+        if (!field) return r;
+        const auto* arr = ctx.getAsConstantArrayType(field->getType());
+        if (!arr) return r;
+        const llvm::APInt& n = arr->getSize();
+        if (n.getActiveBits() > 63) return r;
+        QualType el = arr->getElementType();
+        if (el->isIncompleteType()) return r;
+        r.elements =
+            zerodefect::Interval::constant(static_cast<int64_t>(n.getZExtValue()));
+        r.elemBytes = ctx.getTypeSizeInChars(el).getQuantity();
+        r.ok = r.elemBytes > 0;
+        return r;
+    }
+    return r;
+}
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const zerodefect::ParamIntervalMap& paramMap,
                      zerodefect::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
+    // Variable-buffer extents (fixed arrays + heap pointers). Member-array
+    // extents are derived at the access site (bufferExtent), so an empty
+    // map does not mean there is nothing to check.
     zerodefect::ExtentMap extents = zerodefect::buildExtentMap(fn, ctx);
-    if (extents.empty()) return;
 
     auto subs = collectSubscripts(fn);
     auto copies = collectCopyCalls(fn);
@@ -130,11 +174,9 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     std::set<unsigned> reportedLines;
 
     for (const auto* sub : subs) {
-        const VarDecl* arr = referencedVar(sub->getBase());
-        if (!arr) continue;
-        auto extentIt = extents.find(arr);
-        if (extentIt == extents.end()) continue;
-        const zerodefect::Interval& extent = extentIt->second;
+        BufExtent be = bufferExtent(sub->getBase(), extents, ctx);
+        if (!be.ok) continue;
+        const zerodefect::Interval& extent = be.elements;
 
         const zerodefect::IntervalMap* st = analysis.stateAt(sub);
         if (!st) continue;  // not recorded — nothing proven
@@ -177,15 +219,10 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     // element size.
     const zerodefect::IntervalMap emptyState;
     for (const auto* call : copies) {
-        const VarDecl* dst = referencedVar(call->getArg(0));
-        if (!dst) continue;
-        auto extentIt = extents.find(dst);
-        if (extentIt == extents.end()) continue;
-        const int64_t elemSize = destElemSize(dst, ctx);
-        if (elemSize <= 0) continue;
-        zerodefect::Interval capacity =
-            zerodefect::Interval::mul(extentIt->second,
-                                      zerodefect::Interval::constant(elemSize));
+        BufExtent be = bufferExtent(call->getArg(0), extents, ctx);
+        if (!be.ok) continue;
+        zerodefect::Interval capacity = zerodefect::Interval::mul(
+            be.elements, zerodefect::Interval::constant(be.elemBytes));
         if (capacity.hiIsInf()) continue;  // unbounded capacity — prove nothing
 
         const zerodefect::IntervalMap* st = analysis.stateAt(call);
