@@ -1,5 +1,35 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — Engine: assert's ternary no longer leaks the null disjunct (#79)
+
+### Fixed
+- **`assert(A && B)` between a null guard and a dereference no longer
+  re-introduces a maybe-null disjunct.** glibc's C++ assert expands to
+  `static_cast<bool>(expr) ? void(0) : __assert_fail(...)`; the
+  EXPLICIT static_cast is invisible to IgnoreParenImpCasts, so every
+  condition digest (edge refinement, the nullness walk, disjunct-fact
+  keying) stopped at the cast and refined nothing — the maybe-null
+  disjunct born on the `&&`'s short-circuit edge then sailed past the
+  noreturn arm into the guarded code (found on ImGui: every IM_ASSERT).
+  New shared `stripBoolPreservingCasts` applied at all three digest
+  points, next to the __builtin_expect transparency.
+- The strip is TYPE-based, not CastKind-based, deliberately: Clang
+  marks the explicit node of `(char)x` CK_NoOp and hides the narrowing
+  in a `part_of_explicit_cast` child, so a kind-based strip would
+  "prove" x zero from `!(char)x` while x=256 takes the same branch
+  (caught during development by a negative control, now a pinned test).
+  Safe cases only: casts TO bool (truthiness preserved by
+  construction) and pure same-type no-ops.
+
+### Receipts
+- ImGui whole-program: 18 → 14 null-deref warnings, zero new findings;
+  all four killed are the IM_ASSERT-compound shape (SetCurrentFont,
+  ListClipper_StepInternal, BringWindowToDisplayBehind,
+  TableSetColumnWidth).
+- 5 new unit tests (assert-ternary clean with/without outer guard,
+  static_cast<bool> guard refines, assert-on-OTHER-variable keeps the
+  unguarded report, narrowing-cast false-proof pinned).
+
 ## 2026-07-16 — Leak rule: modern-C++ ownership-escape FP fix (#75)
 
 ### Fixed

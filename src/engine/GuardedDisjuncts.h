@@ -22,6 +22,7 @@
 // VarMap requirements: std::map<K, V>; the caller supplies a
 // mergeVal(V, V) -> V combiner for V.
 
+#include "engine/ConditionWalk.h"
 #include "engine/PathFacts.h"
 
 #include <clang/AST/Expr.h>
@@ -169,7 +170,7 @@ bool refineDisjunctCondition(Guarded<VarMap>& d, const clang::Expr* cond,
                              bool isTrue, RefuteFn&& refutes,
                              ApplyLeafFn&& applyLeaf) {
     if (!cond) return true;
-    cond = cond->IgnoreParenImpCasts();
+    cond = stripBoolPreservingCasts(cond->IgnoreParenImpCasts());
 
     if (const auto* call = llvm::dyn_cast<clang::CallExpr>(cond)) {
         const clang::FunctionDecl* callee = call->getDirectCallee();

@@ -649,6 +649,15 @@ edge is not killed by the noreturn false-arm. Standard assert with a
 compound pointer condition is ubiquitous → high-value engine fix,
 CWE476-gated (next task).
 
+**FIXED (#79, same day):** shared `stripBoolPreservingCasts` at all
+three condition-digest points (edgeCondition, walkCondition,
+refineDisjunctCondition), TYPE-based (casts to bool + pure no-ops
+only) — a CastKind-based first attempt was caught wrongly "proving"
+`x == 0` from `!(char)x` (Clang hides the narrowing in a
+part_of_explicit_cast child) and is pinned as a negative test.
+Receipt: ImGui 18 → 14 warnings, zero new; all four killed are the
+IM_ASSERT-compound shape.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

@@ -771,3 +771,81 @@ TEST(ForeachArrayFpTest, PostLoopDeref_StillWarns) {
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- #79: assert's ternary must not leak the null disjunct ---
+//
+// glibc's C++ assert expands to `static_cast<bool>(expr) ? void(0)
+// : __assert_fail(...)`. Two transparency requirements meet here:
+// the EXPLICIT static_cast<bool> wrapper must be stripped by the
+// condition digest (IgnoreParenImpCasts cannot see it), and the
+// maybe-null disjunct born on the `&&`'s short-circuit edge must die
+// in the noreturn arm instead of sailing into the guarded code (the
+// ImGui SetCurrentFont FP family, 2026-07-16). Tests hand-write the
+// expansion — runToolOnCode has no system headers.
+
+namespace {
+const char* kAssertTernaryPrelude = R"(
+        [[noreturn]] void assert_fail(const char*);
+        #define MYASSERT(e) \
+            (static_cast<bool>(e) ? void(0) : assert_fail(#e))
+        struct F { float scale; int loaded() const; };
+)";
+} // namespace
+
+TEST(AssertTernaryTest, CompoundAssertAfterGuard_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kAssertTernaryPrelude) + R"(
+        void f(F* font) {
+            if (font != nullptr) {
+                MYASSERT(font && font->loaded());
+                float s = font->scale;
+                (void)s;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AssertTernaryTest, CompoundAssertNoGuard_Clean) {
+    // The assert alone proves font non-null past it.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kAssertTernaryPrelude) + R"(
+        void f(F* font) {
+            MYASSERT(font && font->loaded());
+            float s = font->scale;
+            (void)s;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AssertTernaryTest, StaticCastBoolGuard_Clean) {
+    // Transparency case 1: explicit conversion TO bool preserves
+    // truthiness — the guard must refine through it.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct S { int v; };
+        int f(S* p) {
+            if (static_cast<bool>(p)) {
+                return p->v;
+            }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AssertTernaryTest, AssertOnOtherVar_LeakStaysVisible) {
+    // The assert proves only q; a deref of the UNGUARDED p must still
+    // report — transparency must not over-suppress.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kAssertTernaryPrelude) + R"(
+        void f(F* font, F* other) {
+            MYASSERT(other && other->loaded());
+            if (font == nullptr) {}
+            float s = font->scale;
+            (void)s;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
