@@ -39,6 +39,7 @@ enum class MsgId {
     CleanNoIssues,
     FindingsCount,        // {0} = finding count
     SuppressedCount,      // {0} = suppressed finding count
+    ReportPathsFiltered,  // {0} = count dropped outside --report-paths
     BaselineWritten,      // {0} = finding count, {1} = file path
     BaselineFiltered,     // {0} = count of findings matching the baseline
     CompileDbNotFound,    // {0} = error message

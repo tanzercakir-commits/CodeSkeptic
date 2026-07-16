@@ -98,6 +98,16 @@ public:
         return owning_pointers_;
     }
 
+    // Report-path filter (--report-paths): only findings under these
+    // path prefixes are reported. The Carbon scan lesson (2026-07-16):
+    // 15 of 16 findings were in LLVM DEPENDENCY headers pulled into the
+    // TUs — noise for the project being scanned. Unset = report all
+    // (analysis itself is unaffected; this filters reporting only).
+    void addReportPaths(const std::string& list);
+    const std::vector<std::string>& reportPaths() const {
+        return report_paths_;
+    }
+
     // Project-wide policies (CONTRACTS.md Round E): `policy = <name>`
     // in .zerodefect.conf or --policy on the CLI; file-scoped
     // activation stays in `// zd:policy` comments.
@@ -126,6 +136,7 @@ private:
     std::set<std::string> alloc_functions_;
     std::set<std::string> free_functions_;
     std::set<std::string> owning_pointers_;
+    std::vector<std::string> report_paths_;
     std::set<std::string> policies_;
     std::string summary_diff_gate_ = "error";
     std::vector<std::pair<unsigned, unsigned>> lines_;

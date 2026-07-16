@@ -1,5 +1,18 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — --report-paths: dependency-header noise filter
+
+### Added
+- **`--report-paths <paths>`** CLI flag / `report_paths` config key:
+  only findings under the given path prefixes are reported (comma
+  list, canonical-path prefix match). The Carbon scan lesson: 15 of 16
+  findings were in LLVM dependency headers pulled into the TUs — noise
+  for the project being scanned. Analysis itself is unaffected;
+  filtering happens in the reporting pipeline next to
+  suppression/baseline, with a count message when findings are
+  dropped. Unset = report everything (unchanged default). Peer:
+  clang-tidy's --header-filter.
+
 ## 2026-07-16 — Engine: assert's ternary no longer leaks the null disjunct (#79)
 
 ### Fixed

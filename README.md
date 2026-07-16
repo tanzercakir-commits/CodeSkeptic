@@ -269,6 +269,10 @@ zerodefect <source_path> [options]
                          constructing one is no longer leaked;
                          std::unique_ptr/shared_ptr are built in
                          (e.g. --owning-pointers Ref,RefPtr,scoped_refptr)
+  --report-paths <paths> Report only findings under these path prefixes
+                         (comma list). Filters out findings in dependency
+                         headers pulled into your TUs; analysis itself is
+                         unaffected (e.g. --report-paths $PWD/src)
   --whole-program        Two-pass mode: collect function summaries
                          across all files first, then analyze
   --summary-out <file>   Save harvested cross-file summaries to a file
