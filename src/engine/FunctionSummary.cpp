@@ -7,10 +7,13 @@
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
+#include <clang/AST/ParentMapContext.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdlib>
 #include <fstream>
 #include <set>
 #include <utility>
@@ -71,6 +74,12 @@ VState vstateOf(const Expr* expr, const SummaryTable& previous) {
     }
     if (isa<CXXNewExpr>(expr)) return VState::NonBad;
     if (isa<StringLiteral>(expr)) return VState::NonBad;
+    // A named ARRAY decays to the address of its first element — never
+    // null (`return table0;` in the picojpeg getHuffVal shape).
+    if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+        if (const auto* vd = dyn_cast<VarDecl>(ref->getDecl()))
+            if (vd->getType()->isArrayType()) return VState::NonBad;
+    }
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         if (const auto* summary =
@@ -369,6 +378,305 @@ ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
     if (flags.sawBad) return ReturnZeroness::MaybeZero;
     if (flags.allNonBad) return ReturnZeroness::NeverZero;
     return ReturnZeroness::Unknown;
+}
+
+// --- #69b: value-conditioned null return ---
+//
+// When the plain harvest says MaybeNull, try to PROVE the stronger
+// claim "null is returned ONLY IF parameter #i lies outside interval
+// R" (the picojpeg getHuffVal shape: null only in the switch default,
+// the caller's argument provably within the cases). Recognized guard
+// shapes, v1 — deliberately narrow, every widening must argue
+// soundness:
+//   A. `switch (param) { case c...: ...; default: return null; }` —
+//      the bad return sits under the DEFAULT of a switch whose
+//      condition is the (never-reassigned) parameter, the case
+//      constants form a CONTIGUOUS range (a hull with holes would let
+//      an in-hull value reach default — unsound), and NO case region
+//      can fall through into another (a fallthrough would let an
+//      in-range value execute the default's return).
+//   B. `if (param CMP const) return null;` — the bad return is inside
+//      the then (or else, polarity flipped) branch of a comparison of
+//      the parameter against an integer constant, and the FALSE set of
+//      the condition is representable as one interval.
+// Requirements common to both: exactly ONE structurally-null return,
+// every other return structurally NonBad (no variable returns — the
+// mini-flow's per-return attribution is not exposed), and the
+// parameter never reassigned / address-taken (the guard must still
+// speak about the CALLER's argument value).
+
+// Any write to `param` (assignment, ++/--, &param) breaks the
+// argument-to-guard link.
+bool paramIsNeverMutated(const FunctionDecl* func, const ParmVarDecl* param) {
+    struct MutVisitor : RecursiveASTVisitor<MutVisitor> {
+        const ParmVarDecl* target = nullptr;
+        bool mutated = false;
+        bool refersToTarget(const Expr* e) {
+            const auto* var = exprAsVar(e);
+            return var == target;
+        }
+        bool VisitBinaryOperator(BinaryOperator* bin) {
+            if (bin->isAssignmentOp() && refersToTarget(bin->getLHS()))
+                mutated = true;
+            return !mutated;
+        }
+        bool VisitUnaryOperator(UnaryOperator* un) {
+            if ((un->isIncrementDecrementOp() ||
+                 un->getOpcode() == UO_AddrOf) &&
+                refersToTarget(un->getSubExpr()))
+                mutated = true;
+            return !mutated;
+        }
+    };
+    MutVisitor visitor;
+    visitor.target = param;
+    visitor.TraverseStmt(func->getBody());
+    return !visitor.mutated;
+}
+
+// Flat-body fallthrough scan: every labeled region that is followed by
+// another label must end in a return or break. goto/continue anywhere
+// in the switch body → bail (control flow we do not model).
+bool switchHasNoFallthrough(const SwitchStmt* sw) {
+    const auto* body = dyn_cast_or_null<CompoundStmt>(sw->getBody());
+    if (!body) return false;
+
+    bool inRegion = false;
+    bool regionTerminated = false;
+    for (const Stmt* child : body->body()) {
+        // Unwrap label chains (`case 0: case 1: return X;`): the chain
+        // plus its first statement arrive as ONE nested child.
+        const Stmt* inner = child;
+        bool isLabel = false;
+        while (const auto* sc = dyn_cast_or_null<SwitchCase>(inner)) {
+            isLabel = true;
+            inner = sc->getSubStmt();
+        }
+        if (isLabel) {
+            if (inRegion && !regionTerminated) return false;  // fallthrough
+            inRegion = true;
+            regionTerminated = false;
+        }
+        if (!inner) continue;
+        struct BadFlowVisitor : RecursiveASTVisitor<BadFlowVisitor> {
+            bool bad = false;
+            bool VisitGotoStmt(GotoStmt*) { bad = true; return false; }
+            bool VisitContinueStmt(ContinueStmt*) { bad = true; return false; }
+        };
+        BadFlowVisitor flow;
+        flow.TraverseStmt(const_cast<Stmt*>(inner));
+        if (flow.bad) return false;
+        if (isa<ReturnStmt>(inner) || isa<BreakStmt>(inner))
+            regionTerminated = true;
+        // A compound region ending in return/break also terminates.
+        if (const auto* comp = dyn_cast<CompoundStmt>(inner)) {
+            if (!comp->body_empty()) {
+                const Stmt* last = comp->body_back();
+                if (isa<ReturnStmt>(last) || isa<BreakStmt>(last))
+                    regionTerminated = true;
+            }
+        }
+    }
+    return true;
+}
+
+// The parameter index of `expr` if it is a plain reference to one of
+// func's parameters; -1 otherwise.
+int paramIndexOf(const FunctionDecl* func, const Expr* expr) {
+    const auto* var = exprAsVar(expr);
+    const auto* param = dyn_cast_or_null<ParmVarDecl>(var);
+    if (!param) return -1;
+    for (unsigned i = 0; i < func->getNumParams(); ++i)
+        if (func->getParamDecl(i) == param) return static_cast<int>(i);
+    return -1;
+}
+
+bool asInt64Const(const Expr* expr, ASTContext& ctx, int64_t* out) {
+    if (!expr) return false;
+    Expr::EvalResult result;
+    if (!expr->EvaluateAsInt(result, ctx)) return false;
+    const llvm::APSInt& v = result.Val.getInt();
+    if (v.getSignificantBits() > 63) return false;
+    *out = v.getExtValue();
+    return true;
+}
+
+// Pattern A: the bad return sits under this switch's DEFAULT.
+// Returns true and fills (paramIdx, range) on success.
+bool matchSwitchDefaultGuard(const SwitchStmt* sw, const FunctionDecl* func,
+                             ASTContext& ctx, int* paramIdx,
+                             zerodefect::Interval* range) {
+    int idx = paramIndexOf(func, sw->getCond());
+    if (idx < 0) return false;
+    if (!paramIsNeverMutated(func, func->getParamDecl(idx))) return false;
+    if (!switchHasNoFallthrough(sw)) return false;
+
+    std::vector<int64_t> values;
+    for (const SwitchCase* sc = sw->getSwitchCaseList(); sc;
+         sc = sc->getNextSwitchCase()) {
+        if (isa<DefaultStmt>(sc)) continue;
+        const auto* cs = cast<CaseStmt>(sc);
+        if (cs->getRHS()) return false;  // GNU case range: bail (v1)
+        int64_t v;
+        if (!asInt64Const(cs->getLHS(), ctx, &v)) return false;
+        values.push_back(v);
+    }
+    if (values.empty()) return false;
+    std::sort(values.begin(), values.end());
+    values.erase(std::unique(values.begin(), values.end()), values.end());
+    // Contiguity is REQUIRED: with holes, an in-hull value still lands
+    // in default — recording the hull would be an unsound safe zone.
+    const int64_t lo = values.front(), hi = values.back();
+    if (hi - lo + 1 != static_cast<int64_t>(values.size())) return false;
+
+    *paramIdx = idx;
+    *range = zerodefect::Interval::range(lo, hi);
+    return true;
+}
+
+// Pattern B: `cond` (an if condition; already polarity-adjusted so the
+// bad return runs when it is TRUE) compares a parameter against an
+// integer constant, and its FALSE set is one interval → that interval
+// is the safe zone.
+bool matchComparisonGuard(const Expr* cond, bool nullWhenTrue,
+                          const FunctionDecl* func, ASTContext& ctx,
+                          int* paramIdx, zerodefect::Interval* range) {
+    if (!cond) return false;
+    const Expr* e = zerodefect::stripBoolPreservingCasts(
+        cond->IgnoreParenImpCasts());
+    // `!cond` flips which branch returns null.
+    if (const auto* un = dyn_cast<UnaryOperator>(e)) {
+        if (un->getOpcode() == UO_LNot)
+            return matchComparisonGuard(un->getSubExpr(), !nullWhenTrue,
+                                        func, ctx, paramIdx, range);
+        return false;
+    }
+    const auto* bin = dyn_cast<BinaryOperator>(e);
+    if (!bin || !bin->isComparisonOp()) return false;
+
+    int idx = paramIndexOf(func, bin->getLHS());
+    const Expr* other = bin->getRHS();
+    BinaryOperatorKind opc = bin->getOpcode();
+    if (idx < 0) {
+        idx = paramIndexOf(func, bin->getRHS());
+        other = bin->getLHS();
+        opc = zerodefect::condwalk_detail::mirror(opc);
+    }
+    if (idx < 0) return false;
+    if (!paramIsNeverMutated(func, func->getParamDecl(idx))) return false;
+
+    int64_t k;
+    if (!asInt64Const(other, ctx, &k)) return false;
+
+    // Null fires when `param OPC k` is `nullWhenTrue`; the safe zone is
+    // the OTHER truth value's set, usable only when it is one interval.
+    if (!nullWhenTrue) {
+        // null when cond FALSE → safe zone = cond TRUE set
+        switch (opc) {
+            case BO_LT: *range = zerodefect::Interval::atMost(k - 1); break;
+            case BO_LE: *range = zerodefect::Interval::atMost(k); break;
+            case BO_GT: *range = zerodefect::Interval::atLeast(k + 1); break;
+            case BO_GE: *range = zerodefect::Interval::atLeast(k); break;
+            case BO_EQ: *range = zerodefect::Interval::constant(k); break;
+            default: return false;  // != true-set: two rays
+        }
+    } else {
+        // null when cond TRUE → safe zone = cond FALSE set
+        switch (opc) {
+            case BO_LT: *range = zerodefect::Interval::atLeast(k); break;
+            case BO_LE: *range = zerodefect::Interval::atLeast(k + 1); break;
+            case BO_GT: *range = zerodefect::Interval::atMost(k); break;
+            case BO_GE: *range = zerodefect::Interval::atMost(k - 1); break;
+            case BO_NE: *range = zerodefect::Interval::constant(k); break;
+            default: return false;  // == false-set: two rays
+        }
+    }
+    // ±1 adjustments must not have wrapped.
+    if ((opc == BO_LT && k == INT64_MIN) || (opc == BO_LE && k == INT64_MAX) ||
+        (opc == BO_GT && k == INT64_MAX) || (opc == BO_GE && k == INT64_MIN))
+        return false;
+    *paramIdx = idx;
+    return true;
+}
+
+// Walk the parent chain from the bad return looking for a recognized
+// guard. Extra ENCLOSING conditions only further restrict when the
+// return runs — they never weaken the claim.
+bool findGuardAbove(const ReturnStmt* badRet, const FunctionDecl* func,
+                    ASTContext& ctx, int* paramIdx,
+                    zerodefect::Interval* range) {
+    DynTypedNode node = DynTypedNode::create(*badRet);
+    const Stmt* childStmt = badRet;
+    // Labels are not nesting parents of everything in their region —
+    // only of their FIRST statement. The chain passes through a
+    // DefaultStmt exactly when the bad return IS the default's own
+    // statement (`default: return null;`); anything looser is a
+    // conservative miss.
+    const SwitchCase* viaLabel = nullptr;
+    for (unsigned depth = 0; depth < 64; ++depth) {
+        auto parents = ctx.getParents(node);
+        if (parents.empty()) return false;
+        const Stmt* parent = parents[0].get<Stmt>();
+        if (!parent) return false;  // reached the FunctionDecl
+
+        if (const auto* sc = dyn_cast<SwitchCase>(parent)) viaLabel = sc;
+        if (const auto* sw = dyn_cast<SwitchStmt>(parent)) {
+            // The label we came through must be THIS switch's default
+            // (an inner switch's label must not leak outward).
+            bool viaThisDefault = false;
+            for (const SwitchCase* sc = sw->getSwitchCaseList(); sc;
+                 sc = sc->getNextSwitchCase())
+                if (sc == viaLabel && isa<DefaultStmt>(sc)) {
+                    viaThisDefault = true;
+                    break;
+                }
+            if (viaThisDefault &&
+                matchSwitchDefaultGuard(sw, func, ctx, paramIdx, range))
+                return true;
+            viaLabel = nullptr;
+        }
+        if (const auto* ifStmt = dyn_cast<IfStmt>(parent)) {
+            const bool inThen = ifStmt->getThen() == childStmt;
+            const bool inElse = ifStmt->getElse() == childStmt;
+            if ((inThen || inElse) &&
+                matchComparisonGuard(ifStmt->getCond(), /*nullWhenTrue=*/inThen,
+                                     func, ctx, paramIdx, range))
+                return true;
+        }
+        childStmt = parent;
+        node = DynTypedNode::create(*parent);
+    }
+    return false;
+}
+
+// Entry point, called only when the plain harvest said MaybeNull.
+// Fills (paramIdx, range) when the conditioned claim is PROVEN.
+bool detectNullCondition(const FunctionDecl* func, ASTContext& ctx,
+                         const SummaryTable& previous, int* paramIdx,
+                         zerodefect::Interval* range) {
+    struct RetStmtCollector : RecursiveASTVisitor<RetStmtCollector> {
+        std::vector<const ReturnStmt*> returns;
+        bool VisitReturnStmt(ReturnStmt* ret) {
+            returns.push_back(ret);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    };
+    RetStmtCollector collector;
+    collector.TraverseStmt(func->getBody());
+
+    const ReturnStmt* badRet = nullptr;
+    for (const ReturnStmt* ret : collector.returns) {
+        VState v = vstateOf(ret->getRetValue(), previous);
+        if (v == VState::NonBad) continue;
+        // Anything not structurally proven — variable returns, unknown
+        // calls — makes per-return attribution unsafe: bail to plain
+        // MaybeNull. Exactly one bad return is supported (v1).
+        if (v != VState::Bad || badRet) return false;
+        badRet = ret;
+    }
+    if (!badRet) return false;
+    return findGuardAbove(badRet, func, ctx, paramIdx, range);
 }
 
 // --- Parameter effects (v2: with alias tracking) ---
@@ -724,6 +1032,18 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             summary.returnZeroness = computeReturnZeroness(func, ctx, current);
             summary.params = computeParamEffects(func, current);
 
+            // #69b: try to strengthen a plain MaybeNull into the
+            // value-conditioned form (null only if param outside R).
+            if (summary.returnNullness == ReturnNullness::MaybeNull) {
+                int condParam = -1;
+                Interval condRange = Interval::top();
+                if (detectNullCondition(func, ctx, current, &condParam,
+                                        &condRange)) {
+                    summary.nullCondParam = condParam;
+                    summary.nullCondRange = condRange;
+                }
+            }
+
             const auto* key = func->getCanonicalDecl();
             next[key] = summary;
 
@@ -731,6 +1051,8 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             if (prev == current.end() ||
                 prev->second.returnNullness != summary.returnNullness ||
                 prev->second.returnZeroness != summary.returnZeroness ||
+                prev->second.nullCondParam != summary.nullCondParam ||
+                prev->second.nullCondRange != summary.nullCondRange ||
                 prev->second.params != summary.params) {
                 changed = true;
             }
@@ -766,6 +1088,18 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     using PE = SummaryRegistry::ParamEffect;
     if (into.returnNullness != from.returnNullness)
         into.returnNullness = RN::Unknown;
+    // A conditioned claim survives a merge only when BOTH sides carry
+    // the identical condition; any disagreement falls back to plain
+    // MaybeNull (weaker, always sound).
+    if (into.nullCondParam != from.nullCondParam ||
+        into.nullCondRange != from.nullCondRange) {
+        into.nullCondParam = -1;
+        into.nullCondRange = zerodefect::Interval::top();
+    }
+    if (into.returnNullness != RN::MaybeNull) {
+        into.nullCondParam = -1;
+        into.nullCondRange = zerodefect::Interval::top();
+    }
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
     if (into.params.size() != from.params.size()) {
@@ -782,7 +1116,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "zerodefect-summaries v2";
+constexpr const char* kSummaryFileHeader = "zerodefect-summaries v3";
+constexpr const char* kSummaryFileHeaderV2 = "zerodefect-summaries v2";
 constexpr const char* kSummaryFileHeaderV1 = "zerodefect-summaries v1";
 
 char rnToChar(ReturnNullness v) {
@@ -876,7 +1211,20 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
             for (ParamEffect effect : summary.params)
                 out << peToChar(effect);
         }
-        out << '\t' << rzToChar(summary.returnZeroness) << '\n';
+        out << '\t' << rzToChar(summary.returnZeroness) << '\t';
+        // v3 column: value-conditioned null return, "-" when absent,
+        // else "paramIdx:lo:hi" with "~" for an infinite bound.
+        if (!summary.hasNullCondition()) {
+            out << '-';
+        } else {
+            out << summary.nullCondParam << ':';
+            if (summary.nullCondRange.loIsInf()) out << '~';
+            else out << summary.nullCondRange.lo();
+            out << ':';
+            if (summary.nullCondRange.hiIsInf()) out << '~';
+            else out << summary.nullCondRange.hi();
+        }
+        out << '\n';
     }
     return out.good();
 }
@@ -889,8 +1237,14 @@ bool SummaryRegistry::parseSummaryFile(
 
     std::string line;
     if (!std::getline(in, line)) return false;
-    if (line != kSummaryFileHeader && line != kSummaryFileHeaderV1)
-        return false;
+    int version = 0;
+    if (line == kSummaryFileHeader) version = 3;
+    else if (line == kSummaryFileHeaderV2) version = 2;
+    else if (line == kSummaryFileHeaderV1) version = 1;
+    else return false;
+    // Field count is VERSION-strict: extra columns under an old header
+    // are corruption, not a future format (rejected wholesale).
+    const size_t maxFields = (version == 3) ? 5 : 4;
 
     // Parse fully first, then hand over: a corrupt file is rejected
     // without leaving partial state behind
@@ -907,8 +1261,8 @@ bool SummaryRegistry::parseSummaryFile(
         }
         fields.push_back(line.substr(start));
 
-        // v1: 3 fields (no zeroness -> Unknown); v2: 4 fields
-        if (fields.size() != 3 && fields.size() != 4) return false;
+        // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null cond)
+        if (fields.size() < 3 || fields.size() > maxFields) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
@@ -916,9 +1270,52 @@ bool SummaryRegistry::parseSummaryFile(
 
         FunctionSummary summary;
         if (!rnFromChar(rn[0], summary.returnNullness)) return false;
-        if (fields.size() == 4) {
+        if (fields.size() >= 4) {
             if (fields[3].size() != 1 ||
                 !rzFromChar(fields[3][0], summary.returnZeroness))
+                return false;
+        }
+        if (fields.size() == 5 && fields[4] != "-") {
+            // "paramIdx:lo:hi", "~" = infinite bound
+            const std::string& cond = fields[4];
+            size_t c1 = cond.find(':');
+            size_t c2 = (c1 == std::string::npos)
+                            ? std::string::npos
+                            : cond.find(':', c1 + 1);
+            if (c2 == std::string::npos) return false;
+            auto parseBound = [](const std::string& s, bool* inf,
+                                 int64_t* v) {
+                if (s == "~") { *inf = true; return true; }
+                *inf = false;
+                if (s.empty()) return false;
+                errno = 0;
+                char* end = nullptr;
+                long long r = std::strtoll(s.c_str(), &end, 10);
+                if (errno != 0 || end != s.c_str() + s.size()) return false;
+                *v = r;
+                return true;
+            };
+            int64_t paramIdx = 0, lo = 0, hi = 0;
+            bool dummyInf = false, loInf = false, hiInf = false;
+            if (!parseBound(cond.substr(0, c1), &dummyInf, &paramIdx) ||
+                dummyInf || paramIdx < 0)
+                return false;
+            if (!parseBound(cond.substr(c1 + 1, c2 - c1 - 1), &loInf, &lo))
+                return false;
+            if (!parseBound(cond.substr(c2 + 1), &hiInf, &hi)) return false;
+            // A condition is only meaningful on a MaybeNull summary.
+            if (summary.returnNullness != ReturnNullness::MaybeNull)
+                return false;
+            summary.nullCondParam = static_cast<int>(paramIdx);
+            if (loInf && hiInf)
+                summary.nullCondRange = zerodefect::Interval::top();
+            else if (loInf)
+                summary.nullCondRange = zerodefect::Interval::atMost(hi);
+            else if (hiInf)
+                summary.nullCondRange = zerodefect::Interval::atLeast(lo);
+            else if (lo <= hi)
+                summary.nullCondRange = zerodefect::Interval::range(lo, hi);
+            else
                 return false;
         }
         if (pe != "-") {

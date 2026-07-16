@@ -7,11 +7,16 @@
 //  - Recursion produces no strong claims (soundness).
 
 #include "TestHelper.h"
+#include "engine/FunctionSummary.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
 
 #include <gtest/gtest.h>
+
+#include <fstream>
+#include <map>
+#include <string>
 
 using namespace zerodefect;
 using namespace zerodefect::testing;
@@ -777,7 +782,13 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
 
     auto outPath = ::testing::TempDir() + "sum_roundtrip_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
-    EXPECT_EQ(readWholeFile(outPath), content);
+    // #69b format bump: save always writes v3 (extra null-condition
+    // column, "-" when absent); loading old v1/v2 stays accepted.
+    EXPECT_EQ(readWholeFile(outPath),
+              "zerodefect-summaries v3\n"
+              "alpha/1\tN\tR\tU\t-\n"
+              "beta/2\tM\tOF\tM\t-\n"
+              "gamma/0\tU\t-\tN\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -795,7 +806,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v2\nlegacy/1\tN\tR\tU\n");
+              "zerodefect-summaries v3\nlegacy/1\tN\tR\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -817,7 +828,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v2\nfoo/1\tU\tO\tU\n");
+              "zerodefect-summaries v3\nfoo/1\tU\tO\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -860,7 +871,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v2\nkeep/1\tN\tR\tU\n");
+              "zerodefect-summaries v3\nkeep/1\tN\tR\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1104,4 +1115,223 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
     }
     err = ::testing::internal::GetCapturedStderr();
     EXPECT_EQ(err.find("may be stale"), std::string::npos);
+}
+
+// --- #69b: value-conditioned null-return summaries ---
+//
+// "Returns null ONLY IF param outside R" + a call-site argument
+// provably inside R = no warning. The picojpeg getHuffVal FP: null
+// only in the switch default, the caller's masked index provably
+// within the cases. Negative controls pin the conservative side.
+
+namespace {
+const char* kSwitchTables = R"(
+        static unsigned char t0[16], t1[16], t2[16], t3[16];
+        static unsigned char* getHuffVal(int idx) {
+            switch (idx) {
+                case 0: return t0;
+                case 1: return t1;
+                case 2: return t2;
+                case 3: return t3;
+                default: return 0;
+            }
+        }
+)";
+} // namespace
+
+TEST(ConditionedNullTest, SwitchDefault_MaskedArg_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kSwitchTables) + R"(
+        unsigned char use(unsigned char x) {
+            int idx = ((x >> 3) & 2) + (x & 1);
+            unsigned char* p = getHuffVal(idx);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ConditionedNullTest, SwitchDefault_InlineArg_Clean) {
+    // The masked expression passed directly, no local.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kSwitchTables) + R"(
+        unsigned char use(unsigned char x) {
+            unsigned char* p = getHuffVal(x & 3);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ConditionedNullTest, SwitchDefault_UnprovableArg_WarningStays) {
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kSwitchTables) + R"(
+        unsigned char use(int idx) {
+            unsigned char* p = getHuffVal(idx);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, SwitchDefault_OutOfRangeArg_WarningStays) {
+    // Provable interval [0,7] is NOT a subset of the cases [0,3].
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kSwitchTables) + R"(
+        unsigned char use(unsigned char x) {
+            unsigned char* p = getHuffVal(x & 7);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, NonContiguousCases_WarningStays) {
+    // Cases {0,1,3}: the hull [0,3] contains 2, which falls to the
+    // default — recording the hull would be unsound, so no condition
+    // forms and the provable-in-hull argument still warns.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static unsigned char t0[16];
+        static unsigned char* pick(int idx) {
+            switch (idx) {
+                case 0: return t0;
+                case 1: return t0;
+                case 3: return t0;
+                default: return 0;
+            }
+        }
+        unsigned char use(unsigned char x) {
+            unsigned char* p = pick(x & 3);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, CaseFallsThroughToDefault_WarningStays) {
+    // `case 1:` falls through into default: an in-range value can
+    // reach the null return — the condition must NOT form.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static unsigned char t0[16];
+        static unsigned char* pick(int idx) {
+            switch (idx) {
+                case 0: return t0;
+                case 1: ;
+                default: return 0;
+            }
+        }
+        unsigned char use(unsigned char x) {
+            unsigned char* p = pick(x & 1);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, IfGuard_ProvableArg_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static unsigned char t0[16];
+        static unsigned char* pick(int n) {
+            if (n > 7) return 0;
+            return t0;
+        }
+        unsigned char use(unsigned char x) {
+            int n = x & 3;
+            unsigned char* p = pick(n);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ConditionedNullTest, MutatedParam_WarningStays) {
+    // The guard tests a REASSIGNED param — it no longer speaks about
+    // the caller's argument, so the condition must not form.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static unsigned char t0[16];
+        static unsigned char* pick(int n) {
+            n = n * 2;
+            if (n > 7) return 0;
+            return t0;
+        }
+        unsigned char use(unsigned char x) {
+            unsigned char* p = pick(x & 3);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, ArgReassignedLocal_WarningStays) {
+    // The caller's local is written twice — no sole definition, its
+    // interval is unknown at the call.
+    NullDerefRule rule;
+    auto results = runRule(rule, std::string(kSwitchTables) + R"(
+        unsigned char use(unsigned char x, int flag) {
+            int idx = x & 3;
+            if (flag) idx = 100;
+            unsigned char* p = getHuffVal(idx);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(ConditionedNullTest, CrossTU_ConditionTravels) {
+    // Whole-program mode: the condition harvested from the callee TU
+    // (externally-visible function) suppresses in the caller TU.
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        static unsigned char t0[16], t1[16];
+        unsigned char* getHuffVal(int idx) {
+            switch (idx) {
+                case 0: return t0;
+                case 1: return t1;
+                default: return 0;
+            }
+        }
+    )", R"(
+        unsigned char* getHuffVal(int idx);
+        unsigned char use(unsigned char x) {
+            unsigned char* p = getHuffVal(x & 1);
+            return p[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(ConditionedNullTest, V3FileRoundtrip) {
+    // Handcrafted v3 line → parse → assert fields; load → save →
+    // re-parse → identical condition (serialization both ways).
+    const std::string dir = ::testing::TempDir();
+    const std::string p1 = dir + "/zd_sum_v3_in.txt";
+    const std::string p2 = dir + "/zd_sum_v3_out.txt";
+    {
+        std::ofstream out(p1);
+        out << "zerodefect-summaries v3\n";
+        out << "getHuffVal/1\tM\tR\tU\t0:0:3\n";
+        out << "plainMaybe/1\tM\tR\tU\t-\n";
+    }
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p1, parsed));
+    ASSERT_EQ(parsed.count("getHuffVal/1"), 1u);
+    const auto& s = parsed["getHuffVal/1"];
+    EXPECT_TRUE(s.hasNullCondition());
+    EXPECT_EQ(s.nullCondParam, 0);
+    EXPECT_EQ(s.nullCondRange, Interval::range(0, 3));
+    EXPECT_FALSE(parsed["plainMaybe/1"].hasNullCondition());
+
+    SummaryRegistry& registry = SummaryRegistry::instance();
+    registry.clearGlobal();
+    ASSERT_TRUE(registry.loadGlobal(p1));
+    ASSERT_TRUE(registry.saveGlobal(p2));
+    std::map<std::string, SummaryRegistry::FunctionSummary> reparsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p2, reparsed));
+    EXPECT_EQ(reparsed["getHuffVal/1"].nullCondParam, 0);
+    EXPECT_EQ(reparsed["getHuffVal/1"].nullCondRange, Interval::range(0, 3));
+    registry.clearGlobal();
 }

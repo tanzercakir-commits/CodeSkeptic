@@ -6,13 +6,16 @@
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/DeclCXX.h>
 #include <clang/AST/Expr.h>
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
 #include <clang/AST/Type.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <optional>
+#include <set>
 
 using namespace clang;
 
@@ -154,18 +157,50 @@ std::optional<int64_t> boundedTypeSizeInChars(ASTContext& ctx,
     return ctx.getTypeSizeInChars(type).getQuantity();
 }
 
-Interval evalInterval(const Expr* expr, const IntervalMap& state) {
+Interval evalInterval(const Expr* expr, const IntervalMap& state,
+                      const clang::ASTContext* ctx) {
     if (!expr) return Interval::top();
     expr = expr->IgnoreParens();
 
     // Casts: only the value-preserving ones are transparent. A narrowing
     // integral cast can WRAP (`(char)300 == 44`), so its value set is
-    // not a subset of the source's — passing it through would be
-    // UNSOUND (miss values). Anything but an lvalue-load / no-op → top.
+    // not a subset of the source's — passing it through TYPE-blind
+    // would be UNSOUND (miss values). With an ASTContext available the
+    // check is VALUE-based instead: if the operand's interval already
+    // FITS the destination type's representable range, no value can
+    // wrap and the cast preserves the interval exactly (the picojpeg
+    // `tableIndex = ((index>>3)&2)+(index&1)` shape — an int expression
+    // in [0,3] assigned to uint8). No context → old conservative top.
     if (const auto* cast = dyn_cast<ImplicitCastExpr>(expr)) {
-        if (cast->getCastKind() == CK_LValueToRValue ||
-            cast->getCastKind() == CK_NoOp)
-            return evalInterval(cast->getSubExpr(), state);
+        const CastKind k = cast->getCastKind();
+        if (k == CK_LValueToRValue || k == CK_NoOp)
+            return evalInterval(cast->getSubExpr(), state, ctx);
+        if (k == CK_IntegralCast && ctx) {
+            Interval v = evalInterval(cast->getSubExpr(), state, ctx);
+            if (v.isEmpty() || v.loIsInf() || v.hiIsInf())
+                return Interval::top();
+            QualType to = cast->getType();
+            const unsigned width = ctx->getIntWidth(to);
+            if (width == 0 || width > 64) return Interval::top();
+            int64_t tmin, tmax;
+            if (to->isSignedIntegerOrEnumerationType()) {
+                if (width == 64) {
+                    tmin = INT64_MIN;
+                    tmax = INT64_MAX;
+                } else {
+                    tmin = -(int64_t(1) << (width - 1));
+                    tmax = (int64_t(1) << (width - 1)) - 1;
+                }
+            } else {
+                tmin = 0;
+                // uint64's full range does not fit int64; only the
+                // int64-representable part can be certified.
+                tmax = (width >= 64) ? INT64_MAX
+                                     : (int64_t(1) << width) - 1;
+            }
+            if (v.lo() >= tmin && v.hi() <= tmax) return v;
+            return Interval::top();
+        }
         return Interval::top();
     }
 
@@ -182,14 +217,15 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state) {
     }
     if (const auto* u = dyn_cast<UnaryOperator>(expr)) {
         if (u->getOpcode() == UO_Minus)
-            return Interval::negate(evalInterval(u->getSubExpr(), state));
+            return Interval::negate(
+                evalInterval(u->getSubExpr(), state, ctx));
         if (u->getOpcode() == UO_Plus)
-            return evalInterval(u->getSubExpr(), state);
+            return evalInterval(u->getSubExpr(), state, ctx);
         return Interval::top();
     }
     if (const auto* bin = dyn_cast<BinaryOperator>(expr)) {
-        Interval l = evalInterval(bin->getLHS(), state);
-        Interval r = evalInterval(bin->getRHS(), state);
+        Interval l = evalInterval(bin->getLHS(), state, ctx);
+        Interval r = evalInterval(bin->getRHS(), state, ctx);
         switch (bin->getOpcode()) {
             case BO_Add: return Interval::add(l, r);
             case BO_Sub: return Interval::sub(l, r);
@@ -200,6 +236,10 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state) {
         }
     }
     return Interval::top();
+}
+
+Interval evalInterval(const Expr* expr, const IntervalMap& state) {
+    return evalInterval(expr, state, nullptr);
 }
 
 void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
@@ -312,6 +352,90 @@ Interval evalSizeInterval(const Expr* e, ASTContext& ctx,
 
     // Literals and tracked variables — the plain evaluator, same state.
     return evalInterval(e, state);
+}
+
+IntervalMap soleDefIntervals(const clang::FunctionDecl* fn,
+                             clang::ASTContext& ctx) {
+    IntervalMap result;
+    if (!fn || !fn->hasBody()) return result;
+
+    // Pass 1: initializers, plain assignments, and disqualifying
+    // writes, in one traversal.
+    struct Scan : clang::RecursiveASTVisitor<Scan> {
+        std::map<const clang::VarDecl*, const clang::Expr*> inits;
+        std::map<const clang::VarDecl*, std::vector<const clang::Expr*>>
+            assigns;
+        std::set<const clang::VarDecl*> otherWrites;
+
+        static const clang::VarDecl* asVar(const clang::Expr* e) {
+            if (!e) return nullptr;
+            e = e->IgnoreParenImpCasts();
+            if (const auto* ref = dyn_cast<clang::DeclRefExpr>(e))
+                return dyn_cast<clang::VarDecl>(ref->getDecl());
+            return nullptr;
+        }
+        bool VisitVarDecl(clang::VarDecl* vd) {
+            if (vd->isLocalVarDecl() && vd->hasLocalStorage() &&
+                vd->getType()->isIntegerType() && vd->hasInit())
+                inits[vd] = vd->getInit();
+            return true;
+        }
+        bool VisitBinaryOperator(clang::BinaryOperator* bin) {
+            if (!bin->isAssignmentOp()) return true;
+            const auto* var = asVar(bin->getLHS());
+            if (!var) return true;
+            if (bin->getOpcode() == clang::BO_Assign)
+                assigns[var].push_back(bin->getRHS());
+            else
+                otherWrites.insert(var);  // compound: += etc.
+            return true;
+        }
+        bool VisitUnaryOperator(clang::UnaryOperator* un) {
+            if (un->isIncrementDecrementOp() ||
+                un->getOpcode() == clang::UO_AddrOf)
+                if (const auto* var = asVar(un->getSubExpr()))
+                    otherWrites.insert(var);
+            return true;
+        }
+        // A non-const reference argument can write the local from the
+        // callee — same treatment as a direct write.
+        bool VisitCallExpr(clang::CallExpr* call) {
+            zerodefect::forEachNonConstRefArg(
+                call, [&](const clang::Expr* refArg) {
+                    if (const auto* var = asVar(refArg))
+                        otherWrites.insert(var);
+                });
+            return true;
+        }
+    };
+    Scan scan;
+    scan.TraverseStmt(fn->getBody());
+
+    // Pass 2: a local qualifies with EITHER an initializer and no
+    // assignments, OR no initializer and exactly ONE plain assignment
+    // (the picojpeg `uint8 tableIndex; ... tableIndex = expr;` shape —
+    // any read before that single write is UB and the uninit domain's
+    // business). Evaluate the sole defining expression against the
+    // empty state.
+    const IntervalMap empty;
+    auto record = [&](const clang::VarDecl* var, const clang::Expr* def) {
+        Interval v = evalInterval(def, empty, &ctx);
+        if (!v.isTop() && !v.isEmpty()) result[var] = v;
+    };
+    for (const auto& [var, init] : scan.inits) {
+        if (scan.otherWrites.count(var) || scan.assigns.count(var))
+            continue;
+        record(var, init);
+    }
+    for (const auto& [var, rhss] : scan.assigns) {
+        if (scan.otherWrites.count(var) || scan.inits.count(var)) continue;
+        if (rhss.size() != 1) continue;
+        if (!var->isLocalVarDecl() || !var->hasLocalStorage() ||
+            !var->getType()->isIntegerType())
+            continue;
+        record(var, rhss.front());
+    }
+    return result;
 }
 
 } // namespace zerodefect

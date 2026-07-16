@@ -787,6 +787,46 @@ attribute every in-domain miss to parse coverage, abstraction, or rule
 gap." Even one attributable miss is a measured engine task; a hit on a
 pre-fix revision is a recall pin candidate for CI.
 
+## 6.17 #69b value-conditioned null-return summaries (2026-07-16)
+
+The picojpeg FP (`getHuffVal(pHuffVal, idx)` at readDHTMarker:542) had
+survived every engine improvement because it needs an INTERPROCEDURAL
+value argument: the callee returns null only in its switch DEFAULT,
+and every caller's index expression provably lands in a case. Three
+pieces, each individually reusable:
+
+1. **Conditioned summary** (`nullCondParam`/`nullCondRange`): harvest
+   "null ONLY IF param outside R" from switch-default and
+   if-comparison guards. Strict harvest discipline — exactly one
+   structurally-null return, contiguous case constants, param never
+   mutated, `switchHasNoFallthrough` (flat-body scan; goto/continue
+   bail). `stripBoolPreservingCasts` (#79's helper) reused in the
+   comparison-guard matcher — the shared-skeleton bet paying off.
+2. **Sole-definition intervals for integers**: the heap extents'
+   sole-def discipline applied to locals. Declaration-init OR the
+   uninitialized-then-single-assignment C idiom both qualify;
+   any second write, ++/--, or address-taken disqualifies (absent =
+   consumers prove nothing — sound).
+3. **Value-based narrowing fit**: `evalInterval` with ASTContext
+   passes a narrowing IntegralCast through when the operand interval
+   fits the destination range. CastKind-blindness was the last
+   soundness-preserving gap; value-based is the correct fix (the #79
+   lesson — kinds lie, types and values don't).
+
+Development shape worth recording: the reduced repro passed while REAL
+picojpeg still fired, three times, and each gap was found by diffing
+real source against the repro — `return t0;` array-decay in vstateOf,
+the declare-then-assign idiom, the uint8 narrowing. The receipt
+discipline (re-scan the ORIGINAL corpus, not the repro) is what
+converted "tests pass" into "the FP is dead": **picojpeg 1 → 0**.
+
+Honest non-result: ImGui stays 14 → 14. The GetFontBaked cluster
+hinges on opaque `ImFontAtlasBakedAdd` — a MaybeNull with no body to
+harvest a condition from. Different mechanism, different task.
+
+Disk format v3 (condition column), version-strict parsing, merge drops
+conditions on cross-TU disagreement. Gate: CWE476 Juliet floor.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

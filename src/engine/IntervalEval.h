@@ -31,6 +31,27 @@ using IntervalMap = std::map<const clang::VarDecl*, Interval>;
 // else (calls, unknown vars, bitwise, division, …) is top().
 Interval evalInterval(const clang::Expr* expr, const IntervalMap& state);
 
+// Context-aware variant (#69b): narrowing integral casts are checked by
+// VALUE — an operand interval that fits the destination type's range
+// passes through unchanged (it cannot wrap); otherwise top() as before.
+// `ctx` may be null (identical to the 2-arg form).
+Interval evalInterval(const clang::Expr* expr, const IntervalMap& state,
+                      const clang::ASTContext* ctx);
+
+// SOLE-DEFINITION intervals for a function's integer locals (#69b): a
+// local whose ONLY write is its declaration initializer — never
+// reassigned, never ++/--, never address-taken — holds its
+// initializer's value at every later read, so `evalInterval(init)` is
+// its interval for the whole function, flow-insensitively. The heap
+// extents' sole-definition discipline, applied to integers. Locals
+// with any other write, and initializers that evaluate to top(), are
+// simply absent (consumers prove nothing — sound). Initializers are
+// evaluated against the empty state: a masked expression over
+// PARAMETERS still lands (`int idx = ((x>>3)&2)+(x&1)` → [0,3], the
+// picojpeg getHuffVal caller), while inter-local chains stay top (v1).
+IntervalMap soleDefIntervals(const clang::FunctionDecl* fn,
+                             clang::ASTContext& ctx);
+
 // Byte size of a type, guarded by a STRUCTURAL BUDGET. Clang's
 // getTypeInfo recurses once per nesting level (array element, record
 // field, base class), and metaprogram-generated types in real code can
