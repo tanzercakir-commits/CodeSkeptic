@@ -47,3 +47,11 @@ target_link_libraries(zerodefect_tests
 
 include(GoogleTest)
 gtest_discover_tests(zerodefect_tests)
+
+# End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
+# hermetic git-repo fixture driven with the real binary. Pins the delta
+# semantics (Baseline-v2 key parity / shift-immunity, rename map, gate
+# ladder). Needs git + python3 — present locally and on the CI runner.
+add_test(NAME ReviewDiffFlow
+         COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
+                 $<TARGET_FILE:zerodefect>)
