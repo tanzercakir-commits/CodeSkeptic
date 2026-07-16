@@ -707,7 +707,9 @@ template code we've ever parsed. 16 findings, all warning severity:
   `decl_context->addHiddenDecl(...)`. The compiler emits the TODO
   diagnostic, then crashes instead of continuing — the shadPS4 #4703
   shape (contract honored in one caller, forgotten in the other).
-  Upstream report drafted, pending user approval.
+  **Reported upstream:
+  [carbon-lang#7523](https://github.com/carbon-language/carbon-lang/issues/7523)**
+  (2026-07-16, user-filed via prefilled toolchain-bug template).
 
 Coverage honesty: the leak domain produced 0 findings here without a
 canary (Carbon allocates via ASTContext arenas — little raw new); the
