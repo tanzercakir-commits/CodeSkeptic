@@ -3,7 +3,10 @@
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 
+#include <clang/AST/ASTContext.h>
+#include <clang/AST/Expr.h>
 #include <clang/AST/Stmt.h>
+#include <clang/AST/Type.h>
 #include <cstdint>
 #include <optional>
 
@@ -172,6 +175,53 @@ void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
             BinaryOperatorKind eff = edgeTrue ? opc : negateCmp(opc);
             it->second = constrainBy(it->second, eff, *c);
         });
+}
+
+Interval evalSizeInterval(const Expr* e, ASTContext& ctx,
+                          const IntervalMap& state) {
+    if (!e) return Interval::top();
+    e = e->IgnoreParens();
+
+    // Value-preserving casts are transparent; a narrowing cast stops here
+    // so the size can never be over-estimated into a false overflow.
+    if (const auto* cast = dyn_cast<ImplicitCastExpr>(e)) {
+        const CastKind k = cast->getCastKind();
+        if (k == CK_LValueToRValue || k == CK_NoOp)
+            return evalSizeInterval(cast->getSubExpr(), ctx, state);
+        if (k == CK_IntegralCast &&
+            cast->getType()->isIntegerType() &&
+            cast->getSubExpr()->getType()->isIntegerType() &&
+            ctx.getIntWidth(cast->getType()) >=
+                ctx.getIntWidth(cast->getSubExpr()->getType()))
+            return evalSizeInterval(cast->getSubExpr(), ctx, state);
+        return Interval::top();
+    }
+
+    // sizeof(T) / sizeof(expr) — a compile-time byte constant.
+    if (const auto* uett = dyn_cast<UnaryExprOrTypeTraitExpr>(e)) {
+        if (uett->getKind() == UETT_SizeOf && !uett->isValueDependent()) {
+            QualType t = uett->getTypeOfArgument();
+            if (!t->isIncompleteType() && !t->isDependentType())
+                return Interval::constant(
+                    ctx.getTypeSizeInChars(t).getQuantity());
+        }
+        return Interval::top();
+    }
+
+    // Constant arithmetic over sizes: count * sizeof(T), etc.
+    if (const auto* bo = dyn_cast<BinaryOperator>(e)) {
+        Interval l = evalSizeInterval(bo->getLHS(), ctx, state);
+        Interval r = evalSizeInterval(bo->getRHS(), ctx, state);
+        switch (bo->getOpcode()) {
+            case BO_Mul: return Interval::mul(l, r);
+            case BO_Add: return Interval::add(l, r);
+            case BO_Sub: return Interval::sub(l, r);
+            default:     return Interval::top();
+        }
+    }
+
+    // Literals and tracked variables — the plain evaluator, same state.
+    return evalInterval(e, state);
 }
 
 } // namespace zerodefect

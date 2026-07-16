@@ -87,36 +87,6 @@ std::vector<const CallExpr*> collectCopyCalls(const FunctionDecl* fn) {
     return v.calls;
 }
 
-// The proven byte-count interval of a copy's size argument. The argument
-// is implicitly cast to size_t, which evalInterval (soundly) treats as
-// top() — so first see through a VALUE-PRESERVING widening integral cast
-// (dest width >= source width preserves a non-negative value; a narrowing
-// cast is NOT stripped, so we never over-estimate the size and raise a
-// false overflow). A sizeof-based size still evaluates to top() here and
-// stays silent — that follow-up shares the allocator's sizeof evaluator.
-zerodefect::Interval copySizeInterval(const Expr* arg,
-                                      const zerodefect::IntervalMap& state,
-                                      ASTContext& ctx) {
-    const Expr* e = arg->IgnoreParens();
-    while (const auto* cast = dyn_cast<ImplicitCastExpr>(e)) {
-        const CastKind k = cast->getCastKind();
-        if (k == CK_LValueToRValue || k == CK_NoOp) {
-            e = cast->getSubExpr();
-            continue;
-        }
-        if (k == CK_IntegralCast &&
-            cast->getType()->isIntegerType() &&
-            cast->getSubExpr()->getType()->isIntegerType() &&
-            ctx.getIntWidth(cast->getType()) >=
-                ctx.getIntWidth(cast->getSubExpr()->getType())) {
-            e = cast->getSubExpr();  // widening — value preserved
-            continue;
-        }
-        break;  // narrowing / other cast: evaluate here (likely top())
-    }
-    return zerodefect::evalInterval(e, state);
-}
-
 // Byte size of one element of a buffer variable — the factor that turns
 // the ExtentMap's element count into a byte capacity. 0 when unknown.
 int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
@@ -219,8 +189,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (capacity.hiIsInf()) continue;  // unbounded capacity — prove nothing
 
         const zerodefect::IntervalMap* st = analysis.stateAt(call);
-        zerodefect::Interval sz =
-            copySizeInterval(call->getArg(2), st ? *st : emptyState, ctx);
+        zerodefect::Interval sz = zerodefect::evalSizeInterval(
+            call->getArg(2), ctx, st ? *st : emptyState);
         // Definite overflow: every byte count exceeds the capacity.
         if (sz.isEmpty() || sz.loIsInf() || sz.lo() <= capacity.hi()) continue;
 
