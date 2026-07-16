@@ -260,12 +260,18 @@ parser/codec":
 - **Null-deref rule: 2 findings, both FALSE POSITIVES** — the mature
   null-deref rule, orthogonal to the new spatial work. Two distinct
   precision mechanisms, both well-understood, neither a soundness bug:
-    1. stb_image TGA (`tga_palette`): a loop-invariant int guard
-       (`tga_indexed`, read once, never reassigned) gates BOTH the palette
-       malloc+null-check and the later deref, with the pixel loop between.
-       The engine loses the null-vs-guard correlation across the loop's
-       widening — the path-sensitivity/loop frontier Coverity and the
-       Clang Static Analyzer also struggle with.
+    1. stb_image TGA (`tga_palette`): DISJUNCT-BUDGET EXHAUSTION. The
+       basic loop-invariant-guard shape (one guard, one pointer) is
+       handled correctly — a minimal repro is silent. The FP needs SCALE:
+       with >=4 independently-guarded pointers (`kMaxDisjuncts = 4`), the
+       binary-guard product exceeds the budget, `widenGuarded` collapses
+       ALL correlations, and every guarded pointer turns into a spurious
+       "may be null" (confirmed: a 4-pointer repro yields 7 FPs). The
+       real fix is a per-variable guard representation so INDEPENDENT
+       guards don't multiply into a cross-product — a disjunct-model
+       redesign, not a constant bump (raising kMaxDisjuncts trades perf
+       and risks the disjuncts-v2a/v2b-tuned Juliet floors). The
+       path-sensitivity scaling wall Coverity/CSA also hit.
     2. picojpeg (`pHuffVal`): `getHuffVal(idx)` returns null only in its
        default case (idx ∉ {0,1,2,3}); the caller's `idx =
        ((x>>3)&2)+(x&1)` provably ∈ {0,1,2,3}, so the null path is
