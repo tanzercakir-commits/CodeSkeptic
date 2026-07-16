@@ -600,6 +600,55 @@ still reported). The ownership-to-MEMBER-freed-in-dtor shape (Reset/dtor)
 is deferred — it needs member-lifetime modeling and is a smaller FP
 source than these two.
 
+## 6.14 #75 live validation: Jolt re-scan + ImGui hunt (2026-07-16)
+
+**Jolt re-scan (the #75 receipt).** Same 143 TUs, same flags plus
+`--owning-pointers Ref,RefConst`: **31 leak findings → 8**. The 23 that
+died are exactly the two fixed mechanisms (17 smart-pointer-return
+adoptions + 6 scope-guard lambdas — 100% of their instances); the 8
+that remain are all the deliberately deferred third class (ownership
+handed to a member, freed in `Reset()`/dtor: IslandBuilder temp arrays,
+AABBTree codec arena allocators). null-deref (3) and spatial (0)
+unchanged — the suppression touched nothing else.
+
+**ImGui hunt (ocornut/imgui, 4 core TUs, imgui_demo excluded).**
+Trivial compile DB (no build system needed), allocator wrappers via
+`--alloc-functions MemAlloc --free-functions MemFree`. Results:
+0 parse errors, ~7s. **Leak: 0 findings — and a canary proved the
+domain was exercised**, not blind (an injected MemAlloc-without-free
+TU reported; its paired-free control stayed silent — the libgit2
+lesson, operationalized). Spatial/numeric: 0 findings (sixth
+independent precision confirmation). null-deref: 17 (18 with
+`--whole-program`, which correctly connected one extra cross-TU
+caller), ALL warning-severity "may" findings. Triage:
+
+- **7 = the `GetFontBaked` cluster**, one root cause: the function
+  syntactically `return NULL`s, but only on the
+  locked-atlas + dynamic-font-size path, straight after
+  `IM_ASSERT(!atlas->Locked && ...)` fires — assert-opacity plus a
+  value-conditioned null return. Exactly the #69b shape (needs
+  null-return summaries conditioned on values); not upstream-reportable
+  (the assert documents the invariant).
+- **≥1 = a NEW analyzer FP, minimally reproduced** (see below).
+- Rest = the known correlation classes: `EndTable` guards through a
+  derived variable (`g.CurrentTable` non-null implies `temp_data`
+  non-null), `InputTextEx` refinement lost across ~380 lines of
+  branches — the #70 family, honest "may" warnings.
+
+**New FP mechanism found: `assert(A && B)` leaks the null disjunct.**
+Minimal repro (scratchpad fp78/guard3.cpp): after `if (font != NULL)`,
+a standard `assert(font && font->IsLoaded())` between the guard and
+the dereference RE-INTRODUCES a maybe-null disjunct on `font`
+(ImGui's `SetCurrentFont` — every IM_ASSERT is this macro). Narrowed
+precisely: `assert(font)` alone is fine, `assert(font->IsLoaded())`
+is fine, and the SAME compound condition as an
+`if (!(A && B)) __builtin_abort();` statement is fine — the bug is
+specific to the `&&` short-circuit INSIDE assert's ternary expansion
+(`cond ? void(0) : __assert_fail(...)`): the null-refined short-circuit
+edge is not killed by the noreturn false-arm. Standard assert with a
+compound pointer condition is ubiquitous → high-value engine fix,
+CWE476-gated (next task).
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
