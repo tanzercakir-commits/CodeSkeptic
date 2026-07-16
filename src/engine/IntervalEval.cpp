@@ -10,6 +10,7 @@
 #include <clang/AST/Type.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 
@@ -18,6 +19,39 @@ using namespace clang;
 namespace zerodefect {
 
 namespace {
+
+// Bitwise AND with a non-negative mask: `x & c` (c >= 0) has every bit a
+// subset of c's bits, so the result is in [0, c] for ANY x (the sign bit
+// is masked off -> non-negative). Mask may be on either side. When both
+// operands are known non-negative finite intervals with no constant, the
+// result is bounded by the smaller upper bound. Sound over-approximation;
+// unknown -> top.
+Interval bitAnd(const Interval& l, const Interval& r) {
+    int64_t c;
+    if (r.isSingleton(&c) && c >= 0) return Interval::range(0, c);
+    if (l.isSingleton(&c) && c >= 0) return Interval::range(0, c);
+    const bool lNonNeg = !l.loIsInf() && l.lo() >= 0;
+    const bool rNonNeg = !r.loIsInf() && r.lo() >= 0;
+    if (lNonNeg && rNonNeg && !l.hiIsInf() && !r.hiIsInf())
+        return Interval::range(0, std::min(l.hi(), r.hi()));
+    if (lNonNeg && !l.hiIsInf()) return Interval::range(0, l.hi());
+    if (rNonNeg && !r.hiIsInf()) return Interval::range(0, r.hi());
+    return Interval::top();
+}
+
+// Remainder by a constant divisor: C truncates toward zero, so `x % c`
+// has the sign of x and magnitude < |c|. Result in [-(|c|-1), |c|-1],
+// tightened to [0, |c|-1] when x is known non-negative. Divisor unknown
+// or zero -> top (a zero divisor is UB; the div-by-zero rule owns it).
+Interval intRem(const Interval& l, const Interval& r) {
+    int64_t d;
+    if (!r.isSingleton(&d) || d == 0) return Interval::top();
+    // |d| - 1, guarding the INT64_MIN abs-overflow (|INT64_MIN|-1 fits).
+    const int64_t bound =
+        d == INT64_MIN ? INT64_MAX : (d < 0 ? -d : d) - 1;
+    if (!l.loIsInf() && l.lo() >= 0) return Interval::range(0, bound);
+    return Interval::range(-bound, bound);
+}
 
 const VarDecl* asIntVar(const Expr* e) {
     if (!e) return nullptr;
@@ -160,6 +194,8 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state) {
             case BO_Add: return Interval::add(l, r);
             case BO_Sub: return Interval::sub(l, r);
             case BO_Mul: return Interval::mul(l, r);
+            case BO_And: return bitAnd(l, r);
+            case BO_Rem: return intRem(l, r);
             default:     return Interval::top();
         }
     }

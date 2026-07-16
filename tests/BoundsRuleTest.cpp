@@ -12,6 +12,53 @@ using namespace zerodefect::testing;
 
 // --- Definite out-of-bounds: report ---
 
+// --- Bitwise / modulo interval modeling (#69a) ---
+// `x & c` (c>=0) is provably in [0, c]; `x % c` in [0, |c|-1] when x>=0.
+// This lets the bounds rule see through the common mask/modulo indexing
+// idioms — both to PROVE safety (stay silent) and to catch an OOB the
+// idiom's range makes definite.
+
+TEST(BoundsRuleTest, BitmaskIndexInRangeClean) {
+    // idx = src() & 3  ->  [0,3], within a[4]: no finding.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern int src(void);
+        int f() { int a[4]; int i = src() & 3; return a[i]; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, BitmaskIndexPlusOffsetOOB) {
+    // idx = src() & 7  ->  [0,7]; idx + 4 -> [4,11], all outside a[4].
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern int src(void);
+        int g() { int a[4]; int i = src() & 7; return a[i + 4]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, ModuloIndexInRangeClean) {
+    // Non-negative index % 4 -> [0,3]: the canonical safe-indexing idiom.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern int src(void);
+        int f() { int a[4]; int n = src() & 15; return a[n % 4]; }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, ModuloIndexPlusOffsetOOB) {
+    // (n>=0) % 4 -> [0,3]; +10 -> [10,13], outside a[4].
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern int src(void);
+        int g() { int a[4]; int n = src() & 255; return a[(n % 4) + 10]; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
 TEST(BoundsRuleTest, ConstantIndexPastEnd) {
     BoundsRule rule;
     auto results = runRule(rule, R"(

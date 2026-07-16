@@ -12,6 +12,12 @@
 # material for rule improvement) lines are grep-friendly. Rule-change
 # PRs can trigger the Juliet run by touching this file (the known path,
 # since workflow_dispatch returns 403 on the integration token).
+#
+# Trigger touch 2026-07-16 (#69a): bitwise/modulo interval modeling in
+# IntervalEval feeds DivByZeroRule (CWE369 floor). The new intervals are
+# zero-CONTAINING ([0,c] / [0,c-1]), so they cannot prove a divisor
+# non-zero and cannot kill a true finding — but CWE369 gates it here
+# regardless.
 set -euo pipefail
 
 # Resolve our own directory BEFORE any cd (relative-path trap)
