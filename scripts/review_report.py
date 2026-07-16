@@ -39,6 +39,7 @@ dropped.
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -278,6 +279,18 @@ def cmd_assemble(args):
     new_errors = [(d, r) for d, r in new if d["severity"] == "error"]
     new_warnings = [(d, r) for d, r in new if d["severity"] != "error"]
 
+    # Human label counts by ACTUAL severity (an assumption finding is
+    # info, not warning); the REVIEW_RESULT machine line keeps its
+    # stable two-bucket schema (new_warnings = everything non-error,
+    # the "does not gate unless --strict" set).
+    sev_counts = Counter(d["severity"] for d, _ in new)
+    sev_label = ", ".join(
+        "%d %s" % (sev_counts[s], s)
+        for s in ("error", "warning", "info") if s in sev_counts) or "none"
+    for s in sev_counts:
+        if s not in ("error", "warning", "info"):
+            sev_label += ", %d %s" % (sev_counts[s], s)
+
     weakened = [rest for kind, rest in sum_changes if kind == "WEAKENED"]
     other_changes = [(k, rest) for k, rest in sum_changes if k != "WEAKENED"]
 
@@ -303,8 +316,7 @@ def cmd_assemble(args):
                   "no weakened contracts")
 
     md.append("")
-    md.append("## New findings (%d error, %d warning)" %
-              (len(new_errors), len(new_warnings)))
+    md.append("## New findings (%s)" % sev_label)
     if new:
         for d, rel in new_errors + new_warnings:
             md.extend(render_finding(d, rel, args.head_root, added_lines))
@@ -345,6 +357,11 @@ def cmd_assemble(args):
     md.append("- Changed files: %d total, %d C/C++ source; analyzed %d "
               "(head side, whole file — not just hunks)." %
               (len(name_status), len(src_changed), len(analyzed_rel)))
+    excludes = args.exclude or []
+
+    def excluded(rel):
+        return any(fnmatch.fnmatch(rel, pat) for pat in excludes)
+
     not_analyzed = []
     for st, old, new_p in name_status:
         if st.startswith("D"):
@@ -356,6 +373,8 @@ def cmd_assemble(args):
                                 "include it)" % new_p)
         elif not new_p.endswith(SRC_EXT):
             not_analyzed.append("`%s` (not a C/C++ source)" % new_p)
+        elif excluded(new_p):
+            not_analyzed.append("`%s` (excluded by --exclude)" % new_p)
         elif new_p not in analyzed_rel and not st.startswith("D"):
             not_analyzed.append("`%s` (not analyzed)" % new_p)
     if not_analyzed:
@@ -475,6 +494,10 @@ def main():
     p_asm.add_argument("--summary-diff")
     p_asm.add_argument("--gate", choices=["error", "warn"], default="error")
     p_asm.add_argument("--strict", action="store_true")
+    p_asm.add_argument("--exclude", action="append",
+                       help="glob over repo-relative paths whose changed "
+                            "files were skipped (labeling only; the "
+                            "actual skip happens in review_diff.sh)")
     p_asm.add_argument("--base-label", default="base")
     p_asm.add_argument("--head-label", default="head")
     p_asm.add_argument("--out")

@@ -191,5 +191,62 @@ bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$RENAME_SHA" --out review.md \
     --strict --gate warn > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "warning review (--gate warn): expected exit 0, got $code"
 assert_grep "gate=fail" "$TMP/stdout.txt"        # says fail, exits 0
+WARN_SHA="$(git rev-parse HEAD)"
 
-echo "PASS: review-diff flow (delta + shift-immunity + self + rename + gate ladder)"
+# --- 6: assumption delta — a new unchecked-param deref (the CWE-476
+# review shape, cJSON #991) surfaces as ONE info finding, on by
+# default, and does not gate.
+cat >> core.c <<'EOF'
+
+int deref_param(int* p) {
+    return *p;
+}
+EOF
+git add -A
+git commit -qm assumption
+ASSUME_SHA="$(git rev-parse HEAD)"
+
+code=0
+bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$WARN_SHA" --out review.md \
+    > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+[ "$code" -eq 0 ] || fail "assumption review: expected exit 0, got $code"
+assert_grep "REVIEW_RESULT new_errors=0 new_warnings=1 fixed=0 weakened=0 gate=pass" \
+    "$TMP/stdout.txt"
+assert_grep "assumed non-null" review.md
+assert_grep "deref_param" review.md
+assert_grep "New findings (1 info)" review.md   # severity-true label
+assert_not_grep "1 warning" review.md           # info is NOT mislabeled
+
+# ...and --no-assumptions turns the delta off.
+code=0
+bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$WARN_SHA" --out review.md \
+    --no-assumptions > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+[ "$code" -eq 0 ] || fail "no-assumptions review: expected exit 0, got $code"
+assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
+    "$TMP/stdout.txt"
+
+# --- 7: --exclude skips matching changed files but LISTS them ----------
+mkdir -p vendor
+cat > vendor/extra.c <<'EOF'
+int vendor_deref(int* p) {
+    return *p;
+}
+EOF
+git add -A
+git commit -qm vendor
+
+code=0
+bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$ASSUME_SHA" --out review.md \
+    --exclude 'vendor/*' > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+[ "$code" -eq 0 ] || fail "exclude review: expected exit 0, got $code"
+assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
+    "$TMP/stdout.txt"
+assert_grep "excluded by --exclude" review.md    # skipped, but SAID
+# Control: without --exclude the same change yields the vendor finding.
+code=0
+bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$ASSUME_SHA" --out review.md \
+    > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+[ "$code" -eq 0 ] || fail "exclude-control review: expected exit 0, got $code"
+assert_grep "vendor_deref" review.md
+
+echo "PASS: review-diff flow (delta + shift-immunity + self + rename + gate ladder + assumption delta + exclude)"

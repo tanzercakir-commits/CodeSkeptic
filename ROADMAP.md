@@ -359,6 +359,19 @@ path-exclude filter; the "New findings (N error, M warning)" label
 says "warning" for info-severity items (cosmetic); consider assumption
 delta on-by-default in review mode.
 
+**v0.5 shipped (2026-07-16):** all three warts closed — assumption
+delta ON BY DEFAULT in review mode (`--no-assumptions` opts out; the
+default was decided from data: 0 new assumption findings across the
+116-commit cJSON range vs. the exact CWE-476 catch in the targeted
+case), `--exclude <glob>` skips changed files VISIBLY (listed in the
+coverage section), and the findings label counts by true severity.
+`--summary-in` composition and a GitHub Actions gate example
+documented in README. The MCP `review` tool was consciously deferred:
+it would force git+python orchestration into the C++ server, breaking
+the zero-C++-risk layering — agents can run review_diff.sh directly.
+Fixture grew to 7 phases (assumption catch + exclude, with a
+no-exclude control).
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

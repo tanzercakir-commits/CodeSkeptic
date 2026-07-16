@@ -404,12 +404,25 @@ The markdown review contains:
   finding that merely *shifted* (code added above it) does not
   resurface: matching uses the baseline's line-content keys, and pure
   renames are mapped old→new, so refactor PRs stay quiet.
+* **New assumptions** — on by default in review mode: a new inferred,
+  unchecked precondition ("parameter `p` is assumed non-null —
+  dereferenced, never checked") is exactly the CWE-476 shape reviews
+  exist to catch; in the field trial it pinpointed cJSON's #991 null
+  dereference as one single finding, and produced zero noise across a
+  116-commit history range (the delta bounds the assumption engine's
+  volume). Info severity — it informs, and gates only under
+  `--strict`. Opt out with `--no-assumptions`.
 * **Fixed findings** — present at base, gone at head.
 * **Contract changes** — the summary diff of both sides' inferred
   contracts; `WEAKENED` entries gate.
 * **Coverage** — what was *not* analyzed and why (headers, deleted
-  files, iteration-cap functions). "No warning" in an unanalyzed file
-  means *not checked*, and the review says so.
+  files, `--exclude` matches, iteration-cap functions). "No warning"
+  in an unanalyzed file means *not checked*, and the review says so.
+
+Real-world diffs are noisy in predictable places — test and vendor
+directories exercise null paths on purpose. `--exclude 'tests/*'`
+(repeatable) skips those changed files *visibly*: they are listed in
+the coverage section, never silently dropped.
 
 The exit code is the verdict, on the same evidence ladder as the rules
 themselves: **new definite findings (error) and weakened contracts
@@ -423,11 +436,26 @@ REVIEW_RESULT new_errors=1 new_warnings=0 fixed=1 weakened=1 gate=fail
 ```
 
 Both analyzer runs receive identical settings (arguments after `--` are
-forwarded to both — `--alloc-functions`, `--fatal-asserts`, …); a delta
-between two differently-configured runs would not be a delta. Known v0
-limits, stated rather than hidden: a header-only change analyzes no TU
-(it is listed in the coverage section), and deleted files' base-only
-findings are not counted as fixed.
+forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
+`--summary-in .zerodefect-summaries` to review with whole-project
+knowledge, …); a delta between two differently-configured runs would
+not be a delta. Known limits, stated rather than hidden: a header-only
+change analyzes no TU (it is listed in the coverage section), and
+deleted files' base-only findings are not counted as fixed.
+
+A minimal GitHub Actions gate:
+
+```yaml
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }        # the review needs the base commit
+- name: Build zerodefect          # or download a release binary
+  run: cmake -B build -G Ninja && cmake --build build
+- name: Review the PR diff
+  run: |
+    scripts/review_diff.sh build/src/zerodefect \
+      "origin/${{ github.base_ref }}" --build-path build \
+      --exclude 'tests/*' --out review.md
+```
 
 ### MCP server (agent integration)
 

@@ -21,9 +21,21 @@
 #     --gate error|warn    exit 1 on a failing verdict (default error)
 #     --strict             new warnings also gate (default: only new
 #                          errors and weakened contracts gate)
+#     --exclude <pat>      skip changed files matching this glob (e.g.
+#                          'tests/*'; repeatable) — they are listed in
+#                          the coverage section, never silently dropped
+#     --no-assumptions     disable the assumption delta (see below)
 #   Arguments after -- go to BOTH analyzer runs verbatim (e.g.
 #   --alloc-functions git__malloc) — both sides must run with identical
 #   settings or the delta is not a delta.
+#
+# The ASSUMPTION DELTA is on by default in review mode: a new inferred,
+# unchecked precondition ("parameter p is assumed non-null — dereferenced,
+# never checked") introduced by the change is exactly the CWE-476 shape
+# reviews exist to catch (it found cJSON #991 in the field trial), and
+# the delta bounds the assumption engine's volume to the change (0 new
+# findings across a 116-commit real-history range). Info severity: it
+# informs, and gates only under --strict.
 #
 # Exit codes: 0 pass (or --gate warn), 1 failing verdict, 2 infrastructure
 # error (analyzer crash, unreadable inputs). Run from inside the git
@@ -39,18 +51,22 @@ usage() {
 [ $# -ge 2 ] || usage
 ZD_BIN="$1"; BASE_REF="$2"; shift 2
 
-BUILD_PATH="."; OUT=""; GATE="error"; STRICT=0; EXTRA=()
+BUILD_PATH="."; OUT=""; GATE="error"; STRICT=0; ASSUMPTIONS=1
+EXTRA=(); EXCLUDES=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --build-path) BUILD_PATH="${2:?--build-path needs a value}"; shift 2;;
         --out)        OUT="${2:?--out needs a value}"; shift 2;;
         --gate)       GATE="${2:?--gate needs error|warn}"; shift 2;;
         --strict)     STRICT=1; shift;;
+        --exclude)    EXCLUDES+=("${2:?--exclude needs a glob pattern}"); shift 2;;
+        --no-assumptions) ASSUMPTIONS=0; shift;;
         --)           shift; EXTRA=("$@"); break;;
         *) echo "[review] unknown option: $1 (analyzer args go after --)" >&2
            usage;;
     esac
 done
+if [ "$ASSUMPTIONS" -eq 1 ]; then EXTRA+=(--assumptions); fi
 case "$GATE" in error|warn) ;; *)
     echo "[review] --gate expects 'error' or 'warn', got: $GATE" >&2; exit 2;;
 esac
@@ -81,25 +97,36 @@ git diff --name-status --find-renames "$BASE_SHA" > "$TMP/name-status.txt"
 git diff -U0 --find-renames "$BASE_SHA" > "$TMP/diff.txt"
 
 is_src() { case "$1" in *.c|*.cpp|*.cc|*.cxx) return 0;; *) return 1;; esac; }
+# --exclude patterns match the repo-relative path (bash `case` globbing:
+# `*` crosses directory separators, so tests/* covers tests/a/b.c).
+is_excluded() {
+    local rel="$1" pat
+    for pat in ${EXCLUDES[@]+"${EXCLUDES[@]}"}; do
+        case "$rel" in $pat) return 0;; esac
+    done
+    return 1
+}
+# A changed file is reviewed when it is a C/C++ source and not excluded.
+wants() { is_src "$1" && ! is_excluded "$1"; }
 
 : > "$TMP/head-files.txt"
 : > "$TMP/base-files.txt"   # base-side paths, RELATIVE (worktree-joined later)
 : > "$TMP/renames.txt"
 while IFS=$'\t' read -r st p1 p2; do
     case "$st" in
-        A) if is_src "$p1"; then echo "$HEAD_ROOT/$p1" >> "$TMP/head-files.txt"; fi;;
-        M) if is_src "$p1"; then
+        A) if wants "$p1"; then echo "$HEAD_ROOT/$p1" >> "$TMP/head-files.txt"; fi;;
+        M) if wants "$p1"; then
                echo "$HEAD_ROOT/$p1" >> "$TMP/head-files.txt"
                echo "$p1" >> "$TMP/base-files.txt"
            fi;;
-        R*) if is_src "$p2"; then
+        R*) if wants "$p2"; then
                 echo "$HEAD_ROOT/$p2" >> "$TMP/head-files.txt"
                 if is_src "$p1"; then
                     echo "$p1" >> "$TMP/base-files.txt"
                     printf '%s\t%s\n' "$p1" "$p2" >> "$TMP/renames.txt"
                 fi
             fi;;
-        C*) if is_src "$p2"; then echo "$HEAD_ROOT/$p2" >> "$TMP/head-files.txt"; fi;;
+        C*) if wants "$p2"; then echo "$HEAD_ROOT/$p2" >> "$TMP/head-files.txt"; fi;;
         D) : ;;  # listed in the honesty section by the assembler
     esac
 done < "$TMP/name-status.txt"
@@ -172,6 +199,10 @@ fi
 # ---- assemble the review; its exit code is the verdict --------------------
 STRICT_ARG=()
 if [ "$STRICT" -eq 1 ]; then STRICT_ARG=(--strict); fi
+EXCLUDE_ARGS=()
+for pat in ${EXCLUDES[@]+"${EXCLUDES[@]}"}; do
+    EXCLUDE_ARGS+=(--exclude "$pat")
+done
 
 python3 "$REPORT_PY" assemble \
     ${BASE_JSON:+--base-json "$BASE_JSON"} \
@@ -185,5 +216,6 @@ python3 "$REPORT_PY" assemble \
     --head-stderr "$TMP/head-stderr.log" \
     --gate "$GATE" \
     ${STRICT_ARG[@]+"${STRICT_ARG[@]}"} \
+    ${EXCLUDE_ARGS[@]+"${EXCLUDE_ARGS[@]}"} \
     --base-label "$BASE_SHORT" --head-label "working tree" \
     ${OUT:+--out "$OUT"}
