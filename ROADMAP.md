@@ -488,6 +488,34 @@ on `tensor()` (zd: ensures) or a baseline — not fatal-asserts. That
 our own assumption engine names precisely this gap is a coherence
 data point for the AI-era thesis.
 
+## 6.11 Bitwise/modulo interval modeling — #69a (2026-07-16)
+
+The picojpeg null-deref FP (task #69) needs two independent pieces: (a)
+proving a bitwise-masked argument is in range, and (b) a
+value-conditioned null-return summary. Split accordingly. #69a lands
+piece (a) as a self-contained, sound, low-risk win in IntervalEval:
+
+  - `x & c` (constant c >= 0) -> [0, c] for ANY x (masked sign bit ->
+    non-negative, result <= c); both-non-negative operands -> [0,
+    min(hi)];
+  - `x % c` (constant c != 0) -> [-(|c|-1), |c|-1], tightened to
+    [0, |c|-1] when x is known non-negative.
+
+Independent value on the VALIDATED spatial rules (not the null FP): the
+bounds rule now sees through the mask/modulo indexing idioms both to
+prove safety AND to catch an OOB the idiom's range makes definite
+(e.g. `a[(src()&7) + 4]` -> index [4,11], definite OOB). Four bounds
+unit tests pin it. IntervalEval also feeds DivByZeroRule (CWE369
+floor), but every new interval is zero-CONTAINING, so it can never
+prove a divisor non-zero and never kill a true finding; Juliet
+triggered in this PR to gate it regardless. Referees: ctest 512/512,
+12 shuffle seeds, corpus on-pin.
+
+#69b (value-conditioned null-return summary + coupling interval
+reasoning into NullDerefRule to actually clear the picojpeg FP) is the
+cross-cutting, CWE476-floor-touching, locally-unmeasurable half — kept
+separate and deferred to an explicit decision.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
