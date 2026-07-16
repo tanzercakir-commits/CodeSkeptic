@@ -1,5 +1,31 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — Leak rule: modern-C++ ownership-escape FP fix (#75)
+
+### Fixed
+- **Owning-smart-pointer adoption** no longer reports a leak. A raw
+  pointer adopted by constructing `std::unique_ptr` / `shared_ptr` /
+  `auto_ptr` (built-in) — or a project wrapper registered via the new
+  `--owning-pointers` allow-list (Jolt `Ref<T>`, `RefPtr<T>`,
+  `scoped_refptr<T>`) — is modeled as an escape, whether returned or
+  adopted into a local. Deliberately a name allow-list: non-adopting
+  views and copying wrappers still leak.
+- **Scope-guard / closure capture** no longer reports a leak. A tracked
+  pointer captured by a lambda (`[&]{ Free(p); }`, `[p]{...}`) escapes —
+  the closure body is opaque and may free/store/transfer it
+  (JPH_SCOPE_EXIT, absl::Cleanup, Eigen `[ctx]{delete ctx;}`).
+
+### Added
+- **`--owning-pointers <names>`** CLI flag / `owning_pointers` config
+  key: names treated as owning smart-pointer wrappers by the leak rule.
+- 10 leak-rule unit tests: adoption cleared; genuine leak beside an
+  adoption, an unconfigured wrapper, and a non-capturing lambda all
+  still reported (the suppression is conservative and per-variable).
+
+Cross-verified on TensorFlow Lite (unique_ptr returns) and JoltPhysics
+(Ref<T> returns, scope-guard lambdas). Pure suppression, no CWE401
+Juliet floor risk (Juliet is C).
+
 ## 2026-07-14 — IntervalEval + IntervalAnalysis: the numeric dataflow
 
 ### Added

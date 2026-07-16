@@ -24,6 +24,20 @@ const std::set<std::string>& allocFunctionNames();
 void setFreeFunctionNames(std::set<std::string> names);
 const std::set<std::string>& freeFunctionNames();
 
+// Custom owning-smart-pointer registry (--owning-pointers).
+//
+// std::unique_ptr / shared_ptr / auto_ptr are recognized built-in, but
+// every engine and game framework ships its own single-owner or
+// ref-counted wrapper: Jolt's Ref<T>/RefConst<T>, WebKit's RefPtr<T>,
+// Chromium's scoped_refptr<T>. Constructing one of these from a raw
+// pointer TRANSFERS ownership into the wrapper (which frees it), so the
+// raw pointer is no longer leaked. Without the wrapper name the leak
+// rule sees a raw `new` whose owner it cannot follow and reports a
+// false positive on idiomatic modern C++. Same lifecycle as the alloc
+// registry: set at startup from Config, cleared in ~StaticAnalyzer.
+void setOwningPointerNames(std::set<std::string> names);
+const std::set<std::string>& owningPointerNames();
+
 } // namespace zerodefect
 
 #endif // ZERODEFECT_ENGINE_ALLOCFUNCTIONS_H

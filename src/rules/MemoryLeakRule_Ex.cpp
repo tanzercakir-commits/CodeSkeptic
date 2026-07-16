@@ -129,6 +129,94 @@ const VarDecl* addrOfMemberBase(const Expr* expr) {
     return nullptr;
 }
 
+// Is this class-type an OWNING smart pointer — one that adopts (takes
+// ownership of, and later frees) a raw pointer handed to its
+// constructor? std::unique_ptr / shared_ptr / auto_ptr are recognized
+// built-in; project wrappers (Jolt's Ref<T>, WebKit's RefPtr<T>,
+// Chromium's scoped_refptr<T>) are added via --owning-pointers. NOT
+// owning, deliberately excluded: non-adopting views (std::span,
+// string_view) and copying wrappers (std::string(char*) copies the
+// bytes — the raw pointer still leaks), which is exactly why a blanket
+// "constructed-from-a-pointer" rule would be wrong and this stays a
+// name allow-list.
+bool isOwningSmartPointerType(QualType qt) {
+    const auto* rec = qt->getAsCXXRecordDecl();
+    if (!rec) return false;
+    const llvm::StringRef name = rec->getName();
+    if (name.empty()) return false;
+    if (rec->isInStdNamespace() &&
+        (name == "unique_ptr" || name == "shared_ptr" ||
+         name == "auto_ptr"))
+        return true;
+    return zerodefect::owningPointerNames().count(name.str()) != 0;
+}
+
+// If `expr` (a return value or a variable initializer) is the
+// construction of an owning smart pointer that adopts a tracked raw
+// pointer, return that raw pointer. Peels the temporary-materialization
+// wrappers that sit between a `return`/init and the CXXConstructExpr:
+//   return std::unique_ptr<S>(p);   // A  (explicit ctor)
+//   Ref<S> f() { ... return p; }    // B  (implicit ctor, configured)
+//   std::unique_ptr<S> up(p);       // D  (adoption into a local)
+// The move/copy constructors take a smart-pointer argument, never a
+// tracked RAW pointer, so they never match — only genuine adoption of
+// a `new`-ed pointer does.
+const VarDecl* adoptedRawPointer(const Expr* expr,
+                                 const std::set<const VarDecl*>& tracked) {
+    if (!expr) return nullptr;
+    const Expr* e = expr;
+    while (e) {
+        e = e->IgnoreParenImpCasts();
+        if (const auto* ewc = dyn_cast<ExprWithCleanups>(e)) {
+            e = ewc->getSubExpr();
+        } else if (const auto* mte = dyn_cast<MaterializeTemporaryExpr>(e)) {
+            e = mte->getSubExpr();
+        } else if (const auto* bte = dyn_cast<CXXBindTemporaryExpr>(e)) {
+            e = bte->getSubExpr();
+        } else if (const auto* fce = dyn_cast<CXXFunctionalCastExpr>(e)) {
+            e = fce->getSubExpr();
+        } else {
+            break;
+        }
+    }
+    const auto* ctor = dyn_cast_or_null<CXXConstructExpr>(e);
+    if (!ctor || !isOwningSmartPointerType(ctor->getType()))
+        return nullptr;
+    for (unsigned i = 0; i < ctor->getNumArgs(); ++i) {
+        const VarDecl* var = asVar(ctor->getArg(i));
+        if (var && tracked.count(var) &&
+            var->getType()->isPointerType())
+            return var;
+    }
+    return nullptr;
+}
+
+// Any tracked pointer CAPTURED by a lambda (`[&]{ Free(p); }`,
+// `[p]{...}`) leaves our view: the closure body is a separate function
+// we do not analyze, and it may free, store or transfer the pointer.
+// This is the scope-guard idiom (JPH_SCOPE_EXIT, absl::Cleanup,
+// `[ctx]{ delete ctx; }`) and, more generally, the same
+// escaped-on-opaque-call posture applied to closures. Conservative
+// escape: it only silences a leak (never fabricates a free/UAF).
+void collectLambdaCaptures(const Expr* expr,
+                           const std::set<const VarDecl*>& tracked,
+                           std::vector<const VarDecl*>& out) {
+    if (!expr) return;
+    const Expr* e = expr->IgnoreParenImpCasts();
+    if (const auto* mte = dyn_cast<MaterializeTemporaryExpr>(e))
+        e = mte->getSubExpr()->IgnoreParenImpCasts();
+    if (const auto* bte = dyn_cast<CXXBindTemporaryExpr>(e))
+        e = bte->getSubExpr()->IgnoreParenImpCasts();
+    const auto* lambda = dyn_cast<LambdaExpr>(e);
+    if (!lambda) return;
+    for (const LambdaCapture& cap : lambda->captures()) {
+        if (!cap.capturesVariable()) continue;
+        const auto* var = dyn_cast<VarDecl>(cap.getCapturedVar());
+        if (var && tracked.count(var))
+            out.push_back(var);
+    }
+}
+
 // Dereference detection (for use-after-free). Since the CFG is
 // fine-grained, looking only at the top node is enough.
 const VarDecl* derefTarget(const Stmt* stmt) {
@@ -191,6 +279,39 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                                 const std::set<const VarDecl*>& tracked,
                                 ASTContext& ctx) {
     StmtEffects effects;
+
+    // Ownership adoption into an owning smart pointer / capture into a
+    // lambda: both hand a tracked raw pointer to something that will
+    // manage or free it. Detected here — ahead of the raw dyn_casts —
+    // so it fires uniformly for the return-value, DeclStmt-initializer
+    // and bare-construct CFG-element shapes. Appends and falls through:
+    // the effect below is Escapes, which never collides with the
+    // Allocates/Frees the concrete handlers emit for the same node.
+    {
+        const Expr* adoptExpr = nullptr;
+        if (const auto* ret = dyn_cast<ReturnStmt>(stmt))
+            adoptExpr = ret->getRetValue();
+        else if (const auto* e = dyn_cast<Expr>(stmt))
+            adoptExpr = e;
+
+        std::vector<const VarDecl*> escaped;
+        if (const VarDecl* a = adoptedRawPointer(adoptExpr, tracked))
+            escaped.push_back(a);
+        collectLambdaCaptures(adoptExpr, tracked, escaped);
+
+        if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+            for (const auto* decl : declStmt->decls()) {
+                const auto* vd = dyn_cast<VarDecl>(decl);
+                if (!vd || !vd->hasInit()) continue;
+                if (const VarDecl* a =
+                        adoptedRawPointer(vd->getInit(), tracked))
+                    escaped.push_back(a);
+                collectLambdaCaptures(vd->getInit(), tracked, escaped);
+            }
+        }
+        for (const VarDecl* var : escaped)
+            effects.emplace_back(var, StmtEffect::Escapes);
+    }
 
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {

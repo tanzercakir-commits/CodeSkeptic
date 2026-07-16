@@ -13,6 +13,10 @@ std::set<std::string>& freeStorage() {
     static std::set<std::string> names;
     return names;
 }
+std::set<std::string>& owningPtrStorage() {
+    static std::set<std::string> names;
+    return names;
+}
 } // namespace
 
 void setAllocFunctionNames(std::set<std::string> names) {
@@ -29,6 +33,14 @@ void setFreeFunctionNames(std::set<std::string> names) {
 
 const std::set<std::string>& freeFunctionNames() {
     return freeStorage();
+}
+
+void setOwningPointerNames(std::set<std::string> names) {
+    owningPtrStorage() = std::move(names);
+}
+
+const std::set<std::string>& owningPointerNames() {
+    return owningPtrStorage();
 }
 
 } // namespace zerodefect

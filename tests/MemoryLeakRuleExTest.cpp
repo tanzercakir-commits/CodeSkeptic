@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
+#include <string>
+
 using namespace zerodefect;
 using namespace zerodefect::testing;
 
@@ -1185,4 +1188,190 @@ TEST(SystemdIdiomTest, AddressIntoLocalViaInit_Escapes_NoLeak) {
         }
     )");
     ASSERT_EQ(results.size(), 0);
+}
+
+// --- #75: owning-smart-pointer adoption + scope-guard lambda escape ---
+//
+// Modern C++ hands a raw `new`-ed pointer to an owner it cannot follow
+// with the old raw-pointer view. Three real-world FP shapes, cross-
+// verified on TensorFlow Lite (std::unique_ptr returns) and JoltPhysics
+// (Ref<T> returns, scope-guard lambdas):
+//   A. return std::unique_ptr<S>(p);   — std adoption, built-in
+//   B. Ref<S> f() { return p; }        — project wrapper, --owning-pointers
+//   C. auto g = [&]{ Free(p); };       — closure escape
+// The suppression is conservative (Escaped, never a fabricated free):
+// a genuine leak beside the adoption, and an unconfigured wrapper, must
+// still report.
+
+namespace {
+// runToolOnCode has no system headers; the tests declare just enough
+// std smart-pointer surface for the type to live in namespace std with
+// the recognized name and an adopting constructor.
+const std::string kStdSmartPtrs = R"(
+namespace std {
+  template <class T> class unique_ptr {
+   public:
+    T* p_;
+    explicit unique_ptr(T* p) : p_(p) {}
+    ~unique_ptr() { delete p_; }
+  };
+  template <class T> class shared_ptr {
+   public:
+    T* p_;
+    explicit shared_ptr(T* p) : p_(p) {}
+  };
+}
+struct S { int x; };
+)";
+
+// Process-global registry, cleared on scope exit (single-process test
+// run is what catches leaked state).
+class OwningPtrScope {
+public:
+    explicit OwningPtrScope(std::set<std::string> names) {
+        setOwningPointerNames(std::move(names));
+    }
+    ~OwningPtrScope() { setOwningPointerNames({}); }
+};
+} // namespace
+
+TEST(OwningPointerTest, ReturnUniquePtrAdoption_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrs + R"(
+        std::unique_ptr<S> make() {
+            S* p = new S;
+            return std::unique_ptr<S>(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, ReturnSharedPtrAdoption_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrs + R"(
+        std::shared_ptr<S> make() {
+            S* p = new S;
+            return std::shared_ptr<S>(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, LocalUniquePtrAdoption_Clean) {
+    // Adoption into a LOCAL, not just a return value.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrs + R"(
+        void use(std::unique_ptr<S>);
+        void f() {
+            S* p = new S;
+            std::unique_ptr<S> up(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, GenuineLeakBesideAdoption_Reported) {
+    // One pointer is adopted; the other genuinely leaks. Only the leak
+    // reports — the suppression is per-variable, not per-function.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrs + R"(
+        std::unique_ptr<S> f() {
+            S* adopted = new S;
+            S* leaked = new S;
+            (void)leaked;
+            return std::unique_ptr<S>(adopted);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_NE(results[0].message.find("leak"), std::string::npos);
+}
+
+TEST(OwningPointerTest, ConfiguredWrapper_ReturnAdoption_Clean) {
+    OwningPtrScope scope({"Ref"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        template <class T> struct Ref { T* ptr; Ref(T* p): ptr(p) {} };
+        Ref<S> make() {
+            S* p = new S;
+            return Ref<S>(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, ConfiguredWrapper_ImplicitAdoption_Clean) {
+    // `return p;` where the return type's ctor is non-explicit: the
+    // implicit CXXConstructExpr adoption must be seen through too.
+    OwningPtrScope scope({"Ref"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        template <class T> struct Ref { T* ptr; Ref(T* p): ptr(p) {} };
+        Ref<S> make() {
+            S* p = new S;
+            return p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, UnconfiguredWrapper_LeakStays) {
+    // A same-shaped wrapper NOT on the allow-list may be a non-owning
+    // view (it copies/observes, does not free): the leak must stay.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        template <class T> struct View { T* ptr; View(T* p): ptr(p) {} };
+        View<S> make() {
+            S* p = new S;
+            return View<S>(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(OwningPointerTest, ScopeGuardLambdaByRef_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        void Free(void*);
+        void f() {
+            S* p = new S;
+            auto guard = [&]{ Free(p); };
+            guard();
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, ScopeGuardLambdaByValue_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        void Free(void*);
+        void f() {
+            S* p = new S;
+            auto guard = [p]{ Free(p); };
+            guard();
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(OwningPointerTest, LambdaNotCapturingPtr_LeakStays) {
+    // A lambda that does NOT capture the tracked pointer must not
+    // silence its leak — the escape is capture-driven, not the mere
+    // presence of a closure.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        void f() {
+            S* p = new S;
+            (void)p;
+            auto g = []{ int x = 0; return x; };
+            g();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
 }

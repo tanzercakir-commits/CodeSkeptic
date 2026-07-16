@@ -564,6 +564,42 @@ No real bug (Jolt is determinism-tested, heavily used); the value is the
 precision proof and the sharpened #75 case. Its clean build also makes
 it a strong candidate for the deep corpus tier.
 
+## 6.13 Leak-rule ownership-escape FP fix (#75, 2026-07-16)
+
+Fixed the modern-C++ leak-FP class characterized on TFLite + Jolt. The
+leak rule tracked raw pointers but could not follow ownership when it
+left the raw-pointer view; three shapes reported false positives on
+idiomatic C++. All are now modeled as an ESCAPE (conservative — silences
+the leak, never fabricates a free/UAF):
+
+- **Owning-smart-pointer adoption.** `return std::unique_ptr<S>(p);`,
+  `std::shared_ptr<S>(p)`, and adoption into a local (`unique_ptr<S>
+  up(p);`) transfer ownership to the wrapper. `std::unique_ptr` /
+  `shared_ptr` / `auto_ptr` are recognized built-in; project wrappers
+  (Jolt `Ref<T>`, WebKit `RefPtr<T>`, Chromium `scoped_refptr<T>`) via a
+  new `--owning-pointers` name allow-list. Deliberately an allow-list,
+  not a blanket "constructed-from-a-pointer" rule: non-adopting views
+  (`span`, `string_view`) and copying wrappers (`std::string(char*)`
+  copies the bytes — the raw pointer still leaks) must NOT be silenced.
+- **Scope-guard / closure capture.** A tracked pointer captured by a
+  lambda (`[&]{ Free(p); }`, `[p]{...}`) escapes: the closure body is a
+  separate function we do not analyze and may free/store/transfer it
+  (JPH_SCOPE_EXIT, absl::Cleanup, Eigen `[ctx]{delete ctx;}`). Same
+  escaped-on-opaque-call posture, applied to closures.
+
+Implementation: `adoptedRawPointer` (peels ExprWithCleanups /
+MaterializeTemporary / CXXBindTemporary / CXXFunctionalCast down to the
+owning CXXConstructExpr) and `collectLambdaCaptures`, wired into
+`classifyStmtEffects` ahead of the raw dyn_casts so they fire uniformly
+for return-value, DeclStmt-init and bare-construct CFG elements. Pure
+suppression, so no CWE401 Juliet floor risk (Juliet is C — no smart
+pointers, no lambdas); the change still CI-gates Juliet via `src/**`.
+Guards: 10 new unit tests (adoption cleared, genuine-leak-beside-adoption
+still reported, unconfigured wrapper still reported, lambda-not-capturing
+still reported). The ownership-to-MEMBER-freed-in-dtor shape (Reset/dtor)
+is deferred — it needs member-lifetime modeling and is a smaller FP
+source than these two.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
