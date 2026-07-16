@@ -516,6 +516,54 @@ reasoning into NullDerefRule to actually clear the picojpeg FP) is the
 cross-cutting, CWE476-floor-touching, locally-unmeasurable half — kept
 separate and deferred to an explicit decision.
 
+## 6.12 JoltPhysics hunt (2026-07-16)
+
+The cleanest big target yet: JoltPhysics (jrouwe/JoltPhysics) is a
+self-contained CMake C++17 physics engine — NO submodules, NO exotic
+deps (unlike shadPS4's 42 submodules and TF's Bazel). 143 TUs of
+SIMD/template-heavy real code, compile DB generated in one configure
+step. Two setup traps, both solved and worth recording for future
+CMake targets: (1) the DB defaulted to GCC and carried
+`-Wno-stringop-overflow`, which clang rejects under `-Werror`
+(`-DCMAKE_CXX_COMPILER=clang++`); (2) Jolt uses PCH, and a
+configure-only tree has no `.pch` (`-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON`).
+Custom allocators registered via `--alloc-functions Allocate,
+AlignedAllocate,Reallocate --free-functions Free,AlignedFree`.
+
+Results: 143 TUs, ZERO parse failures, 34 findings.
+- **Spatial/numeric rules (bounds, int-overflow, uninit): 0 findings,
+  0 FP** on 143 TUs of real SIMD/array physics code. Fifth independent
+  precision confirmation of the v0.2 numeric class.
+- **Leak rule: 31 findings, ALL false positives**, in exactly three
+  modern-C++ ownership-escape mechanisms — hand-verified:
+    * `return raw;` into a `Ref<T>` / `unique_ptr<T>` return type — the
+      pointer is adopted by the smart handle at the return (17: every
+      `*Constraint::GetConstraintSettings`, DebugRenderer batches);
+    * a scope-guard macro frees it — `JPH_SCOPE_EXIT([&]{ Free(p); })`
+      (~6: StaticCompoundShape stack, HeightFieldShape
+      normals/material_remap_table, …), a captured-lambda free the rule
+      does not trace;
+    * ownership handed to a member field, freed later in `Reset()`/dtor
+      (IslandBuilder temp arrays) — an interprocedural free.
+- **null-deref: 3 findings = the assumption class** (BodyManager
+  `TryGetBody(id)` dereferenced without a check where the id is a
+  known-valid loop element; CharacterVirtual `deepest_contact`). Honest
+  "may" warnings, same shape as the TFLite accessor-nullability cluster.
+
+**Cross-codebase confirmation for task #75.** The dominant leak-FP class
+here (smart-pointer-return adoption + scope-guard-lambda free) is the
+SAME two mechanisms characterized on TFLite (unique_ptr adoption +
+Eigen's `[ctx]{delete ctx;}`). Two independent mature C++ engines,
+identical FP mechanisms — #75 is not a niche lever, it is THE modern-C++
+leak-precision fix, and this hunt promotes it from "cheap" to
+"highest-value leak-rule work." A third class surfaced worth adding:
+RAII scope-guard macros (JPH_SCOPE_EXIT / absl::Cleanup / defer-style)
+modeled as frees of their captured pointer.
+
+No real bug (Jolt is determinism-tested, heavily used); the value is the
+precision proof and the sharpened #75 case. Its clean build also makes
+it a strong candidate for the deep corpus tier.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
