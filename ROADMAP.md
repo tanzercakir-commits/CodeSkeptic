@@ -421,6 +421,45 @@ those TUs are reported as errors by the tool and simply not analyzed,
 never silently counted as clean. 12 functions hit the iteration cap
 (abseil str_format internals) and are listed by the coverage report.
 
+## 6.9 uninit-ptr precision: the constant-loop FP class (2026-07-16)
+
+The TFLite hunt's 24 ERROR-severity uninit FPs (task #74) fixed with a
+two-part change confined to UninitPointerRule_Ex (zero engine changes):
+
+1. **Structural must-assign proof (suppression-only).** A pointer
+   assigned unconditionally inside a constant-trip-count loop IS
+   assigned when a later sibling runs, but the dataflow loses that
+   proof at scale: the zero-trip path's infeasibility lives in a
+   literal-stamped disjunct that the kMaxDisjuncts collapse erases in a
+   large function. Rather than grow the disjunct budget (re-measured
+   2026-07-16: k=8 only moves the cliff and multiplies scan time; a
+   similarity-clustering collapse also failed to save the exact
+   disjunct), the proof is re-established at report time the way Java's
+   definite-assignment (JLS 16) reasons — structurally and
+   conservatively: function free of goto/label/switch; a
+   `for (i = A; i </<= B; …)` with integer literals A < B; body has a
+   top-level `p = …` and NO break/continue/return/goto; the deref is a
+   later sibling of that loop. Every clause is necessary; anything
+   unproven keeps its report. (Investigated first as an engine widening
+   fix — the raw pop-count trigger, then selective disjunct collapse —
+   both reverted: the structural check is tighter and carries zero
+   regression risk to other rules.)
+
+2. **Evidence-ladder severity.** The rule previously reported EVERY
+   finding as Error, including maybe-uninitialized (assigned on some
+   path). That made every imprecision a false PROOF — the worst defect
+   our own spec names. Now: unassigned on ALL paths = Error;
+   unassigned on SOME path = Warning. This is the general defense —
+   any future uninit imprecision degrades to a warning, never a false
+   error — and aligns the rule with null-deref/div-by-zero.
+
+Verification: resize_bilinear.cc 21 → 0; genuine all-paths uninit still
+Error; four new unit tests pin the suppression boundary (break /
+variable-bound / conditional-assign all STILL warn) + the severity
+split. Referees: ctest 508/508, single-process 507/507, 12 shuffle
+seeds 0 failures, corpus on-pin (cjson 53, tinyxml2 9). No Juliet floor
+covers uninit-ptr, so the measured CWEs are unaffected by construction.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

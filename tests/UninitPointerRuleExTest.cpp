@@ -21,6 +21,10 @@ TEST(UninitPointerRuleExTest, BothBranchesInit_Clean) {
 }
 
 TEST(UninitPointerRuleExTest, OneBranchOnly_Dangerous) {
+    // Assigned on ONE path only -> uninit on SOME path, not all: the
+    // evidence ladder makes this a Warning ("may be uninitialized"),
+    // the same proven/maybe split every other rule uses. Still reported
+    // — just not falsely claimed as a proof.
     UninitPointerRule_Ex rule;
     auto results = runRule(rule, R"(
         void f(int cond) {
@@ -32,7 +36,80 @@ TEST(UninitPointerRuleExTest, OneBranchOnly_Dangerous) {
     )");
     ASSERT_EQ(results.size(), 1);
     EXPECT_EQ(results[0].rule_id, "uninit-ptr");
-    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+// --- Structural must-assign (TFLite resize_bilinear FP class) ---
+// A pointer assigned unconditionally inside a constant-trip-count loop
+// is assigned when a later sibling runs; the dataflow loses that proof
+// at scale (disjunct collapse), so a structural check re-establishes it
+// at report time. Suppression must be tight: only a guaranteed first
+// trip with no bypass counts.
+
+TEST(UninitPointerRuleExTest, ConstLoopAssign_ThenUse_Clean) {
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern unsigned char make(int);
+        void f(unsigned char* out, int n) {
+            unsigned char* p;
+            for (int c = 0; c < 8; ++c) {
+                out[c] = make(c);
+                p = out + 16;
+            }
+            for (int j = 0; j < n; ++j) p[j] = make(j);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(UninitPointerRuleExTest, ConstLoopAssign_BreakInBody_StillWarns) {
+    // A break can bypass the assignment -> not proven.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern unsigned char make(int);
+        void f(unsigned char* out, int n) {
+            unsigned char* p;
+            for (int c = 0; c < 8; ++c) {
+                if (make(c)) break;
+                p = out + 16;
+            }
+            for (int j = 0; j < n; ++j) p[j] = make(j);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(UninitPointerRuleExTest, VariableBoundLoopAssign_StillWarns) {
+    // `c < depth` is not a proven first trip (depth may be <= 0).
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern unsigned char make(int);
+        void f(unsigned char* out, int depth, int n) {
+            unsigned char* p;
+            for (int c = 0; c < depth; ++c) {
+                out[c] = make(c);
+                p = out + 16;
+            }
+            for (int j = 0; j < n; ++j) p[j] = make(j);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(UninitPointerRuleExTest, ConstLoopConditionalAssign_StillWarns) {
+    // Assignment guarded by an if inside the loop -> not unconditional.
+    UninitPointerRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern unsigned char make(int);
+        void f(unsigned char* out, int n) {
+            unsigned char* p;
+            for (int c = 0; c < 8; ++c) {
+                if (make(c)) p = out + 16;
+            }
+            for (int j = 0; j < n; ++j) p[j] = make(j);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
 }
 
 TEST(UninitPointerRuleExTest, LoopWithInitBeforeUse_Clean) {
