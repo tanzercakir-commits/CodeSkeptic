@@ -199,6 +199,64 @@ TEST(BoundsRuleTest, HeapVariableSizeSilent) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- Copy-size overflow: memcpy / memmove / memset ---
+
+namespace {
+const char* kCopy =
+    "void* memcpy(void*, const void*, unsigned long);\n"
+    "void* memset(void*, int, unsigned long);\n"
+    "void* malloc(unsigned long);\n";
+std::string copy(const std::string& body) { return std::string(kCopy) + body; }
+} // namespace
+
+TEST(BoundsRuleTest, MemcpyPastFixedArray) {
+    // 50 bytes into a 16-byte buffer.
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char buf[16]; memcpy(buf, s, 50); }"));
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "bounds");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, MemcpyExactFitClean) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char buf[16]; memcpy(buf, s, 16); }"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, MemsetPastIntArray) {
+    // int[10] is 40 bytes; memset of 100 overflows.
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(void){ int a[10]; memset(a, 0, 100); }"));
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpyHeapPastEnd) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char* p = (char*)malloc(16); "
+        "memcpy(p, s, 40); }"));
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, MemcpyVariableSizeSilent) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s, unsigned long n){ char buf[16]; "
+        "memcpy(buf, s, n); }"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, MemcpyInRangeClean) {
+    BoundsRule rule;
+    auto results = runRule(rule, copy(
+        "void f(const void* s){ char buf[64]; memcpy(buf, s, 16); }"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
 // --- Interprocedural (C3): parameter entry intervals ---
 
 TEST(BoundsRuleTest, StaticHelperOutOfRangeIndexFromCaller) {
