@@ -286,6 +286,42 @@ parser/codec":
   Vulkan/Qt/SDL — is infeasible in the sandbox, so the hunt used zero-dep
   codecs instead.)
 
+## 6.6 (c1) Diff-native semantic PR review — v0 shipped (2026-07-16)
+
+The market-facing composition layer over the validated engine:
+`scripts/review_diff.sh <bin> <base-ref>` analyzes the changed files at
+base (temporary git worktree + head compile commands remapped by
+`review_report.py remap-db`) and at head, and emits a markdown review of
+the DELTA: new findings (traces included, changed lines marked), fixed
+findings, contract WEAKENED/STRENGTHENED/ADDED/REMOVED via
+--summary-diff, and a coverage-honesty section. Gate = evidence ladder:
+new definite findings + weakened contracts fail; new "may" warnings
+report-only (--strict to gate; --gate warn to never fail the exit).
+
+Design decisions (peer-grounded): delta computed OUTSIDE the C++ core —
+zero risk to analyzer semantics and the Juliet floors (which cannot be
+measured in this sandbox); the finding key is a faithful Python port of
+Baseline v2 (same FNV-1a, same trimming, multiset consume) with the one
+deliberate difference that the file component is repo-RELATIVE (absolute
+canonical paths can never match across two checkouts) plus a rename map
+(git --find-renames), so refactor PRs stay quiet. Whole changed files
+are analyzed (not just hunks — analyze_diff.sh keeps that fast path), so
+a change whose consequence lands elsewhere in the same file is caught.
+
+Verification: hermetic end-to-end fixture (ctest `ReviewDiffFlow`,
+scripts/test_review_diff.sh) pins the semantics — introduce/fix/weaken
+verdict with exact REVIEW_RESULT counts, shift-immunity, pure-rename
+silence, self-review cleanliness, and the full gate ladder
+(default/--strict/--gate warn). MUTATION-tested: disabling the rename
+map or the content-hash key each turns the suite red.
+
+Known v0 limits (stated in README): header-only changes analyze no TU
+(listed in the coverage section instead of silently ignored); deleted
+files' base-only findings are not counted as fixed; cross-FILE
+consequences of a change need --summary-in/whole-program (v0.5
+candidate: auto-harvest summaries for the review pair). MCP `review`
+tool and GitHub Action packaging are follow-ups.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

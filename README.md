@@ -385,6 +385,50 @@ before letting it break CI. The default stays `error` — and an
 unreadable summary file is exit `2` regardless: a gate that cannot
 read its input never looks green.
 
+### PR review (diff-native)
+
+`review_diff.sh` turns the analyzer into a PR reviewer: it analyzes the
+changed files at BOTH the base revision (in a temporary git worktree,
+reusing the head compile commands) and the working tree, and reports the
+**delta** — what this change did, not what the codebase already had:
+
+```bash
+# in CI, after checking out the PR head:
+scripts/review_diff.sh build/src/zerodefect origin/main --out review.md
+```
+
+The markdown review contains:
+
+* **New findings** — introduced by the change, with dataflow traces;
+  findings and trace steps that sit on changed lines are marked. A
+  finding that merely *shifted* (code added above it) does not
+  resurface: matching uses the baseline's line-content keys, and pure
+  renames are mapped old→new, so refactor PRs stay quiet.
+* **Fixed findings** — present at base, gone at head.
+* **Contract changes** — the summary diff of both sides' inferred
+  contracts; `WEAKENED` entries gate.
+* **Coverage** — what was *not* analyzed and why (headers, deleted
+  files, iteration-cap functions). "No warning" in an unanalyzed file
+  means *not checked*, and the review says so.
+
+The exit code is the verdict, on the same evidence ladder as the rules
+themselves: **new definite findings (error) and weakened contracts
+gate; new "may" findings (warning) are reported but do not** — pass
+`--strict` to gate them too, or `--gate warn` to always exit `0` while
+still printing the failing verdict (adoption ramp). The last line is
+machine-greppable for CI dashboards:
+
+```
+REVIEW_RESULT new_errors=1 new_warnings=0 fixed=1 weakened=1 gate=fail
+```
+
+Both analyzer runs receive identical settings (arguments after `--` are
+forwarded to both — `--alloc-functions`, `--fatal-asserts`, …); a delta
+between two differently-configured runs would not be a delta. Known v0
+limits, stated rather than hidden: a header-only change analyzes no TU
+(it is listed in the coverage section), and deleted files' base-only
+findings are not counted as fixed.
+
 ### MCP server (agent integration)
 
 `zerodefect --serve` runs an MCP (Model Context Protocol) server over
