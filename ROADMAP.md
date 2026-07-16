@@ -658,6 +658,61 @@ part_of_explicit_cast child) and is pinned as a negative test.
 Receipt: ImGui 18 → 14 warnings, zero new; all four killed are the
 IM_ASSERT-compound shape.
 
+## 6.15 Carbon-lang hunt (2026-07-16) — the Bazel mountain, climbed sideways
+
+User-assigned stretch target: carbon-language/carbon-lang (Google's C++
+successor toolchain; modern C++20, Bazel-ONLY build, LLVM pinned to
+top-of-tree). The hardest compile-DB story to date, solved WITHOUT
+running Bazel — three layers, all reusable for future Bazel targets:
+
+1. **Version-matched dependency headers.** System LLVM-18 headers
+   failed everywhere (llvm::support, ConstantLog2, ArrayRef API drift).
+   Fetched llvm-project at Carbon's exact pinned commit
+   (MODULE.bazel git_override), CMake **configure-only** with
+   clang+clang-tools-extra enabled, then built ONLY the tablegen
+   header targets (`intrinsics_gen`, `Attributes.inc`,
+   `clang-tablegen-targets` — 487 actions, no library build).
+2. **Bazel-generated files reproduced by hand.** `llvm_tools.def` from
+   a faithful Python port of its `llvm_tools.bzl` rule (30 entries;
+   consumer parses clean); clangd `Features.inc` synthesized.
+3. **Include-order fixes:** `-include variant` (Carbon relies on a
+   transitive include our flag set doesn't produce), clangd/lld
+   include roots.
+
+Parse coverage: 95 → 207 → **218/286 TUs (76%)**. The honest ceiling:
+**63 TUs (check/sem_ir/lower — the semantic core) use an in-class
+member-variable-template explicit specialization (`kind_switch.h`)
+that the clang-18 parser rejects** — needs clang ≥19. Concrete,
+measured motivation for an LLVM-19/20 upgrade task. 5 singletons
+(gmock, Bazel runfiles, …) not worth chasing.
+
+Scan: 218 TUs, 19m38s, `--fatal-asserts CheckFailImpl` (CARBON_CHECK's
+fail fn is [[noreturn]] only under NDEBUG — the shadPS4 lever, exactly
+as designed). **Zero analyzer errors/crashes** on the heaviest
+template code we've ever parsed. 16 findings, all warning severity:
+
+- **15 are in LLVM/clang HEADERS, not Carbon code** (Casting.h `isa`
+  family, MathExtras.h divide helpers — documented caller-contract
+  preconditions). Product insight: findings in DEPENDENCY headers
+  should be filterable (`--report-paths <root>`-style); today the only
+  tool is post-hoc JSON filtering. Task candidate.
+- **1 is in Carbon proper, hand-verified REAL:**
+  `toolchain/check/cpp/export.cpp` `ExportClassToCpp` —
+  `ExportNameScopeToCpp` returns nullptr on its
+  non-identifier-package-name TODO path (`Context::TODO` returns bool,
+  diagnose-and-continue), the SIBLING caller checks
+  (`if (!decl_context) continue;`), but ExportClassToCpp passes the
+  result unchecked into `CXXRecordDecl::Create`,
+  `isa<CXXRecordDecl>(decl_context)` (asserting) and
+  `decl_context->addHiddenDecl(...)`. The compiler emits the TODO
+  diagnostic, then crashes instead of continuing — the shadPS4 #4703
+  shape (contract honored in one caller, forgotten in the other).
+  Upstream report drafted, pending user approval.
+
+Coverage honesty: the leak domain produced 0 findings here without a
+canary (Carbon allocates via ASTContext arenas — little raw new); the
+domain was canary-proven live on ImGui the same day with this binary.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
