@@ -236,6 +236,33 @@ rule as the first consumer (#60/PR #70, merged 2026-07-15). Next: extent
 map + bounds rule (#61) — the OOB / heap-overflow class, targeting the
 shadPS4 #4712 heap-overflow shape and Juliet CWE121/122/124/126.
 
+## 6.5 Real-world spatial-rule validation (2026-07-16)
+
+After landing the bounds rule's three deepenings — heap extents (#76),
+copy-size overflow (#77), sizeof-aware sizes (#78), fixed-size array
+MEMBERS as buffers (#79) — the spatial rules were hunted on six FRESH,
+zero-dependency, buffer-heavy codecs (perfect compile DB, no build deps):
+qoi, qoa, pl_mpeg, stb_vorbis, stb_image, dr_flac (~1.0 MB of decoder
+code, the canonical CWE-125/787 domain — "AI writes a parser").
+
+- **Spatial/bounds rules: 0 findings, 0 false positives.** Correct: a
+  sound bounds rule fires only on a WHOLE-RANGE definite OOB, which
+  shipping decoders do not contain. A definite-OOB + struct-member-copy
+  CANARY appended to the stb_vorbis TU was caught (index [20,20] outside
+  [0,8); copy [116,116] > 16-byte member), proving the rule was EXERCISED
+  on this code, not silently skipped. Precision confirmed on the most
+  FP-hostile input class (heavy fixed arrays, memcpy, sizeof arithmetic).
+- **Null-deref rule: 1 finding = FALSE POSITIVE** (stb_image TGA decoder,
+  `tga_palette` at 6004). Root cause: a loop-invariant int guard
+  (`tga_indexed`, read once, never reassigned) gates BOTH the palette
+  malloc+null-check and the later deref, with the pixel loop between them.
+  The engine loses the null-vs-guard correlation across the loop's
+  widening. This is the path-sensitivity/loop frontier that Coverity and
+  the Clang Static Analyzer also struggle with; logged as a known
+  precision limitation, NOT a soundness bug. (shadPS4 was the original
+  target; its full compile DB — 42 submodules + Vulkan/Qt/SDL — is
+  infeasible in the sandbox, so the hunt pivoted to zero-dep codecs.)
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
