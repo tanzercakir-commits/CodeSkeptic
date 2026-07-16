@@ -1,6 +1,8 @@
 #ifndef ZERODEFECT_FUNCTION_SUMMARY_H
 #define ZERODEFECT_FUNCTION_SUMMARY_H
 
+#include "engine/Interval.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -52,6 +54,21 @@ public:
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
         std::vector<ParamEffect> params;
+
+        // Value-conditioned null return (#69b). When returnNullness is
+        // MaybeNull AND the harvest PROVED that every null-returning
+        // path is guarded by "parameter #nullCondParam outside
+        // nullCondRange", the pair is recorded here: a caller that
+        // proves its argument lies INSIDE the range may treat the call
+        // as NeverNull at that site (the picojpeg getHuffVal shape —
+        // null only in the switch default, argument provably within
+        // the cases). nullCondParam < 0 = no condition (plain
+        // MaybeNull, today's behavior). Merges drop the condition on
+        // any disagreement — ambiguity always loses.
+        int nullCondParam = -1;
+        Interval nullCondRange = Interval::top();
+
+        bool hasNullCondition() const { return nullCondParam >= 0; }
 
         ParamEffect paramEffect(unsigned index) const {
             if (index >= params.size()) return ParamEffect::Opaque;

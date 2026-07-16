@@ -5,6 +5,7 @@
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
+#include "engine/IntervalEval.h"
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
@@ -57,6 +58,27 @@ const VarDecl* asVar(const Expr* expr) {
     return nullptr;
 }
 
+// #69b: the sole-definition interval map of the function being
+// analyzed (set for the duration of each per-function run; the
+// analyzer is single-threaded). evaluateNullness sits several free
+// functions below the analysis object — a scoped pointer keeps the
+// plumbing flat, matching the process-global registry discipline used
+// elsewhere (FunctionFilter, AllocFunctions).
+const zerodefect::IntervalMap* g_soleDefIntervals = nullptr;
+const clang::ASTContext* g_soleDefContext = nullptr;
+
+struct SoleDefScope {
+    SoleDefScope(const zerodefect::IntervalMap* map,
+                 const clang::ASTContext* ctx) {
+        g_soleDefIntervals = map;
+        g_soleDefContext = ctx;
+    }
+    ~SoleDefScope() {
+        g_soleDefIntervals = nullptr;
+        g_soleDefContext = nullptr;
+    }
+};
+
 NullState evaluateNullness(const Expr* expr) {
     if (!expr) return NullState::Unknown;
     // Strip explicit casts too: (int*)0, (Node*)nullptr
@@ -86,8 +108,35 @@ NullState evaluateNullness(const Expr* expr) {
         if (summary) {
             if (summary->returnNullness == RN::NeverNull)
                 return NullState::NonNull;
-            if (summary->returnNullness == RN::MaybeNull)
+            if (summary->returnNullness == RN::MaybeNull) {
+                // #69b: a value-conditioned summary ("null only if
+                // param #i outside R") is refuted at THIS call site
+                // when the argument's interval provably lies inside R.
+                // Stateless evaluation (every variable = top) is
+                // enough for the masked-index idiom: `(x>>3)&2` is
+                // [0,2] whatever x is (the picojpeg getHuffVal FP).
+                if (summary->hasNullCondition() &&
+                    static_cast<unsigned>(summary->nullCondParam) <
+                        call->getNumArgs()) {
+                    static const zerodefect::IntervalMap kEmpty;
+                    const zerodefect::IntervalMap& defs =
+                        g_soleDefIntervals ? *g_soleDefIntervals : kEmpty;
+                    zerodefect::Interval arg = zerodefect::evalInterval(
+                        call->getArg(summary->nullCondParam), defs,
+                        g_soleDefContext);
+                    const zerodefect::Interval& safe =
+                        summary->nullCondRange;
+                    const bool loOk =
+                        safe.loIsInf() ||
+                        (!arg.loIsInf() && arg.lo() >= safe.lo());
+                    const bool hiOk =
+                        safe.hiIsInf() ||
+                        (!arg.hiIsInf() && arg.hi() <= safe.hi());
+                    if (!arg.isEmpty() && loOk && hiOk)
+                        return NullState::NonNull;
+                }
                 return NullState::MaybeNull;
+            }
         }
         return NullState::Unknown;
     }
@@ -721,6 +770,13 @@ public:
         if (trackedVars.empty() && guardedEnsures.enforced.empty() &&
             !hasNonNullContractCalls(func, *result.Context))
             return;
+
+        // #69b: sole-definition intervals for this function's locals —
+        // scoped for the whole run (transfer AND the reporting pass
+        // both evaluate call nullness).
+        zerodefect::IntervalMap soleDefs =
+            zerodefect::soleDefIntervals(func, *result.Context);
+        SoleDefScope soleDefScope(&soleDefs, result.Context);
 
         NullDerefAnalysis analysis(
             trackedVars, zerodefect::collectUnkeyableDecls(func),

@@ -1,5 +1,50 @@
 # ZeroDefect — Changelog
 
+## 2026-07-16 — #69b: value-conditioned null-return summaries
+
+### Added
+- **Summaries can now say "returns null ONLY IF param #i is outside
+  interval R"** (`nullCondParam`/`nullCondRange` on FunctionSummary).
+  Harvested structurally from the two guard shapes that dominate real
+  code: `switch(param)` where every case returns non-null and only the
+  default returns null (case constants must be CONTIGUOUS — the safe
+  zone must be one interval), and a single `if (param REL const)`
+  comparison guarding the sole null return. Discipline: the function
+  must have EXACTLY one structurally-null return, every other return
+  provably non-null, and the parameter never mutated — anything else
+  keeps the plain MaybeNull verdict (sound).
+- **Sole-definition intervals** (`soleDefIntervals`): an integer local
+  whose only write is its initializer (or exactly one plain `=` when
+  declared uninitialized — the `uint8 tableIndex; tableIndex = ...;`
+  C idiom) holds that value at every read, so callers can evaluate
+  masked index expressions flow-insensitively:
+  `int idx = ((x>>3)&2) + (x&1)` → [0,3].
+- **Value-based narrowing-cast fit** in `evalInterval` (ctx-aware
+  overload): a narrowing IntegralCast whose OPERAND interval already
+  fits the destination type's range passes through (it cannot wrap);
+  otherwise top() as before. Type-blind rejection was the last gap:
+  `uint8 idx = smallExpr` erased a provably-in-range value.
+- Summary disk format bumped to **v3** (5th column `paramIdx:lo:hi`,
+  `~` = infinity, `-` = no condition). Version-strict field counts:
+  a v1/v2 file with 5 fields is corrupt, not silently accepted.
+  `mergeConservative` drops the condition when two TUs disagree.
+
+### Receipts
+- **picojpeg (real source, 2325 lines): 1 → 0 findings.** The one
+  finding was our oldest known FP: `getHuffVal(pHuffVal, idx)` where
+  every call site computes `idx` from masked bits (provably in the
+  switch's safe zone) — now proven non-null via the condition.
+  All negative controls still warn: unprovable args, out-of-range
+  constants, non-contiguous cases, fallthrough defaults, mutated
+  params, reassigned locals.
+- **ImGui: 14 → 14, honestly no change.** The remaining GetFontBaked
+  cluster's null root is the opaque `ImFontAtlasBakedAdd` (no body in
+  the TU) — not a parameter-conditioned return; out of #69b's scope
+  by design, stays on the board.
+- 11 new ConditionedNullTest units (clean/dirty pairs per bail-out) +
+  cross-TU condition travel + v3 file roundtrip; 543/543 ctest,
+  12/12 shuffle seeds.
+
 ## 2026-07-16 — --report-paths: dependency-header noise filter
 
 ### Added
