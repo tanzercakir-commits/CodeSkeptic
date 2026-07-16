@@ -227,6 +227,36 @@ int StaticAnalyzer::run() {
         if (!ec) diag.file = canonical.string();
     }
 
+    // Report-path filter: findings OUTSIDE the given prefixes are
+    // dropped (dependency headers pulled into the TU — 15 of the
+    // Carbon scan's 16 findings were in LLVM headers, not the target).
+    // Runs on canonical paths, so the prefixes are canonicalized the
+    // same way; a prefix that fails to canonicalize (not on disk) is
+    // used as written.
+    if (!config_.reportPaths().empty()) {
+        std::vector<std::string> prefixes;
+        for (const auto& p : config_.reportPaths()) {
+            std::error_code ec;
+            auto canonical = std::filesystem::weakly_canonical(p, ec);
+            prefixes.push_back(ec ? p : canonical.string());
+        }
+        auto outside = [&](const Diagnostic& d) {
+            for (const auto& prefix : prefixes)
+                if (d.file.compare(0, prefix.size(), prefix) == 0)
+                    return false;
+            return true;
+        };
+        size_t before = diagnostics_.size();
+        diagnostics_.erase(
+            std::remove_if(diagnostics_.begin(), diagnostics_.end(), outside),
+            diagnostics_.end());
+        size_t dropped = before - diagnostics_.size();
+        if (dropped > 0) {
+            std::cerr << msg(MsgId::ReportPathsFiltered,
+                             std::to_string(dropped)) << "\n";
+        }
+    }
+
     SuppressionFilter suppression;
     size_t suppressed = suppression.filter(diagnostics_);
     if (suppressed > 0) {

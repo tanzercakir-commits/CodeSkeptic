@@ -45,6 +45,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
         else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
+        else if (key == "report_paths")    addReportPaths(value);
         else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "summary_diff_gate") summary_diff_gate_ = value;
         else if (key == "enable_rule")   enabled_rules_.insert(value);
@@ -89,6 +90,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addNamesTo(free_functions_, argv[++i]);
         } else if (arg == "--owning-pointers" && i + 1 < argc) {
             addNamesTo(owning_pointers_, argv[++i]);
+        } else if (arg == "--report-paths" && i + 1 < argc) {
+            addReportPaths(argv[++i]);
         } else if (arg == "--policy" && i + 1 < argc) {
             addNamesTo(policies_, argv[++i]);
         } else if (arg == "--gate" && i + 1 < argc) {
@@ -169,6 +172,11 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         one — Ref, RefPtr, scoped_refptr — is\n"
                       << "                         no longer leaked; std::unique_ptr/\n"
                       << "                         shared_ptr are built in)\n"
+                      << "  --report-paths <paths> Report only findings under these\n"
+                      << "                         path prefixes (comma list). Filters\n"
+                      << "                         out findings in dependency headers\n"
+                      << "                         pulled into your TUs; analysis is\n"
+                      << "                         unaffected\n"
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --whole-program        Two-pass mode: collect function summaries\n"
                       << "                         across all files first, then analyze\n"
@@ -226,6 +234,24 @@ void Config::addFreeFunctions(const std::string& list) {
 
 void Config::addOwningPointers(const std::string& list) {
     addNamesTo(owning_pointers_, list);
+}
+
+void Config::addReportPaths(const std::string& list) {
+    // Comma-split with edge-trim only: unlike identifier lists, paths
+    // may legally contain interior spaces.
+    std::string token;
+    auto flush = [&] {
+        size_t b = token.find_first_not_of(" \t");
+        size_t e = token.find_last_not_of(" \t");
+        if (b != std::string::npos)
+            report_paths_.push_back(token.substr(b, e - b + 1));
+        token.clear();
+    };
+    for (char c : list) {
+        if (c == ',') flush();
+        else token += c;
+    }
+    flush();
 }
 
 void Config::addNamesTo(std::set<std::string>& target,

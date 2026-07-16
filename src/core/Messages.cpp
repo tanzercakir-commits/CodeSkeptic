@@ -79,6 +79,9 @@ const MsgEntry kMessages[] = {
     // SuppressedCount
     {"[ZeroDefect] {0} finding(s) suppressed by source comments",
      "[ZeroDefect] {0} bulgu kaynak yorumlariyla bastirildi"},
+    // ReportPathsFiltered
+    {"[ZeroDefect] {0} finding(s) outside --report-paths filtered",
+     "[ZeroDefect] {0} bulgu --report-paths disinda kaldigi icin filtrelendi"},
     // BaselineWritten
     {"[ZeroDefect] {0} finding(s) recorded to baseline: {1}",
      "[ZeroDefect] {0} bulgu baseline dosyasina kaydedildi: {1}"},

@@ -715,6 +715,78 @@ Coverage honesty: the leak domain produced 0 findings here without a
 canary (Carbon allocates via ASTContext arenas — little raw new); the
 domain was canary-proven live on ImGui the same day with this binary.
 
+## 6.16 Recall study: Carbon's open toolchain bugs vs our rules (2026-07-16)
+
+User-proposed methodology inversion: every hunt so far measured
+PRECISION (are our findings real?); this study measures REAL-WORLD
+RECALL — take the known open bugs and ask "why didn't WE find them?"
+Corpus: 33 of the 36 open `label:toolchain` issues (3 uncollected —
+pagination summarizer losses; noted honestly).
+
+**Classification.** 25/33 are out-of-domain by construction: language
+semantics (#7159 negative floats, #7064 const-eval, #6991/#6913/#5750
+generics), feature requests (#6717/#6680/#6655), infra/perf/UX
+(#5223/#5037/#4944/#3054...). No memory-safety analyzer — ours, CSA,
+Infer, Coverity — targets these. The remaining 8 are CRASHES, our
+domain candidates. Verdicts:
+
+| Issue | Mechanism | Location | Verdict |
+|---|---|---|---|
+| #7371 | CHECK `const_id.is_concrete()` | lower/function_context.cpp:190 | invariant violation, behind parse ceiling |
+| #6862 | CHECK `const_id.is_concrete()` | lower/function_context.cpp:187 | same family |
+| #6905 | FATAL "missing constant value" | lower/handle_call.cpp:551 | same family |
+| #6553 | FATAL "missing constant value" | lower/handle_call.cpp:492 | same family |
+| #7162 | CHECK `poisoning_loc_id.has_value()` | check/name_lookup.cpp:703 | invariant violation |
+| #7160 | crash, no stack (var binding) | check/? | unattributable, likely CHECK |
+| #6500 | impl-selection logic error | check | out-of-domain (semantics) |
+| #7157 | SIGSEGV, **no stack** | ? | the ONE possibly-in-domain crash; indeterminate without attribution |
+
+**The finding of the study: 7 of 8 real-world crashes are
+CARBON_CHECK/FATAL failures** — Carbon's own runtime invariants
+catching semantic states that specific LANGUAGE INPUTS drive the
+compiler into. Statically proving "input X makes `const_id`
+non-concrete at this CHECK" requires modeling Carbon's own language
+semantics — out of scope for ANY general-purpose analyzer; these bugs
+are found by fuzzing and users, not by dataflow. They also cluster in
+`lower/` — behind our clang-19 parse ceiling regardless.
+
+**Three consequences:**
+1. **The niches are complementary, not competing.** Users report
+   input-TRIGGERED invariant violations; we find LATENT contract bugs
+   on paths no input has exercised yet — our #7523 (unchecked null
+   return, sibling caller checks) is exactly the class absent from all
+   33 user reports. Zero overlap = zero redundancy.
+2. **The parse ceiling is the binding constraint on recall,** not rule
+   sensitivity: the crash cluster lives in lower/ + check/, mostly in
+   the 63 unparseable TUs. LLVM-19/20 upgrade remains the recall lever
+   for this codebase.
+3. **CHECK invariants ARE contracts** — enforced far from where they
+   are established. An analyzer that ingests CHECK conditions as
+   callee preconditions and asks "which caller can violate this?" is
+   the growth path past memory safety — direct evidence for the
+   contract-layer direction (§4.A), from the largest C++ project we
+   have touched.
+
+**Ground-truth extension (closed+fixed issues).** Fixed bugs beat open
+ones for recall measurement: the fix commit tells you exactly which
+line was wrong. Probe case #7142 (closed 2026-06): a real SIGSEGV —
+Carbon-function-returning-pointer called from C++ — whose fix (PR
+carbon-lang#7359) added NO null check; it refactored object LIFECYCLE
+(a stale reference through `MultiplexExternalSemaSource` after
+`CarbonExternalASTSource` was removed early). Classification: temporal
+memory safety — our UAF rule's domain in SPIRIT, but cross-object
+registry lifetime is beyond the per-variable heap-state abstraction;
+today we honestly go silent when a pointer ESCAPES, and this class
+requires FOLLOWING the escapee. Recorded as the measured target for
+any future escape-tracking work.
+
+**Standing methodology going forward** (user-proposed, adopted): every
+hunt gains a recall half — alongside "scan and triage our findings,"
+also "triage the target's known bugs (open AND closed+fixed) and
+attribute every in-domain miss to parse coverage, abstraction, or rule
+gap." Even one attributable miss is a measured engine task; a hit on a
+pre-fix revision is a recall pin candidate for CI.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
