@@ -1,3 +1,82 @@
+# ZeroDefect v0.2.0
+
+The quantitative release. v0.1 tracked only SYMBOLIC state (null?
+freed? zero?); v0.2 adds NUMERIC reasoning — intervals, sizes, bounds —
+and builds the first market-facing layer on top of it: a diff-native
+PR review that judges the change, not the backlog.
+
+## New detection: the spatial/numeric class
+
+| Check | rule id | Class |
+|-------|---------|-------|
+| Out-of-bounds array access (proven whole-range) | `bounds` | CWE-125/787 |
+| Copy past destination (`memcpy`/`memmove`/`memset`) | `bounds` | CWE-787/122 |
+| Signed multiply overflow (incl. `malloc(a*b)`) | `int-overflow` | CWE-190 |
+
+Built on a new interval lattice and dataflow: fixed-array extents,
+heap extents (`malloc`/`calloc` with sole-definition discipline),
+sizeof-aware size evaluation, fixed-size ARRAY MEMBERS of structs
+(`s->buf` — the real-world heap-overflow shape), and interprocedural
+parameter entry intervals over closed call graphs. Same soundness
+posture as everything else: only a whole-range proof reports as error.
+
+## Diff-native PR review
+
+`scripts/review_diff.sh <binary> <base-ref>` analyzes the changed
+files at BOTH revisions and reports the delta: new findings (traces
+included, changed lines marked), fixed findings, contract
+WEAKENED/STRENGTHENED changes, and a coverage-honesty section. Gate =
+the evidence ladder: new definite findings and weakened contracts
+fail; "may" findings inform (`--strict` to gate). The ASSUMPTION DELTA
+is on by default — a new inferred, unchecked precondition is exactly
+the CWE-476 shape reviews exist to catch: in the field trial it
+pinpointed cJSON's #991 null dereference as a single finding, with
+zero noise across a 116-commit history range.
+
+## Three-valued honesty, operationalized
+
+- Coverage report: functions the dataflow could not drive to a
+  fixpoint are LISTED — "no warning" there is "not checked".
+- `--assumptions`: the inferred-contract report ("parameter p is
+  assumed non-null — dereferenced, never checked").
+- Evidence-ladder severity everywhere, now including `uninit-ptr`:
+  proven-on-all-paths = error; possible = warning. An imprecision can
+  no longer masquerade as a proof.
+
+## Hardened at scale
+
+A full TensorFlow Lite scan (285 TUs) drove the hardening: a
+metaprogram-generated type 104k stack frames deep crashed the analyzer
+— fixed with a 64MB analysis worker plus structural budgets on every
+type-size query (pathological type = honest "unknown", never a crash
+or a guess). A test-order determinism bug (CFG cache address reuse)
+was found and fixed; shuffle-stability is now a standing referee.
+
+## Confirmed in the wild (new this release)
+
+- cJSON's vendored Unity example ships a deliberate off-by-one
+  (`NumbersToFind[9]` on a 9-element array behind a brace-less `if`);
+  the bounds rule proves `i in [9, +inf)` on loop exit and flags it.
+- TensorFlow Lite `rfft2d`/`irfft2d` leak their FFT work buffer on
+  temporary-tensor lookup failure — hand-verified and reported
+  upstream ([tensorflow#123387](https://github.com/tensorflow/tensorflow/issues/123387)).
+- Precision field test: sixteen fresh, zero-dependency codecs/parsers
+  (~2 MB — stb, dr_libs, lz4, cgltf, picojpeg, …) scanned with the
+  spatial/numeric rules: zero findings, zero false positives, with a
+  canary proving the rules were exercised, not skipped.
+
+## Quality gates behind this release
+
+- 507 unit/integration tests (v0.1: 228), run under ctest isolation,
+  as a single process, and under 12 gtest-shuffle seeds (order
+  dependence is a failure).
+- An end-to-end hermetic git fixture pins the PR-review semantics
+  (shift-immunity, rename silence, gate ladder) and is mutation-tested.
+- Real-world corpus pins and NIST Juliet per-CWE floors gate CI as
+  before.
+
+---
+
 # ZeroDefect v0.1.0
 
 First public release. ZeroDefect is a C/C++ static analyzer built on
