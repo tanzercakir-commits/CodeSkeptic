@@ -1269,6 +1269,64 @@ first-draft code are DIFFERENT axes; optimizing one silently starved
 the other. The thesis test is now the standing recall gate for the
 mission, beside Juliet (synthetic) and the corpora (mature FP).
 
+## 6.26 Thesis v2 — per-class recall map + div-zero recall (2026-07-17)
+
+**The measurement.** After #92 validated the "narrow high-signal recall
+rule" recipe on unchecked allocation, the question was whether the
+mission (catch AI-generated-code bugs) needs that recipe replicated
+across classes. So: a 30-program blind AI corpus — three generator
+agents (bounds/OOB, arithmetic, resource-lifecycle), each unaware of
+the analyzer's rules, first-draft quality, self-annotated ground truth
+(~48 real bugs). No contamination this time (the #92 C-language
+fallback held: 30/30 analyzed).
+
+**Per-class recall (the map):**
+| Class | Ground truth | Caught | Recall |
+|---|---|---|---|
+| Null-deref (unchecked alloc) | ~24 | 11 | ~45% ✓ (#92) |
+| Bounds / OOB | ~8 | 0 | 0% |
+| Div-by-zero | ~5 | 0→(intrinsic slice) | ~0% |
+| Int-overflow | ~4 | 0 | 0% |
+| Memory-leak | ~4 (2 triggered) | 0 | 0% |
+| UAF / double-free | 1 | 0 | 0% |
+
+**One root cause, uniform:** the prove-it-or-stay-silent conservatism
+on parameters / variables / loops. Every non-alloc class is ~0 on
+realistic first-draft code — precision-tuned for mature corpora,
+blind on the code an AI-in-the-loop generates. Juliet confirms it:
+CWE369 recall was 0.053.
+
+**#94 div-zero recall — the ablation.** The direct analog (a bare
+integer PARAMETER divisor → MaybeZero) was built and REJECTED: Juliet
+CWE369 precision 0.71 < 0.95, all 26 FPs `goodG2BSink` (callee
+parameters validated by the caller). Lesson: div-by-zero does NOT have
+malloc's intrinsic-source property — a parameter's zero-ness is
+caller-dependent, so an unguarded param-division is a missing
+PRECONDITION (AssumptionRule's domain), not a bug. The keying that
+DOES work mirrors #92 exactly: an INTRINSIC untrusted-input source
+(atoi/strtol/rand → possibly zero). Result: precision 1.000, recall
+0.053 → 0.228 (4.3×), Godot 0 FP.
+
+**Honest scope of the div-zero win.** It catches the "parse input,
+divide without checking" defect — where div-by-zero actually bites in
+practice. It does NOT catch the corpus's own div cases, for principled
+reasons: `sum/n` on doubles is FLOAT division (inf/nan, skipped);
+`num/gcd` divides by a LOCAL computed value; `src_h/src_w` is the
+caller-dependent parameter case. Those are genuinely different (and
+harder) problems, not this rule's job.
+
+**The next increments (from the map).** Bounds and int-overflow are
+the remaining ~0 classes with a plausible intrinsic lever:
+- **Unbounded copy into a fixed-size buffer** (strcpy/memcpy/sprintf
+  into `char[N]` where the source length isn't provably ≤ N) — CWE-120,
+  intrinsic signal (the destination's fixed extent is known from its
+  type); catches the corpus tokenize_fixed + hash_djb2 misses.
+- **`malloc(a*b)` size-multiply overflow** — CWE-190; catches
+  alloc_grid.
+Memory-leak (return-value ownership escape, parse_or_fail class) and
+UAF (cross-function conditional free, dup_free class) are harder,
+deferred.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
