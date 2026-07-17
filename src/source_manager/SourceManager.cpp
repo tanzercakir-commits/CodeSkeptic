@@ -88,6 +88,38 @@ private:
     zerodefect::ASTCallback callback_;
 };
 
+// Fallback compilation database (no compile_commands.json found):
+// one synthesized command per file, with the standard chosen by the
+// file's EXTENSION. A single fixed `-std=c++17` for everything is
+// wrong for C sources — clang rejects `-std=c++17` on a `.c` file, the
+// TU fails to compile, and the broken-TU guard silently SKIPS it,
+// returning a false "clean". That path is exactly the MCP-for-AI use
+// case: an assistant hands the server a bare `.c` snippet with no
+// build DB and must get real findings, not a skip. `.c` → gnu11 (so
+// strdup/strcasecmp and other POSIX/GNU decls a first-draft file uses
+// are visible); everything else → c++17.
+class ExtensionAwareCompilationDatabase
+    : public clang::tooling::CompilationDatabase {
+public:
+    std::vector<clang::tooling::CompileCommand> getCompileCommands(
+        llvm::StringRef file) const override {
+        llvm::StringRef ext = file.rsplit('.').second;
+        const bool isC = ext == "c";
+        std::vector<std::string> cmd = {isC ? "clang" : "clang++"};
+        if (isC) {
+            cmd.push_back("-x");
+            cmd.push_back("c");
+            cmd.push_back("-std=gnu11");
+        } else {
+            cmd.push_back("-std=c++17");
+        }
+        cmd.push_back("-fsyntax-only");
+        cmd.push_back(file.str());
+        return {clang::tooling::CompileCommand(
+            ".", file.str(), std::move(cmd), "")};
+    }
+};
+
 } // anonymous namespace
 
 namespace zerodefect {
@@ -100,8 +132,7 @@ SourceManager::SourceManager(const std::string& build_path)
 
     if (!comp_db_) {
         std::cerr << msg(MsgId::CompileDbNotFound, error_msg) << "\n";
-        comp_db_ = std::make_unique<clang::tooling::FixedCompilationDatabase>(
-            ".", std::vector<std::string>{"-std=c++17"});
+        comp_db_ = std::make_unique<ExtensionAwareCompilationDatabase>();
     }
 }
 
