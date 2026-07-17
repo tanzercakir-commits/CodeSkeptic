@@ -215,6 +215,13 @@ const MsgEntry kMessages[] = {
      "{1} byte(s)",
      "tampon tasmasi: {0} baytlik kopya, hedefin {1} baytlik kapasitesini "
      "asiyor"},
+    // BoundsUnboundedStrCopy
+    {"possible buffer overflow: {0} copies an unbounded amount into a "
+     "fixed {1}-byte buffer; the source length is not checked (use a "
+     "bounded copy or verify it fits)",
+     "olasi tampon tasmasi: {0} sabit {1} baytlik tampona sinirsiz miktar "
+     "kopyaliyor; kaynak uzunlugu kontrol edilmiyor (sinirli kopya kullanin "
+     "veya sigdigini dogrulayin)"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
