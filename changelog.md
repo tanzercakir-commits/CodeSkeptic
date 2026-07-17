@@ -1,5 +1,50 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — CHECK-macro transparency: Carbon's guard idiom opens (#91)
+
+### Added
+- **Identity-call transparency in the condition walk** (engine-wide):
+  an exact-identity call — one parameter, VISIBLE body that is exactly
+  `return <param>;` — is condition-transparent, the same class as
+  `__builtin_expect` but proven by body instead of trusted by name.
+  Carbon's `CARBON_CHECK` wraps every condition in such a wrapper
+  (`CheckCondition(true && (cond))`, existing only to diagnose
+  constant conditions); without the peel, neither the engine's
+  assume-edges nor the guard-as-contract recognizer could read any
+  CHECK. Transforming or declared-only wrappers stay opaque.
+- **Guard recognizer: literal-true conjunct peel** (`true && x` → x)
+  before the compound-condition bail; a VARIABLE conjunct still bails.
+- **Transitive noreturn**: a call whose callee's visible body provably
+  aborts is noreturn even without the attribute (depth-capped).
+  Carbon's CheckFail carries `[[noreturn]]` only `#ifdef NDEBUG`, but
+  its body is a single call to the noreturn CheckFailFormat.
+  Deliberate limit: in Carbon's DEBUG parse the chain bottoms out in a
+  declaration-only maybe-returning impl (non-fatal checks are a real
+  debug build flag there) — the tool correctly infers nothing; scan
+  with `-DNDEBUG` (shipped semantics) or `--fatal-asserts`.
+- **Guard-violation dedup key includes the callee**: two same-line
+  calls to different guarded callees are two violations, not one.
+
+### Receipts (Carbon re-hunt, 280 TU — was 218 at #80)
+- Ablation: old binary 7 findings → new binary same flags 7
+  (transparency adds ZERO noise) → new binary -DNDEBUG **4**: the
+  three `CARBON_CHECK(ptr)`-guarded FPs (import.cpp base_class,
+  facet_type.cpp lhs_rewrite_value, lower/type.cpp previous_type) die
+  exactly as predicted; nothing else moved.
+- Survivors hand-classified: export.cpp:169 decl_context is
+  TP-quality (callee has an explicit `return nullptr;` TODO path, the
+  sibling variable is CHECK'd, this one is dereferenced unguarded);
+  eval.cpp:2811 + import_ref.cpp:2548 are the KNOWN flag-encodes-
+  nullness correlation gap (§6.22 family); call.cpp:108 is a NEW leak
+  FP class — placement `new (arena)` treated as owning allocation
+  (follow-up task).
+- End-to-end probe through the real macro stack: caller passing
+  `nullptr` into a CARBON_CHECK'd param → error, under -DNDEBUG.
+- 8 new pins across recognizer + engine (identity peel; non-identity
+  wrapper stays opaque; variable conjunct bails; transitive noreturn;
+  returning body infers nothing; same-line dedup; engine clean/warn
+  pair). 584/584 ctest, 5-seed shuffle-stable, tga/dirty unchanged.
+
 ## 2026-07-17 — Guard-as-contract v1: the callee's own entry guard, checked at the call site (#89)
 
 ### Added
