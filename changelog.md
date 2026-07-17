@@ -1,5 +1,42 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Contracts: `requires` proof burden survives partial guards
+
+### Fixed
+- **`requires p != null` now discharges its proof burden through a
+  compound guard.** Discovered demonstrating the contract layer on
+  Godot's `FileAccess::store_buffer` (`ERR_FAIL_COND_V(!p_src &&
+  p_length > 0, ...)`): a seeded NonNull was fabricated back into a
+  "may be null" by the short-circuit fall-through of `if (!p && cond)`,
+  where `!p` held (p null) and `cond` did not. Clang routes p-is-null
+  through to the dereference; the refinement OVERWROTE the seed with
+  null instead of DROPPING the now-contradictory disjunct. A leaf-level
+  domain-contradiction drop (the disjunct's established NonNull refutes
+  the `!p`-true leaf → drop, exactly as a fact contradiction drops)
+  closes it. This is the leaf-refute mechanism prototyped during #84
+  and set aside for lack of a receipt — the contract demonstration is
+  the receipt.
+
+### Receipts
+- `requires p != null` on `int f(T*p, unsigned n){ if(!p && n>0)
+  return -1; return p->x; }`: 1 → 0. The no-contract control (p from
+  an opaque source) still warns — the n==0 path is a genuine deref;
+  the drop is scoped to an established/seeded NonNull.
+- End-to-end on a store_buffer-shaped TU: the callee dereference
+  clears AND a caller passing `nullptr` is flagged as a contract
+  violation — the keystone relational-contract loop working on the
+  shape drawn from real Godot code.
+- 2 new pin tests; 562/562 ctest, shuffle-stable.
+
+### Known gap (recorded)
+- The RELATIONAL escape (`requires p != null unless n == 0`) still FPs
+  when the guarded deref is inside `for (i < n)`: proving the loop body
+  unreachable when n==0 needs the loop bound `i < n` connected to the
+  `n == 0` fact (var-vs-var), which `conditionFact` does not key. This
+  is the round-1 file_access "null + zero-length loop" class — the
+  measured next lever.
+
+
 ## 2026-07-17 — #86: Godot hunt opens — static-local model + broken-TU guard
 
 ### Fixed

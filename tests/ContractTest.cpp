@@ -245,6 +245,45 @@ TEST(ContractRoundCTest, RequiresNonNull_CalleeSeeded_NoNoise) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(ContractRoundCTest, RequiresNonNull_PartialGuard_ProofBurdenDischarged) {
+    // The seeding must survive a PARTIAL guard (2026-07-17). Godot's
+    // `ERR_FAIL_COND_V(!p && n > 0, ...)` — a compound `if (!p && n>0)
+    // return;` — short-circuits to a fall-through where `!p` held and
+    // `n>0` did not (n==0, p null). Without the contract that
+    // fall-through is a REAL deref; WITH `requires p != null` the
+    // p-null path is impossible, so the disjunct where `!p` refined p
+    // to null contradicts the seed and must DROP. Before the leaf-
+    // refute drop this fabricated a spurious "may be null".
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        // zd: requires p != null
+        int f(T *p, unsigned n) {
+            if (!p && n > 0) return -1;
+            return p->x;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRuleTest, PartialGuard_NoContract_RealDerefStillWarns) {
+    // Control: WITHOUT the contract the same partial guard leaves a
+    // genuine null deref on the n==0 path — the drop is scoped to a
+    // seeded/established NonNull, it does not blanket-silence compound
+    // guards.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        T *get();
+        int f(unsigned n) {
+            T *p = get();
+            if (!p && n > 0) return -1;
+            return p->x;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+}
+
 TEST(ContractRoundCTest, CallSite_NullLiteral_IsError) {
     // The caller has no pointer variables of its own — the contract
     // call alone must wake the dataflow pass.
