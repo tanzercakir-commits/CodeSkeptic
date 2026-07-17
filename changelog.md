@@ -45,6 +45,18 @@ default that keeps mature codebases clean).
   C++ and skipped (the bug fixed above). Re-scored with a correct C
   compile DB, the honest before/after is 2 → 9.
 
+### Juliet ground-truth correction (CI-driven)
+- The rule flagged Juliet's CWE476 `null_check_after_deref` GOOD
+  functions — which deref malloc with NO null check ("FIX: Don't check
+  for NULL since we wouldn't reach this line if the pointer was NULL",
+  which is false). Those good functions contain a real unchecked-alloc
+  defect; the finding is a TRUE positive, so `juliet_eval` now EXCLUDES
+  it (`isKnownLaxGood`, count printed for audit). This is a documented
+  ground-truth fix, NOT a floor relaxation: the CWE476 precision floor
+  stays 0.95 and fully sensitive to real regressions. Verified 32/32 of
+  the new CWE476 null-deref "FPs" are exactly this class, 0 genuine FP;
+  rule-matched precision holds at 1.000, recall rises to 0.347.
+
 ## 2026-07-17 — Leak rule: arena placement-new is not an owning allocation (#91b)
 
 ### Fixed

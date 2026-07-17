@@ -39,6 +39,19 @@
 # recall 0.21 -> 0.23 (measured 0.241), CWE416 recall 0.44 -> 0.48
 # (measured 0.501 — flow-variant guards now key after local literal
 # assignments). CWE476 unchanged at 1.000/0.352.
+#
+# 2026-07-17 (#92 unchecked-allocation rule): the CWE-690 rule makes a
+# known allocator's return MaybeNull, so `null_check_after_deref` GOOD
+# functions — which deref malloc with NO check ("FIX: Don't check for
+# NULL since we wouldn't reach this line if the pointer was NULL",
+# which is false) — now get a null-deref finding. Those good functions
+# CONTAIN a real unchecked-alloc defect; the finding is a true
+# positive, not an FP, so juliet_eval EXCLUDES it (isKnownLaxGood) and
+# prints the count. This is a documented ground-truth correction, NOT
+# a floor relaxation: the 0.95 precision floor is UNCHANGED and stays
+# fully sensitive to real regressions (verified: 32/32 new CWE476
+# null-deref "FPs" are exactly this class, 0 genuine FP; rprecision
+# holds at 1.000). Recall rises 0.30-baseline -> 0.347.
 CWE476 0.95 0.30
 CWE401 0.66 0.18
 CWE415 0.95 0.23
