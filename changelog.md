@@ -1,5 +1,28 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — #85: toolchain moved to LLVM/Clang 20
+
+### Changed
+- **CI and recommended build now use LLVM 20** (ubuntu-24.04 packages;
+  `-DCMAKE_PREFIX_PATH=/usr/lib/llvm-20`). Zero source changes — the
+  LibTooling surface the analyzer uses is identical between 18 and 20,
+  and LLVM 18 still builds (README documents both).
+- Referee parity on 20: 552/552 ctest, 551 single-process, 12/12
+  shuffle seeds, corpus pins intact; tga/picojpeg receipts unchanged.
+
+### Receipts
+- **Carbon parse ceiling: 218/286 → 280/286 TUs** (comparative
+  `-fsyntax-only` sweep over the same include set). The entire
+  63-TU "non-static data member cannot be constexpr" class — which
+  locked us out of `toolchain/check/` and `lower/`, exactly where the
+  real-world crash cluster lives (ROADMAP 6.16) — parses with the
+  clang-20 frontend. The 6 remaining failures are infrastructure
+  (Bazel-generated headers: runfiles/gmock/.inc/GPLATFORM), not
+  language level.
+- First analysis through the opened door: `toolchain/check/call.cpp`,
+  previously rejected, now analyzes end-to-end (11 findings, all in
+  dependency headers — `--report-paths` territory).
+
 ## 2026-07-16 — #84: implication witness — the #70 residual is dead
 
 ### Fixed

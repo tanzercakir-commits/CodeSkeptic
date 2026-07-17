@@ -926,6 +926,27 @@ only the FIRST file (the "stb corpus 1→1" line in PR #90 was
 first-file-only). Per-TU scans are the honest form; recorded here so
 future receipts don't repeat the mistake.
 
+## 6.20 #85 LLVM 20 (2026-07-17) — the recall lever, pulled
+
+The 6.16 recall study's binding constraint is gone. The upgrade cost
+NOTHING in source (LibTooling surface identical 18→20; the whole
+project built as-is on the first try) and bought the exact door the
+study pointed at:
+
+- **Carbon: 218/286 → 280/286 TUs parse** (same include set, same
+  probe, clang-18 vs clang-20 side by side). All 63 TUs of the
+  "constexpr data member" ceiling — the `check/` + `lower/` semantic
+  core where 7 of 8 real-world crashes clustered — now parse. The 6
+  stragglers are Bazel-generated-header gaps, not language level.
+- `toolchain/check/call.cpp` (previously unparseable) analyzes
+  end-to-end; its 11 findings are all dependency-header noise, i.e.
+  --report-paths input — the Carbon re-hunt over the opened core is
+  now a straight scan job, queued behind the Godot hunt.
+
+Juliet floors were tuned on the 18 frontend; the PR's gate run on the
+20 frontend is the real referee for the bump (local ctest — including
+the corpus pins — passed unchanged, which is the strong prior).
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

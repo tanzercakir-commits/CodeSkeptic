@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Homebrew LLVM (macOS ARM). On Linux the system LLVM is found;
-# if needed, -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18 can be passed.
+# if needed, -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 can be passed (LLVM 18 still works).
 if(APPLE AND NOT DEFINED CMAKE_PREFIX_PATH)
     set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/llvm")
 endif()
