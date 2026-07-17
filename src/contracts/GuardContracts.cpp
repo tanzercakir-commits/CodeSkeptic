@@ -59,8 +59,60 @@ struct GuardCond {
     bool firesWhenNull = false;  // guard triggers when param IS null
 };
 
+// Peel CHECK-macro wrappers off a guard condition. Carbon's
+// CARBON_CHECK (the §6.16 "CHECK opacity" gap, easy half) hides the
+// condition as `CheckCondition(true && (cond))`:
+//  - an identity call — the callee's body is exactly `return <its
+//    only param>;` (Carbon's CheckCondition exists only to diagnose
+//    constant conditions) — is replaced by its argument. Only a
+//    BODY-VISIBLE exact identity qualifies; a declared-only or
+//    transforming wrapper stays opaque (sound: we never guess).
+//  - a literal-true conjunct — `true && x` (inserted to force the
+//    contextual bool conversion) — is replaced by x. Only a literal
+//    `true` is stripped; a variable conjunct keeps the compound-
+//    condition bail below in force.
+const Expr* peelConditionWrappers(const Expr* e) {
+    for (;;) {
+        e = e->IgnoreParenImpCasts();
+        if (const auto* call = dyn_cast<CallExpr>(e)) {
+            const FunctionDecl* fd = call->getDirectCallee();
+            const FunctionDecl* def = nullptr;
+            if (fd && fd->hasBody(def) && call->getNumArgs() == 1 &&
+                def->getNumParams() == 1) {
+                if (const auto* body =
+                        dyn_cast<CompoundStmt>(def->getBody());
+                    body && body->size() == 1) {
+                    if (const auto* ret =
+                            dyn_cast<ReturnStmt>(body->body_front());
+                        ret && ret->getRetValue()) {
+                        const Expr* rv =
+                            ret->getRetValue()->IgnoreParenImpCasts();
+                        if (const auto* dre = dyn_cast<DeclRefExpr>(rv);
+                            dre &&
+                            dre->getDecl() == def->getParamDecl(0)) {
+                            e = call->getArg(0);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        if (const auto* bo = dyn_cast<BinaryOperator>(e);
+            bo && bo->getOpcode() == BO_LAnd) {
+            const Expr* lhs = bo->getLHS()->IgnoreParenImpCasts();
+            if (const auto* bl = dyn_cast<CXXBoolLiteralExpr>(lhs);
+                bl && bl->getValue()) {
+                e = bo->getRHS();
+                continue;
+            }
+        }
+        return e;
+    }
+}
+
 std::optional<GuardCond> singleParamNullCond(const Expr* cond,
                                              bool guardFiresOnTrue) {
+    cond = peelConditionWrappers(cond);
     int hits = 0;
     GuardCond out;
     bool nonParamOrExtra = false;
