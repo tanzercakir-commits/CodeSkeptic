@@ -339,6 +339,20 @@ template <typename VarMap>
 bool applyFactLeaf(Guarded<VarMap>& d, const clang::Expr* leaf, bool isTrue,
                    const std::set<const clang::ValueDecl*>& unkeyable,
                    const std::set<const clang::ValueDecl*>& ptrKeyable) {
+    // TRUE-EDGE-ONLY unsigned-bound fact (#87): `X < n` (both unsigned)
+    // true ⟹ n != 0. Applied ONLY on the true edge (never flipped —
+    // the false edge carries no n==0 information), so it lives beside
+    // the flippable conditionFact, not inside it. Refutes the `n == 0`
+    // disjunct on a loop body edge (the file_access null+zero-length
+    // class, and the relational-requires escape).
+    if (isTrue) {
+        if (auto nz = unsignedStrictUpperBoundNonzero(leaf, unkeyable)) {
+            if (factsContradict(d.facts, *nz, /*wanted=*/false))
+                return false;
+            d.facts[*nz] = false;  // n != 0 on this edge
+        }
+    }
+
     auto fact = conditionFact(leaf, unkeyable, ptrKeyable);
     if (!fact) return true;
     const bool value = isTrue ? fact->second : !fact->second;

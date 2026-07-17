@@ -248,6 +248,47 @@ private:
 
 namespace zerodefect {
 
+std::optional<FactKey> unsignedStrictUpperBoundNonzero(
+        const Expr* cond,
+        const std::set<const ValueDecl*>& unkeyable) {
+    // TRUE-EDGE-ONLY fact (#87): for an UNSIGNED integer `n`, a strict
+    // comparison `X < n` (or `n > X`) being TRUE proves `n != 0` —
+    // nothing is unsigned-less-than zero, so if some value sits below
+    // n then n >= 1. This is exactly what makes a `for (i = 0; i < n;
+    // ++i)` body unreachable when n == 0: on the body edge `i < n`
+    // holds, so `n != 0`, which refutes any disjunct carrying the
+    // `n == 0` fact (the relational-`requires ... unless n == 0`
+    // escape, and the file_access null+zero-length loop class).
+    //
+    // Direction matters: the FALSE edge (`X >= n`) says NOTHING about
+    // n == 0 (X >= 0 == n is possible), so this fact must NEVER be
+    // flipped onto the false edge — it is applied only on the true
+    // edge by the caller, which is why it does not ride conditionFact.
+    //
+    // Soundness restriction: BOTH operands unsigned, so the comparison
+    // is performed in unsigned and no wider-signed operand can make
+    // `X < 0` true. `<=`/`>=` are excluded (`X <= n` with n == 0 forces
+    // X == 0, satisfiable — no information).
+    if (!cond) return std::nullopt;
+    cond = cond->IgnoreParenImpCasts();
+    const auto* bin = dyn_cast<BinaryOperator>(cond);
+    if (!bin) return std::nullopt;
+    const BinaryOperatorKind opc = bin->getOpcode();
+    const Expr* greater = nullptr;
+    const Expr* lesser = nullptr;
+    if (opc == BO_LT) { lesser = bin->getLHS(); greater = bin->getRHS(); }
+    else if (opc == BO_GT) { lesser = bin->getRHS(); greater = bin->getLHS(); }
+    else return std::nullopt;
+
+    if (!greater->getType()->isUnsignedIntegerType() ||
+        !lesser->IgnoreParenImpCasts()->getType()->isUnsignedIntegerType())
+        return std::nullopt;
+
+    const ValueDecl* n = stableDeclRef(greater, unkeyable);
+    if (!n) return std::nullopt;
+    return FactKey{n, BO_EQ, 0};  // on the TRUE edge this key is FALSE
+}
+
 std::optional<std::pair<FactKey, bool>> conditionFact(
         const Expr* cond,
         const std::set<const ValueDecl*>& unkeyable,
