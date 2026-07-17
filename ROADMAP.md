@@ -1205,7 +1205,9 @@ scans before the fix landed — parse-mode-stable.
   on file.
 - `call.cpp:108` — NEW leak FP class: **placement `new (arena) T`
   treated as an owning allocation**. ASTContext-arena nodes are never
-  individually freed. Follow-up task filed.
+  individually freed. FIXED (#91b): placement-new detection now treats
+  a non-pointer, non-`std::nothrow` class placement arg as arena
+  storage; Carbon 4 → 3.
 - In-tree guard-as-contract violations: **0** (same honest zero as
   Godot — mature code doesn't pass literal null into its own guarded
   APIs; the feature's yield is AI-generated callers).

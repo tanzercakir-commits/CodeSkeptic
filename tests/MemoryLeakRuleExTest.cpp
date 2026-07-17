@@ -912,6 +912,42 @@ TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
     ASSERT_EQ(results.size(), 1);
 }
 
+TEST(CarbonFpTest, ArenaPlacementNew_IsNotAnAllocation) {
+    // Carbon's MakePlaceholderTemplateArg (call.cpp:108, 280-TU
+    // re-hunt #91): `new (ctx.ast_context()) CXXScalarValueInitExpr(...)`
+    // draws from an arena the ASTContext owns and frees en masse — the
+    // returned node is never individually deleted. A non-pointer,
+    // non-nothrow class placement arg designates arena storage.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Arena {};
+        void* operator new(unsigned long, Arena&);
+        struct Node { int v; };
+        Arena& get_arena();
+        Node* make() {
+            Node* n = new (get_arena()) Node();
+            return n;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(CarbonFpTest, ArenaPlacementNew_ByValue_IsNotAnAllocation) {
+    // Same idiom with the allocator passed by value rather than
+    // reference — still arena storage, still not tracked.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Pool {};
+        void* operator new(unsigned long, Pool);
+        struct Node { int v; };
+        void f(Pool p) {
+            Node* n = new (p) Node();
+            (void)n;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
 // --- Disjuncts v2a (2026-07-12): constant-returning call guards ---
 
 TEST(CallGuardTest, ConstReturningHelper_CorrelatedGuards_Clean) {
