@@ -380,6 +380,49 @@ TEST(AbseilFpTest, RawCheckShape_BuiltinExpect_Clean) {
     ASSERT_EQ(results.size(), 0);
 }
 
+TEST(AbseilFpTest, CarbonCheckShape_IdentityWrapperCondition_Clean) {
+    // The Carbon CARBON_CHECK family (import.cpp base_class /
+    // type.cpp previous_type FP class): the condition hides inside an
+    // exact-identity wrapper (`CheckCondition(true && (p))`, body
+    // `return condition;`) and the failure arm of the ternary is
+    // noreturn. Identity-call transparency in walkCondition lets the
+    // true edge refine p to non-null; the deref below is clean.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        constexpr bool check_cond(bool condition) { return condition; }
+        [[noreturn]] void check_fail();
+        extern T *lookup();
+        int f(bool c) {
+            T *p = lookup();
+            if (c) p = nullptr;
+            check_cond(true && (p != nullptr)) ? void(0) : check_fail();
+            return p->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AbseilFpTest, CarbonCheckShape_TransformingWrapper_StillWarns) {
+    // A wrapper that TRANSFORMS its argument must stay opaque: the
+    // edge learns nothing, and the maybe-null deref keeps warning.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        constexpr bool inverted(bool condition) { return !condition; }
+        [[noreturn]] void check_fail();
+        extern T *lookup();
+        int f(bool c) {
+            T *p = lookup();
+            if (c) p = nullptr;
+            inverted(p == nullptr) ? void(0) : check_fail();
+            return p->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
 TEST(AbseilFpTest, RawCheckShape_NonTerminatingBranch_StillWarns) {
     // The flip side: if the failure branch does NOT terminate, the
     // null path genuinely reaches the dereference — the warning is

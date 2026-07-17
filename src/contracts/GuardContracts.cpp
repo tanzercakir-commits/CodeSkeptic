@@ -88,26 +88,10 @@ const Expr* peelConditionWrappers(const Expr* e) {
     for (;;) {
         e = e->IgnoreParenImpCasts();
         if (const auto* call = dyn_cast<CallExpr>(e)) {
-            const FunctionDecl* fd = call->getDirectCallee();
-            const FunctionDecl* def = nullptr;
-            if (fd && fd->hasBody(def) && call->getNumArgs() == 1 &&
-                def->getNumParams() == 1) {
-                if (const auto* body =
-                        dyn_cast<CompoundStmt>(def->getBody());
-                    body && body->size() == 1) {
-                    if (const auto* ret =
-                            dyn_cast<ReturnStmt>(body->body_front());
-                        ret && ret->getRetValue()) {
-                        const Expr* rv =
-                            ret->getRetValue()->IgnoreParenImpCasts();
-                        if (const auto* dre = dyn_cast<DeclRefExpr>(rv);
-                            dre &&
-                            dre->getDecl() == def->getParamDecl(0)) {
-                            e = call->getArg(0);
-                            continue;
-                        }
-                    }
-                }
+            if (const Expr* inner =
+                    zerodefect::condwalk_detail::identityCallArg(call)) {
+                e = inner;
+                continue;
             }
         }
         if (const auto* bo = dyn_cast<BinaryOperator>(e);

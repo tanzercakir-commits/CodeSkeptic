@@ -110,6 +110,30 @@ inline int zeroLiteralState(const clang::Expr* expr) {
     return -1;
 }
 
+// The exact-identity call wrapper: `f(x)` where f's VISIBLE body is
+// exactly `return <its only param>;`. Carbon's CheckCondition is the
+// motivating case — it exists only to diagnose constant conditions
+// (`CARBON_CHECK` wraps every condition in it), so a condition digest
+// that stops at the call refines NOTHING and every CHECK-guarded
+// value warns downstream. Returns the argument if f qualifies,
+// nullptr otherwise. Body-visible exact identity ONLY — a declared-
+// only or transforming wrapper stays opaque; we never guess.
+inline const clang::Expr* identityCallArg(const clang::CallExpr* call) {
+    const clang::FunctionDecl* fd = call->getDirectCallee();
+    const clang::FunctionDecl* def = nullptr;
+    if (!fd || !fd->hasBody(def) || call->getNumArgs() != 1 ||
+        def->getNumParams() != 1)
+        return nullptr;
+    const auto* body = llvm::dyn_cast<clang::CompoundStmt>(def->getBody());
+    if (!body || body->size() != 1) return nullptr;
+    const auto* ret = llvm::dyn_cast<clang::ReturnStmt>(body->body_front());
+    if (!ret || !ret->getRetValue()) return nullptr;
+    const clang::Expr* rv = ret->getRetValue()->IgnoreParenImpCasts();
+    const auto* dre = llvm::dyn_cast<clang::DeclRefExpr>(rv);
+    if (!dre || dre->getDecl() != def->getParamDecl(0)) return nullptr;
+    return call->getArg(0);
+}
+
 inline clang::BinaryOperatorKind mirror(clang::BinaryOperatorKind opc) {
     switch (opc) {
         case clang::BO_LT: return clang::BO_GT;
@@ -152,6 +176,14 @@ void walkCondition(const clang::Expr* cond, bool isTrue,
                     return;
                 }
             }
+        }
+        // Same transparency class as __builtin_expect, proven by body
+        // instead of by name: an exact-identity wrapper (Carbon's
+        // CheckCondition — see identityCallArg).
+        if (const clang::Expr* inner = d::identityCallArg(call)) {
+            walkCondition(inner, isTrue, std::forward<TruthFn>(onTruth),
+                          std::forward<CompareFn>(onCompare));
+            return;
         }
     }
 
