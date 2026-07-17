@@ -119,6 +119,19 @@ const clang::ValueDecl* assignedDecl(const clang::Stmt* stmt);
 std::optional<std::pair<const clang::ValueDecl*, int64_t>>
 assignedIntLiteral(const clang::Stmt* stmt);
 
+// TRUE-EDGE-ONLY fact (#87): when `cond` is `X < n` / `n > X` with
+// BOTH operands unsigned and `n` a stable keyable var, returns the
+// key `(n EQ 0)` — which on the condition's TRUE edge holds FALSE
+// (n != 0), because nothing is unsigned-less-than zero. The caller
+// applies it ONLY on the true edge; it must never be flipped onto the
+// false edge (`X >= n` says nothing about n == 0), which is why it is
+// separate from conditionFact. Refutes the `n == 0` disjunct of a
+// loop body (`for (i=0; i<n; ++i)`) — the relational-requires escape
+// and the file_access null+zero-length loop class.
+std::optional<FactKey> unsignedStrictUpperBoundNonzero(
+    const clang::Expr* cond,
+    const std::set<const clang::ValueDecl*>& unkeyable);
+
 // Public builder for a (var REL literal) fact key — the contract
 // layer constructs keys for declared guards without an Expr in hand.
 // Same canonicalization as conditionFact (EQ/LT/LE base + unsigned

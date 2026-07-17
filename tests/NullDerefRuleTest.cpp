@@ -1083,6 +1083,66 @@ TEST(GuardImplicationTest, UncheckedAllocUnderGuard_Warns) {
 // a fresh NULL and an infeasible-made-feasible branch on every entry.
 // Statics decay to Unknown at their DeclStmt (both the value and the
 // fact stamp); mid-call assignments still track.
+// #87: unsigned strict loop bound proves the bound nonzero on the body
+// edge. The Godot FileAccess::store_buffer shape (no contract):
+// `if (!p && n>0) return; for (i=0; i<n; ++i) use(p[i])`. On the
+// fall-through the guard leaves `p || n==0`; inside the loop `i < n`
+// (both unsigned) gives n != 0, which refutes the n==0 operand and
+// disjunction-eliminates to p non-null. Round-1 file_access FP.
+TEST(LoopBoundNonzeroTest, StoreBufferShape_NoContract_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long u64;
+        struct B { bool store(unsigned char c); };
+        bool store_buffer(B *self, const unsigned char *p_src, u64 p_length) {
+            if (!p_src && p_length > 0) return false;
+            for (u64 i = 0; i < p_length; i++) {
+                if (!self->store(p_src[i])) return false;
+            }
+            return true;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Soundness pin (#87): the nonzero fact is per-disjunct on the path
+// that iterated — it must NOT leak past the loop exit. Here p is
+// genuinely null on the n==0 path and dereferenced AFTER the loop, so
+// the warning must survive.
+TEST(LoopBoundNonzeroTest, NonzeroFactDoesNotLeakPastLoop) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        T *maybe();
+        int f(unsigned n) {
+            T *p = 0;
+            if (n > 0) p = maybe();
+            for (unsigned i = 0; i < n; i++) { }
+            return p->x;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+}
+
+// Soundness pin (#87): a SIGNED bound carries no nonzero information
+// (`X < n` with n==0 is satisfiable when X is negative), so the fact
+// must not fire — a real null path guarded by a signed loop bound
+// still warns.
+TEST(LoopBoundNonzeroTest, SignedBound_NoNonzeroInference) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        T *maybe();
+        int f(int n) {
+            T *p = 0;
+            if (n > 0) p = maybe();
+            for (int i = 0; i < n; i++) { }
+            return p->x;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+}
+
 TEST(StaticLocalTest, DoubleCheckedLazyInit_Clean) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(

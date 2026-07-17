@@ -1,5 +1,35 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Facts: an unsigned loop bound proves itself nonzero (#87)
+
+### Added
+- **`X < n` (both operands unsigned) proves `n != 0` on the true
+  edge.** Nothing is unsigned-less-than zero, so if any value sits
+  below n then n >= 1. Recorded as a TRUE-EDGE-ONLY fact (never
+  flipped — the false edge `X >= n` carries no n==0 information), so
+  it lives beside the flippable `conditionFact`, not inside it. On a
+  loop body edge `for (i = 0; i < n; ++i)` this refutes any disjunct
+  carrying the `n == 0` fact — the body is unreachable when n == 0.
+
+### Fixed
+- **The relational `requires p != null unless n == 0` escape no longer
+  FPs through a loop.** The escape disjunct (n==0, p free) is dropped
+  on the loop body edge, so a deref of p inside `for (i < n)` is clean.
+- **The round-1 Godot `FileAccess::store_buffer` FP is dead, no
+  contract needed** (`if (!p_src && p_length>0) return; for (i <
+  p_length) use(p_src[i])`): the loop-bound fact completes the
+  disjunction elimination `p_src || p_length==0` that the guard leaves,
+  which the engine could not close before (var-vs-var loop bound).
+
+### Receipts
+- Godot core/io/file_access.cpp: **1 → 0**.
+- Soundness pinned: the nonzero fact is per-disjunct on the iterated
+  path — a genuinely-null p dereferenced AFTER the loop (n could be 0)
+  still warns; a SIGNED loop bound infers nothing (X<n with n==0 holds
+  for negative X). 4 new pins; tga/picojpeg unchanged; 566/566 ctest,
+  shuffle-stable.
+
+
 ## 2026-07-17 — Contracts: `requires` proof burden survives partial guards
 
 ### Fixed

@@ -266,6 +266,28 @@ TEST(ContractRoundCTest, RequiresNonNull_PartialGuard_ProofBurdenDischarged) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(ContractRoundCTest, RequiresUnlessZero_ThroughLoop_ProofDischarged) {
+    // #87: the relational escape `requires p != null unless n == 0`
+    // seeds a {n==0: p free} disjunct. A deref inside `for (i=0; i<n;
+    // ++i)` must be clean: on the body edge `i < n` holds, so (both
+    // unsigned) n != 0, which refutes the n==0 escape — the loop body
+    // is unreachable when n==0. Before the loop-bound-nonzero fact the
+    // escape survived into the body and the guard/short-circuit
+    // fabricated a null p there.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern int sink(int);
+        // zd: requires p != null unless n == 0
+        int f(T *p, unsigned n) {
+            int s = 0;
+            for (unsigned i = 0; i < n; i++) s += sink(p->x);
+            return s;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(ContractRuleTest, PartialGuard_NoContract_RealDerefStillWarns) {
     // Control: WITHOUT the contract the same partial guard leaves a
     // genuine null deref on the n==0 path — the drop is scoped to a
