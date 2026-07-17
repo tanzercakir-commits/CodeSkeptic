@@ -213,13 +213,13 @@ predecessor merges.
 ## Building
 
 Requires CMake ≥ 3.20, a C++17 compiler, and LLVM/Clang development
-libraries (tested with LLVM 18).
+libraries (tested with LLVM 18 and 20; LLVM 20 recommended).
 
 ### Linux (Ubuntu 24.04)
 
 ```bash
-sudo apt-get install -y llvm-18-dev libclang-18-dev libzstd-dev zlib1g-dev ninja-build
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18
+sudo apt-get install -y llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev ninja-build
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
 cmake --build build
 ctest --test-dir build        # 52 tests
 ```
