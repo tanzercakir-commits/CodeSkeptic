@@ -10,6 +10,7 @@
 #include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
 #include "contracts/ContractInfo.h"
+#include "contracts/GuardContracts.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -424,7 +425,16 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
         auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
-        if (parsed.clauses.empty()) continue;
+        if (parsed.clauses.empty()) {
+            // Guard-as-contract (#89): a body-visible callee whose own
+            // entry guard implies a precondition also wakes the pass —
+            // `g() { f(nullptr); }` with f's guard is exactly the
+            // caller-side violation the lift exists to catch.
+            if (callee->hasBody() &&
+                !zerodefect::inferGuardRequires(callee, ctx).empty())
+                return true;
+            continue;
+        }
         auto req = zerodefect::analyzeRequires(parsed, callee);
         for (const auto& info : req.enforced)
             if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
@@ -655,14 +665,98 @@ public:
     // (warning for zd:ai); possibly-null -> warning. The relational
     // escape is honored when the condition argument is an integer
     // literal; a non-literal escape stays conservative (silent).
+    // Guard-as-contract (#89, §4.A v1): the callee's OWN entry guard
+    // (`assert(p)` / `if (!p) return X;`) is a precondition the code
+    // already enforces — lifted here into a caller-side check no
+    // compiler performs. v1 reports DEFINITE violations only (null
+    // literal / definitely-null variable): zero noise by design. The
+    // guard's kind decides the severity (user decision, 2026-07-17):
+    // an assert vanishes in release builds, so a violating call
+    // CRASHES there -> error; an if-return guard always runs, the
+    // callee just refuses -> warning ("this call can never do its
+    // work" — a logic bug, not a crash). A param with a DECLARED
+    // contract is skipped — the author's clause owns that check.
+    void checkGuardContracts(const CallExpr* call,
+                             const FunctionDecl* callee,
+                             const State& before, ASTContext& ctx,
+                             const std::set<unsigned>& declaredParams) {
+        auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
+        if (inserted)
+            cacheIt->second = zerodefect::inferGuardRequires(callee, ctx);
+        if (cacheIt->second.empty()) return;
+
+        NullVarState flat;
+        bool flatComputed = false;
+        for (const auto& g : cacheIt->second) {
+            if (declaredParams.count(g.paramIndex)) continue;
+            if (g.paramIndex >= call->getNumArgs() ||
+                g.paramIndex >= callee->getNumParams())
+                continue;
+            const Expr* arg = call->getArg(g.paramIndex);
+
+            bool definite = zerodefect::isNullPointerArg(arg);
+            if (!definite) {
+                if (const VarDecl* var = asVar(arg)) {
+                    if (!flatComputed) {
+                        flat = zerodefect::flattenGuarded(before,
+                                                          mergeNullVals);
+                        flatComputed = true;
+                    }
+                    auto f = flat.find(var);
+                    definite = f != flat.end() &&
+                               f->second.st == NullState::Null;
+                }
+            }
+            if (!definite) continue;  // v1: definite violations only
+
+            const SourceManager& sm = ctx.getSourceManager();
+            SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
+            const unsigned line = sm.getSpellingLineNumber(loc);
+            const std::string paramName =
+                callee->getParamDecl(g.paramIndex)->getNameAsString();
+            const bool crash =
+                g.consequence == zerodefect::GuardConsequence::Crash;
+            const std::string text =
+                (crash ? "guard-crash:" : "guard-reject:") + paramName;
+            if (!reportedContracts_.emplace(line, text).second) continue;
+
+            zerodefect::Diagnostic diag;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = line;
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = "contract";
+            diag.severity = crash ? zerodefect::Severity::Error
+                                  : zerodefect::Severity::Warning;
+            diag.message = zerodefect::msg(
+                crash ? zerodefect::MsgId::ContractGuardCrash
+                      : zerodefect::MsgId::ContractGuardRejected,
+                paramName, callee->getNameAsString(),
+                std::to_string(g.guardLine));
+            diag.function = funcName_;
+            results_.push_back(std::move(diag));
+            if (const VarDecl* var = asVar(arg))
+                noteTargets_.emplace_back(results_.size() - 1, var);
+        }
+    }
+
     void checkCallContracts(const CallExpr* call, const State& before,
                             ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) return;
+
         auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
-        if (parsed.clauses.empty()) return;
-        auto req = zerodefect::analyzeRequires(parsed, callee);
-        if (req.enforced.empty()) return;
+        std::vector<zerodefect::RequiresInfo> enforced;
+        std::set<unsigned> declaredParams;
+        if (!parsed.clauses.empty()) {
+            auto req = zerodefect::analyzeRequires(parsed, callee);
+            enforced = std::move(req.enforced);
+            for (const auto& info : enforced)
+                declaredParams.insert(info.paramIndex);
+        }
+        checkGuardContracts(call, callee, before, ctx, declaredParams);
+        if (enforced.empty()) return;
+        auto req = zerodefect::RequiresAnalysis{};
+        req.enforced = std::move(enforced);
 
         NullVarState flat =
             zerodefect::flattenGuarded(before, mergeNullVals);
@@ -943,6 +1037,8 @@ private:
     std::map<const VarDecl*, size_t> firstWarnIndex_;
     std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> alsoDerefs_;
     std::set<std::pair<unsigned, std::string>> reportedContracts_;
+    std::map<const clang::FunctionDecl*,
+             std::vector<zerodefect::GuardRequire>> guardCache_;
     std::vector<zerodefect::GuardedEnsuresInfo> guardedEnsures_;
 };
 

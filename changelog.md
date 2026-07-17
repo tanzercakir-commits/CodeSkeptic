@@ -1,5 +1,59 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Guard-as-contract v1: the callee's own entry guard, checked at the call site (#89)
+
+### Added
+- **`src/contracts/GuardContracts.{h,cpp}`** — recognize a function's
+  LEADING entry guards and lift them into null-preconditions, no
+  annotation required. Two shapes in v1: `if (<p is null>)
+  <no-fallthrough branch>` (the ERR_FAIL expansion; a compound branch
+  is decided by its last statement) and the glibc assert ternary
+  (`cond ? void(0) : __assert_fail(...)`). Compound conditions
+  (`!p && n > 0`) are structurally detected and skipped — lifting
+  half of one would fabricate a requires the code does not enforce.
+- **Severity by consequence class** (user decision): an assert-style
+  guard vanishes in NDEBUG — a definite violating call crashes → new
+  `ContractGuardCrash` ERROR. An if-return guard always runs — the
+  callee refuses and the call silently does nothing → new
+  `ContractGuardRejected` WARNING ("this call will always be
+  refused"). EN/TR messages carry callee name + guard line.
+- **Caller-side check in NullDerefRule**: memoized per-callee
+  inference; DEFINITE violations only (literal null or flat-state
+  Null) — zero possible-violation noise in v1; a param covered by a
+  DECLARED contract defers to the author's clause (no double report);
+  callers with no pointer locals still wake the pass.
+
+### Scope (user decision)
+- v1 is the compiler-silent slice only: null preconditions. Narrowing
+  / int64→int32 mismatches are `-Wconversion` territory and excluded
+  — no overlap with compiler warnings. Extensions (possible
+  violations, relational guards, cross-TU) wait on verdict.
+
+### Fixed (the cJSON lesson — caught by the corpus referee)
+- **A SILENT early return is not a contract.** First CI run: cJSON
+  corpus pin 53 → 88; all 35 extras were `if (item == NULL) return
+  false;`-shaped "violations" — but those are null-TOLERANT APIs
+  (`cJSON_IsInvalid(NULL)` → false is the documented answer;
+  `cJSON_InitHooks(NULL)` MEANS "reset to defaults"), and their
+  callers pass null on purpose. Refusal evidence now requires the
+  guard to COMPLAIN before returning (an error-report call, then the
+  return — exactly Godot's ERR_FAIL expansion) or to die
+  (assert/abort/throw). Work-then-return (InitHooks) and bare returns
+  (cJSON_Is*) infer nothing. 2 new soundness pins; corpus pin stays
+  at 53 — the feature narrowed, the referee floor did not move.
+
+### Receipts
+- End-to-end: `crash_callee(nullptr)` → error naming the callee's own
+  assert line; `reject_callee(nullptr)` → warning; declared-contract
+  param single-reports; clean calls silent.
+- 8 new pins incl. compound-guard-not-lifted and non-entry-guard-
+  ignored soundness pins; 574/574 ctest, shuffle-stable;
+  tga/picojpeg receipts unchanged.
+- Godot 6-file noise check: **0 new findings** — mature in-tree
+  callers don't violate their own guards; the feature targets
+  AI-generated callers of guarded APIs and costs nothing in-tree.
+
+
 ## 2026-07-17 — Facts: an unsigned loop bound proves itself nonzero (#87)
 
 ### Added

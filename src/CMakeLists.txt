@@ -35,6 +35,7 @@ add_library(zerodefect_core STATIC
     rules/PolicyRule.cpp
     contracts/ContractParser.cpp
     contracts/ContractInfo.cpp
+    contracts/GuardContracts.cpp
     contracts/Policy.cpp
     contracts/Sidecar.cpp
 )

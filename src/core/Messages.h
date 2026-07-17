@@ -62,6 +62,8 @@ enum class MsgId {
 
     // Contracts (CONTRACTS.md)
     ContractViolated,           // {0} = clause text
+    ContractGuardCrash,         // {0} = param, {1} = callee, {2} = guard line
+    ContractGuardRejected,      // {0} = param, {1} = callee, {2} = guard line
     ContractSyntaxError,        // {0} = offending line text
     ContractUnsupported,        // {0} = clause text (outside v1 subset)
     ContractUnverified,         // {0} = clause text (engine cannot prove yet)
@@ -75,9 +77,9 @@ enum class MsgId {
     BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
 };
 
-// Replaces the {0} and {1} placeholders with the arguments.
+// Replaces the {0}, {1} and {2} placeholders with the arguments.
 std::string msg(MsgId id, const std::string& a0 = "",
-                const std::string& a1 = "");
+                const std::string& a1 = "", const std::string& a2 = "");
 
 } // namespace zerodefect
 

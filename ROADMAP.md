@@ -1058,6 +1058,105 @@ deliverables were round 1 (static-local, broken-TU guard); recall
 produced a clean attributed miss. The hunt's honest yield is the
 broken-TU guard — a precision mechanism the whole project now carries.
 
+## 6.23 #89 Guard-as-contract v1 (2026-07-17) — the code's own guard becomes a checked contract
+
+**The §4.A increment, demonstration-driven.** Three real-world evidence
+points converged on one shape (Carbon's CARBON_CHECK preconditions
+§6.16, Godot's `ERR_FAIL_COND_V(!p_object && ..., ...)` placeholder
+guard §6.22, and `FileAccess::store_buffer`'s
+`ERR_FAIL_COND_V(!p_src && p_length > 0, false)` §6.21–22): a
+function's OWN entry guard is a precondition the code already enforces
+at runtime — but only locally. #89 lifts it into a checkable contract
+and asks the interprocedural question no compiler asks: **which caller
+violates the callee's own rule?** No annotation, no sidecar — the
+guard IS the contract.
+
+**Two user design decisions shaped v1 (2026-07-17).**
+1. **Severity by consequence class**, not by confidence alone. The
+   guard's KIND tells you what a violation DOES:
+   - `Crash` (assert ternary, or an if-guard that aborts/throws): the
+     check vanishes in NDEBUG builds or kills the process — a
+     violating call crashes or is UB. Definite violation → **error**.
+   - `Rejected` (if-guard that returns): the check is always compiled
+     in; the callee refuses and the call silently does nothing — a
+     logic bug (the caller believes work happened), not a crash.
+     Definite violation → **warning** ("this call will always be
+     refused").
+2. **No overlap with compiler warnings.** v1 deliberately takes only
+   the compiler-silent slice: null-pointer preconditions. Narrowing /
+   int64→int32 argument mismatches are `-Wconversion` territory and
+   are EXCLUDED — we do not add to warning chaos the compiler already
+   covers. Extension beyond this slice waits on the user's verdict
+   ("beğenilirse geliştiririz").
+
+**v1 recognizer** (`src/contracts/GuardContracts.{h,cpp}`): scan the
+LEADING statements of a body (DeclStmts tolerated between guards; the
+first real statement ends the entry region — a guard below other work
+proves nothing about entry). Two shapes: `if (<p is null>) <branch
+that provably does not fall through>` (the ERR_FAIL expansion — a
+CompoundStmt is decided by its LAST statement, matching
+`{ print; return v; }`) and the glibc assert ternary
+(`cond ? void(0) : __assert_fail(...)`). One parameter per condition;
+a compound condition (`!p && n > 0`) is structurally detected and
+SKIPPED — walkNullCondition's `&&`-decomposition makes it look like a
+clean single hit, and accepting it would fabricate an unconditional
+requires the code does not enforce (the store_buffer lesson: that
+guard does NOT fire for p==null when n==0). Relational lifting is
+v-next.
+
+**Caller-side wiring** (NullDerefRule): memoized per-callee inference;
+a param covered by a DECLARED contract is skipped (the author's clause
+wins — no double report); DEFINITE violations only (literal
+null/nullptr argument, or a flat-state Null variable) — zero
+possible-violation noise in v1; callers with no pointer locals of
+their own still wake the pass. Messages carry the callee name and the
+guard's line so the report reads as "violates X's own entry assert
+(line N)".
+
+**Receipts.**
+- End-to-end 4-scenario TU: `crash_callee(nullptr)` → ERROR
+  (assert-guard, "in builds where the assert is compiled out this
+  call crashes"); `reject_callee(nullptr)` → WARNING ("will always
+  refuse this call"); declared-contract param single-reports; clean
+  calls silent.
+- 8 new pins (assert/if-return severities, definite-null variable,
+  maybe-null NOT reported, compound guard NOT lifted, non-entry guard
+  ignored, declared-contract precedence, no-pointer-locals caller
+  wake). 574/574 ctest, 5/5 shuffle seeds; tga + picojpeg receipts
+  0/0 unchanged.
+- **Godot noise check: 0 new findings** across the 6 hunted core
+  files (file_access, input, worker_thread_pool, image, convex_hull,
+  resource_loader). Honest reading: mature in-tree callers do not
+  violate their own guards — the yield of this feature is for
+  AI-GENERATED callers of guarded APIs, the project's mission target;
+  its in-tree value is that it costs nothing (zero noise).
+
+**The cJSON lesson (first CI run, corpus referee).** The initial
+if-return arm accepted ANY non-fallthrough return branch — and the
+cJSON corpus pin jumped 53 → 88. All 35 extras were the same class:
+silent early returns on null-TOLERANT APIs. `cJSON_IsInvalid(NULL)`
+→ false is the documented answer to a legitimate question;
+`cJSON_InitHooks(NULL)` MEANS "reset allocators to defaults" — the
+null branch does the function's work. Their callers (the library's
+own tests) pass null deliberately. The correction: **refusal evidence
+requires the guard to COMPLAIN before returning** — an
+expression-statement call (error report) before the terminal return,
+exactly the ERR_FAIL expansion (`{ _err_print_error(...); return
+ret; }`) that motivated the Rejected class — or to die. Bare returns
+and work-then-return infer nothing; a branch whose only call is
+inside the return value (`return make_default();`) is alternative
+work, not a complaint. The corpus pin stays at 53: the feature
+narrowed to fit the evidence, the referee floor did not move. This is
+the ablation discipline working as designed — the corpus caught in
+one CI run an FP class the 6-file Godot noise check could not see
+(Godot's guards all complain; C null-tolerant-API style does not).
+
+**v-next menu (awaiting the "beğenilirse" verdict):** possible-
+violation warnings (maybe-null args), relational/compound guard
+lifting (`!p && n > 0` → `requires p != null unless n == 0`, reusing
+the declared-contract relational machinery), cross-TU transport via
+the summary store, configurable guard-macro names.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

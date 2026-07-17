@@ -154,6 +154,18 @@ const MsgEntry kMessages[] = {
     // ContractViolated
     {"contract violated: '{0}'",
      "sozlesme ihlal edildi: '{0}'"},
+    // ContractGuardCrash
+    {"null argument for '{0}' violates {1}'s own entry assert (line {2}); "
+     "in builds where the assert is compiled out this call crashes",
+     "'{0}' icin null arguman, {1} fonksiyonunun kendi giris assert'ini "
+     "ihlal ediyor (satir {2}); assert'in derlenmedigi build'lerde bu "
+     "cagri coker"},
+    // ContractGuardRejected
+    {"null argument for '{0}': {1}'s own entry guard (line {2}) will "
+     "always refuse this call - it can never do its work",
+     "'{0}' icin null arguman: {1} fonksiyonunun kendi giris guard'i "
+     "(satir {2}) bu cagriyi her zaman reddedecek - cagri isini asla "
+     "yapamaz"},
     // ContractSyntaxError
     {"invalid contract syntax: '{0}'",
      "gecersiz sozlesme sozdizimi: '{0}'"},
@@ -223,11 +235,13 @@ Lang parseLang(const std::string& value) {
     return value == "tr" ? Lang::TR : Lang::EN;
 }
 
-std::string msg(MsgId id, const std::string& a0, const std::string& a1) {
+std::string msg(MsgId id, const std::string& a0, const std::string& a1,
+                const std::string& a2) {
     const MsgEntry& entry = kMessages[static_cast<int>(id)];
     std::string text = (g_lang == Lang::TR) ? entry.tr : entry.en;
     substitute(text, "{0}", a0);
     substitute(text, "{1}", a1);
+    substitute(text, "{2}", a2);
     return text;
 }
 
