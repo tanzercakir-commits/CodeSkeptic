@@ -55,6 +55,27 @@ ZeroState evaluateAsZero(const Expr* expr) {
 // (`if (f() != 0) x / f()` is a fresh call), and reporting it would
 // spawn a family of FPs in real code. An assigned value, by contrast,
 // is tracked by dataflow and refined by guards.
+// An INTRINSIC source of a possibly-zero integer: a value parsed from
+// untrusted input or drawn from the RNG. This is the div-by-zero twin
+// of #92's known allocator — the zero-ness is intrinsic to the source
+// (atoi("0") is 0, rand() can be 0), NOT caller-dependent the way a
+// bare parameter's is. A parameter divisor was tried (#94) and
+// REJECTED: it fails Juliet CWE369 precision (0.71 < 0.95) because a
+// callee's parameter is often validated by its caller — that case is a
+// missing PRECONDITION (AssumptionRule's domain), not a div-by-zero
+// bug. Keying on the intrinsic source keeps precision while catching
+// the "parse input, divide without checking" defect (CWE-369).
+bool isUntrustedZeroSource(const CallExpr* call) {
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!callee) return false;
+    const IdentifierInfo* id = callee->getIdentifier();
+    if (!id) return false;
+    const llvm::StringRef n = id->getName();
+    return n == "atoi" || n == "atol" || n == "atoll" || n == "strtol" ||
+           n == "strtoul" || n == "strtoll" || n == "strtoull" ||
+           n == "rand" || n == "random";
+}
+
 ZeroState evaluateAssignedValue(const Expr* expr) {
     ZeroState lit = evaluateAsZero(expr);
     if (lit != ZeroState::Unknown) return lit;
@@ -69,6 +90,10 @@ ZeroState evaluateAssignedValue(const Expr* expr) {
             if (summary->returnZeroness == RZ::MaybeZero)
                 return ZeroState::MaybeZero;
         }
+        // No summary (opaque): an intrinsic untrusted-input source can
+        // be zero — MaybeZero so an unguarded `x / atoi(...)`-derived
+        // divisor warns; a guard refines it to NonZero.
+        if (isUntrustedZeroSource(call)) return ZeroState::MaybeZero;
     }
     return ZeroState::Unknown;
 }

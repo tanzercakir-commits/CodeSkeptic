@@ -68,13 +68,51 @@ TEST(DivByZeroRuleTest, VarDefinitelyNonZero_Clean) {
 }
 
 TEST(DivByZeroRuleTest, ParameterUnknown_Clean) {
+    // A bare parameter divisor stays SILENT: its zero-ness is
+    // caller-dependent (a sink may be called with a validated value),
+    // so warning here fails precision (Juliet CWE369 sink-param FPs,
+    // #94 ablation). A missing precondition is AssumptionRule's job,
+    // not div-by-zero's.
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
         void f(int z) {
             int x = 1 / z;
         }
     )");
-    // Unknown → no report (conservative)
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(DivByZeroRuleTest, UntrustedInputDivisor_Warns) {
+    // Recall (#94, the intrinsic-source twin of #92): a value parsed
+    // from untrusted input can be zero (atoi("0")). Divided without a
+    // guard → warning. Zero-ness is intrinsic to the source, not
+    // caller-dependent, so precision holds.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        int atoi(const char*);
+        int f(void) {
+            int n = atoi(getenv("N"));
+            return 100 / n;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, UntrustedInputDivisor_Guarded_Clean) {
+    // The guard refines the parsed value to NonZero → clean.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        int atoi(const char*);
+        int f(void) {
+            int n = atoi(getenv("N"));
+            if (n == 0) return 0;
+            return 100 / n;
+        }
+    )");
     ASSERT_EQ(results.size(), 0);
 }
 

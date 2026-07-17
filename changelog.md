@@ -1,5 +1,48 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Recall: div-by-zero from untrusted input (#94)
+
+Thesis test v2 (30-program blind AI corpus, 3 generator agents, broad
+bug taxonomy) measured per-class recall on realistic first-draft code.
+Result: unchecked-alloc null-deref (#92) is the ONLY class with real
+recall (~45%); bounds, div-zero, int-overflow, leak, and UAF are all
+~0. One root cause: the "prove-it-or-stay-silent" conservatism on
+parameters / variables / loops.
+
+### Added
+- **A divisor parsed from an untrusted-input source is MaybeZero.**
+  `atoi`/`atol`/`atoll`/`strtol`/`strtoul`/`strtoll`/`strtoull`/`rand`/
+  `random` return a value that can intrinsically be zero (`atoi("0")`,
+  `rand()`); assigned to a divisor and used without a guard → warning
+  (CWE-369), while `if (n != 0)` / `if (n == 0) return` refines it to
+  NonZero and stays clean. The div-by-zero twin of #92's known
+  allocator — the zero-ness is intrinsic to the source.
+
+### Ablation (rejected, documented)
+- **A bare PARAMETER divisor was tried as MaybeZero and REJECTED.** It
+  fails Juliet CWE369 precision (0.71 < 0.95 floor): the 26 FPs are all
+  `goodG2BSink` — sink functions dividing by a parameter their caller
+  already validated. Unlike malloc-null (intrinsic), a parameter's
+  zero-ness is caller-dependent; an unguarded division by a parameter
+  is a missing PRECONDITION (AssumptionRule's domain), not a
+  div-by-zero bug. The intrinsic-source keying keeps precision.
+
+### Receipts
+- Juliet CWE369 rule-matched: **precision 1.000 (0 FP), recall
+  0.053 → 0.228** (4.3×). Godot 175-TU C++: 0 div-by-zero FP. tga
+  clean, dirty control warns; 594/594 ctest incl. 3 new pins.
+- Honest scope: the corpus's own div-zero cases stay out of scope for
+  principled reasons — `sum/n` on a double array is FLOATING division
+  (inf/nan, not a crash — deliberately skipped); `num/gcd` divides by
+  a LOCAL computed value (needs value tracking); `src_h/src_w` is the
+  caller-dependent PARAMETER case above.
+
+### Measurement (thesis v2, banked in ROADMAP 6.26)
+- Per-class recall on 30 blind programs: null-deref ~45% (the #92
+  win generalizes), **bounds/OOB 0, div-zero 0→(intrinsic slice now),
+  int-overflow 0, memory-leak 0, UAF/double-free 0.** The map for the
+  next recall increments (bounds unbounded-copy, malloc(a*b) overflow).
+
 ## 2026-07-17 — Recall: unchecked allocation, the #1 AI-code bug (#92)
 
 The mission is an MCP server an AI calls in-the-loop to check its own
