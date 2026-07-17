@@ -58,18 +58,41 @@ llvm::StringRef calleeName(const FunctionDecl* callee) {
     return {};
 }
 
+// `std::nothrow_t` — the placement tag of the ONE standard placement
+// form (`new (std::nothrow) T`) that still returns owned heap. Matched
+// by name + an enclosing `std` namespace so libc++'s inline-versioned
+// `std::__1::nothrow_t` counts too.
+bool isStdNothrowT(const CXXRecordDecl* rd) {
+    if (!rd || rd->getName() != "nothrow_t") return false;
+    for (const DeclContext* dc = rd->getDeclContext(); dc;
+         dc = dc->getParent())
+        if (const auto* ns = dyn_cast<NamespaceDecl>(dc))
+            if (ns->getName() == "std") return true;
+    return false;
+}
+
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
-    // Placement new into EXISTING storage (`new (&m_slots[i]) Slot()`,
-    // the NASA fprime AtomicQueue loop) allocates nothing. But not
-    // every placement ARG means placement STORAGE: `new (std::nothrow)
-    // T` is a genuine heap allocation — only a POINTER-typed placement
-    // argument designates caller-provided memory.
+    // Placement new that does NOT return individually-owned heap:
+    //   - a POINTER placement arg designates caller-provided raw
+    //     storage (`new (&m_slots[i]) Slot()`, the NASA fprime
+    //     AtomicQueue loop) — allocates nothing;
+    //   - an ALLOCATOR/ARENA OBJECT arg (`new (ctx.ast_context()) T`,
+    //     Carbon's node allocation; `new (arena) T`) draws from
+    //     storage the arena owns and frees en masse — never a block
+    //     the caller must `delete` per-object.
+    // The ONE standard placement tag that still heap-allocates is
+    // `std::nothrow`; it (and scalar/enum tags like `std::align_val_t`)
+    // must stay tracked. So: pointer arg or a NON-nothrow class/record
+    // arg ⟹ not a tracked allocation; anything else ⟹ tracked.
     if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr)) {
         for (unsigned i = 0; i < newExpr->getNumPlacementArgs(); ++i) {
             QualType t = newExpr->getPlacementArg(i)->getType();
             if (t->isPointerType()) return false;
+            QualType u = t.getNonReferenceType().getUnqualifiedType();
+            if (const auto* rd = u->getAsCXXRecordDecl())
+                if (!isStdNothrowT(rd)) return false;
         }
         return true;
     }

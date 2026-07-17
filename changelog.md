@@ -1,5 +1,26 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Leak rule: arena placement-new is not an owning allocation (#91b)
+
+### Fixed
+- **`new (arena) T` no longer reported as a leak.** The Carbon
+  `call.cpp:108` FP surfaced by the 280-TU re-hunt:
+  `new (ctx.ast_context()) CXXScalarValueInitExpr(...)` draws from an
+  arena the ASTContext owns and frees en masse — the node is never
+  individually `delete`d. Placement-new detection previously excluded
+  only POINTER placement args (raw caller storage); a non-pointer,
+  non-`std::nothrow` class/record placement arg now also designates
+  managed storage. `std::nothrow` stays tracked (the one standard
+  placement tag that still returns owned heap); `std::align_val_t`
+  (enum) and scalar tags stay tracked too.
+
+### Receipts
+- Carbon 280-TU scan: **4 → 3** (call.cpp leak gone; nothing else
+  moved). 2 new pins (arena by-reference + by-value clean);
+  NothrowNew / PlacementNew / PlainNew pins unchanged; 586/586 ctest,
+  shuffle-stable.
+
+
 ## 2026-07-17 — CHECK-macro transparency: Carbon's guard idiom opens (#91)
 
 ### Added
