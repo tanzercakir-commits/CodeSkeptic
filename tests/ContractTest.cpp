@@ -849,3 +849,156 @@ TEST(SidecarTest, NoSidecarFile_NoEffect) {
     )", ::testing::TempDir() + "zd_sc_none.cc");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Guard-as-contract (#89, §4.A v1) ---
+//
+// The callee's OWN entry guard is lifted into a caller-side check.
+// Severity by consequence class (user decision, 2026-07-17): an
+// assert vanishes in NDEBUG builds, so a definite violation CRASHES
+// there -> error; an if-return guard always runs and the callee just
+// refuses -> warning. v1 reports definite violations only.
+
+TEST(GuardContractTest, AssertGuard_NullLiteral_IsError) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern "C" void __assert_fail(const char*, const char*,
+                                      unsigned, const char*)
+            __attribute__((noreturn));
+        struct T { int x; };
+        int callee(T *p) {
+            (p != nullptr) ? void(0)
+                           : __assert_fail("p", "f.cpp", 1, "callee");
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("crash"), std::string::npos);
+}
+
+TEST(GuardContractTest, IfReturnGuard_NullLiteral_IsWarning) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        int callee(T *p) {
+            if (!p) {
+                return -1;
+            }
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+    EXPECT_NE(results[0].message.find("refuse"), std::string::npos);
+}
+
+TEST(GuardContractTest, DefinitelyNullVariable_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        int callee(T *p) {
+            if (!p) return -1;
+            return p->x;
+        }
+        int caller() {
+            T *q = nullptr;
+            return callee(q);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(GuardContractTest, MaybeNull_NotReported_V1DefiniteOnly) {
+    // v1 is the zero-noise slice: a possibly-null argument stays
+    // silent (the compiler-silent DEFINITE cases are the point).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern T *mk();
+        int callee(T *p) {
+            if (!p) return -1;
+            return p->x;
+        }
+        int caller(int c) {
+            T *q = c ? mk() : nullptr;
+            return callee(q);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, CompoundGuard_SkippedInV1) {
+    // `if (!p && n > 0) return;` does NOT enforce unconditional
+    // non-null (p==null with n==0 passes) — v1 must not fabricate a
+    // requires from half of a conjunction.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        int callee(T *p, unsigned n) {
+            if (!p && n > 0) {
+                return -1;
+            }
+            int s = 0;
+            for (unsigned i = 0; i < n; i++) s += p->x;
+            return s;
+        }
+        int caller() { return callee(nullptr, 0); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, GuardAfterWork_NotAnEntryGuard) {
+    // A guard below real work is not an ENTRY precondition — the
+    // leading-statement scan must stop before it.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern void log_call();
+        int callee(T *p) {
+            log_call();
+            if (!p) return -1;
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, DeclaredContractOwnsTheParam_NoDoubleReport) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        // zd: requires p != null
+        int callee(T *p) {
+            if (!p) return -1;
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    // The author's declared clause reports (error), not the inferred
+    // guard warning.
+    EXPECT_EQ(results[0].severity, Severity::Error);
+    EXPECT_NE(results[0].message.find("requires p != null"),
+              std::string::npos);
+}
+
+TEST(GuardContractTest, CallerWithNoPointerLocals_StillChecked) {
+    // The dataflow pass must wake for a caller whose ONLY sin is the
+    // literal argument (no pointer locals of its own).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        int callee(T *p) {
+            if (!p) return -1;
+            return p->x;
+        }
+        void caller() { callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
