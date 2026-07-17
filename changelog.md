@@ -1,5 +1,33 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Recall: unbounded string copy into a fixed buffer (#95)
+
+Third application of the #92/#94 recipe (from the thesis-v2 map, where
+bounds recall was 0). CWE-120.
+
+### Added
+- **`strcpy`/`strcat`/`stpcpy`/`gets` into a fixed-size array warns.**
+  These functions carry NO length argument — the amount written is
+  bounded only by the SOURCE, which the code does not check. The
+  unboundedness is intrinsic to the FUNCTION (the #94 lesson: key on
+  intrinsic signals, never caller-dependent ones), so keying on it
+  stays precise. Restricted to genuinely fixed-size destinations (a
+  local/global `char[N]` or a struct/union array member); heap
+  pointers are excluded (the right-sized `malloc(strlen+1); strcpy`
+  idiom must not FP). A string-literal source that provably fits is
+  skipped.
+
+### Receipts
+- Thesis-v2 corpus miss recovered: `hash_djb2.c` `strcpy(n->key, key)`
+  into `char key[32]` now flagged. Godot 175-TU C++: **0** (uses
+  `String`, not fixed-buffer strcpy — no flood). tga clean; 598/598
+  ctest incl. 4 new pins, 3-seed shuffle-stable. cJSON corpus measured
+  in CI (a move, if any, is triaged TP-vs-FP before adjusting).
+- Honest scope: v1 is the no-length-argument string family only. The
+  memcpy-with-a-variable-length case (corpus `tokenize_fixed`) is a
+  follow-up (Pattern B) — it needs the length's caller-dependency
+  handled the way #94 handled the parameter divisor.
+
 ## 2026-07-17 — Recall: div-by-zero from untrusted input (#94)
 
 Thesis test v2 (30-program blind AI corpus, 3 generator agents, broad

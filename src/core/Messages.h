@@ -75,6 +75,7 @@ enum class MsgId {
     BrokenTuSkipped,            // {0} = count of TUs that failed to compile
     AssumptionNonNullParam,     // {0} = parameter name
     BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
+    BoundsUnboundedStrCopy,     // {0} = function name, {1} = dest capacity bytes
 };
 
 // Replaces the {0}, {1} and {2} placeholders with the arguments.

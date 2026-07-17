@@ -460,3 +460,51 @@ TEST(BoundsRuleTest, PointerParamHasNoExtentSilent) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Unbounded string copy into a fixed buffer (#95, CWE-120) ---
+
+TEST(BoundsRuleTest, StrcpyIntoFixedMember_Warns) {
+    // The thesis-corpus miss (hash_djb2): strcpy into a fixed char[N]
+    // member with no length check.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { char name[16]; };
+        void f(struct S* s, const char* in) { strcpy(s->name, in); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "bounds");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, StrcpyLocalArray_Warns) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        void f(const char* in) { char buf[8]; strcpy(buf, in); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, StrcpyFittingLiteral_Clean) {
+    // A string literal that provably fits is safe — skipped.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        void f(void) { char buf[16]; strcpy(buf, "hello"); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, StrcpyIntoHeap_Clean) {
+    // A heap destination is NOT a fixed array — excluded (the
+    // right-sized malloc+strcpy idiom must not FP).
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        extern char* strcpy(char*, const char*);
+        void f(const char* in) { char* p = (char*)malloc(100); strcpy(p, in); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

@@ -1317,10 +1317,11 @@ harder) problems, not this rule's job.
 
 **The next increments (from the map).** Bounds and int-overflow are
 the remaining ~0 classes with a plausible intrinsic lever:
-- **Unbounded copy into a fixed-size buffer** (strcpy/memcpy/sprintf
-  into `char[N]` where the source length isn't provably ≤ N) — CWE-120,
-  intrinsic signal (the destination's fixed extent is known from its
-  type); catches the corpus tokenize_fixed + hash_djb2 misses.
+- **Unbounded copy into a fixed-size buffer** — CWE-120. DONE for the
+  no-length string family (#95: strcpy/strcat/stpcpy/gets into a fixed
+  `char[N]`; catches hash_djb2; Godot 0 FP). The memcpy-variable-length
+  case (tokenize_fixed) remains — Pattern B, needs the length's
+  caller-dependency handled like #94's parameter divisor.
 - **`malloc(a*b)` size-multiply overflow** — CWE-190; catches
   alloc_grid.
 Memory-leak (return-value ownership escape, parse_or_fail class) and
