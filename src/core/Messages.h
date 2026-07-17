@@ -70,6 +70,7 @@ enum class MsgId {
     IntOverflowMul,             // {0} = the arithmetic type name
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
+    BrokenTuSkipped,            // {0} = count of TUs that failed to compile
     AssumptionNonNullParam,     // {0} = parameter name
     BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
 };

@@ -201,8 +201,14 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (vd == targetVar && vd->hasInit())
+                if (vd == targetVar && vd->hasInit()) {
+                    // Static locals initialize once per program, not
+                    // per call — the init value is not this call's
+                    // state (see NullDeref classifyStmt, #86).
+                    if (vd->isStaticLocal())
+                        return StmtEffect::AssignsUnknown;
                     return effectOfValue(evaluateAssignedValue(vd->getInit()));
+                }
             }
         }
         return StmtEffect::None;

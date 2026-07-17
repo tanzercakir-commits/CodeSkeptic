@@ -48,6 +48,8 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "report_paths")    addReportPaths(value);
         else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "summary_diff_gate") summary_diff_gate_ = value;
+        else if (key == "analyze_broken_tus")
+            analyze_broken_tus_ = (value == "true" || value == "1");
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
     }
@@ -109,6 +111,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             serve_ = true;
         } else if (arg == "--whole-program") {
             whole_program_ = true;
+        } else if (arg == "--analyze-broken-tus") {
+            analyze_broken_tus_ = true;
         } else if (arg == "--assumptions") {
             assumptions_ = true;
         } else if (arg == "--summary-in" && i + 1 < argc) {

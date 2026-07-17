@@ -437,6 +437,11 @@ std::optional<std::pair<const ValueDecl*, int64_t>> assignedIntLiteral(
         if (!decl->isSingleDecl()) return std::nullopt;
         const auto* vd = dyn_cast<VarDecl>(decl->getSingleDecl());
         if (!vd || !vd->hasInit()) return std::nullopt;
+        // A static local's initializer is once-per-program: stamping
+        // `static bool initialized = false;` as a per-call truth is
+        // exactly the wrong half of the double-checked lazy-init
+        // idiom (#86). No stamp; later plain assignments still stamp.
+        if (vd->isStaticLocal()) return std::nullopt;
         target = vd;
         value = vd->getInit();
     } else {

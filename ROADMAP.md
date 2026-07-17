@@ -947,6 +947,34 @@ Juliet floors were tuned on the 18 frontend; the PR's gate run on the
 20 frontend is the real referee for the bump (local ctest — including
 the corpus pins — passed unchanged, which is the strong prior).
 
+## 6.21 #86 Godot hunt, round 1 (2026-07-17) — two engine deliverables before the first real finding
+
+The hunt's opening hours produced tool work, exactly as the libgit2
+and shadPS4 hunts did:
+
+1. **Static-local model** (GDCLASS DCL flood): decl-inits of static
+   locals are once-per-program; modeling them per-call fabricated
+   "definitely null" at thousands of macro expansion sites.
+2. **Broken-TU guard**: the first scan ran against TUs missing
+   Godot's build-generated headers — clang error recovery silently ate
+   initializers, and 298 of 311 findings were confident nonsense from
+   ASTs of code that does not exist. TUs that fail to compile are now
+   skipped and honestly listed. This guard matters beyond hunts: the
+   AI-generated-code mission analyzes exactly the kind of code that
+   often does not compile, and "unreliable AST" must be a stated
+   coverage gap, not a silent precision leak. (Field note recorded:
+   scons compiledb produces the DB without building — the .gen.h
+   fixpoint loop in the scratchpad builds the 6 needed headers in
+   seconds.)
+
+Round-1 scan state: 176 core/ TUs, 0 broken, 18 findings. Standing
+candidates: gdextension.cpp sibling-evidence null contract (report
+candidate), convex_hull.cpp cluster (deep verify + recall tie-in:
+upstream has convex-hull crash reports), file_access.cpp null+zero-
+length loop (measured FP class: var-vs-var loop bound with the
+zero-length fact already recorded — conditionFact keys var-vs-CONST
+only). Recall half not started.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

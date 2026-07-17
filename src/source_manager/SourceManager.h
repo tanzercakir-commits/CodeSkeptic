@@ -39,6 +39,18 @@ public:
     static unsigned warmCacheMisses();
     static void clearWarmCache();
 
+    // Broken-TU guard (#86): TUs whose parse ended with an
+    // uncompilable error are skipped by default — error recovery eats
+    // initializers and declarations, and rules would report
+    // confidently about code that does not exist. The skip list is
+    // process-global for the run (mirrors the warm-cache counters);
+    // StaticAnalyzer surfaces it as an honest coverage note.
+    static void setAnalyzeBrokenTUs(bool allow);
+    static bool analyzeBrokenTUs();
+    static void recordBrokenTU(const std::string& file);
+    static const std::vector<std::string>& brokenTUs();
+    static void clearBrokenTUs();
+
     size_t fileCount() const;
     const std::vector<std::string>& files() const;
 

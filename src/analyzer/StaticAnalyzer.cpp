@@ -188,10 +188,22 @@ int StaticAnalyzer::run() {
     // equivalent values, harmless)
     if (!config_.summaryOut().empty()) engine_.enableGlobalHarvest(true);
 
+    SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
+    SourceManager::clearBrokenTUs();
+
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
+
+    // Broken-TU guard (#86): honest coverage note for every skipped TU.
+    if (!SourceManager::brokenTUs().empty()) {
+        std::cerr << msg(MsgId::BrokenTuSkipped,
+                         std::to_string(SourceManager::brokenTUs().size()))
+                  << "\n";
+        for (const auto& file : SourceManager::brokenTUs())
+            std::cerr << "  - " << file << "\n";
+    }
 
     // Coverage: surface the functions the dataflow could not drive to a
     // fixpoint (iteration cap). "No warning" in these is NOT "proven

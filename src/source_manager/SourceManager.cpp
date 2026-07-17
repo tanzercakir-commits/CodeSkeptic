@@ -20,12 +20,38 @@ namespace fs = std::filesystem;
 
 namespace {
 
+// Broken-TU guard (#86). An AST built through error recovery is not
+// the program: after a failed include or a hard type error, clang
+// drops initializers, whole declarations, and types — and every rule
+// then reasons CONFIDENTLY about code that does not exist. Measured
+// on Godot: 176 TUs analyzed with a missing generated header produced
+// 298 uninit-ptr ERRORS, all artifacts ("declared without an
+// initializer" on declarations whose initializers the recovery had
+// eaten). A TU that did not compile is SKIPPED and honestly counted;
+// --analyze-broken-tus restores the old behavior for consumers who
+// accept the risk (AI-generated code that never compiled at all).
+bool tuIsBroken(clang::ASTContext& ctx) {
+    return ctx.getDiagnostics().hasUncompilableErrorOccurred();
+}
+
+std::string mainFileOf(clang::ASTContext& ctx) {
+    const clang::SourceManager& sm = ctx.getSourceManager();
+    if (auto ref = sm.getFileEntryRefForID(sm.getMainFileID()))
+        return ref->getName().str();
+    return "<unknown>";
+}
+
 class ZeroDefectASTConsumer : public clang::ASTConsumer {
 public:
     explicit ZeroDefectASTConsumer(zerodefect::ASTCallback callback)
         : callback_(std::move(callback)) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
+        if (!zerodefect::SourceManager::analyzeBrokenTUs() &&
+            tuIsBroken(ctx)) {
+            zerodefect::SourceManager::recordBrokenTU(mainFileOf(ctx));
+            return;
+        }
         callback_(ctx);
     }
 
@@ -220,11 +246,22 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
             const std::string key = file + "|" + build_path_;
             const std::string fp = fingerprintOf(file);
 
+            // The broken-TU guard applies to both cache paths — a
+            // cached AST keeps its DiagnosticsEngine, so the check is
+            // identical (see ZeroDefectASTConsumer).
+            auto guardedCall = [&](clang::ASTContext& ctx) {
+                if (!analyzeBrokenTUs() && tuIsBroken(ctx)) {
+                    recordBrokenTU(mainFileOf(ctx));
+                    return;
+                }
+                callback(ctx);
+            };
+
             auto it = astCache().find(key);
             if (!fp.empty() && it != astCache().end() &&
                 it->second.fingerprint == fp && it->second.unit) {
                 ++g_warmHits;
-                callback(it->second.unit->getASTContext());
+                guardedCall(it->second.unit->getASTContext());
                 continue;
             }
 
@@ -237,7 +274,7 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
                 anyFailed = true;
                 continue;
             }
-            callback(units[0]->getASTContext());
+            guardedCall(units[0]->getASTContext());
 
             if (astCache().size() >= kMaxCachedAsts) astCache().clear();
             astCache()[key] = {fp, std::move(units[0])};
@@ -251,6 +288,26 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
     ZeroDefectActionFactory factory(callback);
     return tool.run(&factory);
 }
+
+namespace {
+bool g_analyzeBrokenTUs = false;
+std::vector<std::string>& brokenList() {
+    static std::vector<std::string> list;
+    return list;
+}
+} // anonymous namespace
+
+void SourceManager::setAnalyzeBrokenTUs(bool allow) {
+    g_analyzeBrokenTUs = allow;
+}
+bool SourceManager::analyzeBrokenTUs() { return g_analyzeBrokenTUs; }
+void SourceManager::recordBrokenTU(const std::string& file) {
+    brokenList().push_back(file);
+}
+const std::vector<std::string>& SourceManager::brokenTUs() {
+    return brokenList();
+}
+void SourceManager::clearBrokenTUs() { brokenList().clear(); }
 
 size_t SourceManager::fileCount() const {
     return source_files_.size();

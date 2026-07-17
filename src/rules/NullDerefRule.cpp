@@ -244,9 +244,22 @@ Effect classifyStmt(const Stmt* stmt) {
         // rest start Unknown (conservative). Rare case, noted in the todo.
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
-                if (vd->getType()->isPointerType() && vd->hasInit())
+                if (vd->getType()->isPointerType() && vd->hasInit()) {
+                    // A STATIC local's initializer runs once per
+                    // program, not once per call — on every later
+                    // call the variable holds whatever earlier calls
+                    // left in it. Modeling the init as a per-call
+                    // assignment invented a fresh NULL on each entry
+                    // and flooded Godot's GDCLASS double-checked
+                    // lazy-init (`static T *inst = nullptr; ...
+                    // if (initialized) return *inst;`) with
+                    // "definitely null" errors. Unknown is the honest
+                    // per-call state (#86).
+                    if (vd->isStaticLocal())
+                        return {vd, EffectKind::AssignUnknown};
                     return {vd, EffectKind::Assign,
                             evaluateNullness(vd->getInit())};
+                }
             }
         }
         return {};

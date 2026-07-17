@@ -1,5 +1,41 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — #86: Godot hunt opens — static-local model + broken-TU guard
+
+### Fixed
+- **Static locals are once-per-program, not per-call.** Godot's GDCLASS
+  double-checked lazy-init (`static T *inst = nullptr; static bool
+  initialized = false; if (initialized) return *inst;`) produced a
+  "definitely null" ERROR at every expansion site: the decl-inits were
+  modeled as a per-call assignment plus a per-call fact stamp. Statics
+  now decay to Unknown at their DeclStmt (NullDeref, DivByZero, fact
+  stamps); mid-call assignments still track. Honest trade: a
+  first-call-only null deref through a static goes silent — cross-call
+  state is out of scope.
+- **Broken-TU guard.** A TU whose parse ends in an uncompilable error
+  is now SKIPPED with an honest per-file coverage note instead of
+  analyzed through clang's error recovery — recovery eats initializers
+  and declarations, and rules then report confidently about code that
+  does not exist. `--analyze-broken-tus` restores the old behavior.
+
+### Receipts
+- Godot core/, 176 TUs: first scan (missing generated headers, broken
+  ASTs) yielded 311 findings — 298 uninit-ptr ERRORS all artifacts.
+  With the generated headers built and the two fixes: **0 broken TUs,
+  18 findings** (15 null-deref + 3 div-by-zero warnings), a hand-
+  triageable table over one of the most-used C++ codebases alive.
+- Triage: 3 findings in gdextension.cpp share one shape — the author's
+  own `p_object && ...` placeholder guard proves the parameter is
+  considered nullable, then the non-static path dereferences it
+  unguarded (the shadPS4 sibling-evidence class; upstream-report
+  candidate). 9 in convex_hull.cpp (dense pointer-list geometry,
+  next round's deep verify). 3 image.cpp div-by-zero via the callee
+  may-return-zero summary. 1 file_access.cpp null+zero-length loop —
+  a measured FP class (var-vs-var loop bound, `i < p_length` with the
+  (p_length <= 0) fact in hand but no var-vs-var edge keying).
+- 8 new tests (4 static-local pins, 4 BrokenTuTest); 560/560 ctest.
+
+
 ## 2026-07-17 — #85: toolchain moved to LLVM/Clang 20
 
 ### Changed

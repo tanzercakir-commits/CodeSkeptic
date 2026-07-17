@@ -32,6 +32,7 @@ add_executable(zerodefect_tests
     StressEdgeCaseTest.cpp
     FunctionFilterTest.cpp
     ReportPathsTest.cpp
+    BrokenTuTest.cpp
     McpServerTest.cpp
     InterproceduralTest.cpp
 )
