@@ -496,3 +496,36 @@ TEST(DivByZeroRuleTest, NarrowingCastCondition_NoFalseProof) {
         EXPECT_NE(r.severity, Severity::Error)
             << "narrowing cast refined as transparent: " << r.message;
 }
+
+// Static locals initialize once per program, not per call (#86): the
+// decl-init value is NOT this call's state. `static int d = 0;` with a
+// later `d = ...` on some path used to report a definite zero divide
+// on the paths where the assignment was skipped — Godot's lazy-init
+// counters. Unknown is the honest per-call state.
+TEST(DivByZeroRuleTest, StaticLocalInit_NotPerCallZero) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int get();
+        int f(int x) {
+            static int d = 0;
+            if (get()) d = get();
+            return x / d;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+// Control: the NON-static version keeps its report — the exemption is
+// storage-duration-scoped, not a blanket decl-init blindness.
+TEST(DivByZeroRuleTest, PlainLocalZeroInit_StillReports) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int get();
+        int f(int x) {
+            int d = 0;
+            if (get()) d = get();
+            return x / d;
+        }
+    )");
+    ASSERT_GE(results.size(), 1);
+}

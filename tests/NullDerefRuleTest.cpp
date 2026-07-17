@@ -1075,6 +1075,50 @@ TEST(GuardImplicationTest, UncheckedAllocUnderGuard_Warns) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
+// Static locals initialize once per program, not per call (#86). The
+// Godot GDCLASS double-checked lazy-init — `static T *inst = nullptr;
+// static bool initialized = false; if (initialized) return *inst;` —
+// used to produce a "definitely null" ERROR: the decl-inits were
+// modeled as per-call assignment + per-call stamp, so the analysis saw
+// a fresh NULL and an infeasible-made-feasible branch on every entry.
+// Statics decay to Unknown at their DeclStmt (both the value and the
+// fact stamp); mid-call assignments still track.
+TEST(StaticLocalTest, DoubleCheckedLazyInit_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern T *make();
+        T &get_static() {
+            static T *inst = nullptr;
+            static bool initialized = false;
+            if (initialized) {
+                return *inst;
+            }
+            inst = make();
+            initialized = true;
+            return *inst;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+// Control: a PLAIN local initialized null and dereferenced on a
+// reachable path keeps its report — the exemption is scoped to static
+// storage duration, not to null decl-inits in general.
+TEST(StaticLocalTest, PlainLocalNullInit_StillReports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern int get();
+        int f() {
+            T *p = 0;
+            if (get()) return p->x;
+            return 0;
+        }
+    )");
+    ASSERT_GE(results.size(), 1);
+}
+
 TEST(GuardImplicationTest, RealTgaLoader_ImplicationWitness_Clean) {
     // The verbatim-shape stbi__tga_load pin (#84, the #70 residual).
     // The reduced tga shapes above pass WITHOUT the implication-
