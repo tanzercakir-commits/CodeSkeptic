@@ -975,6 +975,65 @@ length loop (measured FP class: var-vs-var loop bound with the
 zero-length fact already recorded — conditionFact keys var-vs-CONST
 only). Recall half not started.
 
+## 6.22 #86 Godot hunt, round 2 (2026-07-17) — deep-verify + recall cross-check, honest negatives
+
+Round 2 hand-verified the 18 round-1 findings and ran the recall half.
+The result is a clean pair of documented NEGATIVES — no upstream
+report — which is itself the deliverable: precision held, and the one
+recall opportunity was attributed, not hand-waved.
+
+**gdextension.cpp (3 findings) — non-report, implicit contract.**
+`p_object->_get_extension_instance()` after an `is_static() ? nullptr
+: p_object->...` — the author's OWN `p_object && p_object->is_...`
+placeholder guard proves p_object is considered nullable, then the
+non-static path dereferences it unguarded. But the NATIVE MethodBind
+siblings (method_bind.h:224/260) have the identical shape: the engine-
+wide invariant is `p_object != null unless is_static()` — a relational
+precondition callers satisfy, not a bug. Documented as §4.A contract-
+layer evidence (this is literally `requires p_object != null unless
+is_static()`), not filed.
+
+**convex_hull.cpp (9 findings) — all FP, disjunct-budget exhaustion.**
+Hand-traced every one. Two correlation shapes the #70 miner does not
+capture, both inside `merge()`/`merge_projection()` — 235-line internal
+geometric routines with 10+ interacting pointer locals that blow past
+kMaxDisjuncts = 4 (the tga_palette scale wall, pre-miner):
+  1. constant-trip-count loop, first iteration assigns: `for (side=0;
+     side<=1) if (side==0) { v00=v0; v10=v1; }` then `v00->next` — the
+     side==0 body always runs, but the loop join re-enters with
+     v00=null. (The NullDeref cousin of #74's resize_bilinear.)
+  2. integer-encodes-nullness: `cmp = !min0 ? 1 : (!min1 ? -1 : cmp())`
+     then `if (cmp>=0) min1->x` — cmp>=0 with min1 null gives cmp=-1,
+     excluded, so min1 is non-null there; the correlation runs through
+     a derived integer the disjunct facts do not key.
+Minimal reductions of BOTH come out clean — our engine handles the
+simple shapes; the FPs need the full budget-exhausting context, which
+confirms the class (scale, not a new soundness gap). Not fixed this
+round: one giant internal file, and the right lever (per-variable
+guard rep that also mines integer-encoded and loop-structural
+correlations) is a larger engine task than the finding density
+justifies. Recorded as a measured target.
+
+**Recall cross-check — NEGATIVE, attributed.** Two open convex crashes
+exist upstream and live in this exact file's call graph: #60337
+(`ConvexPolygonShape.get_debug_mesh` → find_max_angle:1168 assertion
+`p_ccw ? t.dot(p_s)<0 : t.dot(p_s)>0`) and #60357 (`create_convex_
+shape` → vhacd voxelize OOB). BOTH are NaN/INF-float-driven
+assertion/OOB failures found by the Qarminer fuzzer — value-domain
+float reasoning we do not do, and CHECK/assert-invariant violations
+driven by specific inputs. This is the SAME conclusion as the Carbon
+recall study (§6.16): the real-world crashes are input-triggered
+invariant violations (fuzzer + user territory), orthogonal to the
+latent contract bugs a dataflow analyzer finds. Our 9 findings share
+the file but not the mechanism — no overlap, honest miss, filed under
+the standing "float value-domain + input-driven CHECK" gap.
+
+**Round verdict.** Precision held on the largest C++ codebase touched
+(0 real findings survived, but 0 false reports filed); the two engine
+deliverables were round 1 (static-local, broken-TU guard); recall
+produced a clean attributed miss. The hunt's honest yield is the
+broken-TU guard — a precision mechanism the whole project now carries.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
