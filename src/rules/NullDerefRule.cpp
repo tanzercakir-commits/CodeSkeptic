@@ -9,6 +9,7 @@
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/GuardedDisjuncts.h"
+#include "engine/AllocFunctions.h"
 #include "contracts/ContractInfo.h"
 #include "contracts/GuardContracts.h"
 
@@ -40,6 +41,34 @@ namespace {
 // MaybeNull: null on at least one path (reportable signal)
 
 enum class NullState { Unknown, Null, NonNull, MaybeNull };
+
+// The C heap allocators that return NULL on failure. A result
+// dereferenced without a null check is the single most common
+// first-draft / AI-generated defect (CWE-690/476); the thesis corpus
+// (12 blind AI programs) put ~15 of its 23 real bugs in this class,
+// all silent because an opaque call return is Unknown. Treating a
+// KNOWN allocator's return as MaybeNull (not Unknown) hands the
+// existing guard/refinement machinery its signal: an unguarded deref
+// warns, `if (p)` / `if (!p) return` / `assert(p)` refines to NonNull
+// and stays clean. Deliberately the KNOWN allocators only (plus the
+// --alloc-functions wrappers) — never arbitrary opaque returns, which
+// is the FP flood the NullDeref rule was built to avoid.
+bool isKnownAllocatorCall(const CallExpr* call) {
+    if (!call) return false;
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!callee) return false;
+    const IdentifierInfo* id = callee->getIdentifier();
+    if (!id) return false;
+    const llvm::StringRef name = id->getName();
+    // Standard C allocators that can return NULL. `new`/`new[]` are
+    // NOT here: throwing new never returns null (handled as NonNull
+    // above); the nothrow form is rarer and left to v-next.
+    if (name == "malloc" || name == "calloc" || name == "realloc" ||
+        name == "strdup" || name == "strndup" || name == "aligned_alloc" ||
+        name == "reallocarray")
+        return true;
+    return zerodefect::allocFunctionNames().count(name.str()) != 0;
+}
 
 NullState mergeNullStates(NullState a, NullState b) {
     if (a == b) return a;
@@ -223,6 +252,10 @@ NullState evaluateNullness(const Expr* expr) {
                 return NullState::MaybeNull;
             }
         }
+        // No summary (opaque call). A KNOWN allocator can return NULL:
+        // MaybeNull so an unguarded deref is caught; everything else
+        // stays Unknown (silent) — the anti-FP-flood default.
+        if (isKnownAllocatorCall(call)) return NullState::MaybeNull;
         return NullState::Unknown;
     }
 

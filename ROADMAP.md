@@ -1218,6 +1218,57 @@ positional mode only analyzes the first file (known); one unreproduced
 single-run anomaly (a crash-class finding absent once, 240/240
 deterministic since) noted for watch.
 
+## 6.25 #92 Thesis test → the recall pivot (2026-07-17)
+
+**Why.** After a long precision run (guard-as-contract, CHECK
+transparency, placement-new — all zero in-tree findings on mature
+code), the standing question was whether we had drifted: sophisticated
+machinery whose real-world yield was 0, on a mission ("catch
+AI-generated-code bugs") we had never actually tested. So we tested it.
+
+**The thesis test.** A generator subagent, BLIND to ZeroDefect's
+rules, solved 12 everyday C/C++ tasks at first-draft quality and
+self-annotated its own bugs (25 across 10 files; ~23 real). ZeroDefect
+caught **0** — and the diagnosis was sharp: the dominant class (~15 of
+23) is an unchecked `malloc`/`strdup`/`calloc`/`realloc` return
+dereferenced, which we deliberately SILENCE (opaque return → Unknown,
+the anti-FP-flood default tuned for Godot/Carbon/libgit2). The
+precision tuning that keeps us clean on mature code made us blind on
+first-draft code — the exact code an AI-in-the-loop generates. The
+user reframed the use case precisely: *an AI calling ZeroDefect as an
+MCP server to check its own output* — for which unchecked allocation
+is THE core signal.
+
+**Methodology catch (honest).** The first score read "0/23" — but it
+was contaminated: single-file `.c` invocations were force-compiled as
+c++17, failed, and the broken-TU guard SILENTLY SKIPPED them. Caught
+by probing a two-line unchecked-malloc file that also "passed". Two
+consequences: (1) a real MCP bug — a bare `.c` snippet with no compile
+DB returns a false "clean"; (2) re-scored with a correct C compile DB,
+the honest before/after is 2 → 9.
+
+**The fix (#92).** Two coupled changes:
+- Known-allocator returns → MaybeNull (not Unknown), so the existing
+  guard machinery flags an unguarded deref and refines a checked one
+  to NonNull. NARROW: known allocators + `--alloc-functions` only,
+  never arbitrary opaque returns (the flood stays closed).
+- Fallback compilation DB picks the standard by extension
+  (`.c` → gnu11, else c++17) instead of forcing c++17 — so the
+  MCP-for-AI path (bare `.c`) is analyzed, not skipped.
+
+**Receipts.** Corpus null-deref 2 → 9 (+7 ground-truth unchecked
+allocations); Godot 175-TU C++ 0 FP; 6 guarded-allocation patterns 0
+FP; tga clean / dirty warns; 592/592 ctest incl. 6 new pins. Juliet
+CWE476 + cJSON corpus are the CI-authoritative mature-code gate (local
+Juliet download network-blocked this session). If the cJSON pin moves,
+triage TP-vs-FP before adjusting — a move from NEW TRUE POSITIVES is a
+legitimate baseline update (as the bounds rule moved cJSON 50→53).
+
+**The lesson banked.** Precision on mature corpora and recall on
+first-draft code are DIFFERENT axes; optimizing one silently starved
+the other. The thesis test is now the standing recall gate for the
+mission, beside Juliet (synthetic) and the corpora (mature FP).
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

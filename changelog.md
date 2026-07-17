@@ -1,5 +1,50 @@
 # ZeroDefect — Changelog
 
+## 2026-07-17 — Recall: unchecked allocation, the #1 AI-code bug (#92)
+
+The mission is an MCP server an AI calls in-the-loop to check its own
+first-draft C/C++. A blind 12-program AI corpus (a generator agent
+that did not know the analyzer's rules) put ~15 of its 23 real bugs in
+ONE class: a `malloc`/`calloc`/`strdup`/`realloc` result dereferenced
+with no null check (CWE-690/476) — and we caught none, because an
+opaque call return is Unknown (silent by design, the anti-FP-flood
+default that keeps mature codebases clean).
+
+### Added
+- **Known-allocator returns are MaybeNull, not Unknown.** A KNOWN
+  allocator (`malloc`/`calloc`/`realloc`/`strdup`/`strndup`/
+  `aligned_alloc`/`reallocarray` + the `--alloc-functions` wrappers) —
+  never an arbitrary opaque return — now yields MaybeNull, handing the
+  existing guard/refinement machinery its signal: an unguarded deref
+  warns; `if (p)` / `if (!p) return` / `if (p==NULL)` / `p ? … : …` /
+  `assert(p)` refines to NonNull and stays clean. Narrow by
+  construction — the FP flood the NullDeref rule was built to avoid
+  stays closed (arbitrary returns remain Unknown).
+
+### Fixed
+- **A bare `.c` file with no compile DB is now analyzed as C.** The
+  fallback compilation database forced `-std=c++17` on every file;
+  clang rejects that on a `.c` source, the TU failed to compile, and
+  the broken-TU guard SILENTLY SKIPPED it — returning a false "clean".
+  That is exactly the MCP-for-AI path (assistant hands the server a
+  bare `.c` snippet). Fallback now picks the standard by extension
+  (`.c` → gnu11, else c++17). Without this the new rule could never
+  fire on the very inputs it exists for.
+
+### Receipts
+- Blind AI corpus (12 programs): null-deref findings **2 → 9**; the +7
+  are all ground-truth-annotated unchecked allocations (base64 ×2,
+  bst, csv_avg, json_tokens, lru_cache ×2) — real recall, not planted.
+- FP discipline: Godot 175-TU core (C++): **0**; 6 guarded-allocation
+  patterns: **0** null-deref; tga receipt clean, dirty control warns;
+  592/592 ctest incl. 6 new UncheckedAllocTest pins. Juliet CWE476 +
+  cJSON corpus measured authoritatively in CI (local suite download
+  network-blocked this session).
+- Methodology note: the corpus's first "0/23" score was a
+  contamination artifact — the `.c` files were being force-compiled as
+  C++ and skipped (the bug fixed above). Re-scored with a correct C
+  compile DB, the honest before/after is 2 → 9.
+
 ## 2026-07-17 — Leak rule: arena placement-new is not an owning allocation (#91b)
 
 ### Fixed

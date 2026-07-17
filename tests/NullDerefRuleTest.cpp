@@ -265,6 +265,93 @@ TEST(NullDerefRuleTest, OpaqueFunctionReturn_Silent) {
             int x = *p;
         }
     )");
+    // A KNOWN allocator return is MaybeNull (see UncheckedMalloc below);
+    // an arbitrary opaque return stays Unknown → silent. This boundary
+    // is the anti-FP-flood contract of the whole rule.
+    ASSERT_EQ(results.size(), 0);
+}
+
+// --- Unchecked allocation (CWE-690/476): the #1 first-draft / AI bug ---
+
+TEST(UncheckedAllocTest, Malloc_UnguardedDeref_Warns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <stdlib.h>
+        struct T { int x; };
+        int f(void) {
+            struct T* p = (struct T*)malloc(sizeof(struct T));
+            return p->x;                 // no null check → warning
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(UncheckedAllocTest, Malloc_IfReturnGuard_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <stdlib.h>
+        struct T { int x; };
+        int f(void) {
+            struct T* p = (struct T*)malloc(sizeof(struct T));
+            if (!p) return -1;           // guarded → clean
+            return p->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(UncheckedAllocTest, Calloc_IfBlockGuard_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <stdlib.h>
+        struct T { int x; };
+        int f(void) {
+            struct T* p = (struct T*)calloc(1, sizeof(struct T));
+            if (p) { return p->x; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(UncheckedAllocTest, Strdup_UnguardedDeref_Warns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <string.h>
+        char first(const char* s) {
+            char* d = strdup(s);
+            return d[0];                 // strdup may return null
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(UncheckedAllocTest, Realloc_UnguardedDeref_Warns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <stdlib.h>
+        struct T { int x; };
+        int f(struct T* p) {
+            p = (struct T*)realloc(p, 8 * sizeof(struct T));
+            return p->x;                 // realloc may return null
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+}
+
+TEST(UncheckedAllocTest, Ternary_Guard_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        #include <stdlib.h>
+        struct T { int x; };
+        int f(void) {
+            struct T* p = (struct T*)malloc(sizeof(struct T));
+            return p ? p->x : 0;
+        }
+    )");
     ASSERT_EQ(results.size(), 0);
 }
 
