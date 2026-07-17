@@ -20,19 +20,32 @@ namespace {
 // crashes/aborts. A branch doing neither (fallthrough) is NOT a guard.
 enum class BranchExit { FallsThrough, Returns, Aborts };
 
-bool isNoreturnCall(const Stmt* s) {
+BranchExit branchExit(const Stmt* s, int depth = 0);
+
+// A call is noreturn if the callee says so — or if the callee's
+// VISIBLE body provably never returns (its exit is Aborts). The
+// transitive case is real: Carbon's CheckFail is `[[noreturn]]` only
+// `#ifdef NDEBUG`, but in every build its body is a single call to
+// the unconditionally-[[noreturn]] CheckFailFormat. Depth-capped so a
+// mutual-recursion cycle of body-visible functions cannot loop us;
+// beyond the cap we conservatively say "may return".
+bool isNoreturnCall(const Stmt* s, int depth = 0) {
     const auto* call = dyn_cast_or_null<CallExpr>(s);
     if (!call) return false;
     if (zerodefect::isFatalCall(call)) return true;
     const FunctionDecl* callee = call->getDirectCallee();
-    return callee && callee->isNoReturn();
+    if (!callee) return false;
+    if (callee->isNoReturn()) return true;
+    const FunctionDecl* def = nullptr;
+    if (depth >= 2 || !callee->hasBody(def)) return false;
+    return branchExit(def->getBody(), depth + 1) == BranchExit::Aborts;
 }
 
-BranchExit branchExit(const Stmt* s) {
+BranchExit branchExit(const Stmt* s, int depth) {
     if (!s) return BranchExit::FallsThrough;
     if (isa<ReturnStmt>(s)) return BranchExit::Returns;
     if (isa<CXXThrowExpr>(s)) return BranchExit::Aborts;  // leaves; guard
-    if (isNoreturnCall(s)) return BranchExit::Aborts;
+    if (isNoreturnCall(s, depth)) return BranchExit::Aborts;
     if (const auto* cs = dyn_cast<CompoundStmt>(s)) {
         // The ERR_FAIL expansion shape: `{ _err_print_error(...);
         // return m_retval; }` — the LAST statement decides; earlier
@@ -40,10 +53,10 @@ BranchExit branchExit(const Stmt* s) {
         // themselves branch away invisibly, which plain expression
         // statements cannot.
         if (cs->body_empty()) return BranchExit::FallsThrough;
-        return branchExit(cs->body_back());
+        return branchExit(cs->body_back(), depth);
     }
     if (const auto* expr = dyn_cast<Expr>(s))
-        return isNoreturnCall(expr->IgnoreParenImpCasts())
+        return isNoreturnCall(expr->IgnoreParenImpCasts(), depth)
                    ? BranchExit::Aborts
                    : BranchExit::FallsThrough;
     return BranchExit::FallsThrough;

@@ -938,6 +938,57 @@ TEST(GuardContractTest, CheckMacroShape_VariableConjunct_StillBails) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(GuardContractTest, TransitiveNoreturn_BodyNeverReturns_IsError) {
+    // Carbon's CheckFail is `[[noreturn]]` only #ifdef NDEBUG — but in
+    // every build its body is a single call to an unconditionally
+    // noreturn function. A visible body whose exit provably aborts
+    // makes the call noreturn, attribute or not.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        [[noreturn]] void fail_impl(const char *);
+        void check_fail() { fail_impl("check"); }
+        int callee(T *p) {
+            (p != nullptr) ? void(0) : check_fail();
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(GuardContractTest, TransitiveNoreturn_BodyReturns_NotAGuard) {
+    // The false arm calls a function that RETURNS: the "guard" falls
+    // through — no contract may be inferred from it.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        void just_logs(const char *);
+        void soft_fail() { just_logs("check"); }
+        int callee(T *p) {
+            (p != nullptr) ? void(0) : soft_fail();
+            return p ? p->x : 0;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, SameLine_DifferentCallees_BothReported) {
+    // The dedup key must include the CALLEE: two same-line calls to
+    // different guarded functions are two violations.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        [[noreturn]] void die();
+        int f(T *p) { (p != nullptr) ? void(0) : die(); return p->x; }
+        int g(T *p) { (p != nullptr) ? void(0) : die(); return p->x; }
+        int caller() { return f(nullptr) + g(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 2u);
+}
+
 TEST(GuardContractTest, ComplainThenReturnGuard_NullLiteral_IsWarning) {
     // The ERR_FAIL shape: the guard COMPLAINS (error-report call) and
     // then returns — the author marked null a caller bug.

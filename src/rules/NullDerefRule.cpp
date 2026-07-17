@@ -716,8 +716,11 @@ public:
                 callee->getParamDecl(g.paramIndex)->getNameAsString();
             const bool crash =
                 g.consequence == zerodefect::GuardConsequence::Crash;
+            // Callee name is part of the key: two same-line calls to
+            // DIFFERENT guarded callees are two violations, not one.
             const std::string text =
-                (crash ? "guard-crash:" : "guard-reject:") + paramName;
+                (crash ? "guard-crash:" : "guard-reject:") +
+                callee->getNameAsString() + ":" + paramName;
             if (!reportedContracts_.emplace(line, text).second) continue;
 
             zerodefect::Diagnostic diag;
