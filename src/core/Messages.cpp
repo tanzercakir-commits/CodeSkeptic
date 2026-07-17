@@ -182,6 +182,15 @@ const MsgEntry kMessages[] = {
      "and were not fully analyzed; their findings may be incomplete:",
      "[ZeroDefect] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
      "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
+    // BrokenTuSkipped
+    {"[ZeroDefect] {0} translation unit(s) failed to COMPILE and were "
+     "skipped - findings from an error-recovery AST are unreliable. Fix "
+     "the include paths/flags, or pass --analyze-broken-tus to analyze "
+     "anyway:",
+     "[ZeroDefect] {0} ceviri birimi DERLENEMEDI ve atlandi - hata "
+     "kurtarmali AST'den gelen bulgular guvenilmezdir. Include yollarini/"
+     "bayraklari duzeltin ya da yine de analiz icin --analyze-broken-tus "
+     "verin:"},
     // AssumptionNonNullParam
     {"inferred assumption: parameter '{0}' is assumed non-null "
      "(dereferenced, never checked); this precondition is undeclared "

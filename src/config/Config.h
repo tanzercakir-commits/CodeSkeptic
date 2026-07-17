@@ -42,6 +42,10 @@ public:
     void setMinSeverity(Severity severity) { min_severity_ = severity; }
     bool serve() const { return serve_; }
     bool wholeProgram() const { return whole_program_; }
+    // #86: analyze TUs whose parse ended in errors (default: skip them
+    // with an honest coverage note — error recovery eats declarations
+    // and rules would report confidently about code that isn't there).
+    bool analyzeBrokenTUs() const { return analyze_broken_tus_; }
     // --assumptions: opt-in intent-debt report of inferred, undeclared
     // preconditions (AssumptionRule). Off by default — it is high-volume
     // by nature and must not perturb the normal finding stream.
@@ -142,6 +146,7 @@ private:
     std::vector<std::pair<unsigned, unsigned>> lines_;
     bool serve_ = false;
     bool whole_program_ = false;
+    bool analyze_broken_tus_ = false;
     bool assumptions_ = false;
     bool warm_cache_ = false;
     std::string summary_in_path_;
