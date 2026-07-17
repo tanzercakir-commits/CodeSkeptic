@@ -1007,12 +1007,36 @@ kMaxDisjuncts = 4 (the tga_palette scale wall, pre-miner):
      excluded, so min1 is non-null there; the correlation runs through
      a derived integer the disjunct facts do not key.
 Minimal reductions of BOTH come out clean — our engine handles the
-simple shapes; the FPs need the full budget-exhausting context, which
-confirms the class (scale, not a new soundness gap). Not fixed this
-round: one giant internal file, and the right lever (per-variable
-guard rep that also mines integer-encoded and loop-structural
-correlations) is a larger engine task than the finding density
-justifies. Recorded as a measured target.
+simple shapes; the FPs need the full context. Not fixed this round:
+one giant internal file, and the right lever is a larger engine task
+than the finding density justifies. Recorded as a measured target.
+
+**Correction (2026-07-17, deeper diagnosis).** The "disjunct-budget
+exhaustion" attribution above was WRONG, and disproving it is the
+lesson: raising `kMaxDisjuncts` 4 → 16 left all 9 findings unchanged.
+It is not scale — it is three distinct correlation-shape gaps, pinned
+by disjunct tracing at the deref sites:
+  1. **v00/v10 (2)** — loop-first-iteration definite assignment. At the
+     `v00->next` deref the state is a SINGLE disjunct `{side<=1=false,
+     v00=MaybeNull}`: the loop provably ran (`for(side=0;side<=1)`, so
+     `if(side==0)` fires on trip 0 and assigns), but the "did trip 0
+     run" distinction is gone. This is #74's class one level harder —
+     the must-assign sits under `if(loopvar==initliteral)`, not
+     top-level, AND the loop body's `break`/`continue` target INNER
+     `while` loops (they never bypass the assignment), which #74's
+     coarse `hasEarlyExit` cannot tell apart. A sound fix needs
+     loop-precise break/continue targeting + first-trip if-guard
+     reasoning, ported to NullDeref.
+  2. **min0/min1/pending… (5)** — integer-encodes-nullness through a
+     `cmp` ternary, plus linked-list edge invariants.
+  3. **face_edge/first_face_edge (2)** — linked-list traversal
+     invariants; likely beyond a sound per-variable abstraction (CSA/
+     Infer would struggle too).
+Verdict: three specialized sound mechanisms for 9 FPs in one internal
+geometry file — the round's own "lever > density" call holds, now with
+the budget hypothesis retired. Deferred by decision (2026-07-17) in
+favor of the contract-language work (§4.A); kept as a measured target,
+the tractable slice being (1).
 
 **Recall cross-check — NEGATIVE, attributed.** Two open convex crashes
 exist upstream and live in this exact file's call graph: #60337
