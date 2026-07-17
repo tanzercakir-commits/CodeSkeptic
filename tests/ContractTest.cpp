@@ -878,6 +878,117 @@ TEST(GuardContractTest, AssertGuard_NullLiteral_IsError) {
     EXPECT_NE(results[0].message.find("crash"), std::string::npos);
 }
 
+TEST(GuardContractTest, CheckMacroShape_IdentityWrapper_IsError) {
+    // The CARBON_CHECK expansion: `CheckCondition(true && (cond)) ?
+    // void(0) : CheckFail(...)`. CheckCondition is an exact identity
+    // (`return condition;`) and `true &&` only forces bool conversion
+    // — both must peel so the guard reads as `assert(n != nullptr)`.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        constexpr bool check_cond(bool condition) { return condition; }
+        [[noreturn]] void check_fail();
+        int callee(T *p) {
+            check_cond(true && (p != nullptr)) ? void(0) : check_fail();
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(GuardContractTest, CheckMacroShape_NonIdentityWrapper_StaysOpaque) {
+    // A wrapper that TRANSFORMS its argument is not an identity —
+    // peeling it would misread the guard. Must stay opaque (no
+    // contract, no report).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        constexpr bool inverted(bool condition) { return !condition; }
+        [[noreturn]] void check_fail();
+        int callee(T *p) {
+            inverted(p != nullptr) ? void(0) : check_fail();
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, CheckMacroShape_VariableConjunct_StillBails) {
+    // Peeling strips only a LITERAL true conjunct. `flag && !p` keeps
+    // the compound-condition bail: half-reading it would fabricate an
+    // unconditional requires.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        extern void log_fail(const char *);
+        bool flag();
+        int callee(T *p) {
+            if (flag() && !p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, TransitiveNoreturn_BodyNeverReturns_IsError) {
+    // Carbon's CheckFail is `[[noreturn]]` only #ifdef NDEBUG — but in
+    // every build its body is a single call to an unconditionally
+    // noreturn function. A visible body whose exit provably aborts
+    // makes the call noreturn, attribute or not.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        [[noreturn]] void fail_impl(const char *);
+        void check_fail() { fail_impl("check"); }
+        int callee(T *p) {
+            (p != nullptr) ? void(0) : check_fail();
+            return p->x;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(GuardContractTest, TransitiveNoreturn_BodyReturns_NotAGuard) {
+    // The false arm calls a function that RETURNS: the "guard" falls
+    // through — no contract may be inferred from it.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        void just_logs(const char *);
+        void soft_fail() { just_logs("check"); }
+        int callee(T *p) {
+            (p != nullptr) ? void(0) : soft_fail();
+            return p ? p->x : 0;
+        }
+        int caller() { return callee(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, SameLine_DifferentCallees_BothReported) {
+    // The dedup key must include the CALLEE: two same-line calls to
+    // different guarded functions are two violations.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        [[noreturn]] void die();
+        int f(T *p) { (p != nullptr) ? void(0) : die(); return p->x; }
+        int g(T *p) { (p != nullptr) ? void(0) : die(); return p->x; }
+        int caller() { return f(nullptr) + g(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 2u);
+}
+
 TEST(GuardContractTest, ComplainThenReturnGuard_NullLiteral_IsWarning) {
     // The ERR_FAIL shape: the guard COMPLAINS (error-report call) and
     // then returns — the author marked null a caller bug.

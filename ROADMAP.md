@@ -1157,6 +1157,65 @@ lifting (`!p && n > 0` → `requires p != null unless n == 0`, reusing
 the declared-contract relational machinery), cross-TU transport via
 the summary store, configurable guard-macro names.
 
+## 6.24 #91 Carbon re-hunt + CHECK transparency (2026-07-17) — the §6.16 opacity gap, easy half closed
+
+**Setup.** LLVM 20 re-opened Carbon: 280/286 TUs parse (was 218 at
+#80; the 6 fails are generated-file/env). Motivation: demonstrate
+guard-as-contract (#89) on the corpus whose CARBON_CHECK idiom
+motivated §4.A, and re-measure precision with the season's fixes.
+
+**The probe-driven chain.** A hand probe (`CARBON_CHECK(n != nullptr)`
+callee + `nullptr` caller) failed to fire, and peeling the onion
+produced four distinct findings:
+1. **CheckCondition opacity** — CARBON_CHECK wraps every condition in
+   an exact-identity function (`return condition;`, exists only for
+   constant-condition diagnosis). Fix: identity-call transparency in
+   walkCondition (condwalk_detail::identityCallArg) — same class as
+   __builtin_expect, proven by body instead of trusted by name. This
+   is engine-wide: assume-edges AND the guard recognizer see through.
+2. **`true && (cond)`** — literal-true conjunct peel in the
+   recognizer (walk handles && natively; the peel is for the
+   compound-bail).
+3. **Conditional [[noreturn]]** — CheckFail is noreturn only under
+   NDEBUG; every build's body is a single call to noreturn
+   CheckFailFormat. Fix: transitive noreturn (visible body provably
+   aborts, depth-capped). HONEST LIMIT: in the debug parse the chain
+   ends at a declaration-only maybe-returning impl — Carbon's
+   non-fatal-checks debug flag makes "may return" CORRECT there; the
+   scan answer is -DNDEBUG (shipped semantics), not a recognizer
+   guess.
+4. **Dedup key lacked the callee** — same-line calls to different
+   guarded callees collapsed to one report.
+
+**Ablation receipts (280 TU).** Baseline (merged #89 binary) 7
+findings → new binary, same flags: identical 7 (transparency adds
+zero noise) → -DNDEBUG: **4** — the three `CARBON_CHECK(ptr)` FPs
+(import.cpp:746, facet_type.cpp:393, lower/type.cpp:712) die exactly
+as predicted, nothing else moves. Findings identical across all three
+scans before the fix landed — parse-mode-stable.
+
+**Survivor triage (4).**
+- `export.cpp:169` — **TP-quality**: ExportNameScopeToCpp has an
+  explicit `return nullptr;` TODO path (keyword package names);
+  caller CHECKs the sibling identifier_info but dereferences
+  decl_context unguarded. Alive since #80; both parse modes agree.
+- `eval.cpp:2811`, `import_ref.cpp:2548` — the KNOWN
+  flag-encodes-nullness correlation gap (evaluation_mode/thunk-state
+  set iff pointer set; §6.22 convex_hull family). Honest FPs, class
+  on file.
+- `call.cpp:108` — NEW leak FP class: **placement `new (arena) T`
+  treated as an owning allocation**. ASTContext-arena nodes are never
+  individually freed. Follow-up task filed.
+- In-tree guard-as-contract violations: **0** (same honest zero as
+  Godot — mature code doesn't pass literal null into its own guarded
+  APIs; the feature's yield is AI-generated callers).
+
+**Tool-side lessons banked.** `--` fixed-database flags are silently
+dropped (scans must use a compile DB; backlog); the multi-file
+positional mode only analyzes the first file (known); one unreproduced
+single-run anomaly (a crash-class finding absent once, 240/240
+deterministic since) noted for watch.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
