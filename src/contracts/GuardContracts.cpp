@@ -92,6 +92,32 @@ std::optional<GuardCond> singleParamNullCond(const Expr* cond,
     return out;
 }
 
+// A guard that merely RETURNS is only contract evidence when it
+// COMPLAINS first. The cJSON lesson (corpus pin, 53 -> 88): a silent
+// early return — `if (item == NULL) return false;` in the cJSON_Is*
+// predicates, or InitHooks' reset-to-defaults-then-return — is a
+// null-TOLERANT API: null is a documented input with a defined answer,
+// and callers (their tests!) pass it deliberately. The ERR_FAIL shape
+// that motivated the Rejected class complains before refusing
+// (`{ _err_print_error(...); return ret; }`): the error-report call is
+// the author saying "this is a caller bug". So: at least one
+// expression-statement CALL before the terminal return. Assignments
+// (InitHooks) and bare returns (cJSON_Is*) do not qualify; a branch
+// whose only call is inside the return value (`return make_default();`)
+// is alternative work, not a complaint, and does not qualify either.
+bool complainsBeforeReturn(const Stmt* s) {
+    const auto* cs = dyn_cast<CompoundStmt>(s);
+    if (!cs || cs->body_empty()) return false;  // `return X;` — silent
+    for (const Stmt* b : cs->body()) {
+        if (b == cs->body_back()) break;  // the return itself
+        const auto* e = dyn_cast<Expr>(b);
+        if (!e) continue;
+        if (isa<CallExpr>(e->IgnoreImplicit()->IgnoreParenImpCasts()))
+            return true;
+    }
+    return false;
+}
+
 unsigned lineOf(const Stmt* s, ASTContext& ctx) {
     const SourceManager& sm = ctx.getSourceManager();
     return sm.getSpellingLineNumber(sm.getExpansionLoc(s->getBeginLoc()));
@@ -134,6 +160,9 @@ std::optional<zerodefect::GuardRequire> matchIfGuard(
         return std::nullopt;
     const BranchExit exit = branchExit(ifs->getThen());
     if (exit == BranchExit::FallsThrough) return std::nullopt;
+    if (exit == BranchExit::Returns &&
+        !complainsBeforeReturn(ifs->getThen()))
+        return std::nullopt;  // silent return = null-tolerant API
     // `if (COND) <leave>;` — the guard fires when COND is TRUE, so the
     // surviving path has COND false. We need the guard to fire exactly
     // when the parameter IS null: (param, isNull=true) on true.

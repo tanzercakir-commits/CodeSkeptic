@@ -29,6 +29,19 @@
   — no overlap with compiler warnings. Extensions (possible
   violations, relational guards, cross-TU) wait on verdict.
 
+### Fixed (the cJSON lesson — caught by the corpus referee)
+- **A SILENT early return is not a contract.** First CI run: cJSON
+  corpus pin 53 → 88; all 35 extras were `if (item == NULL) return
+  false;`-shaped "violations" — but those are null-TOLERANT APIs
+  (`cJSON_IsInvalid(NULL)` → false is the documented answer;
+  `cJSON_InitHooks(NULL)` MEANS "reset to defaults"), and their
+  callers pass null on purpose. Refusal evidence now requires the
+  guard to COMPLAIN before returning (an error-report call, then the
+  return — exactly Godot's ERR_FAIL expansion) or to die
+  (assert/abort/throw). Work-then-return (InitHooks) and bare returns
+  (cJSON_Is*) infer nothing. 2 new soundness pins; corpus pin stays
+  at 53 — the feature narrowed, the referee floor did not move.
+
 ### Receipts
 - End-to-end: `crash_callee(nullptr)` → error naming the callee's own
   assert line; `reject_callee(nullptr)` → warning; declared-contract

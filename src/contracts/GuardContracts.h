@@ -17,8 +17,16 @@
 //
 // v1 scope (deliberately the compiler-silent, zero-noise slice):
 //  - recognized guards: a leading `if (<p is null>) <no-fallthrough>`
-//    (the ERR_FAIL expansion shape) and the assert ternary
+//    that either DIES (abort/throw) or COMPLAINS before returning
+//    (the ERR_FAIL expansion shape — an error-report call, then the
+//    return), and the assert ternary
 //    (`cond ? void(0) : __assert_fail(...)`);
+//  - a SILENT early return is NOT a contract: `if (p == NULL) return
+//    false;` is a null-tolerant API (null is a documented input with a
+//    defined answer — the cJSON_Is* predicates, cJSON_InitHooks(NULL)
+//    meaning "reset to defaults") and its callers pass null on
+//    purpose. Learned from the cJSON corpus pin (53 -> 88 without
+//    this line);
 //  - extracted contract: plain `requires p != null` only (compound /
 //    relational escapes are v-next);
 //  - consumers report DEFINITE violations only.

@@ -878,12 +878,16 @@ TEST(GuardContractTest, AssertGuard_NullLiteral_IsError) {
     EXPECT_NE(results[0].message.find("crash"), std::string::npos);
 }
 
-TEST(GuardContractTest, IfReturnGuard_NullLiteral_IsWarning) {
+TEST(GuardContractTest, ComplainThenReturnGuard_NullLiteral_IsWarning) {
+    // The ERR_FAIL shape: the guard COMPLAINS (error-report call) and
+    // then returns — the author marked null a caller bug.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
+        extern void log_fail(const char *);
         int callee(T *p) {
             if (!p) {
+                log_fail("callee: p is null");
                 return -1;
             }
             return p->x;
@@ -896,12 +900,55 @@ TEST(GuardContractTest, IfReturnGuard_NullLiteral_IsWarning) {
     EXPECT_NE(results[0].message.find("refuse"), std::string::npos);
 }
 
+TEST(GuardContractTest, SilentReturnGuard_NullTolerantApi_NotAContract) {
+    // The cJSON lesson: `if (item == NULL) return false;` is a
+    // null-TOLERANT API (null has a defined answer) — callers pass
+    // null deliberately. A silent early return is NOT a contract.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct T { int x; };
+        bool is_valid(T *p) {
+            if (!p) {
+                return false;
+            }
+            return p->x != 0;
+        }
+        bool caller() { return is_valid(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(GuardContractTest, WorkThenReturnGuard_NotAContract) {
+    // The cJSON_InitHooks shape: the null branch DOES the function's
+    // work (reset to defaults) and returns — null means "use
+    // defaults", a documented feature, not a refusal. Assignments are
+    // not a complaint.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Hooks { int mode; };
+        int g_mode;
+        void init_hooks(Hooks *h) {
+            if (!h) {
+                g_mode = 0;
+                return;
+            }
+            g_mode = h->mode;
+        }
+        void caller() { init_hooks(nullptr); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(GuardContractTest, DefinitelyNullVariable_Reported) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
+        extern void log_fail(const char *);
         int callee(T *p) {
-            if (!p) return -1;
+            if (!p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
             return p->x;
         }
         int caller() {
@@ -920,8 +967,12 @@ TEST(GuardContractTest, MaybeNull_NotReported_V1DefiniteOnly) {
     auto results = runRule(rule, R"(
         struct T { int x; };
         extern T *mk();
+        extern void log_fail(const char *);
         int callee(T *p) {
-            if (!p) return -1;
+            if (!p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
             return p->x;
         }
         int caller(int c) {
@@ -939,8 +990,10 @@ TEST(GuardContractTest, CompoundGuard_SkippedInV1) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
+        extern void log_fail(const char *);
         int callee(T *p, unsigned n) {
             if (!p && n > 0) {
+                log_fail("callee: p is null");
                 return -1;
             }
             int s = 0;
@@ -959,9 +1012,13 @@ TEST(GuardContractTest, GuardAfterWork_NotAnEntryGuard) {
     auto results = runRule(rule, R"(
         struct T { int x; };
         extern void log_call();
+        extern void log_fail(const char *);
         int callee(T *p) {
             log_call();
-            if (!p) return -1;
+            if (!p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
             return p->x;
         }
         int caller() { return callee(nullptr); }
@@ -973,9 +1030,13 @@ TEST(GuardContractTest, DeclaredContractOwnsTheParam_NoDoubleReport) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
+        extern void log_fail(const char *);
         // zd: requires p != null
         int callee(T *p) {
-            if (!p) return -1;
+            if (!p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
             return p->x;
         }
         int caller() { return callee(nullptr); }
@@ -994,8 +1055,12 @@ TEST(GuardContractTest, CallerWithNoPointerLocals_StillChecked) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
+        extern void log_fail(const char *);
         int callee(T *p) {
-            if (!p) return -1;
+            if (!p) {
+                log_fail("callee: p is null");
+                return -1;
+            }
             return p->x;
         }
         void caller() { callee(nullptr); }

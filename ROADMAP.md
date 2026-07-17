@@ -1131,6 +1131,26 @@ guard's line so the report reads as "violates X's own entry assert
   AI-GENERATED callers of guarded APIs, the project's mission target;
   its in-tree value is that it costs nothing (zero noise).
 
+**The cJSON lesson (first CI run, corpus referee).** The initial
+if-return arm accepted ANY non-fallthrough return branch — and the
+cJSON corpus pin jumped 53 → 88. All 35 extras were the same class:
+silent early returns on null-TOLERANT APIs. `cJSON_IsInvalid(NULL)`
+→ false is the documented answer to a legitimate question;
+`cJSON_InitHooks(NULL)` MEANS "reset allocators to defaults" — the
+null branch does the function's work. Their callers (the library's
+own tests) pass null deliberately. The correction: **refusal evidence
+requires the guard to COMPLAIN before returning** — an
+expression-statement call (error report) before the terminal return,
+exactly the ERR_FAIL expansion (`{ _err_print_error(...); return
+ret; }`) that motivated the Rejected class — or to die. Bare returns
+and work-then-return infer nothing; a branch whose only call is
+inside the return value (`return make_default();`) is alternative
+work, not a complaint. The corpus pin stays at 53: the feature
+narrowed to fit the evidence, the referee floor did not move. This is
+the ablation discipline working as designed — the corpus caught in
+one CI run an FP class the 6-file Godot noise check could not see
+(Godot's guards all complain; C null-tolerant-API style does not).
+
 **v-next menu (awaiting the "beğenilirse" verdict):** possible-
 violation warnings (maybe-null args), relational/compound guard
 lifting (`!p && n > 0` → `requires p != null unless n == 0`, reusing
