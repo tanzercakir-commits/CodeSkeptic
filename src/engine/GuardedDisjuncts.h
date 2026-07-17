@@ -416,6 +416,22 @@ void refineGuardedFactsOps(GuardedState<VarMap>& state,
     };
     auto applyLeaf = [&](Guarded<VarMap>& d, const clang::Expr* leaf,
                          bool leafTrue) {
+        // Leaf-level domain contradiction drop: when the disjunct's
+        // established state already REFUTES this leaf (a NonNull
+        // pointer meeting a `!p`-true edge — the short-circuit path of
+        // `if (!p && cond)` where cond is false), no path this disjunct
+        // covers can take the edge. Drop it, exactly as a fact
+        // contradiction drops. The motivating receipt (contract
+        // seeding, 2026-07-17): `requires p != null` seeds p NonNull,
+        // then a partial guard `if (!p && n>0) return;` short-circuits
+        // to a fall-through where `!p` held and `n>0` did not — clang
+        // routes p-is-null through to the deref. Overwriting p to Null
+        // (the old extraApply-only behavior) fabricated a path the
+        // contract rules out; dropping the disjunct discharges the
+        // proof burden the contract promised. Only the fact-based +
+        // domain refuters vote here (extraRefutes), so a plain guard
+        // on an unconstrained pointer is untouched.
+        if (refutes(d, leaf, leafTrue)) return false;
         if (!applyFactLeaf(d, leaf, leafTrue, unkeyable, ptrKeyable))
             return false;
         extraApply(d, leaf, leafTrue);
