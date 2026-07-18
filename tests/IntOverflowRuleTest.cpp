@@ -245,6 +245,40 @@ TEST(IntOverflowRuleTest, ConstantFoldedGuardRefines) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(IntOverflowRuleTest, ScanfSourceMultiplyOverflows) {
+    // #97: scanf fills its output arg from external text — the untrusted
+    // source delivered by pointer. `w>0 && h>0` refine to [1, INT_MAX];
+    // w*h escapes int32 on its upper half → report.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        int f(void) {
+            int w, h;
+            if (scanf("%d %d", &w, &h) != 2) return 1;
+            if (w <= 0 || h <= 0) return 1;
+            return w * h;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, ScanfSourceGuardedClean) {
+    // A caller who bounds the scanf value before multiplying is believed.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        int f(void) {
+            int w, h;
+            if (scanf("%d %d", &w, &h) != 2) return 1;
+            if (w < 1 || w > 10000) return 1;
+            if (h < 1 || h > 10000) return 1;
+            return w * h;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(IntOverflowRuleTest, SelfSquareSilent) {
     // KNOWN LIMITATION (honest FN): a square's safe form is guarded by
     // `abs(x) < sqrt(TYPE_MAX)`, which the integer refiner cannot fold —

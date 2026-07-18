@@ -70,6 +70,27 @@ bool isKnownAllocatorCall(const CallExpr* call) {
     return zerodefect::allocFunctionNames().count(name.str()) != 0;
 }
 
+// Intrinsic NULL-returning library calls that are not allocators. Same
+// #92 discipline (key on an intrinsic property of the CALLEE, never on
+// caller data), extended to the lookup functions an AI reaches for on a
+// first draft: getenv returns NULL when the variable is unset, the
+// fopen family returns NULL on failure. The result flows into a
+// dereference (`strchr(getenv(x), ':')`, `fread(buf, 1, n, fopen(...))`)
+// with no NULL check — the thesis-v3 p07 shape. A downstream `if (p)`
+// refines to NonNull exactly as for malloc, so a validated result stays
+// silent; only the unchecked use warns.
+bool isIntrinsicNullSource(const CallExpr* call) {
+    if (isKnownAllocatorCall(call)) return true;
+    if (!call) return false;
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!callee) return false;
+    const IdentifierInfo* id = callee->getIdentifier();
+    if (!id) return false;
+    const llvm::StringRef name = id->getName();
+    return name == "getenv" || name == "fopen" || name == "freopen" ||
+           name == "fdopen" || name == "tmpfile";
+}
+
 NullState mergeNullStates(NullState a, NullState b) {
     if (a == b) return a;
     // Null knowledge on any path is preserved; only NonNull + Unknown
@@ -252,10 +273,11 @@ NullState evaluateNullness(const Expr* expr) {
                 return NullState::MaybeNull;
             }
         }
-        // No summary (opaque call). A KNOWN allocator can return NULL:
-        // MaybeNull so an unguarded deref is caught; everything else
-        // stays Unknown (silent) — the anti-FP-flood default.
-        if (isKnownAllocatorCall(call)) return NullState::MaybeNull;
+        // No summary (opaque call). A KNOWN intrinsic null source
+        // (allocator, getenv, fopen family) can return NULL: MaybeNull so
+        // an unguarded deref is caught; everything else stays Unknown
+        // (silent) — the anti-FP-flood default.
+        if (isIntrinsicNullSource(call)) return NullState::MaybeNull;
         return NullState::Unknown;
     }
 

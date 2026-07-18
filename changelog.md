@@ -1,5 +1,50 @@
 # ZeroDefect — Changelog
 
+## 2026-07-18 — Recall: scanf & getenv as untrusted sources (#97)
+
+Data-driven increment from **thesis-v3** — a fresh 24-program blind AI
+corpus (3 generator agents unaware of the rules, self-annotated ground
+truth, 9 clean files). With the four prior recall rules active it
+measured combined recall **6/16 = 0.375 at precision 1.000** (0 FP on 24
+programs). Triaging the 10 misses showed 4 shared ONE root cause: the
+value that flows into the bug comes from `scanf(&x)` or `getenv()`, both
+unmodeled. This closes that cause with the same intrinsic-source recipe.
+
+### Added
+- **`scanf`/`fscanf`/`sscanf` output arguments are untrusted.** `&n` in a
+  scanf call is filled from external text exactly as an `atoi` return is —
+  now seeded with its type's full FINITE range (for int-overflow &
+  bounds) and MaybeZero (for div-by-zero). `scanf("%d",&n); x/n` and
+  `scanf("%d %d",&w,&h); w*h` now warn; a downstream guard refines and
+  stays silent.
+- **`getenv` / `fopen` family are null sources.** `getenv` returns NULL
+  when the variable is unset; the fopen family on failure. An unchecked
+  deref of the result warns (same #92 discipline as malloc); `if (p)`
+  refines to NonNull.
+
+### Receipts
+- **thesis-v3 recall 6/16 → 9/16 = 0.562** (div-by-zero 2/4 → 4/4,
+  int-overflow 1/2 → 2/2), **precision still 1.000** — 10 findings, all
+  real (one, `n06` `r*8` from scanf, is a genuine overflow the generator
+  did not annotate; not a false positive).
+- All six Juliet floors unchanged and green: **CWE476 (getenv risk) and
+  CWE369 (scanf-maybe-zero risk) both hold rprecision 1.000, fp=0.**
+  602→608 ctest with 6 new pins, shuffle-stable. (Juliet filters the
+  `fscanf` filename family, so the bare-`scanf` precision receipt is
+  carried by thesis-v3's 9 clean files + the guard-refinement pins.)
+
+### Honest negatives (known FNs, documented)
+- **getenv through a libc call** (`strchr(getenv(x), ':')`, the corpus
+  p07 sink) is still missed: the null-deref rule flags a DIRECT deref
+  (`v[0]`, `*v`, `v->f`), not passing a maybe-null pointer to a libc
+  function that dereferences it. Modeling which libc args are
+  dereferenced is a separate follow-up. getenv on a direct deref is
+  caught (verified).
+- Remaining thesis-v3 misses are the genuinely harder classes:
+  loop-write into a fixed buffer (p05), computed-index POSSIBLE OOB
+  (n03/n06 — the bounds rule reports DEFINITE OOB only), cross-iteration
+  / cross-function UAF (m04/m08), and leak on an error path (m07).
+
 ## 2026-07-18 — Recall: int-overflow from an untrusted source (#96)
 
 Fourth application of the #92/#94/#95 recipe (from the thesis-v2 map,

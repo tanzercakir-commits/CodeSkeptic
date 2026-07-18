@@ -1309,6 +1309,35 @@ TEST(StaticLocalTest, PlainLocalNullInit_StillReports) {
     ASSERT_GE(results.size(), 1);
 }
 
+// #97: getenv returns NULL when the variable is unset — an intrinsic
+// null source (same discipline as malloc). An unchecked deref warns; a
+// guard refines it to NonNull.
+TEST(IntrinsicNullSourceTest, GetenvUncheckedDeref_Reports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char *getenv(const char*);
+        int f() {
+            char *v = getenv("PATH");
+            return v[0];
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(IntrinsicNullSourceTest, GetenvGuardedDeref_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char *getenv(const char*);
+        int f() {
+            char *v = getenv("PATH");
+            if (!v) return -1;
+            return v[0];
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(GuardImplicationTest, RealTgaLoader_ImplicationWitness_Clean) {
     // The verbatim-shape stbi__tga_load pin (#84, the #70 residual).
     // The reduced tga shapes above pass WITHOUT the implication-

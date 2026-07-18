@@ -119,6 +119,31 @@ const VarDecl* asIntVar(const Expr* e) {
     return nullptr;
 }
 
+// A formatted-input call that fills its arguments from external text.
+// scanf/fscanf/sscanf and their v-forms deliver an untrusted value the
+// same way atoi does, only through an output POINTER (`&n`) instead of a
+// return. Same intrinsic-source discipline as isUntrustedIntSource.
+bool isScanfFamily(const CallExpr* call) {
+    const FunctionDecl* fd = call->getDirectCallee();
+    if (!fd) return false;
+    const IdentifierInfo* id = fd->getIdentifier();
+    if (!id) return false;
+    const llvm::StringRef n = id->getName();
+    return n == "scanf" || n == "fscanf" || n == "sscanf" || n == "vscanf" ||
+           n == "vfscanf" || n == "vsscanf";
+}
+
+// `&x` where x is a tracked integer variable — the shape a scanf output
+// argument takes. Returns x, or null.
+const VarDecl* addrOfIntVar(const Expr* e) {
+    if (!e) return nullptr;
+    e = e->IgnoreParenImpCasts();
+    if (const auto* u = dyn_cast<UnaryOperator>(e))
+        if (u->getOpcode() == UO_AddrOf)
+            return asIntVar(u->getSubExpr());
+    return nullptr;
+}
+
 std::optional<int64_t> constInt(const Expr* e) {
     if (!e) return std::nullopt;
     e = e->IgnoreParenImpCasts();
@@ -363,6 +388,16 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
         return;
     }
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+        // scanf(&n): n is filled from external text — the untrusted
+        // source delivered by pointer. Seed its type's FULL FINITE range
+        // (not top()), the same model as an atoi return, so a downstream
+        // `n * k` proves overflow and a guard re-narrows on its edge.
+        if (ctx && isScanfFamily(call)) {
+            for (const Expr* arg : call->arguments())
+                if (const VarDecl* v = addrOfIntVar(arg))
+                    if (auto iv = intTypeRange(v->getType(), *ctx)) set(v, *iv);
+            return;
+        }
         // An int passed by non-const reference may be rewritten.
         forEachNonConstRefArg(call, [&](const Expr* arg) {
             if (const VarDecl* v = asIntVar(arg)) set(v, Interval::top());
