@@ -1380,6 +1380,41 @@ other interval consumer) stays fp=0. 602/602 ctest, shuffle-stable.
 - Cross-file (a/b whole-program) variants: intra-procedural rule; not
   caught, never FP.
 
+## 6.28 thesis-v3 + #97 scanf/getenv sources (2026-07-18)
+
+**The re-measurement (thesis-v3).** After four recall rules
+(#92/#94/#95/#96), the question was whether they moved the needle
+*together* on realistic first-draft code — the thesis-v2 map was taken
+before three of them. A fresh 24-program blind AI corpus (3 generator
+agents unaware of the rules, self-annotated ground truth, 9 clean files)
+measured it: **combined recall 6/16 = 0.375 at precision 1.000** (zero
+false positives across 24 programs, 9 of them clean). The recipe is
+validated — recall up from ~0 on every non-alloc class, precision intact.
+
+**The data-pointed increment (#97).** Triaging the 10 misses: 4 shared a
+single root cause — the value reaching the bug comes from `scanf(&x)` or
+`getenv()`, neither modeled. Closed with the same intrinsic-source recipe:
+- scanf/fscanf/sscanf integer OUTPUT args → the type's full finite range
+  (int-overflow, bounds) and MaybeZero (div-by-zero). Delivered by
+  pointer instead of by return, but the same "external text, no bound"
+  signal as atoi.
+- getenv / fopen family → null sources (the #92 discipline, two more
+  intrinsic-NULL library calls).
+
+**Receipts.** thesis-v3 recall **6/16 → 9/16 = 0.562** (div-by-zero 4/4,
+int-overflow 2/2), precision **1.000** (10 findings, all real — one is a
+scanf overflow the generator failed to annotate). All six Juliet floors
+green; CWE476 (getenv) and CWE369 (scanf) both fp=0. A bare-`scanf`
+precision receipt comes from thesis-v3's clean files + guard pins, since
+Juliet filters the `fscanf` family.
+
+**Known FNs (kept honest).** getenv whose result is dereferenced THROUGH
+a libc call (`strchr(getenv(x),':')`) — the rule flags direct derefs, not
+maybe-null-passed-to-a-deref-ing-callee (a separate follow-up). Remaining
+misses are the harder classes: loop-write into a fixed buffer,
+computed-index POSSIBLE OOB (bounds is definite-only), cross-iteration /
+cross-function UAF, and error-path leak.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash

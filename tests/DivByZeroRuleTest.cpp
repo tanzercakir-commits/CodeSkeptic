@@ -567,3 +567,35 @@ TEST(DivByZeroRuleTest, PlainLocalZeroInit_StillReports) {
     )");
     ASSERT_GE(results.size(), 1);
 }
+
+// #97: scanf fills its output arg from external text — MaybeZero, the
+// same intrinsic signal as an atoi divisor. An unguarded `x / n` after
+// scanf warns.
+TEST(DivByZeroRuleTest, ScanfDivisorMaybeZero_Reports) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        int f(int x) {
+            int n;
+            if (scanf("%d", &n) != 1) return 0;
+            return x / n;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+}
+
+// A guard on the scanf value refines it back to NonZero → silent.
+TEST(DivByZeroRuleTest, ScanfDivisorGuarded_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        int f(int x) {
+            int n;
+            if (scanf("%d", &n) != 1) return 0;
+            if (n == 0) return 0;
+            return x / n;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

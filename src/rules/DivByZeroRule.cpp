@@ -264,10 +264,32 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
             return StmtEffect::AssignsUnknown;
         return StmtEffect::None;
     }
-    // `f(z)` where the parameter is a non-const reference (`int&`):
-    // an out-param with no AddrOf node to observe — only the parameter
-    // type reveals that z may be reassigned by the callee.
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+        // scanf("%d", &z): z is filled from external text, which can be
+        // 0 — MaybeZero, the same intrinsic-source signal as an atoi
+        // divisor. This element follows the `&z` AddrOf element (which
+        // set z Unknown) in the fine-grained CFG, so it lands last and
+        // wins. `x / z` after an unguarded scanf now warns; a guard
+        // (`if (z)`) refines it back to NonZero.
+        if (const FunctionDecl* fd = call->getDirectCallee()) {
+            if (const IdentifierInfo* id = fd->getIdentifier()) {
+                const llvm::StringRef n = id->getName();
+                const bool scanf = n == "scanf" || n == "fscanf" ||
+                                   n == "sscanf" || n == "vscanf" ||
+                                   n == "vfscanf" || n == "vsscanf";
+                if (scanf)
+                    for (const Expr* arg : call->arguments()) {
+                        const Expr* a = arg->IgnoreParenImpCasts();
+                        if (const auto* u = dyn_cast<UnaryOperator>(a))
+                            if (u->getOpcode() == UO_AddrOf &&
+                                refersToVar(u->getSubExpr(), targetVar))
+                                return StmtEffect::AssignsMaybeZero;
+                    }
+            }
+        }
+        // `f(z)` where the parameter is a non-const reference (`int&`):
+        // an out-param with no AddrOf node to observe — only the
+        // parameter type reveals that z may be reassigned by the callee.
         bool invalidated = false;
         zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
             if (refersToVar(arg, targetVar)) invalidated = true;
