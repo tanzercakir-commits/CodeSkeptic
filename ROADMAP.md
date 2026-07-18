@@ -1448,6 +1448,24 @@ interprocedural version, deferred. This is the shallow, precise slice of
 the deref-by-proxy class; the summary-based version is where §4.A's
 intent-verification bet would carry it further.
 
+## 6.30 Typestate / protocol intent-verification — designed & PARKED (2026-07-18)
+
+The concrete form of "intent verification" for ordering/lifecycle intent
+(use-after-close, double-close, missing-release, "init before use") is a
+per-object typestate automaton over the shared engine — a generalization
+of the already-shipped `AllocState` typestate (guarded by CWE401/415/416
+at rprecision 1.000). Full feasibility, formal object, three intent
+sources, minimal `FILE*` v1, and the executable guard plan (a NEW Juliet
+floor on CWE775/CWE404, verified present in the corpus) are written up in
+**`TYPESTATE_FEASIBILITY.md`**. Recommendation there is GO on Phase 1.
+
+**PARKED by decision (2026-07-18):** ship-readiness before new
+experiments — the recall series (§6.25–6.29) is done and the tool is
+strong; endless experiments delay the public release. Typestate Phase 1
+is deferred (planned for the Fable-quota window). The feasibility notes
+are preserved in the repo so the design is not lost. Resume gate: after
+public-release readiness.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
