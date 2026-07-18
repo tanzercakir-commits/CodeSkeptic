@@ -54,6 +54,30 @@ struct MulSite {
     unsigned bits;
 };
 
+// The two operands of `*` are the SAME variable (`x * x` — a square).
+// KNOWN LIMITATION / honest FN: the safe form of a square bounds the
+// operand with `abs(x) < sqrt(TYPE_MAX)` (there is no other way to keep
+// x*x inside the type), and that guard rests on `abs` and `sqrt` — a
+// call and a floating-point operation the integer-interval refiner
+// cannot fold. So a guarded-safe square looks identical to an unguarded
+// one (its operand keeps the source's full range either way), and
+// reporting it would be a false positive on correct code. We therefore
+// stay SILENT on x*x until abs/sqrt guards are modeled — precision over
+// recall. A distinct-operand product (`w * h`, `n * k`) is unaffected:
+// its natural guard (`w < K`) is a plain constant comparison that DOES
+// refine. Measured on Juliet CWE190: every square-op false positive is
+// exactly this abs/sqrt-guarded good sink.
+bool isSelfSquare(const BinaryOperator* op) {
+    auto asVar = [](const Expr* e) -> const ValueDecl* {
+        e = e->IgnoreParenImpCasts();
+        if (const auto* ref = dyn_cast<DeclRefExpr>(e)) return ref->getDecl();
+        return nullptr;
+    };
+    const ValueDecl* l = asVar(op->getLHS());
+    const ValueDecl* r = asVar(op->getRHS());
+    return l && l == r;
+}
+
 std::vector<MulSite> collectSignedMuls(const FunctionDecl* fn,
                                        ASTContext& ctx) {
     struct V : RecursiveASTVisitor<V> {
@@ -66,6 +90,7 @@ std::vector<MulSite> collectSignedMuls(const FunctionDecl* fn,
             if (!t->isIntegerType() || !t->isSignedIntegerType()) return true;
             unsigned bits = ctx.getIntWidth(t);
             if (bits >= 64) return true;  // int64 product is unreportable
+            if (isSelfSquare(op)) return true;  // abs/sqrt guard — see above
             muls.push_back({op, bits});
             return true;
         }
@@ -105,7 +130,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         const zerodefect::IntervalMap* st = analysis.stateAt(site.op);
         if (!st) continue;  // unreached / not recorded — nothing proven
 
-        zerodefect::Interval product = zerodefect::evalInterval(site.op, *st);
+        zerodefect::Interval product =
+            zerodefect::evalInterval(site.op, *st, &ctx);
 
         // Report ONLY when the product's range is fully proven (bounded)
         // AND provably escapes the multiplication's own signed type. An

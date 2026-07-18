@@ -1322,11 +1322,63 @@ the remaining ~0 classes with a plausible intrinsic lever:
   `char[N]`; catches hash_djb2; Godot 0 FP). The memcpy-variable-length
   case (tokenize_fixed) remains — Pattern B, needs the length's
   caller-dependency handled like #94's parameter divisor.
-- **`malloc(a*b)` size-multiply overflow** — CWE-190; catches
-  alloc_grid.
+- **Untrusted-int-source multiply overflow** — CWE-190. DONE (#96):
+  `int n = atoi(input); n * k` now proves overflow. The original
+  `malloc(a*b)`/alloc_grid framing dissolved on inspection (its corpus
+  cases were all provably safe, or 64-bit, which the rule soundly skips);
+  the real intrinsic lever is a text-parse source (atoi/strtol), whose
+  result spans the whole return-type range. See §6.27.
 Memory-leak (return-value ownership escape, parse_or_fail class) and
 UAF (cross-function conditional free, dup_free class) are harder,
 deferred.
+
+## 6.27 #96 Int-overflow recall — untrusted source (2026-07-18)
+
+Fourth recipe application (after #92 alloc, #94 div-zero, #95 str-copy);
+the thesis-v2 map's int-overflow row was 0.
+
+**The premise correction.** The original plan (§6.26) was `malloc(a*b)`
+size-overflow, "catches alloc_grid". On inspection that premise
+dissolved: alloc_grid's `rows*cols*4` is a provably-safe constant
+(12*20*4=960), and the realistic `malloc(n*sizeof(T))` shape is 64-bit
+arithmetic the rule soundly skips. The genuine intrinsic lever is the
+same one #94 found for div-zero: a **text-parse source**. `atoi(s)` can
+return any int, so `int n = atoi(s); n * k` is a real, unguarded
+overflow — and it is exactly what an AI writes on a first draft.
+
+**Two mechanisms:**
+- *Source model.* `evalInterval` seeds an atoi/strtol-family call with
+  its return type's full FINITE range. Finite is the whole point: a
+  bounded range multiplies into a provably-overflowing product, while
+  the old top() collapsed the product straight back to top() (silent).
+  Threaded through `applyIntervalAssign` → `IntervalAnalysis::transfer`
+  so the shared numeric dataflow carries it; the overflow rule reads it
+  back unchanged.
+- *Guard fold.* Edge refinement now folds constant ARITHMETIC on the
+  compared-against side (`n < INT_MAX/2`) via Clang's constant
+  evaluator, not just plain literals. This is what makes the recall
+  precise — the Juliet good sinks bound with exactly this idiom — and it
+  fixed a pre-existing FP on those good functions.
+
+**Receipts.** Juliet CWE190: **42 TP, 0 FP, precision 1.000** (full
+3080-file corpus); 400-sample rprecision 1.000, rhitrate 0.010 → new
+floor 0.95/0.005. Five prior floors unchanged and green; CWE369 (the
+other interval consumer) stays fp=0. 602/602 ctest, shuffle-stable.
+
+**Honest negatives (ablation, kept).**
+- `rand()`/`random()` excluded from the interval source set — range is
+  `[0, RAND_MAX]`, RAND_MAX implementation-defined (≥32767); a full-int
+  over-approximation would FP on `rand()*k`. No measured recall cost:
+  Juliet's rand family reaches the sink through the `RAND32()` bit
+  shuffle the evaluator cannot fold regardless.
+- Self-square `x*x` skipped — its safe form is `abs(x) < sqrt(TYPE_MAX)`,
+  which rests on abs/sqrt the integer refiner cannot fold, so a
+  guarded-safe square looks identical to an unguarded one. Every
+  square-op FP in the corpus is exactly that good sink; staying silent
+  is precision-first. Modeling abs/sqrt guards is the follow-up if the
+  square shape ever earns it on real code.
+- Cross-file (a/b whole-program) variants: intra-procedural rule; not
+  caught, never FP.
 
 ## 7. Build recipe (unchanged since 2026-07)
 

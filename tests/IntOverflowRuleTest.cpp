@@ -188,3 +188,77 @@ TEST(IntOverflowRuleTest, SixtyFourBitProductNotReported) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- #96: untrusted-source recall (CWE-190) ---
+//
+// An intrinsic untrusted source (atoi/strtol/rand) seeds the divisor's
+// interval to its return type's FULL range, so an unguarded multiply on
+// it provably overflows — the canonical `int n = atoi(input); n * k`
+// shape an AI writes on a first draft.
+
+TEST(IntOverflowRuleTest, UntrustedSourceMultiplyOverflows) {
+    // atoi() returns the full int range; `n > 0` refines to [1, INT_MAX];
+    // [1, INT_MAX] * 2 escapes int32 on its upper half → report.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s) {
+            int n = atoi(s);
+            if (n > 0) return n * 2;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(IntOverflowRuleTest, UntrustedSourceOverflowGuardedClean) {
+    // The caller who bounds the value before multiplying is believed:
+    // `n < 10000` refines the range, product fits int32 → silent.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s) {
+            int n = atoi(s);
+            if (n > 0 && n < 10000) return n * 2;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, ConstantFoldedGuardRefines) {
+    // Part 1: an overflow guard written with constant ARITHMETIC
+    // (`x < LIMIT/2`, the Juliet good-sink idiom) must refine like a
+    // plain literal. x is pinned to 2e9; the folded guard makes the
+    // guarded branch infeasible (⊥), so the multiply is never reported.
+    // Without the fold x keeps [2e9] and x*2 would be a false positive.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f(void) {
+            int x = 2000000000;
+            if (x < 2000000000 / 2) return x * 2;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, SelfSquareSilent) {
+    // KNOWN LIMITATION (honest FN): a square's safe form is guarded by
+    // `abs(x) < sqrt(TYPE_MAX)`, which the integer refiner cannot fold —
+    // so a guarded-safe square is indistinguishable from an unguarded
+    // one and reporting `x * x` would false-positive. We stay silent on
+    // self-multiply until abs/sqrt guards are modeled.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s) {
+            int n = atoi(s);
+            if (n > 0) return n * n;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

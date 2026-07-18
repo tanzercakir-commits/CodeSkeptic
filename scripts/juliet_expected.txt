@@ -52,8 +52,23 @@
 # fully sensitive to real regressions (verified: 32/32 new CWE476
 # null-deref "FPs" are exactly this class, 0 genuine FP; rprecision
 # holds at 1.000). Recall rises 0.30-baseline -> 0.347.
+# 2026-07-18 (#96 int-overflow untrusted-source recall): the
+# int-overflow rule now models a text-parse source (atoi/strtol family)
+# as its return type's full range, so `int n = atoi(input); n * k`
+# proves overflow — the canonical untrusted-multiply shape. NEW floor
+# for CWE190. Measured on the strided 400-file sample: rprecision 1.000,
+# rhitrate 0.010 (full 3080-file corpus: 42 TP, 0 FP, precision 1.000).
+# Floor rprecision 0.95 (matches the other perfect-precision rules — a
+# single new FP fails it); rhitrate 0.005 (a ~2x margin that catches a
+# total recall collapse to 0 while tolerating sample jitter). Recall is
+# deliberately narrow: rand()'s [0,RAND_MAX] range is NOT over-
+# approximated (documented known FN — RAND32() bit-shuffle), and self-
+# square x*x is skipped (its safe form is guarded by abs()/sqrt(), which
+# the integer refiner cannot fold — every square-op FP is exactly that
+# good sink). Precision-first, as everywhere.
 CWE476 0.95 0.30
 CWE401 0.66 0.18
 CWE415 0.95 0.23
 CWE416 0.95 0.48
 CWE369 0.95 0.03
+CWE190 0.95 0.005
