@@ -49,7 +49,7 @@ Data flow:
   Diagnostic(+TraceNotes) ──▶ canonical path → suppression → baseline
     → severity filter → sort+dedup ──▶ Reporter
 
-Engine contracts (kept in sync with todo.md "Technical Notes"):
+Engine contracts:
   - transfer is pure; reporting happens only in the post-fixpoint pass
   - CFG is fine-grained (setAllAlwaysAdd): analyses look only at the
     top node of each element; CFGs come from the shared CfgCache

@@ -161,4 +161,4 @@ libgit2, llama.cpp, NASA fprime, abseil, Catch2).
   recall; the hit-rate numbers in the README reflect this).
 - Analysis is per translation unit unless `--whole-program` or summary
   files are used.
-- See the README's Benchmark section and `todo.md` for the full list.
+- See the README's Benchmark section for the full list.

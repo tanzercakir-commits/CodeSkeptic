@@ -3,9 +3,9 @@
 This document tracks the project's verified state, its positioning, and
 the decisions that remain. The previous revision (2026-07) described a
 pre-public prototype; almost everything it planned has since shipped.
-History lives in `changelog.md`; the maintenance backlog lives in
-`todo.md`. This file is for STRATEGY: what is true today, and which
-forks in the road are still open.
+History lives in `changelog.md`; the maintenance backlog lives in the
+session task list. This file is for STRATEGY: what is true today, and
+which forks in the road are still open.
 
 ---
 
@@ -157,7 +157,7 @@ once the repo is public.
   upstream reports (drafts delivered).
 - **Fri**: public flip (user), contract-language co-design session
   (4.A, max effort).
-- Rolling maintenance from `todo.md` (fstab-util correlation loss,
+- Rolling maintenance from the backlog (fstab-util correlation loss,
   llama header-template non-convergence residue, ternary-value FN,
   Redis idiom round 2) — each is an ordinary PR round guarded by the
   three referees.
