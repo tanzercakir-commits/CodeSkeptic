@@ -1,5 +1,40 @@
 # ZeroDefect — Changelog
 
+## 2026-07-18 — Recall: null dereference through a libc call (#98)
+
+The thesis-v3 miss `p07` — `strchr(getenv(x), ':')` — dereferences a
+possibly-null pointer, but through a libc call rather than a `*p`/`p->f`
+site, so the null-deref rule stayed silent. This closes that shape.
+
+### Added
+- **Passing a Null/MaybeNull pointer to a libc function that
+  unconditionally dereferences that argument is a dereference by proxy.**
+  A curated whitelist (`strlen`, `strcpy`, `strcat`, `strcmp`, `strchr`,
+  `strstr`, `strdup`, `atoi`, `strtol`, `puts`, …) — functions whose
+  contract makes the access certain, with NO length parameter that could
+  be 0 to excuse it — is treated exactly like a direct deref: unguarded
+  warns, a guard refines to NonNull and stays silent. Reuses the whole
+  existing report path (severity ladder, report-flood dedup, traces).
+
+### Receipts
+- **thesis-v3 recall 9/16 → 10/16 = 0.625** (null-deref 2/3 → **3/3**;
+  p07 now caught), **precision still 1.000** — the one unmatched finding
+  remains the real `n06` scanf overflow, not an FP.
+- **Juliet CWE476 unchanged: rprecision 1.000, fp=0** — the whitelist
+  adds no false positives on the benchmark. 608→612 ctest with 4 new
+  pins, shuffle-stable.
+
+### Honest scope (known FNs)
+- The dereferenced pointer must be a tracked VARIABLE. The inline form
+  `strcpy(buf, getenv("X"))` — where the null source is the argument
+  expression itself, not a variable — is not caught yet (follow-up:
+  evaluate the argument's nullness, not just a variable's state).
+- The n-bounded `mem*`/`strn*` forms are deliberately excluded: a 0
+  length dereferences nothing, so they are not unconditional.
+- A CUSTOM function that dereferences its parameter (VeraCrypt's
+  `SetUserEnvPATH(getenv("PATH"))`) needs a per-callee "derefs-param"
+  summary — a separate interprocedural follow-up.
+
 ## 2026-07-18 — Recall: scanf & getenv as untrusted sources (#97)
 
 Data-driven increment from **thesis-v3** — a fresh 24-program blind AI
