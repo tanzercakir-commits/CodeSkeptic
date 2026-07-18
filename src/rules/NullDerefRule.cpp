@@ -351,6 +351,46 @@ Effect classifyStmt(const Stmt* stmt) {
     return {};
 }
 
+// libc functions that UNCONDITIONALLY dereference a pointer argument — a
+// NULL there is definite UB, with NO length parameter that could be 0 to
+// excuse it. Passing a Null/MaybeNull pointer to one of these is a
+// dereference BY PROXY: `strchr(getenv(x), ':')` (thesis-v3 p07) and the
+// everyday `strcpy(buf, getenv(x))`. The curated whitelist keeps this as
+// precise as a direct deref — only callees whose contract makes the
+// access certain are listed (the n-bounded mem*/strn* forms are omitted:
+// a 0 length dereferences nothing, so they are not unconditional). This
+// is the intrinsic-signal discipline pointed at the callee's contract,
+// the same as isIntrinsicNullSource. Appends the tracked pointer vars at
+// the dereferenced positions to `out`.
+void collectLibcDerefArgs(const CallExpr* call,
+                          std::vector<const VarDecl*>& out) {
+    const FunctionDecl* fd = call->getDirectCallee();
+    if (!fd) return;
+    const IdentifierInfo* id = fd->getIdentifier();
+    if (!id) return;
+    const llvm::StringRef n = id->getName();
+
+    unsigned mask = 0;  // bit i set => argument i is dereferenced
+    if (n == "strlen" || n == "strchr" || n == "strrchr" || n == "strdup" ||
+        n == "atoi" || n == "atol" || n == "atoll" || n == "atof" ||
+        n == "strtol" || n == "strtoul" || n == "strtoll" ||
+        n == "strtoull" || n == "puts")
+        mask = 0b01;  // the single string argument (endptr etc. is nullable)
+    else if (n == "strcpy" || n == "strcat" || n == "stpcpy" ||
+             n == "strcmp" || n == "strcasecmp" || n == "strstr" ||
+             n == "strcasestr" || n == "strpbrk" || n == "strspn" ||
+             n == "strcspn")
+        mask = 0b11;  // both pointer operands are read/written
+    else
+        return;
+
+    const unsigned nargs = call->getNumArgs();
+    for (unsigned i = 0; i < nargs && i < 2; ++i)
+        if (mask & (1u << i))
+            if (const VarDecl* v = asVar(call->getArg(i)))
+                out.push_back(v);
+}
+
 // --- Branch condition refinement (assume edges) ---
 
 using NullVarState = std::map<const VarDecl*, NullVal>;
@@ -978,10 +1018,29 @@ public:
                             zerodefect::MsgId::TraceAssignedMaybeNullHere);
         }
 
+        // Direct dereference (`*p`, `p->x`, `p[i]`).
         Effect effect = classifyStmt(stmt);
-        if (effect.kind != EffectKind::Deref) return;
+        if (effect.kind == EffectKind::Deref)
+            reportDerefOf(effect.var, stmt, before, ctx);
 
-        auto it = before.find(effect.var);
+        // Dereference by proxy: a Null/MaybeNull pointer passed to a libc
+        // function that dereferences that argument (#98). Reuses the same
+        // report path — dedup, severity, trace notes — as a direct deref.
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            std::vector<const VarDecl*> derefArgs;
+            collectLibcDerefArgs(call, derefArgs);
+            for (const VarDecl* v : derefArgs)
+                reportDerefOf(v, stmt, before, ctx);
+        }
+    }
+
+    // Emit a null-deref finding for `var` dereferenced at `stmt`, if its
+    // pre-statement state is Null/MaybeNull. Shared by direct derefs and
+    // libc deref-by-proxy; owns the dedup, severity ladder, and the
+    // report-flood collapse to "also dereferenced here" trace notes.
+    void reportDerefOf(const VarDecl* var, const Stmt* stmt,
+                       const NullVarState& before, ASTContext& ctx) {
+        auto it = before.find(var);
         if (it == before.end()) return;
         if (it->second.st != NullState::Null &&
             it->second.st != NullState::MaybeNull)
@@ -990,7 +1049,7 @@ public:
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
-        if (!reported_.emplace(effect.var, line).second) return;
+        if (!reported_.emplace(var, line).second) return;
 
         const bool definite = (it->second.st == NullState::Null);
 
@@ -1002,7 +1061,7 @@ public:
         // reports keep per-line granularity — they are rare and each
         // site matters.
         if (!definite) {
-            auto first = firstWarnIndex_.find(effect.var);
+            auto first = firstWarnIndex_.find(var);
             if (first != firstWarnIndex_.end()) {
                 zerodefect::TraceNote note;
                 note.file = sm.getFilename(loc).str();
@@ -1010,8 +1069,8 @@ public:
                 note.column = sm.getSpellingColumnNumber(loc);
                 note.message = zerodefect::msg(
                     zerodefect::MsgId::TraceAlsoDerefHere,
-                    effect.var->getNameAsString());
-                alsoDerefs_[effect.var].push_back(std::move(note));
+                    var->getNameAsString());
+                alsoDerefs_[var].push_back(std::move(note));
                 return;
             }
         }
@@ -1026,17 +1085,17 @@ public:
             diag.severity = zerodefect::Severity::Error;
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::NullDerefDefinite,
-                effect.var->getNameAsString());
+                var->getNameAsString());
         } else {
             diag.severity = zerodefect::Severity::Warning;
             diag.message = zerodefect::msg(
                 zerodefect::MsgId::NullDerefMaybe,
-                effect.var->getNameAsString());
+                var->getNameAsString());
         }
         results_.push_back(diag);
         if (!definite)
-            firstWarnIndex_[effect.var] = results_.size() - 1;
-        noteTargets_.emplace_back(results_.size() - 1, effect.var);
+            firstWarnIndex_[var] = results_.size() - 1;
+        noteTargets_.emplace_back(results_.size() - 1, var);
     }
 
     // After the run finishes: attach the null-assignment traces to

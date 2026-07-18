@@ -1338,6 +1338,68 @@ TEST(IntrinsicNullSourceTest, GetenvGuardedDeref_Clean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// #98: a Null/MaybeNull pointer passed to a libc function that
+// dereferences that argument is a dereference by proxy.
+TEST(DerefThroughCallTest, GetenvIntoStrchr_Reports) {
+    // The thesis-v3 p07 shape: strchr dereferences its first argument.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char *getenv(const char*);
+        extern char *strchr(const char*, int);
+        int f(const char* name) {
+            char *v = getenv(name);
+            return strchr(v, ':') ? 1 : 0;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(DerefThroughCallTest, MallocIntoStrlen_Reports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern void *malloc(unsigned long);
+        extern unsigned long strlen(const char*);
+        unsigned long f() {
+            char *p = (char*) malloc(16);
+            return strlen(p);
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(DerefThroughCallTest, GuardedBeforeCall_Clean) {
+    // A guard refines the source to NonNull before the libc call.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char *getenv(const char*);
+        extern unsigned long strlen(const char*);
+        unsigned long f() {
+            char *v = getenv("PATH");
+            if (!v) return 0;
+            return strlen(v);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DerefThroughCallTest, NBoundedMemFn_NotFlagged) {
+    // memcpy/strncpy carry a length that may be 0 → NOT an unconditional
+    // deref, deliberately excluded (precision-first). No report even
+    // though `p` is MaybeNull.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern void *malloc(unsigned long);
+        extern void *memcpy(void*, const void*, unsigned long);
+        void f(char* dst, unsigned long n) {
+            char *p = (char*) malloc(16);
+            memcpy(dst, p, n);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(GuardImplicationTest, RealTgaLoader_ImplicationWitness_Clean) {
     // The verbatim-shape stbi__tga_load pin (#84, the #70 residual).
     // The reduced tga shapes above pass WITHOUT the implication-

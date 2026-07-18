@@ -1415,6 +1415,39 @@ misses are the harder classes: loop-write into a fixed buffer,
 computed-index POSSIBLE OOB (bounds is definite-only), cross-iteration /
 cross-function UAF, and error-path leak.
 
+## 6.29 #98 Null dereference through a libc call (2026-07-18)
+
+The thesis-v3 `p07` miss and a live VeraCrypt example
+(`SetUserEnvPATH(getenv("PATH"))`) share a shape the null-deref rule
+could not see: a possibly-null pointer is dereferenced not at a `*p` /
+`p->f` / `p[i]` site but by PASSING it to a function that dereferences
+it. `strchr(getenv(x), ':')` is a null deref exactly as `getenv(x)[0]`
+is — the access just happens one call frame down.
+
+**Mechanism.** A curated whitelist of libc functions that
+UNCONDITIONALLY dereference a pointer argument (strlen/strcpy/strcat/
+strcmp/strchr/strstr/strdup/atoi/strtol/puts/…) — chosen because their
+contract makes the access certain and they carry no length that could be
+0 — is treated as a deref of that argument. Reuses the entire existing
+report path (severity ladder, report-flood dedup, traces). The signal is
+intrinsic to the CALLEE's contract, the same discipline as
+isIntrinsicNullSource — so precision is that of a direct deref.
+
+**Receipts.** thesis-v3 recall **9/16 → 10/16 = 0.625** (null-deref
+2/3 → 3/3; p07 caught), precision **1.000** (the lone unmatched finding
+is the real n06 scanf overflow). Juliet CWE476 unchanged at rprecision
+1.000, fp=0; all six floors green. 612 ctest, shuffle-stable.
+
+**Honest scope (known FNs).** (1) The pointer must be a tracked VARIABLE;
+the inline `strcpy(buf, getenv("X"))` (source is the argument expression
+itself) is a follow-up — evaluate the arg's nullness, not just a
+variable's state. (2) n-bounded mem*/strn* forms excluded (a 0 length
+dereferences nothing). (3) A CUSTOM function that dereferences its
+parameter needs a per-callee "derefs-param" summary — the
+interprocedural version, deferred. This is the shallow, precise slice of
+the deref-by-proxy class; the summary-based version is where §4.A's
+intent-verification bet would carry it further.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
