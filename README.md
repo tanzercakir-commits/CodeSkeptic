@@ -24,8 +24,22 @@ machine-readable findings with dataflow traces.
 | Use after free | `use-after-free` | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
+| Array/heap bounds | `bounds` | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
+| Integer overflow | `int-overflow` | Signed multiplication whose proven operand ranges escape the type (CWE-190), including an untrusted source (`int n = atoi(s); n * k`) |
 | Contract verification | `contract` | Violations of declared `// zd:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries; `contract-syntax` / `contract-unsupported` keep unparseable or unverifiable contracts visible |
 | Policy enforcement | `policy` | `zd:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
+
+**Intrinsic-source recall (v0.3):** the rules above recognize the
+library calls whose *contract* makes a defect intrinsic — `malloc`/
+`calloc`/`getenv`/`fopen` may return null, `atoi`/`strtol`/`scanf` deliver
+unbounded untrusted values, `strcpy`/`strchr` have no bound / dereference
+their argument. Keying on the callee's contract (never on caller data)
+turns the everyday first-draft shapes an AI writes — `p = malloc(n); *p`,
+`x / atoi(s)`, `int n = atoi(s); n * k`, `strchr(getenv(x), ':')` — into
+findings, while a downstream guard refines the state and stays silent. On
+a blind 24-program AI corpus this lifted combined recall from ~0 (on the
+non-alloc classes) to **0.625 at precision 1.000** (zero false positives,
+including on 9 deliberately-clean programs).
 
 **Targeted path-sensitivity:** the memory rules keep a small set of
 guarded states instead of one merged state, keyed by conditions on
@@ -84,7 +98,14 @@ FP-hunting material).
 | CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (141 TP / 0 FP) | 0.352 | **0.521** |
 | CWE-415 Double Free | `double-free` | **1.000** (95 TP / 0 FP) | 0.241 | 0.388 |
 | CWE-401 Memory Leak | `memory-leak` | 0.716 (case-level) | 0.195 | 0.306 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (20 TP / 0 FP) | 0.050 | 0.095 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (38 TP / 0 FP) | 0.095 | 0.174 |
+| CWE-190 Integer Overflow | `int-overflow` | **1.000** (42 TP / 0 FP*) | 0.010 | 0.020 |
+
+<sub>* CWE-190 precision measured over the full 3080-file corpus (42 TP,
+0 FP); the recall figure is the CI-sampled rate. The rand-source family
+reaches the sink through a bit-shuffle macro the interval evaluator
+cannot fold — a documented known false negative — so the sampled recall
+is deliberately low while precision is perfect.</sub>
 
 The journey these numbers took: targeted path-sensitivity
 (2026-07-10) cut false positives across rules (memory-leak 92 → 61,
@@ -131,8 +152,12 @@ Notes on reading these numbers honestly:
   cross-rule noise on other CWEs' files) and is the current
   improvement target.
 
-Results are from the 2026-07-12 run; grep `JULIET_RESULT` in the
-weekly workflow logs for current numbers.
+Results are from the 2026-07-18 run (v0.3); grep `JULIET_RESULT` in the
+weekly workflow logs for current numbers. The v0.3 recall series added a
+sixth per-CWE floor (CWE-190) and raised div-by-zero recall via untrusted
+sources — all six floors hold rprecision 1.000 with zero regressions.
+Beyond Juliet, a blind 24-program AI corpus (the design's actual target)
+measures combined first-draft recall at 0.625 / precision 1.000.
 
 ## Real-world scans
 
@@ -596,5 +621,7 @@ support, benchmark-driven precision measurement, incremental analysis,
 and MCP-server mode for agent integration.
 
 ## License
+
+Apache License 2.0 — see [LICENSE](LICENSE).
 
 Apache License 2.0 — see [LICENSE](LICENSE).

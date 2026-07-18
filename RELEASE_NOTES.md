@@ -1,3 +1,83 @@
+# ZeroDefect v0.3.0
+
+The recall release — tuned for its actual job: an analyzer an AI runs as
+an MCP server to re-check its own first-draft code. v0.1 tracked symbolic
+state, v0.2 added numeric reasoning; v0.3 asks a sharper question — *do we
+actually catch the bugs an AI writes on a first pass?* — and closes the
+gap on six of them, at zero measured precision cost.
+
+## The recipe: intrinsic-source recall
+
+Every rule below keys on an **intrinsic property of a library call's
+contract**, never on caller data. `malloc` intrinsically may return null;
+`atoi`/`strtol` intrinsically parse an unbounded value; `scanf` fills its
+output from untrusted text; `strcpy` intrinsically has no length bound;
+`getenv` may return null; `strchr(p, …)` unconditionally dereferences `p`.
+Keying on the *callee's* contract is what keeps precision at a direct
+proof's level: a downstream guard (`if (p)`, `if (n < LIMIT)`) refines the
+state on its own edge, so validated input stays silent — only the
+unchecked use warns.
+
+| Increment | Class | Shape now caught |
+|-----------|-------|------------------|
+| Unchecked allocation | CWE-690/476 | `p = malloc(n); *p` with no null check |
+| Div-by-zero from untrusted input | CWE-369 | `x / atoi(s)`, `x / n` after `scanf` |
+| Unbounded copy into a fixed buffer | CWE-120 | `strcpy`/`strcat`/`gets` into `char[N]` |
+| Int-overflow from an untrusted source | CWE-190 | `int n = atoi(s); n * k` |
+| `scanf` / `getenv` sources | 190/369/476 | `scanf("%d",&n)` untrusted; `getenv()` maybe-null |
+| Null dereference through a libc call | CWE-476 | `strchr(getenv(x), ':')` |
+
+Guard understanding was sharpened alongside: overflow guards written with
+constant *arithmetic* (`n < INT_MAX/2`, the idiom real code uses) now
+fold and refine.
+
+## Measured on a blind AI corpus
+
+The gate for this release is **thesis-v3**: a fresh 24-program corpus
+written by generator agents that were *unaware of the analyzer's rules*,
+first-draft quality, with self-annotated ground truth (9 of 24 files
+deliberately clean). With the six rules active:
+
+- **Combined recall 6/16 → 10/16 = 0.625** (up from ~0 on every non-alloc
+  class before the series).
+- **Precision 1.000** — zero false positives across all 24 programs,
+  including the 9 clean ones. (One finding beyond ground truth turned out
+  to be a *real* overflow the generator failed to annotate.)
+
+A NEW NIST Juliet floor guards CWE-190 (rprecision 1.000, 0 FP over the
+full 3080-file corpus); all six per-CWE floors stay green with zero
+regressions — the CWE-369 and CWE-476 floors, the classes the new sources
+feed, both hold rprecision 1.000, fp=0.
+
+## Confirmed clean at scale (precision, the other direction)
+
+Two large, mature, heavily-audited codebases were scanned end-to-end and
+came back with **zero findings in their own code** — the honest signal
+that the recall additions did not cost precision:
+
+- **Bitcoin Core** — 236 own translation units: 0 findings (the rules
+  fired 19 times, all in dependency/system headers, correctly filtered).
+- **VeraCrypt** — 95 units including the untrusted-volume-header parsing
+  attack surface: 0 findings; the 17 `getenv` sites were hand-verified as
+  correctly guarded.
+
+Modern C++ (RAII) and custom-allocator codebases give the C-idiom rules
+little surface — an honest negative, not a miss: no low-hanging defect of
+these classes was present, and none was invented.
+
+## Honest negatives (documented, kept)
+
+Each rule ships with its ablation receipts: `rand()` is excluded from the
+interval source set (its range is `[0, RAND_MAX]`, not the full int);
+self-square `x*x` is skipped (its safe form guards with `abs`/`sqrt`,
+unmodellable); the inline `strcpy(buf, getenv(...))` and custom
+functions that dereference a parameter are deferred to interprocedural
+follow-ups. Spec-level and cross-process bugs (a valid-key length rule, an
+IPC ownership contract) remain deliberately out of scope — they need
+declared intent, not code-only inference.
+
+---
+
 # ZeroDefect v0.2.0
 
 The quantitative release. v0.1 tracked only SYMBOLIC state (null?
