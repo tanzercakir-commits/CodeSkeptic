@@ -65,6 +65,7 @@ CWES=(
     "CWE415_Double_Free"
     "CWE416_Use_After_Free"
     "CWE369_Divide_by_Zero"
+    "CWE190_Integer_Overflow"
 )
 
 run_cwe() { # <cwe-name>

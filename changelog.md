@@ -1,5 +1,48 @@
 # ZeroDefect — Changelog
 
+## 2026-07-18 — Recall: int-overflow from an untrusted source (#96)
+
+Fourth application of the #92/#94/#95 recipe (from the thesis-v2 map,
+where int-overflow recall was 0). CWE-190. Key on an INTRINSIC signal —
+a text-parse call's result — never on caller data.
+
+### Added
+- **`int n = atoi(input); n * k` now proves overflow.** A parse-of-text
+  source (`atoi`/`atol`/`atoll`/`strtol`/`strtoul`/`strtoll`/`strtoull`)
+  puts no bound on its result beyond the return type, so the interval
+  evaluator seeds it with that type's FULL FINITE range. A finite range
+  multiplies into a provably-overflowing product (whereas the old top()
+  collapsed every product back to top() and reported nothing). A
+  downstream bound (`if (n < LIMIT)`) re-narrows the range on the guard's
+  own edge, so validated input stays silent — precision holds by the
+  same mechanism as #94's div-by-zero.
+- **Constant-arithmetic guards now refine (Part 1).** An overflow guard
+  written as `n < INT_MAX/2` (or `SIZE_MAX-1`, `1<<30`, a sizeof) folds
+  through Clang's constant evaluator, so the guarded-safe branch narrows
+  like a plain literal comparison. This closed a pre-existing false
+  positive on such good sinks and is what keeps the new recall precise.
+
+### Receipts
+- **Juliet CWE190: 42 TP, 0 FP, precision 1.000** over the full
+  3080-file corpus (400-file CI sample: rprecision 1.000, rhitrate
+  0.010). NEW per-CWE floor added (0.95 / 0.005). All five prior floors
+  unchanged and green — CWE369 (the other interval consumer) stays
+  fp=0, confirming the atoi full-range does not leak into div-by-zero.
+- 602/602 ctest incl. 4 new pins, shuffle-stable. Real-code boundary
+  probe: guarded-atoi, `rand()%256 * k`, self-square, and 64-bit
+  products all stay silent; only the unguarded `atoi()*2` fires.
+- **Honest negatives (ablation).** (1) `rand()`/`random()` are excluded
+  from the interval source set: their range is `[0, RAND_MAX]` and
+  RAND_MAX is implementation-defined (as small as 32767), so a full-int
+  over-approximation would false-positive on `rand()*k`. Zero measured
+  recall cost — Juliet's rand family reaches the sink through the
+  `RAND32()` bit-shuffle macro the interval evaluator cannot fold
+  anyway. (2) Self-square `x*x` is skipped: its safe form is guarded by
+  `abs(x) < sqrt(TYPE_MAX)`, which rests on `abs`/`sqrt` the integer
+  refiner cannot fold — so a guarded-safe square is indistinguishable
+  from an unguarded one, and reporting it would be an FP. Both are
+  documented known FNs, not silent gaps.
+
 ## 2026-07-17 — Recall: unbounded string copy into a fixed buffer (#95)
 
 Third application of the #92/#94 recipe (from the thesis-v2 map, where

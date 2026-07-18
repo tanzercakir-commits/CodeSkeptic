@@ -66,16 +66,16 @@ public:
     }
 
     State transfer(const clang::Stmt* stmt, const State& in,
-                   clang::ASTContext& /*ctx*/) const {
+                   clang::ASTContext& ctx) const {
         State out = in;
-        applyIntervalAssign(out, stmt, vars_);
+        applyIntervalAssign(out, stmt, vars_, &ctx);
         return out;
     }
 
     void refineOnEdge(const clang::Stmt* cond, bool isTrue, State& state,
-                      clang::ASTContext& /*ctx*/) const {
+                      clang::ASTContext& ctx) const {
         if (const auto* e = clang::dyn_cast<clang::Expr>(cond))
-            refineIntervalOnEdge(state, e, isTrue, vars_);
+            refineIntervalOnEdge(state, e, isTrue, vars_, &ctx);
     }
 
     // Convergence widening: at a re-visited (loop) block the engine has

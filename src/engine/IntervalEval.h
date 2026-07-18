@@ -22,6 +22,10 @@
 #include <optional>
 #include <set>
 
+namespace clang {
+class ASTContext;
+}
+
 namespace zerodefect {
 
 using IntervalMap = std::map<const clang::VarDecl*, Interval>;
@@ -81,14 +85,20 @@ Interval evalSizeInterval(const clang::Expr* expr, clang::ASTContext& ctx,
 // conservatively reset the target to top() (v0 — no relational loop
 // modeling yet).
 void applyIntervalAssign(IntervalMap& state, const clang::Stmt* stmt,
-                         const std::set<const clang::VarDecl*>& vars);
+                         const std::set<const clang::VarDecl*>& vars,
+                         const clang::ASTContext* ctx = nullptr);
 
 // Refine the intervals of `vars` on the edge where `cond` is
 // true/false (assume-edge). Handles `var REL const` and truthiness via
 // the shared ConditionWalk skeleton; a contradiction narrows to ⊥.
+// With `ctx` (optional), the compared-against side is folded as a full
+// constant expression, so idiomatic overflow guards written with
+// constant arithmetic — `n < INT_MAX/2`, `n <= SIZE_MAX-1` — refine too;
+// without it only plain integer literals fold (the old behavior).
 void refineIntervalOnEdge(IntervalMap& state, const clang::Expr* cond,
                           bool isTrue,
-                          const std::set<const clang::VarDecl*>& vars);
+                          const std::set<const clang::VarDecl*>& vars,
+                          const clang::ASTContext* ctx = nullptr);
 
 } // namespace zerodefect
 

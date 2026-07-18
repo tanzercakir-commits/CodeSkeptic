@@ -44,6 +44,7 @@ CWE_RULES = {
     "CWE415": {"double-free"},
     "CWE416": {"use-after-free"},
     "CWE369": {"div-by-zero"},
+    "CWE190": {"int-overflow"},
 }
 
 

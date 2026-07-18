@@ -56,6 +56,60 @@ Interval intRem(const Interval& l, const Interval& r) {
     return Interval::range(-bound, bound);
 }
 
+// The value range of an integer type, as a finite interval — [INT_MIN,
+// INT_MAX] for a 32-bit signed int, [0, UINT_MAX] for 32-bit unsigned,
+// and so on. Finite (not top()), which is the point: a full-but-BOUNDED
+// range multiplies into a provably-overflowing product, whereas top()
+// collapses any product straight back to top() and reports nothing.
+// A width outside (0, 64] or a 64-bit unsigned (whose top does not fit
+// int64) yields nullopt.
+std::optional<Interval> intTypeRange(QualType t, const ASTContext& ctx) {
+    if (t.isNull() || !t->isIntegerType()) return std::nullopt;
+    const unsigned width = ctx.getIntWidth(t);
+    if (width == 0 || width > 64) return std::nullopt;
+    if (t->isSignedIntegerOrEnumerationType()) {
+        const int64_t hi =
+            width == 64 ? INT64_MAX : (int64_t(1) << (width - 1)) - 1;
+        const int64_t lo =
+            width == 64 ? INT64_MIN : -(int64_t(1) << (width - 1));
+        return Interval::range(lo, hi);
+    }
+    if (width >= 64) return std::nullopt;  // uint64 max exceeds int64
+    return Interval::range(0, (int64_t(1) << width) - 1);
+}
+
+// An intrinsic untrusted-integer source: a library call that parses
+// external text (the atoi/strtol family). The callee's contract puts NO
+// bound on the value beyond its return type — `atoi("2000000000")` is a
+// valid full-magnitude int — so the sound-and-useful model is the whole
+// representable range of the return type. This is an INTRINSIC signal (a
+// property of the callee, never of the caller's data), the same
+// discipline as the unchecked-allocation (malloc) and div-by-zero
+// (atoi/strtol) recall rules: precision holds because a caller who
+// validated the value re-narrows the range on the guard's own edge.
+//
+// rand()/random() are DELIBERATELY EXCLUDED here even though the
+// div-by-zero rule treats them as untrusted ZERO sources. Their range is
+// [0, RAND_MAX], and RAND_MAX is implementation-defined (as small as
+// 32767); over-approximating it to the full int range would report a
+// false overflow on `rand() * k` that cannot occur on a small-RAND_MAX
+// target. The exclusion costs no measured recall — Juliet's rand family
+// reaches the multiply through the RAND32() bit-shuffle macro, which the
+// interval evaluator cannot fold regardless (a documented known FN).
+bool isUntrustedIntSource(const CallExpr* call) {
+    const FunctionDecl* fd = call->getDirectCallee();
+    if (!fd) return false;
+    const IdentifierInfo* id = fd->getIdentifier();
+    if (!id) return false;
+    const llvm::StringRef n = id->getName();
+    static constexpr llvm::StringRef kNames[] = {
+        "atoi", "atol", "atoll", "strtol", "strtoul", "strtoll", "strtoull",
+    };
+    for (const auto& k : kNames)
+        if (n == k) return true;
+    return false;
+}
+
 const VarDecl* asIntVar(const Expr* e) {
     if (!e) return nullptr;
     e = e->IgnoreParenImpCasts();
@@ -76,6 +130,30 @@ std::optional<int64_t> constInt(const Expr* e) {
         if (u->getOpcode() == UO_Minus)
             if (auto v = constInt(u->getSubExpr())) return -*v;
     return std::nullopt;
+}
+
+// Fold `e` to a signed 64-bit constant. The literal path (constInt) is
+// tried first — it needs no context and covers the common case. With a
+// context, Clang's own constant evaluator folds full constant
+// expressions: `INT_MAX/2`, `SIZE_MAX-1`, `1 << 30`, a sizeof, an enum
+// constant. Only genuinely constant expressions fold — anything with a
+// runtime operand (`abs(x)`, `sqrt(MAX)`) fails and yields nullopt, so
+// no unsound refinement can slip in. Values outside int64 are dropped.
+std::optional<int64_t> foldConstInt(const Expr* e, const ASTContext* ctx) {
+    if (auto v = constInt(e)) return v;
+    if (!ctx || !e) return std::nullopt;
+    if (e->isValueDependent() || e->isTypeDependent()) return std::nullopt;
+    if (!e->getType()->isIntegralOrEnumerationType()) return std::nullopt;
+    clang::Expr::EvalResult res;
+    if (!e->EvaluateAsInt(res, *ctx) || !res.Val.isInt())
+        return std::nullopt;
+    const llvm::APSInt& ap = res.Val.getInt();
+    if (ap.isSigned()) {
+        if (ap.getSignificantBits() > 63) return std::nullopt;
+        return ap.getSExtValue();
+    }
+    if (ap.getActiveBits() > 63) return std::nullopt;
+    return static_cast<int64_t>(ap.getZExtValue());
 }
 
 // Negation of a comparison operator (for the false edge).
@@ -235,6 +313,15 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state,
             default:     return Interval::top();
         }
     }
+    // An intrinsic untrusted source (the atoi/strtol family) evaluates to
+    // its return type's full FINITE range — the seed the overflow rule needs
+    // to prove `atoi(s) * k` escapes the type. Needs a context for the
+    // type width; without one it stays top() (the old behavior).
+    if (const auto* call = dyn_cast<CallExpr>(expr)) {
+        if (ctx && isUntrustedIntSource(call))
+            if (auto iv = intTypeRange(call->getType(), *ctx)) return *iv;
+        return Interval::top();
+    }
     return Interval::top();
 }
 
@@ -243,7 +330,8 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state) {
 }
 
 void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
-                         const std::set<const VarDecl*>& vars) {
+                         const std::set<const VarDecl*>& vars,
+                         const ASTContext* ctx) {
     auto set = [&](const VarDecl* v, Interval iv) {
         if (vars.count(v)) state[v] = iv;
     };
@@ -253,14 +341,14 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
             if (const auto* vd = dyn_cast<VarDecl>(d))
                 if (vars.count(vd))
                     state[vd] = vd->hasInit()
-                                    ? evalInterval(vd->getInit(), state)
+                                    ? evalInterval(vd->getInit(), state, ctx)
                                     : Interval::top();
         return;
     }
     if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
         if (bin->getOpcode() == BO_Assign)
             if (const VarDecl* v = asIntVar(bin->getLHS()))
-                set(v, evalInterval(bin->getRHS(), state));
+                set(v, evalInterval(bin->getRHS(), state, ctx));
         // Compound assignment (`x += ...`) not modeled yet → top.
         if (bin->isCompoundAssignmentOp())
             if (const VarDecl* v = asIntVar(bin->getLHS()))
@@ -283,7 +371,8 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
 }
 
 void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
-                          const std::set<const VarDecl*>& vars) {
+                          const std::set<const VarDecl*>& vars,
+                          const ASTContext* ctx) {
     walkCondition(
         cond, isTrue,
         // `if (x)`: true → x != 0; false → x == 0.
@@ -294,12 +383,13 @@ void refineIntervalOnEdge(IntervalMap& state, const Expr* cond, bool isTrue,
             it->second = truthy ? it->second.constrainNe(0)
                                 : it->second.constrainEq(0);
         },
-        // `x OPC other`: refine when `other` is a constant. opc arrives
-        // variable-on-the-left; on the false edge the negation holds.
+        // `x OPC other`: refine when `other` folds to a constant. opc
+        // arrives variable-on-the-left; on the false edge the negation
+        // holds.
         [&](const VarDecl* var, BinaryOperatorKind opc, const Expr* other,
             bool edgeTrue) {
             if (!vars.count(var)) return;
-            auto c = constInt(other);
+            auto c = foldConstInt(other, ctx);
             if (!c) return;
             auto it = state.find(var);
             if (it == state.end()) return;
