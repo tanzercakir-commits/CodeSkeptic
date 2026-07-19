@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_ASSUMPTION_MODE_H
-#define ZERODEFECT_ASSUMPTION_MODE_H
+#ifndef CODESKEPTIC_ASSUMPTION_MODE_H
+#define CODESKEPTIC_ASSUMPTION_MODE_H
 
 // Assumption-extraction is OPT-IN (--assumptions). It is an intent-debt
 // report, not a bug hunt: it surfaces the implicit preconditions a
@@ -11,11 +11,11 @@
 // StaticAnalyzer, like the allocator/fatal-call name sets) keeps the
 // AssumptionRule silent unless the user explicitly asks for the report.
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void setAssumptionMode(bool enabled);
 bool assumptionMode();
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_ASSUMPTION_MODE_H
+#endif // CODESKEPTIC_ASSUMPTION_MODE_H

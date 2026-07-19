@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_EXTENT_MAP_H
-#define ZERODEFECT_EXTENT_MAP_H
+#ifndef CODESKEPTIC_EXTENT_MAP_H
+#define CODESKEPTIC_EXTENT_MAP_H
 
 // ExtentMap (2026-07-15): the spatial counterpart to the interval
 // dataflow. Where IntervalAnalysis answers "what value range does index
@@ -32,7 +32,7 @@ class ASTContext;
 class FunctionDecl;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // VarDecl -> element-count interval. A present entry means "this variable
 // names a buffer whose element count lies in this interval"; a singleton
@@ -45,6 +45,6 @@ using ExtentMap = std::map<const clang::VarDecl*, Interval>;
 ExtentMap buildExtentMap(const clang::FunctionDecl* fn,
                          clang::ASTContext& ctx);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_EXTENT_MAP_H
+#endif // CODESKEPTIC_EXTENT_MAP_H

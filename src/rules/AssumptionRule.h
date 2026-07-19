@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_ASSUMPTION_RULE_H
-#define ZERODEFECT_ASSUMPTION_RULE_H
+#ifndef CODESKEPTIC_ASSUMPTION_RULE_H
+#define CODESKEPTIC_ASSUMPTION_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Assumption extraction (spec §20.2 — the design doc's self-declared #1
 // idea, 2026-07-15). AI-written code routinely relies on preconditions
@@ -37,6 +37,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_ASSUMPTION_RULE_H
+#endif // CODESKEPTIC_ASSUMPTION_RULE_H

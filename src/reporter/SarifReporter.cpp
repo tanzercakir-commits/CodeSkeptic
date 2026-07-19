@@ -24,11 +24,11 @@ std::string escapeJson(const std::string& s) {
     return out;
 }
 
-const char* sarifLevel(zerodefect::Severity severity) {
+const char* sarifLevel(codeskeptic::Severity severity) {
     switch (severity) {
-        case zerodefect::Severity::Error:   return "error";
-        case zerodefect::Severity::Warning: return "warning";
-        case zerodefect::Severity::Info:    return "note";
+        case codeskeptic::Severity::Error:   return "error";
+        case codeskeptic::Severity::Warning: return "warning";
+        case codeskeptic::Severity::Info:    return "note";
     }
     return "none";
 }
@@ -43,7 +43,7 @@ std::string toUri(const std::string& path) {
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 SarifReporter::SarifReporter(const std::string& output_path)
     : output_path_(output_path) {}
@@ -67,9 +67,9 @@ void SarifReporter::report(const DiagnosticList& diagnostics) {
     file << "    {\n";
     file << "      \"tool\": {\n";
     file << "        \"driver\": {\n";
-    file << "          \"name\": \"ZeroDefect\",\n";
+    file << "          \"name\": \"CodeSkeptic\",\n";
     file << "          \"informationUri\": "
-            "\"https://github.com/tanzercakir-commits/ZeroDefect\",\n";
+            "\"https://github.com/tanzercakir-commits/CodeSkeptic\",\n";
     file << "          \"rules\": [";
     {
         bool first = true;
@@ -145,4 +145,4 @@ std::string SarifReporter::format() const {
     return "sarif";
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

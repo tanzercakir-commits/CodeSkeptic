@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // bounds (CWE-125/787), v0: a fixed-size array subscripted by an index
 // whose ENTIRE proven range is outside [0, extent). Precision-first —

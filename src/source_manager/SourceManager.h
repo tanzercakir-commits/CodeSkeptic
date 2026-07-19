@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_SOURCE_MANAGER_H
-#define ZERODEFECT_SOURCE_MANAGER_H
+#ifndef CODESKEPTIC_SOURCE_MANAGER_H
+#define CODESKEPTIC_SOURCE_MANAGER_H
 
 #include <functional>
 #include <memory>
@@ -13,7 +13,7 @@ class CompilationDatabase;
 }
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 using ASTCallback = std::function<void(clang::ASTContext&)>;
 
@@ -66,6 +66,6 @@ private:
     bool warm_cache_ = false;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_SOURCE_MANAGER_H
+#endif // CODESKEPTIC_SOURCE_MANAGER_H

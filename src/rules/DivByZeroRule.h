@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_DIV_BY_ZERO_RULE_H
-#define ZERODEFECT_DIV_BY_ZERO_RULE_H
+#ifndef CODESKEPTIC_DIV_BY_ZERO_RULE_H
+#define CODESKEPTIC_DIV_BY_ZERO_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class DivByZeroRule : public Rule {
 public:
@@ -14,6 +14,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_DIV_BY_ZERO_RULE_H
+#endif // CODESKEPTIC_DIV_BY_ZERO_RULE_H

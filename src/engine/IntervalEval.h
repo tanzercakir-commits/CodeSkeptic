@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_INTERVAL_EVAL_H
-#define ZERODEFECT_INTERVAL_EVAL_H
+#ifndef CODESKEPTIC_INTERVAL_EVAL_H
+#define CODESKEPTIC_INTERVAL_EVAL_H
 
 // Reusable interval evaluation over the AST (2026-07-14): given the
 // current per-variable intervals, evaluate an integer expression to an
@@ -26,7 +26,7 @@ namespace clang {
 class ASTContext;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 using IntervalMap = std::map<const clang::VarDecl*, Interval>;
 
@@ -100,6 +100,6 @@ void refineIntervalOnEdge(IntervalMap& state, const clang::Expr* cond,
                           const std::set<const clang::VarDecl*>& vars,
                           const clang::ASTContext* ctx = nullptr);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_INTERVAL_EVAL_H
+#endif // CODESKEPTIC_INTERVAL_EVAL_H

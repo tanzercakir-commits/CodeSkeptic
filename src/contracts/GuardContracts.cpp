@@ -32,7 +32,7 @@ BranchExit branchExit(const Stmt* s, int depth = 0);
 bool isNoreturnCall(const Stmt* s, int depth = 0) {
     const auto* call = dyn_cast_or_null<CallExpr>(s);
     if (!call) return false;
-    if (zerodefect::isFatalCall(call)) return true;
+    if (codeskeptic::isFatalCall(call)) return true;
     const FunctionDecl* callee = call->getDirectCallee();
     if (!callee) return false;
     if (callee->isNoReturn()) return true;
@@ -89,7 +89,7 @@ const Expr* peelConditionWrappers(const Expr* e) {
         e = e->IgnoreParenImpCasts();
         if (const auto* call = dyn_cast<CallExpr>(e)) {
             if (const Expr* inner =
-                    zerodefect::condwalk_detail::identityCallArg(call)) {
+                    codeskeptic::condwalk_detail::identityCallArg(call)) {
                 e = inner;
                 continue;
             }
@@ -113,7 +113,7 @@ std::optional<GuardCond> singleParamNullCond(const Expr* cond,
     int hits = 0;
     GuardCond out;
     bool nonParamOrExtra = false;
-    zerodefect::walkNullCondition(
+    codeskeptic::walkNullCondition(
         cond, guardFiresOnTrue,
         [&](const VarDecl* var, bool isNull) {
             const auto* p = dyn_cast<ParmVarDecl>(var);
@@ -130,7 +130,7 @@ std::optional<GuardCond> singleParamNullCond(const Expr* cond,
     // accept (the guard does not fire for p==null when n==0). Detect
     // any conjunction/disjunction structurally and bail.
     const Expr* e = cond->IgnoreParenImpCasts();
-    e = zerodefect::stripBoolPreservingCasts(e);
+    e = codeskeptic::stripBoolPreservingCasts(e);
     while (const auto* un = dyn_cast<UnaryOperator>(e)) {
         if (un->getOpcode() != UO_LNot) break;
         e = un->getSubExpr()->IgnoreParenImpCasts();
@@ -176,7 +176,7 @@ unsigned lineOf(const Stmt* s, ASTContext& ctx) {
 // __assert_fail(...)` as a top-level expression statement. The C
 // statement-expression variant materializes as an IfStmt and is caught
 // by the if-guard path below.
-std::optional<zerodefect::GuardRequire> matchAssertTernary(
+std::optional<codeskeptic::GuardRequire> matchAssertTernary(
         const Stmt* s, const FunctionDecl* fn, ASTContext& ctx) {
     const auto* expr = dyn_cast<Expr>(s);
     if (!expr) return std::nullopt;
@@ -194,14 +194,14 @@ std::optional<zerodefect::GuardRequire> matchAssertTernary(
     unsigned idx = 0;
     for (const ParmVarDecl* p : fn->parameters()) {
         if (p == gc->param)
-            return zerodefect::GuardRequire{
-                idx, zerodefect::GuardConsequence::Crash, lineOf(s, ctx)};
+            return codeskeptic::GuardRequire{
+                idx, codeskeptic::GuardConsequence::Crash, lineOf(s, ctx)};
         ++idx;
     }
     return std::nullopt;
 }
 
-std::optional<zerodefect::GuardRequire> matchIfGuard(
+std::optional<codeskeptic::GuardRequire> matchIfGuard(
         const Stmt* s, const FunctionDecl* fn, ASTContext& ctx) {
     const auto* ifs = dyn_cast<IfStmt>(s);
     if (!ifs || ifs->getElse() || ifs->getConditionVariable() ||
@@ -220,11 +220,11 @@ std::optional<zerodefect::GuardRequire> matchIfGuard(
     unsigned idx = 0;
     for (const ParmVarDecl* p : fn->parameters()) {
         if (p == gc->param)
-            return zerodefect::GuardRequire{
+            return codeskeptic::GuardRequire{
                 idx,
                 exit == BranchExit::Aborts
-                    ? zerodefect::GuardConsequence::Crash
-                    : zerodefect::GuardConsequence::Rejected,
+                    ? codeskeptic::GuardConsequence::Crash
+                    : codeskeptic::GuardConsequence::Rejected,
                 lineOf(s, ctx)};
         ++idx;
     }
@@ -240,7 +240,7 @@ std::optional<zerodefect::GuardRequire> matchIfGuard(
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::vector<GuardRequire> inferGuardRequires(const FunctionDecl* fn,
                                              ASTContext& ctx) {
@@ -271,4 +271,4 @@ std::vector<GuardRequire> inferGuardRequires(const FunctionDecl* fn,
     return out;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

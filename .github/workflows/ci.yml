@@ -40,7 +40,7 @@ jobs:
         # global-state leakage between tests (this is how McpServerTest's
         # filter leak hid 11 interproc tests). The same binary is also
         # run in a single process so contamination becomes visible.
-        run: ./build/tests/zerodefect_tests
+        run: ./build/tests/codeskeptic_tests
 
       - name: Smoke test
         run: |
@@ -54,14 +54,14 @@ jobs:
           # with `bash -e`: a failing command not caught with || kills the
           # script immediately.
           code=0
-          ./build/src/zerodefect /tmp/smoke.cpp || code=$?
+          ./build/src/codeskeptic /tmp/smoke.cpp || code=$?
           test "$code" -eq 1
 
       - name: Self-scan (dogfood gate)
         # The analyzer analyzes its own sources — with the founding
         # policy active. Any finding (or a hard-coded absolute path)
         # fails CI: exit 0 means clean.
-        run: ./build/src/zerodefect src/ --build-path build --policy no-absolute-paths
+        run: ./build/src/codeskeptic src/ --build-path build --policy no-absolute-paths
 
       - name: Real-world corpus (cJSON + tinyxml2)
-        run: bash scripts/run_corpus.sh ./build/src/zerodefect /tmp/corpus
+        run: bash scripts/run_corpus.sh ./build/src/codeskeptic /tmp/corpus

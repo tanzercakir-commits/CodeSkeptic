@@ -25,10 +25,10 @@ namespace {
 
 constexpr unsigned kMaxSweeps = 5;
 
-using ReturnNullness = zerodefect::SummaryRegistry::ReturnNullness;
-using ReturnZeroness = zerodefect::SummaryRegistry::ReturnZeroness;
-using ParamEffect = zerodefect::SummaryRegistry::ParamEffect;
-using FunctionSummary = zerodefect::SummaryRegistry::FunctionSummary;
+using ReturnNullness = codeskeptic::SummaryRegistry::ReturnNullness;
+using ReturnZeroness = codeskeptic::SummaryRegistry::ReturnZeroness;
+using ParamEffect = codeskeptic::SummaryRegistry::ParamEffect;
+using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
 // --- Return nullness ---
@@ -43,7 +43,7 @@ const FunctionSummary* lookupPrev(const SummaryTable& previous,
     if (!callee) return nullptr;
     auto it = previous.find(callee->getCanonicalDecl());
     if (it != previous.end()) return &it->second;
-    return zerodefect::SummaryRegistry::instance().lookupGlobal(callee);
+    return codeskeptic::SummaryRegistry::instance().lookupGlobal(callee);
 }
 
 // Value-level "bad value" state. The two domains share one shape: in
@@ -132,7 +132,7 @@ const VarDecl* exprAsVar(const Expr* expr) {
 // skeleton (engine/ConditionWalk.h)
 void applyNullCond(const Expr* cond, bool isTrue,
                    std::map<const VarDecl*, VState>& state) {
-    zerodefect::walkNullCondition(
+    codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
             auto it = state.find(var);
             if (it != state.end())
@@ -142,7 +142,7 @@ void applyNullCond(const Expr* cond, bool isTrue,
 
 void applyZeroCond(const Expr* cond, bool isTrue,
                    std::map<const VarDecl*, VState>& state) {
-    zerodefect::walkZeroCondition(
+    codeskeptic::walkZeroCondition(
         cond, isTrue, [&](const VarDecl* var, bool isZero) {
             auto it = state.find(var);
             if (it != state.end())
@@ -341,7 +341,7 @@ AggregateFlags computeReturnFlow(const FunctionDecl* func, ASTContext& ctx,
 
     ReturnFlowAnalysis<ValueOf, Refine> analysis(
         collectTypedVars(func, varMatches), previous);
-    zerodefect::runDataflow(func, ctx, analysis);
+    codeskeptic::runDataflow(func, ctx, analysis);
     return aggregateFlags(analysis.contributions);
 }
 
@@ -505,7 +505,7 @@ bool asInt64Const(const Expr* expr, ASTContext& ctx, int64_t* out) {
 // Returns true and fills (paramIdx, range) on success.
 bool matchSwitchDefaultGuard(const SwitchStmt* sw, const FunctionDecl* func,
                              ASTContext& ctx, int* paramIdx,
-                             zerodefect::Interval* range) {
+                             codeskeptic::Interval* range) {
     int idx = paramIndexOf(func, sw->getCond());
     if (idx < 0) return false;
     if (!paramIsNeverMutated(func, func->getParamDecl(idx))) return false;
@@ -530,7 +530,7 @@ bool matchSwitchDefaultGuard(const SwitchStmt* sw, const FunctionDecl* func,
     if (hi - lo + 1 != static_cast<int64_t>(values.size())) return false;
 
     *paramIdx = idx;
-    *range = zerodefect::Interval::range(lo, hi);
+    *range = codeskeptic::Interval::range(lo, hi);
     return true;
 }
 
@@ -540,9 +540,9 @@ bool matchSwitchDefaultGuard(const SwitchStmt* sw, const FunctionDecl* func,
 // is the safe zone.
 bool matchComparisonGuard(const Expr* cond, bool nullWhenTrue,
                           const FunctionDecl* func, ASTContext& ctx,
-                          int* paramIdx, zerodefect::Interval* range) {
+                          int* paramIdx, codeskeptic::Interval* range) {
     if (!cond) return false;
-    const Expr* e = zerodefect::stripBoolPreservingCasts(
+    const Expr* e = codeskeptic::stripBoolPreservingCasts(
         cond->IgnoreParenImpCasts());
     // `!cond` flips which branch returns null.
     if (const auto* un = dyn_cast<UnaryOperator>(e)) {
@@ -560,7 +560,7 @@ bool matchComparisonGuard(const Expr* cond, bool nullWhenTrue,
     if (idx < 0) {
         idx = paramIndexOf(func, bin->getRHS());
         other = bin->getLHS();
-        opc = zerodefect::condwalk_detail::mirror(opc);
+        opc = codeskeptic::condwalk_detail::mirror(opc);
     }
     if (idx < 0) return false;
     if (!paramIsNeverMutated(func, func->getParamDecl(idx))) return false;
@@ -573,21 +573,21 @@ bool matchComparisonGuard(const Expr* cond, bool nullWhenTrue,
     if (!nullWhenTrue) {
         // null when cond FALSE → safe zone = cond TRUE set
         switch (opc) {
-            case BO_LT: *range = zerodefect::Interval::atMost(k - 1); break;
-            case BO_LE: *range = zerodefect::Interval::atMost(k); break;
-            case BO_GT: *range = zerodefect::Interval::atLeast(k + 1); break;
-            case BO_GE: *range = zerodefect::Interval::atLeast(k); break;
-            case BO_EQ: *range = zerodefect::Interval::constant(k); break;
+            case BO_LT: *range = codeskeptic::Interval::atMost(k - 1); break;
+            case BO_LE: *range = codeskeptic::Interval::atMost(k); break;
+            case BO_GT: *range = codeskeptic::Interval::atLeast(k + 1); break;
+            case BO_GE: *range = codeskeptic::Interval::atLeast(k); break;
+            case BO_EQ: *range = codeskeptic::Interval::constant(k); break;
             default: return false;  // != true-set: two rays
         }
     } else {
         // null when cond TRUE → safe zone = cond FALSE set
         switch (opc) {
-            case BO_LT: *range = zerodefect::Interval::atLeast(k); break;
-            case BO_LE: *range = zerodefect::Interval::atLeast(k + 1); break;
-            case BO_GT: *range = zerodefect::Interval::atMost(k); break;
-            case BO_GE: *range = zerodefect::Interval::atMost(k - 1); break;
-            case BO_NE: *range = zerodefect::Interval::constant(k); break;
+            case BO_LT: *range = codeskeptic::Interval::atLeast(k); break;
+            case BO_LE: *range = codeskeptic::Interval::atLeast(k + 1); break;
+            case BO_GT: *range = codeskeptic::Interval::atMost(k); break;
+            case BO_GE: *range = codeskeptic::Interval::atMost(k - 1); break;
+            case BO_NE: *range = codeskeptic::Interval::constant(k); break;
             default: return false;  // == false-set: two rays
         }
     }
@@ -604,7 +604,7 @@ bool matchComparisonGuard(const Expr* cond, bool nullWhenTrue,
 // return runs — they never weaken the claim.
 bool findGuardAbove(const ReturnStmt* badRet, const FunctionDecl* func,
                     ASTContext& ctx, int* paramIdx,
-                    zerodefect::Interval* range) {
+                    codeskeptic::Interval* range) {
     DynTypedNode node = DynTypedNode::create(*badRet);
     const Stmt* childStmt = badRet;
     // Labels are not nesting parents of everything in their region —
@@ -653,7 +653,7 @@ bool findGuardAbove(const ReturnStmt* badRet, const FunctionDecl* func,
 // Fills (paramIdx, range) when the conditioned claim is PROVEN.
 bool detectNullCondition(const FunctionDecl* func, ASTContext& ctx,
                          const SummaryTable& previous, int* paramIdx,
-                         zerodefect::Interval* range) {
+                         codeskeptic::Interval* range) {
     struct RetStmtCollector : RecursiveASTVisitor<RetStmtCollector> {
         std::vector<const ReturnStmt*> returns;
         bool VisitReturnStmt(ReturnStmt* ret) {
@@ -1003,7 +1003,7 @@ struct FunctionCollector : RecursiveASTVisitor<FunctionCollector> {
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 SummaryRegistry& SummaryRegistry::instance() {
     static SummaryRegistry registry;
@@ -1094,11 +1094,11 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     if (into.nullCondParam != from.nullCondParam ||
         into.nullCondRange != from.nullCondRange) {
         into.nullCondParam = -1;
-        into.nullCondRange = zerodefect::Interval::top();
+        into.nullCondRange = codeskeptic::Interval::top();
     }
     if (into.returnNullness != RN::MaybeNull) {
         into.nullCondParam = -1;
-        into.nullCondRange = zerodefect::Interval::top();
+        into.nullCondRange = codeskeptic::Interval::top();
     }
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
@@ -1116,9 +1116,9 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "zerodefect-summaries v3";
-constexpr const char* kSummaryFileHeaderV2 = "zerodefect-summaries v2";
-constexpr const char* kSummaryFileHeaderV1 = "zerodefect-summaries v1";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v3";
+constexpr const char* kSummaryFileHeaderV2 = "codeskeptic-summaries v2";
+constexpr const char* kSummaryFileHeaderV1 = "codeskeptic-summaries v1";
 
 char rnToChar(ReturnNullness v) {
     switch (v) {
@@ -1308,13 +1308,13 @@ bool SummaryRegistry::parseSummaryFile(
                 return false;
             summary.nullCondParam = static_cast<int>(paramIdx);
             if (loInf && hiInf)
-                summary.nullCondRange = zerodefect::Interval::top();
+                summary.nullCondRange = codeskeptic::Interval::top();
             else if (loInf)
-                summary.nullCondRange = zerodefect::Interval::atMost(hi);
+                summary.nullCondRange = codeskeptic::Interval::atMost(hi);
             else if (hiInf)
-                summary.nullCondRange = zerodefect::Interval::atLeast(lo);
+                summary.nullCondRange = codeskeptic::Interval::atLeast(lo);
             else if (lo <= hi)
-                summary.nullCondRange = zerodefect::Interval::range(lo, hi);
+                summary.nullCondRange = codeskeptic::Interval::range(lo, hi);
             else
                 return false;
         }
@@ -1345,4 +1345,4 @@ bool SummaryRegistry::loadGlobal(const std::string& path) {
     return true;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

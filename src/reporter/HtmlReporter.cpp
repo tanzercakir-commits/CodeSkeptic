@@ -148,7 +148,7 @@ document.getElementById('q').addEventListener('input',function(e){
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 HtmlReporter::HtmlReporter(const std::string& output_path)
     : output_path_(output_path) {}
@@ -177,9 +177,9 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
          << "<meta charset=\"utf-8\">\n"
          << "<meta name=\"viewport\" content=\"width=device-width, "
             "initial-scale=1\">\n"
-         << "<title>ZeroDefect Report</title>\n"
+         << "<title>CodeSkeptic Report</title>\n"
          << "<style>" << kStyle << "</style>\n</head>\n<body>\n"
-         << "<div class=\"wrap\">\n<header>\n<h1>ZeroDefect Report</h1>\n"
+         << "<div class=\"wrap\">\n<header>\n<h1>CodeSkeptic Report</h1>\n"
          << "<p class=\"sub\"><span id=\"shown\">" << diagnostics.size()
          << "</span> / " << diagnostics.size()
          << " finding(s) &middot; generated " << stamp << "</p>\n"
@@ -253,7 +253,7 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
         file << "</article>\n";
     }
 
-    file << "</main>\n<footer>ZeroDefect &middot; self-contained report "
+    file << "</main>\n<footer>CodeSkeptic &middot; self-contained report "
             "&mdash; works offline</footer>\n</div>\n"
          << "<script>" << kScript << "</script>\n</body>\n</html>\n";
 }
@@ -262,4 +262,4 @@ std::string HtmlReporter::format() const {
     return "html";
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

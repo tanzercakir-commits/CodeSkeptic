@@ -1,10 +1,10 @@
-#ifndef ZERODEFECT_CONTRACT_PARSER_H
-#define ZERODEFECT_CONTRACT_PARSER_H
+#ifndef CODESKEPTIC_CONTRACT_PARSER_H
+#define CODESKEPTIC_CONTRACT_PARSER_H
 
 // Contract comment parser (CONTRACTS.md §3).
 //
 // Grammar (v1):
-//   contract-line := "zd:" [ "ai" ] clause
+//   contract-line := "cs:" [ "ai" ] clause
 //   clause  := "requires" pred
 //            | "ensures" pred [ "if" pred ]
 //            | "owns" "(" param ")"
@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 enum class ContractClauseKind {
     Requires,
@@ -60,7 +60,7 @@ struct ContractPred {
 
 struct ContractClause {
     ContractClauseKind kind = ContractClauseKind::Ensures;
-    bool machineProposed = false;  // zd:ai
+    bool machineProposed = false;  // cs:ai
     std::string text;              // clause verbatim (after the tag)
     unsigned line = 0;             // 1-based line within the comment block
 
@@ -82,12 +82,12 @@ struct ParsedContracts {
     bool empty() const { return clauses.empty() && syntaxErrors.empty(); }
 };
 
-// Scans a raw comment block for `zd:` lines and parses each one.
-// Non-`zd:` lines are ignored (ordinary prose). Line numbers in the
+// Scans a raw comment block for `cs:` lines and parses each one.
+// Non-`cs:` lines are ignored (ordinary prose). Line numbers in the
 // result are relative to the block (1-based); the caller offsets them
 // with the block's source location.
 ParsedContracts parseContractComment(const std::string& commentText);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONTRACT_PARSER_H
+#endif // CODESKEPTIC_CONTRACT_PARSER_H

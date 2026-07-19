@@ -1,4 +1,4 @@
-# ZeroDefect — Changelog
+# CodeSkeptic — Changelog
 
 ## 2026-07-18 — Recall: null dereference through a libc call (#98)
 
@@ -879,7 +879,7 @@ dataflow trace described. The maintainers added the missing
 ### Added
 - **`--gate error|warn`** (CONTRACTS.md §5, the last unimplemented
   spec row): `--gate warn` (or `summary_diff_gate = warn` in
-  .zerodefect.conf) keeps the full WEAKENED report but exits 0 — the
+  .codeskeptic.conf) keeps the full WEAKENED report but exits 0 — the
   adoption ramp for projects not ready to break CI on
   inferred-contract drift. Default stays `error` (exit 1). An
   unreadable summary file is exit 2 REGARDLESS of the gate: a gate
@@ -903,44 +903,44 @@ dataflow trace described. The maintainers added the missing
 ## 2026-07-13 — Contracts Round E: policies + sidecars — v1 complete
 
 ### Added
-- **Policy engine** (rule_id `policy`): `zd:policy` pattern
+- **Policy engine** (rule_id `policy`): `cs:policy` pattern
   prohibitions under the shared contract surface. v1 ships
   `no-absolute-paths` — a hard-coded absolute path in a string
   literal is an error. The founding Ruledsl release incident (a
   hard-coded rules path that crashed every machine but the dev box)
-  is now a machine-checked rule. Activation: a `// zd:policy` comment
-  scopes to its file; `policy = <name>` in .zerodefect.conf or
+  is now a machine-checked rule. Activation: a `// cs:policy` comment
+  scopes to its file; `policy = <name>` in .codeskeptic.conf or
   `--policy` activates project-wide. Unknown policy names are
   contract-syntax errors (a policy that silently fails to activate
-  would be a false comfort); `zd:ai policy` activation downgrades
+  would be a false comfort); `cs:ai policy` activation downgrades
   violations to warnings. The path heuristic is conservative (>= 2
   segments, no whitespace, or a Windows drive root); macro-born
   literals (__FILE__) are skipped.
-- **Sidecar contracts** (`src/core.c` -> `src/core.c.zdc`): contracts
+- **Sidecar contracts** (`src/core.c` -> `src/core.c.csk`): contracts
   for code you cannot annotate. Every entry is EXPLICITLY anchored
   (`vendor_find: requires id != 0`; optional `/arity` for overloads)
   — position-based mapping is forbidden by design. Sidecar clauses
   merge into the same enforcement pipeline (`allContractClausesForDecl`):
   requires seeding, call-site checks and guarded-ensures checks work
-  identically; ContractRule reports sidecar findings AT the .zdc
+  identically; ContractRule reports sidecar findings AT the .csk
   file/line, and malformed sidecar lines are contract-syntax errors,
   never silently dropped. The cache is process-lifetime with a
-  per-run clear (the MCP server must see an edited .zdc).
+  per-run clear (the MCP server must see an edited .csk).
 - **README contracts section** + contract/policy rows in the rules
   table.
 
 ### Verification
 - 389/389 tests in both modes (+13 Round E: path heuristic unit,
   file-comment activation, no-policy silence, non-path literals
-  silent, unknown-name syntax error, profile-wide activation, zd:ai
+  silent, unknown-name syntax error, profile-wide activation, cs:ai
   downgrade, sidecar text parse unit, sidecar requires at call site,
-  sidecar ensures pointing at the .zdc line, arity anchor, malformed
+  sidecar ensures pointing at the .csk line, arity anchor, malformed
   lines reported, missing sidecar no-effect).
 - Juliet floors and corpus pins green (byte-identical; policies and
   sidecars activate only where declared).
 - Dogfood: the founding incident itself —
   `fopen("/home/tanzer/projects/ruledsl/rules.dsl", "r")` under
-  `zd:policy no-absolute-paths` -> error at the literal; a sidecar
+  `cs:policy no-absolute-paths` -> error at the literal; a sidecar
   `requires id != 0` on unannotatable third-party code fires at the
   caller's `vendor_find(0)`.
 
@@ -962,7 +962,7 @@ dataflow trace described. The maintainers added the missing
   return statement inside NullDeref. A path that REFUTES the guard is
   exempt (returning null there is exactly what the guard licenses); a
   path that PROVES the guard and returns definite null is an ERROR
-  (warning for `zd:ai`); null under an undecided guard, or
+  (warning for `cs:ai`); null under an undecided guard, or
   possibly-null, is a warning. The guard must be fact-keyable — the
   keyability decision lives in `analyzeNullEnsuresGuards`
   (ContractInfo), shared by NullDeref and ContractRule, so an
@@ -986,7 +986,7 @@ dataflow trace described. The maintainers added the missing
 
 ### Verification
 - 376/376 tests in both modes (+13 Round D: guard-true violation,
-  guard-false licensed silence, undecided-guard warning, zd:ai
+  guard-false licensed silence, undecided-guard warning, cs:ai
   downgrade, trace attachment, enforced-not-unverified, unkeyable
   guard stays reported, borrows-frees error, borrows-readonly
   silence, owns-readonly error, owns-frees silence, owns unknown
@@ -1016,7 +1016,7 @@ dataflow trace described. The maintainers added the missing
   parameters NonZero.
 - **Caller-side checks at every visible call site**: a NULL-literal
   or definitely-null argument into `requires p != null` is an ERROR
-  (warning for `zd:ai`); possibly-null is a warning; a guarded
+  (warning for `cs:ai`); possibly-null is a warning; a guarded
   argument is silent. Same in the zero domain: literal `0` or a
   zero-state variable into `requires n != 0` (DivByZero tracks
   variables passed at contract positions even when they are never
@@ -1035,12 +1035,12 @@ dataflow trace described. The maintainers added the missing
 
 ### Verification
 - 363/363 tests in both modes (+15 Round C: seeding silences the
-  callee deref, error/warning/zd:ai severity split at call sites,
+  callee deref, error/warning/cs:ai severity split at call sites,
   guarded-caller silence, relational escape satisfied/violated/
   callee-split, zero-domain literal + tracked-var + maybe + guarded,
   unknown-param contract-syntax, enforced-not-unverified).
 - Juliet floors and corpus pins green (contracts add checks only
-  where `zd:` comments exist; the referees confirm zero drift).
+  where `cs:` comments exist; the referees confirm zero drift).
 - Dogfood: `load_config(NULL)` under `requires path != null` → error
   at the call line; a maybe-null argument → warning; `average(100,
   count)` with a zero counter under `requires n != 0` → error; the
@@ -1052,16 +1052,16 @@ dataflow trace described. The maintainers added the missing
 - **CONTRACTS.md** — the contract-language design spec from the
   co-design session: a contract is a DECLARED function summary,
   checked by the same dataflow that infers summaries.
-- **Contract parser** (`contracts/ContractParser`): `zd:` /
-  `zd:ai` structured line comments, one expression grammar
+- **Contract parser** (`contracts/ContractParser`): `cs:` /
+  `cs:ai` structured line comments, one expression grammar
   (`ensures return != null if n != 0`, `requires p != null || n == 0`),
-  effect keywords (`owns/borrows/returns owned`), `zd:policy` names.
+  effect keywords (`owns/borrows/returns owned`), `cs:policy` names.
   Hand-written recursive descent; parse errors are NEVER silent.
 - **ContractRule** (rule_id `contract`): Round B checks unconditional
   return postconditions (`ensures return != null` / `!= 0`) against
   the inferred return-nullness/zeroness summaries. Violation of a
-  bare `zd:` contract is an ERROR (CI breaks — the friction is the
-  product); a `zd:ai` proposal violating downgrades to warning.
+  bare `cs:` contract is an ERROR (CI breaks — the friction is the
+  product); a `cs:ai` proposal violating downgrades to warning.
   Unparseable lines are `contract-syntax` errors; parseable but
   not-yet/never-checkable clauses get explicit `contract-unsupported`
   warnings — a contract is never silently "accepted".
@@ -2497,7 +2497,7 @@ automatic fix loop.
 ### Added
 - **scripts/run_corpus.sh**: downloads version-pinned cJSON v1.7.18 (C)
   and tinyxml2 10.0.0 (C++), produces `compile_commands.json` with
-  CMake, runs zerodefect. Success criterion: crash-free (exit 0/1);
+  CMake, runs codeskeptic. Success criterion: crash-free (exit 0/1);
   finding counts logged for information. The build directory is outside
   the source tree (so CMake feature-test sources are not scanned);
   `CMAKE_POLICY_VERSION_MINIMUM=3.5` (CMake 4 compatibility).
@@ -2562,8 +2562,8 @@ automatic fix loop.
   URIs. 5 tests; output validated with `json.load`.
 - **SuppressionFilter** (`src/analyzer/SuppressionFilter.h/.cpp`):
   finding suppression via source comments.
-  `// zerodefect-disable-line [rule,list]` and
-  `// zerodefect-disable-next-line [...]`. A bare marker suppresses all
+  `// codeskeptic-disable-line [rule,list]` and
+  `// codeskeptic-disable-next-line [...]`. A bare marker suppresses all
   rules, a rule list only the listed ones. The suppressed count is
   reported to stderr. File contents are read with caching. 9 tests.
 - **MsgId::OutputFileOpenError / SuppressedCount** — a Turkish
@@ -2791,7 +2791,7 @@ detection. The matcher is precise, no filter needed.
   namespace.
 - **main.cpp** (`src/main.cpp`): entry point. Read Config → set up
   Analyzer → register rules → run → CI/CD exit code.
-- **`zerodefect` executable**: `add_executable` + `zerodefect_core` link
+- **`codeskeptic` executable**: `add_executable` + `codeskeptic_core` link
   in CMake.
 
 ### Fixed
@@ -2825,7 +2825,7 @@ detection. The matcher is precise, no filter needed.
   Config, wires the components, `run()` flow: build ASTs → run rules →
   filter by severity → sort → report.
 - **CMake build system**: LLVM/Clang find_package, `-fno-rtti`
-  compatibility, `zerodefect_core` static library.
+  compatibility, `codeskeptic_core` static library.
 
 ### Fixed
 - `SourceManager::processAll`: the callback is passed by copy instead of

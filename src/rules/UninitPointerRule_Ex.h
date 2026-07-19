@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_UNINIT_POINTER_RULE_EX_H
-#define ZERODEFECT_UNINIT_POINTER_RULE_EX_H
+#ifndef CODESKEPTIC_UNINIT_POINTER_RULE_EX_H
+#define CODESKEPTIC_UNINIT_POINTER_RULE_EX_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class UninitPointerRule_Ex : public Rule {
 public:
@@ -14,6 +14,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_UNINIT_POINTER_RULE_EX_H
+#endif // CODESKEPTIC_UNINIT_POINTER_RULE_EX_H

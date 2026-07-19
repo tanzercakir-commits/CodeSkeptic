@@ -1,4 +1,4 @@
-ZeroDefect - Architecture (as of 2026-07)
+CodeSkeptic - Architecture (as of 2026-07)
 
                       ┌──────────────────────┐
                       │    StaticAnalyzer     │

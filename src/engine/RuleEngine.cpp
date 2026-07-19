@@ -4,7 +4,7 @@
 #include "engine/FunctionSummary.h"
 #include "engine/ParamIntervals.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void RuleEngine::enableRule(const std::string& rule_id, bool enabled) {
     for (auto& rule : rules_) {
@@ -54,4 +54,4 @@ std::vector<std::string> RuleEngine::ruleIds() const {
     return ids;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

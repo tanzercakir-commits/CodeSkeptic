@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_STATIC_ANALYZER_H
-#define ZERODEFECT_STATIC_ANALYZER_H
+#ifndef CODESKEPTIC_STATIC_ANALYZER_H
+#define CODESKEPTIC_STATIC_ANALYZER_H
 
 #include "config/Config.h"
 #include "core/Diagnostic.h"
@@ -10,7 +10,7 @@
 #include <memory>
 #include <utility>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class StaticAnalyzer {
 public:
@@ -39,6 +39,6 @@ private:
     DiagnosticList diagnostics_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_STATIC_ANALYZER_H
+#endif // CODESKEPTIC_STATIC_ANALYZER_H

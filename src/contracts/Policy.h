@@ -1,23 +1,23 @@
-#ifndef ZERODEFECT_CONTRACT_POLICY_H
-#define ZERODEFECT_CONTRACT_POLICY_H
+#ifndef CODESKEPTIC_CONTRACT_POLICY_H
+#define CODESKEPTIC_CONTRACT_POLICY_H
 
 // Policies (CONTRACTS.md §2.3, Round E): AST-level pattern
-// prohibitions under the shared zd: surface — a different
+// prohibitions under the shared cs: surface — a different
 // verification engine from the dataflow contracts. v1 ships ONE
 // policy, no-absolute-paths: the founding Ruledsl incident (a
 // hard-coded config path shipped in a release) immortalized as the
 // first machine-checked rule.
 //
-// Activation: `// zd:policy <name>` anywhere in a file scopes the
+// Activation: `// cs:policy <name>` anywhere in a file scopes the
 // policy to THAT file; project-wide activation comes from the idiom
-// profile (`policy = <name>` in .zerodefect.conf or --policy). An
+// profile (`policy = <name>` in .codeskeptic.conf or --policy). An
 // unknown policy name is a contract-syntax error — never silently
 // inert.
 
 #include <set>
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 bool isKnownPolicy(const std::string& name);
 
@@ -32,6 +32,6 @@ const std::set<std::string>& profilePolicies();
 // drive root (`C:\...`). Exposed for unit tests.
 bool looksLikeAbsolutePath(const std::string& text);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONTRACT_POLICY_H
+#endif // CODESKEPTIC_CONTRACT_POLICY_H

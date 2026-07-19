@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_HTML_REPORTER_H
-#define ZERODEFECT_HTML_REPORTER_H
+#ifndef CODESKEPTIC_HTML_REPORTER_H
+#define CODESKEPTIC_HTML_REPORTER_H
 
 #include "reporter/Reporter.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // A single, self-contained HTML report: no dependencies, opens offline,
 // as easy to share as an email/PR attachment. The summary cards double
@@ -22,6 +22,6 @@ private:
     std::string output_path_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_HTML_REPORTER_H
+#endif // CODESKEPTIC_HTML_REPORTER_H

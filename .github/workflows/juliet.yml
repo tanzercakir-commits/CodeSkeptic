@@ -70,7 +70,7 @@ jobs:
           else
             LIMIT="${{ github.event.inputs.limit || '400' }}"
           fi
-          bash scripts/run_juliet.sh ./build/src/zerodefect juliet-work \
+          bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work \
             "$LIMIT" | tee juliet-output.txt
 
       - name: Deep corpus (abseil) — weekly only
@@ -78,7 +78,7 @@ jobs:
         # leg out of PR runs — CI cost balance). Guarded by the pinned
         # count in corpus_expected.txt like the rest of the corpus.
         if: github.event_name == 'schedule'
-        run: CORPUS_DEEP=1 bash scripts/run_corpus.sh ./build/src/zerodefect corpus-work
+        run: CORPUS_DEEP=1 bash scripts/run_corpus.sh ./build/src/codeskeptic corpus-work
 
       - name: Summary
         if: always()

@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <fstream>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 namespace fs = std::filesystem;
 
 // Broken-TU guard (#86): a TU whose parse ends in an uncompilable
@@ -39,13 +39,13 @@ struct TempTu {
 };
 
 constexpr const char* kBrokenSource =
-    "#include \"no_such_header_zd_test.h\"\n"
+    "#include \"no_such_header_cs_test.h\"\n"
     "int f() { int *p = make(); return *p; }\n";
 
 } // namespace
 
 TEST(BrokenTuTest, BrokenTuIsSkippedAndRecorded) {
-    TempTu tu("zd_broken_tu_skip", kBrokenSource);
+    TempTu tu("cs_broken_tu_skip", kBrokenSource);
     SourceManager::setAnalyzeBrokenTUs(false);
     SourceManager::clearBrokenTUs();
 
@@ -60,7 +60,7 @@ TEST(BrokenTuTest, BrokenTuIsSkippedAndRecorded) {
 }
 
 TEST(BrokenTuTest, AnalyzeBrokenTUsOverride) {
-    TempTu tu("zd_broken_tu_force", kBrokenSource);
+    TempTu tu("cs_broken_tu_force", kBrokenSource);
     SourceManager::setAnalyzeBrokenTUs(true);
     SourceManager::clearBrokenTUs();
 
@@ -75,7 +75,7 @@ TEST(BrokenTuTest, AnalyzeBrokenTUsOverride) {
 }
 
 TEST(BrokenTuTest, CleanTuStillAnalyzed) {
-    TempTu tu("zd_broken_tu_clean", "int f() { return 0; }\n");
+    TempTu tu("cs_broken_tu_clean", "int f() { return 0; }\n");
     SourceManager::setAnalyzeBrokenTUs(false);
     SourceManager::clearBrokenTUs();
 
@@ -90,7 +90,7 @@ TEST(BrokenTuTest, CleanTuStillAnalyzed) {
 
 TEST(BrokenTuTest, ConfigFlagParsed) {
     Config config;
-    const char* argv[] = {"zerodefect", "--analyze-broken-tus", "d.cpp"};
+    const char* argv[] = {"codeskeptic", "--analyze-broken-tus", "d.cpp"};
     ASSERT_TRUE(config.parseArgs(3, const_cast<char**>(argv)));
     EXPECT_TRUE(config.analyzeBrokenTUs());
 }

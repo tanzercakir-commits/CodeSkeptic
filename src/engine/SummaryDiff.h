@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_SUMMARY_DIFF_H
-#define ZERODEFECT_SUMMARY_DIFF_H
+#ifndef CODESKEPTIC_SUMMARY_DIFF_H
+#define CODESKEPTIC_SUMMARY_DIFF_H
 
 #include "engine/FunctionSummary.h"
 
@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Summary-diff (the core of the semantic regression signal): how did
 // function CONTRACTS change between two harvests?
@@ -61,6 +61,6 @@ int reportSummaryDiff(const std::string& oldPath,
                       const std::string& newPath, std::ostream& out,
                       bool gateWeakened = true);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_SUMMARY_DIFF_H
+#endif // CODESKEPTIC_SUMMARY_DIFF_H

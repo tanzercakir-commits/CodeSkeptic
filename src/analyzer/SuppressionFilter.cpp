@@ -4,12 +4,12 @@
 #include <cctype>
 #include <fstream>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
-const char kDisableLine[] = "zerodefect-disable-line";
-const char kDisableNextLine[] = "zerodefect-disable-next-line";
+const char kDisableLine[] = "codeskeptic-disable-line";
+const char kDisableNextLine[] = "codeskeptic-disable-next-line";
 
 bool isRuleChar(char c) {
     return std::isalnum(static_cast<unsigned char>(c)) || c == '-' ||
@@ -26,7 +26,7 @@ bool markerSuppressesRule(const std::string& line_text,
 
     // Rule list after the marker: space/comma-separated tokens.
     // Verify the marker ends on its own so that searching for
-    // "zerodefect-disable-line" does not match the "-next-line" variant.
+    // "codeskeptic-disable-line" does not match the "-next-line" variant.
     size_t after = pos + marker.size();
     if (after < line_text.size() && isRuleChar(line_text[after]))
         return false;
@@ -99,4 +99,4 @@ size_t SuppressionFilter::filter(DiagnosticList& diagnostics) {
     return before - diagnostics.size();
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

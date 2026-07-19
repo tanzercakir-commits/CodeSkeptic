@@ -21,7 +21,7 @@
 // consumes it.
 
 using namespace clang;
-using zerodefect::Interval;
+using codeskeptic::Interval;
 
 namespace {
 
@@ -80,7 +80,7 @@ public:
         // ASTContext POINTER changes — a freed context reallocated at the
         // same address would otherwise serve a stale CFG (address reuse,
         // hence order/ASLR-dependent flakiness). Clear before use.
-        zerodefect::CfgCache::instance().clear();
+        codeskeptic::CfgCache::instance().clear();
         struct V : RecursiveASTVisitor<V> {
             const FunctionDecl* fn = nullptr;
             bool VisitFunctionDecl(FunctionDecl* f) {
@@ -92,8 +92,8 @@ public:
         if (!v.fn) return;
         DivSite site = findDiv(v.fn);
         if (!site.op) return;
-        zerodefect::IntervalAnalysis analysis(intVars(v.fn, ctx));
-        zerodefect::runDataflow(v.fn, ctx, analysis);
+        codeskeptic::IntervalAnalysis analysis(intVars(v.fn, ctx));
+        codeskeptic::runDataflow(v.fn, ctx, analysis);
         out_.divisor = analysis.intervalAt(site.op, site.divisor);
         out_.found = true;
     }

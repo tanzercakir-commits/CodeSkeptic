@@ -14,7 +14,7 @@
 
 using namespace clang;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -203,4 +203,4 @@ void ParamIntervalCache::clear() {
     built_ = false;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

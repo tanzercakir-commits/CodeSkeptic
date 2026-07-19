@@ -9,7 +9,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 namespace {
 

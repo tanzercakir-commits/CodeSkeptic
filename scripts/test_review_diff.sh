@@ -12,13 +12,13 @@
 #   3. A self-review (base == head) is clean.
 #   4. A pure file RENAME introduces nothing — the old->new path map.
 #
-# Usage: scripts/test_review_diff.sh <zerodefect-binary>
+# Usage: scripts/test_review_diff.sh <codeskeptic-binary>
 # Wired into ctest as ReviewDiffFlow (tests/CMakeLists.txt), so the
 # referee gate and CI run it with every build.
 set -euo pipefail
 
-ZD_BIN="${1:?usage: test_review_diff.sh <zerodefect-binary>}"
-ZD_BIN="$(cd "$(dirname "$ZD_BIN")" && pwd)/$(basename "$ZD_BIN")"
+CS_BIN="${1:?usage: test_review_diff.sh <codeskeptic-binary>}"
+CS_BIN="$(cd "$(dirname "$CS_BIN")" && pwd)/$(basename "$CS_BIN")"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TMP="$(mktemp -d)"
@@ -115,7 +115,7 @@ HEAD_SHA="$(git rev-parse HEAD)"
 
 # --- 1+2: the real delta ------------------------------------------------
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$BASE_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$BASE_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 1 ] || fail "delta review: expected gate exit 1, got $code"
 
@@ -131,7 +131,7 @@ assert_not_grep "stable_warning" review.md       # shifted-only: silent
 
 # --- 3: self-review is clean ---------------------------------------------
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$HEAD_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$HEAD_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "self review: expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
@@ -146,7 +146,7 @@ git commit -qm rename
 RENAME_SHA="$(git rev-parse HEAD)"
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$HEAD_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$HEAD_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "rename review: expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
@@ -173,7 +173,7 @@ git add -A
 git commit -qm warning
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$RENAME_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$RENAME_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "warning review (default): expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=1 fixed=0 weakened=0 gate=pass" \
@@ -181,13 +181,13 @@ assert_grep "REVIEW_RESULT new_errors=0 new_warnings=1 fixed=0 weakened=0 gate=p
 assert_grep "pass --strict" review.md            # the hint that warnings exist
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$RENAME_SHA" --out review.md --strict \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$RENAME_SHA" --out review.md --strict \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 1 ] || fail "warning review (--strict): expected exit 1, got $code"
 assert_grep "gate=fail" "$TMP/stdout.txt"
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$RENAME_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$RENAME_SHA" --out review.md \
     --strict --gate warn > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "warning review (--gate warn): expected exit 0, got $code"
 assert_grep "gate=fail" "$TMP/stdout.txt"        # says fail, exits 0
@@ -207,7 +207,7 @@ git commit -qm assumption
 ASSUME_SHA="$(git rev-parse HEAD)"
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$WARN_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$WARN_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "assumption review: expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=1 fixed=0 weakened=0 gate=pass" \
@@ -219,7 +219,7 @@ assert_not_grep "1 warning" review.md           # info is NOT mislabeled
 
 # ...and --no-assumptions turns the delta off.
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$WARN_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$WARN_SHA" --out review.md \
     --no-assumptions > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "no-assumptions review: expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
@@ -236,7 +236,7 @@ git add -A
 git commit -qm vendor
 
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$ASSUME_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$ASSUME_SHA" --out review.md \
     --exclude 'vendor/*' > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "exclude review: expected exit 0, got $code"
 assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=pass" \
@@ -244,7 +244,7 @@ assert_grep "REVIEW_RESULT new_errors=0 new_warnings=0 fixed=0 weakened=0 gate=p
 assert_grep "excluded by --exclude" review.md    # skipped, but SAID
 # Control: without --exclude the same change yields the vendor finding.
 code=0
-bash "$SCRIPT_DIR/review_diff.sh" "$ZD_BIN" "$ASSUME_SHA" --out review.md \
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$ASSUME_SHA" --out review.md \
     > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
 [ "$code" -eq 0 ] || fail "exclude-control review: expected exit 0, got $code"
 assert_grep "vendor_deref" review.md

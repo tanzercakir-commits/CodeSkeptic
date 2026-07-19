@@ -13,7 +13,7 @@
 
 using namespace clang;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 ParsedContracts contractsForDecl(const FunctionDecl* func, ASTContext& ctx,
                                  unsigned* commentLine,
@@ -27,7 +27,7 @@ ParsedContracts contractsForDecl(const FunctionDecl* func, ASTContext& ctx,
 
     const SourceManager& sm = ctx.getSourceManager();
     const std::string text = comment->getRawText(sm).str();
-    if (text.find("zd:") == std::string::npos) return {};
+    if (text.find("cs:") == std::string::npos) return {};
 
     if (commentLine)
         *commentLine = sm.getSpellingLineNumber(comment->getBeginLoc());
@@ -44,7 +44,7 @@ ParsedContracts allContractClausesForDecl(const FunctionDecl* func,
     for (auto& clause : sidecar.clauses)
         merged.clauses.push_back(std::move(clause));
     // Sidecar syntax errors are ContractRule's to report (with the
-    // .zdc file attached) — enforcement only reads clauses.
+    // .csk file attached) — enforcement only reads clauses.
     return merged;
 }
 
@@ -284,4 +284,4 @@ RequiresAnalysis analyzeRequires(const ParsedContracts& parsed,
     return out;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

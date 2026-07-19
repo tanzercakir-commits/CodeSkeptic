@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_SUPPRESSION_FILTER_H
-#define ZERODEFECT_SUPPRESSION_FILTER_H
+#ifndef CODESKEPTIC_SUPPRESSION_FILTER_H
+#define CODESKEPTIC_SUPPRESSION_FILTER_H
 
 #include "core/Diagnostic.h"
 
@@ -7,12 +7,12 @@
 #include <string>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Applies suppression comments found in the source code:
-//   // zerodefect-disable-line              -> all findings on that line
-//   // zerodefect-disable-line rule1,rule2  -> only these rules on that line
-//   // zerodefect-disable-next-line [...]   -> same, for the next line
+//   // codeskeptic-disable-line              -> all findings on that line
+//   // codeskeptic-disable-line rule1,rule2  -> only these rules on that line
+//   // codeskeptic-disable-next-line [...]   -> same, for the next line
 // The rule list may be separated by spaces or commas.
 class SuppressionFilter {
 public:
@@ -34,6 +34,6 @@ bool markerSuppressesRule(const std::string& line_text,
                           const std::string& marker,
                           const std::string& rule_id);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_SUPPRESSION_FILTER_H
+#endif // CODESKEPTIC_SUPPRESSION_FILTER_H

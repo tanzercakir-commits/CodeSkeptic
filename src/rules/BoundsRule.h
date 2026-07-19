@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_BOUNDS_RULE_H
-#define ZERODEFECT_BOUNDS_RULE_H
+#ifndef CODESKEPTIC_BOUNDS_RULE_H
+#define CODESKEPTIC_BOUNDS_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Out-of-bounds array access (CWE-125 read / CWE-787 write, the
 // stack/global-buffer-overflow class), the second consumer of the
@@ -33,6 +33,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_BOUNDS_RULE_H
+#endif // CODESKEPTIC_BOUNDS_RULE_H

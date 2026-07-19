@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_DATAFLOW_ENGINE_H
-#define ZERODEFECT_DATAFLOW_ENGINE_H
+#ifndef CODESKEPTIC_DATAFLOW_ENGINE_H
+#define CODESKEPTIC_DATAFLOW_ENGINE_H
 
 #include "engine/CfgCache.h"
 #include "engine/ConditionWalk.h"
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <unordered_map>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 template <typename Analysis>
 struct DataflowResult {
@@ -442,6 +442,6 @@ DataflowResult<Analysis> runDataflow(
     return result;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_DATAFLOW_ENGINE_H
+#endif // CODESKEPTIC_DATAFLOW_ENGINE_H

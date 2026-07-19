@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_INT_OVERFLOW_RULE_H
-#define ZERODEFECT_INT_OVERFLOW_RULE_H
+#ifndef CODESKEPTIC_INT_OVERFLOW_RULE_H
+#define CODESKEPTIC_INT_OVERFLOW_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Integer overflow (CWE-190) — the first consumer of the interval
 // dataflow (2026-07-14). v0 scope: SIGNED integer MULTIPLICATION whose
@@ -30,6 +30,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_INT_OVERFLOW_RULE_H
+#endif // CODESKEPTIC_INT_OVERFLOW_RULE_H

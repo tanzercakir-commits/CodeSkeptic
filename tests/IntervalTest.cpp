@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-using zerodefect::Interval;
+using codeskeptic::Interval;
 
 // The interval lattice (2026-07-14): the numeric foundation for
 // bounds/overflow checking. The soundness invariant — an Interval

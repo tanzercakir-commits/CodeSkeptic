@@ -1,6 +1,6 @@
 #include "contracts/Policy.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 std::set<std::string>& profilePoliciesStorage() {
@@ -46,4 +46,4 @@ bool looksLikeAbsolutePath(const std::string& text) {
     return true;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

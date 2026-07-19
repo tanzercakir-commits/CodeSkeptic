@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZeroDefect diff-review assembler (the c1 "semantic PR review" core).
+"""CodeSkeptic diff-review assembler (the c1 "semantic PR review" core).
 
 Two subcommands, both invoked by scripts/review_diff.sh:
 
@@ -299,7 +299,7 @@ def cmd_assemble(args):
 
     # --- render -----------------------------------------------------------
     md = []
-    md.append("# ZeroDefect diff review")
+    md.append("# CodeSkeptic diff review")
     md.append("")
     md.append("Base `%s` -> head `%s`." % (args.base_label, args.head_label))
     if gate_fail:
@@ -440,7 +440,7 @@ def cmd_remap_db(args):
         protect = os.path.realpath(args.protect).rstrip(os.sep)
         if not protect.startswith(src_root + os.sep):
             protect = None  # outside the root: the rewrite can't touch it
-    sentinel = "\x00ZD_PROTECTED\x00"
+    sentinel = "\x00CS_PROTECTED\x00"
     prot_pat = re.compile(re.escape(protect) + r'(?=[/\s"\']|$)') \
         if protect else None
 

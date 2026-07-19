@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_JSON_REPORTER_H
-#define ZERODEFECT_JSON_REPORTER_H
+#ifndef CODESKEPTIC_JSON_REPORTER_H
+#define CODESKEPTIC_JSON_REPORTER_H
 
 #include "reporter/Reporter.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class JsonReporter : public Reporter {
 public:
@@ -16,6 +16,6 @@ private:
     std::string output_path_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_JSON_REPORTER_H
+#endif // CODESKEPTIC_JSON_REPORTER_H

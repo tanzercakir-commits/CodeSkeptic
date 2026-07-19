@@ -7,8 +7,8 @@
 #include <set>
 #include <string>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 TEST(MemoryLeakRuleExTest, SimpleLeak) {
     MemoryLeakRule_Ex rule;

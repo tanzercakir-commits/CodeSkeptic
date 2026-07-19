@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_COVERAGE_REPORT_H
-#define ZERODEFECT_COVERAGE_REPORT_H
+#ifndef CODESKEPTIC_COVERAGE_REPORT_H
+#define CODESKEPTIC_COVERAGE_REPORT_H
 
 // CoverageReport (2026-07-15): the first step toward the "assurance
 // engine" stance — an analyzer must not let "no warning" be read as
@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 enum class CoverageGap {
     NonConvergence,   // dataflow hit the iteration cap; findings incomplete
@@ -54,6 +54,6 @@ private:
     std::set<std::string> seen_;   // dedup key: function name
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_COVERAGE_REPORT_H
+#endif // CODESKEPTIC_COVERAGE_REPORT_H

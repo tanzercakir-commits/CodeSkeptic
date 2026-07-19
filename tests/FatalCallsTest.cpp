@@ -7,8 +7,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using zerodefect::testing::runRule;
+using namespace codeskeptic;
+using codeskeptic::testing::runRule;
 
 namespace {
 

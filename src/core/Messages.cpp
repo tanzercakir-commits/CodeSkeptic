@@ -1,6 +1,6 @@
 #include "core/Messages.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -62,78 +62,78 @@ const MsgEntry kMessages[] = {
     {"'{0}' declared without an initializer here",
      "{0} burada baslangic degeri olmadan bildirildi"},
     // AnalysisStarting
-    {"[ZeroDefect] Analysis starting... ({0} files, {1} rules)",
-     "[ZeroDefect] Analiz basliyor... ({0} dosya, {1} kural)"},
+    {"[CodeSkeptic] Analysis starting... ({0} files, {1} rules)",
+     "[CodeSkeptic] Analiz basliyor... ({0} dosya, {1} kural)"},
     // NoFilesToAnalyze
-    {"[ZeroDefect] No files to analyze.",
-     "[ZeroDefect] Analiz edilecek dosya yok."},
+    {"[CodeSkeptic] No files to analyze.",
+     "[CodeSkeptic] Analiz edilecek dosya yok."},
     // NoRulesRegistered
-    {"[ZeroDefect] No rules registered.",
-     "[ZeroDefect] Kayitli kural yok."},
+    {"[CodeSkeptic] No rules registered.",
+     "[CodeSkeptic] Kayitli kural yok."},
     // CleanNoIssues
-    {"ZeroDefect: Clean! No issues found.",
-     "ZeroDefect: Temiz! Sorun bulunamadi."},
+    {"CodeSkeptic: Clean! No issues found.",
+     "CodeSkeptic: Temiz! Sorun bulunamadi."},
     // FindingsCount
-    {"ZeroDefect: {0} finding(s)",
-     "ZeroDefect: {0} bulgu"},
+    {"CodeSkeptic: {0} finding(s)",
+     "CodeSkeptic: {0} bulgu"},
     // SuppressedCount
-    {"[ZeroDefect] {0} finding(s) suppressed by source comments",
-     "[ZeroDefect] {0} bulgu kaynak yorumlariyla bastirildi"},
+    {"[CodeSkeptic] {0} finding(s) suppressed by source comments",
+     "[CodeSkeptic] {0} bulgu kaynak yorumlariyla bastirildi"},
     // ReportPathsFiltered
-    {"[ZeroDefect] {0} finding(s) outside --report-paths filtered",
-     "[ZeroDefect] {0} bulgu --report-paths disinda kaldigi icin filtrelendi"},
+    {"[CodeSkeptic] {0} finding(s) outside --report-paths filtered",
+     "[CodeSkeptic] {0} bulgu --report-paths disinda kaldigi icin filtrelendi"},
     // BaselineWritten
-    {"[ZeroDefect] {0} finding(s) recorded to baseline: {1}",
-     "[ZeroDefect] {0} bulgu baseline dosyasina kaydedildi: {1}"},
+    {"[CodeSkeptic] {0} finding(s) recorded to baseline: {1}",
+     "[CodeSkeptic] {0} bulgu baseline dosyasina kaydedildi: {1}"},
     // BaselineFiltered
-    {"[ZeroDefect] {0} known finding(s) filtered by baseline",
-     "[ZeroDefect] {0} bilinen bulgu baseline ile filtrelendi"},
+    {"[CodeSkeptic] {0} known finding(s) filtered by baseline",
+     "[CodeSkeptic] {0} bilinen bulgu baseline ile filtrelendi"},
     // CompileDbNotFound
-    {"[ZeroDefect] compile_commands.json not found: {0}\n"
-     "[ZeroDefect] Fallback: continuing with -std=c++17.",
-     "[ZeroDefect] compile_commands.json bulunamadi: {0}\n"
-     "[ZeroDefect] Fallback: -std=c++17 ile devam ediliyor."},
+    {"[CodeSkeptic] compile_commands.json not found: {0}\n"
+     "[CodeSkeptic] Fallback: continuing with -std=c++17.",
+     "[CodeSkeptic] compile_commands.json bulunamadi: {0}\n"
+     "[CodeSkeptic] Fallback: -std=c++17 ile devam ediliyor."},
     // OutputFileOpenError
-    {"[ZeroDefect] Cannot open output file: {0}",
-     "[ZeroDefect] Cikti dosyasi acilamadi: {0}"},
+    {"[CodeSkeptic] Cannot open output file: {0}",
+     "[CodeSkeptic] Cikti dosyasi acilamadi: {0}"},
     // FileNotFound
-    {"[ZeroDefect] File not found: {0}",
-     "[ZeroDefect] Dosya bulunamadi: {0}"},
+    {"[CodeSkeptic] File not found: {0}",
+     "[CodeSkeptic] Dosya bulunamadi: {0}"},
     // DirNotFound
-    {"[ZeroDefect] Directory not found: {0}",
-     "[ZeroDefect] Dizin bulunamadi: {0}"},
+    {"[CodeSkeptic] Directory not found: {0}",
+     "[CodeSkeptic] Dizin bulunamadi: {0}"},
     // DirScanError
-    {"[ZeroDefect] Directory scan error: {0}",
-     "[ZeroDefect] Dizin tarama hatasi: {0}"},
+    {"[CodeSkeptic] Directory scan error: {0}",
+     "[CodeSkeptic] Dizin tarama hatasi: {0}"},
     // UsageError
     {"Error: no source path given.\n"
-     "Usage: zerodefect <source_path> [options]\n"
-     "See: zerodefect --help",
+     "Usage: codeskeptic <source_path> [options]\n"
+     "See: codeskeptic --help",
      "Hata: Kaynak dizin belirtilmedi.\n"
-     "Kullanim: zerodefect <kaynak_yolu> [secenekler]\n"
-     "Detay icin: zerodefect --help"},
+     "Kullanim: codeskeptic <kaynak_yolu> [secenekler]\n"
+     "Detay icin: codeskeptic --help"},
     // WholeProgramPass
-    {"[ZeroDefect] Whole-program pass: collecting summaries from {0} file(s)...",
-     "[ZeroDefect] Tum-program gecisi: {0} dosyadan ozetler toplaniyor..."},
+    {"[CodeSkeptic] Whole-program pass: collecting summaries from {0} file(s)...",
+     "[CodeSkeptic] Tum-program gecisi: {0} dosyadan ozetler toplaniyor..."},
     // AnalysisNotConverged
-    {"[ZeroDefect] warning: dataflow did not converge in '{0}' "
+    {"[CodeSkeptic] warning: dataflow did not converge in '{0}' "
      "(iteration cap hit); findings in this function may be incomplete",
-     "[ZeroDefect] uyari: '{0}' icinde dataflow yakinsamadi (iterasyon "
+     "[CodeSkeptic] uyari: '{0}' icinde dataflow yakinsamadi (iterasyon "
      "tavani); bu fonksiyondaki bulgular eksik olabilir"},
     // SummariesLoaded
-    {"[ZeroDefect] {0} function summaries loaded from {1}",
-     "[ZeroDefect] {0} fonksiyon ozeti yuklendi: {1}"},
+    {"[CodeSkeptic] {0} function summaries loaded from {1}",
+     "[CodeSkeptic] {0} fonksiyon ozeti yuklendi: {1}"},
     // SummariesSaved
-    {"[ZeroDefect] {0} function summaries saved to {1}",
-     "[ZeroDefect] {0} fonksiyon ozeti kaydedildi: {1}"},
+    {"[CodeSkeptic] {0} function summaries saved to {1}",
+     "[CodeSkeptic] {0} fonksiyon ozeti kaydedildi: {1}"},
     // SummaryLoadError
-    {"[ZeroDefect] warning: could not load summaries from {0} "
+    {"[CodeSkeptic] warning: could not load summaries from {0} "
      "(missing or malformed file); continuing without them",
-     "[ZeroDefect] uyari: ozetler yuklenemedi: {0} (dosya yok ya da "
+     "[CodeSkeptic] uyari: ozetler yuklenemedi: {0} (dosya yok ya da "
      "bozuk); ozetsiz devam ediliyor"},
     // SummarySaveError
-    {"[ZeroDefect] warning: could not save summaries to {0}",
-     "[ZeroDefect] uyari: ozetler kaydedilemedi: {0}"},
+    {"[CodeSkeptic] warning: could not save summaries to {0}",
+     "[CodeSkeptic] uyari: ozetler kaydedilemedi: {0}"},
     // TraceAssignedMaybeZeroHere
     {"'{0}' assigned a possibly-zero value here (callee may return zero)",
      "{0} burada sifir olabilecek bir deger atandi (cagrilan sifir donebilir)"},
@@ -144,9 +144,9 @@ const MsgEntry kMessages[] = {
     {"'{0}' is zero on this branch (per this condition)",
      "{0} bu dalda sifir (buradaki kosula gore)"},
     // SummaryStaleWarning
-    {"[ZeroDefect] warning: summary file {0} is older than {1} — "
+    {"[CodeSkeptic] warning: summary file {0} is older than {1} — "
      "summaries may be stale; re-run --summary-out to refresh",
-     "[ZeroDefect] uyari: ozet dosyasi {0}, {1} dosyasindan eski — "
+     "[CodeSkeptic] uyari: ozet dosyasi {0}, {1} dosyasindan eski — "
      "ozetler bayat olabilir; --summary-out ile tazeleyin"},
     // TraceAlsoDerefHere
     {"'{0}' is also dereferenced here (same origin)",
@@ -190,16 +190,16 @@ const MsgEntry kMessages[] = {
      "dizi sinirlari disinda erisim: ispatlanan indeks araligi {0}, dizi "
      "siniri [0, {1}) disinda"},
     // CoverageIncomplete
-    {"[ZeroDefect] analysis coverage: {0} function(s) hit the iteration cap "
+    {"[CodeSkeptic] analysis coverage: {0} function(s) hit the iteration cap "
      "and were not fully analyzed; their findings may be incomplete:",
-     "[ZeroDefect] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
+     "[CodeSkeptic] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
      "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
     // BrokenTuSkipped
-    {"[ZeroDefect] {0} translation unit(s) failed to COMPILE and were "
+    {"[CodeSkeptic] {0} translation unit(s) failed to COMPILE and were "
      "skipped - findings from an error-recovery AST are unreliable. Fix "
      "the include paths/flags, or pass --analyze-broken-tus to analyze "
      "anyway:",
-     "[ZeroDefect] {0} ceviri birimi DERLENEMEDI ve atlandi - hata "
+     "[CodeSkeptic] {0} ceviri birimi DERLENEMEDI ve atlandi - hata "
      "kurtarmali AST'den gelen bulgular guvenilmezdir. Include yollarini/"
      "bayraklari duzeltin ya da yine de analiz icin --analyze-broken-tus "
      "verin:"},
@@ -252,4 +252,4 @@ std::string msg(MsgId id, const std::string& a0, const std::string& a1,
     return text;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

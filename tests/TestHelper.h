@@ -1,12 +1,12 @@
-#ifndef ZERODEFECT_TEST_HELPER_H
-#define ZERODEFECT_TEST_HELPER_H
+#ifndef CODESKEPTIC_TEST_HELPER_H
+#define CODESKEPTIC_TEST_HELPER_H
 
 #include "core/Diagnostic.h"
 #include "core/Rule.h"
 
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 namespace testing {
 
 DiagnosticList runRule(Rule& rule, const std::string& code,
@@ -19,6 +19,6 @@ DiagnosticList runRuleCrossTU(Rule& rule, const std::string& calleeTU,
                               const std::string& callerTU);
 
 } // namespace testing
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_TEST_HELPER_H
+#endif // CODESKEPTIC_TEST_HELPER_H

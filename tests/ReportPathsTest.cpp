@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 // --report-paths parsing (the filter itself runs inside
 // StaticAnalyzer's reporting pipeline on canonical paths; the
@@ -37,7 +37,7 @@ TEST(ReportPathsTest, DefaultIsEmpty_NoFiltering) {
 
 TEST(ReportPathsTest, CliFlagParsed) {
     Config config;
-    const char* argv[] = {"zerodefect", "--report-paths", "src,include",
+    const char* argv[] = {"codeskeptic", "--report-paths", "src,include",
                           "dummy.cpp"};
     ASSERT_TRUE(config.parseArgs(4, const_cast<char**>(argv)));
     ASSERT_EQ(config.reportPaths().size(), 2u);

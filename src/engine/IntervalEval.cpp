@@ -19,7 +19,7 @@
 
 using namespace clang;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -525,7 +525,7 @@ IntervalMap soleDefIntervals(const clang::FunctionDecl* fn,
         // A non-const reference argument can write the local from the
         // callee — same treatment as a direct write.
         bool VisitCallExpr(clang::CallExpr* call) {
-            zerodefect::forEachNonConstRefArg(
+            codeskeptic::forEachNonConstRefArg(
                 call, [&](const clang::Expr* refArg) {
                     if (const auto* var = asVar(refArg))
                         otherWrites.insert(var);
@@ -563,4 +563,4 @@ IntervalMap soleDefIntervals(const clang::FunctionDecl* fn,
     return result;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

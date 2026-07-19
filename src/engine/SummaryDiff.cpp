@@ -6,10 +6,10 @@
 
 namespace {
 
-using RN = zerodefect::SummaryRegistry::ReturnNullness;
-using RZ = zerodefect::SummaryRegistry::ReturnZeroness;
-using PE = zerodefect::SummaryRegistry::ParamEffect;
-using FunctionSummary = zerodefect::SummaryRegistry::FunctionSummary;
+using RN = codeskeptic::SummaryRegistry::ReturnNullness;
+using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
+using PE = codeskeptic::SummaryRegistry::ParamEffect;
+using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 
 const char* rnName(RN v) {
     switch (v) {
@@ -69,7 +69,7 @@ void classifyField(T oldV, T newV, StrongFn isStrong, NameFn name,
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                                 const SummaryMap& newMap) {
@@ -156,19 +156,19 @@ int reportSummaryDiff(const std::string& oldPath,
     SummaryMap oldMap;
     SummaryMap newMap;
     if (!SummaryRegistry::parseSummaryFile(oldPath, oldMap)) {
-        out << "[ZeroDefect] cannot read summary file: " << oldPath
+        out << "[CodeSkeptic] cannot read summary file: " << oldPath
             << "\n";
         return 2;
     }
     if (!SummaryRegistry::parseSummaryFile(newPath, newMap)) {
-        out << "[ZeroDefect] cannot read summary file: " << newPath
+        out << "[CodeSkeptic] cannot read summary file: " << newPath
             << "\n";
         return 2;
     }
 
     SummaryDiffResult result = diffSummaries(oldMap, newMap);
 
-    out << "[ZeroDefect] summary diff: " << oldPath << " -> " << newPath
+    out << "[CodeSkeptic] summary diff: " << oldPath << " -> " << newPath
         << " (" << newMap.size() << " functions)\n";
     for (const auto& change : result.changes) {
         out << "SUMMARY_DIFF " << kindName(change.kind) << " "
@@ -176,16 +176,16 @@ int reportSummaryDiff(const std::string& oldPath,
         if (!change.detail.empty()) out << " " << change.detail;
         out << "\n";
     }
-    out << "[ZeroDefect] " << result.weakened << " weakened, "
+    out << "[CodeSkeptic] " << result.weakened << " weakened, "
         << result.strengthened << " strengthened, " << result.changed
         << " changed, " << result.added << " added, " << result.removed
         << " removed\n";
     if (result.weakened > 0) {
-        out << "[ZeroDefect] weakened contracts: callers relying on "
+        out << "[CodeSkeptic] weakened contracts: callers relying on "
                "them must be re-checked\n";
         return gateWeakened ? 1 : 0;
     }
     return 0;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

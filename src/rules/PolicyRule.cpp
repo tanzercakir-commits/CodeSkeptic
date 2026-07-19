@@ -19,13 +19,13 @@
 using namespace clang;
 using namespace clang::ast_matchers;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
 struct FilePolicies {
     bool noAbsolutePaths = false;
-    bool machineProposedOnly = false;  // activated only by zd:ai lines
+    bool machineProposedOnly = false;  // activated only by cs:ai lines
 };
 
 } // anonymous namespace
@@ -45,7 +45,7 @@ void PolicyRule::check(ASTContext& ctx, DiagnosticList& results) {
             files.insert(sm.getFileID(loc));
     }
 
-    // Per-file activation from `zd:policy` comment lines. Any such
+    // Per-file activation from `cs:policy` comment lines. Any such
     // line anywhere in a file scopes the policy to that whole file
     // (§2.3 — file comments are the local addition mechanism; the
     // project-wide mechanism is the idiom profile).
@@ -58,7 +58,7 @@ void PolicyRule::check(ASTContext& ctx, DiagnosticList& results) {
         if (!comments) continue;
         for (const auto& [offset, comment] : *comments) {
             const std::string text = comment->getRawText(sm).str();
-            if (text.find("zd:") == std::string::npos) continue;
+            if (text.find("cs:") == std::string::npos) continue;
             ParsedContracts parsed = parseContractComment(text);
             for (const auto& clause : parsed.clauses) {
                 if (clause.kind != ContractClauseKind::Policy) continue;
@@ -126,8 +126,8 @@ void PolicyRule::check(ASTContext& ctx, DiagnosticList& results) {
         diag.line = sm.getSpellingLineNumber(loc);
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "policy";
-        // Profile activation or a bare zd:policy line is declared
-        // intent -> error; activation only via zd:ai -> warning.
+        // Profile activation or a bare cs:policy line is declared
+        // intent -> error; activation only via cs:ai -> warning.
         diag.severity = (!profileActive && aiOnly) ? Severity::Warning
                                                    : Severity::Error;
         diag.message = msg(MsgId::PolicyAbsolutePath, "\"" + shown + "\"");
@@ -135,4 +135,4 @@ void PolicyRule::check(ASTContext& ctx, DiagnosticList& results) {
     }
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

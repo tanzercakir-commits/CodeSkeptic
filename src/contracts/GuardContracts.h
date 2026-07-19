@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_GUARD_CONTRACTS_H
-#define ZERODEFECT_GUARD_CONTRACTS_H
+#ifndef CODESKEPTIC_GUARD_CONTRACTS_H
+#define CODESKEPTIC_GUARD_CONTRACTS_H
 
 // Guard-as-contract (#89, §4.A v1): a function's OWN entry guard is a
 // precondition the code already enforces at runtime — but only
@@ -44,7 +44,7 @@
 
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 enum class GuardConsequence {
     Crash,     // assert-style: gone in release, or aborts — UB/crash
@@ -64,6 +64,6 @@ struct GuardRequire {
 std::vector<GuardRequire> inferGuardRequires(const clang::FunctionDecl* fn,
                                              clang::ASTContext& ctx);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_GUARD_CONTRACTS_H
+#endif // CODESKEPTIC_GUARD_CONTRACTS_H

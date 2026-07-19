@@ -13,7 +13,7 @@
 
 using namespace clang;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -160,4 +160,4 @@ ExtentMap buildExtentMap(const FunctionDecl* fn, ASTContext& ctx) {
     return std::move(c.map);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

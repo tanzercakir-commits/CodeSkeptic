@@ -1,7 +1,7 @@
-#ifndef ZERODEFECT_INTERVAL_H
-#define ZERODEFECT_INTERVAL_H
+#ifndef CODESKEPTIC_INTERVAL_H
+#define CODESKEPTIC_INTERVAL_H
 
-// Interval lattice — the numeric foundation ZeroDefect lacked
+// Interval lattice — the numeric foundation CodeSkeptic lacked
 // (2026-07-14). Every existing lattice is SYMBOLIC (null? freed?
 // zero?); none is QUANTITATIVE. Spatial safety (buffer/heap overflow)
 // and integer overflow are quantitative — they ask "is index i within
@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class Interval {
 public:
@@ -95,6 +95,6 @@ private:
     int64_t hi_ = 0;      // valid iff !hiInf_
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_INTERVAL_H
+#endif // CODESKEPTIC_INTERVAL_H

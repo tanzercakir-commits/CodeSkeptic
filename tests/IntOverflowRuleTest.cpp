@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // int-overflow (CWE-190), v0: signed integer multiplication whose proven
 // operand ranges yield a product that escapes the expression's own signed

@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_CONDITION_WALK_H
-#define ZERODEFECT_CONDITION_WALK_H
+#ifndef CODESKEPTIC_CONDITION_WALK_H
+#define CODESKEPTIC_CONDITION_WALK_H
 
 // Condition-walk skeleton: the shared backbone of ALL analyses that
 // extract edge information from branch conditions. The structure is
@@ -26,7 +26,7 @@
 
 #include <utility>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // glibc's C++ assert wraps its condition in `static_cast<bool>(...)`
 // (an EXPLICIT cast, invisible to IgnoreParenImpCasts). A condition
@@ -317,6 +317,6 @@ void walkZeroCondition(const clang::Expr* cond, bool isTrue,
         });
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONDITION_WALK_H
+#endif // CODESKEPTIC_CONDITION_WALK_H

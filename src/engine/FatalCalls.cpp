@@ -5,7 +5,7 @@
 
 #include <utility>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 std::set<std::string>& storage() {
@@ -34,4 +34,4 @@ bool isFatalCall(const clang::Stmt* stmt) {
     return false;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

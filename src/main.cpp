@@ -16,57 +16,57 @@
 #include <cstring>
 #include <iostream>
 
-#ifndef ZERODEFECT_VERSION
-#define ZERODEFECT_VERSION "0.0.0-dev"
+#ifndef CODESKEPTIC_VERSION
+#define CODESKEPTIC_VERSION "0.0.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
     // --version exits 0 by convention (unlike --help's usage-error exit)
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--version") == 0) {
-            std::cout << "ZeroDefect " << ZERODEFECT_VERSION << "\n";
+            std::cout << "CodeSkeptic " << CODESKEPTIC_VERSION << "\n";
             return 0;
         }
     }
 
-    zerodefect::Config config;
-    config.loadFromFile(".zerodefect.conf");
+    codeskeptic::Config config;
+    config.loadFromFile(".codeskeptic.conf");
 
     if (!config.parseArgs(argc, argv)) {
         return 1;
     }
 
-    zerodefect::setLang(zerodefect::parseLang(config.lang()));
+    codeskeptic::setLang(codeskeptic::parseLang(config.lang()));
 
     if (config.serve()) {
-        return zerodefect::runMcpServer();
+        return codeskeptic::runMcpServer();
     }
 
     // Summary-diff mode: not analysis, but a contract-diff report
     // between two harvests. Exit 1 if anything is WEAKENED — a semantic
     // regression CI gate.
     if (!config.summaryDiffOld().empty()) {
-        return zerodefect::reportSummaryDiff(
+        return codeskeptic::reportSummaryDiff(
             config.summaryDiffOld(), config.summaryDiffNew(), std::cout,
             config.summaryDiffGate() != "warn");
     }
 
     if (config.sourcePath().empty() && config.sourceFiles().empty()) {
-        std::cerr << zerodefect::msg(zerodefect::MsgId::UsageError) << "\n";
+        std::cerr << codeskeptic::msg(codeskeptic::MsgId::UsageError) << "\n";
         return 1;
     }
 
-    zerodefect::StaticAnalyzer analyzer(std::move(config));
+    codeskeptic::StaticAnalyzer analyzer(std::move(config));
 
-    analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
-    analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
-    analyzer.addRule<zerodefect::DivByZeroRule>();
-    analyzer.addRule<zerodefect::IntOverflowRule>();
-    analyzer.addRule<zerodefect::BoundsRule>();
-    analyzer.addRule<zerodefect::AssumptionRule>();
-    analyzer.addRule<zerodefect::NullDerefRule>();
-    analyzer.addRule<zerodefect::ContractRule>();
-    analyzer.addRule<zerodefect::PolicyRule>();
+    analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
+    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
+    analyzer.addRule<codeskeptic::DivByZeroRule>();
+    analyzer.addRule<codeskeptic::IntOverflowRule>();
+    analyzer.addRule<codeskeptic::BoundsRule>();
+    analyzer.addRule<codeskeptic::AssumptionRule>();
+    analyzer.addRule<codeskeptic::NullDerefRule>();
+    analyzer.addRule<codeskeptic::ContractRule>();
+    analyzer.addRule<codeskeptic::PolicyRule>();
 
     int findings = analyzer.run();
 

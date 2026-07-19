@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void ConsoleReporter::report(const DiagnosticList& diagnostics) {
     if (diagnostics.empty()) {
@@ -33,4 +33,4 @@ std::string ConsoleReporter::format() const {
     return "console";
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

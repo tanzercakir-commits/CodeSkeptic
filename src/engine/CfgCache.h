@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_CFG_CACHE_H
-#define ZERODEFECT_CFG_CACHE_H
+#ifndef CODESKEPTIC_CFG_CACHE_H
+#define CODESKEPTIC_CFG_CACHE_H
 
 #include <map>
 #include <memory>
@@ -10,7 +10,7 @@ class CFG;
 class FunctionDecl;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Per-function CFG cache: the CFG of a function is built ONCE within
 // the TU and shared by all consumers (4 rules + every sweep of the
@@ -52,6 +52,6 @@ private:
     const clang::ASTContext* ctx_ = nullptr;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CFG_CACHE_H
+#endif // CODESKEPTIC_CFG_CACHE_H

@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_PARAM_INTERVALS_H
-#define ZERODEFECT_PARAM_INTERVALS_H
+#ifndef CODESKEPTIC_PARAM_INTERVALS_H
+#define CODESKEPTIC_PARAM_INTERVALS_H
 
 // Interprocedural parameter intervals (C3, 2026-07-15): the numeric
 // bridge across function boundaries. Real overflow/OOB bugs rarely have
@@ -40,7 +40,7 @@ namespace clang {
 class ASTContext;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // f (canonical decl) -> per-parameter entry interval. A function absent
 // from the map has no proven entry constraint (treat every parameter as
@@ -79,6 +79,6 @@ private:
     bool built_ = false;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_PARAM_INTERVALS_H
+#endif // CODESKEPTIC_PARAM_INTERVALS_H

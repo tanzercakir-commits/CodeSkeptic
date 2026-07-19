@@ -108,7 +108,7 @@ bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
         // leak/double-free/UAF domain is blind in wrapper-heavy
         // codebases.
         return !name.empty() &&
-               zerodefect::allocFunctionNames().count(name.str()) != 0;
+               codeskeptic::allocFunctionNames().count(name.str()) != 0;
     }
     return false;
 }
@@ -171,7 +171,7 @@ bool isOwningSmartPointerType(QualType qt) {
         (name == "unique_ptr" || name == "shared_ptr" ||
          name == "auto_ptr"))
         return true;
-    return zerodefect::owningPointerNames().count(name.str()) != 0;
+    return codeskeptic::owningPointerNames().count(name.str()) != 0;
 }
 
 // If `expr` (a return value or a variable initializer) is the
@@ -473,10 +473,10 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         const bool isFreeByName =
             name == "free" ||
             (!name.empty() &&
-             zerodefect::freeFunctionNames().count(name.str()) != 0);
+             codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
-            zerodefect::SummaryRegistry::instance().lookup(callee);
-        using PE = zerodefect::SummaryRegistry::ParamEffect;
+            codeskeptic::SummaryRegistry::instance().lookup(callee);
+        using PE = codeskeptic::SummaryRegistry::ParamEffect;
 
         // &var is always Escapes (the callee may reassign/free it).
         std::map<const VarDecl*, VarCallEffect> byVar;
@@ -496,7 +496,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         // (`T*& handle`) lets the callee reassign or stash the
         // caller's pointer — always an escape, whatever the summary
         // says about by-value semantics.
-        zerodefect::forEachNonConstRefArg(call, [&](const Expr* refArg) {
+        codeskeptic::forEachNonConstRefArg(call, [&](const Expr* refArg) {
             const VarDecl* var = asVar(refArg);
             if (var && tracked.count(var)) byVar[var].escapes = true;
         });
@@ -692,7 +692,7 @@ using VarState = std::map<const VarDecl*, AllocState>;
 // The walk comes from the shared skeleton (engine/ConditionWalk.h); this
 // domain only cares about the null edge and ignores non-null knowledge.
 void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
-    zerodefect::walkNullCondition(
+    codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
             if (!isNull) return;
             auto it = state.find(var);
@@ -710,10 +710,10 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
 // engine/GuardedDisjuncts.h — here it is only instantiated with the
 // AllocState merger.
 
-using DisjunctState = zerodefect::GuardedState<VarState>;
+using DisjunctState = codeskeptic::GuardedState<VarState>;
 
 VarState flattenState(const DisjunctState& state) {
-    return zerodefect::flattenGuarded(state, mergeAllocStates);
+    return codeskeptic::flattenGuarded(state, mergeAllocStates);
 }
 
 // --- Analysis struct for DataflowEngine ---
@@ -728,14 +728,14 @@ public:
                     std::string funcName,
                     std::map<const VarDecl*, std::vector<const VarDecl*>>
                         aliasGroups,
-                    zerodefect::DiagnosticList& results)
+                    codeskeptic::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
           mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)),
           aliasGroups_(std::move(aliasGroups)),
           funcName_(std::move(funcName)), results_(results) {
-        zerodefect::Guarded<VarState> init;
+        codeskeptic::Guarded<VarState> init;
         for (const auto* var : trackedVars_)
             init.vars[var] = AllocState::None;
         initState_.push_back(std::move(init));
@@ -748,7 +748,7 @@ public:
     // rise independently)
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
-                   static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
+                   static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
     // Fact records add lattice climbs the var-state formula above
@@ -757,15 +757,15 @@ public:
     unsigned factBudget() const {
         auto n = static_cast<unsigned>(stampable_.size());
         return (n > 16 ? 16u : n) * 2 *
-               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+               static_cast<unsigned>(codeskeptic::kMaxDisjuncts);
     }
 
     // Engine convergence hook: collapse the disjuncts when a block is
     // revisited beyond any monotone explanation (see DataflowEngine).
-    void widen(State& s) const { zerodefect::widenGuarded(s, mergeAllocStates); }
+    void widen(State& s) const { codeskeptic::widenGuarded(s, mergeAllocStates); }
 
     State merge(const State& a, const State& b) const {
-        return zerodefect::mergeGuarded(a, b, mergeAllocStates);
+        return codeskeptic::mergeGuarded(a, b, mergeAllocStates);
     }
 
     // Pure state transition — produces no reports. Reporting lives in
@@ -775,7 +775,7 @@ public:
         // Fact lifecycle first (v2b): see NullDerefRule — erase facts
         // on assigned locals, stamp integer-constant stores.
         State in = inRaw;
-        zerodefect::applyStmtFacts(in, stmt, stampable_, mergeAllocStates);
+        codeskeptic::applyStmtFacts(in, stmt, stampable_, mergeAllocStates);
 
         // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
@@ -817,7 +817,7 @@ public:
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        zerodefect::refineGuardedFacts(state, condExpr, isTrueBranch,
+        codeskeptic::refineGuardedFacts(state, condExpr, isTrueBranch,
                                        mutated_, mergeAllocStates);
         for (auto& d : state)
             applyNullCondition(condExpr, isTrueBranch, d.vars);
@@ -840,10 +840,10 @@ public:
             if (b == before.end() || b->second == afterState) continue;
             if (afterState == AllocState::Allocated)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceAllocatedHere);
+                            codeskeptic::MsgId::TraceAllocatedHere);
             else if (afterState == AllocState::Freed)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceFreedHere);
+                            codeskeptic::MsgId::TraceFreedHere);
         }
 
         for (const auto& [var, effect] :
@@ -853,15 +853,15 @@ public:
 
             if (effect == StmtEffect::Allocates &&
                 it->second == AllocState::Allocated) {
-                report(stmt, var, ctx, zerodefect::Severity::Warning,
-                       "memory-leak", zerodefect::MsgId::LeakReassign);
+                report(stmt, var, ctx, codeskeptic::Severity::Warning,
+                       "memory-leak", codeskeptic::MsgId::LeakReassign);
             } else if (effect == StmtEffect::Frees &&
                        it->second == AllocState::Freed) {
                 // Under its own identity, like UAF: so the CWE415 mapping
                 // and the --disable-rule taxonomy can tell the finding
                 // kinds apart
-                report(stmt, var, ctx, zerodefect::Severity::Error,
-                       "double-free", zerodefect::MsgId::DoubleFree);
+                report(stmt, var, ctx, codeskeptic::Severity::Error,
+                       "double-free", codeskeptic::MsgId::DoubleFree);
             }
         }
 
@@ -869,8 +869,8 @@ public:
         if (const VarDecl* var = derefTarget(stmt)) {
             auto it = before.find(var);
             if (it != before.end() && it->second == AllocState::Freed) {
-                report(stmt, var, ctx, zerodefect::Severity::Error,
-                       "use-after-free", zerodefect::MsgId::UseAfterFree);
+                report(stmt, var, ctx, codeskeptic::Severity::Error,
+                       "use-after-free", codeskeptic::MsgId::UseAfterFree);
             }
         }
     }
@@ -898,18 +898,18 @@ public:
     }
 
 private:
-    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
 
     void recordEvent(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
-                     zerodefect::MsgId msgId) {
+                     codeskeptic::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
-        zerodefect::TraceNote note;
+        codeskeptic::TraceNote note;
         note.file = sm.getFilename(loc).str();
         note.line = sm.getSpellingLineNumber(loc);
         note.column = sm.getSpellingColumnNumber(loc);
-        note.message = zerodefect::msg(msgId, var->getNameAsString());
+        note.message = codeskeptic::msg(msgId, var->getNameAsString());
 
         auto& list = events_[var];
         for (const auto& existing : list)
@@ -920,8 +920,8 @@ private:
     }
 
     void report(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
-                zerodefect::Severity severity, const char* ruleId,
-                zerodefect::MsgId msgId) {
+                codeskeptic::Severity severity, const char* ruleId,
+                codeskeptic::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         // Findings inside macros are bound to the use site (expansion);
         // otherwise the file name can end up empty (scratch buffer)
@@ -929,14 +929,14 @@ private:
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reported_.emplace(var, line).second) return;
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.severity = severity;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = ruleId;
         diag.function = funcName_;
-        diag.message = zerodefect::msg(msgId, var->getNameAsString());
+        diag.message = codeskeptic::msg(msgId, var->getNameAsString());
         results_.push_back(diag);
         noteTargets_.emplace_back(results_.size() - 1, var);
     }
@@ -947,7 +947,7 @@ private:
     std::set<const ValueDecl*> stampable_;
     std::map<const VarDecl*, std::vector<const VarDecl*>> aliasGroups_;
     std::string funcName_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
     State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
 };
@@ -956,7 +956,7 @@ private:
 
 void analyzeFunction(const FunctionDecl* funcDecl,
                      ASTContext& ctx,
-                     zerodefect::DiagnosticList& results) {
+                     codeskeptic::DiagnosticList& results) {
     if (!funcDecl->hasBody()) return;
 
     auto trackedVars = collectTrackedVars(funcDecl, ctx);
@@ -976,13 +976,13 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     // The exit-leak check below consults the groups too
     const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
-        trackedVars, zerodefect::collectUnkeyableDecls(funcDecl),
-        zerodefect::collectFactDecls(funcDecl),
+        trackedVars, codeskeptic::collectUnkeyableDecls(funcDecl),
+        codeskeptic::collectFactDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
         std::move(aliasGroups), results);
-    auto dfResult = zerodefect::runDataflow(funcDecl, ctx, analysis);
+    auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
-        zerodefect::CoverageReport::instance().recordNonConvergence(
+        codeskeptic::CoverageReport::instance().recordNonConvergence(
             funcDecl->getQualifiedNameAsString());
 
     // Exit block leak check
@@ -1034,15 +1034,15 @@ void analyzeFunction(const FunctionDecl* funcDecl,
             if (!leaksSomewhere) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);
             if (analysis.reported().emplace(var, line).second) {
-                zerodefect::Diagnostic diag;
-                diag.severity = zerodefect::Severity::Warning;
+                codeskeptic::Diagnostic diag;
+                diag.severity = codeskeptic::Severity::Warning;
                 diag.file = sm.getFilename(endLoc).str();
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(endLoc);
                 diag.rule_id = "memory-leak";
                 diag.function = funcDecl->getQualifiedNameAsString();
-                diag.message = zerodefect::msg(
-                    zerodefect::MsgId::LeakEndOfFunction,
+                diag.message = codeskeptic::msg(
+                    codeskeptic::MsgId::LeakEndOfFunction,
                     var->getNameAsString());
                 results.push_back(diag);
                 analysis.registerNoteTarget(results.size() - 1, var);
@@ -1057,7 +1057,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
 class FindMemLeakCallback : public MatchFinder::MatchCallback {
 public:
-    explicit FindMemLeakCallback(zerodefect::DiagnosticList& results)
+    explicit FindMemLeakCallback(codeskeptic::DiagnosticList& results)
         : results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -1066,19 +1066,19 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*func)) return;
-        if (!zerodefect::lineFilterAllows(*func, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*func)) return;
+        if (!codeskeptic::lineFilterAllows(*func, sm)) return;
 
         analyzeFunction(func, *result.Context, results_);
     }
 
 private:
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::string MemoryLeakRule_Ex::id() const {
     return "memory-leak";
@@ -1102,4 +1102,4 @@ void MemoryLeakRule_Ex::check(clang::ASTContext& ctx,
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

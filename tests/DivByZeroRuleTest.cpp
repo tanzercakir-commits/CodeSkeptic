@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // --- Phase 1: Literal zero ---
 

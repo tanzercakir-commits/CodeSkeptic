@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 std::set<std::string>& allocStorage() {
@@ -43,4 +43,4 @@ const std::set<std::string>& owningPointerNames() {
     return owningPtrStorage();
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

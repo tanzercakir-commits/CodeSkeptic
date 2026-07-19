@@ -10,8 +10,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 TEST(CfgCacheTest, SharedWithinTU_SummaryFlowAndRuleReuse) {
     CfgCache::resetCounters();

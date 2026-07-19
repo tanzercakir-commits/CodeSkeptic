@@ -19,7 +19,7 @@
 // (external linkage, address-taken, mixed callers).
 
 using namespace clang;
-using zerodefect::Interval;
+using codeskeptic::Interval;
 
 namespace {
 
@@ -41,11 +41,11 @@ Interval entryOfFirstParam(const std::string& code, const std::string& fnName) {
             // CfgCache clear contract (see IntervalAnalysisTest) — the
             // per-function CFG cache is keyed by FunctionDecl* and must
             // not serve a stale CFG from a prior test's reused context.
-            zerodefect::CfgCache::instance().clear();
+            codeskeptic::CfgCache::instance().clear();
             V v; v.want = want;
             v.TraverseDecl(ctx.getTranslationUnitDecl());
-            auto map = zerodefect::buildParamIntervals(ctx);
-            if (v.fn) *out = zerodefect::paramEntryInterval(map, v.fn, 0);
+            auto map = codeskeptic::buildParamIntervals(ctx);
+            if (v.fn) *out = codeskeptic::paramEntryInterval(map, v.fn, 0);
         }
     };
     struct Action : ASTFrontendAction {

@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_INTERVAL_ANALYSIS_H
-#define ZERODEFECT_INTERVAL_ANALYSIS_H
+#ifndef CODESKEPTIC_INTERVAL_ANALYSIS_H
+#define CODESKEPTIC_INTERVAL_ANALYSIS_H
 
 // IntervalAnalysis (2026-07-14): the reusable numeric dataflow. Runs the
 // interval lattice over a function's CFG via the shared DataflowEngine
@@ -26,7 +26,7 @@ namespace clang {
 class ASTContext;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class IntervalAnalysis {
 public:
@@ -121,6 +121,6 @@ private:
     std::map<const clang::Stmt*, IntervalMap> atStmt_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_INTERVAL_ANALYSIS_H
+#endif // CODESKEPTIC_INTERVAL_ANALYSIS_H

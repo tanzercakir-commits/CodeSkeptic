@@ -1,6 +1,6 @@
 #include "engine/CoverageReport.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 CoverageReport& CoverageReport::instance() {
     static CoverageReport report;
@@ -17,4 +17,4 @@ void CoverageReport::clear() {
     seen_.clear();
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

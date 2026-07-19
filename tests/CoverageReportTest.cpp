@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 // CoverageReport (2026-07-15): the process-global accumulator that lets
 // a run say "I could not fully analyze these functions" instead of
