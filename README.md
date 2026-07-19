@@ -16,6 +16,21 @@ AI-assisted development**: an analyzer designed to sit inside the
 code-generation loop, re-checking each edit in milliseconds and returning
 machine-readable findings with dataflow traces.
 
+![CodeSkeptic's HTML report on a first-draft file](docs/img/report.png)
+
+Point it at first-draft code and it flags what the compiler waves through
+— an unchecked `getenv`, an `atoi` result multiplied past `int`, a work
+buffer leaked on an error path. Where a bug spans several lines, the
+finding carries a **dataflow trace** with source context:
+
+![A finding's dataflow trace](docs/img/trace.png)
+
+That is real output on [`docs/demo.c`](docs/demo.c) — and none of it is a
+compiler warning. `gcc -O2 -Wall -Wextra -Woverflow` and `clang
+-Winteger-overflow` are both silent on that `n * 4096`: `-Woverflow` only
+fires on compile-time-*constant* overflow, not a value that arrives from
+`atoi` at runtime.
+
 ## Rules
 
 | Rule | ID | Detects |
@@ -542,13 +557,41 @@ line, and CodeSkeptic's dataflow traces show up as *related locations*
 navigable step by step).
 
 **GitHub code scanning.** Upload the same file from CI and findings
-appear in the repository's Security tab and as PR annotations:
+appear in the repository's Security tab and as PR annotations. A complete
+workflow — build CodeSkeptic, generate your project's compilation
+database, analyze, upload:
 
 ```yaml
-- run: build/src/codeskeptic src/ --sarif findings.sarif || true
-- uses: github/codeql-action/upload-sarif@v3
-  with:
-    sarif_file: findings.sarif
+# .github/workflows/codeskeptic.yml
+name: CodeSkeptic
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write        # required to upload SARIF to code scanning
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CodeSkeptic
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libclang-18-dev cmake
+          cmake -B cs-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build cs-build -j
+
+      - name: Generate your project's compile_commands.json
+        run: cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Analyze -> SARIF
+        run: ./cs-build/src/codeskeptic . --build-path build --sarif codeskeptic.sarif || true
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: codeskeptic.sarif
 ```
 
 (`|| true` because CodeSkeptic exits 1 on findings; code scanning does
