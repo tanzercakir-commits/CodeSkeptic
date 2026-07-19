@@ -1527,3 +1527,63 @@ TEST(GuardImplicationTest, RealTgaLoader_ImplicationWitness_Clean) {
     )");
     ASSERT_EQ(results.size(), 0);
 }
+
+// --- Real-world regression pins: open upstream bugs CodeSkeptic found ---
+// Bodies are the real upstream functions reduced to minimal parseable
+// stubs. They lock in recall on defects that are still OPEN upstream, so
+// any future change that stops catching them fails CI.
+
+// shadps4-emu/shadPS4 #4697 — UsbEmulatedBackend::GetMaxPacketSize:
+// `desc` is set null, passed BY VALUE to GetDeviceDescriptor (so the
+// caller's pointer stays null), then dereferenced. Definite null deref.
+TEST(RealWorldReproTest, ShadPS4_4697_NullDescDeref_Reports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct libusb_device;
+        struct libusb_device_descriptor { unsigned char bMaxPacketSize0; };
+        extern void* memcpy(void*, const void*, unsigned long);
+        struct EmulatedBackend {
+            libusb_device_descriptor* FillDeviceDescriptor();
+            int GetDeviceDescriptor(libusb_device* dev, libusb_device_descriptor* desc) {
+                memcpy(desc, FillDeviceDescriptor(), sizeof(libusb_device_descriptor));
+                return 0;
+            }
+            int GetMaxPacketSize(libusb_device* dev, unsigned char endpoint) {
+                libusb_device_descriptor* desc = nullptr;
+                int r = GetDeviceDescriptor(dev, desc);
+                if (r < 0) { return -99; }
+                return desc->bMaxPacketSize0;
+            }
+        };
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+// carbon-language/carbon-lang #7523 — ExportClassToCpp dereferences the
+// DeclContext returned by ExportNameScopeToCpp, which returns null on the
+// non-identifier-package-name TODO path, with no null check. The callee's
+// maybe-null return travels to the caller's deref (interprocedural).
+TEST(RealWorldReproTest, CarbonLang_7523_NullDeclContextDeref_Reports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Context;
+        struct RecordDecl;
+        struct DeclContext { void addHiddenDecl(RecordDecl*); };
+        DeclContext* ExportNameScopeToCpp(Context& context, int loc_id, int name_scope_id) {
+            if (name_scope_id == 0) { return nullptr; }
+            static DeclContext dc;
+            return &dc;
+        }
+        RecordDecl* ExportClassToCpp(Context& context, int loc_id, int parent_scope_id) {
+            auto* decl_context = ExportNameScopeToCpp(context, loc_id, parent_scope_id);
+            RecordDecl* record_decl = nullptr;
+            decl_context->addHiddenDecl(record_decl);
+            return record_decl;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
