@@ -1587,3 +1587,52 @@ TEST(RealWorldReproTest, CarbonLang_7523_NullDeclContextDeref_Reports) {
     EXPECT_EQ(results[0].rule_id, "null-deref");
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- README "How does it compare?" pins ---
+// These guard the claims in the README comparison table for CodeSkeptic's
+// own cells: if a change makes CodeSkeptic stop catching what docs/demo.c
+// or docs/custom.c show, CI turns red so the README can't overclaim.
+
+// docs/demo.c: getenv() may return null -> strlen(val) derefs it; malloc
+// result used unchecked. (Table row 1, CodeSkeptic cell.)
+TEST(ReadmeCompareTest, DemoC_GetenvMalloc_NullDeref) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char *getenv(const char*);
+        extern void *malloc(unsigned long);
+        extern unsigned long strlen(const char*);
+        extern char *strcpy(char*, const char*);
+        char *load_setting(const char *name) {
+            char *val = getenv(name);
+            char *copy = (char*)malloc(strlen(val) + 1);
+            strcpy(copy, val);
+            return copy;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    for (const auto& d : results) EXPECT_EQ(d.rule_id, "null-deref");
+}
+
+// docs/custom.c: a hand-written function returns null on some path; its
+// result is dereferenced. (Table row 2, CodeSkeptic cell.)
+TEST(ReadmeCompareTest, CustomC_HandWrittenNullReturner_NullDeref) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern unsigned long strlen(const char*);
+        char *my_lookup(int key) {
+            if (key == 0) return 0;
+            static char buf[8];
+            return buf;
+        }
+        unsigned long via_libc(int key) {
+            char *v = my_lookup(key);
+            return strlen(v);
+        }
+        char direct(int key) {
+            char *v = my_lookup(key);
+            return v[0];
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    for (const auto& d : results) EXPECT_EQ(d.rule_id, "null-deref");
+}

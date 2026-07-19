@@ -1,5 +1,23 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-19 — Guard: README comparison-table claims (Tier 1)
+
+The README "How does it compare?" table asserts CodeSkeptic catches three
+findings the everyday compiler warnings miss. Pin those cells so the claim
+stays honest: if a change makes CodeSkeptic stop catching what docs/demo.c
+or docs/custom.c show, CI turns red.
+
+### Added
+- `ReadmeCompareTest.DemoC_GetenvMalloc_NullDeref`,
+  `ReadmeCompareTest.CustomC_HandWrittenNullReturner_NullDeref`,
+  `ReadmeCompareTest.DemoC_AtoiOverflow` — the CodeSkeptic column of the
+  comparison table, executable. 618 ctest total, shuffle-stable.
+
+(Only our own cells are guarded — the external-tool cells are reproducible
+by hand but not gated in CI, since a competitor's behavior across tool
+versions is not ours to keep green.)
+
+
 ## 2026-07-19 — Regression pins: three open real-world bugs
 
 Re-ran the current binary against the three real, still-open upstream
