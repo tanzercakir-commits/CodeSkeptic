@@ -31,6 +31,33 @@ compiler warning. `gcc -O2 -Wall -Wextra -Woverflow` and `clang
 fires on compile-time-*constant* overflow, not a value that arrives from
 `atoi` at runtime.
 
+### How does it compare?
+
+Those three findings, run through the mainstream C/C++ tools on
+[`docs/demo.c`](docs/demo.c) and [`docs/custom.c`](docs/custom.c). The
+interesting part isn't that CodeSkeptic wins a row — it's that **no single
+mainstream tool catches all three, and for the two null cases the good
+static analyzers disagree with each other**:
+
+| Finding | `-Wall -Wextra` | gcc `-fanalyzer` | clang `--analyze` | CodeSkeptic |
+|---------|:---:|:---:|:---:|:---:|
+| null-deref via `getenv` (a library contract) | — | — | ✅ | ✅ + trace |
+| null-deref via your own null-returning function | — | ✅ | — | ✅ + trace |
+| int-overflow from `atoi` | — | — | — | ✅ + trace |
+
+Clang's analyzer models `getenv` as nullable but doesn't follow the
+hand-written function; gcc's `-fanalyzer` does the exact opposite; the
+everyday `-Wall -Wextra` warnings flag none of them. CodeSkeptic covers
+the class — a library-contract source, an interprocedural custom return,
+and the runtime overflow — each with a dataflow trace. This isn't
+"nobody else can": it's that the everyday warning net has a real gap
+here, and analyzer coverage is uneven — which is exactly the surface
+CodeSkeptic is built for.
+
+<sub>Reproduced with gcc 13.3 and clang 18.1 on the two files above. MSVC
+2022 (`/W4` and `/analyze`) and cppcheck 2.17 (`--enable=all`) were also
+checked by hand on the `getenv` case and stayed silent.</sub>
+
 ## Rules
 
 | Rule | ID | Detects |
