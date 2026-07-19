@@ -296,3 +296,20 @@ TEST(IntOverflowRuleTest, SelfSquareSilent) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// README "How does it compare?" pin (Table row 3, CodeSkeptic cell):
+// docs/demo.c multiplies an unbounded atoi() result past int. No compiler
+// warning fires here; if CodeSkeptic stops flagging it, CI turns red so
+// the README can't overclaim.
+TEST(ReadmeCompareTest, DemoC_AtoiOverflow) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int buffer_size(const char *s) {
+            int n = atoi(s);
+            return n * 4096;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
