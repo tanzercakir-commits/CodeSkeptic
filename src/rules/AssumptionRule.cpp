@@ -92,19 +92,19 @@ struct ParamUsageVisitor : RecursiveASTVisitor<ParamUsageVisitor> {
 std::set<unsigned> declaredNonNullParams(const FunctionDecl* fn,
                                          ASTContext& ctx) {
     std::set<unsigned> declared;
-    zerodefect::ParsedContracts parsed =
-        zerodefect::allContractClausesForDecl(fn, ctx);
+    codeskeptic::ParsedContracts parsed =
+        codeskeptic::allContractClausesForDecl(fn, ctx);
     if (parsed.clauses.empty()) return declared;
-    auto req = zerodefect::analyzeRequires(parsed, fn);
+    auto req = codeskeptic::analyzeRequires(parsed, fn);
     for (const auto& info : req.enforced)
-        if (info.kind == zerodefect::RequiresInfo::Kind::NonNullParam ||
-            info.kind == zerodefect::RequiresInfo::Kind::NonNullUnlessCond)
+        if (info.kind == codeskeptic::RequiresInfo::Kind::NonNullParam ||
+            info.kind == codeskeptic::RequiresInfo::Kind::NonNullUnlessCond)
             declared.insert(info.paramIndex);
     return declared;
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
-                     zerodefect::DiagnosticList& results) {
+                     codeskeptic::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
     ParamUsageVisitor usage;
@@ -121,22 +121,22 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (declared.count(i)) continue;         // declared — verified in contract
 
         SourceLocation loc = sm.getExpansionLoc(p->getLocation());
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = sm.getSpellingLineNumber(loc);
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "assumption";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = zerodefect::Severity::Info;
-        diag.message = zerodefect::msg(
-            zerodefect::MsgId::AssumptionNonNullParam, p->getNameAsString());
+        diag.severity = codeskeptic::Severity::Info;
+        diag.message = codeskeptic::msg(
+            codeskeptic::MsgId::AssumptionNonNullParam, p->getNameAsString());
         results.push_back(std::move(diag));
     }
 }
 
 class AssumptionCallback : public MatchFinder::MatchCallback {
 public:
-    explicit AssumptionCallback(zerodefect::DiagnosticList& results)
+    explicit AssumptionCallback(codeskeptic::DiagnosticList& results)
         : results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -145,19 +145,19 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(fn->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*fn)) return;
-        if (!zerodefect::lineFilterAllows(*fn, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*fn)) return;
+        if (!codeskeptic::lineFilterAllows(*fn, sm)) return;
 
         analyzeFunction(fn, *result.Context, results_);
     }
 
 private:
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void AssumptionRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     // Opt-in intent-debt report: silent unless --assumptions is set.
@@ -173,4 +173,4 @@ void AssumptionRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

@@ -41,51 +41,51 @@ std::string mainFileOf(clang::ASTContext& ctx) {
     return "<unknown>";
 }
 
-class ZeroDefectASTConsumer : public clang::ASTConsumer {
+class CodeSkepticASTConsumer : public clang::ASTConsumer {
 public:
-    explicit ZeroDefectASTConsumer(zerodefect::ASTCallback callback)
+    explicit CodeSkepticASTConsumer(codeskeptic::ASTCallback callback)
         : callback_(std::move(callback)) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
-        if (!zerodefect::SourceManager::analyzeBrokenTUs() &&
+        if (!codeskeptic::SourceManager::analyzeBrokenTUs() &&
             tuIsBroken(ctx)) {
-            zerodefect::SourceManager::recordBrokenTU(mainFileOf(ctx));
+            codeskeptic::SourceManager::recordBrokenTU(mainFileOf(ctx));
             return;
         }
         callback_(ctx);
     }
 
 private:
-    zerodefect::ASTCallback callback_;
+    codeskeptic::ASTCallback callback_;
 };
 
-class ZeroDefectAction : public clang::ASTFrontendAction {
+class CodeSkepticAction : public clang::ASTFrontendAction {
 public:
-    explicit ZeroDefectAction(zerodefect::ASTCallback callback)
+    explicit CodeSkepticAction(codeskeptic::ASTCallback callback)
         : callback_(std::move(callback)) {}
 
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance& /*ci*/,
                       llvm::StringRef /*file*/) override {
-        return std::make_unique<ZeroDefectASTConsumer>(callback_);
+        return std::make_unique<CodeSkepticASTConsumer>(callback_);
     }
 
 private:
-    zerodefect::ASTCallback callback_;
+    codeskeptic::ASTCallback callback_;
 };
 
-class ZeroDefectActionFactory
+class CodeSkepticActionFactory
     : public clang::tooling::FrontendActionFactory {
 public:
-    explicit ZeroDefectActionFactory(zerodefect::ASTCallback callback)
+    explicit CodeSkepticActionFactory(codeskeptic::ASTCallback callback)
         : callback_(std::move(callback)) {}
 
     std::unique_ptr<clang::FrontendAction> create() override {
-        return std::make_unique<ZeroDefectAction>(callback_);
+        return std::make_unique<CodeSkepticAction>(callback_);
     }
 
 private:
-    zerodefect::ASTCallback callback_;
+    codeskeptic::ASTCallback callback_;
 };
 
 // Fallback compilation database (no compile_commands.json found):
@@ -122,7 +122,7 @@ public:
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 SourceManager::SourceManager(const std::string& build_path)
     : build_path_(build_path) {
@@ -172,7 +172,7 @@ namespace {
 void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
     // Contracts live in ordinary line comments; without this flag the
     // AST keeps only doc-comments and getRawCommentForDeclNoCache
-    // returns nothing for `// zd:` blocks (CONTRACTS.md).
+    // returns nothing for `// cs:` blocks (CONTRACTS.md).
     tool.appendArgumentsAdjuster(
         clang::tooling::getInsertArgumentAdjuster(
             {"-fparse-all-comments"},
@@ -279,7 +279,7 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
 
             // The broken-TU guard applies to both cache paths — a
             // cached AST keeps its DiagnosticsEngine, so the check is
-            // identical (see ZeroDefectASTConsumer).
+            // identical (see CodeSkepticASTConsumer).
             auto guardedCall = [&](clang::ASTContext& ctx) {
                 if (!analyzeBrokenTUs() && tuIsBroken(ctx)) {
                     recordBrokenTU(mainFileOf(ctx));
@@ -316,7 +316,7 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
     clang::tooling::ClangTool tool(*comp_db_, source_files_);
     applyPlatformAdjusters(tool);
 
-    ZeroDefectActionFactory factory(callback);
+    CodeSkepticActionFactory factory(callback);
     return tool.run(&factory);
 }
 
@@ -348,4 +348,4 @@ const std::vector<std::string>& SourceManager::files() const {
     return source_files_;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

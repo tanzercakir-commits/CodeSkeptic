@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Diff-aware analysis: runs zerodefect over the C/C++ files changed
+# Diff-aware analysis: runs codeskeptic over the C/C++ files changed
 # since the given git ref. The "only check what you touched" primitive
 # for agent/CI loops.
 #
-# Usage: scripts/analyze_diff.sh <zerodefect-binary> <git-ref> [extra args...]
-#   example: scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
+# Usage: scripts/analyze_diff.sh <codeskeptic-binary> <git-ref> [extra args...]
+#   example: scripts/analyze_diff.sh build/src/codeskeptic origin/main --severity error
 #
 # Extra arguments are forwarded to the binary verbatim; with --summary-in
 # the diff loop gains whole-project knowledge (callee summaries from
 # other files become visible):
-#   scripts/analyze_diff.sh build/src/zerodefect origin/main \
-#       --summary-in .zerodefect-summaries
+#   scripts/analyze_diff.sh build/src/codeskeptic origin/main \
+#       --summary-in .codeskeptic-summaries
 set -euo pipefail
 
-ZD_BIN="${1:?usage: analyze_diff.sh <zerodefect-binary> <git-ref> [extra args...]}"
-REF="${2:?usage: analyze_diff.sh <zerodefect-binary> <git-ref> [extra args...]}"
+CS_BIN="${1:?usage: analyze_diff.sh <codeskeptic-binary> <git-ref> [extra args...]}"
+REF="${2:?usage: analyze_diff.sh <codeskeptic-binary> <git-ref> [extra args...]}"
 shift 2
 
 mapfile -t files < <(git diff --name-only --diff-filter=d "$REF" -- \
@@ -51,11 +51,11 @@ for f in "${files[@]}"; do
         echo "=== $f (lines $ranges) ==="
         set -- "$@" # existing extra arguments are preserved
         code=0
-        "$ZD_BIN" "$f" --lines "$ranges" "$@" || code=$?
+        "$CS_BIN" "$f" --lines "$ranges" "$@" || code=$?
     else
         echo "=== $f ==="
         code=0
-        "$ZD_BIN" "$f" "$@" || code=$?
+        "$CS_BIN" "$f" "$@" || code=$?
     fi
     if [ "$code" -gt 1 ]; then
         echo "[analyze-diff] FAIL: analyzer error on $f (exit $code)"

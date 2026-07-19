@@ -21,7 +21,7 @@
 #include <filesystem>
 #include <iostream>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 StaticAnalyzer::StaticAnalyzer(Config config)
     : config_(std::move(config)) {
@@ -36,7 +36,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setAssumptionMode(config_.assumptions());
     // Sidecar contracts are cached per file path for the process
     // lifetime; a new analyzer run re-reads them (the MCP server
-    // lives long — an edited .zdc must be seen).
+    // lives long — an edited .csk must be seen).
     clearSidecarCache();
     // Coverage gaps belong to a single run; a long-lived process (the
     // MCP server) must not inherit the previous run's non-convergence.
@@ -320,4 +320,4 @@ int StaticAnalyzer::run() {
     return static_cast<int>(diagnostics_.size());
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

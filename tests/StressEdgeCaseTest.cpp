@@ -15,8 +15,8 @@
 #include <string>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // ===================================================================
 // BEST CASE — defensive patterns must stay clean

@@ -1,6 +1,6 @@
 #include "engine/AssumptionMode.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 bool g_assumptionMode = false;
@@ -10,4 +10,4 @@ void setAssumptionMode(bool enabled) { g_assumptionMode = enabled; }
 
 bool assumptionMode() { return g_assumptionMode; }
 
-} // namespace zerodefect
+} // namespace codeskeptic

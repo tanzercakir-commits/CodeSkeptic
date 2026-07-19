@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_MESSAGES_H
-#define ZERODEFECT_MESSAGES_H
+#ifndef CODESKEPTIC_MESSAGES_H
+#define CODESKEPTIC_MESSAGES_H
 
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 enum class Lang { EN, TR };
 
@@ -82,6 +82,6 @@ enum class MsgId {
 std::string msg(MsgId id, const std::string& a0 = "",
                 const std::string& a1 = "", const std::string& a2 = "");
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_MESSAGES_H
+#endif // CODESKEPTIC_MESSAGES_H

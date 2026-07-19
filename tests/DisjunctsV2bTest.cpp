@@ -5,8 +5,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // Disjuncts v2b — cross-variable correlation (2026-07-12).
 //

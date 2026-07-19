@@ -1,12 +1,12 @@
-#ifndef ZERODEFECT_BASELINE_H
-#define ZERODEFECT_BASELINE_H
+#ifndef CODESKEPTIC_BASELINE_H
+#define CODESKEPTIC_BASELINE_H
 
 #include "core/Diagnostic.h"
 
 #include <map>
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Baseline: freezes the current findings into a file; subsequent runs
 // report ONLY NEW findings. The standard path for gradual adoption on
@@ -23,7 +23,7 @@ namespace zerodefect {
 // semantics): baselining one of two identical `delete p;` lines in two
 // different functions does not hide the other.
 //
-// Format: "# zerodefect-baseline v2" header + one key per line
+// Format: "# codeskeptic-baseline v2" header + one key per line
 // (rule_id|file|line-hash|message; duplicates preserved). Headerless
 // old v1 files (rule_id|file|line|message) are recognized on load and
 // keep matching with their old meaning — refreshing the baseline
@@ -52,6 +52,6 @@ private:
     std::map<std::string, int> counts_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_BASELINE_H
+#endif // CODESKEPTIC_BASELINE_H

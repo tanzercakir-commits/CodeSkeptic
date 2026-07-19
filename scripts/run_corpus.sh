@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Real-world regression corpus: downloads pinned-version open-source
-# projects, generates compile_commands.json and runs zerodefect on them.
+# projects, generates compile_commands.json and runs codeskeptic on them.
 #
 # Success criteria:
 #   1. The analyzer runs WITHOUT CRASHING (exit code 0 or 1).
@@ -10,13 +10,13 @@
 #      FP explosion). If no value is recorded, only the CORPUS_RESULT
 #      line is printed (pin it from the first run when adding a project).
 #
-# Usage: scripts/run_corpus.sh <zerodefect-binary> [work-dir]
+# Usage: scripts/run_corpus.sh <codeskeptic-binary> [work-dir]
 set -euo pipefail
 
 # Resolve our own directory BEFORE any cd (relative-path trap)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-ZD_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+CS_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 WORK="${2:-corpus-work}"
 mkdir -p "$WORK"
 cd "$WORK"
@@ -69,10 +69,10 @@ d = sys.argv[1]
 db = json.load(open(f"build-{d}/compile_commands.json"))
 open(f"files-{d}.txt", "w").write("\n".join(sorted({e["file"] for e in db})))
 PYEOF
-        "$ZD_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
+        "$CS_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
             > "out-$dir.txt" 2>&1
     else
-        "$ZD_BIN" "$dir" --build-path "build-$dir" > "out-$dir.txt" 2>&1
+        "$CS_BIN" "$dir" --build-path "build-$dir" > "out-$dir.txt" 2>&1
     fi
     local code=$?
     set -e

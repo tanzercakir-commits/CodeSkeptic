@@ -1,4 +1,4 @@
-# ZeroDefect v0.3.0
+# CodeSkeptic v0.3.0
 
 The recall release — tuned for its actual job: an analyzer an AI runs as
 an MCP server to re-check its own first-draft code. v0.1 tracked symbolic
@@ -78,7 +78,7 @@ declared intent, not code-only inference.
 
 ---
 
-# ZeroDefect v0.2.0
+# CodeSkeptic v0.2.0
 
 The quantitative release. v0.1 tracked only SYMBOLIC state (null?
 freed? zero?); v0.2 adds NUMERIC reasoning — intervals, sizes, bounds —
@@ -157,9 +157,9 @@ was found and fixed; shuffle-stability is now a standing referee.
 
 ---
 
-# ZeroDefect v0.1.0
+# CodeSkeptic v0.1.0
 
-First public release. ZeroDefect is a C/C++ static analyzer built on
+First public release. CodeSkeptic is a C/C++ static analyzer built on
 Clang LibTooling, designed for the age of AI-generated code: every
 finding comes with a **dataflow trace** — the chain of events that leads
 to the bug — so both humans and coding agents can act on it without

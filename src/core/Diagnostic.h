@@ -1,10 +1,10 @@
-#ifndef ZERODEFECT_DIAGNOSTIC_H
-#define ZERODEFECT_DIAGNOSTIC_H
+#ifndef CODESKEPTIC_DIAGNOSTIC_H
+#define CODESKEPTIC_DIAGNOSTIC_H
 
 #include <string>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 enum class Severity {
     Info,
@@ -76,6 +76,6 @@ struct Diagnostic {
 
 using DiagnosticList = std::vector<Diagnostic>;
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_DIAGNOSTIC_H
+#endif // CODESKEPTIC_DIAGNOSTIC_H

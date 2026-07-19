@@ -1,4 +1,4 @@
-# ZeroDefect — Assessment & Roadmap (updated 2026-07-13)
+# CodeSkeptic — Assessment & Roadmap (updated 2026-07-13)
 
 This document tracks the project's verified state, its positioning, and
 the decisions that remain. The previous revision (2026-07) described a
@@ -91,11 +91,11 @@ founding pain — "we said it was done, and it crashed anyway" — is
 about INTENT: the code does not do what it was supposed to do. The
 plan: a lightweight annotation language (ownership, nullability,
 ranges, relations between parameters); the LLM emits code AND
-contract; ZeroDefect verifies one against the other, deterministically.
+contract; CodeSkeptic verifies one against the other, deterministically.
 
 Design questions that need co-design (user + assistant, max effort):
-- **Surface syntax**: attributes (`[[zd::nonnull]]`), structured
-  comments (`// @zd: returns nonnull unless n == 0`), or a sidecar
+- **Surface syntax**: attributes (`[[cs::nonnull]]`), structured
+  comments (`// @cs: returns nonnull unless n == 0`), or a sidecar
   file? Trade-off: attributes are toolable but invasive; comments are
   adoptable on any codebase including C89; sidecars never touch
   upstream code (works for scanning third-party projects).
@@ -145,7 +145,7 @@ The scan campaign produced a second product insight: **idioms are
 configuration** — every codebase needed its own allocator/assert/
 cleanup vocabulary before the analysis saw the code the way the
 project means it. That configuration is shippable: per-project
-"idiom profiles" (a `zerodefect.conf` for systemd, redis, libgit2,
+"idiom profiles" (a `codeskeptic.conf` for systemd, redis, libgit2,
 ...) maintained in-repo, doubling as documentation of what the
 analyzer understands. Decision needed on packaging priority order
 once the repo is public.
@@ -484,7 +484,7 @@ at all — control-flow kernels (while/if/case) dereference
 `subgraph->tensor(...)` bare, with null-safety resting on the
 graph-validity invariant. So they are honest "may" warnings of exactly
 the ASSUMPTION class; the right consumer-side treatment is a contract
-on `tensor()` (zd: ensures) or a baseline — not fatal-asserts. That
+on `tensor()` (cs: ensures) or a baseline — not fatal-asserts. That
 our own assumption engine names precisely this gap is a coherence
 data point for the AI-era thesis.
 
@@ -1226,16 +1226,16 @@ code), the standing question was whether we had drifted: sophisticated
 machinery whose real-world yield was 0, on a mission ("catch
 AI-generated-code bugs") we had never actually tested. So we tested it.
 
-**The thesis test.** A generator subagent, BLIND to ZeroDefect's
+**The thesis test.** A generator subagent, BLIND to CodeSkeptic's
 rules, solved 12 everyday C/C++ tasks at first-draft quality and
-self-annotated its own bugs (25 across 10 files; ~23 real). ZeroDefect
+self-annotated its own bugs (25 across 10 files; ~23 real). CodeSkeptic
 caught **0** — and the diagnosis was sharp: the dominant class (~15 of
 23) is an unchecked `malloc`/`strdup`/`calloc`/`realloc` return
 dereferenced, which we deliberately SILENCE (opaque return → Unknown,
 the anti-FP-flood default tuned for Godot/Carbon/libgit2). The
 precision tuning that keeps us clean on mature code made us blind on
 first-draft code — the exact code an AI-in-the-loop generates. The
-user reframed the use case precisely: *an AI calling ZeroDefect as an
+user reframed the use case precisely: *an AI calling CodeSkeptic as an
 MCP server to check its own output* — for which unchecked allocation
 is THE core signal.
 
@@ -1473,5 +1473,5 @@ apt-get install -y llvm-18-dev libclang-18-dev libzstd-dev zlib1g-dev
 cmake -B build -G Ninja -DCMAKE_PREFIX_PATH=/usr/lib/llvm-18 -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build          # 334/334
-./build/tests/zerodefect_tests  # single-process mode, same 334
+./build/tests/codeskeptic_tests  # single-process mode, same 334
 ```

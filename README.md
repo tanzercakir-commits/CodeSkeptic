@@ -1,9 +1,11 @@
-# ZeroDefect
+# CodeSkeptic
 
-[![CI](https://github.com/tanzercakir-commits/ZeroDefect/actions/workflows/ci.yml/badge.svg)](https://github.com/tanzercakir-commits/ZeroDefect/actions/workflows/ci.yml)
+[![CI](https://github.com/tanzercakir-commits/CodeSkeptic/actions/workflows/ci.yml/badge.svg)](https://github.com/tanzercakir-commits/CodeSkeptic/actions/workflows/ci.yml)
+
+> **Everyone generates. CodeSkeptic verifies.**
 
 A C/C++ static analyzer built on Clang LibTooling, with a reusable
-dataflow-analysis engine at its core. ZeroDefect performs CFG-based
+dataflow-analysis engine at its core. CodeSkeptic performs CFG-based
 forward dataflow analysis — not just AST pattern matching — so it can
 reason about *paths*: what a pointer's state is at a dereference, whether
 an allocation is freed on every path, whether a divisor can be zero on
@@ -26,8 +28,8 @@ machine-readable findings with dataflow traces.
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
 | Array/heap bounds | `bounds` | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
 | Integer overflow | `int-overflow` | Signed multiplication whose proven operand ranges escape the type (CWE-190), including an untrusted source (`int n = atoi(s); n * k`) |
-| Contract verification | `contract` | Violations of declared `// zd:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries; `contract-syntax` / `contract-unsupported` keep unparseable or unverifiable contracts visible |
-| Policy enforcement | `policy` | `zd:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
+| Contract verification | `contract` | Violations of declared `// cs:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries; `contract-syntax` / `contract-unsupported` keep unparseable or unverifiable contracts visible |
+| Policy enforcement | `policy` | `cs:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
 
 **Intrinsic-source recall (v0.3):** the rules above recognize the
 library calls whose *contract* makes a defect intrinsic — `malloc`/
@@ -64,8 +66,8 @@ callees stay conservative. |
 Example:
 
 ```
-$ zerodefect demo.cpp
-ZeroDefect: 2 finding(s)
+$ codeskeptic demo.cpp
+CodeSkeptic: 2 finding(s)
 ----------------------------------------
 demo.cpp:4:13 [error] use-after-free: Use after free: 'p' is dereferenced after being freed
     -> demo.cpp:2:5 'p' allocated here
@@ -227,7 +229,7 @@ StaticAnalyzer (facade)
  │             Analysis = { State, initialState, merge, transfer,
  │                          onStatement?, refineOnEdge? (assume edges) }
  ├─ Reporter        — ConsoleReporter, JsonReporter
- └─ Config          — CLI args + .zerodefect.conf
+ └─ Config          — CLI args + .codeskeptic.conf
 ```
 
 Writing a new flow-sensitive rule means defining a lattice (`State`), a
@@ -261,7 +263,7 @@ ctest --test-dir build
 ## Usage
 
 ```bash
-zerodefect <source_path> [options]
+codeskeptic <source_path> [options]
 
   --source <path>        Directory/file to analyze
   --build-path <path>    compile_commands.json directory
@@ -307,7 +309,7 @@ zerodefect <source_path> [options]
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
-Options can also be set in a `.zerodefect.conf` file (`key=value` lines:
+Options can also be set in a `.codeskeptic.conf` file (`key=value` lines:
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `alloc_functions`, `free_functions`).
@@ -317,10 +319,10 @@ Options can also be set in a `.zerodefect.conf` file (`key=value` lines:
 Individual findings can be suppressed with source comments:
 
 ```cpp
-int x = 1 / z;  // zerodefect-disable-line
-int y = 1 / w;  // zerodefect-disable-line div-by-zero
+int x = 1 / z;  // codeskeptic-disable-line
+int y = 1 / w;  // codeskeptic-disable-line div-by-zero
 
-// zerodefect-disable-next-line memory-leak
+// codeskeptic-disable-next-line memory-leak
 p = new int(7);
 ```
 
@@ -334,8 +336,8 @@ Adopting the analyzer on an existing codebase without fixing every
 legacy finding first:
 
 ```bash
-zerodefect src/ --write-baseline .zerodefect-baseline   # record & exit clean
-zerodefect src/ --baseline .zerodefect-baseline         # only NEW findings fail
+codeskeptic src/ --write-baseline .codeskeptic-baseline   # record & exit clean
+codeskeptic src/ --baseline .codeskeptic-baseline         # only NEW findings fail
 ```
 
 Baseline keys are **line-independent**: instead of the line number they
@@ -355,27 +357,27 @@ changed:
 
 ```bash
 # re-check just the function you edited (milliseconds)
-zerodefect src/parser.cpp --function Parser::parse
+codeskeptic src/parser.cpp --function Parser::parse
 
 # analyze only the functions actually touched since a git ref:
 # the script extracts changed line ranges from diff hunks and passes
 # --lines per file, so untouched functions are skipped entirely
-scripts/analyze_diff.sh build/src/zerodefect origin/main --severity error
+scripts/analyze_diff.sh build/src/codeskeptic origin/main --severity error
 ```
 
 Cross-file knowledge survives incremental runs via summary files:
 
 ```bash
 # once (or nightly): harvest function summaries from the whole project
-zerodefect src/ --summary-out .zerodefect-summaries
+codeskeptic src/ --summary-out .codeskeptic-summaries
 
 # then: analyze just the changed file WITH whole-project knowledge —
 # e.g. a callee in another file that may return null is still known
-zerodefect src/parser.cpp --summary-in .zerodefect-summaries
+codeskeptic src/parser.cpp --summary-in .codeskeptic-summaries
 
 # analyze_diff.sh forwards extra options, so the diff loop composes:
-scripts/analyze_diff.sh build/src/zerodefect origin/main \
-    --summary-in .zerodefect-summaries --severity error
+scripts/analyze_diff.sh build/src/codeskeptic origin/main \
+    --summary-in .codeskeptic-summaries --severity error
 ```
 
 The MCP `analyze` tool accepts the same file via its optional
@@ -391,16 +393,16 @@ Summary files are deterministic, so two harvests can be compared as
 *contracts*:
 
 ```bash
-zerodefect src/ --summary-out before.txt     # e.g. on main
+codeskeptic src/ --summary-out before.txt     # e.g. on main
 # ... apply the change ...
-zerodefect src/ --summary-out after.txt
-zerodefect --summary-diff before.txt after.txt
+codeskeptic src/ --summary-out after.txt
+codeskeptic --summary-diff before.txt after.txt
 ```
 
 ```
 SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
-[ZeroDefect] 1 weakened, 0 strengthened, 0 changed, 0 added, 0 removed
-[ZeroDefect] weakened contracts: callers relying on them must be re-checked
+[CodeSkeptic] 1 weakened, 0 strengthened, 0 changed, 0 added, 0 removed
+[CodeSkeptic] weakened contracts: callers relying on them must be re-checked
 ```
 
 `WEAKENED` means a strong claim callers may rely on was lost — a
@@ -413,7 +415,7 @@ and signature changes appear as `REMOVED`+`ADDED` (the key includes
 arity — an arity change breaks callers anyway).
 
 The gate is configurable for adoption: `--gate warn` (or
-`summary_diff_gate = warn` in `.zerodefect.conf`) keeps the full
+`summary_diff_gate = warn` in `.codeskeptic.conf`) keeps the full
 report but exits `0`, so a project can watch its contract drift
 before letting it break CI. The default stays `error` — and an
 unreadable summary file is exit `2` regardless: a gate that cannot
@@ -428,7 +430,7 @@ reusing the head compile commands) and the working tree, and reports the
 
 ```bash
 # in CI, after checking out the PR head:
-scripts/review_diff.sh build/src/zerodefect origin/main --out review.md
+scripts/review_diff.sh build/src/codeskeptic origin/main --out review.md
 ```
 
 The markdown review contains:
@@ -471,7 +473,7 @@ REVIEW_RESULT new_errors=1 new_warnings=0 fixed=1 weakened=1 gate=fail
 
 Both analyzer runs receive identical settings (arguments after `--` are
 forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
-`--summary-in .zerodefect-summaries` to review with whole-project
+`--summary-in .codeskeptic-summaries` to review with whole-project
 knowledge, …); a delta between two differently-configured runs would
 not be a delta. Known limits, stated rather than hidden: a header-only
 change analyzes no TU (it is listed in the coverage section), and
@@ -482,18 +484,18 @@ A minimal GitHub Actions gate:
 ```yaml
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }        # the review needs the base commit
-- name: Build zerodefect          # or download a release binary
+- name: Build codeskeptic          # or download a release binary
   run: cmake -B build -G Ninja && cmake --build build
 - name: Review the PR diff
   run: |
-    scripts/review_diff.sh build/src/zerodefect \
+    scripts/review_diff.sh build/src/codeskeptic \
       "origin/${{ github.base_ref }}" --build-path build \
       --exclude 'tests/*' --out review.md
 ```
 
 ### MCP server (agent integration)
 
-`zerodefect --serve` runs an MCP (Model Context Protocol) server over
+`codeskeptic --serve` runs an MCP (Model Context Protocol) server over
 stdio, exposing an `analyze` tool that returns findings — with dataflow
 traces — as structured JSON. Agents like Claude Code can call it after
 every edit. Register it in `.mcp.json`:
@@ -501,8 +503,8 @@ every edit. Register it in `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "zerodefect": {
-      "command": "/path/to/zerodefect",
+    "codeskeptic": {
+      "command": "/path/to/codeskeptic",
       "args": ["--serve"]
     }
   }
@@ -530,12 +532,12 @@ our own required:
 extension (Microsoft), then:
 
 ```bash
-zerodefect src/ --sarif findings.sarif
+codeskeptic src/ --sarif findings.sarif
 code findings.sarif   # or: open via the SARIF Viewer panel
 ```
 
 Findings appear in a results panel; clicking one jumps to the source
-line, and ZeroDefect's dataflow traces show up as *related locations*
+line, and CodeSkeptic's dataflow traces show up as *related locations*
 (the allocation/free/null-assignment chain behind each finding is
 navigable step by step).
 
@@ -543,29 +545,29 @@ navigable step by step).
 appear in the repository's Security tab and as PR annotations:
 
 ```yaml
-- run: build/src/zerodefect src/ --sarif findings.sarif || true
+- run: build/src/codeskeptic src/ --sarif findings.sarif || true
 - uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: findings.sarif
 ```
 
-(`|| true` because ZeroDefect exits 1 on findings; code scanning does
+(`|| true` because CodeSkeptic exits 1 on findings; code scanning does
 its own gating.)
 
 For a shareable, tool-free view of the same findings, use `--html` —
 one self-contained file with filters and source-context traces.
 
-## Contracts (`zd:`)
+## Contracts (`cs:`)
 
-ZeroDefect's rules infer what a function does. Contracts pin what it
+CodeSkeptic's rules infer what a function does. Contracts pin what it
 is SUPPOSED to do — a contract is a **declared function summary**,
 written as a structured comment and checked by the same dataflow that
 does the inference:
 
 ```c
-// zd: requires p != null
-// zd: ensures return != null if n != 0
-// zd: owns(cfg)
+// cs: requires p != null
+// cs: ensures return != null if n != 0
+// cs: owns(cfg)
 char *find_config(struct Cfg *cfg, const char *p, int n);
 ```
 
@@ -589,14 +591,14 @@ What is enforced today:
 - `owns(p)` / `borrows(p)` — checked against the inferred parameter
   effects: `owns` with a provably read-only body and `borrows` with a
   freeing body are violations (leak and double-free shapes).
-- `zd:policy no-absolute-paths` — AST-level pattern prohibition: a
+- `cs:policy no-absolute-paths` — AST-level pattern prohibition: a
   hard-coded absolute path in a string literal is an error. Activate
   per file with the comment, or project-wide via `policy =
-  no-absolute-paths` in `.zerodefect.conf` (or `--policy`).
+  no-absolute-paths` in `.codeskeptic.conf` (or `--policy`).
 
-Failure semantics are deliberate: a violated bare `zd:` contract is an
-**error** (CI fails — that friction is the point; changing the `zd:`
-line in review IS the audit trail of changed intent). `zd:ai` marks a
+Failure semantics are deliberate: a violated bare `cs:` contract is an
+**error** (CI fails — that friction is the point; changing the `cs:`
+line in review IS the audit trail of changed intent). `cs:ai` marks a
 machine-proposed contract: same grammar, violations downgrade to
 warnings — tools propose, humans adopt by deleting three characters.
 Unparseable lines are `contract-syntax` errors and anything outside
@@ -604,7 +606,7 @@ the checkable subset is an explicit `contract-unsupported` warning —
 a contract is never silently accepted.
 
 For third-party code you cannot annotate, contracts live in a sidecar
-file (`src/core.c` → `src/core.c.zdc`), every entry explicitly
+file (`src/core.c` → `src/core.c.csk`), every entry explicitly
 anchored to its function (`git_commit_create: requires repo != null`,
 optional `/arity` for overloads). Position-based mapping is forbidden
 by design: a silently shifted mapping would attach guarantees to the

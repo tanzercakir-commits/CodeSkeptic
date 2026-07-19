@@ -15,7 +15,7 @@
 using namespace clang;
 using namespace clang::ast_matchers;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -156,7 +156,7 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
 
         // One reporting pass per SOURCE: inline comment lines map
         // through the comment-block base line; sidecar lines are
-        // absolute in the .zdc file. The verdict logic is shared —
+        // absolute in the .csk file. The verdict logic is shared —
         // the two sources cannot drift.
         auto processSource = [&](const ParsedContracts& parsed,
                                  const std::string& diagFile,
@@ -241,18 +241,18 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
         if (!inlineParsed.empty())
             processSource(inlineParsed, file, commentLine);
 
-        std::string zdcFile;
+        std::string cskFile;
         ParsedContracts sidecarParsed =
-            sidecarContractsForDecl(func, ctx, &zdcFile);
+            sidecarContractsForDecl(func, ctx, &cskFile);
         if (!sidecarParsed.empty())
-            processSource(sidecarParsed, zdcFile, /*lineBase=*/0);
+            processSource(sidecarParsed, cskFile, /*lineBase=*/0);
     }
 
     // Malformed sidecar LINES (no anchor colon): reported once per
-    // load, at the .zdc file — never silently dropped.
-    for (const auto& [zdcFile, issue] : takeSidecarIssues()) {
+    // load, at the .csk file — never silently dropped.
+    for (const auto& [cskFile, issue] : takeSidecarIssues()) {
         Diagnostic diag;
-        diag.file = zdcFile;
+        diag.file = cskFile;
         diag.line = issue.line;
         diag.column = 1;
         diag.rule_id = "contract-syntax";
@@ -262,4 +262,4 @@ void ContractRule::check(ASTContext& ctx, DiagnosticList& results) {
     }
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

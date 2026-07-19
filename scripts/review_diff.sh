@@ -15,7 +15,7 @@
 # this script is the verdict path (whole changed files, base-aware).
 #
 # Usage:
-#   scripts/review_diff.sh <zerodefect-binary> <base-ref> [options] [-- <analyzer args>]
+#   scripts/review_diff.sh <codeskeptic-binary> <base-ref> [options] [-- <analyzer args>]
 #     --build-path <dir>   compile_commands.json directory (default .)
 #     --out <file>         write the markdown review here (default stdout)
 #     --gate error|warn    exit 1 on a failing verdict (default error)
@@ -49,7 +49,7 @@ usage() {
 }
 
 [ $# -ge 2 ] || usage
-ZD_BIN="$1"; BASE_REF="$2"; shift 2
+CS_BIN="$1"; BASE_REF="$2"; shift 2
 
 BUILD_PATH="."; OUT=""; GATE="error"; STRICT=0; ASSUMPTIONS=1
 EXTRA=(); EXCLUDES=()
@@ -73,7 +73,7 @@ esac
 
 # Resolve our own paths BEFORE any cd (relative-path trap)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ZD_BIN="$(cd "$(dirname "$ZD_BIN")" && pwd)/$(basename "$ZD_BIN")"
+CS_BIN="$(cd "$(dirname "$CS_BIN")" && pwd)/$(basename "$CS_BIN")"
 REPORT_PY="$SCRIPT_DIR/review_report.py"
 BUILD_PATH="$(cd "$BUILD_PATH" && pwd)"
 
@@ -136,7 +136,7 @@ done < "$TMP/name-status.txt"
 # analyzer failure and the review must NOT pretend to be a verdict.
 run_zd() { # <files-list> <build-path> <json-out> <summary-out> <stderr-log>
     local code=0
-    "$ZD_BIN" --files "$1" --build-path "$2" --json "$3" \
+    "$CS_BIN" --files "$1" --build-path "$2" --json "$3" \
         --summary-out "$4" --lang en \
         ${EXTRA[@]+"${EXTRA[@]}"} 2> "$5" || code=$?
     # 0/1 = clean/findings. The binary maps internal "no files" (2) onto
@@ -187,7 +187,7 @@ fi
 # assembler is the single gate point. Exit 2 (unreadable) stays fatal.
 if [ -s "$TMP/base.sum" ] && [ -s "$TMP/head.sum" ]; then
     code=0
-    "$ZD_BIN" --summary-diff "$TMP/base.sum" "$TMP/head.sum" --gate warn \
+    "$CS_BIN" --summary-diff "$TMP/base.sum" "$TMP/head.sum" --gate warn \
         --lang en > "$TMP/sumdiff.txt" || code=$?
     if [ "$code" -ge 2 ]; then
         echo "[review] FAIL: summary diff could not read its inputs" >&2

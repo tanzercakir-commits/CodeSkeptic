@@ -9,7 +9,7 @@ unsigned g_hits = 0;
 unsigned g_misses = 0;
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 CfgCache& CfgCache::instance() {
     static CfgCache cache;
@@ -56,4 +56,4 @@ unsigned CfgCache::hits() { return g_hits; }
 unsigned CfgCache::misses() { return g_misses; }
 void CfgCache::resetCounters() { g_hits = 0; g_misses = 0; }
 
-} // namespace zerodefect
+} // namespace codeskeptic

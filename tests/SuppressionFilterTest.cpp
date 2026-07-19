@@ -3,7 +3,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 namespace {
 
@@ -27,43 +27,43 @@ Diagnostic makeDiag(const std::string& file, unsigned line,
 
 TEST(SuppressionMarkerTest, BareMarkerSuppressesAllRules) {
     EXPECT_TRUE(markerSuppressesRule(
-        "int x = 1/z; // zerodefect-disable-line",
-        "zerodefect-disable-line", "div-by-zero"));
+        "int x = 1/z; // codeskeptic-disable-line",
+        "codeskeptic-disable-line", "div-by-zero"));
     EXPECT_TRUE(markerSuppressesRule(
-        "int x = 1/z; // zerodefect-disable-line",
-        "zerodefect-disable-line", "memory-leak"));
+        "int x = 1/z; // codeskeptic-disable-line",
+        "codeskeptic-disable-line", "memory-leak"));
 }
 
 TEST(SuppressionMarkerTest, RuleListLimitsSuppression) {
     const std::string line =
-        "int x = 1/z; // zerodefect-disable-line div-by-zero, uninit-ptr";
-    EXPECT_TRUE(markerSuppressesRule(line, "zerodefect-disable-line",
+        "int x = 1/z; // codeskeptic-disable-line div-by-zero, uninit-ptr";
+    EXPECT_TRUE(markerSuppressesRule(line, "codeskeptic-disable-line",
                                      "div-by-zero"));
-    EXPECT_TRUE(markerSuppressesRule(line, "zerodefect-disable-line",
+    EXPECT_TRUE(markerSuppressesRule(line, "codeskeptic-disable-line",
                                      "uninit-ptr"));
-    EXPECT_FALSE(markerSuppressesRule(line, "zerodefect-disable-line",
+    EXPECT_FALSE(markerSuppressesRule(line, "codeskeptic-disable-line",
                                       "memory-leak"));
 }
 
 TEST(SuppressionMarkerTest, NextLineVariantDoesNotMatchLineMarker) {
     // A disable-next-line line must not count as a disable-line marker
     EXPECT_FALSE(markerSuppressesRule(
-        "// zerodefect-disable-next-line",
-        "zerodefect-disable-line", "div-by-zero"));
+        "// codeskeptic-disable-next-line",
+        "codeskeptic-disable-line", "div-by-zero"));
 }
 
 TEST(SuppressionMarkerTest, TrailingCommentAfterRuleList) {
     EXPECT_TRUE(markerSuppressesRule(
-        "// zerodefect-disable-line div-by-zero (deliberate: demo)",
-        "zerodefect-disable-line", "div-by-zero"));
+        "// codeskeptic-disable-line div-by-zero (deliberate: demo)",
+        "codeskeptic-disable-line", "div-by-zero"));
     EXPECT_FALSE(markerSuppressesRule(
-        "// zerodefect-disable-line div-by-zero (deliberate: demo)",
-        "zerodefect-disable-line", "memory-leak"));
+        "// codeskeptic-disable-line div-by-zero (deliberate: demo)",
+        "codeskeptic-disable-line", "memory-leak"));
 }
 
 TEST(SuppressionMarkerTest, NoMarker_NoSuppression) {
     EXPECT_FALSE(markerSuppressesRule("int x = 1/z; // normal comment",
-                                      "zerodefect-disable-line",
+                                      "codeskeptic-disable-line",
                                       "div-by-zero"));
 }
 
@@ -72,7 +72,7 @@ TEST(SuppressionMarkerTest, NoMarker_NoSuppression) {
 TEST(SuppressionFilterTest, DisableLineSameLine) {
     auto path = writeTempSource("supp1.cpp",
         "int a;\n"
-        "int x = 1/z; // zerodefect-disable-line\n"
+        "int x = 1/z; // codeskeptic-disable-line\n"
         "int y = 1/w;\n");
 
     SuppressionFilter filter;
@@ -89,7 +89,7 @@ TEST(SuppressionFilterTest, DisableLineSameLine) {
 
 TEST(SuppressionFilterTest, DisableNextLine) {
     auto path = writeTempSource("supp2.cpp",
-        "// zerodefect-disable-next-line div-by-zero\n"
+        "// codeskeptic-disable-next-line div-by-zero\n"
         "int x = 1/z;\n"
         "int y = 1/w;\n");
 

@@ -100,8 +100,8 @@ std::vector<MulSite> collectSignedMuls(const FunctionDecl* fn,
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
-                     const zerodefect::ParamIntervalMap& paramMap,
-                     zerodefect::DiagnosticList& results) {
+                     const codeskeptic::ParamIntervalMap& paramMap,
+                     codeskeptic::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
     auto muls = collectSignedMuls(fn, ctx);
@@ -113,11 +113,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     // seed map (C3) starts parameters with visible, closed callers at a
     // proven range instead of top() — that is what carries a caller's
     // bounded argument into this function's overflow check.
-    zerodefect::IntervalAnalysis analysis(collectIntVars(fn),
-                                          zerodefect::paramSeeds(paramMap, fn));
-    auto df = zerodefect::runDataflow(fn, ctx, analysis);
+    codeskeptic::IntervalAnalysis analysis(collectIntVars(fn),
+                                          codeskeptic::paramSeeds(paramMap, fn));
+    auto df = codeskeptic::runDataflow(fn, ctx, analysis);
     if (!df.converged)
-        zerodefect::CoverageReport::instance().recordNonConvergence(
+        codeskeptic::CoverageReport::instance().recordNonConvergence(
             fn->getQualifiedNameAsString());
 
     const SourceManager& sm = ctx.getSourceManager();
@@ -127,11 +127,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         // The entry interval-state at the multiplication's own CFG
         // element. Its operands were read (not written) just before, so
         // the variable ranges here are exactly the ones the product uses.
-        const zerodefect::IntervalMap* st = analysis.stateAt(site.op);
+        const codeskeptic::IntervalMap* st = analysis.stateAt(site.op);
         if (!st) continue;  // unreached / not recorded — nothing proven
 
-        zerodefect::Interval product =
-            zerodefect::evalInterval(site.op, *st, &ctx);
+        codeskeptic::Interval product =
+            codeskeptic::evalInterval(site.op, *st, &ctx);
 
         // Report ONLY when the product's range is fully proven (bounded)
         // AND provably escapes the multiplication's own signed type. An
@@ -144,14 +144,14 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reportedLines.insert(line).second) continue;
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "int-overflow";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = zerodefect::Severity::Warning;
-        diag.message = zerodefect::msg(zerodefect::MsgId::IntOverflowMul,
+        diag.severity = codeskeptic::Severity::Warning;
+        diag.message = codeskeptic::msg(codeskeptic::MsgId::IntOverflowMul,
                                        site.op->getType().getAsString());
         results.push_back(std::move(diag));
     }
@@ -159,8 +159,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
 class IntOverflowCallback : public MatchFinder::MatchCallback {
 public:
-    IntOverflowCallback(const zerodefect::ParamIntervalMap& paramMap,
-                        zerodefect::DiagnosticList& results)
+    IntOverflowCallback(const codeskeptic::ParamIntervalMap& paramMap,
+                        codeskeptic::DiagnosticList& results)
         : paramMap_(paramMap), results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -169,20 +169,20 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(fn->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*fn)) return;
-        if (!zerodefect::lineFilterAllows(*fn, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*fn)) return;
+        if (!codeskeptic::lineFilterAllows(*fn, sm)) return;
 
         analyzeFunction(fn, *result.Context, paramMap_, results_);
     }
 
 private:
-    const zerodefect::ParamIntervalMap& paramMap_;
-    zerodefect::DiagnosticList& results_;
+    const codeskeptic::ParamIntervalMap& paramMap_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void IntOverflowRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     const ParamIntervalMap& paramMap =
@@ -198,4 +198,4 @@ void IntOverflowRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

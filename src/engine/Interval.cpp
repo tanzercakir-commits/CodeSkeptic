@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -301,4 +301,4 @@ std::string Interval::toString() const {
     return s;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

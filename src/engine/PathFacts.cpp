@@ -90,10 +90,10 @@ const ValueDecl* stableDeclRef(
 
 // Reduces the (var REL lit) form to the EQ/LT/LE base. `holds`: the
 // key's value when the condition is true.
-std::optional<std::pair<zerodefect::FactKey, bool>> normalizeCompare(
+std::optional<std::pair<codeskeptic::FactKey, bool>> normalizeCompare(
         const ValueDecl* var, BinaryOperatorKind opc, int64_t lit,
         bool varOnLeft) {
-    using K = zerodefect::FactKey;
+    using K = codeskeptic::FactKey;
     if (!varOnLeft) {
         // "lit OP var" -> mirror the operator: 5 < X  ≡  X > 5
         switch (opc) {
@@ -246,7 +246,7 @@ private:
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::optional<FactKey> unsignedStrictUpperBoundNonzero(
         const Expr* cond,
@@ -518,4 +518,4 @@ bool factsContradict(const std::map<FactKey, bool>& facts,
     return false;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

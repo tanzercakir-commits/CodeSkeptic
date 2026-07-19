@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // AssumptionRule (spec §20.2), v0: inferred undeclared non-null parameter
 // preconditions. Opt-in — the rule is silent unless assumption mode is
@@ -97,7 +97,7 @@ TEST_F(AssumptionRuleTest, ContractedNonNullIsClean) {
     // intent debt and stays silent.
     AssumptionRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int f(int* p) { return *p; }
     )");
     EXPECT_EQ(results.size(), 0u);

@@ -67,7 +67,7 @@ bool isKnownAllocatorCall(const CallExpr* call) {
         name == "strdup" || name == "strndup" || name == "aligned_alloc" ||
         name == "reallocarray")
         return true;
-    return zerodefect::allocFunctionNames().count(name.str()) != 0;
+    return codeskeptic::allocFunctionNames().count(name.str()) != 0;
 }
 
 // Intrinsic NULL-returning library calls that are not allocators. Same
@@ -119,7 +119,7 @@ NullState mergeNullStates(NullState a, NullState b) {
 // sound default) and when the guard variable itself is reassigned.
 struct NullVal {
     NullState st = NullState::Unknown;
-    std::optional<zerodefect::FactKey> fact;
+    std::optional<codeskeptic::FactKey> fact;
     bool factVal = true;
 
     NullVal() = default;
@@ -170,13 +170,13 @@ NullVal mergeNullVals(const NullVal& a, const NullVal& b) {
 // cannot prove it value-only), and that one drop re-merged into every
 // later join until no implication survived anywhere (measured: 13
 // such drops seeded ~1300 downstream ones on stb_image's tga loader).
-NullVal meetNullVals(const std::map<zerodefect::FactKey, bool>& facts,
+NullVal meetNullVals(const std::map<codeskeptic::FactKey, bool>& facts,
                      const NullVal& a, const NullVal& b) {
     NullVal out = mergeNullVals(a, b);
     if (out.fact) return out;
     const NullVal* impl = a.fact ? &a : (b.fact ? &b : nullptr);
     if (impl &&
-        zerodefect::factsContradict(facts, *impl->fact, impl->factVal)) {
+        codeskeptic::factsContradict(facts, *impl->fact, impl->factVal)) {
         out.fact = impl->fact;
         out.factVal = impl->factVal;
     }
@@ -199,11 +199,11 @@ const VarDecl* asVar(const Expr* expr) {
 // functions below the analysis object — a scoped pointer keeps the
 // plumbing flat, matching the process-global registry discipline used
 // elsewhere (FunctionFilter, AllocFunctions).
-const zerodefect::IntervalMap* g_soleDefIntervals = nullptr;
+const codeskeptic::IntervalMap* g_soleDefIntervals = nullptr;
 const clang::ASTContext* g_soleDefContext = nullptr;
 
 struct SoleDefScope {
-    SoleDefScope(const zerodefect::IntervalMap* map,
+    SoleDefScope(const codeskeptic::IntervalMap* map,
                  const clang::ASTContext* ctx) {
         g_soleDefIntervals = map;
         g_soleDefContext = ctx;
@@ -236,9 +236,9 @@ NullState evaluateNullness(const Expr* expr) {
     // an unguarded dereference becomes a warning; guarded use stays
     // clean via the assume-edge.
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        using RN = zerodefect::SummaryRegistry::ReturnNullness;
+        using RN = codeskeptic::SummaryRegistry::ReturnNullness;
         const auto* summary =
-            zerodefect::SummaryRegistry::instance().lookup(
+            codeskeptic::SummaryRegistry::instance().lookup(
                 call->getDirectCallee());
         if (summary) {
             if (summary->returnNullness == RN::NeverNull)
@@ -253,13 +253,13 @@ NullState evaluateNullness(const Expr* expr) {
                 if (summary->hasNullCondition() &&
                     static_cast<unsigned>(summary->nullCondParam) <
                         call->getNumArgs()) {
-                    static const zerodefect::IntervalMap kEmpty;
-                    const zerodefect::IntervalMap& defs =
+                    static const codeskeptic::IntervalMap kEmpty;
+                    const codeskeptic::IntervalMap& defs =
                         g_soleDefIntervals ? *g_soleDefIntervals : kEmpty;
-                    zerodefect::Interval arg = zerodefect::evalInterval(
+                    codeskeptic::Interval arg = codeskeptic::evalInterval(
                         call->getArg(summary->nullCondParam), defs,
                         g_soleDefContext);
-                    const zerodefect::Interval& safe =
+                    const codeskeptic::Interval& safe =
                         summary->nullCondRange;
                     const bool loOk =
                         safe.loIsInf() ||
@@ -415,9 +415,9 @@ void setIfTracked(NullVarState& state, const VarDecl* var, NullState value) {
 // really does mean "every path reaching this point with F=v has the
 // pointer NonNull".
 void mineGuardImplications(
-    const zerodefect::GuardedState<NullVarState>& pre,
-    zerodefect::Guarded<NullVarState>& widened) {
-    std::set<zerodefect::FactKey> candidates;
+    const codeskeptic::GuardedState<NullVarState>& pre,
+    codeskeptic::Guarded<NullVarState>& widened) {
+    std::set<codeskeptic::FactKey> candidates;
     for (const auto& d : pre)
         for (const auto& [key, value] : d.facts) candidates.insert(key);
     if (candidates.empty()) return;
@@ -476,7 +476,7 @@ void mineGuardImplications(
 // Via the shared walk skeleton (engine/ConditionWalk.h): `if (p)`,
 // `!p`, `p ==/!= nullptr/NULL/0`, && / || short-circuiting.
 void applyCondition(const Expr* cond, bool isTrue, NullVarState& state) {
-    zerodefect::walkNullCondition(
+    codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
             setIfTracked(state, var,
                          isNull ? NullState::Null : NullState::NonNull);
@@ -519,20 +519,20 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
-        auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
+        auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) {
             // Guard-as-contract (#89): a body-visible callee whose own
             // entry guard implies a precondition also wakes the pass —
             // `g() { f(nullptr); }` with f's guard is exactly the
             // caller-side violation the lift exists to catch.
             if (callee->hasBody() &&
-                !zerodefect::inferGuardRequires(callee, ctx).empty())
+                !codeskeptic::inferGuardRequires(callee, ctx).empty())
                 return true;
             continue;
         }
-        auto req = zerodefect::analyzeRequires(parsed, callee);
+        auto req = codeskeptic::analyzeRequires(parsed, callee);
         for (const auto& info : req.enforced)
-            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+            if (info.kind != codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 return true;
     }
     return false;
@@ -548,19 +548,19 @@ public:
     // correlation-free analysis. The shared machinery is in
     // engine/GuardedDisjuncts.h; the pointer nullness refinement
     // (applyCondition) is additionally applied per disjunct.
-    using State = zerodefect::GuardedState<NullVarState>;
+    using State = codeskeptic::GuardedState<NullVarState>;
 
     NullDerefAnalysis(const std::vector<const VarDecl*>& trackedVars,
                       std::set<const ValueDecl*> unkeyableDecls,
                       std::set<const ValueDecl*> stampableDecls,
                       std::set<const ValueDecl*> ptrFactDecls,
                       std::string funcName,
-                      zerodefect::DiagnosticList& results)
+                      codeskeptic::DiagnosticList& results)
         : mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)),
           ptrFacts_(std::move(ptrFactDecls)),
           funcName_(std::move(funcName)), results_(results) {
-        zerodefect::Guarded<NullVarState> init;
+        codeskeptic::Guarded<NullVarState> init;
         for (const auto* var : trackedVars)
             init.vars[var] = NullState::Unknown;
         initState_.push_back(std::move(init));
@@ -575,21 +575,21 @@ public:
     // escape-condition disjunct leaves p unconstrained, the other
     // pins it NonNull.
     void seedRequires(const FunctionDecl* func,
-                      const std::vector<zerodefect::RequiresInfo>& infos) {
+                      const std::vector<codeskeptic::RequiresInfo>& infos) {
         for (const auto& info : infos) {
             if (info.paramIndex >= func->getNumParams()) continue;
             const ParmVarDecl* p = func->getParamDecl(info.paramIndex);
-            if (info.kind == zerodefect::RequiresInfo::Kind::NonNullParam) {
+            if (info.kind == codeskeptic::RequiresInfo::Kind::NonNullParam) {
                 for (auto& d : initState_) setIfTracked(d.vars, p,
                                                         NullState::NonNull);
             } else if (info.kind ==
-                       zerodefect::RequiresInfo::Kind::NonNullUnlessCond) {
+                       codeskeptic::RequiresInfo::Kind::NonNullUnlessCond) {
                 if (info.condParamIndex >= func->getNumParams()) continue;
                 const ParmVarDecl* c =
                     func->getParamDecl(info.condParamIndex);
                 if (mutated_.count(c)) continue;  // unkeyable: no seed
-                auto fact = zerodefect::compareFact(
-                    c, zerodefect::toBinaryOp(info.condOp),
+                auto fact = codeskeptic::compareFact(
+                    c, codeskeptic::toBinaryOp(info.condOp),
                     info.condLiteral);
                 if (!fact) continue;
                 State next;
@@ -603,7 +603,7 @@ public:
                     next.push_back(std::move(pinned));
                 }
                 initState_ = std::move(next);
-                zerodefect::normalizeGuarded(initState_, mergeNullVals);
+                codeskeptic::normalizeGuarded(initState_, mergeNullVals);
             }
         }
     }
@@ -611,7 +611,7 @@ public:
     // Guarded postconditions of THIS function (CONTRACTS.md Round D):
     // `ensures return != null if <g>` — checked per disjunct at every
     // return statement (checkGuardedEnsures).
-    void setGuardedEnsures(std::vector<zerodefect::GuardedEnsuresInfo> v) {
+    void setGuardedEnsures(std::vector<codeskeptic::GuardedEnsuresInfo> v) {
         guardedEnsures_ = std::move(v);
     }
 
@@ -619,7 +619,7 @@ public:
     // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 3 +
-                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
+                1) * static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
     // Fact records add lattice climbs the var-state formula above
@@ -628,7 +628,7 @@ public:
     unsigned factBudget() const {
         auto n = static_cast<unsigned>(stampable_.size());
         return (n > 16 ? 16u : n) * 2 *
-               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+               static_cast<unsigned>(codeskeptic::kMaxDisjuncts);
     }
 
     // Engine convergence hook: collapse the disjuncts when a block is
@@ -638,14 +638,14 @@ public:
     // fact-aware meet keeps vacuous implications alive across
     // same-facts merges (see meetNullVals).
     static auto ops() {
-        return zerodefect::makeGuardedOps(mergeNullVals, meetNullVals,
+        return codeskeptic::makeGuardedOps(mergeNullVals, meetNullVals,
                                           mineGuardImplications);
     }
 
-    void widen(State& s) const { zerodefect::widenGuardedOps(s, ops()); }
+    void widen(State& s) const { codeskeptic::widenGuardedOps(s, ops()); }
 
     State merge(const State& a, const State& b) const {
-        return zerodefect::mergeGuardedOps(a, b, ops());
+        return codeskeptic::mergeGuardedOps(a, b, ops());
     }
 
     State transfer(const Stmt* stmt, const State& inRaw,
@@ -654,12 +654,12 @@ public:
         // facts keyed on them; integer-constant stores stamp the new
         // truth. Domain logic below then reads the fact-current state.
         State in = inRaw;
-        zerodefect::applyStmtFactsOps(in, stmt, stampable_, ptrFacts_,
+        codeskeptic::applyStmtFactsOps(in, stmt, stampable_, ptrFacts_,
                                       ops());
         // #70: an assignment to a guard variable stales every
         // implication keyed on it — the exact mirror of the fact
         // erasure applyStmtFacts just performed.
-        if (const clang::ValueDecl* target = zerodefect::assignedDecl(stmt)) {
+        if (const clang::ValueDecl* target = codeskeptic::assignedDecl(stmt)) {
             for (auto& d : in)
                 for (auto& [var, val] : d.vars)
                     if (val.fact && val.fact->var == target)
@@ -675,7 +675,7 @@ public:
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             State out = in;
             bool changed = false;
-            zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+            codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
                 const VarDecl* var = asVar(arg);
                 if (!var) return;
                 for (auto& d : out) {
@@ -707,17 +707,17 @@ public:
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        zerodefect::refineGuardedFactsOps(
+        codeskeptic::refineGuardedFactsOps(
             state, condExpr, isTrueBranch, mutated_, ptrFacts_,
             ops(),
             // Domain refuter for disjunction elimination: an operand
             // whose REQUIRED nullness contradicts this disjunct's var
             // state cannot have held here (walkNullCondition yields
             // the operand's necessary conditions).
-            [](const zerodefect::Guarded<NullVarState>& d, const Expr* e,
+            [](const codeskeptic::Guarded<NullVarState>& d, const Expr* e,
                bool wanted) {
                 bool refuted = false;
-                zerodefect::walkNullCondition(
+                codeskeptic::walkNullCondition(
                     e, wanted, [&](const VarDecl* var, bool isNull) {
                         auto it = d.vars.find(var);
                         if (it == d.vars.end()) return;
@@ -732,7 +732,7 @@ public:
             // is known to satisfy (including survivors of an
             // eliminated disjunction — whole-state applyCondition
             // never sees those).
-            [](zerodefect::Guarded<NullVarState>& d, const Expr* leaf,
+            [](codeskeptic::Guarded<NullVarState>& d, const Expr* leaf,
                bool leafTrue) {
                 applyCondition(leaf, leafTrue, d.vars);
                 // #70: the leaf's fact was just recorded into d.facts
@@ -757,7 +757,7 @@ public:
     // visible call into a function with a declared `requires` on a
     // pointer parameter is checked against the caller's own nullness
     // state. Null literal / definitely-null argument -> error
-    // (warning for zd:ai); possibly-null -> warning. The relational
+    // (warning for cs:ai); possibly-null -> warning. The relational
     // escape is honored when the condition argument is an integer
     // literal; a non-literal escape stays conservative (silent).
     // Guard-as-contract (#89, §4.A v1): the callee's OWN entry guard
@@ -777,7 +777,7 @@ public:
                              const std::set<unsigned>& declaredParams) {
         auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
         if (inserted)
-            cacheIt->second = zerodefect::inferGuardRequires(callee, ctx);
+            cacheIt->second = codeskeptic::inferGuardRequires(callee, ctx);
         if (cacheIt->second.empty()) return;
 
         NullVarState flat;
@@ -789,11 +789,11 @@ public:
                 continue;
             const Expr* arg = call->getArg(g.paramIndex);
 
-            bool definite = zerodefect::isNullPointerArg(arg);
+            bool definite = codeskeptic::isNullPointerArg(arg);
             if (!definite) {
                 if (const VarDecl* var = asVar(arg)) {
                     if (!flatComputed) {
-                        flat = zerodefect::flattenGuarded(before,
+                        flat = codeskeptic::flattenGuarded(before,
                                                           mergeNullVals);
                         flatComputed = true;
                     }
@@ -810,7 +810,7 @@ public:
             const std::string paramName =
                 callee->getParamDecl(g.paramIndex)->getNameAsString();
             const bool crash =
-                g.consequence == zerodefect::GuardConsequence::Crash;
+                g.consequence == codeskeptic::GuardConsequence::Crash;
             // Callee name is part of the key: two same-line calls to
             // DIFFERENT guarded callees are two violations, not one.
             const std::string text =
@@ -818,16 +818,16 @@ public:
                 callee->getNameAsString() + ":" + paramName;
             if (!reportedContracts_.emplace(line, text).second) continue;
 
-            zerodefect::Diagnostic diag;
+            codeskeptic::Diagnostic diag;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "contract";
-            diag.severity = crash ? zerodefect::Severity::Error
-                                  : zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                crash ? zerodefect::MsgId::ContractGuardCrash
-                      : zerodefect::MsgId::ContractGuardRejected,
+            diag.severity = crash ? codeskeptic::Severity::Error
+                                  : codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                crash ? codeskeptic::MsgId::ContractGuardCrash
+                      : codeskeptic::MsgId::ContractGuardRejected,
                 paramName, callee->getNameAsString(),
                 std::to_string(g.guardLine));
             diag.function = funcName_;
@@ -842,43 +842,43 @@ public:
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) return;
 
-        auto parsed = zerodefect::allContractClausesForDecl(callee, ctx);
-        std::vector<zerodefect::RequiresInfo> enforced;
+        auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
+        std::vector<codeskeptic::RequiresInfo> enforced;
         std::set<unsigned> declaredParams;
         if (!parsed.clauses.empty()) {
-            auto req = zerodefect::analyzeRequires(parsed, callee);
+            auto req = codeskeptic::analyzeRequires(parsed, callee);
             enforced = std::move(req.enforced);
             for (const auto& info : enforced)
                 declaredParams.insert(info.paramIndex);
         }
         checkGuardContracts(call, callee, before, ctx, declaredParams);
         if (enforced.empty()) return;
-        auto req = zerodefect::RequiresAnalysis{};
+        auto req = codeskeptic::RequiresAnalysis{};
         req.enforced = std::move(enforced);
 
         NullVarState flat =
-            zerodefect::flattenGuarded(before, mergeNullVals);
+            codeskeptic::flattenGuarded(before, mergeNullVals);
 
         for (const auto& info : req.enforced) {
-            if (info.kind == zerodefect::RequiresInfo::Kind::NonZeroParam)
+            if (info.kind == codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;  // DivByZero owns the zero domain
             if (info.paramIndex >= call->getNumArgs()) continue;
             const Expr* arg = call->getArg(info.paramIndex);
 
             if (info.kind ==
-                zerodefect::RequiresInfo::Kind::NonNullUnlessCond) {
+                codeskeptic::RequiresInfo::Kind::NonNullUnlessCond) {
                 if (info.condParamIndex >= call->getNumArgs()) continue;
-                auto lit = zerodefect::intLiteralArg(
+                auto lit = codeskeptic::intLiteralArg(
                     call->getArg(info.condParamIndex));
                 if (!lit) continue;  // non-literal escape: conservative
-                if (zerodefect::evalCmp(*lit, info.condOp,
+                if (codeskeptic::evalCmp(*lit, info.condOp,
                                         info.condLiteral))
                     continue;  // escape holds, contract satisfied
             }
 
             bool definite = false;
             bool maybe = false;
-            if (zerodefect::isNullPointerArg(arg)) {
+            if (codeskeptic::isNullPointerArg(arg)) {
                 definite = true;
             } else if (const VarDecl* var = asVar(arg)) {
                 auto it = flat.find(var);
@@ -895,16 +895,16 @@ public:
             if (!reportedContracts_.emplace(line, info.text).second)
                 continue;
 
-            zerodefect::Diagnostic diag;
+            codeskeptic::Diagnostic diag;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "contract";
             diag.severity = (definite && !info.machineProposed)
-                                ? zerodefect::Severity::Error
-                                : zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::ContractViolated, info.text);
+                                ? codeskeptic::Severity::Error
+                                : codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::ContractViolated, info.text);
             diag.function = funcName_;
             results_.push_back(std::move(diag));
             // Violation trace (Round D): why is the argument null?
@@ -916,7 +916,7 @@ public:
     // Guarded postcondition check (CONTRACTS.md Round D): at a return
     // statement, every disjunct that does not REFUTE the guard must
     // satisfy the postcondition. A disjunct that PROVES the guard and
-    // returns definite null is a violation (error for bare zd:); null
+    // returns definite null is a violation (error for bare cs:); null
     // under an undecided guard, or possibly-null, is a warning —
     // evidence-per-path, the same ladder as everywhere else.
     void checkGuardedEnsures(const ReturnStmt* ret, const State& before,
@@ -933,10 +933,10 @@ public:
             bool maybe = false;
             for (const auto& d : before) {
                 // Guard provably false on this path: exempt.
-                if (zerodefect::factsContradict(d.facts, info.guardKey,
+                if (codeskeptic::factsContradict(d.facts, info.guardKey,
                                                 info.guardWanted))
                     continue;
-                bool guardProven = zerodefect::factsContradict(
+                bool guardProven = codeskeptic::factsContradict(
                     d.facts, info.guardKey, !info.guardWanted);
                 NullState v = literal;
                 if (v == NullState::Unknown) {
@@ -957,16 +957,16 @@ public:
             if (!reportedContracts_.emplace(line, info.text).second)
                 continue;
 
-            zerodefect::Diagnostic diag;
+            codeskeptic::Diagnostic diag;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "contract";
             diag.severity = (definite && !info.machineProposed)
-                                ? zerodefect::Severity::Error
-                                : zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::ContractViolated, info.text);
+                                ? codeskeptic::Severity::Error
+                                : codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::ContractViolated, info.text);
             diag.function = funcName_;
             results_.push_back(std::move(diag));
             if (var)
@@ -983,15 +983,15 @@ public:
                        const State& beforeDisjuncts,
                        const State& afterDisjuncts, ASTContext& ctx) {
         NullVarState before =
-            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullVals);
+            codeskeptic::flattenGuarded(beforeDisjuncts, mergeNullVals);
         NullVarState after =
-            zerodefect::flattenGuarded(afterDisjuncts, mergeNullVals);
+            codeskeptic::flattenGuarded(afterDisjuncts, mergeNullVals);
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
             if (afterState.st == NullState::Null)
                 recordEvent(cond, var, ctx,
-                            zerodefect::MsgId::TraceAssumedNullHere);
+                            codeskeptic::MsgId::TraceAssumedNullHere);
         }
     }
 
@@ -1003,19 +1003,19 @@ public:
             checkGuardedEnsures(ret, beforeDisjuncts, ctx);
 
         NullVarState before =
-            zerodefect::flattenGuarded(beforeDisjuncts, mergeNullVals);
+            codeskeptic::flattenGuarded(beforeDisjuncts, mergeNullVals);
         NullVarState after =
-            zerodefect::flattenGuarded(afterDisjuncts, mergeNullVals);
+            codeskeptic::flattenGuarded(afterDisjuncts, mergeNullVals);
         // Dataflow trace: record transitions to null / possibly-null
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
             if (b == before.end() || b->second == afterState) continue;
             if (afterState.st == NullState::Null)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceAssignedNullHere);
+                            codeskeptic::MsgId::TraceAssignedNullHere);
             else if (afterState.st == NullState::MaybeNull)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceAssignedMaybeNullHere);
+                            codeskeptic::MsgId::TraceAssignedMaybeNullHere);
         }
 
         // Direct dereference (`*p`, `p->x`, `p[i]`).
@@ -1063,33 +1063,33 @@ public:
         if (!definite) {
             auto first = firstWarnIndex_.find(var);
             if (first != firstWarnIndex_.end()) {
-                zerodefect::TraceNote note;
+                codeskeptic::TraceNote note;
                 note.file = sm.getFilename(loc).str();
                 note.line = line;
                 note.column = sm.getSpellingColumnNumber(loc);
-                note.message = zerodefect::msg(
-                    zerodefect::MsgId::TraceAlsoDerefHere,
+                note.message = codeskeptic::msg(
+                    codeskeptic::MsgId::TraceAlsoDerefHere,
                     var->getNameAsString());
                 alsoDerefs_[var].push_back(std::move(note));
                 return;
             }
         }
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "null-deref";
         diag.function = funcName_;
         if (definite) {
-            diag.severity = zerodefect::Severity::Error;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::NullDerefDefinite,
+            diag.severity = codeskeptic::Severity::Error;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::NullDerefDefinite,
                 var->getNameAsString());
         } else {
-            diag.severity = zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::NullDerefMaybe,
+            diag.severity = codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::NullDerefMaybe,
                 var->getNameAsString());
         }
         results_.push_back(diag);
@@ -1102,7 +1102,7 @@ public:
     // reports, then the deduplicated "also dereferenced here" sites.
     void attachTraces() {
         for (const auto& [index, var] : noteTargets_) {
-            std::vector<zerodefect::TraceNote> notes;
+            std::vector<codeskeptic::TraceNote> notes;
             auto it = events_.find(var);
             if (it != events_.end()) {
                 notes = it->second;
@@ -1127,14 +1127,14 @@ public:
 
 private:
     void recordEvent(const Stmt* stmt, const VarDecl* var,
-                     ASTContext& ctx, zerodefect::MsgId msgId) {
+                     ASTContext& ctx, codeskeptic::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
-        zerodefect::TraceNote note;
+        codeskeptic::TraceNote note;
         note.file = sm.getFilename(loc).str();
         note.line = sm.getSpellingLineNumber(loc);
         note.column = sm.getSpellingColumnNumber(loc);
-        note.message = zerodefect::msg(msgId, var->getNameAsString());
+        note.message = codeskeptic::msg(msgId, var->getNameAsString());
 
         auto& list = events_[var];
         for (const auto& existing : list)
@@ -1146,24 +1146,24 @@ private:
     std::set<const ValueDecl*> stampable_;
     std::set<const ValueDecl*> ptrFacts_;
     std::string funcName_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
     State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
-    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
     std::map<const VarDecl*, size_t> firstWarnIndex_;
-    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> alsoDerefs_;
+    std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> alsoDerefs_;
     std::set<std::pair<unsigned, std::string>> reportedContracts_;
     std::map<const clang::FunctionDecl*,
-             std::vector<zerodefect::GuardRequire>> guardCache_;
-    std::vector<zerodefect::GuardedEnsuresInfo> guardedEnsures_;
+             std::vector<codeskeptic::GuardRequire>> guardCache_;
+    std::vector<codeskeptic::GuardedEnsuresInfo> guardedEnsures_;
 };
 
 // --- Matcher callback ---
 
 class NullDerefCallback : public MatchFinder::MatchCallback {
 public:
-    explicit NullDerefCallback(zerodefect::DiagnosticList& results)
+    explicit NullDerefCallback(codeskeptic::DiagnosticList& results)
         : results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -1172,12 +1172,12 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*func)) return;
-        if (!zerodefect::lineFilterAllows(*func, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*func)) return;
+        if (!codeskeptic::lineFilterAllows(*func, sm)) return;
 
-        auto parsed = zerodefect::allContractClausesForDecl(func, *result.Context);
+        auto parsed = codeskeptic::allContractClausesForDecl(func, *result.Context);
         auto guardedEnsures =
-            zerodefect::analyzeNullEnsuresGuards(parsed, func);
+            codeskeptic::analyzeNullEnsuresGuards(parsed, func);
 
         auto trackedVars = collectTrackedVars(func, *result.Context);
         // A function with no pointer variables still needs the pass
@@ -1191,37 +1191,37 @@ public:
         // #69b: sole-definition intervals for this function's locals —
         // scoped for the whole run (transfer AND the reporting pass
         // both evaluate call nullness).
-        zerodefect::IntervalMap soleDefs =
-            zerodefect::soleDefIntervals(func, *result.Context);
+        codeskeptic::IntervalMap soleDefs =
+            codeskeptic::soleDefIntervals(func, *result.Context);
         SoleDefScope soleDefScope(&soleDefs, result.Context);
 
         NullDerefAnalysis analysis(
-            trackedVars, zerodefect::collectUnkeyableDecls(func),
-            zerodefect::collectFactDecls(func),
-            zerodefect::collectPtrFactDecls(func),
+            trackedVars, codeskeptic::collectUnkeyableDecls(func),
+            codeskeptic::collectFactDecls(func),
+            codeskeptic::collectPtrFactDecls(func),
             func->getQualifiedNameAsString(), results_);
         if (!parsed.clauses.empty()) {
-            auto req = zerodefect::analyzeRequires(parsed, func);
+            auto req = codeskeptic::analyzeRequires(parsed, func);
             if (!req.enforced.empty())
                 analysis.seedRequires(func, req.enforced);
             if (!guardedEnsures.enforced.empty())
                 analysis.setGuardedEnsures(
                     std::move(guardedEnsures.enforced));
         }
-        auto df = zerodefect::runDataflow(func, *result.Context, analysis);
+        auto df = codeskeptic::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
-            zerodefect::CoverageReport::instance().recordNonConvergence(
+            codeskeptic::CoverageReport::instance().recordNonConvergence(
                 func->getQualifiedNameAsString());
         analysis.attachTraces();
     }
 
 private:
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::string NullDerefRule::id() const {
     return "null-deref";
@@ -1249,4 +1249,4 @@ void NullDerefRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

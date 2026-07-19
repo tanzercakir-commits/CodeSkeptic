@@ -1,12 +1,12 @@
-#ifndef ZERODEFECT_ENGINE_FATALCALLS_H
-#define ZERODEFECT_ENGINE_FATALCALLS_H
+#ifndef CODESKEPTIC_ENGINE_FATALCALLS_H
+#define CODESKEPTIC_ENGINE_FATALCALLS_H
 
 #include <clang/AST/Stmt.h>
 
 #include <set>
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Fatal-call registry (--fatal-asserts): function names the user
 // declares to never return, even though their declarations carry no
@@ -38,6 +38,6 @@ const std::set<std::string>& fatalCallNames();
 // overloads have no place in an assert-handler list).
 bool isFatalCall(const clang::Stmt* stmt);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_ENGINE_FATALCALLS_H
+#endif // CODESKEPTIC_ENGINE_FATALCALLS_H

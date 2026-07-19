@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_RULE_H
-#define ZERODEFECT_RULE_H
+#ifndef CODESKEPTIC_RULE_H
+#define CODESKEPTIC_RULE_H
 
 #include "core/Diagnostic.h"
 
@@ -9,7 +9,7 @@ namespace clang {
 class ASTContext;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class Rule {
 public:
@@ -28,6 +28,6 @@ private:
     bool enabled_ = true;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_RULE_H
+#endif // CODESKEPTIC_RULE_H

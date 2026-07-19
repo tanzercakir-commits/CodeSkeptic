@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 Config::Config()
     : build_path_(".")
@@ -100,7 +100,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
             summary_diff_gate_ = argv[++i];
             if (summary_diff_gate_ != "error" &&
                 summary_diff_gate_ != "warn") {
-                std::cerr << "[ZeroDefect] --gate expects 'error' or "
+                std::cerr << "[CodeSkeptic] --gate expects 'error' or "
                              "'warn', got: " << summary_diff_gate_
                           << "\n";
                 return false;
@@ -132,7 +132,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
             // usage message and cost a 20-minute scan-diff hunt
             // (2026-07-12).
             if (!listFile) {
-                std::cerr << "[ZeroDefect] --files list not found: "
+                std::cerr << "[CodeSkeptic] --files list not found: "
                           << listPath << "\n";
                 return false;
             }
@@ -143,7 +143,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
-            std::cerr << "Usage: zerodefect [options] [source_path]\n"
+            std::cerr << "Usage: codeskeptic [options] [source_path]\n"
                       << "\n"
                       << "Options:\n"
                       << "  --source <path>        Directory/file to analyze\n"
@@ -309,4 +309,4 @@ Severity Config::parseSeverity(const std::string& str) const {
     return Severity::Info;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

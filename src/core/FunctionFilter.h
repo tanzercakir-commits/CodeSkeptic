@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_FUNCTION_FILTER_H
-#define ZERODEFECT_FUNCTION_FILTER_H
+#ifndef CODESKEPTIC_FUNCTION_FILTER_H
+#define CODESKEPTIC_FUNCTION_FILTER_H
 
 #include <set>
 #include <string>
@@ -11,7 +11,7 @@ class FunctionDecl;
 class SourceManager;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Incremental analysis primitives: when the filters are non-empty,
 // ONLY the functions in scope are analyzed. For the "re-check only
@@ -38,6 +38,6 @@ const LineRanges& lineRanges();
 bool lineFilterAllows(const clang::FunctionDecl& func,
                       const clang::SourceManager& sm);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_FUNCTION_FILTER_H
+#endif // CODESKEPTIC_FUNCTION_FILTER_H

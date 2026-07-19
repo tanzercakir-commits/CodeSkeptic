@@ -6,7 +6,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(zerodefect_tests
+add_executable(codeskeptic_tests
     TestHelper.cpp
     DiagnosticTest.cpp
     UninitPointerRuleExTest.cpp
@@ -37,18 +37,18 @@ add_executable(zerodefect_tests
     InterproceduralTest.cpp
 )
 
-target_include_directories(zerodefect_tests
+target_include_directories(codeskeptic_tests
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(zerodefect_tests
+target_link_libraries(codeskeptic_tests
     PRIVATE
-        zerodefect_core
+        codeskeptic_core
         GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(zerodefect_tests)
+gtest_discover_tests(codeskeptic_tests)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
@@ -56,4 +56,4 @@ gtest_discover_tests(zerodefect_tests)
 # ladder). Needs git + python3 — present locally and on the CI runner.
 add_test(NAME ReviewDiffFlow
          COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
-                 $<TARGET_FILE:zerodefect>)
+                 $<TARGET_FILE:codeskeptic>)

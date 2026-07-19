@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_NULL_DEREF_RULE_H
-#define ZERODEFECT_NULL_DEREF_RULE_H
+#ifndef CODESKEPTIC_NULL_DEREF_RULE_H
+#define CODESKEPTIC_NULL_DEREF_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Null pointer dereference detection via CFG dataflow. Tracks the flow
 // of nullptr/NULL/0; thanks to branch condition refinement (assume
@@ -18,6 +18,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_NULL_DEREF_RULE_H
+#endif // CODESKEPTIC_NULL_DEREF_RULE_H

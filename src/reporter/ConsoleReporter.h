@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_CONSOLE_REPORTER_H
-#define ZERODEFECT_CONSOLE_REPORTER_H
+#ifndef CODESKEPTIC_CONSOLE_REPORTER_H
+#define CODESKEPTIC_CONSOLE_REPORTER_H
 
 #include "reporter/Reporter.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class ConsoleReporter : public Reporter {
 public:
@@ -11,6 +11,6 @@ public:
     std::string format() const override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONSOLE_REPORTER_H
+#endif // CODESKEPTIC_CONSOLE_REPORTER_H

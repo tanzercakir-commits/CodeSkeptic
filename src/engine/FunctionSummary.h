@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_FUNCTION_SUMMARY_H
-#define ZERODEFECT_FUNCTION_SUMMARY_H
+#ifndef CODESKEPTIC_FUNCTION_SUMMARY_H
+#define CODESKEPTIC_FUNCTION_SUMMARY_H
 
 #include "engine/Interval.h"
 
@@ -12,7 +12,7 @@ class ASTContext;
 class FunctionDecl;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Interprocedural analysis v1: TU-local function summaries.
 //
@@ -139,6 +139,6 @@ private:
     std::map<std::string, FunctionSummary> globalStore_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_FUNCTION_SUMMARY_H
+#endif // CODESKEPTIC_FUNCTION_SUMMARY_H

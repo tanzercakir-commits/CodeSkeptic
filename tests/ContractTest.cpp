@@ -11,20 +11,20 @@
 
 #include <fstream>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // Contracts Round B (CONTRACTS.md): comment surface + parser +
 // unconditional return postconditions checked against the inferred
 // summaries. A contract is a DECLARED summary; violation semantics:
-// bare zd: = error, zd:ai = warning, unparseable = contract-syntax
+// bare cs: = error, cs:ai = warning, unparseable = contract-syntax
 // error, not-yet/never-checkable = explicit warning (never silent).
 
 // --- Parser unit tests ---
 
 TEST(ContractParserTest, ParsesEnsuresWithGuard) {
     auto parsed = parseContractComment(
-        "// zd: ensures return != null if n != 0\n");
+        "// cs: ensures return != null if n != 0\n");
     ASSERT_EQ(parsed.clauses.size(), 1u);
     ASSERT_TRUE(parsed.syntaxErrors.empty());
     const auto& c = parsed.clauses[0];
@@ -39,7 +39,7 @@ TEST(ContractParserTest, ParsesEnsuresWithGuard) {
 
 TEST(ContractParserTest, ParsesRequiresDisjunction) {
     auto parsed = parseContractComment(
-        "// zd: requires p != null || n == 0\n");
+        "// cs: requires p != null || n == 0\n");
     ASSERT_EQ(parsed.clauses.size(), 1u);
     const auto& c = parsed.clauses[0];
     EXPECT_EQ(c.kind, ContractClauseKind::Requires);
@@ -49,10 +49,10 @@ TEST(ContractParserTest, ParsesRequiresDisjunction) {
 
 TEST(ContractParserTest, ParsesEffectsAndPolicy) {
     auto parsed = parseContractComment(
-        "/* zd: owns(cfg)\n"
-        "   zd: borrows(name)\n"
-        "   zd: returns owned\n"
-        "   zd:policy no-absolute-paths */\n");
+        "/* cs: owns(cfg)\n"
+        "   cs: borrows(name)\n"
+        "   cs: returns owned\n"
+        "   cs:policy no-absolute-paths */\n");
     ASSERT_EQ(parsed.clauses.size(), 4u);
     EXPECT_EQ(parsed.clauses[0].kind, ContractClauseKind::Owns);
     EXPECT_EQ(parsed.clauses[0].paramName, "cfg");
@@ -63,15 +63,15 @@ TEST(ContractParserTest, ParsesEffectsAndPolicy) {
 }
 
 TEST(ContractParserTest, MachineProposedTag) {
-    auto parsed = parseContractComment("// zd:ai ensures return != null\n");
+    auto parsed = parseContractComment("// cs:ai ensures return != null\n");
     ASSERT_EQ(parsed.clauses.size(), 1u);
     EXPECT_TRUE(parsed.clauses[0].machineProposed);
 }
 
 TEST(ContractParserTest, SyntaxErrorsAreNeverSilent) {
     auto parsed = parseContractComment(
-        "// zd: ensure return != null\n"     // typo: ensure
-        "// zd: ensures return !=\n"          // missing operand
+        "// cs: ensure return != null\n"     // typo: ensure
+        "// cs: ensures return !=\n"          // missing operand
         "// ordinary prose, ignored\n");
     EXPECT_TRUE(parsed.clauses.empty());
     ASSERT_EQ(parsed.syntaxErrors.size(), 2u);
@@ -82,7 +82,7 @@ TEST(ContractParserTest, SyntaxErrorsAreNeverSilent) {
 TEST(ContractRuleTest, EnsuresNonNull_Violated_IsError) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null
+        // cs: ensures return != null
         int *find(int c) {
             if (c) return nullptr;
             static int g;
@@ -98,7 +98,7 @@ TEST(ContractRuleTest, EnsuresNonNull_Violated_IsError) {
 TEST(ContractRuleTest, EnsuresNonNull_Satisfied_Silent) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null
+        // cs: ensures return != null
         int *find() {
             static int g;
             return &g;
@@ -110,7 +110,7 @@ TEST(ContractRuleTest, EnsuresNonNull_Satisfied_Silent) {
 TEST(ContractRuleTest, EnsuresNonZero_Violated) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != 0
+        // cs: ensures return != 0
         int divisor(int c) {
             if (c) return 8;
             return 0;
@@ -124,7 +124,7 @@ TEST(ContractRuleTest, EnsuresNonZero_Violated) {
 TEST(ContractRuleTest, MachineProposed_ViolationIsWarning) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd:ai ensures return != null
+        // cs:ai ensures return != null
         int *find(int c) {
             if (c) return nullptr;
             static int g;
@@ -138,7 +138,7 @@ TEST(ContractRuleTest, MachineProposed_ViolationIsWarning) {
 TEST(ContractRuleTest, SyntaxError_IsContractSyntaxError) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensure return != null
+        // cs: ensure return != null
         int *find() {
             static int g;
             return &g;
@@ -156,7 +156,7 @@ TEST(ContractRuleTest, LaterRoundClause_ReportedNotSilent) {
     ContractRule rule;
     auto results = runRule(rule, R"(
         char *dup(const char *s);
-        // zd: returns owned
+        // cs: returns owned
         char *make_name(const char *base) { return dup(base); }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -167,7 +167,7 @@ TEST(ContractRuleTest, LaterRoundClause_ReportedNotSilent) {
 TEST(ContractRuleTest, ParamVsParam_Unsupported) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n < m
+        // cs: requires n < m
         int slice(int n, int m) { return m - n; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -190,8 +190,8 @@ TEST(ContractRuleTest, NoContract_NoNoise) {
 TEST(ContractRuleTest, MultipleClauses_CheckedIndependently) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null
-        // zd: ensures return != 0
+        // cs: ensures return != null
+        // cs: ensures return != 0
         int *find(int c) {
             if (c) return nullptr;
             static int g;
@@ -215,7 +215,7 @@ TEST(ContractRuleTest, MultipleClauses_CheckedIndependently) {
 TEST(ContractRoundCTest, EnforcedRequires_NotReportedUnverified) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int deref(int *p) { return *p; }
     )");
     EXPECT_EQ(results.size(), 0u);
@@ -226,7 +226,7 @@ TEST(ContractRoundCTest, UnknownParamName_IsContractSyntax) {
     // can never bind — that is a contract error, not a later round.
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires q != null
+        // cs: requires q != null
         int deref(int *p) { return p ? *p : 0; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -239,7 +239,7 @@ TEST(ContractRoundCTest, RequiresNonNull_CalleeSeeded_NoNoise) {
     // NonNull, the dereference is silent.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int deref(int *p) { return *p; }
     )");
     EXPECT_EQ(results.size(), 0u);
@@ -257,7 +257,7 @@ TEST(ContractRoundCTest, RequiresNonNull_PartialGuard_ProofBurdenDischarged) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
         struct T { int x; };
-        // zd: requires p != null
+        // cs: requires p != null
         int f(T *p, unsigned n) {
             if (!p && n > 0) return -1;
             return p->x;
@@ -278,7 +278,7 @@ TEST(ContractRoundCTest, RequiresUnlessZero_ThroughLoop_ProofDischarged) {
     auto results = runRule(rule, R"(
         struct T { int x; };
         extern int sink(int);
-        // zd: requires p != null unless n == 0
+        // cs: requires p != null unless n == 0
         int f(T *p, unsigned n) {
             int s = 0;
             for (unsigned i = 0; i < n; i++) s += sink(p->x);
@@ -311,7 +311,7 @@ TEST(ContractRoundCTest, CallSite_NullLiteral_IsError) {
     // call alone must wake the dataflow pass.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int f(int *p);
         int g() { return f(nullptr); }
     )");
@@ -324,7 +324,7 @@ TEST(ContractRoundCTest, CallSite_NullLiteral_IsError) {
 TEST(ContractRoundCTest, CallSite_MaybeNullVar_IsWarning) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int f(int *p);
         int *mk();
         int g(int c) {
@@ -342,7 +342,7 @@ TEST(ContractRoundCTest, CallSite_GuardedVar_Silent) {
     // The caller honors the contract: q is checked before the call.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int f(int *p);
         int *mk();
         int g() {
@@ -355,11 +355,11 @@ TEST(ContractRoundCTest, CallSite_GuardedVar_Silent) {
 }
 
 TEST(ContractRoundCTest, CallSite_MachineProposed_IsWarning) {
-    // zd:ai contracts never produce errors — a machine guess must not
+    // cs:ai contracts never produce errors — a machine guess must not
     // block a build.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd:ai requires p != null
+        // cs:ai requires p != null
         int f(int *p);
         int g() { return f(nullptr); }
     )");
@@ -373,7 +373,7 @@ TEST(ContractRoundCTest, RelationalEscape_Satisfied_Silent) {
     // releases the pointer — null is allowed on this call.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null || n <= 0
+        // cs: requires p != null || n <= 0
         int f(int *p, int n);
         int g() { return f(nullptr, 0); }
     )");
@@ -383,7 +383,7 @@ TEST(ContractRoundCTest, RelationalEscape_Satisfied_Silent) {
 TEST(ContractRoundCTest, RelationalEscape_Violated_IsError) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null || n <= 0
+        // cs: requires p != null || n <= 0
         int f(int *p, int n);
         int g() { return f(nullptr, 5); }
     )");
@@ -398,7 +398,7 @@ TEST(ContractRoundCTest, RelationalEscape_CalleeSplitSeed_NoNoise) {
     // dereference stays silent.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null || n <= 0
+        // cs: requires p != null || n <= 0
         int f(int *p, int n) {
             if (n > 0) return *p;
             return 0;
@@ -410,7 +410,7 @@ TEST(ContractRoundCTest, RelationalEscape_CalleeSplitSeed_NoNoise) {
 TEST(ContractRoundCTest, RequiresNonZero_ZeroLiteral_IsError) {
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n != 0
+        // cs: requires n != 0
         int divide(int a, int n);
         int g() { return divide(10, 0); }
     )");
@@ -425,7 +425,7 @@ TEST(ContractRoundCTest, RequiresNonZero_TrackedZeroVar_IsError) {
     // it tracked.
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n != 0
+        // cs: requires n != 0
         int divide(int a, int n);
         int g() { int z = 0; return divide(10, z); }
     )");
@@ -437,7 +437,7 @@ TEST(ContractRoundCTest, RequiresNonZero_TrackedZeroVar_IsError) {
 TEST(ContractRoundCTest, RequiresNonZero_MaybeZeroVar_IsWarning) {
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n != 0
+        // cs: requires n != 0
         int divide(int a, int n);
         int g(int c) {
             int z = 0;
@@ -453,7 +453,7 @@ TEST(ContractRoundCTest, RequiresNonZero_MaybeZeroVar_IsWarning) {
 TEST(ContractRoundCTest, RequiresNonZero_GuardedVar_Silent) {
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n != 0
+        // cs: requires n != 0
         int divide(int a, int n);
         int g(int z) {
             if (z == 0) return -1;
@@ -466,7 +466,7 @@ TEST(ContractRoundCTest, RequiresNonZero_GuardedVar_Silent) {
 TEST(ContractRoundCTest, RequiresNonZero_CalleeSeeded_NoNoise) {
     DivByZeroRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires n != 0
+        // cs: requires n != 0
         int divide(int a, int n) { return a / n; }
     )");
     EXPECT_EQ(results.size(), 0u);
@@ -481,7 +481,7 @@ TEST(ContractRoundCTest, RequiresNonZero_CalleeSeeded_NoNoise) {
 TEST(ContractRoundDTest, GuardedEnsures_ViolatedOnGuardTruePath_IsError) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) {
             static int g;
             if (n != 0) return 0;   // exactly the promised case
@@ -498,7 +498,7 @@ TEST(ContractRoundDTest, GuardedEnsures_NullOnGuardFalsePath_Silent) {
     // The guard-refuting path is exactly what the guard licenses.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) {
             static int g;
             if (n == 0) return 0;   // licensed: guard is false here
@@ -513,7 +513,7 @@ TEST(ContractRoundDTest, GuardedEnsures_NullUnderUndecidedGuard_IsWarning) {
     // guard — evidence is partial, so a warning, not an error.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) { return 0; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -524,7 +524,7 @@ TEST(ContractRoundDTest, GuardedEnsures_NullUnderUndecidedGuard_IsWarning) {
 TEST(ContractRoundDTest, GuardedEnsures_MachineProposed_IsWarning) {
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd:ai ensures return != null if n != 0
+        // cs:ai ensures return != null if n != 0
         int *lookup(int n) {
             static int g;
             if (n != 0) return 0;
@@ -539,7 +539,7 @@ TEST(ContractRoundDTest, GuardedEnsures_ViolatingVarReturn_HasTrace) {
     // The violation carries the "why null" trace (which assignment).
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) {
             int *r = 0;
             if (n != 0) return r;
@@ -557,7 +557,7 @@ TEST(ContractRoundDTest, GuardedEnsures_EnforcedLine_NotUnverified) {
     // ContractRule no longer reports the enforced guarded clause.
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) {
             static int g;
             if (n != 0) return 0;
@@ -574,7 +574,7 @@ TEST(ContractRoundDTest, GuardedEnsures_UnkeyableGuard_StaysUnverified) {
     ContractRule rule;
     auto results = runRule(rule, R"(
         void touch(int *p);
-        // zd: ensures return != null if n != 0
+        // cs: ensures return != null if n != 0
         int *lookup(int n) {
             touch(&n);
             static int g;
@@ -593,7 +593,7 @@ TEST(ContractRoundDTest, Borrows_CalleeFrees_IsError) {
     ContractRule rule;
     auto results = runRule(rule, R"(
         void free(void *);
-        // zd: borrows(buf)
+        // cs: borrows(buf)
         void use(char *buf) { free(buf); }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -605,7 +605,7 @@ TEST(ContractRoundDTest, Borrows_CalleeFrees_IsError) {
 TEST(ContractRoundDTest, Borrows_ReadOnlyBody_Silent) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: borrows(buf)
+        // cs: borrows(buf)
         int use(const char *buf) { return buf[0]; }
     )");
     EXPECT_EQ(results.size(), 0u);
@@ -616,7 +616,7 @@ TEST(ContractRoundDTest, Owns_ReadOnlyBody_IsError) {
     // leaks — the claim is false.
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: owns(cfg)
+        // cs: owns(cfg)
         int consume(char *cfg) { return cfg[0]; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -628,7 +628,7 @@ TEST(ContractRoundDTest, Owns_CalleeFrees_Silent) {
     ContractRule rule;
     auto results = runRule(rule, R"(
         void free(void *);
-        // zd: owns(cfg)
+        // cs: owns(cfg)
         void consume(char *cfg) { free(cfg); }
     )");
     EXPECT_EQ(results.size(), 0u);
@@ -637,7 +637,7 @@ TEST(ContractRoundDTest, Owns_CalleeFrees_Silent) {
 TEST(ContractRoundDTest, Owns_UnknownParamName_IsContractSyntax) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        // zd: owns(config)
+        // cs: owns(config)
         int consume(char *cfg) { return cfg[0]; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -649,7 +649,7 @@ TEST(ContractRoundDTest, CallSiteViolation_HasTrace) {
     // Round C's caller-side finding now carries the "why null" trace.
     NullDerefRule rule;
     auto results = runRule(rule, R"(
-        // zd: requires p != null
+        // cs: requires p != null
         int f(int *p);
         int g() {
             int *q = 0;
@@ -662,9 +662,9 @@ TEST(ContractRoundDTest, CallSiteViolation_HasTrace) {
 }
 
 // --- Round E: policies + sidecar files ---
-// Policies are AST-level pattern prohibitions under the shared zd:
+// Policies are AST-level pattern prohibitions under the shared cs:
 // surface; v1 ships no-absolute-paths (the founding Ruledsl release
-// incident). Sidecars (.zdc) carry contracts for code you cannot
+// incident). Sidecars (.csk) carry contracts for code you cannot
 // annotate — every entry explicitly anchored to a function name.
 
 TEST(PolicyTest, AbsolutePathHeuristic) {
@@ -681,7 +681,7 @@ TEST(PolicyTest, AbsolutePathHeuristic) {
 TEST(PolicyRuleTest, FileComment_CatchesAbsolutePath) {
     PolicyRule rule;
     auto results = runRule(rule, R"(
-        // zd:policy no-absolute-paths
+        // cs:policy no-absolute-paths
         const char *config_path() { return "/etc/app/config.ini"; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -702,7 +702,7 @@ TEST(PolicyRuleTest, NoPolicy_NoNoise) {
 TEST(PolicyRuleTest, PathLikeButNotAbsolute_Silent) {
     PolicyRule rule;
     auto results = runRule(rule, R"(
-        // zd:policy no-absolute-paths
+        // cs:policy no-absolute-paths
         const char *a() { return "config/app.ini"; }
         const char *b() { return "/"; }
         const char *c() { return "use / to divide"; }
@@ -715,7 +715,7 @@ TEST(PolicyRuleTest, UnknownPolicyName_IsContractSyntax) {
     // comfort — unknown names are errors.
     PolicyRule rule;
     auto results = runRule(rule, R"(
-        // zd:policy no-such-policy
+        // cs:policy no-such-policy
         int f() { return 0; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -738,7 +738,7 @@ TEST(PolicyRuleTest, ProfilePolicy_ActsProjectWide) {
 TEST(PolicyRuleTest, MachineProposedActivation_IsWarning) {
     PolicyRule rule;
     auto results = runRule(rule, R"(
-        // zd:ai policy no-absolute-paths
+        // cs:ai policy no-absolute-paths
         const char *config_path() { return "/etc/app/config.ini"; }
     )");
     ASSERT_EQ(results.size(), 1u);
@@ -770,7 +770,7 @@ namespace {
 std::string writeSidecar(const std::string& srcName,
                          const std::string& content) {
     const std::string src = ::testing::TempDir() + srcName;
-    std::ofstream(src + ".zdc") << content;
+    std::ofstream(src + ".csk") << content;
     return src;
 }
 } // namespace
@@ -778,7 +778,7 @@ std::string writeSidecar(const std::string& srcName,
 TEST(SidecarTest, RequiresFromSidecar_CallSiteViolation) {
     NullDerefRule rule;
     const std::string src = writeSidecar(
-        "zd_sc_req.cc", "f: requires p != null\n");
+        "cs_sc_req.cc", "f: requires p != null\n");
     auto results = runRule(rule, R"(
         int f(int *p);
         int g() { return f(nullptr); }
@@ -788,10 +788,10 @@ TEST(SidecarTest, RequiresFromSidecar_CallSiteViolation) {
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
-TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtZdcFile) {
+TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtCskFile) {
     ContractRule rule;
     const std::string src = writeSidecar(
-        "zd_sc_ens.cc", "find: ensures return != null\n");
+        "cs_sc_ens.cc", "find: ensures return != null\n");
     auto results = runRule(rule, R"(
         int *find(int c) {
             if (c) return nullptr;
@@ -802,14 +802,14 @@ TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtZdcFile) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "contract");
     EXPECT_EQ(results[0].severity, Severity::Error);
-    EXPECT_NE(results[0].file.find(".zdc"), std::string::npos);
+    EXPECT_NE(results[0].file.find(".csk"), std::string::npos);
     EXPECT_EQ(results[0].line, 1u);
 }
 
 TEST(SidecarTest, ArityAnchor_Binds) {
     NullDerefRule rule;
     const std::string src = writeSidecar(
-        "zd_sc_arity.cc", "f/2: requires p != null\n");
+        "cs_sc_arity.cc", "f/2: requires p != null\n");
     auto results = runRule(rule, R"(
         int f(int *p, int n);
         int g() { return f(nullptr, 3); }
@@ -821,7 +821,7 @@ TEST(SidecarTest, ArityAnchor_Binds) {
 TEST(SidecarTest, MalformedLines_AreContractSyntaxErrors) {
     ContractRule rule;
     const std::string src = writeSidecar(
-        "zd_sc_bad.cc",
+        "cs_sc_bad.cc",
         "prose without an anchor\n"
         "find: ensure return != null\n");  // typo'd clause
     auto results = runRule(rule, R"(
@@ -835,7 +835,7 @@ TEST(SidecarTest, MalformedLines_AreContractSyntaxErrors) {
     EXPECT_EQ(results[0].rule_id, "contract-syntax");
     EXPECT_EQ(results[1].rule_id, "contract-syntax");
     for (const auto& r : results)
-        EXPECT_NE(r.file.find(".zdc"), std::string::npos);
+        EXPECT_NE(r.file.find(".csk"), std::string::npos);
 }
 
 TEST(SidecarTest, NoSidecarFile_NoEffect) {
@@ -846,7 +846,7 @@ TEST(SidecarTest, NoSidecarFile_NoEffect) {
             static int g;
             return &g;
         }
-    )", ::testing::TempDir() + "zd_sc_none.cc");
+    )", ::testing::TempDir() + "cs_sc_none.cc");
     EXPECT_EQ(results.size(), 0u);
 }
 
@@ -1142,7 +1142,7 @@ TEST(GuardContractTest, DeclaredContractOwnsTheParam_NoDoubleReport) {
     auto results = runRule(rule, R"(
         struct T { int x; };
         extern void log_fail(const char *);
-        // zd: requires p != null
+        // cs: requires p != null
         int callee(T *p) {
             if (!p) {
                 log_fail("callee: p is null");

@@ -152,13 +152,13 @@ bool literalFits(const Expr* src, int64_t capacityBytes) {
 int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
     QualType t = vd->getType();
     if (const auto* arr = ctx.getAsConstantArrayType(t)) {
-        return zerodefect::boundedTypeSizeInChars(ctx, arr->getElementType())
+        return codeskeptic::boundedTypeSizeInChars(ctx, arr->getElementType())
             .value_or(0);
     }
     if (t->isPointerType()) {
         QualType p = t->getPointeeType();
         if (!p->isVoidType())
-            return zerodefect::boundedTypeSizeInChars(ctx, p).value_or(0);
+            return codeskeptic::boundedTypeSizeInChars(ctx, p).value_or(0);
     }
     return 0;
 }
@@ -171,12 +171,12 @@ int64_t destElemSize(const VarDecl* vd, ASTContext& ctx) {
 // heap-overflow shape: a small buffer inside a struct). Unprovable →
 // {ok = false}.
 struct BufExtent {
-    zerodefect::Interval elements;  // element count
+    codeskeptic::Interval elements;  // element count
     int64_t elemBytes = 0;          // byte size of one element
     bool ok = false;
 };
 
-BufExtent bufferExtent(const Expr* e, const zerodefect::ExtentMap& extents,
+BufExtent bufferExtent(const Expr* e, const codeskeptic::ExtentMap& extents,
                        ASTContext& ctx) {
     BufExtent r;
     if (!e) return r;
@@ -203,10 +203,10 @@ BufExtent bufferExtent(const Expr* e, const zerodefect::ExtentMap& extents,
         const llvm::APInt& n = arr->getSize();
         if (n.getActiveBits() > 63) return r;
         auto elemBytes =
-            zerodefect::boundedTypeSizeInChars(ctx, arr->getElementType());
+            codeskeptic::boundedTypeSizeInChars(ctx, arr->getElementType());
         if (!elemBytes || *elemBytes <= 0) return r;
         r.elements =
-            zerodefect::Interval::constant(static_cast<int64_t>(n.getZExtValue()));
+            codeskeptic::Interval::constant(static_cast<int64_t>(n.getZExtValue()));
         r.elemBytes = *elemBytes;
         r.ok = true;
         return r;
@@ -215,14 +215,14 @@ BufExtent bufferExtent(const Expr* e, const zerodefect::ExtentMap& extents,
 }
 
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
-                     const zerodefect::ParamIntervalMap& paramMap,
-                     zerodefect::DiagnosticList& results) {
+                     const codeskeptic::ParamIntervalMap& paramMap,
+                     codeskeptic::DiagnosticList& results) {
     if (!fn->hasBody()) return;
 
     // Variable-buffer extents (fixed arrays + heap pointers). Member-array
     // extents are derived at the access site (bufferExtent), so an empty
     // map does not mean there is nothing to check.
-    zerodefect::ExtentMap extents = zerodefect::buildExtentMap(fn, ctx);
+    codeskeptic::ExtentMap extents = codeskeptic::buildExtentMap(fn, ctx);
 
     auto subs = collectSubscripts(fn);
     auto copies = collectCopyCalls(fn);
@@ -231,11 +231,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
     // Seed parameters with visible, closed callers (C3) at their proven
     // entry range, so a caller's bounded index argument reaches the check.
-    zerodefect::IntervalAnalysis analysis(collectIntVars(fn),
-                                          zerodefect::paramSeeds(paramMap, fn));
-    auto df = zerodefect::runDataflow(fn, ctx, analysis);
+    codeskeptic::IntervalAnalysis analysis(collectIntVars(fn),
+                                          codeskeptic::paramSeeds(paramMap, fn));
+    auto df = codeskeptic::runDataflow(fn, ctx, analysis);
     if (!df.converged)
-        zerodefect::CoverageReport::instance().recordNonConvergence(
+        codeskeptic::CoverageReport::instance().recordNonConvergence(
             fn->getQualifiedNameAsString());
 
     const SourceManager& sm = ctx.getSourceManager();
@@ -244,11 +244,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     for (const auto* sub : subs) {
         BufExtent be = bufferExtent(sub->getBase(), extents, ctx);
         if (!be.ok) continue;
-        const zerodefect::Interval& extent = be.elements;
+        const codeskeptic::Interval& extent = be.elements;
 
-        const zerodefect::IntervalMap* st = analysis.stateAt(sub);
+        const codeskeptic::IntervalMap* st = analysis.stateAt(sub);
         if (!st) continue;  // not recorded — nothing proven
-        zerodefect::Interval idx = zerodefect::evalInterval(sub->getIdx(), *st);
+        codeskeptic::Interval idx = codeskeptic::evalInterval(sub->getIdx(), *st);
         if (idx.isEmpty()) continue;  // unreachable
 
         // Definite out-of-bounds: the ENTIRE proven index range is out.
@@ -268,14 +268,14 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         std::string extentStr =
             extent.isSingleton(&e) ? std::to_string(e) : extent.toString();
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "bounds";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = zerodefect::Severity::Error;
-        diag.message = zerodefect::msg(zerodefect::MsgId::BoundsArrayDefinite,
+        diag.severity = codeskeptic::Severity::Error;
+        diag.message = codeskeptic::msg(codeskeptic::MsgId::BoundsArrayDefinite,
                                        idx.toString(), extentStr);
         results.push_back(std::move(diag));
     }
@@ -285,16 +285,16 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     // minimum exceeds even the largest possible capacity, it definitely
     // overflows (CWE-787). Byte capacity = element count (ExtentMap) *
     // element size.
-    const zerodefect::IntervalMap emptyState;
+    const codeskeptic::IntervalMap emptyState;
     for (const auto* call : copies) {
         BufExtent be = bufferExtent(call->getArg(0), extents, ctx);
         if (!be.ok) continue;
-        zerodefect::Interval capacity = zerodefect::Interval::mul(
-            be.elements, zerodefect::Interval::constant(be.elemBytes));
+        codeskeptic::Interval capacity = codeskeptic::Interval::mul(
+            be.elements, codeskeptic::Interval::constant(be.elemBytes));
         if (capacity.hiIsInf()) continue;  // unbounded capacity — prove nothing
 
-        const zerodefect::IntervalMap* st = analysis.stateAt(call);
-        zerodefect::Interval sz = zerodefect::evalSizeInterval(
+        const codeskeptic::IntervalMap* st = analysis.stateAt(call);
+        codeskeptic::Interval sz = codeskeptic::evalSizeInterval(
             call->getArg(2), ctx, st ? *st : emptyState);
         // Definite overflow: every byte count exceeds the capacity.
         if (sz.isEmpty() || sz.loIsInf() || sz.lo() <= capacity.hi()) continue;
@@ -303,14 +303,14 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reportedLines.insert(line).second) continue;
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "bounds";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = zerodefect::Severity::Error;
-        diag.message = zerodefect::msg(zerodefect::MsgId::BoundsCopyOverflow,
+        diag.severity = codeskeptic::Severity::Error;
+        diag.message = codeskeptic::msg(codeskeptic::MsgId::BoundsCopyOverflow,
                                        sz.toString(),
                                        std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
@@ -327,8 +327,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (!destIsFixedArray(dest, ctx)) continue;  // fixed buffers only
         BufExtent be = bufferExtent(dest, extents, ctx);
         if (!be.ok) continue;
-        zerodefect::Interval capacity = zerodefect::Interval::mul(
-            be.elements, zerodefect::Interval::constant(be.elemBytes));
+        codeskeptic::Interval capacity = codeskeptic::Interval::mul(
+            be.elements, codeskeptic::Interval::constant(be.elemBytes));
         if (capacity.hiIsInf()) continue;  // unbounded dest — prove nothing
         if (sc.hasSource &&
             literalFits(sc.call->getArg(sc.srcArg), capacity.hi()))
@@ -339,15 +339,15 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (!reportedLines.insert(line).second) continue;
 
         const FunctionDecl* callee = sc.call->getDirectCallee();
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "bounds";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = zerodefect::Severity::Warning;
-        diag.message = zerodefect::msg(
-            zerodefect::MsgId::BoundsUnboundedStrCopy,
+        diag.severity = codeskeptic::Severity::Warning;
+        diag.message = codeskeptic::msg(
+            codeskeptic::MsgId::BoundsUnboundedStrCopy,
             callee->getNameAsString(), std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
     }
@@ -355,8 +355,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
 
 class BoundsCallback : public MatchFinder::MatchCallback {
 public:
-    BoundsCallback(const zerodefect::ParamIntervalMap& paramMap,
-                   zerodefect::DiagnosticList& results)
+    BoundsCallback(const codeskeptic::ParamIntervalMap& paramMap,
+                   codeskeptic::DiagnosticList& results)
         : paramMap_(paramMap), results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -365,20 +365,20 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(fn->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*fn)) return;
-        if (!zerodefect::lineFilterAllows(*fn, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*fn)) return;
+        if (!codeskeptic::lineFilterAllows(*fn, sm)) return;
 
         analyzeFunction(fn, *result.Context, paramMap_, results_);
     }
 
 private:
-    const zerodefect::ParamIntervalMap& paramMap_;
-    zerodefect::DiagnosticList& results_;
+    const codeskeptic::ParamIntervalMap& paramMap_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 void BoundsRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     const ParamIntervalMap& paramMap =
@@ -394,4 +394,4 @@ void BoundsRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

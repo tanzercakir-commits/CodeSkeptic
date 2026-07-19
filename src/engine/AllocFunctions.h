@@ -1,10 +1,10 @@
-#ifndef ZERODEFECT_ENGINE_ALLOCFUNCTIONS_H
-#define ZERODEFECT_ENGINE_ALLOCFUNCTIONS_H
+#ifndef CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H
+#define CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H
 
 #include <set>
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Custom allocator registry (--alloc-functions / --free-functions).
 //
@@ -38,6 +38,6 @@ const std::set<std::string>& freeFunctionNames();
 void setOwningPointerNames(std::set<std::string> names);
 const std::set<std::string>& owningPointerNames();
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_ENGINE_ALLOCFUNCTIONS_H
+#endif // CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H

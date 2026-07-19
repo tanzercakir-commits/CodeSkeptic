@@ -1,15 +1,15 @@
-#ifndef ZERODEFECT_POLICY_RULE_H
-#define ZERODEFECT_POLICY_RULE_H
+#ifndef CODESKEPTIC_POLICY_RULE_H
+#define CODESKEPTIC_POLICY_RULE_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Policy enforcement (CONTRACTS.md §2.3, Round E). Policies are
-// AST-level pattern prohibitions under the shared zd: surface —
-// activated per file by a `// zd:policy <name>` comment, or
+// AST-level pattern prohibitions under the shared cs: surface —
+// activated per file by a `// cs:policy <name>` comment, or
 // project-wide from the idiom profile (`policy = <name>` in
-// .zerodefect.conf / --policy).
+// .codeskeptic.conf / --policy).
 //
 // v1 ships one policy: no-absolute-paths — a hard-coded absolute
 // path in a string literal is an error (the founding Ruledsl
@@ -20,7 +20,7 @@ class PolicyRule : public Rule {
 public:
     std::string id() const override { return "policy"; }
     std::string description() const override {
-        return "Enforces zd:policy pattern prohibitions "
+        return "Enforces cs:policy pattern prohibitions "
                "(no-absolute-paths)";
     }
     Severity defaultSeverity() const override { return Severity::Error; }
@@ -28,6 +28,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_POLICY_RULE_H
+#endif // CODESKEPTIC_POLICY_RULE_H

@@ -2,7 +2,7 @@
 # Measurement on NIST Juliet C/C++ 1.3: scans the CWE directories that
 # match our rules and scores findings via good/bad function names.
 #
-# Usage: scripts/run_juliet.sh <zerodefect-binary> [work-dir] [file-limit]
+# Usage: scripts/run_juliet.sh <codeskeptic-binary> [work-dir] [file-limit]
 #   file-limit: maximum files to scan per CWE (default 400;
 #               0 = unlimited). Used to bound CI time.
 #
@@ -23,7 +23,7 @@ set -euo pipefail
 # Resolve our own directory BEFORE any cd (relative-path trap)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-ZD_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+CS_BIN="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 WORK="${2:-juliet-work}"
 LIMIT="${3:-400}"
 mkdir -p "$WORK"
@@ -141,7 +141,7 @@ PYEOF
     # --files: only the selected (filtered + limited) files are analyzed
     # --whole-program: flow variants (61/63/64...) split source/sink
     # across a/b files — invisible without cross-TU summaries
-    "$ZD_BIN" --files "$list" --build-path "$build" --whole-program \
+    "$CS_BIN" --files "$list" --build-path "$build" --whole-program \
         --json "findings_$cwe.json" > /dev/null 2> "log_$cwe.txt"
     local code=$?
     set -e

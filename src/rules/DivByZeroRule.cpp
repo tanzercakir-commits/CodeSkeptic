@@ -82,8 +82,8 @@ ZeroState evaluateAssignedValue(const Expr* expr) {
     if (!expr) return ZeroState::Unknown;
     const Expr* stripped = expr->IgnoreParenImpCasts();
     if (const auto* call = dyn_cast<CallExpr>(stripped)) {
-        using RZ = zerodefect::SummaryRegistry::ReturnZeroness;
-        if (const auto* summary = zerodefect::SummaryRegistry::instance()
+        using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
+        if (const auto* summary = codeskeptic::SummaryRegistry::instance()
                                       .lookup(call->getDirectCallee())) {
             if (summary->returnZeroness == RZ::NeverZero)
                 return ZeroState::NonZero;
@@ -189,12 +189,12 @@ bool addContractArgVars(const FunctionDecl* funcDecl, ASTContext& ctx,
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
-        zerodefect::ParsedContracts parsed =
-            zerodefect::allContractClausesForDecl(callee, ctx);
+        codeskeptic::ParsedContracts parsed =
+            codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) continue;
-        auto req = zerodefect::analyzeRequires(parsed, callee);
+        auto req = codeskeptic::analyzeRequires(parsed, callee);
         for (const auto& info : req.enforced) {
-            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+            if (info.kind != codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;
             if (info.paramIndex >= call->getNumArgs()) continue;
             anyContractCall = true;
@@ -291,7 +291,7 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
         // an out-param with no AddrOf node to observe — only the
         // parameter type reveals that z may be reassigned by the callee.
         bool invalidated = false;
-        zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+        codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
             if (refersToVar(arg, targetVar)) invalidated = true;
         });
         if (invalidated) return StmtEffect::AssignsUnknown;
@@ -350,7 +350,7 @@ void setIfTracked(VarState& state, const VarDecl* var, ZeroState value) {
 // && / || short-circuiting and variable-on-the-left normalization live
 // there; the zero-domain interpretation lives here.
 void applyCondition(const Expr* cond, bool isTrue, VarState& state) {
-    zerodefect::walkCondition(
+    codeskeptic::walkCondition(
         cond, isTrue,
         // if (z) / while (z): truthiness
         [&](const VarDecl* var, bool truthy) {
@@ -401,7 +401,7 @@ public:
 
     DivByZeroAnalysis(const std::set<const VarDecl*>& trackedVars,
                       std::string funcName,
-                      zerodefect::DiagnosticList& results,
+                      codeskeptic::DiagnosticList& results,
                       std::set<unsigned>& reportedLines)
         : trackedVars_(trackedVars), funcName_(std::move(funcName)),
           results_(results), reportedLines_(reportedLines) {
@@ -416,9 +416,9 @@ public:
     // contract, and every visible call site is checked instead
     // (checkCallContracts below).
     void seedRequires(const FunctionDecl* func,
-                      const std::vector<zerodefect::RequiresInfo>& infos) {
+                      const std::vector<codeskeptic::RequiresInfo>& infos) {
         for (const auto& info : infos) {
-            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+            if (info.kind != codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;
             if (info.paramIndex >= func->getNumParams()) continue;
             auto it = initState_.find(func->getParamDecl(info.paramIndex));
@@ -492,7 +492,7 @@ public:
             if (b == before.end() || b->second == afterState) continue;
             if (afterState == ZeroState::Zero)
                 recordEvent(cond, var, ctx,
-                            zerodefect::MsgId::TraceAssumedZeroHere);
+                            codeskeptic::MsgId::TraceAssumedZeroHere);
         }
     }
 
@@ -507,10 +507,10 @@ public:
             if (b == before.end() || b->second == afterState) continue;
             if (afterState == ZeroState::Zero)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceAssignedZeroHere);
+                            codeskeptic::MsgId::TraceAssignedZeroHere);
             else if (afterState == ZeroState::MaybeZero)
                 recordEvent(stmt, var, ctx,
-                            zerodefect::MsgId::TraceAssignedMaybeZeroHere);
+                            codeskeptic::MsgId::TraceAssignedMaybeZeroHere);
         }
 
         // Top node ONLY: in the fine-grained CFG every division arrives
@@ -539,21 +539,21 @@ public:
         unsigned line = sm.getSpellingLineNumber(loc);
         if (!reportedLines_.insert(line).second) return;
 
-        zerodefect::Diagnostic diag;
+        codeskeptic::Diagnostic diag;
         diag.file = sm.getFilename(loc).str();
         diag.line = line;
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "div-by-zero";
         diag.function = funcName_;
         if (state == ZeroState::Zero) {
-            diag.severity = zerodefect::Severity::Error;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::DivByZeroDefinite,
+            diag.severity = codeskeptic::Severity::Error;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::DivByZeroDefinite,
                 var->getNameAsString());
         } else {
-            diag.severity = zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::DivByZeroMaybe,
+            diag.severity = codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::DivByZeroMaybe,
                 var->getNameAsString());
         }
         results_.push_back(diag);
@@ -583,17 +583,17 @@ private:
                             ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) return;
-        zerodefect::ParsedContracts parsed =
-            zerodefect::allContractClausesForDecl(callee, ctx);
+        codeskeptic::ParsedContracts parsed =
+            codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) return;
-        auto req = zerodefect::analyzeRequires(parsed, callee);
+        auto req = codeskeptic::analyzeRequires(parsed, callee);
 
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
         const unsigned line = sm.getSpellingLineNumber(loc);
 
         for (const auto& info : req.enforced) {
-            if (info.kind != zerodefect::RequiresInfo::Kind::NonZeroParam)
+            if (info.kind != codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;
             if (info.paramIndex >= call->getNumArgs()) continue;
             const Expr* arg = call->getArg(info.paramIndex);
@@ -601,7 +601,7 @@ private:
             bool definite = false;
             bool maybe = false;
             const VarDecl* var = nullptr;
-            if (auto lit = zerodefect::intLiteralArg(arg)) {
+            if (auto lit = codeskeptic::intLiteralArg(arg)) {
                 definite = (*lit == 0);
             } else if ((var = getReferencedVar(arg))) {
                 auto it = before.find(var);
@@ -614,17 +614,17 @@ private:
             if (!reportedContracts_.insert({line, info.text}).second)
                 continue;
 
-            zerodefect::Diagnostic diag;
+            codeskeptic::Diagnostic diag;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "contract";
             diag.function = funcName_;
             diag.severity = (definite && !info.machineProposed)
-                                ? zerodefect::Severity::Error
-                                : zerodefect::Severity::Warning;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::ContractViolated, info.text);
+                                ? codeskeptic::Severity::Error
+                                : codeskeptic::Severity::Warning;
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::ContractViolated, info.text);
             results_.push_back(std::move(diag));
             // Violation trace (Round D): why is the argument zero?
             if (var) noteTargets_.emplace_back(results_.size() - 1, var);
@@ -632,14 +632,14 @@ private:
     }
 
     void recordEvent(const Stmt* stmt, const VarDecl* var,
-                     ASTContext& ctx, zerodefect::MsgId msgId) {
+                     ASTContext& ctx, codeskeptic::MsgId msgId) {
         const SourceManager& sm = ctx.getSourceManager();
         SourceLocation loc = sm.getExpansionLoc(stmt->getBeginLoc());
-        zerodefect::TraceNote note;
+        codeskeptic::TraceNote note;
         note.file = sm.getFilename(loc).str();
         note.line = sm.getSpellingLineNumber(loc);
         note.column = sm.getSpellingColumnNumber(loc);
-        note.message = zerodefect::msg(msgId, var->getNameAsString());
+        note.message = codeskeptic::msg(msgId, var->getNameAsString());
 
         auto& list = events_[var];
         for (const auto& existing : list)
@@ -649,10 +649,10 @@ private:
 
     const std::set<const VarDecl*>& trackedVars_;
     std::string funcName_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
     std::set<unsigned>& reportedLines_;
     VarState initState_;
-    std::map<const VarDecl*, std::vector<zerodefect::TraceNote>> events_;
+    std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
     std::set<std::pair<unsigned, std::string>> reportedContracts_;
 };
@@ -661,7 +661,7 @@ private:
 
 void analyzeFunction(const FunctionDecl* funcDecl,
                      ASTContext& ctx,
-                     zerodefect::DiagnosticList& results) {
+                     codeskeptic::DiagnosticList& results) {
     if (!funcDecl->hasBody()) return;
 
     const SourceManager& sm = ctx.getSourceManager();
@@ -676,15 +676,15 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 sm.getExpansionLoc(div.op->getOperatorLoc());
             unsigned line = sm.getSpellingLineNumber(loc);
             if (reportedLines.insert(line).second) {
-                zerodefect::Diagnostic diag;
-                diag.severity = zerodefect::Severity::Error;
+                codeskeptic::Diagnostic diag;
+                diag.severity = codeskeptic::Severity::Error;
                 diag.file = sm.getFilename(loc).str();
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(loc);
                 diag.rule_id = "div-by-zero";
                 diag.function = funcDecl->getQualifiedNameAsString();
-                diag.message = zerodefect::msg(
-                    zerodefect::MsgId::DivByZeroLiteral);
+                diag.message = codeskeptic::msg(
+                    codeskeptic::MsgId::DivByZeroLiteral);
                 results.push_back(diag);
             }
         }
@@ -699,15 +699,15 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     DivByZeroAnalysis analysis(
         trackedVars, funcDecl->getQualifiedNameAsString(), results,
         reportedLines);
-    zerodefect::ParsedContracts ownContracts =
-        zerodefect::allContractClausesForDecl(funcDecl, ctx);
+    codeskeptic::ParsedContracts ownContracts =
+        codeskeptic::allContractClausesForDecl(funcDecl, ctx);
     if (!ownContracts.clauses.empty()) {
-        auto req = zerodefect::analyzeRequires(ownContracts, funcDecl);
+        auto req = codeskeptic::analyzeRequires(ownContracts, funcDecl);
         analysis.seedRequires(funcDecl, req.enforced);
     }
-    auto df = zerodefect::runDataflow(funcDecl, ctx, analysis);
+    auto df = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!df.converged)
-        zerodefect::CoverageReport::instance().recordNonConvergence(
+        codeskeptic::CoverageReport::instance().recordNonConvergence(
             funcDecl->getQualifiedNameAsString());
     analysis.attachTraces();
 }
@@ -716,7 +716,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
 class DivByZeroCallback : public MatchFinder::MatchCallback {
 public:
-    explicit DivByZeroCallback(zerodefect::DiagnosticList& results)
+    explicit DivByZeroCallback(codeskeptic::DiagnosticList& results)
         : results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -725,19 +725,19 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*func)) return;
-        if (!zerodefect::lineFilterAllows(*func, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*func)) return;
+        if (!codeskeptic::lineFilterAllows(*func, sm)) return;
 
         analyzeFunction(func, *result.Context, results_);
     }
 
 private:
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::string DivByZeroRule::id() const {
     return "div-by-zero";
@@ -764,4 +764,4 @@ void DivByZeroRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

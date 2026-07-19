@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 TEST(DiagnosticTest, SeverityToString) {
     Diagnostic info{Severity::Info, "f.cpp", 1, 1, "r", "m"};

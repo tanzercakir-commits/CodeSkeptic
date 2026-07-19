@@ -4,7 +4,7 @@
 #include <sstream>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 namespace {
 
@@ -30,7 +30,7 @@ TEST(SarifReporterTest, MinimalStructure) {
 
     EXPECT_NE(out.find("\"version\": \"2.1.0\""), std::string::npos);
     EXPECT_NE(out.find("sarif-schema-2.1.0.json"), std::string::npos);
-    EXPECT_NE(out.find("\"name\": \"ZeroDefect\""), std::string::npos);
+    EXPECT_NE(out.find("\"name\": \"CodeSkeptic\""), std::string::npos);
     // Rules are listed uniquely under driver.rules
     EXPECT_NE(out.find("{ \"id\": \"uninit-ptr\" }"), std::string::npos);
     EXPECT_NE(out.find("{ \"id\": \"memory-leak\" }"), std::string::npos);

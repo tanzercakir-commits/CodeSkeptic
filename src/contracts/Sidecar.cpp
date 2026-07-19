@@ -12,7 +12,7 @@
 
 using namespace clang;
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -39,12 +39,12 @@ std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-const SidecarFileData& loadSidecar(const std::string& zdcPath) {
-    auto it = cache().find(zdcPath);
+const SidecarFileData& loadSidecar(const std::string& cskPath) {
+    auto it = cache().find(cskPath);
     if (it != cache().end()) return it->second;
 
-    SidecarFileData& data = cache()[zdcPath];
-    std::ifstream in(zdcPath);
+    SidecarFileData& data = cache()[cskPath];
+    std::ifstream in(cskPath);
     if (!in) return data;  // exists stays false
     data.exists = true;
 
@@ -57,7 +57,7 @@ const SidecarFileData& loadSidecar(const std::string& zdcPath) {
     for (auto& e : entries)
         data.byAnchor[e.anchor].push_back(e);
     for (auto& iss : issues)
-        pendingIssues().emplace_back(zdcPath, std::move(iss));
+        pendingIssues().emplace_back(cskPath, std::move(iss));
     return data;
 }
 
@@ -100,9 +100,9 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
     const std::string file =
         sm.getFilename(sm.getExpansionLoc(func->getLocation())).str();
     if (file.empty()) return out;
-    const std::string zdcPath = file + ".zdc";
+    const std::string cskPath = file + ".csk";
 
-    const SidecarFileData& data = loadSidecar(zdcPath);
+    const SidecarFileData& data = loadSidecar(cskPath);
     if (!data.exists || data.byAnchor.empty()) return out;
 
     // Anchor candidates: qualified and plain names, each with an
@@ -118,10 +118,10 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
         if (it == data.byAnchor.end()) continue;
         for (const auto& entry : it->second) {
             // Reuse the one contract grammar: a sidecar clause is
-            // exactly a zd: line without the comment leader. Clause
-            // line numbers are rewritten to the ABSOLUTE .zdc line.
+            // exactly a cs: line without the comment leader. Clause
+            // line numbers are rewritten to the ABSOLUTE .csk line.
             ParsedContracts one =
-                parseContractComment("// zd: " + entry.clause + "\n");
+                parseContractComment("// cs: " + entry.clause + "\n");
             for (auto& clause : one.clauses) {
                 clause.line = entry.line;
                 out.clauses.push_back(std::move(clause));
@@ -131,7 +131,7 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
                 out.syntaxErrors.push_back(std::move(err));
             }
         }
-        if (sidecarFile) *sidecarFile = zdcPath;
+        if (sidecarFile) *sidecarFile = cskPath;
     }
     return out;
 }
@@ -148,4 +148,4 @@ void clearSidecarCache() {
     pendingIssues().clear();
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

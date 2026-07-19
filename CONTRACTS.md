@@ -1,4 +1,4 @@
-# ZeroDefect Contracts — Design Specification (v1)
+# CodeSkeptic Contracts — Design Specification (v1)
 
 Status: AGREED (co-design session 2026-07-13). This document is the
 spec the implementation is written against. Grammar and semantics
@@ -12,7 +12,7 @@ crashed anyway" — is about INTENT: the code silently stopped doing
 what it was supposed to do. Contracts close that gap:
 
 > The author (human or LLM) states intent next to the code;
-> ZeroDefect verifies the code against the stated intent,
+> CodeSkeptic verifies the code against the stated intent,
 > deterministically, on every change.
 
 The key architectural insight: **a contract is a declared function
@@ -27,15 +27,15 @@ intent, the dataflow engine checks the pin.
 ### 2.1 Primary: structured line comments
 
 ```c
-// zd: ensures return != null if n != 0
-// zd: requires p != null
-// zd: owns(cfg)
+// cs: ensures return != null if n != 0
+// cs: requires p != null
+// cs: owns(cfg)
 char *find_config(struct Cfg *cfg, const char *dir, size_t n);
 ```
 
 - Works on every codebase (C89 included), no build-system impact,
   cheap for an LLM to emit next to the code it writes.
-- One clause per line; multiple `zd:` lines may precede one function.
+- One clause per line; multiple `cs:` lines may precede one function.
 - Contract lines attach to the NEXT function declaration or
   definition; intervening blank lines and ordinary comments are
   allowed, but another declaration ends the attachment window.
@@ -43,35 +43,35 @@ char *find_config(struct Cfg *cfg, const char *dir, size_t n);
 ### 2.2 Machine-proposed contracts
 
 ```c
-// zd:ai ensures return != null
+// cs:ai ensures return != null
 ```
 
-`zd:ai` marks a contract proposed by a tool/LLM but not yet adopted
+`cs:ai` marks a contract proposed by a tool/LLM but not yet adopted
 by a human. Same grammar; different failure severity (§5).
 
-There is deliberately NO `zd:trust` tag: the bare form already means
+There is deliberately NO `cs:trust` tag: the bare form already means
 human-authored, and "trust(ed)" reads as "assume WITHOUT checking" in
 analyzer vocabulary — the opposite of what we do.
 
 ### 2.3 Policies
 
 ```c
-// zd:policy no-absolute-paths
+// cs:policy no-absolute-paths
 ```
 
 Policies are pattern prohibitions (AST-level), not dataflow claims —
 a different verification engine under a shared surface. The bare
-`zd:` form is reserved for dataflow contracts (the overwhelmingly
+`cs:` form is reserved for dataflow contracts (the overwhelmingly
 common case pays no disambiguation tax); policies carry the explicit
 `policy` tag. A policy comment at file top scopes to the file;
 project-wide policies belong in the idiom profile
-(`zerodefect.conf`, `policy = no-absolute-paths`), with file comments
+(`codeskeptic.conf`, `policy = no-absolute-paths`), with file comments
 usable for local additions.
 
 ### 2.4 Sidecar files (third-party code)
 
 For code you cannot annotate, contracts live in a sidecar:
-`src/core.c` → `src/core.c.zdc`. Entries are **explicitly anchored**
+`src/core.c` → `src/core.c.csk`. Entries are **explicitly anchored**
 — every line names its function:
 
 ```
@@ -87,19 +87,19 @@ assurance is worse than any missed finding.
 
 ### 2.5 Out of v1 (recorded, not promised)
 
-- `[[zd::...]]` C++ attributes — possible future sugar over the same
+- `[[cs::...]]` C++ attributes — possible future sugar over the same
   clauses.
 - Compiler-integrated checking (a clang plugin surfacing findings at
   build time) — a distribution question (ROADMAP §4.C), not a syntax
   question.
-- IDE affordances (accept/fix buttons for `zd:ai` proposals) — needs
+- IDE affordances (accept/fix buttons for `cs:ai` proposals) — needs
   the deferred VS Code extension; v1 surfaces the same events through
   CLI/CI reports.
 
 ## 3. Grammar (v1)
 
 ```
-contract-line := "zd:" [ "ai" ] clause
+contract-line := "cs:" [ "ai" ] clause
 clause  := "requires" pred
          | "ensures" pred [ "if" pred ]
          | "owns" "(" param-name ")"
@@ -136,7 +136,7 @@ Design notes:
 A contract the engine cannot check is a false comfort. v1 enforces
 the boundary explicitly:
 
-- **Syntax error** in a `zd:` line → analyzer error (`contract-syntax`).
+- **Syntax error** in a `cs:` line → analyzer error (`contract-syntax`).
   Never silently skipped.
 - **Parseable but outside the v1 checkable subset** → explicit
   diagnostic (`contract-unsupported`, warning): the contract is
@@ -165,23 +165,23 @@ needs next).
 
 | Event | Severity | CI effect |
 |-------|----------|-----------|
-| Declared (`zd:`) contract violated by the code | **error** | fails (exit 1) |
-| Machine-proposed (`zd:ai`) contract violated | warning | reported, does not fail |
-| `contract-syntax` (unparseable zd: line) | error | fails |
+| Declared (`cs:`) contract violated by the code | **error** | fails (exit 1) |
+| Machine-proposed (`cs:ai`) contract violated | warning | reported, does not fail |
+| `contract-syntax` (unparseable cs: line) | error | fails |
 | `contract-unsupported` (outside v1 subset) | warning | reported |
 | Inferred summary WEAKENED, no declared contract (`--summary-diff`) | configurable gate | default remains exit 1; projects may relax to warn during adoption |
 
 Rationale (resolving the drift question): a violated DECLARED
 contract must break CI — that friction is the product. The exit is
 always explicit and always visible in the diff: either fix the code
-or change the `zd:` line, and a changed `zd:` line in review IS the
+or change the `cs:` line, and a changed `cs:` line in review IS the
 audit trail of "intent changed deliberately". The softer
 "don't block the team" instinct applies to the INFERRED layer
 (summary-diff without declarations), where the gate becomes a
 per-project choice instead of an absolute rule.
 
-`zd:ai` is the adoption ramp: tools propose, humans promote a line to
-bare `zd:` by deleting three characters — the cheapest possible
+`cs:ai` is the adoption ramp: tools propose, humans promote a line to
+bare `cs:` by deleting three characters — the cheapest possible
 "reviewed and adopted" gesture.
 
 ## 6. Violation output (LLM self-repair fuel)
@@ -203,15 +203,15 @@ core.c:41: error: contract violated: 'ensures return != null if n != 0'
 
 - **B — parser + unconditional postconditions**: comment scanner +
   clause parser + attachment; `ensures return != null / != 0` checked
-  against the existing return dataflow; `zd:ai` severity split;
+  against the existing return dataflow; `cs:ai` severity split;
   `contract-syntax` / `contract-unsupported` diagnostics; tests.
 - **C — preconditions**: `requires p != null` callee seeding +
   caller-side checking; relational `requires` (fact-keyable).
 - **D — conditional postconditions + effects**: `ensures ... if g`
   per-disjunct checking; `owns/borrows/returns owned` vs the effect
   summaries.
-- **E — policies + sidecars**: `zd:policy no-absolute-paths` as the
-  first policy (the founding Ruledsl incident, immortalized); `.zdc`
+- **E — policies + sidecars**: `cs:policy no-absolute-paths` as the
+  first policy (the founding Ruledsl incident, immortalized); `.csk`
   sidecar loading with anchored entries; profile-level policies.
 
 Rule id: `contract` (one rule, clause carried in the message).

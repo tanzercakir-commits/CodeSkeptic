@@ -1,4 +1,4 @@
-add_library(zerodefect_core STATIC
+add_library(codeskeptic_core STATIC
     core/Messages.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
@@ -40,21 +40,21 @@ add_library(zerodefect_core STATIC
     contracts/Sidecar.cpp
 )
 
-add_executable(zerodefect main.cpp)
-target_link_libraries(zerodefect PRIVATE zerodefect_core)
+add_executable(codeskeptic main.cpp)
+target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 
-target_include_directories(zerodefect_core
+target_include_directories(codeskeptic_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_include_directories(zerodefect_core SYSTEM
+target_include_directories(codeskeptic_core SYSTEM
     PUBLIC ${LLVM_INCLUDE_DIRS} ${CLANG_INCLUDE_DIRS}
 )
 
-target_compile_definitions(zerodefect_core
+target_compile_definitions(codeskeptic_core
     PUBLIC ${LLVM_DEFINITIONS}
     # Single source of truth for the version: project(VERSION ...) above
-    PUBLIC ZERODEFECT_VERSION="${PROJECT_VERSION}"
+    PUBLIC CODESKEPTIC_VERSION="${PROJECT_VERSION}"
 )
 
 # Clang resource dir (for intrinsic headers such as stddef.h, stdarg.h)
@@ -64,7 +64,7 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 if(CLANG_RESOURCE_DIR)
-    target_compile_definitions(zerodefect_core PRIVATE
+    target_compile_definitions(codeskeptic_core PRIVATE
         CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR}"
     )
     message(STATUS "Clang resource dir: ${CLANG_RESOURCE_DIR}")
@@ -78,7 +78,7 @@ if(APPLE)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     if(MACOS_SDK_PATH)
-        target_compile_definitions(zerodefect_core PRIVATE
+        target_compile_definitions(codeskeptic_core PRIVATE
             MACOS_SDK_PATH="${MACOS_SDK_PATH}"
         )
         message(STATUS "macOS SDK path: ${MACOS_SDK_PATH}")
@@ -86,10 +86,10 @@ if(APPLE)
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
-    target_compile_options(zerodefect_core PUBLIC -fno-rtti)
+    target_compile_options(codeskeptic_core PUBLIC -fno-rtti)
 endif()
 
-target_link_libraries(zerodefect_core
+target_link_libraries(codeskeptic_core
     PUBLIC
         clangTooling
         clangFrontend

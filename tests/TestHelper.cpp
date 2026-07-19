@@ -15,29 +15,29 @@ namespace {
 
 class TestASTConsumer : public clang::ASTConsumer {
 public:
-    TestASTConsumer(zerodefect::Rule& rule, zerodefect::DiagnosticList& results)
+    TestASTConsumer(codeskeptic::Rule& rule, codeskeptic::DiagnosticList& results)
         : rule_(rule), results_(results) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
         // As RuleEngine::runAll does in production: summaries are built
         // before the rule and cleared when the TU ends (no dangling
         // pointers)
-        zerodefect::SummaryRegistry::instance().rebuild(ctx);
+        codeskeptic::SummaryRegistry::instance().rebuild(ctx);
         rule_.check(ctx, results_);
-        zerodefect::SummaryRegistry::instance().clear();
-        zerodefect::CfgCache::instance().clear();
-        zerodefect::ParamIntervalCache::instance().clear();
-        zerodefect::clearSidecarCache();
+        codeskeptic::SummaryRegistry::instance().clear();
+        codeskeptic::CfgCache::instance().clear();
+        codeskeptic::ParamIntervalCache::instance().clear();
+        codeskeptic::clearSidecarCache();
     }
 
 private:
-    zerodefect::Rule& rule_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::Rule& rule_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 class TestAction : public clang::ASTFrontendAction {
 public:
-    TestAction(zerodefect::Rule& rule, zerodefect::DiagnosticList& results)
+    TestAction(codeskeptic::Rule& rule, codeskeptic::DiagnosticList& results)
         : rule_(rule), results_(results) {}
 
     std::unique_ptr<clang::ASTConsumer>
@@ -47,19 +47,19 @@ public:
     }
 
 private:
-    zerodefect::Rule& rule_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::Rule& rule_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 // Test counterpart of whole-program pass 1: summary harvesting only
 class HarvestASTConsumer : public clang::ASTConsumer {
 public:
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
-        auto& registry = zerodefect::SummaryRegistry::instance();
+        auto& registry = codeskeptic::SummaryRegistry::instance();
         registry.rebuild(ctx);
         registry.harvestGlobal();
         registry.clear();
-        zerodefect::CfgCache::instance().clear();
+        codeskeptic::CfgCache::instance().clear();
     }
 };
 
@@ -74,7 +74,7 @@ public:
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 namespace testing {
 
 DiagnosticList runRule(Rule& rule, const std::string& code,
@@ -102,4 +102,4 @@ DiagnosticList runRuleCrossTU(Rule& rule, const std::string& calleeTU,
 }
 
 } // namespace testing
-} // namespace zerodefect
+} // namespace codeskeptic

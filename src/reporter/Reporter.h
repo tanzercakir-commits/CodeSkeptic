@@ -1,11 +1,11 @@
-#ifndef ZERODEFECT_REPORTER_H
-#define ZERODEFECT_REPORTER_H
+#ifndef CODESKEPTIC_REPORTER_H
+#define CODESKEPTIC_REPORTER_H
 
 #include "core/Diagnostic.h"
 
 #include <string>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class Reporter {
 public:
@@ -15,6 +15,6 @@ public:
     virtual std::string format() const = 0;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_REPORTER_H
+#endif // CODESKEPTIC_REPORTER_H

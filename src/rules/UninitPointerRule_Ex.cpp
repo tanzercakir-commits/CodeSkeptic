@@ -260,17 +260,17 @@ public:
     // pattern — `if(staticTrue) data = ...; ... if(staticTrue) use(data);`
     // — produced a false "may not be assigned" under correlation-free
     // analysis. The shared machinery is in engine/GuardedDisjuncts.h.
-    using State = zerodefect::GuardedState<PtrVarState>;
+    using State = codeskeptic::GuardedState<PtrVarState>;
 
     UninitPtrAnalysis(const std::vector<const VarDecl*>& trackedVars,
                       std::set<const ValueDecl*> unkeyableDecls,
                       std::set<const ValueDecl*> stampableDecls,
                       const FunctionDecl* func,
-                      zerodefect::DiagnosticList& results)
+                      codeskeptic::DiagnosticList& results)
         : mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)), func_(func),
           funcName_(func->getQualifiedNameAsString()), results_(results) {
-        zerodefect::Guarded<PtrVarState> init;
+        codeskeptic::Guarded<PtrVarState> init;
         for (const auto* var : trackedVars)
             init.vars[var] = PtrState::Uninit;
         initState_.push_back(std::move(init));
@@ -282,7 +282,7 @@ public:
     // the number of disjuncts multiplies the height
     unsigned latticeHeight() const {
         return (static_cast<unsigned>(initState_.front().vars.size()) * 2 +
-                1) * static_cast<unsigned>(zerodefect::kMaxDisjuncts) + 4 + factBudget();
+                1) * static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
     // Fact records add lattice climbs the var-state formula above
@@ -291,15 +291,15 @@ public:
     unsigned factBudget() const {
         auto n = static_cast<unsigned>(stampable_.size());
         return (n > 16 ? 16u : n) * 2 *
-               static_cast<unsigned>(zerodefect::kMaxDisjuncts);
+               static_cast<unsigned>(codeskeptic::kMaxDisjuncts);
     }
 
     // Engine convergence hook: collapse the disjuncts when a block is
     // revisited beyond any monotone explanation (see DataflowEngine).
-    void widen(State& s) const { zerodefect::widenGuarded(s, mergePtrStates); }
+    void widen(State& s) const { codeskeptic::widenGuarded(s, mergePtrStates); }
 
     State merge(const State& a, const State& b) const {
-        return zerodefect::mergeGuarded(a, b, mergePtrStates);
+        return codeskeptic::mergeGuarded(a, b, mergePtrStates);
     }
 
     State transfer(const Stmt* stmt, const State& inRaw,
@@ -307,7 +307,7 @@ public:
         // Fact lifecycle first (v2b): see NullDerefRule — erase facts
         // on assigned locals, stamp integer-constant stores.
         State in = inRaw;
-        zerodefect::applyStmtFacts(in, stmt, stampable_, mergePtrStates);
+        codeskeptic::applyStmtFacts(in, stmt, stampable_, mergePtrStates);
 
         // `f(p)` with a non-const reference parameter (`T*& p`) is an
         // out-param assignment with no AddrOf node to observe — the
@@ -315,7 +315,7 @@ public:
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             State out = in;
             bool changed = false;
-            zerodefect::forEachNonConstRefArg(call, [&](const Expr* arg) {
+            codeskeptic::forEachNonConstRefArg(call, [&](const Expr* arg) {
                 const VarDecl* var = asVar(arg);
                 if (!var) return;
                 for (auto& d : out) {
@@ -341,7 +341,7 @@ public:
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
-        zerodefect::refineGuardedFacts(state, dyn_cast<Expr>(cond),
+        codeskeptic::refineGuardedFacts(state, dyn_cast<Expr>(cond),
                                        isTrueBranch, mutated_,
                                        mergePtrStates);
     }
@@ -352,7 +352,7 @@ public:
         if (effect.kind != EffectKind::Dereferences) return;
 
         PtrVarState before =
-            zerodefect::flattenGuarded(beforeDisjuncts, mergePtrStates);
+            codeskeptic::flattenGuarded(beforeDisjuncts, mergePtrStates);
         auto it = before.find(effect.var);
         if (it == before.end() || it->second == PtrState::Init) return;
 
@@ -365,33 +365,33 @@ public:
         unsigned line = sm.getSpellingLineNumber(loc);
 
         if (reported_.emplace(effect.var, line).second) {
-            zerodefect::Diagnostic diag;
+            codeskeptic::Diagnostic diag;
             // Evidence ladder (aligned with every other rule,
             // 2026-07-16): unassigned on ALL paths = proven = Error;
             // unassigned on SOME path = "may" = Warning. Reporting the
             // maybe-class as Error made every imprecision in this rule
             // a false PROOF — the worst defect our own spec names.
             diag.severity = (it->second == PtrState::Uninit)
-                                ? zerodefect::Severity::Error
-                                : zerodefect::Severity::Warning;
+                                ? codeskeptic::Severity::Error
+                                : codeskeptic::Severity::Warning;
             diag.file = sm.getFilename(loc).str();
             diag.line = line;
             diag.column = sm.getSpellingColumnNumber(loc);
             diag.rule_id = "uninit-ptr";
             diag.function = funcName_;
-            diag.message = zerodefect::msg(
-                zerodefect::MsgId::UninitPtrDeref,
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::UninitPtrDeref,
                 effect.var->getNameAsString());
 
             // Trace: declaration point (definition without an initial value)
             SourceLocation declLoc =
                 sm.getExpansionLoc(effect.var->getLocation());
-            zerodefect::TraceNote note;
+            codeskeptic::TraceNote note;
             note.file = sm.getFilename(declLoc).str();
             note.line = sm.getSpellingLineNumber(declLoc);
             note.column = sm.getSpellingColumnNumber(declLoc);
-            note.message = zerodefect::msg(
-                zerodefect::MsgId::TraceDeclaredHere,
+            note.message = codeskeptic::msg(
+                codeskeptic::MsgId::TraceDeclaredHere,
                 effect.var->getNameAsString());
             diag.notes.push_back(std::move(note));
 
@@ -404,7 +404,7 @@ private:
     std::set<const ValueDecl*> stampable_;
     const FunctionDecl* func_ = nullptr;
     std::string funcName_;
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
     State initState_;
     std::set<std::pair<const VarDecl*, unsigned>> reported_;
 };
@@ -413,7 +413,7 @@ private:
 
 class FindUninitPtrCallback : public MatchFinder::MatchCallback {
 public:
-    explicit FindUninitPtrCallback(zerodefect::DiagnosticList& results)
+    explicit FindUninitPtrCallback(codeskeptic::DiagnosticList& results)
         : results_(results) {}
 
     void run(const MatchFinder::MatchResult& result) override {
@@ -422,28 +422,28 @@ public:
 
         const SourceManager& sm = *result.SourceManager;
         if (sm.isInSystemHeader(func->getLocation())) return;
-        if (!zerodefect::functionFilterAllows(*func)) return;
-        if (!zerodefect::lineFilterAllows(*func, sm)) return;
+        if (!codeskeptic::functionFilterAllows(*func)) return;
+        if (!codeskeptic::lineFilterAllows(*func, sm)) return;
 
         auto trackedVars = collectTrackedVars(func, *result.Context);
         if (trackedVars.empty()) return;
 
         UninitPtrAnalysis analysis(
-            trackedVars, zerodefect::collectUnkeyableDecls(func),
-            zerodefect::collectFactDecls(func), func, results_);
-        auto df = zerodefect::runDataflow(func, *result.Context, analysis);
+            trackedVars, codeskeptic::collectUnkeyableDecls(func),
+            codeskeptic::collectFactDecls(func), func, results_);
+        auto df = codeskeptic::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
-            zerodefect::CoverageReport::instance().recordNonConvergence(
+            codeskeptic::CoverageReport::instance().recordNonConvergence(
                 func->getQualifiedNameAsString());
     }
 
 private:
-    zerodefect::DiagnosticList& results_;
+    codeskeptic::DiagnosticList& results_;
 };
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::string UninitPointerRule_Ex::id() const {
     return "uninit-ptr";
@@ -471,4 +471,4 @@ void UninitPointerRule_Ex::check(clang::ASTContext& ctx,
     finder.matchAST(ctx);
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

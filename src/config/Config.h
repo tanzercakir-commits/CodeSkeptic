@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_CONFIG_H
-#define ZERODEFECT_CONFIG_H
+#ifndef CODESKEPTIC_CONFIG_H
+#define CODESKEPTIC_CONFIG_H
 
 #include "core/Diagnostic.h"
 
@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class Config {
 public:
@@ -113,8 +113,8 @@ public:
     }
 
     // Project-wide policies (CONTRACTS.md Round E): `policy = <name>`
-    // in .zerodefect.conf or --policy on the CLI; file-scoped
-    // activation stays in `// zd:policy` comments.
+    // in .codeskeptic.conf or --policy on the CLI; file-scoped
+    // activation stays in `// cs:policy` comments.
     const std::set<std::string>& policies() const { return policies_; }
 
     // Summary-diff gate (CONTRACTS.md §5): "error" (default) exits 1
@@ -158,6 +158,6 @@ private:
     std::set<std::string> disabled_rules_;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONFIG_H
+#endif // CODESKEPTIC_CONFIG_H

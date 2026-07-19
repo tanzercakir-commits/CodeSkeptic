@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_CONTRACT_INFO_H
-#define ZERODEFECT_CONTRACT_INFO_H
+#ifndef CODESKEPTIC_CONTRACT_INFO_H
+#define CODESKEPTIC_CONTRACT_INFO_H
 
 // Rule-consumable view of a function's contracts (CONTRACTS.md,
 // Round C). ContractRule owns REPORTING decisions; the dataflow rules
@@ -21,10 +21,10 @@ class Expr;
 class FunctionDecl;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Fetches the raw comment attached to the declaration and parses its
-// zd: lines. Also usable on declarations without a body (headers) —
+// cs: lines. Also usable on declarations without a body (headers) —
 // that is how caller-side checks see contracts of out-of-TU callees.
 // commentLine receives the 1-based source line of the comment block
 // start (0 when there is no comment).
@@ -33,7 +33,7 @@ ParsedContracts contractsForDecl(const clang::FunctionDecl* func,
                                  unsigned* commentLine = nullptr,
                                  std::string* commentFile = nullptr);
 
-// Inline comment clauses MERGED with the declaring file's .zdc
+// Inline comment clauses MERGED with the declaring file's .csk
 // sidecar clauses (Round E): what the ENFORCING rules consume —
 // seeding and call-site checks must not care where a contract was
 // written. ContractRule keeps the two sources separate for reporting
@@ -111,6 +111,6 @@ bool evalCmp(long long value, ContractCmpOp op, long long literal);
 // compareFact/normalizeCompare canonicalize.
 clang::BinaryOperatorKind toBinaryOp(ContractCmpOp op);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_CONTRACT_INFO_H
+#endif // CODESKEPTIC_CONTRACT_INFO_H

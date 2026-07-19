@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_RULE_ENGINE_H
-#define ZERODEFECT_RULE_ENGINE_H
+#ifndef CODESKEPTIC_RULE_ENGINE_H
+#define CODESKEPTIC_RULE_ENGINE_H
 
 #include "core/Diagnostic.h"
 #include "core/Rule.h"
@@ -13,7 +13,7 @@ namespace clang {
 class ASTContext;
 }
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class RuleEngine {
 public:
@@ -38,6 +38,6 @@ private:
     bool harvest_global_ = false;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_RULE_ENGINE_H
+#endif // CODESKEPTIC_RULE_ENGINE_H

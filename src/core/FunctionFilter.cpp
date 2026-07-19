@@ -3,7 +3,7 @@
 #include <clang/AST/Decl.h>
 #include <clang/Basic/SourceManager.h>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 std::set<std::string> g_filter;
@@ -46,4 +46,4 @@ bool lineFilterAllows(const clang::FunctionDecl& func,
     return false;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

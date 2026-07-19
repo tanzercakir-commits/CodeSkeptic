@@ -3,7 +3,7 @@
 #include <cctype>
 #include <optional>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
@@ -236,7 +236,7 @@ private:
     bool failed_ = false;
 };
 
-// Parses ONE clause body (the text after "zd:"/"zd:ai"). Returns
+// Parses ONE clause body (the text after "cs:"/"cs:ai"). Returns
 // nullopt on any syntax problem — the caller records the line.
 std::optional<ContractClause> parseClauseBody(const std::string& body) {
     Parser p(body);
@@ -350,11 +350,11 @@ ParsedContracts parseContractComment(const std::string& commentText) {
         start = (end == std::string::npos) ? commentText.size() + 1 : end + 1;
 
         std::string line = stripCommentLine(rawLine);
-        if (line.rfind("zd:", 0) != 0) continue;
+        if (line.rfind("cs:", 0) != 0) continue;
 
         std::string body = line.substr(3);
         bool machine = false;
-        // "zd:ai <clause>" — the tag is glued to the prefix.
+        // "cs:ai <clause>" — the tag is glued to the prefix.
         if (body.rfind("ai", 0) == 0 &&
             (body.size() == 2 ||
              std::isspace(static_cast<unsigned char>(body[2])))) {
@@ -377,4 +377,4 @@ ParsedContracts parseContractComment(const std::string& commentText) {
     return out;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

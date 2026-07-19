@@ -25,7 +25,7 @@ std::string escapeJson(const std::string& s) {
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 JsonReporter::JsonReporter(const std::string& output_path)
     : output_path_(output_path) {}
@@ -38,7 +38,7 @@ void JsonReporter::report(const DiagnosticList& diagnostics) {
     }
 
     file << "{\n";
-    file << "  \"tool\": \"ZeroDefect\",\n";
+    file << "  \"tool\": \"CodeSkeptic\",\n";
     file << "  \"total\": " << diagnostics.size() << ",\n";
     file << "  \"diagnostics\": [";
 
@@ -76,4 +76,4 @@ std::string JsonReporter::format() const {
     return "json";
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

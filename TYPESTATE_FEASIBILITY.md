@@ -100,7 +100,7 @@ Per the intent-verification discipline (extracted intent is a
    the direct analogue of `isIntrinsicNullSource` — key on the callee's
    contract, never on caller data.
 2. **Declared** — the author (or the AI, via MCP) writes a protocol in a
-   `.zdc` sidecar (the CONTRACTS.md DSL already exists). This is where a
+   `.csk` sidecar (the CONTRACTS.md DSL already exists). This is where a
    *custom* object's lifecycle (the bitcoin `BlockTemplate`
    create/destroy) gets checked.
 3. **Inferred-as-question** — names betray protocol roles
@@ -136,7 +136,7 @@ Why `FILE*` first:
 - It maps to real NIST Juliet CWEs (CWE-775, CWE-404) → a ready-made
   guard corpus (see §5).
 
-Explicitly **out of v1** (documented, deferred): custom `.zdc` protocols
+Explicitly **out of v1** (documented, deferred): custom `.csk` protocols
 (source 2), name-inferred protocols (source 3), cross-function handle
 ownership (needs a typestate summary — the interprocedural version),
 alias sets beyond the sole-definition discipline.
@@ -194,7 +194,7 @@ bar. (This is the "ilerleyemezsek askıya alırız" clause, made executable.)
   typestate to a protocol id; add fopen/fclose/use recognition; unit
   pins; Juliet CWE775/404 floor; corpus gate. Estimate: comparable to one
   recall PR (#95/#96 scale). This is the real go/no-go.
-- **Phase 2 — declarable protocols (`.zdc`):** a protocol DSL over the
+- **Phase 2 — declarable protocols (`.csk`):** a protocol DSL over the
   existing contract parser; no engine change. Only if Phase 1 clears.
 - **Phase 3 — name-inferred protocols (question-with-proof):** the
   AssumptionRule posture applied to protocols. Only if Phases 1–2 hold.

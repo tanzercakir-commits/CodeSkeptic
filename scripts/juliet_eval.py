@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Juliet evaluator.
 
-Scores zerodefect's --json output using the Juliet naming convention:
+Scores codeskeptic's --json output using the Juliet naming convention:
   - Finding in a function whose name contains 'bad'  -> TP (true positive)
   - Finding in a function whose name contains 'good' -> FP (false positive)
   - Everything else (helpers, main, etc.)            -> not counted (other)

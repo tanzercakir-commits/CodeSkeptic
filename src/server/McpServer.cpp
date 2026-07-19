@@ -24,11 +24,11 @@ namespace json = llvm::json;
 namespace {
 
 const char kProtocolVersion[] = "2024-11-05";
-const char kServerName[] = "zerodefect";
-#ifndef ZERODEFECT_VERSION
-#define ZERODEFECT_VERSION "0.0.0-dev"
+const char kServerName[] = "codeskeptic";
+#ifndef CODESKEPTIC_VERSION
+#define CODESKEPTIC_VERSION "0.0.0-dev"
 #endif
-const char kServerVersion[] = ZERODEFECT_VERSION;
+const char kServerVersion[] = CODESKEPTIC_VERSION;
 
 std::string serialize(const json::Value& value) {
     std::string out;
@@ -125,7 +125,7 @@ json::Value handleToolsList(const json::Value& id) {
         {"tools", json::Array{json::Object{
             {"name", "analyze"},
             {"description",
-             "Run ZeroDefect static analysis (uninitialized pointers, "
+             "Run CodeSkeptic static analysis (uninitialized pointers, "
              "memory leaks, double free, use-after-free, division by "
              "zero, null dereference). Findings include dataflow traces "
              "explaining the event chain that leads to each bug."},
@@ -139,7 +139,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     auto path = args->getString("path");
     if (!path) return makeError(id, -32602, "missing required field: path");
 
-    zerodefect::Config config;
+    codeskeptic::Config config;
     config.setSourcePath(path->str());
     if (auto buildPath = args->getString("build_path"))
         config.setBuildPath(buildPath->str());
@@ -159,16 +159,16 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     // fingerprint catches staleness — a stale AST is NEVER served)
     config.setWarmCache(true);
 
-    zerodefect::StaticAnalyzer analyzer(std::move(config));
-    analyzer.addRule<zerodefect::UninitPointerRule_Ex>();
-    analyzer.addRule<zerodefect::MemoryLeakRule_Ex>();
-    analyzer.addRule<zerodefect::DivByZeroRule>();
-    analyzer.addRule<zerodefect::IntOverflowRule>();
-    analyzer.addRule<zerodefect::BoundsRule>();
-    analyzer.addRule<zerodefect::AssumptionRule>();
-    analyzer.addRule<zerodefect::NullDerefRule>();
-    analyzer.addRule<zerodefect::ContractRule>();
-    analyzer.addRule<zerodefect::PolicyRule>();
+    codeskeptic::StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
+    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
+    analyzer.addRule<codeskeptic::DivByZeroRule>();
+    analyzer.addRule<codeskeptic::IntOverflowRule>();
+    analyzer.addRule<codeskeptic::BoundsRule>();
+    analyzer.addRule<codeskeptic::AssumptionRule>();
+    analyzer.addRule<codeskeptic::NullDerefRule>();
+    analyzer.addRule<codeskeptic::ContractRule>();
+    analyzer.addRule<codeskeptic::PolicyRule>();
     analyzer.run();
 
     json::Array findings;
@@ -221,7 +221,7 @@ json::Value handleToolsCall(const json::Value& id,
 
 } // anonymous namespace
 
-namespace zerodefect {
+namespace codeskeptic {
 
 std::string handleMcpMessage(const std::string& line) {
     auto parsed = json::parse(line);
@@ -279,4 +279,4 @@ int runMcpServer() {
     return 0;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

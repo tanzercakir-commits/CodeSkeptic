@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_GUARDED_DISJUNCTS_H
-#define ZERODEFECT_GUARDED_DISJUNCTS_H
+#ifndef CODESKEPTIC_GUARDED_DISJUNCTS_H
+#define CODESKEPTIC_GUARDED_DISJUNCTS_H
 
 // Guarded-disjunct state: the data structure of targeted path
 // sensitivity.
@@ -33,7 +33,7 @@
 #include <set>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 template <typename VarMap>
 struct Guarded {
@@ -563,6 +563,6 @@ bool applyStmtFactsOps(GuardedState<VarMap>& state, const clang::Stmt* stmt,
     return changed;
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_GUARDED_DISJUNCTS_H
+#endif // CODESKEPTIC_GUARDED_DISJUNCTS_H

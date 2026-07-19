@@ -1,9 +1,9 @@
-#ifndef ZERODEFECT_MEMORY_LEAK_RULE_EX_H
-#define ZERODEFECT_MEMORY_LEAK_RULE_EX_H
+#ifndef CODESKEPTIC_MEMORY_LEAK_RULE_EX_H
+#define CODESKEPTIC_MEMORY_LEAK_RULE_EX_H
 
 #include "core/Rule.h"
 
-namespace zerodefect {
+namespace codeskeptic {
 
 class MemoryLeakRule_Ex : public Rule {
 public:
@@ -13,6 +13,6 @@ public:
     void check(clang::ASTContext& ctx, DiagnosticList& results) override;
 };
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_MEMORY_LEAK_RULE_EX_H
+#endif // CODESKEPTIC_MEMORY_LEAK_RULE_EX_H

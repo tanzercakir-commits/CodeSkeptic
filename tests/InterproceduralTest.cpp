@@ -18,8 +18,8 @@
 #include <map>
 #include <string>
 
-using namespace zerodefect;
-using namespace zerodefect::testing;
+using namespace codeskeptic;
+using namespace codeskeptic::testing;
 
 // ===================================================================
 // Return nullness
@@ -770,7 +770,7 @@ struct GlobalStoreGuard {
 TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     GlobalStoreGuard guard;
     const std::string content =
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "alpha/1\tN\tR\tU\n"
         "beta/2\tM\tOF\tM\n"
         "gamma/0\tU\t-\tN\n";
@@ -785,7 +785,7 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // #69b format bump: save always writes v3 (extra null-condition
     // column, "-" when absent); loading old v1/v2 stays accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v3\n"
+              "codeskeptic-summaries v3\n"
               "alpha/1\tN\tR\tU\t-\n"
               "beta/2\tM\tOF\tM\t-\n"
               "gamma/0\tU\t-\tN\t-\n");
@@ -796,7 +796,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     // — old harvest files keep working in the new version
     GlobalStoreGuard guard;
     auto v1Path = writePersistFile("sum_v1_compat.txt",
-        "zerodefect-summaries v1\n"
+        "codeskeptic-summaries v1\n"
         "legacy/1\tN\tR\n");
 
     auto& registry = SummaryRegistry::instance();
@@ -806,16 +806,16 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v3\nlegacy/1\tN\tR\tU\t-\n");
+              "codeskeptic-summaries v3\nlegacy/1\tN\tR\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     GlobalStoreGuard guard;
     auto pathA = writePersistFile("sum_conflict_a.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "foo/1\tN\tR\tN\n");
     auto pathB = writePersistFile("sum_conflict_b.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "foo/1\tM\tF\tM\n");
 
     auto& registry = SummaryRegistry::instance();
@@ -828,7 +828,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v3\nfoo/1\tU\tO\tU\t-\n");
+              "codeskeptic-summaries v3\nfoo/1\tU\tO\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -836,7 +836,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto& registry = SummaryRegistry::instance();
 
     auto good = writePersistFile("sum_good.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "keep/1\tN\tR\tU\n");
     ASSERT_TRUE(registry.loadGlobal(good));
 
@@ -849,20 +849,20 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     // the ENTIRE file is rejected — we don't take the earlier valid
     // line either
     auto badLine = writePersistFile("sum_bad_line.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "bar/1\tN\tR\tU\n"
         "baz/1\tX\tqq\tU\n");
     EXPECT_FALSE(registry.loadGlobal(badLine));
 
     // Line with missing fields: reject
     auto badFields = writePersistFile("sum_bad_fields.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "noeffects/1\tN\n");
     EXPECT_FALSE(registry.loadGlobal(badFields));
 
     // Line with extra fields: reject (not an unknown future format)
     auto extraFields = writePersistFile("sum_extra_fields.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "extra/1\tN\tR\tU\tX\n");
     EXPECT_FALSE(registry.loadGlobal(extraFields));
 
@@ -871,7 +871,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "zerodefect-summaries v3\nkeep/1\tN\tR\tU\t-\n");
+              "codeskeptic-summaries v3\nkeep/1\tN\tR\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1074,7 +1074,7 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
     // break correctness, at worst it carries missing/extra claims)
     GlobalStoreGuard guard;
     auto sumPath = writePersistFile("sum_stale.txt",
-        "zerodefect-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
     auto src = writePersistFile("sum_stale_caller.cpp", R"(
         int* find(int c);
         void f(int c) {
@@ -1308,11 +1308,11 @@ TEST(ConditionedNullTest, V3FileRoundtrip) {
     // Handcrafted v3 line → parse → assert fields; load → save →
     // re-parse → identical condition (serialization both ways).
     const std::string dir = ::testing::TempDir();
-    const std::string p1 = dir + "/zd_sum_v3_in.txt";
-    const std::string p2 = dir + "/zd_sum_v3_out.txt";
+    const std::string p1 = dir + "/cs_sum_v3_in.txt";
+    const std::string p2 = dir + "/cs_sum_v3_out.txt";
     {
         std::ofstream out(p1);
-        out << "zerodefect-summaries v3\n";
+        out << "codeskeptic-summaries v3\n";
         out << "getHuffVal/1\tM\tR\tU\t0:0:3\n";
         out << "plainMaybe/1\tM\tR\tU\t-\n";
     }

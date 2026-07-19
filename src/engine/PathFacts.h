@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_PATH_FACTS_H
-#define ZERODEFECT_PATH_FACTS_H
+#ifndef CODESKEPTIC_PATH_FACTS_H
+#define CODESKEPTIC_PATH_FACTS_H
 
 // Condition facts (path facts) for targeted path sensitivity.
 //
@@ -41,7 +41,7 @@
 #include <tuple>
 #include <utility>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Canonical condition key: "var REL literal". REL is only EQ/LT/LE —
 // NE/GT/GE reduce to these by flipping the value (X!=5 ≡ !(X==5)).
@@ -149,6 +149,6 @@ std::optional<std::pair<FactKey, bool>> compareFact(
 bool factsContradict(const std::map<FactKey, bool>& facts,
                      const FactKey& key, bool wanted);
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_PATH_FACTS_H
+#endif // CODESKEPTIC_PATH_FACTS_H

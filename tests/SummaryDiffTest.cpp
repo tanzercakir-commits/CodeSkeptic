@@ -10,7 +10,7 @@
 #include <sstream>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 using RN = SummaryRegistry::ReturnNullness;
 using RZ = SummaryRegistry::ReturnZeroness;
 using PE = SummaryRegistry::ParamEffect;
@@ -101,13 +101,13 @@ TEST(SummaryDiffTest, IdenticalHarvests_NoChanges) {
 
 TEST(SummaryDiffTest, ReportEndToEnd_ExitCodes) {
     auto oldPath = writeFile("sd_old.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "find/1\tN\t-\tU\n");
     auto newPathWeak = writeFile("sd_new_weak.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "find/1\tM\t-\tU\n");
     auto newPathSame = writeFile("sd_new_same.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "find/1\tN\t-\tU\n");
 
     std::ostringstream out;
@@ -127,10 +127,10 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     // --gate warn (CONTRACTS.md §5): the adoption ramp — WEAKENED is
     // still fully visible in the output, only the exit code relaxes.
     auto oldPath = writeFile("sd_gate_old.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "find/1\tN\t-\tU\n");
     auto newPathWeak = writeFile("sd_gate_new.txt",
-        "zerodefect-summaries v2\n"
+        "codeskeptic-summaries v2\n"
         "find/1\tM\t-\tU\n");
 
     std::ostringstream out;

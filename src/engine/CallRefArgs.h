@@ -1,5 +1,5 @@
-#ifndef ZERODEFECT_ENGINE_CALLREFARGS_H
-#define ZERODEFECT_ENGINE_CALLREFARGS_H
+#ifndef CODESKEPTIC_ENGINE_CALLREFARGS_H
+#define CODESKEPTIC_ENGINE_CALLREFARGS_H
 
 #include <clang/AST/Decl.h>
 #include <clang/AST/DeclCXX.h>
@@ -7,7 +7,7 @@
 #include <clang/AST/ExprCXX.h>
 #include <clang/AST/Type.h>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 // Calls the callback for every argument that binds to a NON-CONST
 // reference parameter of the callee. Such a parameter is an out-param:
@@ -71,6 +71,6 @@ void forEachNonConstRefArg(const clang::CallExpr* call, Callback cb) {
     }
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic
 
-#endif // ZERODEFECT_ENGINE_CALLREFARGS_H
+#endif // CODESKEPTIC_ENGINE_CALLREFARGS_H

@@ -7,11 +7,11 @@
 #include <set>
 #include <vector>
 
-namespace zerodefect {
+namespace codeskeptic {
 
 namespace {
 
-constexpr const char* kHeaderV2 = "# zerodefect-baseline v2";
+constexpr const char* kHeaderV2 = "# codeskeptic-baseline v2";
 
 std::string trimmed(const std::string& s) {
     const char* ws = " \t\r\n";
@@ -131,4 +131,4 @@ size_t Baseline::filter(DiagnosticList& diagnostics) const {
     return before - diagnostics.size();
 }
 
-} // namespace zerodefect
+} // namespace codeskeptic

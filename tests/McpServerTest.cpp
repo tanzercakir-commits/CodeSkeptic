@@ -7,7 +7,7 @@
 #include <string>
 #include <gtest/gtest.h>
 
-using namespace zerodefect;
+using namespace codeskeptic;
 
 namespace {
 
@@ -25,7 +25,7 @@ TEST(McpServerTest, Initialize) {
     auto response = handleMcpMessage(
         R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}})");
     EXPECT_NE(response.find("\"protocolVersion\""), std::string::npos);
-    EXPECT_NE(response.find("zerodefect"), std::string::npos);
+    EXPECT_NE(response.find("codeskeptic"), std::string::npos);
     EXPECT_NE(response.find("\"tools\""), std::string::npos);
 }
 
@@ -121,8 +121,8 @@ TEST(McpServerTest, FilterStateResetAfterScopedAnalyze) {
         R"(","functions":"second","lines":"1-2"}}})";
     handleMcpMessage(request);
 
-    EXPECT_TRUE(zerodefect::functionFilter().empty());
-    EXPECT_TRUE(zerodefect::lineRanges().empty());
+    EXPECT_TRUE(codeskeptic::functionFilter().empty());
+    EXPECT_TRUE(codeskeptic::lineRanges().empty());
 }
 
 namespace {
@@ -210,7 +210,7 @@ TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
         }
     )");
     auto sumPath = writeTempSource("mcp_sum_store.txt",
-        "zerodefect-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
 
     auto without = handleMcpMessage(
         std::string(R"({"jsonrpc":"2.0","id":30,"method":"tools/call",)") +
