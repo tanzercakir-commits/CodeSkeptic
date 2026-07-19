@@ -1411,3 +1411,39 @@ TEST(OwningPointerTest, LambdaNotCapturingPtr_LeakStays) {
     )");
     ASSERT_EQ(results.size(), 1);
 }
+
+// Real-world regression pin: tensorflow/tensorflow #123387 (still open).
+// TFLite rfft2d Rfft2dHelper allocates fft_input_output, then a
+// temporary-tensor lookup (TF_LITE_ENSURE_OK) can return early before the
+// delete[] — leaking the FFT work buffer on the error path. Conditional
+// leak -> Warning. Body reduced from the real function to parseable stubs.
+TEST(MemoryLeakRuleExTest, TFLite_123387_Rfft2dWorkBufferLeak_Reports) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        enum TfLiteStatus { kTfLiteOk = 0, kTfLiteError = 1 };
+        struct TfLiteContext; struct TfLiteNode; struct TfLiteTensor;
+        TfLiteStatus GetTemporarySafe(TfLiteContext*, TfLiteNode*, int, TfLiteTensor**);
+        TfLiteStatus Rfft2dHelper(TfLiteContext* context, TfLiteNode* node,
+                                  int fft_height, int fft_width) {
+            double** fft_input_output = new double*[fft_height];
+            for (int i = 0; i < fft_height; ++i) {
+                fft_input_output[i] = new double[fft_width + 2];
+            }
+            TfLiteTensor* fft_integer_working_area;
+            if (GetTemporarySafe(context, node, 0, &fft_integer_working_area) != kTfLiteOk)
+                return kTfLiteError;
+            TfLiteTensor* fft_double_working_area;
+            if (GetTemporarySafe(context, node, 1, &fft_double_working_area) != kTfLiteOk)
+                return kTfLiteError;
+            for (int i = 0; i < fft_height; ++i) { delete[] fft_input_output[i]; }
+            delete[] fft_input_output;
+            return kTfLiteOk;
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    bool found = false;
+    for (const auto& d : results) {
+        if (d.rule_id == "memory-leak" && d.severity == Severity::Warning) found = true;
+    }
+    EXPECT_TRUE(found);
+}

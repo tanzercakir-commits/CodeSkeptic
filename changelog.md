@@ -1,5 +1,29 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-19 — Regression pins: three open real-world bugs
+
+Re-ran the current binary against the three real, still-open upstream
+defects CodeSkeptic reported, and locked each in as a regression test so
+recall on them is guaranteed by CI — a future change that stops catching
+them fails the build.
+
+### Added
+- **`RealWorldReproTest.ShadPS4_4697_NullDescDeref_Reports`** —
+  shadps4-emu/shadPS4#4697: `GetMaxPacketSize` dereferences a `desc`
+  that stays null (passed by value). Definite null-deref (`error`).
+- **`RealWorldReproTest.CarbonLang_7523_NullDeclContextDeref_Reports`** —
+  carbon-language/carbon-lang#7523: `ExportClassToCpp` derefs the
+  maybe-null `DeclContext` from `ExportNameScopeToCpp`. Interprocedural
+  maybe-null (`warning`).
+- **`MemoryLeakRuleExTest.TFLite_123387_Rfft2dWorkBufferLeak_Reports`** —
+  tensorflow/tensorflow#123387: TFLite `rfft2d` leaks its FFT work buffer
+  when a temporary-tensor lookup early-returns. Conditional leak
+  (`warning`).
+
+Test bodies are the real upstream functions reduced to minimal parseable
+stubs (the sandbox cannot rebuild those projects' full compile databases).
+615 ctest total, shuffle-stable.
+
 ## 2026-07-18 — Recall: null dereference through a libc call (#98)
 
 The thesis-v3 miss `p07` — `strchr(getenv(x), ':')` — dereferences a
