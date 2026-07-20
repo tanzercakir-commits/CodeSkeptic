@@ -1466,6 +1466,23 @@ is deferred (planned for the Fable-quota window). The feasibility notes
 are preserved in the repo so the design is not lost. Resume gate: after
 public-release readiness.
 
+## 6.31 Windows support — requirements captured, PLAN ONLY (2026-07-20)
+
+The core engine is already portable (no POSIX process/syscall use, C++17
+`std::filesystem` throughout). A Windows port is a small, bounded set of
+gaps, written up with file:line evidence in **`docs/windows-support.md`**:
+(1) a Windows LLVM/Clang dev package, (2) MSVC flag guards (`/GR-`,
+`/bigobj`), (3) Windows-SDK header discovery for the analyzed code — only
+needed for the "point-at-a-directory" mode; bypassed when the user supplies
+`compile_commands.json`, (4) SARIF drive-letter absolute-path detection,
+(5) MCP stdio binary mode, (6) a `windows-latest` CI floor to guard it.
+Recommended sequencing: Tier 1 (items 1+2+4, "builds and runs with a
+compile DB", plus the CI job) → Tier 2 (item 3, SDK discovery).
+
+**No code written.** Any implementation lands behind the item-6 CI floor
+and keeps every unit test and Juliet floor green — added on top of the
+invariants, never by relaxing them.
+
 ## 7. Build recipe (unchanged since 2026-07)
 
 ```bash
