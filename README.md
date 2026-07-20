@@ -58,6 +58,30 @@ CodeSkeptic is built for.
 2022 (`/W4` and `/analyze`) and cppcheck 2.17 (`--enable=all`) were also
 checked by hand on the `getenv` case and stayed silent.</sub>
 
+### Cheaper than raw-code AI review (6–59× fewer tokens)
+
+If you already loop an LLM over your diffs to find bugs, CodeSkeptic makes
+that loop **cheaper**. An LLM asked to review raw C/C++ must ingest every
+line and reason over the paths between them. CodeSkeptic reads the code as
+*computation* — outside the token budget — and hands back a compact,
+deterministic findings list with a trace. Its output is **O(bugs), not
+O(lines)**: flat at ~205 tokens whether the file is 18 lines or 2 400.
+
+![Tokens to locate the bugs — baseline grows with lines, CodeSkeptic stays flat](docs/img/token-ablation.png)
+
+| input (same 3 bugs) | LOC  | baseline tokens | CodeSkeptic | saving |
+|---------------------|-----:|----------------:|------------:|-------:|
+| small file          |  257 |           1 342 |         205 |  6.5×  |
+| module              |  737 |           3 725 |         205 | 18.2×  |
+| large file          | 2417 |          12 090 |         205 | 59.0×  |
+
+Honest caveat kept: on toy files (<~50 lines) there is **no saving** — the
+findings payload costs as much as the source. The crossover is ~50–80 lines;
+real review happens well above it, and the saving grows with size. And it is
+cheaper *and* more reliable at once — the findings are deterministic with a
+verifiable trace, not a probabilistic guess. Full method, numbers, and
+limits: [docs/token-ablation.md](docs/token-ablation.md).
+
 ## Rules
 
 | Rule | ID | Detects |
@@ -560,11 +584,11 @@ every edit. Register it in `.mcp.json`:
 ```
 
 Calling the analyzer is also **cheaper than asking the model to reason over
-the raw code**: CodeSkeptic's output is O(bugs), not O(lines), so on a
-real-sized file an agent processes far fewer tokens to know where the
-memory-safety bugs are — and gets a deterministic answer with a trace
-instead of a probabilistic guess. Measured, with the honest caveats (no
-saving on toy files), in [docs/token-ablation.md](docs/token-ablation.md).
+the raw code** — O(bugs), not O(lines), so an agent spends 6–59× fewer
+tokens to locate the memory-safety bugs on a real-sized file, and gets a
+deterministic answer with a trace. See [Cheaper than raw-code AI
+review](#cheaper-than-raw-code-ai-review-659-fewer-tokens) above for the
+measurement and honest caveats.
 
 The `analyze` tool accepts `path` plus optional `build_path`,
 `functions` and `lines` — so an agent can scope the re-check to exactly
