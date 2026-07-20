@@ -338,6 +338,12 @@ codeskeptic <source_path> [options]
                          constructing one is no longer leaked;
                          std::unique_ptr/shared_ptr are built in
                          (e.g. --owning-pointers Ref,RefPtr,scoped_refptr)
+  --untrusted-int-sources <names> Treat these functions' return as a
+                         full-range untrusted integer (comma list), the
+                         same discipline as atoi/strtol. For protocol/parser
+                         length fields read off the wire, so downstream
+                         length arithmetic that can overflow is reported
+                         (e.g. --untrusted-int-sources read_u16,packet_len)
   --report-paths <paths> Report only findings under these path prefixes
                          (comma list). Filters out findings in dependency
                          headers pulled into your TUs; analysis itself is

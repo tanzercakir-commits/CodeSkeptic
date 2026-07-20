@@ -1,4 +1,5 @@
 #include "TestHelper.h"
+#include "engine/AllocFunctions.h"
 #include "rules/IntOverflowRule.h"
 
 #include <gtest/gtest.h>
@@ -312,4 +313,29 @@ TEST(ReadmeCompareTest, DemoC_AtoiOverflow) {
     )");
     ASSERT_GE(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+// --untrusted-int-sources: a project-declared function whose return is an
+// untrusted length (e.g. a wire/packet length field) behaves like atoi —
+// a downstream multiply can overflow. Default (unregistered) stays silent,
+// so the engine is unchanged unless a project opts in.
+TEST(UntrustedIntSourceTest, Configured_Reports) {
+    setUntrustedIntSourceNames({"recv_len"});
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int recv_len(void);
+        int scale(void) { int n = recv_len(); return n * 4096; }
+    )");
+    setUntrustedIntSourceNames({});   // restore — process-global registry
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(UntrustedIntSourceTest, NotConfigured_Clean) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int recv_len(void);
+        int scale(void) { int n = recv_len(); return n * 4096; }
+    )");
+    EXPECT_EQ(results.size(), 0u);   // unknown callee -> not assumed unbounded
 }

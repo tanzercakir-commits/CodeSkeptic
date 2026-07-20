@@ -32,6 +32,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
     setOwningPointerNames(config_.owningPointers());
+    setUntrustedIntSourceNames(config_.untrustedIntSources());
     setProfilePolicies(config_.policies());
     setAssumptionMode(config_.assumptions());
     // Sidecar contracts are cached per file path for the process
@@ -93,6 +94,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     setAllocFunctionNames({});
     setFreeFunctionNames({});
     setOwningPointerNames({});
+    setUntrustedIntSourceNames({});
     setAssumptionMode(false);
     // Same rationale for the cross-TU summary store: one run's
     // summaries must not leak into the next (the MCP server runs many

@@ -45,6 +45,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
         else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
+        else if (key == "untrusted_int_sources") addNamesTo(untrusted_int_sources_, value);
         else if (key == "report_paths")    addReportPaths(value);
         else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "summary_diff_gate") summary_diff_gate_ = value;
@@ -90,6 +91,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addNamesTo(alloc_functions_, argv[++i]);
         } else if (arg == "--free-functions" && i + 1 < argc) {
             addNamesTo(free_functions_, argv[++i]);
+        } else if (arg == "--untrusted-int-sources" && i + 1 < argc) {
+            addNamesTo(untrusted_int_sources_, argv[++i]);
         } else if (arg == "--owning-pointers" && i + 1 < argc) {
             addNamesTo(owning_pointers_, argv[++i]);
         } else if (arg == "--report-paths" && i + 1 < argc) {
@@ -168,6 +171,10 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         allocators (comma list; extends the\n"
                       << "                         leak/double-free/UAF analysis to project\n"
                       << "                         wrappers like git__malloc, zmalloc)\n"
+                      << "  --untrusted-int-sources <names> Treat these functions'\n"
+                      << "                         return as a full-range untrusted length\n"
+                      << "                         (comma list; same discipline as atoi —\n"
+                      << "                         for wire/packet length fields in parsers)\n"
                       << "  --free-functions <names> Treat these functions as deallocators\n"
                       << "                         (first argument is freed)\n"
                       << "  --owning-pointers <names> Treat these class templates as\n"

@@ -1,5 +1,37 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-20 — Config: untrusted length sources (`--untrusted-int-sources`)
+
+Protocol/parser code reads a length or count field off the wire (a USB
+descriptor, a packet header, a file-format field). Those reader function
+names are project-specific, so they are configuration, not code. A listed
+function's **return** is now treated as a full-range untrusted integer —
+the exact discipline already applied to `atoi`/`strtol` — so a downstream
+`n * k` that can escape its type is reported (CWE-190), while a guard
+refines it and stays silent.
+
+Designed to be reversible: the default is empty, so with no flag the engine
+is byte-for-byte the previous behavior and every unit test and NIST Juliet
+floor is unchanged. Re-hunt receipt: the full tinyusb device stack scanned
+clean both without and with the flag on plausible sources — no new false
+positives.
+
+Honest limit (deferred, documented in `docs/untrusted-length.md`): the
+source feeds the **int-overflow** rule today. Consuming an untrusted length
+in the **bounds** rule — the `memcpy(fixed_buf, src, len)` catch, the real
+protocol attack surface — is a separate increment, because it can shift
+CWE-120/125 precision and must be validated against the Juliet floors in CI
+before it lands.
+
+### Added
+- `--untrusted-int-sources <names>` flag and `untrusted_int_sources` config
+  key; `setUntrustedIntSourceNames`/`untrustedIntSourceNames` registry.
+- `UntrustedIntSourceTest.Configured_Reports`,
+  `UntrustedIntSourceTest.NotConfigured_Clean` — the mechanism is on/off
+  gated. 620 ctest total, shuffle-stable.
+- `docs/untrusted-length.md` — design, reversibility receipt, deferred step.
+
+
 ## 2026-07-19 — Ablation: does CodeSkeptic cut tokens in an AI review loop?
 
 Measured. CodeSkeptic's output is O(bugs), not O(lines): on a real-sized
