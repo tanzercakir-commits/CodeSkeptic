@@ -553,6 +553,13 @@ every edit. Register it in `.mcp.json`:
 }
 ```
 
+Calling the analyzer is also **cheaper than asking the model to reason over
+the raw code**: CodeSkeptic's output is O(bugs), not O(lines), so on a
+real-sized file an agent processes far fewer tokens to know where the
+memory-safety bugs are — and gets a deterministic answer with a trace
+instead of a probabilistic guess. Measured, with the honest caveats (no
+saving on toy files), in [docs/token-ablation.md](docs/token-ablation.md).
+
 The `analyze` tool accepts `path` plus optional `build_path`,
 `functions` and `lines` — so an agent can scope the re-check to exactly
 the functions it just edited — and the project-idiom parameters
