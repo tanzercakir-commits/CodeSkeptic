@@ -38,6 +38,22 @@ const std::set<std::string>& freeFunctionNames();
 void setOwningPointerNames(std::set<std::string> names);
 const std::set<std::string>& owningPointerNames();
 
+// Custom untrusted-length source registry (--untrusted-int-sources).
+//
+// The intrinsic-source recipe (v0.3): atoi/strtol/scanf deliver an
+// unbounded value the caller did not choose, so a downstream copy or
+// multiply into a fixed extent is an overflow unless a guard refines
+// it. Protocol/parser code has its own such sources — a length field
+// decoded off the wire (a received USB descriptor, a packet header).
+// Those are project-specific, so they are configuration, not code:
+// register the functions whose RETURN is an untrusted length/count and
+// the existing interval/bounds/overflow machinery treats them as full
+// range. Default empty — the engine is unchanged unless a project opts
+// in. Same lifecycle as the alloc registry: set from Config at startup,
+// cleared in ~StaticAnalyzer.
+void setUntrustedIntSourceNames(std::set<std::string> names);
+const std::set<std::string>& untrustedIntSourceNames();
+
 } // namespace codeskeptic
 
 #endif // CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H

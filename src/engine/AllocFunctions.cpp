@@ -17,6 +17,10 @@ std::set<std::string>& owningPtrStorage() {
     static std::set<std::string> names;
     return names;
 }
+std::set<std::string>& untrustedIntStorage() {
+    static std::set<std::string> names;
+    return names;
+}
 } // namespace
 
 void setAllocFunctionNames(std::set<std::string> names) {
@@ -41,6 +45,14 @@ void setOwningPointerNames(std::set<std::string> names) {
 
 const std::set<std::string>& owningPointerNames() {
     return owningPtrStorage();
+}
+
+void setUntrustedIntSourceNames(std::set<std::string> names) {
+    untrustedIntStorage() = std::move(names);
+}
+
+const std::set<std::string>& untrustedIntSourceNames() {
+    return untrustedIntStorage();
 }
 
 } // namespace codeskeptic

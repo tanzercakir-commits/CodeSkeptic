@@ -1,5 +1,6 @@
 #include "engine/IntervalEval.h"
 
+#include "engine/AllocFunctions.h"
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 
@@ -107,6 +108,10 @@ bool isUntrustedIntSource(const CallExpr* call) {
     };
     for (const auto& k : kNames)
         if (n == k) return true;
+    // Project-declared untrusted-length sources (--untrusted-int-sources):
+    // empty by default, so this is a no-op unless a project opts in.
+    const auto& extra = untrustedIntSourceNames();
+    if (!extra.empty() && extra.count(n.str())) return true;
     return false;
 }
 

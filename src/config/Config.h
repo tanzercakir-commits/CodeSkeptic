@@ -94,6 +94,14 @@ public:
         return free_functions_;
     }
 
+    // Project untrusted-length sources (--untrusted-int-sources): the
+    // RETURN of these functions is treated as a full-range untrusted
+    // integer (a length/count decoded off the wire), the same discipline
+    // as atoi/strtol. Default empty — no effect unless a project opts in.
+    const std::set<std::string>& untrustedIntSources() const {
+        return untrusted_int_sources_;
+    }
+
     // Project owning-smart-pointer wrappers (--owning-pointers): raw
     // pointers adopted by construction into these types escape the leak
     // domain (Ref<T>, RefPtr<T>, scoped_refptr<T>, ...).
@@ -138,6 +146,7 @@ private:
     std::set<std::string> functions_;
     std::set<std::string> fatal_asserts_;
     std::set<std::string> alloc_functions_;
+    std::set<std::string> untrusted_int_sources_;
     std::set<std::string> free_functions_;
     std::set<std::string> owning_pointers_;
     std::vector<std::string> report_paths_;
