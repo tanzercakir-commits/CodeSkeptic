@@ -1,5 +1,24 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-19 — Ablation: does CodeSkeptic cut tokens in an AI review loop?
+
+Measured. CodeSkeptic's output is O(bugs), not O(lines): on a real-sized
+file an agent processes far fewer tokens to locate the memory-safety bugs
+(6–59x on 257–2417-line inputs), and gets a deterministic answer with a
+trace instead of a probabilistic guess. Honest negative kept: on tiny files
+(<~50 LOC) there is no saving — the findings payload costs as much as the
+source.
+
+### Added
+- `scripts/token_ablation.py` — deterministic input-token footprint harness
+  (baseline whole-file vs CodeSkeptic findings), with a controlled scaling
+  series (bugs fixed, clean code grows).
+- `scripts/token_ablation_live.py` — live harness (real model, real tokens +
+  accuracy) to run with your own API key.
+- `docs/token-ablation.md` + `docs/img/token-ablation.png` — the write-up,
+  table, chart, and honest limits.
+
+
 ## 2026-07-19 — Guard: README comparison-table claims (Tier 1)
 
 The README "How does it compare?" table asserts CodeSkeptic catches three
