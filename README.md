@@ -328,7 +328,7 @@ ctest --test-dir build
 
 ## Usage
 
-```bash
+```
 codeskeptic <source_path> [options]
 
   --source <path>        Directory/file to analyze
