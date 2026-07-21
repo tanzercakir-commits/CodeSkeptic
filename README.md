@@ -1,6 +1,12 @@
 # CodeSkeptic
 
 [![CI](https://github.com/tanzercakir-commits/CodeSkeptic/actions/workflows/ci.yml/badge.svg)](https://github.com/tanzercakir-commits/CodeSkeptic/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/tanzercakir-commits/CodeSkeptic?color=blue)](https://github.com/tanzercakir-commits/CodeSkeptic/releases)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/17)
+![Built on Clang LibTooling](https://img.shields.io/badge/Clang-LibTooling-262D3A.svg?logo=llvm)
+![Platform: Linux | macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/tanzercakir-commits/CodeSkeptic/pulls)
 
 > **Everyone generates. CodeSkeptic verifies.**
 
