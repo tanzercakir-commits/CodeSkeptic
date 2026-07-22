@@ -170,6 +170,41 @@ std::set<const VarDecl*> collectDivisorVars(const FunctionDecl* funcDecl,
         if (const auto* var = getReferencedVar(divisor))
             vars.insert(var);
     }
+
+    // Copy-source closure (v0.4 recall round): `int dataCopy = data;
+    // ... 100 / dataCopy` — the divisor's zeroness comes FROM `data`,
+    // so every transitive var-to-var copy source must be tracked too,
+    // or the source's state is never computed and the copy assigns
+    // Unknown (the Juliet fgets *_31/_33 family FN).
+    struct CopyEdges : RecursiveASTVisitor<CopyEdges> {
+        // target -> direct sources
+        std::map<const VarDecl*, std::set<const VarDecl*>> edges;
+        void addEdge(const VarDecl* dst, const Expr* rhs) {
+            if (!dst || !rhs) return;
+            if (const auto* src = getReferencedVar(rhs))
+                edges[dst].insert(src);
+        }
+        bool VisitBinaryOperator(BinaryOperator* op) {
+            if (op->getOpcode() == BO_Assign)
+                addEdge(getReferencedVar(op->getLHS()), op->getRHS());
+            return true;
+        }
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->hasInit() && !vd->isStaticLocal())
+                addEdge(vd, vd->getInit());
+            return true;
+        }
+    } copies;
+    copies.TraverseStmt(funcDecl->getBody());
+    bool grew = true;
+    while (grew) {
+        grew = false;
+        for (const auto& [dst, srcs] : copies.edges) {
+            if (!vars.count(dst)) continue;
+            for (const auto* src : srcs)
+                if (vars.insert(src).second) grew = true;
+        }
+    }
     return vars;
 }
 
@@ -209,7 +244,11 @@ bool addContractArgVars(const FunctionDecl* funcDecl, ASTContext& ctx,
 // --- Statement classification ---
 
 enum class StmtEffect {
-    None, AssignsZero, AssignsNonZero, AssignsMaybeZero, AssignsUnknown
+    None, AssignsZero, AssignsNonZero, AssignsMaybeZero, AssignsUnknown,
+    // `target = src;` where src is another tracked variable: the
+    // effect is src's CURRENT state (resolved in transfer, where the
+    // in-state is visible) — zeroness flows through copies (v0.4).
+    AssignsCopy
 };
 
 StmtEffect effectOfValue(ZeroState val) {
@@ -222,7 +261,20 @@ StmtEffect effectOfValue(ZeroState val) {
     return StmtEffect::AssignsUnknown;
 }
 
-StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
+StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
+                        const VarDecl** copySrc) {
+    // The RHS value's effect; when it is opaque but a plain var-to-var
+    // copy, the state flows from the source (resolved in transfer).
+    auto effectOfRhs = [&](const Expr* rhs) {
+        StmtEffect e = effectOfValue(evaluateAssignedValue(rhs));
+        if (e == StmtEffect::AssignsUnknown) {
+            if (const auto* src = getReferencedVar(rhs)) {
+                *copySrc = src;
+                return StmtEffect::AssignsCopy;
+            }
+        }
+        return e;
+    };
     if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* decl : declStmt->decls()) {
             if (const auto* vd = dyn_cast<VarDecl>(decl)) {
@@ -232,7 +284,7 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
                     // state (see NullDeref classifyStmt, #86).
                     if (vd->isStaticLocal())
                         return StmtEffect::AssignsUnknown;
-                    return effectOfValue(evaluateAssignedValue(vd->getInit()));
+                    return effectOfRhs(vd->getInit());
                 }
             }
         }
@@ -241,7 +293,7 @@ StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar) {
     if (const auto* binOp = dyn_cast<BinaryOperator>(stmt)) {
         if (binOp->getOpcode() == BO_Assign &&
             refersToVar(binOp->getLHS(), targetVar))
-            return effectOfValue(evaluateAssignedValue(binOp->getRHS()));
+            return effectOfRhs(binOp->getRHS());
         // Compound assignments (`z += n`) change the value too —
         // without this a counter initialized to 0 stayed "definitely
         // zero" forever (the llama.cpp ngram-cache FP: `++n_done; ...
@@ -458,7 +510,8 @@ public:
                    ASTContext& /*ctx*/) const {
         State out = in;
         for (const auto* var : trackedVars_) {
-            StmtEffect effect = classifyStmt(stmt, var);
+            const VarDecl* copySrc = nullptr;
+            StmtEffect effect = classifyStmt(stmt, var, &copySrc);
             switch (effect) {
                 case StmtEffect::AssignsZero:
                     out[var] = ZeroState::Zero; break;
@@ -469,6 +522,17 @@ public:
                     out[var] = ZeroState::MaybeZero; break;
                 case StmtEffect::AssignsUnknown:
                     out[var] = ZeroState::Unknown; break;
+                case StmtEffect::AssignsCopy: {
+                    // Zeroness flows through the copy: the target takes
+                    // the source's IN-state (an untracked source is
+                    // honest Unknown). Trace notes come free — the
+                    // state transition at this stmt is recorded by
+                    // onStatement like any other assignment.
+                    auto it = in.find(copySrc);
+                    out[var] = (it != in.end()) ? it->second
+                                                : ZeroState::Unknown;
+                    break;
+                }
                 case StmtEffect::None: break;
             }
         }
