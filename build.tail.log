@@ -1,0 +1,83 @@
+-- The C compiler identification is AppleClang 15.0.0.15000309
+-- The CXX compiler identification is AppleClang 15.0.0.15000309
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAVE_FFI_CALL
+-- Performing Test HAVE_FFI_CALL - Success
+-- Found FFI: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libffi.tbd
+-- Looking for histedit.h
+-- Looking for histedit.h - found
+-- Found LibEdit: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include (found version "2.11")
+-- Found ZLIB: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libz.tbd (found version "1.2.12")
+-- Found zstd: /opt/homebrew/lib/libzstd.dylib
+-- Found LibXml2: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libxml2.tbd (found version "2.9.13")
+-- LLVM version: 20.1.8
+-- Clang include dirs: /opt/homebrew/opt/llvm@20/include
+-- Clang resource dir: /opt/homebrew/Cellar/llvm@20/20.1.8/lib/clang/20
+-- macOS SDK path: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+-- Found Python3: /opt/homebrew/Frameworks/Python.framework/Versions/3.14/bin/python3.14 (found version "3.14.6") found components: Interpreter
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done (10.9s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+[1/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/Messages.cpp.o
+[2/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/ResourceDir.cpp.o
+[3/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AllocFunctions.cpp.o
+[4/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/FunctionFilter.cpp.o
+[5/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FatalCalls.cpp.o
+[6/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/CfgCache.cpp.o
+[7/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/RuleEngine.cpp.o
+[8/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/SummaryDiff.cpp.o
+[9/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/Interval.cpp.o
+[10/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o
+FAILED: [code=1] src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o 
+/usr/bin/c++ -DCLANG_RESOURCE_DIR=\"/opt/homebrew/Cellar/llvm@20/20.1.8/lib/clang/20\" -DCODESKEPTIC_VERSION=\"0.4.0\" -DMACOS_SDK_PATH=\"/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\" -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -I/Users/runner/work/CodeSkeptic/CodeSkeptic/src -isystem /opt/homebrew/opt/llvm@20/include -isystem /opt/homebrew/include -O3 -DNDEBUG -std=gnu++17 -arch arm64 -MD -MT src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o -MF src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o.d -o src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o -c /Users/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp
+/Users/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp:179:13: warning: braces around scalar initializer [-Wbraced-scalar-init]
+            {"-fparse-all-comments"},
+            ^~~~~~~~~~~~~~~~~~~~~~~~
+/Users/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp:244:12: error: call to 'to_string' is ambiguous
+           std::to_string(mtime.time_since_epoch().count());
+           ^~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4278:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(int __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4279:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4280:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(long __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4281:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4282:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(long long __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4283:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(unsigned long long __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4284:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(float __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4285:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(double __val);
+                                 ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string:4286:34: note: candidate function
+_LIBCPP_EXPORTED_FROM_ABI string to_string(long double __val);
+                                 ^
+1 warning and 1 error generated.
+[11/81] Building CXX object _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[12/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/IntervalEval.cpp.o
+[13/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/PathFacts.cpp.o
+[14/81] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FunctionSummary.cpp.o
+ninja: build stopped: subcommand failed.
