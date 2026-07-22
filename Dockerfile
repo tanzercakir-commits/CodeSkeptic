@@ -15,6 +15,7 @@ COPY . /src
 RUN cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
         -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
+        -DCODESKEPTIC_BUILD_TESTS=OFF \
     && cmake --build /build \
     && bash /src/scripts/package_release.sh /build/src/codeskeptic /dist clang-20
 

@@ -19,5 +19,11 @@ message(STATUS "Clang include dirs: ${CLANG_INCLUDE_DIRS}")
 
 add_subdirectory(src)
 
-enable_testing()
-add_subdirectory(tests)
+# OFF for artifact builds (Docker image): the tests FetchContent
+# googletest, which needs git + network — a hermetic image build
+# shouldn't. CI and dev builds keep the default ON.
+option(CODESKEPTIC_BUILD_TESTS "Build unit tests" ON)
+if(CODESKEPTIC_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
