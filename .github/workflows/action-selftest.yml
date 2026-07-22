@@ -1,12 +1,23 @@
 name: Action self-test
 
-# When a release is published, the packaged action (action.yml) is
+# After a successful Release run, the packaged action (action.yml) is
 # exercised end to end against this repo's own docs/demo.c: download
 # the fresh release binary, analyze, produce SARIF, and verify that
 # report-only gating keeps the job green while findings exist.
+#
+# Trigger is workflow_run, NOT release:published — the release is
+# published by the Release workflow's own GITHUB_TOKEN, and
+# token-created events never trigger other workflows (recursion
+# guard). workflow_run is exempt (proven by docker.yml's publish leg).
+# The push trigger on this file itself gives a one-shot validation
+# lane against the latest published release.
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  push:
+    branches: ["phase*"]
+    paths: [".github/workflows/action-selftest.yml"]
 
 permissions:
   contents: write
@@ -14,6 +25,10 @@ permissions:
 
 jobs:
   selftest:
+    # workflow_run fires on failed Release runs too — only test what
+    # actually published.
+    if: github.event_name != 'workflow_run' ||
+        github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +41,7 @@ jobs:
           sarif: selftest.sarif
           upload-sarif: "false"
           gate: report-only
-          version: ${{ github.event.release.tag_name }}
+          version: latest
 
       - name: Verify findings + SARIF
         run: |
