@@ -38,15 +38,32 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image
-        run: docker build -t codeskeptic:test .
+        id: build
+        run: |
+          set -o pipefail
+          docker build -t codeskeptic:test . 2>&1 | tee /tmp/docker_build.log
 
       - name: Smoke (fresh image, demo.c, exit 1 + findings)
+        id: smoke
         run: |
           code=0
           out=$(docker run --rm -v "$PWD/docs:/work:ro" codeskeptic:test demo.c 2>&1) || code=$?
-          echo "$out"
+          echo "$out" | tee /tmp/docker_smoke.log
+          echo "exit_code=$code" >> /tmp/docker_smoke.log
           test "$code" -eq 1
           echo "$out" | grep -qi finding
+
+      - name: Failure diagnostics -> refs/ci-logs/*
+        if: failure()
+        run: |
+          tail -c 30000 /tmp/docker_build.log > build_tail.log 2>/dev/null || true
+          cp /tmp/docker_smoke.log smoke.log 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f build_tail.log smoke.log 2>/dev/null || git add -f build_tail.log || true
+          git commit -qm "ci diagnostics: docker @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docker"
 
       - name: Publish to ghcr.io (releases only)
         if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
