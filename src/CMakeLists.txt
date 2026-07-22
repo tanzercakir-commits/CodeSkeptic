@@ -44,6 +44,18 @@ add_library(codeskeptic_core STATIC
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 
+# Relocatable-tarball rpath: distro LLVM packages link the clang libs
+# against a shared libLLVM.so; the release layout bundles it in ../lib
+# next to the binary (package_release.sh). Harmless for dev builds —
+# an rpath entry that matches nothing is simply skipped.
+if(APPLE)
+    target_link_options(codeskeptic PRIVATE
+        "-Wl,-rpath,@executable_path/../lib")
+else()
+    target_link_options(codeskeptic PRIVATE
+        "-Wl,-rpath,$ORIGIN/../lib" "-Wl,--enable-new-dtags")
+endif()
+
 target_include_directories(codeskeptic_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 )

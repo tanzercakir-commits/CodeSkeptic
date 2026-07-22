@@ -53,6 +53,37 @@ cp -R "$RES_DIR/include" "$STAGE/lib/clang/$MAJOR/include"
 cp LICENSE "$STAGE/LICENSE"
 cp README.md "$STAGE/README.md"
 
+# Bundle the LLVM/Clang shared libraries the binary links (distro LLVM
+# packages use a shared libLLVM.so / libclang-cpp.so). The binary
+# carries an rpath to ../lib (src/CMakeLists.txt), so the unpacked tree
+# is self-contained on machines with no LLVM installed. Common system
+# libs (libzstd, zlib, tinfo, libc) are NOT bundled — they stay in
+# DEPENDENCIES.txt.
+mkdir -p "$STAGE/lib"
+if [ "$OS" = "darwin" ]; then
+    otool -L "$STAGE/bin/codeskeptic" | awk 'NR>1{print $1}' \
+      | grep -Ei 'libLLVM|libclang' | while read -r so; do
+        real="$so"
+        case "$so" in
+            @rpath/*) real="$(brew --prefix llvm 2>/dev/null)/lib/${so#@rpath/}" ;;
+        esac
+        [ -f "$real" ] || { echo "PACKAGE_WARN cannot resolve $so"; continue; }
+        cp -L "$real" "$STAGE/lib/"
+        install_name_tool -change "$so" \
+            "@executable_path/../lib/$(basename "$so")" \
+            "$STAGE/bin/codeskeptic"
+    done || true
+    # install_name_tool invalidates the ad-hoc signature on arm64
+    codesign -f -s - "$STAGE/bin/codeskeptic" 2>/dev/null || true
+else
+    # (|| true: statically-linked LLVM means grep matches nothing —
+    # that's success, not an error, under set -o pipefail)
+    ldd "$STAGE/bin/codeskeptic" | awk '$3 ~ /\// {print $3}' \
+      | grep -Ei 'libLLVM|libclang' | while read -r so; do
+        cp -L "$so" "$STAGE/lib/"
+    done || true
+fi
+
 # Honest dependency listing: what the binary still links dynamically.
 {
     echo "# Dynamic dependencies of bin/codeskeptic ($OS-$ARCH)"
