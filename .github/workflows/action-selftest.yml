@@ -1,0 +1,41 @@
+name: Action self-test
+
+# When a release is published, the packaged action (action.yml) is
+# exercised end to end against this repo's own docs/demo.c: download
+# the fresh release binary, analyze, produce SARIF, and verify that
+# report-only gating keeps the job green while findings exist.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  security-events: write
+
+jobs:
+  selftest:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the action on docs/demo.c (report-only)
+        id: run
+        uses: ./
+        with:
+          path: docs/demo.c
+          sarif: selftest.sarif
+          upload-sarif: "false"
+          gate: report-only
+          version: ${{ github.event.release.tag_name }}
+
+      - name: Verify findings + SARIF
+        run: |
+          test "${{ steps.run.outputs.exit-code }}" = "1"
+          test -s selftest.sarif
+          grep -q '"results"' selftest.sarif
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/action-selftest/${{ job.status }}"

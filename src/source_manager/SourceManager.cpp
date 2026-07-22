@@ -1,6 +1,7 @@
 #include "source_manager/SourceManager.h"
 
 #include "core/Messages.h"
+#include "source_manager/ResourceDir.h"
 
 #include <filesystem>
 #include <iostream>
@@ -188,12 +189,18 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
             clang::tooling::ArgumentInsertPosition::BEGIN));
 #endif
 
-#ifdef CLANG_RESOURCE_DIR
-    tool.appendArgumentsAdjuster(
-        clang::tooling::getInsertArgumentAdjuster(
-            {"-resource-dir", CLANG_RESOURCE_DIR},
-            clang::tooling::ArgumentInsertPosition::BEGIN));
-#endif
+    // Relocatable resource-dir (v0.4): release tarballs ship the
+    // intrinsic headers next to the binary, so the path is resolved at
+    // runtime — env override -> exe-relative lib/clang/<ver> -> the
+    // baked build-machine path (ResourceDir.cpp) — instead of trusting
+    // a build-time absolute path that does not exist on user machines.
+    const std::string& resource_dir = codeskeptic::resourceDir();
+    if (!resource_dir.empty()) {
+        tool.appendArgumentsAdjuster(
+            clang::tooling::getInsertArgumentAdjuster(
+                {"-resource-dir", resource_dir},
+                clang::tooling::ArgumentInsertPosition::BEGIN));
+    }
 
 #ifdef MACOS_SDK_PATH
     tool.appendArgumentsAdjuster(

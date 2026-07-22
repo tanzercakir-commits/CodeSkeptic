@@ -2,6 +2,7 @@ add_library(codeskeptic_core STATIC
     core/Messages.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
+    source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
     engine/CfgCache.cpp
     engine/FatalCalls.cpp

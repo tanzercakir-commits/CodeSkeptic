@@ -79,3 +79,22 @@ TEST(SarifReporterTest, MessageEscaping) {
 
     EXPECT_NE(out.find("quote \\\" and \\\\ slash"), std::string::npos);
 }
+
+TEST(SarifReporterTest, WindowsAbsolutePathsGetFileUris) {
+    // docs/windows-support.md §4: drive-letter and UNC paths are
+    // absolute; they must become file URIs (forward slashes), not be
+    // emitted verbatim as "relative" paths.
+    DiagnosticList diags = {
+        {Severity::Error, "C:\\work\\a.cpp", 1, 1, "r", "m1"},
+        {Severity::Error, "d:/proj/b.cpp", 2, 1, "r", "m2"},
+        {Severity::Error, "\\\\srv\\share\\c.cpp", 3, 1, "r", "m3"},
+        {Severity::Error, "rel\\dir\\d.cpp", 4, 1, "r", "m4"},
+    };
+    std::string out = reportToString(diags);
+
+    EXPECT_NE(out.find("\"uri\": \"file:///C:/work/a.cpp\""), std::string::npos);
+    EXPECT_NE(out.find("\"uri\": \"file:///d:/proj/b.cpp\""), std::string::npos);
+    EXPECT_NE(out.find("\"uri\": \"file://srv/share/c.cpp\""), std::string::npos);
+    // A relative Windows-style path stays relative (verbatim, escaped).
+    EXPECT_NE(out.find("\"uri\": \"rel\\\\dir\\\\d.cpp\""), std::string::npos);
+}

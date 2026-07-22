@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Assemble a relocatable release tarball (Phase 1 of docs/PLAN-v0.4.md):
+#
+#   codeskeptic-v<version>-<os>-<arch>/
+#     bin/codeskeptic
+#     lib/clang/<N>/include/   intrinsic headers (stddef.h, stdarg.h, ...)
+#                              copied from the build LLVM — the binary
+#                              finds them exe-relative (ResourceDir.cpp),
+#                              so the unpacked tree works anywhere
+#     DEPENDENCIES.txt         honest list of remaining dynamic deps
+#     LICENSE, README.md
+#
+# Only include/ is shipped from the resource dir — the full resource dir
+# also carries sanitizer runtime libraries (tens of MB) the analyzer
+# never uses.
+#
+# Usage: scripts/package_release.sh <codeskeptic-binary> [out-dir] [clang]
+set -euo pipefail
+
+BIN=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
+OUT="${2:-dist}"
+CLANG="${3:-}"
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+if [ -z "$CLANG" ]; then
+    for c in clang-20 clang-19 clang-18 clang; do
+        if command -v "$c" >/dev/null 2>&1; then CLANG="$c"; break; fi
+    done
+fi
+[ -n "$CLANG" ] || { echo "PACKAGE_FAIL no clang found for -print-resource-dir"; exit 1; }
+
+RES_DIR=$("$CLANG" -print-resource-dir)
+[ -d "$RES_DIR/include" ] || { echo "PACKAGE_FAIL resource dir has no include/: $RES_DIR"; exit 1; }
+
+VERSION=$("$BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*' | head -1)
+[ -n "$VERSION" ] || { echo "PACKAGE_FAIL could not parse --version output"; exit 1; }
+
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+NAME="codeskeptic-v${VERSION}-${OS}-${ARCH}"
+STAGE="$OUT/$NAME"
+
+rm -rf "$STAGE"
+mkdir -p "$STAGE/bin"
+
+cp "$BIN" "$STAGE/bin/codeskeptic"
+
+MAJOR=$(basename "$RES_DIR")
+mkdir -p "$STAGE/lib/clang/$MAJOR"
+cp -R "$RES_DIR/include" "$STAGE/lib/clang/$MAJOR/include"
+
+cp LICENSE "$STAGE/LICENSE"
+cp README.md "$STAGE/README.md"
+
+# Honest dependency listing: what the binary still links dynamically.
+{
+    echo "# Dynamic dependencies of bin/codeskeptic ($OS-$ARCH)"
+    echo "# Analyzing code also needs the TARGET's own headers installed"
+    echo "# (libc6-dev / Xcode Command Line Tools) — as any compiler does."
+    if [ "$OS" = "darwin" ]; then
+        otool -L "$STAGE/bin/codeskeptic" || true
+    else
+        ldd "$STAGE/bin/codeskeptic" || true
+    fi
+} > "$STAGE/DEPENDENCIES.txt"
+
+mkdir -p "$OUT"
+tar czf "$OUT/$NAME.tar.gz" -C "$OUT" "$NAME"
+(cd "$OUT" && { command -v sha256sum >/dev/null && sha256sum "$NAME.tar.gz" || shasum -a 256 "$NAME.tar.gz"; } >> sha256sums.txt)
+
+SIZE=$(du -h "$OUT/$NAME.tar.gz" | cut -f1)
+echo "PACKAGE_RESULT name=$NAME.tar.gz size=$SIZE version=$VERSION resource_major=$MAJOR"

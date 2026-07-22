@@ -1,0 +1,156 @@
+name: Release
+
+# Tag push v* -> build, package (scripts/package_release.sh), smoke the
+# tarball in CLEAN containers (the release-blocking gate: extract ->
+# analyze docs/demo.c -> exactly exit 1 with findings), upload assets to
+# a DRAFT release, and publish only when every leg is green. A release
+# that never ran on a clean machine never goes public.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04   # older glibc -> wider binary compatibility
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 20 (apt.llvm.org — jammy has no in-archive LLVM 20)
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc >/dev/null
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build
+
+      - name: Build (portable link flags)
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
+          cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Version must match the tag
+        run: |
+          v=$(./build/src/codeskeptic --version)
+          echo "binary: $v  tag: ${GITHUB_REF_NAME}"
+          test "CodeSkeptic ${GITHUB_REF_NAME#v}" = "$v"
+
+      - name: Package
+        run: bash scripts/package_release.sh build/src/codeskeptic dist clang-20
+
+      - name: Smoke in clean containers (22.04 + 24.04)
+        # The tarball must work on a machine with NO LLVM installed.
+        # libc6-dev is installed because analyzing C code needs the
+        # target's own libc headers — same requirement as any compiler.
+        run: |
+          for img in ubuntu:22.04 ubuntu:24.04; do
+            echo "=== smoke on $img ==="
+            docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/docs:/demo:ro" "$img" bash -c '
+              set -e
+              apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev libzstd1 zlib1g libtinfo6 >/dev/null 2>&1 || apt-get install -y -qq libc6-dev libzstd1 zlib1g >/dev/null
+              tar xzf /dist/codeskeptic-*-linux-*.tar.gz -C /tmp
+              cd /tmp/codeskeptic-*
+              code=0; out=$(./bin/codeskeptic /demo/demo.c 2>&1) || code=$?
+              echo "$out"
+              test "$code" -eq 1
+              echo "$out" | grep -qi finding'
+          done
+
+      - name: Upload to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft \
+            --title "CodeSkeptic $GITHUB_REF_NAME" \
+            --notes "Draft — assets uploading." 2>/dev/null || true
+          gh release upload "$GITHUB_REF_NAME" \
+            dist/codeskeptic-*-linux-*.tar.gz --clobber
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/release-linux/${{ job.status }}"
+
+  macos:
+    runs-on: macos-14   # arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM (Homebrew)
+        run: brew install llvm cmake ninja
+
+      - name: Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Version must match the tag
+        run: |
+          v=$(./build/src/codeskeptic --version)
+          echo "binary: $v  tag: ${GITHUB_REF_NAME}"
+          test "CodeSkeptic ${GITHUB_REF_NAME#v}" = "$v"
+
+      - name: Package
+        run: |
+          bash scripts/package_release.sh build/src/codeskeptic dist \
+            "$(brew --prefix llvm)/bin/clang"
+
+      - name: Smoke from an unpacked tree outside the repo
+        # Relocation check: run from /tmp; the exe-relative bundled
+        # headers outrank the baked brew path by resolution order.
+        run: |
+          tar xzf dist/codeskeptic-*-darwin-*.tar.gz -C /tmp
+          cd /tmp/codeskeptic-*
+          code=0; out=$(./bin/codeskeptic "$GITHUB_WORKSPACE/docs/demo.c" 2>&1) || code=$?
+          echo "$out"
+          test "$code" -eq 1
+          echo "$out" | grep -qi finding
+
+      - name: Upload to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft \
+            --title "CodeSkeptic $GITHUB_REF_NAME" \
+            --notes "Draft — assets uploading." 2>/dev/null || true
+          gh release upload "$GITHUB_REF_NAME" \
+            dist/codeskeptic-*-darwin-*.tar.gz --clobber
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/release-macos/${{ job.status }}"
+
+  publish:
+    needs: [linux, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Combined checksums, then publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" -p '*.tar.gz' -D assets
+          (cd assets && sha256sum *.tar.gz) > sha256sums.txt
+          cat sha256sums.txt
+          gh release upload "$GITHUB_REF_NAME" sha256sums.txt --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/release-publish/${{ job.status }}"

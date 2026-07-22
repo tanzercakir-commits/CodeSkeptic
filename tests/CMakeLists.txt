@@ -35,6 +35,7 @@ add_executable(codeskeptic_tests
     BrokenTuTest.cpp
     McpServerTest.cpp
     InterproceduralTest.cpp
+    ResourceDirTest.cpp
 )
 
 target_include_directories(codeskeptic_tests

@@ -34,10 +34,30 @@ const char* sarifLevel(codeskeptic::Severity severity) {
 }
 
 // SARIF artifactLocation.uri: absolute paths with the file:// scheme,
-// relative paths as-is
+// relative paths as-is. Windows absolute paths (drive-letter C:\ or
+// C:/, and UNC \\server\share) are absolute too — mis-classifying
+// them as relative used to emit URIs GitHub code scanning cannot
+// ingest (docs/windows-support.md §4).
+bool isWindowsAbsolute(const std::string& path) {
+    if (path.size() >= 2 && path[0] == '\\' && path[1] == '\\')
+        return true; // UNC
+    return path.size() >= 3 &&
+           ((path[0] >= 'A' && path[0] <= 'Z') ||
+            (path[0] >= 'a' && path[0] <= 'z')) &&
+           path[1] == ':' && (path[2] == '\\' || path[2] == '/');
+}
+
 std::string toUri(const std::string& path) {
     if (!path.empty() && path[0] == '/')
         return "file://" + path;
+    if (isWindowsAbsolute(path)) {
+        std::string p = path;
+        for (char& c : p)
+            if (c == '\\') c = '/';
+        if (p[0] == '/')           // UNC //server/share/...
+            return "file:" + p;    // -> file://server/share/...
+        return "file:///" + p;     // -> file:///C:/...
+    }
     return path;
 }
 
