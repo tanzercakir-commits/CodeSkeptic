@@ -67,7 +67,14 @@
 # the integer refiner cannot fold — every square-op FP is exactly that
 # good sink). Precision-first, as everywhere.
 CWE476 0.95 0.30
-CWE401 0.66 0.18
+# 2026-07-22 (v0.4, immutable-flag constprop): engine-level pruning of
+# assume edges contradicting never-written static-flag values killed
+# the goodB2G flag-correlation FP family root cause. Case FP 37 -> 32,
+# rule precision 0.684 -> 0.714 (TPs unchanged); cross-rule noise on
+# CWE476/415/416 files also dropped. Precision floor RAISED to 0.68.
+# Remaining FP families (documented): external-linkage globals (cannot
+# fold soundly), constant-return call flags, flag copies.
+CWE401 0.68 0.18
 CWE415 0.95 0.23
 CWE416 0.95 0.48
 # 2026-07-22 (v0.4 recall round, copy-taint): zeroness flows through
