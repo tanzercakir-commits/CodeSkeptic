@@ -64,9 +64,10 @@ vocabulary, and that is configuration, not code:
     --owning-pointers RefPtr
 ```
 
-See the [usage reference](usage.md) for the full list. Worked example
-profiles from the projects we scan (systemd, libgit2, …) are landing in
-a `profiles/` directory as part of the v0.4 round.
+See the [usage reference](usage.md) for the full list, and
+[`profiles/`](../profiles/) for the exact configurations used in our
+real-world scans (libgit2, fprime, JoltPhysics, …) — worked examples
+for writing your own.
 
 ## 5. Compare against your existing tools
 

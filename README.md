@@ -253,7 +253,10 @@ checkable subset and failure semantics: [CONTRACTS.md](CONTRACTS.md).
 - [docs/comparison.md](docs/comparison.md) — vs mainstream tools, honest positioning
 - [docs/engine.md](docs/engine.md) — architecture and analysis machinery
 - [docs/token-ablation.md](docs/token-ablation.md) — the 6–59× token measurement
+- [docs/reproduce.md](docs/reproduce.md) — every published number, one command each
+- [profiles/](profiles/) — the exact idiom configs behind the real-world scans
 - [CONTRACTS.md](CONTRACTS.md) — the `cs:` contract language
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build, the three CI referees, starter tasks
 - [ROADMAP.md](ROADMAP.md) — current state and near-term plan ([full devlog](docs/devlog/))
 
 ## License
