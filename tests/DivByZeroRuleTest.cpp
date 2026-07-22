@@ -692,3 +692,18 @@ TEST(DivByZeroRuleTest, CopyReassignedSafe_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+TEST(DivByZeroRuleTest, ImmutableFlagDeadAssign_Clean) {
+    // Engine-level flag pruning benefits every rule: the zero
+    // assignment sits on a provably-dead edge.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int staticFalse = 0;
+        int f(int x) {
+            int d = 7;
+            if (staticFalse) { d = 0; }
+            return x / d;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

@@ -1447,3 +1447,85 @@ TEST(MemoryLeakRuleExTest, TFLite_123387_Rfft2dWorkBufferLeak_Reports) {
     }
     EXPECT_TRUE(found);
 }
+
+// --- v0.4: immutable-flag constant propagation (edge pruning) ---
+// The Juliet flag-variant goodB2G FP family: alloc guarded by one
+// never-written static flag, the free by its complement — the "leaked"
+// path cannot execute. ImmutableFlags.h; engine-level, all rules.
+
+TEST(MemoryLeakRuleExTest, ImmutableFlagCorrelation_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        extern void free(void*);
+        extern void exit(int);
+        static int staticTrue = 1;
+        static int staticFalse = 0;
+        void goodB2G() {
+            long* data = 0;
+            if (staticTrue) {
+                data = (long*)malloc(100 * sizeof(long));
+                if (data == 0) { exit(-1); }
+            }
+            if (staticFalse) {
+                /* infeasible: no free here */
+            } else {
+                free(data);
+            }
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(MemoryLeakRuleExTest, ImmutableTrueFlagLeak_StillReports) {
+    // The FEASIBLE side must keep reporting — pruning removes only the
+    // impossible edge, never the live one.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        static int enabled = 1;
+        void f() {
+            long* p = 0;
+            if (enabled) {
+                p = (long*)malloc(8);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(MemoryLeakRuleExTest, MutatedFlag_NotConstantFolded) {
+    // The flag is written elsewhere in the TU — folding it would hide
+    // a REAL leak. Mutation disqualifies; the leak must be reported.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        static int flag = 0;
+        void set_flag(void) { flag = 1; }
+        void f() {
+            long* p = 0;
+            if (flag) {
+                p = (long*)malloc(8);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(MemoryLeakRuleExTest, AddressTakenFlag_NotConstantFolded) {
+    // &flag escapes — any code could write through the pointer.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        static int flag = 0;
+        int* leak_the_flag(void) { return &flag; }
+        void f() {
+            long* p = 0;
+            if (flag) {
+                p = (long*)malloc(8);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}

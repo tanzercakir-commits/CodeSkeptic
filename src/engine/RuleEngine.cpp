@@ -1,5 +1,7 @@
 #include "engine/RuleEngine.h"
 
+#include "engine/ImmutableFlags.h"
+
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "engine/ParamIntervals.h"
@@ -38,6 +40,7 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
     SummaryRegistry::instance().clear();
     CfgCache::instance().clear();
     ParamIntervalCache::instance().clear();
+    ImmutableFlagCache::instance().clear();
     return results;
 }
 

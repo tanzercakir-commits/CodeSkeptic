@@ -4,6 +4,7 @@
 #include "engine/CfgCache.h"
 #include "engine/ConditionWalk.h"
 #include "engine/FatalCalls.h"
+#include "engine/ImmutableFlags.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
@@ -263,23 +264,32 @@ DataflowResult<Analysis> runDataflow(
             State predState = found->second;
 
             // Assume edge: on a conditional terminator with two
-            // successors (if/while/for), the state is refined per the
-            // true/false edge. succ[0] = true, succ[1] = false (Clang
-            // CFG convention).
-            if constexpr (detail::HasRefineOnEdge<Analysis>::value) {
-                if (pred->succ_size() == 2) {
-                    detail::EdgeCondition cond = detail::edgeCondition(pred);
-                    if (cond.leaf) {
-                        auto succIt = pred->succ_begin();
-                        const clang::CFGBlock* trueSucc =
-                            succIt->getReachableBlock();
-                        ++succIt;
-                        const clang::CFGBlock* falseSucc =
-                            succIt->getReachableBlock();
-                        if (trueSucc != falseSucc &&
-                            (block == trueSucc || block == falseSucc)) {
-                            const bool edgeIsTrue =
-                                (block == trueSucc) != cond.flip;
+            // successors (if/while/for), the edge is first checked
+            // against the TU's immutable-flag constants — an edge whose
+            // branch sense contradicts a flag's provable value is
+            // INFEASIBLE and contributes nothing, the unreachable-
+            // predecessor semantics (ImmutableFlags.h; the Juliet
+            // staticTrue/staticFalse leak-FP family). Then the state is
+            // refined per the true/false edge. succ[0] = true,
+            // succ[1] = false (Clang CFG convention).
+            if (pred->succ_size() == 2) {
+                detail::EdgeCondition cond = detail::edgeCondition(pred);
+                if (cond.leaf) {
+                    auto succIt = pred->succ_begin();
+                    const clang::CFGBlock* trueSucc =
+                        succIt->getReachableBlock();
+                    ++succIt;
+                    const clang::CFGBlock* falseSucc =
+                        succIt->getReachableBlock();
+                    if (trueSucc != falseSucc &&
+                        (block == trueSucc || block == falseSucc)) {
+                        const bool edgeIsTrue =
+                            (block == trueSucc) != cond.flip;
+                        if (edgeInfeasibleByFlags(cond.leaf, edgeIsTrue,
+                                                  ctx))
+                            continue;
+                        if constexpr (
+                            detail::HasRefineOnEdge<Analysis>::value) {
                             if constexpr (
                                 detail::HasOnEdgeRefined<Analysis>::value) {
                                 if (reporting) {
