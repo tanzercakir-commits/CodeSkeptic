@@ -55,6 +55,70 @@ def relevant_rules(cwe: str) -> set:
     return set()
 
 
+# --- FN classification (the recall map) ------------------------------
+#
+# Juliet file names encode the variant: CWE<n>_<name>__<source/sink
+# description>_<flow-number><letter?>.c/.cpp. Classifying every MISSED
+# case by name turns a bare recall number into a decision map:
+#   float     — floating-point variants; deliberately silent (IEEE 754
+#               division is defined behavior) — by design, not a gap
+#   opaque    — rand()/socket/listen sources; an honest analyzer
+#               cannot claim the value is zero/overflowing — by design
+#   multifile — flow variants 54a..54e (chain across 5 files) and the
+#               61 family (source and sink split across files): needs
+#               --whole-program / summary-file analysis
+#   baseline  — control-flow variants 01..34 in one function: if these
+#               miss, the local engine itself has a gap (highest-value
+#               targets)
+#   flow      — single-TU dataflow variants (41..53: through calls/
+#               pointers; 62..68: through structs/arrays/globals)
+#   cpp       — C++ container/class variants (72..74, 81..84)
+#   other     — anything the name does not place
+import re
+
+_FLOW_RE = re.compile(r"_(\d{2})[a-e]?\.(?:c|cpp)$")
+
+
+def classify_fn(basename: str) -> str:
+    name = basename.lower()
+    if "float" in name:
+        return "float"
+    if "rand" in name or "socket" in name:
+        return "opaque"
+    m = _FLOW_RE.search(basename)
+    flow = int(m.group(1)) if m else -1
+    if flow in (54, 61):
+        return "multifile"
+    if 1 <= flow <= 34:
+        return "baseline"
+    if 41 <= flow <= 53 or 62 <= flow <= 68:
+        return "flow"
+    if 72 <= flow <= 74 or 81 <= flow <= 84:
+        return "cpp"
+    return "other"
+
+
+def selftest() -> int:
+    cases = {
+        "CWE369_Divide_by_Zero__float_zero_divide_01.c": "float",
+        "CWE369_Divide_by_Zero__int_rand_divide_02.c": "opaque",
+        "CWE369_Divide_by_Zero__int_zero_divide_54c.c": "multifile",
+        "CWE190_Integer_Overflow__int_max_multiply_61b.c": "multifile",
+        "CWE369_Divide_by_Zero__int_zero_divide_09.c": "baseline",
+        "CWE416_Use_After_Free__malloc_free_char_44.c": "flow",
+        "CWE401_Memory_Leak__int64_t_calloc_67a.c": "flow",
+        "CWE401_Memory_Leak__new_array_TwoIntsClass_72a.cpp": "cpp",
+        "CWE190_weird_name.c": "other",
+    }
+    bad = {n: (classify_fn(n), want) for n, want in cases.items()
+           if classify_fn(n) != want}
+    if bad:
+        print(f"FN-classifier selftest FAILED: {bad}")
+        return 1
+    print("FN-classifier selftest ok")
+    return 0
+
+
 # Known-lax-baseline exclusion (documented ground-truth correction).
 #
 # Juliet's CWE476 `null_check_after_deref` GOOD functions deliberately
@@ -117,6 +181,8 @@ def load_expected(path, cwe):
 
 
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
+        return selftest()
     if len(sys.argv) not in (4, 5):
         print(__doc__)
         return 2
@@ -199,7 +265,7 @@ def main() -> int:
 
     # FP samples: raw material for rule improvement. Since the suite
     # lives in CI, FP patterns can only be read from the logs —
-    # first 5 samples per rule (deterministic: sorted by file+line).
+    # first 12 samples per rule (deterministic: sorted by file+line).
     fp_by_rule = {}
     for d in fp:
         rule = d.get("rule") or d.get("rule_id") or "?"
@@ -207,10 +273,25 @@ def main() -> int:
     for rule in sorted(fp_by_rule):
         samples = sorted(fp_by_rule[rule],
                          key=lambda d: (d.get("file", ""), d.get("line", 0)))
-        for d in samples[:5]:
+        for d in samples[:12]:
             base = os.path.basename(d.get("file", "?"))
             print(f"FP_SAMPLE {cwe} {rule} {base}:{d.get('line', 0)} "
                   f"{d.get('function', '?')} :: {d.get('message', '')}")
+
+    # FN classification: every missed case, bucketed by variant name —
+    # the recall decision map (by-design vs addressable; see classify_fn).
+    missed = sorted(set(scanned_files) - rfiles_with_tp)
+    buckets = {}
+    for path in missed:
+        buckets.setdefault(classify_fn(os.path.basename(path)),
+                           []).append(path)
+    counts = " ".join(f"{k}={len(buckets.get(k, []))}"
+                      for k in ("float", "opaque", "multifile",
+                                "baseline", "flow", "cpp", "other"))
+    print(f"JULIET_FN_CLASS {cwe} total={len(missed)} {counts}")
+    for bucket in ("baseline", "flow", "multifile", "cpp", "other"):
+        for path in buckets.get(bucket, [])[:5]:
+            print(f"FN_SAMPLE {cwe} {bucket} {os.path.basename(path)}")
 
     # Machine-readable line (grep-friendly for trend tracking).
     # Legacy fields are preserved; r* fields are the rule-matched view.

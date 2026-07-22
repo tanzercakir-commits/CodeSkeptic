@@ -74,6 +74,9 @@ jobs:
           path: juliet-work/juliet
           key: juliet-c-cpp-1.3
 
+      - name: FN-classifier selftest
+        run: python3 scripts/juliet_eval.py --selftest
+
       - name: Run benchmark
         # shell: bash → -eo pipefail: the tee pipe cannot mask the exit code
         # Limit: PR guard 400 (fast signal); weekly cron 1600 (deep
@@ -105,6 +108,20 @@ jobs:
             grep "JULIET_RESULT" juliet-output.txt || echo "(no results)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish full output to refs/ci-logs/*
+        # Always (not just on failure): the FN classification and FP
+        # samples in this output ARE the working data of the recall
+        # rounds — the sandbox reads them over the git protocol.
+        if: always()
+        run: |
+          tail -c 120000 juliet-output.txt > juliet-output.tail.txt 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f juliet-output.tail.txt
+          git commit -qm "juliet output @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/juliet"
 
       - name: Mirror job status to refs/status/*
         if: always()
