@@ -23,6 +23,22 @@ on:
       - "src/**"
       - "tests/**"
       - "CMakeLists.txt"
+  push:
+    # Same paths, phase* branches: the sandbox-driven loop (see ci.yml)
+    # gets the score guard on analysis-code pushes without a PR.
+    branches: ["phase*"]
+    paths:
+      - ".github/workflows/juliet.yml"
+      - "scripts/run_juliet.sh"
+      - "scripts/juliet_eval.py"
+      - "scripts/juliet_expected.txt"
+      - "src/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+
+# Job-status mirroring (refs/status/*, see ci.yml) needs push rights.
+permissions:
+  contents: write
 
 # Cost balance: back-to-back pushes to the same ref cancel the old run
 concurrency:
@@ -89,3 +105,9 @@ jobs:
             grep "JULIET_RESULT" juliet-output.txt || echo "(no results)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/juliet/${{ job.status }}"

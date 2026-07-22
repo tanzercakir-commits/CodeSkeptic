@@ -11,7 +11,7 @@ name: Docs
 #     commands is already covered by ci.yml's build+smoke on every PR.)
 on:
   push:
-    branches: [main]
+    branches: [main, "phase*"]
     paths:
       - "README.md"
       - "docs/**"
@@ -24,6 +24,10 @@ on:
       - "scripts/check_readme.sh"
       - ".github/workflows/docs.yml"
 
+# Job-status mirroring (refs/status/*, see ci.yml) needs push rights.
+permissions:
+  contents: write
+
 concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
@@ -35,6 +39,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: README structure & link guard
         run: bash scripts/check_readme.sh
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/docs-structure/${{ job.status }}"
 
   quickstart:
     runs-on: ubuntu-24.04
@@ -66,3 +75,9 @@ jobs:
           echo "$out"
           test "$code" -eq 1
           echo "$out" | grep -qi "finding"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/docs-quickstart/${{ job.status }}"
