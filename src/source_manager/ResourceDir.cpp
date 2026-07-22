@@ -33,7 +33,9 @@ std::string exeDir() {
     return p.parent_path().string();
 #else
     std::error_code ec;
-    fs::path p = fs::read_symlink("/proc/self/exe", ec);
+    // Not a hard-coded install path: /proc/self/exe is the kernel's
+    // stable API for "where is this very executable".
+    fs::path p = fs::read_symlink("/proc/self/exe", ec);  // codeskeptic-disable-line policy
     if (ec) return {};
     return p.parent_path().string();
 #endif
