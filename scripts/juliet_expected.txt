@@ -71,4 +71,12 @@ CWE401 0.66 0.18
 CWE415 0.95 0.23
 CWE416 0.95 0.48
 CWE369 0.95 0.03
-CWE190 0.95 0.005
+# 2026-07-22 (v0.4 recall round, int-overflow coverage): BO_Add joins
+# BO_Mul, 64-bit sites proved via __int128 operand corners, implicit
+# narrowing stores checked against the destination width, INT64_MAX
+# literals modelable. Sampled rhitrate 0.012 -> 0.052 at rprecision
+# 1.000 (0 FP); floor RAISED 0.005 -> 0.040 (margin for sampling
+# variance). Remaining known-FN classes: rand bit-shuffle (opaque),
+# abs/sqrt-guarded squares (documented), opaque-flag control variants
+# (the correlation machinery round).
+CWE190 0.95 0.040
