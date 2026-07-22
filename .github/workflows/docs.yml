@@ -14,14 +14,20 @@ on:
     branches: [main, "phase*"]
     paths:
       - "README.md"
+      - "CONTRIBUTING.md"
       - "docs/**"
+      - "profiles/**"
       - "scripts/check_readme.sh"
+      - "scripts/check_profiles.sh"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "README.md"
+      - "CONTRIBUTING.md"
       - "docs/**"
+      - "profiles/**"
       - "scripts/check_readme.sh"
+      - "scripts/check_profiles.sh"
       - ".github/workflows/docs.yml"
 
 # Job-status mirroring (refs/status/*, see ci.yml) needs push rights.
@@ -39,6 +45,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: README structure & link guard
         run: bash scripts/check_readme.sh
+      - name: Profile format guard
+        run: bash scripts/check_profiles.sh
       - name: Mirror job status to refs/status/*
         if: always()
         run: |
