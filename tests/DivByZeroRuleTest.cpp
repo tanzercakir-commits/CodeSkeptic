@@ -599,3 +599,96 @@ TEST(DivByZeroRuleTest, ScanfDivisorGuarded_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- v0.4 recall round: zeroness flows through var-to-var copies ---
+// (the Juliet fgets *_31/_33 family: `int dataCopy = data;` used to
+// assign Unknown and silently launder an untrusted divisor)
+
+TEST(DivByZeroRuleTest, CopyOfUntrustedDivisor_Reports) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s, int x) {
+            int data = atoi(s);
+            int dataCopy = data;
+            int data2 = dataCopy;
+            return x / data2;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, CopyOfGuardedDivisor_Clean) {
+    // The source was refined NonZero BEFORE the copy — the copy must
+    // carry NonZero, not degrade it.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s, int x) {
+            int data = atoi(s);
+            if (data == 0) return 0;
+            int c = data;
+            return x / c;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, GuardAfterCopy_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s, int x) {
+            int data = atoi(s);
+            int c = data;
+            if (c != 0) return x / c;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, CopyOfDefiniteZero_ReportsDefinite) {
+    // Definite zeroness flows through the copy as an error, with the
+    // copy step visible in the dataflow.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x) {
+            int a = 0;
+            int b = a;
+            return x / b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(DivByZeroRuleTest, CopyFromUnknownParam_Clean) {
+    // Copying an unconstrained parameter proves nothing — silent.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int f(int n, int x) {
+            int c = n;
+            return x / c;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, CopyReassignedSafe_Clean) {
+    // The copy takes the source's state AT the copy point; a later
+    // safe reassignment of the target must win.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int f(const char* s, int x) {
+            int data = atoi(s);
+            int c = data;
+            c = 5;
+            return x / c;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
