@@ -1,0 +1,101 @@
+name: Docs
+
+# Two guards for the "first five minutes" contract (docs/PLAN-v0.4.md
+# Phase 0):
+#   - structure: line budget + required sections + relative-link
+#     integrity (seconds, no toolchain).
+#   - quickstart doc-test: the README's first Quickstart code block is
+#     extracted VERBATIM and executed on a clean runner — copy-paste
+#     installability is proven, not assumed. (~5 min, so it only runs
+#     when the docs themselves change; code breakage of the same
+#     commands is already covered by ci.yml's build+smoke on every PR.)
+on:
+  push:
+    branches: [main, "phase*"]
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "scripts/check_readme.sh"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "scripts/check_readme.sh"
+      - ".github/workflows/docs.yml"
+
+# Job-status mirroring (refs/status/*, see ci.yml) needs push rights.
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: README structure & link guard
+        run: bash scripts/check_readme.sh
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/docs-structure/${{ job.status }}"
+
+  quickstart:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract the first Quickstart code block
+        run: |
+          awk '/^## Quickstart/{s=1} s&&/^```bash/{b=1;next} b&&/^```/{exit} b' \
+            README.md > /tmp/quickstart.sh
+          echo "--- extracted quickstart ---"
+          cat /tmp/quickstart.sh
+          test -s /tmp/quickstart.sh   # empty extraction = broken README
+
+      - name: Run setup lines (must succeed)
+        run: |
+          head -n -1 /tmp/quickstart.sh > /tmp/setup.sh
+          set -o pipefail
+          bash -ex /tmp/setup.sh 2>&1 | tee /tmp/setup.log
+
+      - name: Run the analyze line (must find the demo bugs, exit 1)
+        # The last quickstart line runs the analyzer on docs/demo.c.
+        # Exit code must be exactly 1 (findings reported) and the
+        # output must actually contain findings — a build breakage or
+        # a silent analyzer would both fail here.
+        run: |
+          line=$(tail -n 1 /tmp/quickstart.sh)
+          code=0
+          out=$(bash -c "$line" 2>&1) || code=$?
+          echo "$out" | tee /tmp/analyze.log
+          echo "exit_code=$code" >> /tmp/analyze.log
+          test "$code" -eq 1
+          echo "$out" | grep -qi "finding"
+
+      - name: Publish failure logs to refs/ci-logs/*
+        # The sandbox cannot read Actions logs (git protocol only), so
+        # on failure the step logs are committed on a detached HEAD and
+        # pushed to refs/ci-logs/<sha>/docs-quickstart — readable with
+        # `git fetch origin <ref> && git show FETCH_HEAD:<file>`.
+        if: failure()
+        run: |
+          tail -n 150 /tmp/setup.log   > setup.tail.log   2>/dev/null || true
+          cp /tmp/analyze.log analyze.log                 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f setup.tail.log analyze.log 2>/dev/null || true
+          git commit -qm "ci logs: docs-quickstart @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docs-quickstart"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/docs-quickstart/${{ job.status }}"
