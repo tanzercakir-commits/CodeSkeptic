@@ -2,6 +2,7 @@ add_library(codeskeptic_core STATIC
     core/Messages.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
+    source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
     engine/CfgCache.cpp
     engine/FatalCalls.cpp
@@ -42,6 +43,21 @@ add_library(codeskeptic_core STATIC
 
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
+
+# Relocatable-tarball rpath: distro LLVM packages link the clang libs
+# against a shared libLLVM.so; the release layout bundles it in ../lib
+# next to the binary (package_release.sh). Harmless for dev builds —
+# an rpath entry that matches nothing is simply skipped.
+if(APPLE)
+    target_link_options(codeskeptic PRIVATE
+        "-Wl,-rpath,@executable_path/../lib")
+else()
+    # --disable-new-dtags => DT_RPATH (not RUNPATH): unlike RUNPATH,
+    # DT_RPATH applies transitively, so bundled libLLVM.so's own deps
+    # (libedit, libxml2, ...) are also resolved from ../lib.
+    target_link_options(codeskeptic PRIVATE
+        "-Wl,-rpath,$ORIGIN/../lib" "-Wl,--disable-new-dtags")
+endif()
 
 target_include_directories(codeskeptic_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}

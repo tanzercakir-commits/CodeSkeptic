@@ -1,0 +1,85 @@
+name: Docker
+
+# phase* pushes and PRs touching the image: build + smoke only (the
+# gate). Tag pushes additionally publish to ghcr.io as <version> and
+# latest. The smoke is the same contract as the release tarball's:
+# analyze docs/demo.c in the fresh image -> exactly exit 1, findings
+# present.
+on:
+  push:
+    branches: ["phase*"]
+    paths:
+      - "Dockerfile"
+      - "scripts/package_release.sh"
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/docker.yml"
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - "scripts/package_release.sh"
+      - ".github/workflows/docker.yml"
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        id: build
+        run: |
+          set -o pipefail
+          docker build -t codeskeptic:test . 2>&1 | tee /tmp/docker_build.log
+
+      - name: Smoke (fresh image, demo.c, exit 1 + findings)
+        id: smoke
+        run: |
+          code=0
+          out=$(docker run --rm -v "$PWD/docs:/work:ro" codeskeptic:test demo.c 2>&1) || code=$?
+          echo "$out" | tee /tmp/docker_smoke.log
+          echo "exit_code=$code" >> /tmp/docker_smoke.log
+          test "$code" -eq 1
+          echo "$out" | grep -qi finding
+
+      - name: Failure diagnostics -> refs/ci-logs/*
+        if: failure()
+        run: |
+          tail -c 30000 /tmp/docker_build.log > build_tail.log 2>/dev/null || true
+          cp /tmp/docker_smoke.log smoke.log 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f build_tail.log smoke.log 2>/dev/null || git add -f build_tail.log || true
+          git commit -qm "ci diagnostics: docker @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docker"
+
+      - name: Publish to ghcr.io (releases only)
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          IMG=ghcr.io/${{ github.repository_owner }}/codeskeptic
+          VER=$(docker run --rm codeskeptic:test --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          docker tag codeskeptic:test "$IMG:v$VER"
+          docker tag codeskeptic:test "$IMG:latest"
+          docker push "$IMG:v$VER"
+          docker push "$IMG:latest"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/docker/${{ job.status }}"

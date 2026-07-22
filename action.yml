@@ -1,0 +1,101 @@
+name: "CodeSkeptic Analyze"
+description: >-
+  Precision-first C/C++ static analysis with dataflow traces.
+  Downloads a CodeSkeptic release binary, analyzes your code, and can
+  upload SARIF to GitHub code scanning. Default gate is report-only:
+  findings are reported but do not fail the job until you opt in.
+author: "tanzercakir-commits"
+branding:
+  icon: "search"
+  color: "gray-dark"
+
+inputs:
+  path:
+    description: "Directory or file to analyze"
+    required: false
+    default: "."
+  build-path:
+    description: "Directory containing compile_commands.json (strongly recommended)"
+    required: false
+    default: ""
+  sarif:
+    description: "SARIF output file path"
+    required: false
+    default: "codeskeptic.sarif"
+  upload-sarif:
+    description: "Upload the SARIF to GitHub code scanning (needs security-events: write)"
+    required: false
+    default: "true"
+  gate:
+    description: >-
+      report-only (default): always exit 0, findings inform.
+      error: exit 1 when findings are reported — opt in AFTER a
+      report-only adoption week (see docs/evaluate.md).
+    required: false
+    default: "report-only"
+  version:
+    description: "Release tag to use (e.g. v0.4.0); latest release by default"
+    required: false
+    default: "latest"
+  extra-args:
+    description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $PWD/src)"
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: "Raw analyzer exit code (0 clean, 1 findings)"
+    value: ${{ steps.analyze.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download CodeSkeptic release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        DEST="$RUNNER_TEMP/codeskeptic-dist"
+        mkdir -p "$DEST"
+        REPO="tanzercakir-commits/CodeSkeptic"
+        PATTERN="codeskeptic-*-linux-x86_64.tar.gz"
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          gh release download -R "$REPO" -p "$PATTERN" -D "$DEST"
+        else
+          gh release download "${{ inputs.version }}" -R "$REPO" -p "$PATTERN" -D "$DEST"
+        fi
+        tar xzf "$DEST"/codeskeptic-*.tar.gz -C "$DEST"
+        BIN_DIR=$(dirname "$(find "$DEST" -name codeskeptic -type f | head -1)")
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
+        "$BIN_DIR/codeskeptic" --version
+
+    - name: Analyze
+      id: analyze
+      shell: bash
+      run: |
+        set -uo pipefail
+        args=( "${{ inputs.path }}" --sarif "${{ inputs.sarif }}" )
+        if [ -n "${{ inputs.build-path }}" ]; then
+          args+=( --build-path "${{ inputs.build-path }}" )
+        fi
+        # extra-args is intentionally word-split
+        extra=( ${{ inputs.extra-args }} )
+        code=0
+        codeskeptic "${args[@]}" "${extra[@]}" || code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" -gt 1 ]; then
+          echo "::error::codeskeptic failed (exit $code)"; exit "$code"
+        fi
+        if [ "$code" -eq 1 ]; then
+          if [ "${{ inputs.gate }}" = "error" ]; then
+            echo "::error::CodeSkeptic reported findings (gate: error)"; exit 1
+          fi
+          echo "::notice::CodeSkeptic reported findings (gate: report-only — job stays green)"
+        fi
+
+    - name: Upload SARIF to code scanning
+      if: ${{ inputs.upload-sarif == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif }}

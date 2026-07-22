@@ -63,6 +63,12 @@ codeskeptic <source_path> [options]
 Exit code is `1` when findings are reported, `0` when clean — suitable
 for CI gates.
 
+**Environment:** `CODESKEPTIC_RESOURCE_DIR` overrides the Clang
+resource directory (intrinsic headers). Normally unnecessary — release
+tarballs bundle the headers next to the binary (`lib/clang/<N>/include`,
+found automatically), and source builds bake the build machine's path.
+Set it only when analyzing with a resource dir in a non-standard place.
+
 ## Configuration file
 
 Options can also be set in a `.codeskeptic.conf` file (`key=value` lines:

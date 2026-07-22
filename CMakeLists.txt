@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(CodeSkeptic VERSION 0.3.0 LANGUAGES C CXX)
+project(CodeSkeptic VERSION 0.4.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,5 +19,11 @@ message(STATUS "Clang include dirs: ${CLANG_INCLUDE_DIRS}")
 
 add_subdirectory(src)
 
-enable_testing()
-add_subdirectory(tests)
+# OFF for artifact builds (Docker image): the tests FetchContent
+# googletest, which needs git + network — a hermetic image build
+# shouldn't. CI and dev builds keep the default ON.
+option(CODESKEPTIC_BUILD_TESTS "Build unit tests" ON)
+if(CODESKEPTIC_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
