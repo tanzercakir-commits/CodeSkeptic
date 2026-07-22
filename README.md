@@ -30,7 +30,7 @@ returning machine-readable findings with dataflow traces.
 Linux (Ubuntu 24.04) — four commands from clone to first report:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev ninja-build
+sudo apt-get update && sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 libzstd-dev zlib1g-dev ninja-build
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
 cmake --build build
 ./build/src/codeskeptic docs/demo.c

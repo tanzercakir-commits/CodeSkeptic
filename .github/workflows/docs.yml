@@ -61,7 +61,8 @@ jobs:
       - name: Run setup lines (must succeed)
         run: |
           head -n -1 /tmp/quickstart.sh > /tmp/setup.sh
-          bash -ex /tmp/setup.sh
+          set -o pipefail
+          bash -ex /tmp/setup.sh 2>&1 | tee /tmp/setup.log
 
       - name: Run the analyze line (must find the demo bugs, exit 1)
         # The last quickstart line runs the analyzer on docs/demo.c.
@@ -71,10 +72,27 @@ jobs:
         run: |
           line=$(tail -n 1 /tmp/quickstart.sh)
           code=0
-          out=$(bash -c "$line") || code=$?
-          echo "$out"
+          out=$(bash -c "$line" 2>&1) || code=$?
+          echo "$out" | tee /tmp/analyze.log
+          echo "exit_code=$code" >> /tmp/analyze.log
           test "$code" -eq 1
           echo "$out" | grep -qi "finding"
+
+      - name: Publish failure logs to refs/ci-logs/*
+        # The sandbox cannot read Actions logs (git protocol only), so
+        # on failure the step logs are committed on a detached HEAD and
+        # pushed to refs/ci-logs/<sha>/docs-quickstart — readable with
+        # `git fetch origin <ref> && git show FETCH_HEAD:<file>`.
+        if: failure()
+        run: |
+          tail -n 150 /tmp/setup.log   > setup.tail.log   2>/dev/null || true
+          cp /tmp/analyze.log analyze.log                 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f setup.tail.log analyze.log 2>/dev/null || true
+          git commit -qm "ci logs: docs-quickstart @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docs-quickstart"
 
       - name: Mirror job status to refs/status/*
         if: always()
