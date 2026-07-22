@@ -3,6 +3,7 @@
 #include "contracts/Sidecar.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
+#include "engine/ImmutableFlags.h"
 #include "engine/ParamIntervals.h"
 #include "source_manager/SourceManager.h"
 
@@ -28,6 +29,7 @@ public:
         codeskeptic::SummaryRegistry::instance().clear();
         codeskeptic::CfgCache::instance().clear();
         codeskeptic::ParamIntervalCache::instance().clear();
+        codeskeptic::ImmutableFlagCache::instance().clear();
         codeskeptic::clearSidecarCache();
     }
 

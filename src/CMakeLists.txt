@@ -6,6 +6,7 @@ add_library(codeskeptic_core STATIC
     engine/AllocFunctions.cpp
     engine/CfgCache.cpp
     engine/FatalCalls.cpp
+    engine/ImmutableFlags.cpp
     engine/RuleEngine.cpp
     engine/SummaryDiff.cpp
     engine/FunctionSummary.cpp
