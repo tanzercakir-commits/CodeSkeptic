@@ -240,8 +240,13 @@ std::string fingerprintOf(const std::string& path) {
     if (ec) return {};
     auto mtime = fs::last_write_time(path, ec);
     if (ec) return {};
-    return std::to_string(size) + ":" +
-           std::to_string(mtime.time_since_epoch().count());
+    // Explicit casts: on Apple libc++ file_time_type's rep is __int128,
+    // which has no std::to_string overload (ambiguous-call error). The
+    // narrowing is harmless — this is a cache fingerprint, not a
+    // timestamp.
+    return std::to_string(static_cast<unsigned long long>(size)) + ":" +
+           std::to_string(static_cast<long long>(
+               mtime.time_since_epoch().count()));
 }
 
 } // anonymous namespace
