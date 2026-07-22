@@ -184,6 +184,14 @@ const MsgEntry kMessages[] = {
     // IntOverflowMul
     {"possible integer overflow: this multiplication can exceed '{0}'",
      "olasi tamsayi tasmasi: bu carpma '{0}' sinirini asabilir"},
+    // IntOverflowAdd
+    {"possible integer overflow: this addition can exceed '{0}'",
+     "olasi tamsayi tasmasi: bu toplama '{0}' sinirini asabilir"},
+    // IntOverflowNarrow
+    {"possible integer overflow: arithmetic result provably exceeds the "
+     "narrower target type '{0}'",
+     "olasi tamsayi tasmasi: aritmetik sonuc, daraltilan hedef tip '{0}' "
+     "sinirini kanitlanabilir bicimde asiyor"},
     // BoundsArrayDefinite
     {"out-of-bounds array access: proven index range {0} lies outside the "
      "array bound [0, {1})",
