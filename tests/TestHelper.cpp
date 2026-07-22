@@ -4,6 +4,7 @@
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "engine/ParamIntervals.h"
+#include "source_manager/SourceManager.h"
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -77,13 +78,24 @@ public:
 namespace codeskeptic {
 namespace testing {
 
+// Same platform args as production tooling (resource-dir; macOS SDK
+// sysroot) — single source of truth in platformExtraArgs(). Without
+// them a snippet's #include <stdlib.h> fails on macOS, the TU breaks,
+// and finding-expecting tests fail while clean-expecting ones pass
+// vacuously.
+static std::vector<std::string> testArgs() {
+    std::vector<std::string> args = {"-fparse-all-comments"};
+    for (auto& a : platformExtraArgs()) args.push_back(a);
+    return args;
+}
+
 DiagnosticList runRule(Rule& rule, const std::string& code,
                        const std::string& filename) {
     DiagnosticList results;
     clang::tooling::runToolOnCodeWithArgs(
         std::make_unique<TestAction>(rule, results),
         code,
-        {"-fparse-all-comments"},
+        testArgs(),
         filename);
     return results;
 }
@@ -91,12 +103,13 @@ DiagnosticList runRule(Rule& rule, const std::string& code,
 DiagnosticList runRuleCrossTU(Rule& rule, const std::string& calleeTU,
                               const std::string& callerTU) {
     SummaryRegistry::instance().clearGlobal();
-    clang::tooling::runToolOnCode(std::make_unique<HarvestAction>(),
-                                  calleeTU, "callee_tu.cpp");
+    clang::tooling::runToolOnCodeWithArgs(
+        std::make_unique<HarvestAction>(), calleeTU,
+        testArgs(), "callee_tu.cpp");
     DiagnosticList results;
-    clang::tooling::runToolOnCode(
+    clang::tooling::runToolOnCodeWithArgs(
         std::make_unique<TestAction>(rule, results),
-        callerTU, "caller_tu.cpp");
+        callerTU, testArgs(), "caller_tu.cpp");
     SummaryRegistry::instance().clearGlobal();
     return results;
 }
