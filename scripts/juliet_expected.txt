@@ -70,7 +70,12 @@ CWE476 0.95 0.30
 CWE401 0.66 0.18
 CWE415 0.95 0.23
 CWE416 0.95 0.48
-CWE369 0.95 0.03
+# 2026-07-22 (v0.4 recall round, copy-taint): zeroness flows through
+# var-to-var copies (the fgets *_31/_33 launder). Sampled rhitrate
+# 0.093 -> 0.098 @ rprecision 1.000; floor RAISED 0.03 -> 0.085.
+# Remaining big FN slice (flow-through-calls, 54 files) needs
+# zeroness-through-summaries unification — parked, documented.
+CWE369 0.95 0.085
 # 2026-07-22 (v0.4 recall round, int-overflow coverage): BO_Add joins
 # BO_Mul, 64-bit sites proved via __int128 operand corners, implicit
 # narrowing stores checked against the destination width, INT64_MAX
