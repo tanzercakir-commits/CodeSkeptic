@@ -2,8 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # phase* branches: the dev sandbox drives this repo over the git
+    # protocol only (no REST API), so feature work pushed as phase*
+    # gets CI on push and reads the verdict from refs/status/* (see
+    # the last step) without needing a PR to exist first.
+    branches: [main, "phase*"]
   pull_request:
+
+# Job-status mirroring (refs/status/*) needs push rights.
+permissions:
+  contents: write
 
 # Cost balance: back-to-back pushes to the same ref cancel the old run
 concurrency:
@@ -65,3 +73,14 @@ jobs:
 
       - name: Real-world corpus (cJSON + tinyxml2)
         run: bash scripts/run_corpus.sh ./build/src/codeskeptic /tmp/corpus
+
+      - name: Mirror job status to refs/status/*
+        # The dev sandbox can reach this repo over the git protocol
+        # only (no REST API), so the job's conclusion is published as
+        # a lightweight ref it can read with `git ls-remote`:
+        #   refs/status/<sha>/build-and-test/<success|failure|cancelled>
+        # Namespaced refs are invisible as branches and trigger nothing.
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/build-and-test/${{ job.status }}"
