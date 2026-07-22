@@ -76,10 +76,15 @@ if [ "$OS" = "darwin" ]; then
     # install_name_tool invalidates the ad-hoc signature on arm64
     codesign -f -s - "$STAGE/bin/codeskeptic" 2>/dev/null || true
 else
-    # (|| true: statically-linked LLVM means grep matches nothing —
-    # that's success, not an error, under set -o pipefail)
+    # Bundle EVERYTHING except the glibc core (which must come from the
+    # host — bundling glibc breaks more than it fixes). Chasing named
+    # libs one by one is whack-a-mole: libLLVM pulls libedit, libxml2,
+    # icu, ... — ldd lists the full transitive closure, so one pass
+    # catches them all. (|| true: nothing to bundle is success, not an
+    # error, under set -o pipefail.)
+    GLIBC_CORE='ld-linux|libc\.so|libm\.so|libpthread\.so|libdl\.so|librt\.so|libresolv\.so|libutil\.so|libgcc_s\.so|libstdc\+\+\.so'
     ldd "$STAGE/bin/codeskeptic" | awk '$3 ~ /\// {print $3}' \
-      | grep -Ei 'libLLVM|libclang' | while read -r so; do
+      | grep -Ev "$GLIBC_CORE" | sort -u | while read -r so; do
         cp -L "$so" "$STAGE/lib/"
     done || true
 fi

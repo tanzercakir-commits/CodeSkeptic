@@ -52,8 +52,11 @@ if(APPLE)
     target_link_options(codeskeptic PRIVATE
         "-Wl,-rpath,@executable_path/../lib")
 else()
+    # --disable-new-dtags => DT_RPATH (not RUNPATH): unlike RUNPATH,
+    # DT_RPATH applies transitively, so bundled libLLVM.so's own deps
+    # (libedit, libxml2, ...) are also resolved from ../lib.
     target_link_options(codeskeptic PRIVATE
-        "-Wl,-rpath,$ORIGIN/../lib" "-Wl,--enable-new-dtags")
+        "-Wl,-rpath,$ORIGIN/../lib" "-Wl,--disable-new-dtags")
 endif()
 
 target_include_directories(codeskeptic_core
