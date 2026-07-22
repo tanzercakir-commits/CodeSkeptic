@@ -50,9 +50,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract the first Quickstart code block
+      - name: Extract the build-from-source Quickstart block
+        # The binary/Docker blocks above it depend on published release
+        # assets — those are proven by release.yml's own clean-container
+        # smoke. THIS test proves the copy-paste source build.
         run: |
-          awk '/^## Quickstart/{s=1} s&&/^```bash/{b=1;next} b&&/^```/{exit} b' \
+          awk '/^### Build from source/{s=1} s&&/^```bash/{b=1;next} b&&/^```/{exit} b' \
             README.md > /tmp/quickstart.sh
           echo "--- extracted quickstart ---"
           cat /tmp/quickstart.sh
