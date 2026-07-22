@@ -27,7 +27,33 @@ returning machine-readable findings with dataflow traces.
 
 ## Quickstart
 
-Linux (Ubuntu 24.04) — four commands from clone to first report:
+**Binary** — Linux x86_64 (macOS arm64: `codeskeptic-darwin-arm64.tar.gz`),
+no LLVM install needed; the tarball bundles the Clang headers and every
+non-glibc library, and each release is smoke-tested in clean containers
+before publishing:
+
+```bash
+curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+./codeskeptic-v*/bin/codeskeptic path/to/your.c
+```
+
+**Docker** — nothing installed at all:
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic src/ --sarif out.sarif
+```
+
+**CI** — the [packaged action](action.yml), report-only by default:
+
+```yaml
+- uses: tanzercakir-commits/CodeSkeptic@v0.4.0
+  with: { path: src/, build-path: build }
+```
+
+### Build from source
+
+Linux (Ubuntu 24.04) — four commands from clone to first report (this
+exact block is executed on a clean runner by CI, so it stays honest):
 
 ```bash
 sudo apt-get update && sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 libzstd-dev zlib1g-dev ninja-build

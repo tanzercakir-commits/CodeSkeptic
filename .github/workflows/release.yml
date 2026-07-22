@@ -30,13 +30,16 @@ jobs:
 
       - name: Build (portable link flags)
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
-            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
-          cmake --build build
+          set -o pipefail
+          { cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+              -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
+            && cmake --build build ; } 2>&1 | tee /tmp/build.log
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          set -o pipefail
+          ctest --test-dir build --output-on-failure 2>&1 | tee /tmp/ctest.log
 
       - name: Version must match the tag
         run: |
@@ -45,7 +48,10 @@ jobs:
           test "CodeSkeptic ${GITHUB_REF_NAME#v}" = "$v"
 
       - name: Package
-        run: bash scripts/package_release.sh build/src/codeskeptic dist clang-20
+        run: |
+          set -o pipefail
+          bash scripts/package_release.sh build/src/codeskeptic dist clang-20 \
+            2>&1 | tee /tmp/package.log
 
       - name: Smoke in clean containers (22.04 + 24.04)
         # The tarball must work on a machine with NO LLVM installed.
@@ -72,8 +78,23 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --draft \
             --title "CodeSkeptic $GITHUB_REF_NAME" \
             --notes "Draft — assets uploading." 2>/dev/null || true
+          cp dist/codeskeptic-*-linux-*.tar.gz codeskeptic-linux-x86_64.tar.gz
           gh release upload "$GITHUB_REF_NAME" \
-            dist/codeskeptic-*-linux-*.tar.gz --clobber
+            dist/codeskeptic-*-linux-*.tar.gz \
+            codeskeptic-linux-x86_64.tar.gz --clobber
+
+      - name: Diagnostics -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in build ctest package; do
+            tail -c 25000 "/tmp/$f.log" > "$f.tail.log" 2>/dev/null || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f build.tail.log ctest.tail.log package.tail.log 2>/dev/null || true
+          git commit -qm "release-linux logs @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/release-linux"
 
       - name: Mirror job status to refs/status/*
         if: always()
@@ -86,16 +107,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM (Homebrew)
-        run: brew install llvm cmake ninja
+      - name: Install LLVM 20 (Homebrew, PINNED — brew's default llvm
+              drifts to new majors; the engine is tested on 18/20)
+        run: brew install llvm@20 cmake ninja
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build
+          set -o pipefail
+          { cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)" \
+            && cmake --build build ; } 2>&1 | tee /tmp/build.log
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          set -o pipefail
+          ctest --test-dir build --output-on-failure 2>&1 | tee /tmp/ctest.log
 
       - name: Version must match the tag
         run: |
@@ -105,8 +131,9 @@ jobs:
 
       - name: Package
         run: |
+          set -o pipefail
           bash scripts/package_release.sh build/src/codeskeptic dist \
-            "$(brew --prefix llvm)/bin/clang"
+            "$(brew --prefix llvm@20)/bin/clang" 2>&1 | tee /tmp/package.log
 
       - name: Smoke from an unpacked tree outside the repo
         # Relocation check: run from /tmp; the exe-relative bundled
@@ -115,7 +142,8 @@ jobs:
           tar xzf dist/codeskeptic-*-darwin-*.tar.gz -C /tmp
           cd /tmp/codeskeptic-*
           code=0; out=$(./bin/codeskeptic "$GITHUB_WORKSPACE/docs/demo.c" 2>&1) || code=$?
-          echo "$out"
+          echo "$out" | tee /tmp/smoke.log
+          echo "exit_code=$code" >> /tmp/smoke.log
           test "$code" -eq 1
           echo "$out" | grep -qi finding
 
@@ -126,8 +154,23 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --draft \
             --title "CodeSkeptic $GITHUB_REF_NAME" \
             --notes "Draft — assets uploading." 2>/dev/null || true
+          cp dist/codeskeptic-*-darwin-*.tar.gz codeskeptic-darwin-arm64.tar.gz
           gh release upload "$GITHUB_REF_NAME" \
-            dist/codeskeptic-*-darwin-*.tar.gz --clobber
+            dist/codeskeptic-*-darwin-*.tar.gz \
+            codeskeptic-darwin-arm64.tar.gz --clobber
+
+      - name: Diagnostics -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in build ctest package smoke; do
+            tail -c 25000 "/tmp/$f.log" > "$f.tail.log" 2>/dev/null || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f build.tail.log ctest.tail.log package.tail.log smoke.tail.log 2>/dev/null || true
+          git commit -qm "release-macos logs @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/release-macos"
 
       - name: Mirror job status to refs/status/*
         if: always()
@@ -148,7 +191,9 @@ jobs:
           (cd assets && sha256sum *.tar.gz) > sha256sums.txt
           cat sha256sums.txt
           gh release upload "$GITHUB_REF_NAME" sha256sums.txt --clobber
-          gh release edit "$GITHUB_REF_NAME" --draft=false
+          gh release edit "$GITHUB_REF_NAME" \
+            --title "CodeSkeptic $GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md --draft=false
       - name: Mirror job status to refs/status/*
         if: always()
         run: |
