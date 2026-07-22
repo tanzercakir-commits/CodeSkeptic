@@ -1,0 +1,114 @@
+-- The C compiler identification is GNU 11.4.0
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAVE_FFI_CALL
+-- Performing Test HAVE_FFI_CALL - Success
+-- Found FFI: /usr/lib/x86_64-linux-gnu/libffi.so
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.2.11")
+-- Found zstd: /usr/lib/x86_64-linux-gnu/libzstd.so
+-- Found LibXml2: /usr/lib/x86_64-linux-gnu/libxml2.so (found version "2.9.13")
+-- Could NOT find CURL (missing: CURL_LIBRARY CURL_INCLUDE_DIR) 
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Could NOT find CURL (missing: CURL_LIBRARY CURL_INCLUDE_DIR) 
+-- LLVM version: 20.1.8
+-- Clang include dirs: /usr/lib/llvm-20/include
+-- Clang resource dir: /usr/lib/llvm-20/lib/clang/20
+-- Found Python3: /usr/bin/python3.10 (found version "3.10.12") found components: Interpreter
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Configuring done (4.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/runner/work/CodeSkeptic/CodeSkeptic/build
+[1/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/Messages.cpp.o
+[2/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AllocFunctions.cpp.o
+[3/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/ResourceDir.cpp.o
+[4/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FatalCalls.cpp.o
+[5/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/FunctionFilter.cpp.o
+[6/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/CfgCache.cpp.o
+[7/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/SummaryDiff.cpp.o
+[8/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/RuleEngine.cpp.o
+[9/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/Interval.cpp.o
+[10/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o
+[11/82] Building CXX object _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[12/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ImmutableFlags.cpp.o
+[13/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/CoverageReport.cpp.o
+[14/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AssumptionMode.cpp.o
+[15/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/ConsoleReporter.cpp.o
+[16/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/HtmlReporter.cpp.o
+[17/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/JsonReporter.cpp.o
+[18/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/SarifReporter.cpp.o
+[19/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/config/Config.cpp.o
+[20/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/IntervalEval.cpp.o
+[21/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/SuppressionFilter.cpp.o
+[22/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/Baseline.cpp.o
+[23/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/StaticAnalyzer.cpp.o
+[24/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ExtentMap.cpp.o
+[25/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/server/McpServer.cpp.o
+[26/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/PathFacts.cpp.o
+[27/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/MemoryLeakRule_Ex.cpp.o
+[28/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ParamIntervals.cpp.o
+[29/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/DivByZeroRule.cpp.o
+[30/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/IntOverflowRule.cpp.o
+[31/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/UninitPointerRule_Ex.cpp.o
+[32/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/NullDerefRule.cpp.o
+[33/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FunctionSummary.cpp.o
+[34/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o
+[35/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractParser.cpp.o
+[36/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Policy.cpp.o
+[37/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o
+[38/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
+[39/82] Linking CXX static library lib/libgtest.a
+[40/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o
+[41/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o
+[42/82] Building CXX object src/CMakeFiles/codeskeptic.dir/main.cpp.o
+[43/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o
+[44/82] Building CXX object _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
+[45/82] Building CXX object _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o
+[46/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/UninitPointerRuleExTest.cpp.o
+[47/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/DiagnosticTest.cpp.o
+[48/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/DivByZeroRuleTest.cpp.o
+[49/82] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/BoundsRule.cpp.o
+[50/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/MemoryLeakRuleExTest.cpp.o
+[51/82] Linking CXX static library src/libcodeskeptic_core.a
+[52/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/IntOverflowRuleTest.cpp.o
+[53/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/CfgCacheTest.cpp.o
+[54/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/BoundsRuleTest.cpp.o
+[55/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/HtmlReporterTest.cpp.o
+[56/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/SarifReporterTest.cpp.o
+[57/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/CoverageReportTest.cpp.o
+[58/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/IntervalTest.cpp.o
+[59/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/TestHelper.cpp.o
+[60/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/NullDerefRuleTest.cpp.o
+[61/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/AssumptionRuleTest.cpp.o
+[62/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/SummaryDiffTest.cpp.o
+[63/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/FatalCallsTest.cpp.o
+[64/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/SuppressionFilterTest.cpp.o
+[65/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/BaselineTest.cpp.o
+[66/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/DisjunctsV2bTest.cpp.o
+[67/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/FunctionFilterTest.cpp.o
+[68/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/StressEdgeCaseTest.cpp.o
+[69/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/ReportPathsTest.cpp.o
+[70/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/McpServerTest.cpp.o
+[71/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/BrokenTuTest.cpp.o
+[72/82] Linking CXX static library lib/libgmock.a
+[73/82] Building CXX object _deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o
+[74/82] Linking CXX static library lib/libgtest_main.a
+[75/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/ContractTest.cpp.o
+[76/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/ResourceDirTest.cpp.o
+[77/82] Linking CXX static library lib/libgmock_main.a
+[78/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/InterproceduralTest.cpp.o
+[79/82] Linking CXX executable src/codeskeptic
+[80/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/ParamIntervalsTest.cpp.o
+[81/82] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/IntervalAnalysisTest.cpp.o
+[82/82] Linking CXX executable tests/codeskeptic_tests
