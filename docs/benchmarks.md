@@ -39,18 +39,30 @@ FP-hunting material).
 
 | CWE | Target rule | Rule precision | Recall | Case F1 |
 |-----|-------------|---------------:|-------:|--------:|
-| CWE-416 Use After Free | `use-after-free` | **1.000** (200 TP / 0 FP) | 0.501 | **0.668** |
-| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (141 TP / 0 FP) | 0.352 | **0.521** |
-| CWE-415 Double Free | `double-free` | **1.000** (95 TP / 0 FP) | 0.241 | 0.388 |
-| CWE-401 Memory Leak | `memory-leak` | 0.716 (case-level) | 0.195 | 0.306 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (38 TP / 0 FP) | 0.095 | 0.174 |
-| CWE-190 Integer Overflow | `int-overflow` | **1.000** (42 TP / 0 FP*) | 0.010 | 0.020 |
+| CWE-416 Use After Free | `use-after-free` | **1.000** (198 TP / 0 FP) | 0.496 | **0.663** |
+| CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (140 TP / 0 FP) | 0.347 | **0.516** |
+| CWE-415 Double Free | `double-free` | **1.000** (97 TP / 0 FP) | 0.242 | 0.390 |
+| CWE-401 Memory Leak | `memory-leak` | 0.714 (case-level) | 0.193 | 0.306 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (39 TP / 0 FP) | 0.098 | 0.178 |
+| CWE-190 Integer Overflow | `int-overflow` | **1.000** (21 TP / 0 FP*) | 0.052 | 0.100 |
 
-<sub>* CWE-190 precision measured over the full 3080-file corpus (42 TP,
-0 FP); the recall figure is the CI-sampled rate. The rand-source family
-reaches the sink through a bit-shuffle macro the interval evaluator
-cannot fold — a documented known false negative — so the sampled recall
-is deliberately low while precision is perfect.</sub>
+<sub>* The CWE-190 rand-source family reaches the sink through a
+bit-shuffle macro the interval evaluator cannot fold — a documented
+known false negative — so the sampled recall stays deliberately
+conservative while precision is perfect.</sub>
+
+**Where the misses live — the FN classification.** Every missed case
+is bucketed by its variant name (`JULIET_FN_CLASS` in the CI output;
+`scripts/juliet_eval.py`), so the recall numbers carry their honest
+denominator. Reading div-by-zero as an example: of 360 missed cases,
+158 are floating-point variants (IEEE 754 division is defined
+behavior — deliberately silent) and 81 are opaque sources (`rand()`,
+sockets — an honest analyzer cannot call them zero); the remaining
+~120 addressable misses are dominated by flow-through-calls variants,
+the next recall target. CWE-190's map is similar: 179 opaque
+rand-family cases by design, the rest addressable and shrinking (the
+v0.4 round covered `+`, 64-bit and narrowing-store shapes: recall
+0.010 → 0.052 at precision 1.000).
 
 The journey these numbers took: targeted path-sensitivity
 (2026-07-10) cut false positives across rules (memory-leak 92 → 61,
@@ -62,9 +74,15 @@ connected source/sink flows split across files. Guarded disjuncts v2
 (2026-07-12) added call-condition keys, a flow-sensitive fact
 lifecycle with constant stamping and entailment, disjunction
 elimination for value-materialized asserts, and engine-level
-convergence widening — CWE-416 recall rose 0.436 → 0.501 and CWE-401
-precision 0.653 → 0.716 in the same step that removed hundreds of
-real-world false positives. A caveat on cross-rule findings: Juliet
+convergence widening. The v0.4 recall round (2026-07-22) worked from
+the FN classification: int-overflow grew from signed 32-bit `*` to
+`+`, 64-bit corner proofs and narrowing stores (0.010 → 0.052);
+div-by-zero zeroness now flows through var-to-var copies
+(0.093 → 0.098); and immutable-flag constant propagation prunes
+provably-dead branches engine-wide — the goodB2G flag-correlation FP
+family died (leak precision 0.684 → 0.714 on the 400-file sample,
+cross-rule noise down on three other CWEs at once). A caveat on
+cross-rule findings: Juliet
 `good` functions are only guaranteed free of the *tested* CWE — e.g. a
 CWE-416 good function may genuinely leak, so a `memory-leak` finding
 there is counted against us while possibly being correct. The
@@ -96,10 +114,12 @@ Notes on reading these numbers honestly:
   cross-rule noise on other CWEs' files) and is the current
   improvement target.
 
-Results are from the 2026-07-18 run (v0.3); grep `JULIET_RESULT` in the
-weekly workflow logs for current numbers. The v0.3 recall series added a
-sixth per-CWE floor (CWE-190) and raised div-by-zero recall via untrusted
-sources — all six floors hold rprecision 1.000 with zero regressions.
+Results are from the 2026-07-22 run (v0.4.1, 400 files/CWE); grep
+`JULIET_RESULT` in the workflow logs for current numbers. Every
+improvement is locked by a ratcheted floor in
+`scripts/juliet_expected.txt` (CWE-190 recall 0.005 → 0.040, CWE-369
+0.03 → 0.085, CWE-401 precision 0.66 → 0.68) — the guard file's
+comments carry each move's rationale.
 
 ## Reading the real-world scan numbers
 

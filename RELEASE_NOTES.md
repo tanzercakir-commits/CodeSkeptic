@@ -1,79 +1,50 @@
-# CodeSkeptic v0.4.0 — the onboarding release
+# CodeSkeptic v0.4.1 — the measured-recall round
 
-v0.3 asked "do we catch the bugs an AI writes?"; v0.4 asks the question
-an external reviewer put to us bluntly: *can a stranger try this in
-five minutes?* Until now the honest answer was no — source build only,
-LLVM dev libraries required, a 742-line README. This release is the
-response, built point by point from that review.
+v0.4.0 fixed the front door (relocatable binaries, Docker, the
+report-only Action, a README a stranger can use in five minutes).
+v0.4.1 is the engine round that followed, worked entirely from
+measurement: every missed Juliet case is now *classified*
+(by-design silence vs addressable gap), and the addressable slices
+were closed one root cause at a time — each improvement locked by a
+ratcheted CI floor, precision-first bar intact.
 
-## Try it in one command
+## Engine
 
-**Binary** (no LLVM install needed — the tarball bundles the Clang
-intrinsic headers and every non-glibc shared library, found
-exe-relative at runtime):
+- **int-overflow coverage** (recall 0.010 → 0.052 @ precision 1.000):
+  signed `+` joins `*`; 64-bit sites are proved from operand intervals
+  via `__int128` corner arithmetic; results implicitly narrowed into a
+  smaller signed type (`char r = d + 1` — the add happens in `int`,
+  the wrap on the store) are checked against the destination width.
+  Unsigned destinations (defined wrap) and explicit casts (stated
+  intent) stay silent; `INT64_MAX`-boundary literals became modelable
+  (an off-by-one in the interval evaluator's significant-bits guard).
+- **div-by-zero copy flow** (recall 0.093 → 0.098 @ precision 1.000):
+  zeroness now flows through var-to-var copies — `int copy = data;`
+  no longer launders an untrusted divisor, and the copy step shows up
+  in the finding's dataflow trace.
+- **Immutable-flag constant propagation** (engine-wide): assume edges
+  that contradict the provable value of a never-written file-static
+  flag are infeasible and contribute no state. The Juliet
+  flag-correlation FP family died at the root — memory-leak precision
+  0.684 → 0.714 with cross-rule noise down on three other CWEs at
+  once. Mutated or address-taken flags are never folded (folding
+  would hide real leaks; pinned tests enforce both directions).
 
-```bash
-curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
-./codeskeptic-v*/bin/codeskeptic path/to/your.c
-```
+## Measurement infrastructure
 
-macOS (Apple Silicon): `codeskeptic-darwin-arm64.tar.gz`, same layout.
+- `JULIET_FN_CLASS` — every missed case bucketed by variant family
+  (float / opaque / baseline / flow / multifile / cpp), published with
+  full benchmark output to a git-readable ref on every run. Recall
+  numbers now carry their honest denominator: 66% of div-by-zero's
+  misses are deliberate silences, not gaps.
+- Floors ratcheted in `scripts/juliet_expected.txt` with rationale:
+  CWE-190 recall 0.005 → 0.040, CWE-369 0.03 → 0.085, CWE-401
+  precision 0.66 → 0.68.
 
-**Docker:**
+## Everything else
 
-```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic src/ --sarif out.sarif
-```
-
-**GitHub Action** — report-only by default (findings inform; blocking
-is an explicit opt-in after an adoption week, as our own evaluation
-guide recommends):
-
-```yaml
-- uses: tanzercakir-commits/CodeSkeptic@v0.4.0
-  with:
-    path: src/
-    build-path: build
-```
-
-Every release asset is smoke-tested before publishing: the tarball is
-extracted in clean containers (Ubuntu 22.04 + 24.04, no LLVM) and must
-find the demo bugs with exactly exit code 1.
-
-## What changed
-
-- **Relocatable binaries.** The Clang resource dir is resolved at
-  runtime (env override → exe-relative `lib/clang/<N>` → the build
-  machine's baked path), with the resolution order unit-tested. The
-  executable carries a transitive `DT_RPATH` to its bundled libraries.
-- **README re-architecture** (742 → ~250 lines). Quickstart first;
-  explicit "What it won't catch" and "Use it alongside, not instead"
-  sections; deep content layered into `docs/` (usage, integrations,
-  benchmarks, comparison, engine internals). Nothing was deleted.
-- **`docs/evaluate.md`** — the reviewer's own trial protocol, adopted
-  as our recommended evaluation: 10–30 of *your* TUs, real
-  `compile_commands.json`, memory-leak scored separately, traces
-  verified by hand, report-only CI for week one, gate only after
-  7–8/10 findings hold up.
-- **SARIF Windows-path fix**: drive-letter (`C:\`) and UNC paths are
-  now emitted as proper `file:///` URIs (closes
-  `docs/windows-support.md` §4; Windows support itself remains
-  plan-only, staged honestly).
-- **CI guards for the front door**: the README's quickstart block is
-  extracted verbatim and executed on a clean runner on every docs
-  change — copy-paste installability is proven, not assumed. It
-  caught its first real bug (a missing `clang-20` in the install line)
-  on its maiden run.
-- `CODESKEPTIC_BUILD_TESTS` CMake option (hermetic artifact builds);
-  Docker image with an LLVM-free runtime stage; release/docker/action
-  pipelines with per-job status mirroring.
-
-## Unchanged, on purpose
-
-The analysis engine is v0.3's: six Juliet CWE floors hold (rule
-precision 1.000 on five of six; the honest recall bounds and their
-reasons are in [docs/benchmarks.md](docs/benchmarks.md)), the blind
-AI-corpus recall gate stands at 0.625 @ precision 1.000, and the
-real-world corpus pins are untouched. Rule-quality work (memory-leak
-FP taxonomy, div-by-zero recall classification) is the next round —
-see [docs/PLAN-v0.4.md](docs/PLAN-v0.4.md).
+The v0.4.0 onboarding surface is unchanged and re-validated by this
+release's own clean-container smokes: binaries for Linux x86_64 and
+macOS arm64 (no LLVM install needed), the Docker image, the
+report-only-by-default GitHub Action, idiom profiles, and the
+layered docs. Full plan and status: `docs/PLAN-v0.4.md`.
