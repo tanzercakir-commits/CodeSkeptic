@@ -153,7 +153,11 @@ std::optional<int64_t> constInt(const Expr* e) {
     if (!e) return std::nullopt;
     e = e->IgnoreParenImpCasts();
     if (const auto* lit = dyn_cast<IntegerLiteral>(e)) {
-        if (lit->getValue().getSignificantBits() > 63) return std::nullopt;
+        // isSignedIntN(64), not significantBits>63: INT64_MAX needs 64
+        // significant bits as a signed quantity yet fits int64 exactly.
+        // Interval arithmetic overflow-guards itself (-> top()), so
+        // boundary constants are safe to model (Juliet int64_t_max_*).
+        if (!lit->getValue().isSignedIntN(64)) return std::nullopt;
         return lit->getValue().getSExtValue();
     }
     if (const auto* u = dyn_cast<UnaryOperator>(e))
@@ -179,7 +183,7 @@ std::optional<int64_t> foldConstInt(const Expr* e, const ASTContext* ctx) {
         return std::nullopt;
     const llvm::APSInt& ap = res.Val.getInt();
     if (ap.isSigned()) {
-        if (ap.getSignificantBits() > 63) return std::nullopt;
+        if (!ap.isSignedIntN(64)) return std::nullopt;  // see constInt
         return ap.getSExtValue();
     }
     if (ap.getActiveBits() > 63) return std::nullopt;
@@ -313,7 +317,7 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state,
     }
 
     if (const auto* lit = dyn_cast<IntegerLiteral>(expr)) {
-        if (lit->getValue().getSignificantBits() > 63) return Interval::top();
+        if (!lit->getValue().isSignedIntN(64)) return Interval::top();
         return Interval::constant(lit->getValue().getSExtValue());
     }
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {

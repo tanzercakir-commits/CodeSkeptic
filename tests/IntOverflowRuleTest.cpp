@@ -176,15 +176,161 @@ TEST(IntOverflowRuleTest, StaticHelperBoundedButSafeClean) {
     EXPECT_EQ(results.size(), 0u);
 }
 
-TEST(IntOverflowRuleTest, SixtyFourBitProductNotReported) {
-    // A 64-bit product that overflows int64 collapses to top() in the
-    // interval math and is soundly, silently dropped.
+TEST(IntOverflowRuleTest, SixtyFourBitProductReported) {
+    // v0.4 recall round: a 64-bit product still collapses to top() in
+    // the int64-based interval math, so the site is proved from the
+    // OPERAND intervals via __int128 corner arithmetic instead
+    // (evalEscapes64) — this pinned FN became a finding deliberately.
     IntOverflowRule rule;
     auto results = runRule(rule, R"(
         long f() {
             long a = 100000000000L;
             long b = 100000000000L;
             return a * b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+// --- v0.4 coverage growth: add, 64-bit boundary, narrowing stores ---
+
+TEST(IntOverflowRuleTest, ProvenAdditionOverflows) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f() {
+            int d = 2147483647;
+            int r = d + 1;
+            return r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, GuardedAdditionStaysSilent) {
+    // Half-open ranges must NOT report — same precision bar as `*`.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x) {
+            if (x > 0) return x + 3;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, BoundedAdditionStaysSilent) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f(int x) {
+            if (x > 0 && x < 1000) return x + 3;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, CharNarrowingAddReported) {
+    // The add happens in int; the wrap happens on the char store —
+    // the Juliet char_max_add family (CWE-190 via narrowing).
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        char f() {
+            char d = 127;
+            char r = d + 1;
+            return r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+}
+
+TEST(IntOverflowRuleTest, CharNarrowingMulReported) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        char f() {
+            char d = 100;
+            char r = d * 2;
+            return r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(IntOverflowRuleTest, GuardedCharNarrowingStaysSilent) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        char f(char d) {
+            if (d < 100) {
+                char r = d + 1;
+                return r;
+            }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, UnsignedNarrowingStaysSilent) {
+    // Unsigned wrap is defined behavior — not UB, not reported.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        unsigned char f() {
+            char d = 127;
+            unsigned char r = d + 1;
+            return r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, ExplicitNarrowingCastStaysSilent) {
+    // An explicit cast is stated programmer intent.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        char f() {
+            char d = 127;
+            char r = (char)(d + 1);
+            return r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, SixtyFourBitBoundaryAddReported) {
+    // INT64_MAX is now modelable (isSignedIntN(64), not
+    // significantBits>63) — the Juliet int64_t_max family's shape.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long d = 9223372036854775807LL;
+            long long r = d + 1;
+            return r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(IntOverflowRuleTest, SixtyFourBitHalfOpenStaysSilent) {
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f(long long x) {
+            if (x > 0) return x * 2;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, SixtyFourBitSelfSquareStaysSilent) {
+    // The abs/sqrt-guard FN class applies at every width — documented.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        long long f() {
+            long long d = 9223372036854775807LL;
+            return d * d;
         }
     )");
     EXPECT_EQ(results.size(), 0u);

@@ -70,6 +70,8 @@ enum class MsgId {
     PolicyAbsolutePath,         // {0} = the offending string literal
     PolicyUnknownName,          // {0} = the unknown policy name
     IntOverflowMul,             // {0} = the arithmetic type name
+    IntOverflowAdd,             // {0} = the arithmetic type name
+    IntOverflowNarrow,          // {0} = the narrow target type name
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
     BrokenTuSkipped,            // {0} = count of TUs that failed to compile
