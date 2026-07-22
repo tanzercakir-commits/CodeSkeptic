@@ -1,0 +1,303 @@
+
+[juliet] CWE476_NULL_Pointer_Dereference: scanning 400 files...
+  excluded (known-lax good): 27  [null_check_after_deref good functions deref malloc unchecked — real CWE-690, not an FP]
+=== CWE476_NULL_Pointer_Dereference ===
+  files scanned              : 400
+  OVERALL TP/FP              : 163/100  precision=0.620  hitrate=0.347
+  RULE-MATCHED (null-deref)
+          TP/FP              : 140/0  precision=1.000  hitrate=0.347
+  case (file) level          : TP=139 FP=0 FN=261  precision=1.000  recall=0.347  F1=0.516
+  errors-only operating point: TP/FP 114/0  precision=1.000
+  uncounted (other)          : 0
+    memory-leak      tp=17    fp=36    other=0
+   *null-deref       tp=140   fp=27    other=0
+    uninit-ptr       tp=6     fp=64    other=0
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_05.cpp:131 CWE476_NULL_Pointer_Dereference__class_05::goodG2B1 :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_09.cpp:125 CWE476_NULL_Pointer_Dereference__class_09::goodG2B1 :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_10.cpp:125 CWE476_NULL_Pointer_Dereference__class_10::goodG2B1 :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_11.cpp:124 CWE476_NULL_Pointer_Dereference__class_11::goodG2B1 :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_11.cpp:147 CWE476_NULL_Pointer_Dereference__class_11::goodG2B2 :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_17.cpp:79 CWE476_NULL_Pointer_Dereference__class_17::goodG2B :: Memory leak: 'tmpData' is reassigned without freeing the previous allocation
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_31.cpp:63 CWE476_NULL_Pointer_Dereference__class_31::goodG2B :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_34.cpp:71 CWE476_NULL_Pointer_Dereference__class_34::goodG2B :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__class_67a.cpp:63 CWE476_NULL_Pointer_Dereference__class_67::goodG2B :: Memory leak: allocation stored in 'tmpData' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__null_check_after_deref_02.c:63 good1 :: Memory leak: allocation stored in 'intPointer' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__null_check_after_deref_02.c:80 good2 :: Memory leak: allocation stored in 'intPointer' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference memory-leak CWE476_NULL_Pointer_Dereference__null_check_after_deref_03.c:63 good1 :: Memory leak: allocation stored in 'intPointer' may not be freed
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_08.c:77 goodB2G1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_08.c:128 goodG2B1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_09.c:64 goodB2G1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_09.c:115 goodG2B1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_10.c:64 goodB2G1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_10.c:115 goodG2B1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_11.c:64 goodB2G1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_11.c:88 goodB2G2 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_11.c:115 goodG2B1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__char_11.c:132 goodG2B2 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__class_05.cpp:71 CWE476_NULL_Pointer_Dereference__class_05::goodB2G1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+FP_SAMPLE CWE476_NULL_Pointer_Dereference uninit-ptr CWE476_NULL_Pointer_Dereference__class_05.cpp:127 CWE476_NULL_Pointer_Dereference__class_05::goodG2B1 :: Use of uninitialized pointer: 'data' may not be assigned at this dereference
+JULIET_FN_CLASS CWE476_NULL_Pointer_Dereference total=261 float=0 opaque=0 multifile=30 baseline=35 flow=121 cpp=43 other=32
+FN_SAMPLE CWE476_NULL_Pointer_Dereference baseline CWE476_NULL_Pointer_Dereference__char_21.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference baseline CWE476_NULL_Pointer_Dereference__char_31.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference baseline CWE476_NULL_Pointer_Dereference__char_32.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference baseline CWE476_NULL_Pointer_Dereference__char_33.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference baseline CWE476_NULL_Pointer_Dereference__char_34.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference flow CWE476_NULL_Pointer_Dereference__char_41.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference flow CWE476_NULL_Pointer_Dereference__char_44.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference flow CWE476_NULL_Pointer_Dereference__char_51a.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference flow CWE476_NULL_Pointer_Dereference__char_51b.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference flow CWE476_NULL_Pointer_Dereference__char_52a.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference multifile CWE476_NULL_Pointer_Dereference__char_54a.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference multifile CWE476_NULL_Pointer_Dereference__char_54b.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference multifile CWE476_NULL_Pointer_Dereference__char_54c.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference multifile CWE476_NULL_Pointer_Dereference__char_54d.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference multifile CWE476_NULL_Pointer_Dereference__char_54e.c
+FN_SAMPLE CWE476_NULL_Pointer_Dereference cpp CWE476_NULL_Pointer_Dereference__char_72a.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference cpp CWE476_NULL_Pointer_Dereference__char_72b.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference cpp CWE476_NULL_Pointer_Dereference__char_73a.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference cpp CWE476_NULL_Pointer_Dereference__char_73b.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference cpp CWE476_NULL_Pointer_Dereference__char_74a.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference other CWE476_NULL_Pointer_Dereference__char_81_bad.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference other CWE476_NULL_Pointer_Dereference__char_81_goodG2B.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference other CWE476_NULL_Pointer_Dereference__char_82_bad.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference other CWE476_NULL_Pointer_Dereference__char_82_goodB2G.cpp
+FN_SAMPLE CWE476_NULL_Pointer_Dereference other CWE476_NULL_Pointer_Dereference__char_82_goodG2B.cpp
+JULIET_RESULT CWE476_NULL_Pointer_Dereference files=400 tp=163 fp=100 precision=0.620 hitrate=0.347 rtp=140 rfp=0 rprecision=1.000 rhitrate=0.347 rcaseprec=1.000 rf1=0.516 eprecision=1.000
+[juliet] CWE476_NULL_Pointer_Dereference: score guard OK (rprec>=0.95, rhit>=0.3)
+
+[juliet] CWE401_Memory_Leak: scanning 399 files...
+=== CWE401_Memory_Leak ===
+  files scanned              : 399
+  OVERALL TP/FP              : 80/37  precision=0.684  hitrate=0.193
+  RULE-MATCHED (memory-leak)
+          TP/FP              : 80/37  precision=0.684  hitrate=0.193
+  case (file) level          : TP=77 FP=33 FN=322  precision=0.700  recall=0.193  F1=0.303
+  errors-only operating point: TP/FP 0/0  precision=0.000
+  uncounted (other)          : 0
+   *memory-leak      tp=80    fp=37    other=0
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_calloc_09.c:72 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_malloc_05.c:78 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_malloc_10.c:72 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_malloc_31.c:81 goodB2G :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_realloc_11.c:72 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_realloc_11.c:93 goodB2G2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int64_t_realloc_33.cpp:84 CWE401_Memory_Leak__int64_t_realloc_33::goodB2G :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int_calloc_34.c:90 goodB2G :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int_malloc_08.c:85 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int_realloc_10.c:72 goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__int_realloc_31.c:81 goodB2G :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE401_Memory_Leak memory-leak CWE401_Memory_Leak__new_TwoIntsClass_05.cpp:85 CWE401_Memory_Leak__new_TwoIntsClass_05::goodB2G1 :: Memory leak: allocation stored in 'data' may not be freed
+JULIET_FN_CLASS CWE401_Memory_Leak total=322 float=0 opaque=0 multifile=28 baseline=71 flow=123 cpp=52 other=48
+FN_SAMPLE CWE401_Memory_Leak baseline CWE401_Memory_Leak__char_calloc_01.c
+FN_SAMPLE CWE401_Memory_Leak baseline CWE401_Memory_Leak__char_calloc_07.c
+FN_SAMPLE CWE401_Memory_Leak baseline CWE401_Memory_Leak__char_calloc_13.c
+FN_SAMPLE CWE401_Memory_Leak baseline CWE401_Memory_Leak__char_calloc_18.c
+FN_SAMPLE CWE401_Memory_Leak baseline CWE401_Memory_Leak__char_calloc_34.c
+FN_SAMPLE CWE401_Memory_Leak flow CWE401_Memory_Leak__char_calloc_45.c
+FN_SAMPLE CWE401_Memory_Leak flow CWE401_Memory_Leak__char_calloc_62a.cpp
+FN_SAMPLE CWE401_Memory_Leak flow CWE401_Memory_Leak__char_calloc_62b.cpp
+FN_SAMPLE CWE401_Memory_Leak flow CWE401_Memory_Leak__char_calloc_67a.c
+FN_SAMPLE CWE401_Memory_Leak flow CWE401_Memory_Leak__char_calloc_67b.c
+FN_SAMPLE CWE401_Memory_Leak multifile CWE401_Memory_Leak__int64_t_realloc_61a.c
+FN_SAMPLE CWE401_Memory_Leak multifile CWE401_Memory_Leak__int64_t_realloc_61b.c
+FN_SAMPLE CWE401_Memory_Leak multifile CWE401_Memory_Leak__new_array_int64_t_54a.cpp
+FN_SAMPLE CWE401_Memory_Leak multifile CWE401_Memory_Leak__new_array_int64_t_54b.cpp
+FN_SAMPLE CWE401_Memory_Leak multifile CWE401_Memory_Leak__new_array_int64_t_54c.cpp
+FN_SAMPLE CWE401_Memory_Leak cpp CWE401_Memory_Leak__char_calloc_82a.cpp
+FN_SAMPLE CWE401_Memory_Leak cpp CWE401_Memory_Leak__char_malloc_72a.cpp
+FN_SAMPLE CWE401_Memory_Leak cpp CWE401_Memory_Leak__char_malloc_72b.cpp
+FN_SAMPLE CWE401_Memory_Leak cpp CWE401_Memory_Leak__char_realloc_73a.cpp
+FN_SAMPLE CWE401_Memory_Leak cpp CWE401_Memory_Leak__char_realloc_73b.cpp
+FN_SAMPLE CWE401_Memory_Leak other CWE401_Memory_Leak__char_calloc_81_goodB2G.cpp
+FN_SAMPLE CWE401_Memory_Leak other CWE401_Memory_Leak__char_calloc_84_bad.cpp
+FN_SAMPLE CWE401_Memory_Leak other CWE401_Memory_Leak__char_malloc_81_goodG2B.cpp
+FN_SAMPLE CWE401_Memory_Leak other CWE401_Memory_Leak__char_malloc_83_bad.cpp
+FN_SAMPLE CWE401_Memory_Leak other CWE401_Memory_Leak__char_malloc_84_goodB2G.cpp
+JULIET_RESULT CWE401_Memory_Leak files=399 tp=80 fp=37 precision=0.684 hitrate=0.193 rtp=80 rfp=37 rprecision=0.684 rhitrate=0.193 rcaseprec=0.700 rf1=0.303 eprecision=0.000
+[juliet] CWE401_Memory_Leak: score guard OK (rprec>=0.66, rhit>=0.18)
+
+[juliet] CWE415_Double_Free: scanning 400 files...
+=== CWE415_Double_Free ===
+  files scanned              : 400
+  OVERALL TP/FP              : 104/55  precision=0.654  hitrate=0.260
+  RULE-MATCHED (double-free)
+          TP/FP              : 97/0  precision=1.000  hitrate=0.242
+  case (file) level          : TP=97 FP=0 FN=303  precision=1.000  recall=0.242  F1=0.390
+  errors-only operating point: TP/FP 97/0  precision=1.000
+  uncounted (other)          : 0
+   *double-free      tp=97    fp=0     other=0
+    memory-leak      tp=7     fp=55    other=0
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_char_05.c:122 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_char_09.c:116 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_char_33.cpp:63 CWE415_Double_Free__malloc_free_char_33::goodG2B :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_char_67a.c:64 goodG2B :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int64_t_05.c:122 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int64_t_08.c:129 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int64_t_67a.c:64 goodG2B :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int_08.c:129 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int_11.c:116 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_int_11.c:135 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_long_11.c:116 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE415_Double_Free memory-leak CWE415_Double_Free__malloc_free_long_11.c:135 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+JULIET_FN_CLASS CWE415_Double_Free total=303 float=0 opaque=0 multifile=43 baseline=34 flow=122 cpp=46 other=58
+FN_SAMPLE CWE415_Double_Free baseline CWE415_Double_Free__malloc_free_char_12.c
+FN_SAMPLE CWE415_Double_Free baseline CWE415_Double_Free__malloc_free_char_33.cpp
+FN_SAMPLE CWE415_Double_Free baseline CWE415_Double_Free__malloc_free_int64_t_12.c
+FN_SAMPLE CWE415_Double_Free baseline CWE415_Double_Free__malloc_free_int64_t_32.c
+FN_SAMPLE CWE415_Double_Free baseline CWE415_Double_Free__malloc_free_int_11.c
+FN_SAMPLE CWE415_Double_Free flow CWE415_Double_Free__malloc_free_char_42.c
+FN_SAMPLE CWE415_Double_Free flow CWE415_Double_Free__malloc_free_char_51b.c
+FN_SAMPLE CWE415_Double_Free flow CWE415_Double_Free__malloc_free_char_64a.c
+FN_SAMPLE CWE415_Double_Free flow CWE415_Double_Free__malloc_free_char_64b.c
+FN_SAMPLE CWE415_Double_Free flow CWE415_Double_Free__malloc_free_char_67a.c
+FN_SAMPLE CWE415_Double_Free multifile CWE415_Double_Free__malloc_free_char_54a.c
+FN_SAMPLE CWE415_Double_Free multifile CWE415_Double_Free__malloc_free_char_54b.c
+FN_SAMPLE CWE415_Double_Free multifile CWE415_Double_Free__malloc_free_char_54c.c
+FN_SAMPLE CWE415_Double_Free multifile CWE415_Double_Free__malloc_free_char_54d.c
+FN_SAMPLE CWE415_Double_Free multifile CWE415_Double_Free__malloc_free_char_54e.c
+FN_SAMPLE CWE415_Double_Free cpp CWE415_Double_Free__malloc_free_char_74a.cpp
+FN_SAMPLE CWE415_Double_Free cpp CWE415_Double_Free__malloc_free_char_74b.cpp
+FN_SAMPLE CWE415_Double_Free cpp CWE415_Double_Free__malloc_free_int64_t_73a.cpp
+FN_SAMPLE CWE415_Double_Free cpp CWE415_Double_Free__malloc_free_int64_t_73b.cpp
+FN_SAMPLE CWE415_Double_Free cpp CWE415_Double_Free__malloc_free_int_73a.cpp
+FN_SAMPLE CWE415_Double_Free other CWE415_Double_Free__malloc_free_char_81_goodG2B.cpp
+FN_SAMPLE CWE415_Double_Free other CWE415_Double_Free__malloc_free_char_82_goodG2B.cpp
+FN_SAMPLE CWE415_Double_Free other CWE415_Double_Free__malloc_free_char_83_goodB2G.cpp
+FN_SAMPLE CWE415_Double_Free other CWE415_Double_Free__malloc_free_char_84_goodB2G.cpp
+FN_SAMPLE CWE415_Double_Free other CWE415_Double_Free__malloc_free_int64_t_81_goodG2B.cpp
+JULIET_RESULT CWE415_Double_Free files=400 tp=104 fp=55 precision=0.654 hitrate=0.260 rtp=97 rfp=0 rprecision=1.000 rhitrate=0.242 rcaseprec=1.000 rf1=0.390 eprecision=1.000
+[juliet] CWE415_Double_Free: score guard OK (rprec>=0.95, rhit>=0.23)
+
+[juliet] CWE416_Use_After_Free: scanning 399 files...
+=== CWE416_Use_After_Free ===
+  files scanned              : 399
+  OVERALL TP/FP              : 222/425  precision=0.343  hitrate=0.556
+  RULE-MATCHED (use-after-free)
+          TP/FP              : 198/0  precision=1.000  hitrate=0.496
+  case (file) level          : TP=198 FP=0 FN=201  precision=1.000  recall=0.496  F1=0.663
+  errors-only operating point: TP/FP 198/0  precision=1.000
+  uncounted (other)          : 0
+    memory-leak      tp=10    fp=347   other=0
+    null-deref       tp=14    fp=78    other=0
+   *use-after-free   tp=198   fp=0     other=0
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_01.c:68 goodG2B :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_02.c:148 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_02.c:175 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_03.c:148 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_03.c:175 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_04.c:154 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_04.c:181 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_05.c:154 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_05.c:181 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_06.c:153 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_06.c:180 goodG2B2 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free memory-leak CWE416_Use_After_Free__malloc_free_int64_t_07.c:153 goodG2B1 :: Memory leak: allocation stored in 'data' may not be freed
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int64_t_05.c:151 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int64_t_09.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int64_t_10.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int64_t_11.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int64_t_11.c:172 goodG2B2 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int_08.c:158 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int_09.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int_10.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int_11.c:145 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_int_11.c:172 goodG2B2 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_long_05.c:151 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+FP_SAMPLE CWE416_Use_After_Free null-deref CWE416_Use_After_Free__malloc_free_long_08.c:158 goodG2B1 :: Possible null dereference: 'data' may be null on some paths
+JULIET_FN_CLASS CWE416_Use_After_Free total=201 float=0 opaque=0 multifile=0 baseline=92 flow=105 cpp=0 other=4
+FN_SAMPLE CWE416_Use_After_Free baseline CWE416_Use_After_Free__malloc_free_char_01.c
+FN_SAMPLE CWE416_Use_After_Free baseline CWE416_Use_After_Free__malloc_free_char_03.c
+FN_SAMPLE CWE416_Use_After_Free baseline CWE416_Use_After_Free__malloc_free_char_04.c
+FN_SAMPLE CWE416_Use_After_Free baseline CWE416_Use_After_Free__malloc_free_char_05.c
+FN_SAMPLE CWE416_Use_After_Free baseline CWE416_Use_After_Free__malloc_free_char_06.c
+FN_SAMPLE CWE416_Use_After_Free flow CWE416_Use_After_Free__malloc_free_char_43.cpp
+FN_SAMPLE CWE416_Use_After_Free flow CWE416_Use_After_Free__malloc_free_char_62a.cpp
+FN_SAMPLE CWE416_Use_After_Free flow CWE416_Use_After_Free__malloc_free_char_62b.cpp
+FN_SAMPLE CWE416_Use_After_Free flow CWE416_Use_After_Free__malloc_free_char_64a.c
+FN_SAMPLE CWE416_Use_After_Free flow CWE416_Use_After_Free__malloc_free_char_64b.c
+FN_SAMPLE CWE416_Use_After_Free other CWE416_Use_After_Free__operator_equals_01_bad.cpp
+FN_SAMPLE CWE416_Use_After_Free other CWE416_Use_After_Free__operator_equals_01_good1.cpp
+FN_SAMPLE CWE416_Use_After_Free other main.cpp
+FN_SAMPLE CWE416_Use_After_Free other main_linux.cpp
+JULIET_RESULT CWE416_Use_After_Free files=399 tp=222 fp=425 precision=0.343 hitrate=0.556 rtp=198 rfp=0 rprecision=1.000 rhitrate=0.496 rcaseprec=1.000 rf1=0.663 eprecision=1.000
+[juliet] CWE416_Use_After_Free: score guard OK (rprec>=0.95, rhit>=0.48)
+
+[juliet] CWE369_Divide_by_Zero: scanning 399 files...
+=== CWE369_Divide_by_Zero ===
+  files scanned              : 399
+  OVERALL TP/FP              : 39/0  precision=1.000  hitrate=0.098
+  RULE-MATCHED (div-by-zero)
+          TP/FP              : 39/0  precision=1.000  hitrate=0.098
+  case (file) level          : TP=39 FP=0 FN=360  precision=1.000  recall=0.098  F1=0.178
+  errors-only operating point: TP/FP 9/0  precision=1.000
+  uncounted (other)          : 0
+   *div-by-zero      tp=39    fp=0     other=0
+JULIET_FN_CLASS CWE369_Divide_by_Zero total=360 float=158 opaque=81 multifile=11 baseline=12 flow=54 cpp=18 other=26
+FN_SAMPLE CWE369_Divide_by_Zero baseline CWE369_Divide_by_Zero__int_fgets_divide_21.c
+FN_SAMPLE CWE369_Divide_by_Zero baseline CWE369_Divide_by_Zero__int_fgets_divide_33.cpp
+FN_SAMPLE CWE369_Divide_by_Zero baseline CWE369_Divide_by_Zero__int_fgets_modulo_21.c
+FN_SAMPLE CWE369_Divide_by_Zero baseline CWE369_Divide_by_Zero__int_fgets_modulo_33.cpp
+FN_SAMPLE CWE369_Divide_by_Zero baseline CWE369_Divide_by_Zero__int_zero_divide_22a.c
+FN_SAMPLE CWE369_Divide_by_Zero flow CWE369_Divide_by_Zero__int_fgets_divide_41.c
+FN_SAMPLE CWE369_Divide_by_Zero flow CWE369_Divide_by_Zero__int_fgets_divide_43.cpp
+FN_SAMPLE CWE369_Divide_by_Zero flow CWE369_Divide_by_Zero__int_fgets_divide_45.c
+FN_SAMPLE CWE369_Divide_by_Zero flow CWE369_Divide_by_Zero__int_fgets_divide_52a.c
+FN_SAMPLE CWE369_Divide_by_Zero flow CWE369_Divide_by_Zero__int_fgets_divide_52b.c
+FN_SAMPLE CWE369_Divide_by_Zero multifile CWE369_Divide_by_Zero__int_fgets_divide_54a.c
+FN_SAMPLE CWE369_Divide_by_Zero multifile CWE369_Divide_by_Zero__int_fgets_divide_54b.c
+FN_SAMPLE CWE369_Divide_by_Zero multifile CWE369_Divide_by_Zero__int_fgets_divide_54c.c
+FN_SAMPLE CWE369_Divide_by_Zero multifile CWE369_Divide_by_Zero__int_fgets_divide_54d.c
+FN_SAMPLE CWE369_Divide_by_Zero multifile CWE369_Divide_by_Zero__int_fgets_divide_54e.c
+FN_SAMPLE CWE369_Divide_by_Zero cpp CWE369_Divide_by_Zero__int_fgets_divide_72a.cpp
+FN_SAMPLE CWE369_Divide_by_Zero cpp CWE369_Divide_by_Zero__int_fgets_divide_72b.cpp
+FN_SAMPLE CWE369_Divide_by_Zero cpp CWE369_Divide_by_Zero__int_fgets_divide_74a.cpp
+FN_SAMPLE CWE369_Divide_by_Zero cpp CWE369_Divide_by_Zero__int_fgets_divide_74b.cpp
+FN_SAMPLE CWE369_Divide_by_Zero cpp CWE369_Divide_by_Zero__int_fgets_divide_81a.cpp
+FN_SAMPLE CWE369_Divide_by_Zero other CWE369_Divide_by_Zero__int_fgets_divide_81_goodB2G.cpp
+FN_SAMPLE CWE369_Divide_by_Zero other CWE369_Divide_by_Zero__int_fgets_divide_82_goodB2G.cpp
+FN_SAMPLE CWE369_Divide_by_Zero other CWE369_Divide_by_Zero__int_fgets_divide_83_goodB2G.cpp
+FN_SAMPLE CWE369_Divide_by_Zero other CWE369_Divide_by_Zero__int_fgets_divide_84_goodB2G.cpp
+FN_SAMPLE CWE369_Divide_by_Zero other CWE369_Divide_by_Zero__int_fgets_modulo_81_goodB2G.cpp
+JULIET_RESULT CWE369_Divide_by_Zero files=399 tp=39 fp=0 precision=1.000 hitrate=0.098 rtp=39 rfp=0 rprecision=1.000 rhitrate=0.098 rcaseprec=1.000 rf1=0.178 eprecision=1.000
+[juliet] CWE369_Divide_by_Zero: score guard OK (rprec>=0.95, rhit>=0.03)
+
+[juliet] CWE190_Integer_Overflow: scanning 401 files...
+=== CWE190_Integer_Overflow ===
+  files scanned              : 401
+  OVERALL TP/FP              : 21/0  precision=1.000  hitrate=0.052
+  RULE-MATCHED (int-overflow)
+          TP/FP              : 21/0  precision=1.000  hitrate=0.052
+  case (file) level          : TP=21 FP=0 FN=380  precision=1.000  recall=0.052  F1=0.100
+  errors-only operating point: TP/FP 0/0  precision=0.000
+  uncounted (other)          : 0
+   *int-overflow     tp=21    fp=0     other=0
+JULIET_FN_CLASS CWE190_Integer_Overflow total=380 float=0 opaque=179 multifile=24 baseline=58 flow=79 cpp=16 other=24
+FN_SAMPLE CWE190_Integer_Overflow baseline CWE190_Integer_Overflow__char_max_add_11.c
+FN_SAMPLE CWE190_Integer_Overflow baseline CWE190_Integer_Overflow__char_max_multiply_11.c
+FN_SAMPLE CWE190_Integer_Overflow baseline CWE190_Integer_Overflow__char_max_square_10.c
+FN_SAMPLE CWE190_Integer_Overflow baseline CWE190_Integer_Overflow__char_max_square_22a.c
+FN_SAMPLE CWE190_Integer_Overflow baseline CWE190_Integer_Overflow__char_max_square_22b.c
+FN_SAMPLE CWE190_Integer_Overflow flow CWE190_Integer_Overflow__char_max_add_52a.c
+FN_SAMPLE CWE190_Integer_Overflow flow CWE190_Integer_Overflow__char_max_add_52b.c
+FN_SAMPLE CWE190_Integer_Overflow flow CWE190_Integer_Overflow__char_max_add_52c.c
+FN_SAMPLE CWE190_Integer_Overflow flow CWE190_Integer_Overflow__char_max_add_68a.c
+FN_SAMPLE CWE190_Integer_Overflow flow CWE190_Integer_Overflow__char_max_add_68b.c
+FN_SAMPLE CWE190_Integer_Overflow multifile CWE190_Integer_Overflow__int64_t_max_multiply_61a.c
+FN_SAMPLE CWE190_Integer_Overflow multifile CWE190_Integer_Overflow__int64_t_max_multiply_61b.c
+FN_SAMPLE CWE190_Integer_Overflow multifile CWE190_Integer_Overflow__int64_t_max_square_54a.c
+FN_SAMPLE CWE190_Integer_Overflow multifile CWE190_Integer_Overflow__int64_t_max_square_54b.c
+FN_SAMPLE CWE190_Integer_Overflow multifile CWE190_Integer_Overflow__int64_t_max_square_54c.c
+FN_SAMPLE CWE190_Integer_Overflow cpp CWE190_Integer_Overflow__char_max_multiply_84a.cpp
+FN_SAMPLE CWE190_Integer_Overflow cpp CWE190_Integer_Overflow__int64_t_max_multiply_74a.cpp
+FN_SAMPLE CWE190_Integer_Overflow cpp CWE190_Integer_Overflow__int64_t_max_multiply_74b.cpp
+FN_SAMPLE CWE190_Integer_Overflow cpp CWE190_Integer_Overflow__int64_t_max_square_73a.cpp
+FN_SAMPLE CWE190_Integer_Overflow cpp CWE190_Integer_Overflow__int64_t_max_square_73b.cpp
+FN_SAMPLE CWE190_Integer_Overflow other CWE190_Integer_Overflow__char_max_add_82_goodG2B.cpp
+FN_SAMPLE CWE190_Integer_Overflow other CWE190_Integer_Overflow__char_max_multiply_82_goodB2G.cpp
+FN_SAMPLE CWE190_Integer_Overflow other CWE190_Integer_Overflow__char_max_square_82_bad.cpp
+FN_SAMPLE CWE190_Integer_Overflow other CWE190_Integer_Overflow__char_max_square_84_goodG2B.cpp
+FN_SAMPLE CWE190_Integer_Overflow other CWE190_Integer_Overflow__int64_t_max_add_81_bad.cpp
+JULIET_RESULT CWE190_Integer_Overflow files=401 tp=21 fp=0 precision=1.000 hitrate=0.052 rtp=21 rfp=0 rprecision=1.000 rhitrate=0.052 rcaseprec=1.000 rf1=0.100 eprecision=0.000
+[juliet] CWE190_Integer_Overflow: score guard OK (rprec>=0.95, rhit>=0.04)
+
+[juliet] OK — see the JULIET_RESULT lines for a summary
