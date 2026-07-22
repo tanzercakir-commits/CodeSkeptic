@@ -125,6 +125,33 @@ public:
 
 namespace codeskeptic {
 
+std::vector<std::string> platformExtraArgs() {
+    std::vector<std::string> args;
+#ifdef __APPLE__
+    // macOS: SDK headers come via isysroot; extra system paths are
+    // needed. On Linux, prepending these paths breaks GCC libstdc++'s
+    // include_next chain (stdlib.h not found) — resource-dir is
+    // sufficient there.
+    args.insert(args.end(), {"-isystem", "/usr/include",
+                             "-isystem", "/usr/local/include"});
+#endif
+
+    // Relocatable resource-dir (v0.4): release tarballs ship the
+    // intrinsic headers next to the binary, so the path is resolved at
+    // runtime — env override -> exe-relative lib/clang/<ver> -> the
+    // baked build-machine path (ResourceDir.cpp) — instead of trusting
+    // a build-time absolute path that does not exist on user machines.
+    const std::string& resource_dir = resourceDir();
+    if (!resource_dir.empty()) {
+        args.insert(args.end(), {"-resource-dir", resource_dir});
+    }
+
+#ifdef MACOS_SDK_PATH
+    args.insert(args.end(), {"-isysroot", MACOS_SDK_PATH});
+#endif
+    return args;
+}
+
 SourceManager::SourceManager(const std::string& build_path)
     : build_path_(build_path) {
     std::string error_msg;
@@ -178,36 +205,15 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
         clang::tooling::getInsertArgumentAdjuster(
             {"-fparse-all-comments"},
             clang::tooling::ArgumentInsertPosition::BEGIN));
-#ifdef __APPLE__
-    // macOS: SDK headers come via isysroot; extra system paths are needed.
-    // On Linux, prepending these paths breaks GCC libstdc++'s include_next
-    // chain (stdlib.h not found) — resource-dir is sufficient there.
-    tool.appendArgumentsAdjuster(
-        clang::tooling::getInsertArgumentAdjuster(
-            {"-isystem", "/usr/include",
-             "-isystem", "/usr/local/include"},
-            clang::tooling::ArgumentInsertPosition::BEGIN));
-#endif
 
-    // Relocatable resource-dir (v0.4): release tarballs ship the
-    // intrinsic headers next to the binary, so the path is resolved at
-    // runtime — env override -> exe-relative lib/clang/<ver> -> the
-    // baked build-machine path (ResourceDir.cpp) — instead of trusting
-    // a build-time absolute path that does not exist on user machines.
-    const std::string& resource_dir = codeskeptic::resourceDir();
-    if (!resource_dir.empty()) {
+    // Platform args shared with the test harness (single source of
+    // truth — see platformExtraArgs below).
+    auto extra = codeskeptic::platformExtraArgs();
+    if (!extra.empty()) {
         tool.appendArgumentsAdjuster(
             clang::tooling::getInsertArgumentAdjuster(
-                {"-resource-dir", resource_dir},
-                clang::tooling::ArgumentInsertPosition::BEGIN));
+                extra, clang::tooling::ArgumentInsertPosition::BEGIN));
     }
-
-#ifdef MACOS_SDK_PATH
-    tool.appendArgumentsAdjuster(
-        clang::tooling::getInsertArgumentAdjuster(
-            {"-isysroot", MACOS_SDK_PATH},
-            clang::tooling::ArgumentInsertPosition::BEGIN));
-#endif
 }
 
 // --- Process-lifetime warm AST cache ---

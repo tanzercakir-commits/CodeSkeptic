@@ -17,6 +17,14 @@ namespace codeskeptic {
 
 using ASTCallback = std::function<void(clang::ASTContext&)>;
 
+// The platform-specific compile arguments every analysis invocation
+// needs (resource-dir; on macOS the SDK sysroot and system include
+// paths). Single source of truth: production tooling (ClangTool
+// adjusters) and the unit-test harness (runToolOnCodeWithArgs) must
+// compile snippets IDENTICALLY — a test TU that silently fails to
+// find <stdlib.h> reports zero findings and passes vacuously.
+std::vector<std::string> platformExtraArgs();
+
 class SourceManager {
 public:
     explicit SourceManager(const std::string& build_path);
