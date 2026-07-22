@@ -1,5 +1,13 @@
 # CodeSkeptic — Dış Eleştiri Yanıt Planı (v0.4 Turu)
 
+> **DURUM (2026-07-22 gece):** Faz 0 ✔ · Faz 1 ✔ (v0.4.0 yayında) ·
+> Faz 3 Claude-tarafı ✔ (3a raporlar kullanıcıda) · Faz 4a ✔ ·
+> Faz 2 ✔ (2c int-overflow, 2b kopya-taint, 2a bayrak-constprop —
+> ölçümler benchmarks.md'de; 2d thesis-gate ile derin dilimler
+> [sabit-dönüş bayrakları, zeroness-özet birleşmesi] sonraki tura
+> devredildi ve guard dosyalarında belgeli). v0.4.1 bu turun kapanış
+> sürümüdür.
+
 Tarih: 2026-07-22 · Girdi: dış AI değerlendirmesi (`CodeSkeptic_plan.txt`) · Repo durumu: `main @ 4c62bde`, 158 commit, v0.3.0
 
 Bu plan, dış değerlendirmedeki her maddeyi repo'daki gerçek durumla doğrulayıp, geçerli bulunanları faz faz işe çeviriyor. Her fazda her zamanki disiplin geçerli: iş → test → koruma (guard) → bitti kriteri (Definition of Done, DoD).

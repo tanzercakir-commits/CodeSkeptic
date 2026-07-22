@@ -31,7 +31,7 @@ compiler warnings, sanitizers, broad analyzers, fuzzing or tests
 AI coding loop: millisecond re-checks of just-edited functions, with
 deterministic, trace-backed verdicts an agent can act on.
 
-## 3. Current round — v0.4 "critique response" (week of 2026-07-22)
+## 3. Current round — v0.4 "critique response" (week of 2026-07-22) — SHIPPED
 
 An external reviewer's assessment was verified point by point and
 turned into a phased plan with tests, guards and definition-of-done

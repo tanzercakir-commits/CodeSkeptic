@@ -138,11 +138,12 @@ Read its silence accordingly:
   design; bugs that need reasoning the engine doesn't have (deep
   aliasing, concurrency, arbitrary arithmetic) are not reported.
 - **Recall is bounded and measured.** On Juliet, recall ranges from
-  0.501 (use-after-free) down to 0.010 (integer overflow, a documented
-  known false negative family) — the numbers, and why, are in
-  [docs/benchmarks.md](docs/benchmarks.md).
-- **`memory-leak` is the one noisy rule** (Juliet precision 0.716 vs
-  1.000 for the others) and the current improvement target. Evaluate
+  0.496 (use-after-free) down to 0.052 (integer overflow) — and every
+  missed case is *classified*: by-design silences (float division,
+  opaque `rand()` sources) vs addressable gaps, so the denominator is
+  honest. Numbers, classification and why: [docs/benchmarks.md](docs/benchmarks.md).
+- **`memory-leak` is the one noisy rule** (Juliet precision 0.714 vs
+  1.000 for the others) and the standing improvement target. Evaluate
   it separately ([how](docs/evaluate.md)).
 - Checked bug classes only: the [rules below](#rules) — not style, not
   concurrency, not undefined behavior at large.
@@ -172,7 +173,7 @@ others are weakest: gating *new* changes (human or AI-generated).
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
 | Array/heap bounds | `bounds` | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
-| Integer overflow | `int-overflow` | Signed multiplication whose proven operand ranges escape the type (CWE-190), including an untrusted source (`int n = atoi(s); n * k`) |
+| Integer overflow | `int-overflow` | Signed `*`/`+` whose proven ranges escape the type (CWE-190) — including 64-bit operands, results implicitly narrowed into a smaller type (`char r = d + 1`), and untrusted sources (`int n = atoi(s); n * k`) |
 | Contract verification | `contract` | Violations of declared `// cs:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries |
 | Policy enforcement | `policy` | `cs:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
 
@@ -185,10 +186,11 @@ path-sensitivity, interprocedural function summaries — is described in
 Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 
 - **Mature code (NIST Juliet 1.3):** rule precision **1.000** on five
-  of six rules (memory-leak 0.716); recall 0.501 / 0.352 / 0.241 /
-  0.195 / 0.095 / 0.010 by CWE — lower bounds, with the honest
-  reasons (floating-point variants, opaque sources, one known macro
-  family) documented.
+  of six rules (memory-leak 0.714); recall 0.496 / 0.347 / 0.242 /
+  0.193 / 0.098 / 0.052 by CWE — lower bounds with a classified
+  denominator (floating-point variants and opaque sources are
+  by-design silences, not gaps), every improvement locked by a
+  ratcheted CI floor.
 - **First-draft code (blind 24-program AI corpus — the mission axis):**
   combined recall **0.625 at precision 1.000**, zero false positives
   including on 9 deliberately-clean programs.
