@@ -372,7 +372,7 @@ TEST(BoundsRuleTest, MemcpyStructMemberOverflow) {
     // member buffer.
     BoundsRule rule;
     auto results = runRule(rule, R"(
-        void* memcpy(void*, const void*, unsigned long);
+        void* memcpy(void*, const void*, __SIZE_TYPE__);
         struct S { char charFirst[16]; void* second; };
         void f(struct S* s, const void* src){
             memcpy(s->charFirst, src, sizeof(struct S));
@@ -383,8 +383,10 @@ TEST(BoundsRuleTest, MemcpyStructMemberOverflow) {
 
 TEST(BoundsRuleTest, MemcpyStructMemberInRangeClean) {
     BoundsRule rule;
+    // __SIZE_TYPE__ so the rule actually ENGAGES on LLP64 too — with a
+    // mismatched size type this clean-test would pass vacuously.
     auto results = runRule(rule, R"(
-        void* memcpy(void*, const void*, unsigned long);
+        void* memcpy(void*, const void*, __SIZE_TYPE__);
         struct S { char buf[16]; };
         void f(struct S* s, const void* src){
             memcpy(s->buf, src, sizeof(s->buf));
