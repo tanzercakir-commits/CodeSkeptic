@@ -1,0 +1,40 @@
+name: Housekeeping
+
+# Orphan-draft janitor. Every release re-run (retag) leaves behind a
+# draft release created by `gh release create --draft || true` before
+# the tag moved. Drafts are owner-only-visible, but they pile up.
+# Deletion rule — deliberately narrow: a DRAFT whose tag name already
+# has a PUBLISHED (non-draft) release is an orphan duplicate and dies;
+# a draft for a not-yet-released tag (possibly hand-made) survives.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  push:
+    branches: ["phase*"]
+    paths: [".github/workflows/housekeeping.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  prune-orphan-drafts:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete drafts whose tag is already published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          releases=$(gh api "repos/$REPO/releases?per_page=100")
+          published_tags=$(echo "$releases" | jq -r '.[] | select(.draft | not) | .tag_name' | sort -u)
+          echo "published: $published_tags"
+          echo "$releases" | jq -r '.[] | select(.draft) | "\(.id) \(.tag_name)"' \
+            | while read -r id tag; do
+              if echo "$published_tags" | grep -qx "$tag"; then
+                echo "pruning orphan draft: $tag (id $id)"
+                gh api -X DELETE "repos/$REPO/releases/$id"
+              else
+                echo "keeping draft for unreleased tag: $tag (id $id)"
+              fi
+            done
