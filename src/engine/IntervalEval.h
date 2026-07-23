@@ -84,9 +84,31 @@ Interval evalSizeInterval(const clang::Expr* expr, clang::ASTContext& ctx,
 // assignment, ++/--, address-of, and non-const-reference call arguments
 // conservatively reset the target to top() (v0 — no relational loop
 // modeling yet).
+//
+// `untrusted` (optional): the flow-sensitive UNTRUSTED-ORIGIN set — the
+// vars whose CURRENT value derives from a declared untrusted-integer
+// source (the atoi/strtol/scanf intrinsics or --untrusted-int-sources).
+// Plain assignment and declaration RECOMPUTE membership from the RHS
+// (`n = atoi(s)` inserts, `n = 16` erases — no stale taint); scanf
+// output arguments insert; a non-const-ref pass to an unknown callee
+// erases (the value is no longer of proven origin). Compound assigns
+// and ++/-- leave membership as-is: their interval goes to top(), and
+// the possible-overflow consumer requires a FINITE bound, so staleness
+// there can never surface as a report.
 void applyIntervalAssign(IntervalMap& state, const clang::Stmt* stmt,
                          const std::set<const clang::VarDecl*>& vars,
-                         const clang::ASTContext* ctx = nullptr);
+                         const clang::ASTContext* ctx = nullptr,
+                         std::set<const clang::VarDecl*>* untrusted = nullptr);
+
+// Does `e` derive from a declared untrusted-integer source — a direct
+// source call (`memcpy(d, s, atoi(len))`), a read of a var in the
+// `untrusted` set, or arithmetic/casts/conditionals over either?
+// Purely syntactic over the expression tree; the RANGE (not this bit)
+// decides whether the value can actually exceed a capacity, so the
+// answer only ever gates a possible-overflow warning, never suppresses
+// one.
+bool exprDerivesFromUntrusted(const clang::Expr* e,
+                              const std::set<const clang::VarDecl*>& untrusted);
 
 // Refine the intervals of `vars` on the edge where `cond` is
 // true/false (assume-edge). Handles `var REL const` and truthiness via

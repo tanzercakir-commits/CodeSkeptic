@@ -58,10 +58,11 @@ std::vector<const ArraySubscriptExpr*> collectSubscripts(
 }
 
 // The fixed byte-copy family: dst is arg 0, byte count is arg 2. All
-// write exactly `n` bytes into dst[0 .. n-1], so an `n` past the
-// destination's capacity is a definite overflow (CWE-787). strcpy/strcat
-// (no explicit size) and strncpy/strncat (append/pad semantics) are out
-// of v0 scope.
+// write exactly `n` bytes into dst[0 .. n-1] — memcpy/memmove/memset by
+// contract, and strncpy too (it PADS with NULs up to n), so an `n` past
+// the destination's capacity is a definite overflow (CWE-787). strcat
+// and strncat (append semantics — the write also depends on the
+// existing content) stay out of scope.
 std::vector<const CallExpr*> collectCopyCalls(const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
         std::vector<const CallExpr*> calls;
@@ -69,7 +70,8 @@ std::vector<const CallExpr*> collectCopyCalls(const FunctionDecl* fn) {
             const FunctionDecl* callee = call->getDirectCallee();
             if (!callee || !callee->getIdentifier()) return true;
             const llvm::StringRef n = callee->getName();
-            if ((n == "memcpy" || n == "memmove" || n == "memset") &&
+            if ((n == "memcpy" || n == "memmove" || n == "memset" ||
+                 n == "strncpy") &&
                 call->getNumArgs() == 3)
                 calls.push_back(call);
             return true;
@@ -408,11 +410,19 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         results.push_back(std::move(diag));
     }
 
-    // Copy-size overflow: memcpy/memmove/memset(dst, ..., n) writes n
-    // bytes into dst. When dst has a proven byte capacity and n's proven
-    // minimum exceeds even the largest possible capacity, it definitely
-    // overflows (CWE-787). Byte capacity = element count (ExtentMap) *
-    // element size.
+    // Copy-size overflow: memcpy/memmove/memset/strncpy(dst, ..., n)
+    // writes n bytes into dst. When dst has a proven byte capacity:
+    //  - DEFINITE (CWE-787, error): n's proven minimum exceeds even the
+    //    largest possible capacity — every execution overflows.
+    //  - POSSIBLE-UNTRUSTED (CWE-120, warning): n DERIVES from a
+    //    declared untrusted-integer source (atoi/strtol/scanf or
+    //    --untrusted-int-sources) and its proven FINITE range reaches
+    //    past the capacity. The range is attacker-chosen by the source
+    //    contract, so reachability is by construction — this is the
+    //    docs/untrusted-length.md increment. A guard (`if (n <= cap)`)
+    //    narrows the range on its own edge and silences it; an unknown
+    //    (top) length stays silent — provenance alone never reports.
+    // Byte capacity = element count (ExtentMap) * element size.
     const codeskeptic::IntervalMap emptyState;
     for (const auto* call : copies) {
         BufExtent be = bufferExtent(call->getArg(0), extents, ctx);
@@ -424,8 +434,18 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         const codeskeptic::IntervalMap* st = analysis.stateAt(call);
         codeskeptic::Interval sz = codeskeptic::evalSizeInterval(
             call->getArg(2), ctx, st ? *st : emptyState);
-        // Definite overflow: every byte count exceeds the capacity.
-        if (sz.isEmpty() || sz.loIsInf() || sz.lo() <= capacity.hi()) continue;
+        if (sz.isEmpty()) continue;  // unreachable
+
+        const bool definite =
+            !sz.loIsInf() && sz.lo() > capacity.hi();
+        bool possibleUntrusted = false;
+        if (!definite && !sz.hiIsInf() && sz.hi() > capacity.hi()) {
+            const auto* un = analysis.untrustedAt(call);
+            possibleUntrusted =
+                un && codeskeptic::exprDerivesFromUntrusted(call->getArg(2),
+                                                            *un);
+        }
+        if (!definite && !possibleUntrusted) continue;
 
         SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
@@ -437,10 +457,15 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.column = sm.getSpellingColumnNumber(loc);
         diag.rule_id = "bounds";
         diag.function = fn->getQualifiedNameAsString();
-        diag.severity = codeskeptic::Severity::Error;
-        diag.message = codeskeptic::msg(codeskeptic::MsgId::BoundsCopyOverflow,
-                                       sz.toString(),
-                                       std::to_string(capacity.hi()));
+        diag.severity = definite ? codeskeptic::Severity::Error
+                                 : codeskeptic::Severity::Warning;
+        diag.message =
+            definite ? codeskeptic::msg(codeskeptic::MsgId::BoundsCopyOverflow,
+                                        sz.toString(),
+                                        std::to_string(capacity.hi()))
+                     : codeskeptic::msg(
+                           codeskeptic::MsgId::BoundsCopyUntrustedLen,
+                           sz.toString(), std::to_string(capacity.hi()));
         results.push_back(std::move(diag));
     }
 

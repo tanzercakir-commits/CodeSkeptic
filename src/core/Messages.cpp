@@ -248,6 +248,13 @@ const MsgEntry kMessages[] = {
      "[CodeSkeptic] birden fazla kaynak yolu verildi ('{0}' sonra '{1}') - "
      "tek konumsal yol kabul edilir. Birden fazla dosya icin bir KLASOR "
      "verin ya da --files <liste-dosyasi> kullanin."},
+    // BoundsCopyUntrustedLen
+    {"possible buffer overflow: copy length derives from untrusted input "
+     "(proven range {0}) and can exceed the destination's capacity of {1} "
+     "byte(s) - validate the length before copying",
+     "olasi tampon tasmasi: kopya uzunlugu guvenilmeyen girdiden turuyor "
+     "(ispatlanan aralik {0}) ve hedefin {1} baytlik kapasitesini asabilir "
+     "- kopyalamadan once uzunlugu dogrulayin"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

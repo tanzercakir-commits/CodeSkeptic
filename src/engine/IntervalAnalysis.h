@@ -28,9 +28,25 @@ class ASTContext;
 
 namespace codeskeptic {
 
+// The interval dataflow's state: per-variable proven ranges PLUS the
+// untrusted-origin set — the vars whose current value derives from a
+// declared untrusted-integer source (see applyIntervalAssign's
+// `untrusted` contract). Two dimensions of one value, transferred by
+// the same statements; keeping them in one State keeps them in sync
+// across merge/refine/widen for free.
+struct IntervalState {
+    IntervalMap iv;
+    std::set<const clang::VarDecl*> untrusted;
+
+    bool operator==(const IntervalState& o) const {
+        return iv == o.iv && untrusted == o.untrusted;
+    }
+    bool operator!=(const IntervalState& o) const { return !(*this == o); }
+};
+
 class IntervalAnalysis {
 public:
-    using State = IntervalMap;
+    using State = IntervalState;
 
     explicit IntervalAnalysis(std::set<const clang::VarDecl*> vars,
                               std::map<const clang::VarDecl*, Interval> seeds =
@@ -45,7 +61,7 @@ public:
             // proven range instead of top(). Everything else is
             // caller-unknown -> top().
             auto it = seeds_.find(v);
-            s[v] = (it == seeds_.end()) ? Interval::top() : it->second;
+            s.iv[v] = (it == seeds_.end()) ? Interval::top() : it->second;
         }
         return s;
     }
@@ -58,24 +74,31 @@ public:
 
     State merge(const State& a, const State& b) const {
         State r = a;
-        for (const auto& [v, iv] : b) {
-            auto it = r.find(v);
-            r[v] = (it == r.end()) ? iv : Interval::join(it->second, iv);
+        for (const auto& [v, iv] : b.iv) {
+            auto it = r.iv.find(v);
+            r.iv[v] = (it == r.iv.end()) ? iv : Interval::join(it->second, iv);
         }
+        // Origin joins by UNION: either path delivering an untrusted
+        // value makes the merged value possibly-untrusted. (The RANGE
+        // decides whether that can ever exceed a capacity.)
+        r.untrusted.insert(b.untrusted.begin(), b.untrusted.end());
         return r;
     }
 
     State transfer(const clang::Stmt* stmt, const State& in,
                    clang::ASTContext& ctx) const {
         State out = in;
-        applyIntervalAssign(out, stmt, vars_, &ctx);
+        applyIntervalAssign(out.iv, stmt, vars_, &ctx, &out.untrusted);
         return out;
     }
 
     void refineOnEdge(const clang::Stmt* cond, bool isTrue, State& state,
                       clang::ASTContext& ctx) const {
+        // Guards narrow RANGES only. Origin survives deliberately: a
+        // validated length is still externally chosen, and the
+        // narrowed range is exactly what makes it safe.
         if (const auto* e = clang::dyn_cast<clang::Expr>(cond))
-            refineIntervalOnEdge(state, e, isTrue, vars_, &ctx);
+            refineIntervalOnEdge(state.iv, e, isTrue, vars_, &ctx);
     }
 
     // Convergence widening: at a re-visited (loop) block the engine has
@@ -85,7 +108,7 @@ public:
     // re-narrows the specific branch (e.g. `if (n <= 1) return;`), which
     // is where the useful ranges actually come from.
     void widen(State& s) const {
-        for (auto& [v, iv] : s) {
+        for (auto& [v, iv] : s.iv) {
             int64_t c;
             if (!iv.isSingleton(&c)) iv = Interval::top();
         }
@@ -103,8 +126,8 @@ public:
                         const clang::VarDecl* var) const {
         auto s = atStmt_.find(stmt);
         if (s == atStmt_.end()) return Interval::top();
-        auto v = s->second.find(var);
-        return v == s->second.end() ? Interval::top() : v->second;
+        auto v = s->second.iv.find(var);
+        return v == s->second.iv.end() ? Interval::top() : v->second;
     }
 
     // The full entry interval-map at `stmt` (for evaluating a whole
@@ -112,13 +135,21 @@ public:
     // nullptr when the statement was never reached/recorded.
     const IntervalMap* stateAt(const clang::Stmt* stmt) const {
         auto s = atStmt_.find(stmt);
-        return s == atStmt_.end() ? nullptr : &s->second;
+        return s == atStmt_.end() ? nullptr : &s->second.iv;
+    }
+
+    // The untrusted-origin set on entry to `stmt` (for
+    // exprDerivesFromUntrusted at a sink). nullptr when unrecorded.
+    const std::set<const clang::VarDecl*>* untrustedAt(
+        const clang::Stmt* stmt) const {
+        auto s = atStmt_.find(stmt);
+        return s == atStmt_.end() ? nullptr : &s->second.untrusted;
     }
 
 private:
     std::set<const clang::VarDecl*> vars_;
     std::map<const clang::VarDecl*, Interval> seeds_;
-    std::map<const clang::Stmt*, IntervalMap> atStmt_;
+    std::map<const clang::Stmt*, IntervalState> atStmt_;
 };
 
 } // namespace codeskeptic

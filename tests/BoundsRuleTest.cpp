@@ -1,4 +1,5 @@
 #include "TestHelper.h"
+#include "engine/AllocFunctions.h"
 #include "rules/BoundsRule.h"
 
 #include <gtest/gtest.h>
@@ -626,4 +627,203 @@ TEST(BoundsRuleTest, StrcpyOtherVarGuard_Reported) {
         }
     )");
     ASSERT_EQ(results.size(), 1u);
+}
+
+// --- Untrusted-length copies (docs/untrusted-length.md increment) ---
+// memcpy/memmove/memset/strncpy sized by a value that DERIVES from a
+// declared untrusted-integer source and whose proven FINITE range can
+// exceed the destination capacity -> possible overflow (Warning). The
+// range decides: a guard's edge narrows it and silences; an unknown
+// (top) length or an underived value never reports.
+
+TEST(BoundsRuleTest, UntrustedLenMemcpy_Warn) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int atoi(const char*);
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* s, const char* src) {
+            char buf[64];
+            int n = atoi(s);
+            memcpy(buf, src, n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, UntrustedLenGuarded_Clean) {
+    // The guard's own edge narrows the range below capacity: silent.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int atoi(const char*);
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* s, const char* src) {
+            char buf[64];
+            int n = atoi(s);
+            if (n < 0 || n > 64) return;
+            memcpy(buf, src, n);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, UntrustedLenScanfStrncpy_Warn) {
+    // scanf fills n from external text; strncpy writes exactly n bytes.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int scanf(const char*, ...);
+        extern char* strncpy(char*, const char*, size_t);
+        void f(const char* src) {
+            char buf[32];
+            int n;
+            if (scanf("%d", &n) != 1) return;
+            strncpy(buf, src, n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, TrustedOrUnknownLen_Clean) {
+    // A trusted constant AND an unknown (underived) parameter length:
+    // neither arm may report — provenance alone gates the warning.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* src, int m) {
+            char buf[64];
+            int n = 32;
+            memcpy(buf, src, n);
+            memcpy(buf, src, m);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, ReassignedAfterUntrusted_Clean) {
+    // Plain reassignment recomputes provenance: no stale taint.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int atoi(const char*);
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* s, const char* src) {
+            char buf[64];
+            int n = atoi(s);
+            n = 16;
+            memcpy(buf, src, n);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, UntrustedArithDerived_Warn) {
+    // Derivation flows through arithmetic: n*2 is still attacker-sized.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int atoi(const char*);
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* s, const char* src) {
+            char buf[64];
+            int n = atoi(s);
+            memcpy(buf, src, n * 2);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, ScanfWidthBound_RangeDecides) {
+    // %2d caps the value at 99: fits a 200-byte buffer (silent), can
+    // exceed a 50-byte one (warn) — the WIDTH-narrowed range decides,
+    // provenance stays untrusted in both.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int scanf(const char*, ...);
+        extern void* memcpy(void*, const void*, size_t);
+        void ok(const char* src) {
+            char big[200];
+            int n;
+            if (scanf("%2d", &n) != 1) return;
+            memcpy(big, src, n);
+        }
+        void bad(const char* src) {
+            char small[50];
+            int n;
+            if (scanf("%2d", &n) != 1) return;
+            memcpy(small, src, n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, StrncpyConstant_DefiniteVsFits) {
+    // strncpy joins the sized-copy family: a constant n past capacity
+    // is a DEFINITE overflow (strncpy always writes n bytes — it pads),
+    // a fitting constant stays silent.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern char* strncpy(char*, const char*, size_t);
+        void bad(const char* src) {
+            char buf[8];
+            strncpy(buf, src, 16);
+        }
+        void ok(const char* src) {
+            char buf[8];
+            strncpy(buf, src, 8);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, MemsetUntrustedLen_Warn) {
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern int atoi(const char*);
+        extern void* memset(void*, int, size_t);
+        void f(const char* s) {
+            char buf[16];
+            int n = atoi(s);
+            memset(buf, 0, n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(BoundsRuleTest, ConfiguredUntrustedSource_WarnAndRestore) {
+    // --untrusted-int-sources read_u16: the project-declared wire-length
+    // source drives the possible-overflow arm; an UNLISTED extern stays
+    // silent (provenance is opt-in, never guessed).
+    setUntrustedIntSourceNames({"read_u16"});
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern unsigned short read_u16(void);
+        extern int other_len(void);
+        extern void* memcpy(void*, const void*, size_t);
+        void f(const char* src) {
+            char buf[64];
+            unsigned short n = read_u16();
+            memcpy(buf, src, n);
+        }
+        void g(const char* src) {
+            char buf[64];
+            int n = other_len();
+            memcpy(buf, src, n);
+        }
+    )");
+    setUntrustedIntSourceNames({});   // restore — process-global registry
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
 }

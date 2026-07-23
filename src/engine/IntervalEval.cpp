@@ -498,27 +498,69 @@ Interval evalInterval(const Expr* expr, const IntervalMap& state) {
     return evalInterval(expr, state, nullptr);
 }
 
+bool exprDerivesFromUntrusted(const Expr* e,
+                              const std::set<const VarDecl*>& untrusted) {
+    if (!e) return false;
+    // Casts are transparent for PROVENANCE: (size_t)n is still n's
+    // value. Range soundness is evalSizeInterval's job, not this one's.
+    e = e->IgnoreParenCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(e)) {
+        const auto* vd = dyn_cast<VarDecl>(ref->getDecl());
+        return vd && untrusted.count(vd) > 0;
+    }
+    if (const auto* call = dyn_cast<CallExpr>(e))
+        return isUntrustedIntSource(call);
+    if (const auto* u = dyn_cast<UnaryOperator>(e))
+        return exprDerivesFromUntrusted(u->getSubExpr(), untrusted);
+    if (const auto* bin = dyn_cast<BinaryOperator>(e))
+        return exprDerivesFromUntrusted(bin->getLHS(), untrusted) ||
+               exprDerivesFromUntrusted(bin->getRHS(), untrusted);
+    if (const auto* c = dyn_cast<ConditionalOperator>(e))
+        return exprDerivesFromUntrusted(c->getTrueExpr(), untrusted) ||
+               exprDerivesFromUntrusted(c->getFalseExpr(), untrusted);
+    return false;
+}
+
 void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
                          const std::set<const VarDecl*>& vars,
-                         const ASTContext* ctx) {
+                         const ASTContext* ctx,
+                         std::set<const VarDecl*>* untrusted) {
     auto set = [&](const VarDecl* v, Interval iv) {
         if (vars.count(v)) state[v] = iv;
+    };
+    // Recompute untrusted-origin membership on a plain (re)definition:
+    // derivation is a property of the NEW value, so stale membership
+    // dies exactly where the old value does.
+    auto setOrigin = [&](const VarDecl* v, const Expr* rhs) {
+        if (!untrusted || !vars.count(v)) return;
+        const bool derived =
+            rhs && (exprDerivesFromUntrusted(rhs, *untrusted));
+        if (derived)
+            untrusted->insert(v);
+        else
+            untrusted->erase(v);
     };
 
     if (const auto* ds = dyn_cast<DeclStmt>(stmt)) {
         for (const auto* d : ds->decls())
             if (const auto* vd = dyn_cast<VarDecl>(d))
-                if (vars.count(vd))
+                if (vars.count(vd)) {
                     state[vd] = vd->hasInit()
                                     ? evalInterval(vd->getInit(), state, ctx)
                                     : Interval::top();
+                    setOrigin(vd, vd->hasInit() ? vd->getInit() : nullptr);
+                }
         return;
     }
     if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
         if (bin->getOpcode() == BO_Assign)
-            if (const VarDecl* v = asIntVar(bin->getLHS()))
+            if (const VarDecl* v = asIntVar(bin->getLHS())) {
                 set(v, evalInterval(bin->getRHS(), state, ctx));
+                setOrigin(v, bin->getRHS());
+            }
         // Compound assignment (`x += ...`) not modeled yet → top.
+        // Origin membership stays as-is: with a top() interval the
+        // possible-overflow consumer (finite-bound bar) cannot report.
         if (bin->isCompoundAssignmentOp())
             if (const VarDecl* v = asIntVar(bin->getLHS()))
                 set(v, Interval::top());
@@ -569,18 +611,33 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
                     } else if (auto wb = scanfWidthBound(c)) {
                         seed = Interval::meet(seed, *wb);
                     }
-                    if (!seed.isEmpty()) set(v, seed);
+                    if (!seed.isEmpty()) {
+                        set(v, seed);
+                        // scanf-filled = externally chosen, even when a
+                        // field width narrows the RANGE (%2d still lets
+                        // the input pick any value in it).
+                        if (untrusted && vars.count(v) && c.conv != 'n')
+                            untrusted->insert(v);
+                    }
                 }
                 return;
             }
             for (const Expr* arg : call->arguments())
                 if (const VarDecl* v = addrOfIntVar(arg))
-                    if (auto iv = intTypeRange(v->getType(), *ctx)) set(v, *iv);
+                    if (auto iv = intTypeRange(v->getType(), *ctx)) {
+                        set(v, *iv);
+                        if (untrusted && vars.count(v)) untrusted->insert(v);
+                    }
             return;
         }
         // An int passed by non-const reference may be rewritten.
         forEachNonConstRefArg(call, [&](const Expr* arg) {
-            if (const VarDecl* v = asIntVar(arg)) set(v, Interval::top());
+            if (const VarDecl* v = asIntVar(arg)) {
+                set(v, Interval::top());
+                // Rewritten by an unknown callee: no longer of proven
+                // untrusted origin (and top() blocks reporting anyway).
+                if (untrusted) untrusted->erase(v);
+            }
         });
     }
 }
