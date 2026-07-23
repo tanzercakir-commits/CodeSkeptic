@@ -1,5 +1,23 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-23 — Windows Tier 2 closed by measurement: the driver already discovers the SDK
+
+The plan's "largest, most brittle piece" — automatic MSVC/Windows-SDK
+header discovery for point-at-a-directory mode — cost two probe rounds
+and zero engine lines (phase8-windows-sdk). Round 1 cleared only
+`INCLUDE` and passed, but the proof was contaminated (vcvars residue
+like `VCToolsInstallDir` still in the env); round 2 stripped the
+entire 28-variable vcvars family and the freshly built exe STILL
+resolved `#include <stdio.h>` in analyzed code and reported the
+planted bounds/null-deref/leak findings with exit 1 — clang's MSVC
+toolchain locates VS (COM setup-API/registry) and the SDK (registry)
+on its own. Landed as a guard, not code: the probe was promoted to a
+hard windows.yml step ("Directory mode without a Developer Prompt"),
+so an LLVM upgrade that regresses driver discovery turns the lane red
+instead of silently demoting the claim. Inherent requirement, stated
+in the docs: an MSVC toolset + SDK must exist on the machine.
+Remaining open on Windows: prebuilt release binary + packaging.
+
 ## 2026-07-23 — Native Windows Tier 1: MSVC build + windows-latest ratchet
 
 The bounded port that windows-support.md scoped, landed exactly along

@@ -128,6 +128,42 @@ jobs:
           ./build/src/codeskeptic.exe smoke.cpp || code=$?
           test "$code" -eq 1
 
+      - name: Directory mode without a Developer Prompt (Tier 2 guard)
+        id: nodev-dirmode
+        # Tier 2 ("SDK discovery") closed by measurement, not code:
+        # clang's MSVC toolchain locates VS and the Windows SDK by
+        # COM/registry on its own. Proven in two probe rounds (the
+        # second stripped the ENTIRE 28-variable vcvars family), then
+        # promoted to this hard step: plain-terminal simulation, the
+        # analyzer must still resolve <stdio.h> in analyzed code and
+        # report the planted bug. If this regresses, the lane goes red.
+        shell: pwsh
+        run: |
+          $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'
+          Get-ChildItem Env: | Where-Object { $_.Name -match $family } | ForEach-Object {
+            Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue
+          }
+          New-Item -ItemType Directory -Force -Path probe_dir | Out-Null
+          @'
+          #include <stdio.h>
+          #include <stdlib.h>
+          void f(void) {
+              int* p = (int*)malloc(4 * sizeof(int));
+              p[10] = 1;
+          }
+          '@ | Set-Content probe_dir\probe.c
+          $out = & .\build\src\codeskeptic.exe probe_dir 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          "exit=$code`n$out" | Set-Content probe_result.txt
+          if (-not ($code -eq 1 -and $out -match 'bounds')) {
+            Write-Host $out
+            throw "no-dev-prompt directory mode regressed (exit=$code)"
+          }
+          # Explicit success: the pwsh shell wrapper otherwise exits
+          # with $LASTEXITCODE — which is the analyzer's 1 (= findings,
+          # exactly what we asserted FOR).
+          exit 0
+
       - name: Failure diagnostics -> refs/ci-logs/*
         # Same contract as ci.yml: the dev sandbox reads Actions results
         # over the git protocol only. Configure/build logs matter most
@@ -153,6 +189,7 @@ jobs:
           cp /tmp/diag/steps.txt /tmp/diag/build_tail.txt \
              /tmp/diag/ctest_failed_tail.txt /tmp/diag/configure_tail.txt . 2>/dev/null || true
           git add -f steps.txt build_tail.txt ctest_failed_tail.txt configure_tail.txt
+          [ -f probe_result.txt ] && git add -f probe_result.txt || true
           git commit -qm "windows ci diagnostics @ ${{ github.sha }}"
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/windows-native"
 
