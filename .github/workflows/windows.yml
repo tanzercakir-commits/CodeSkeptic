@@ -19,70 +19,14 @@ concurrency:
   group: windows-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Matches the Linux lane's LLVM 20 (ci.yml installs llvm-20-dev).
-  LLVM_VER: "20.1.8"
-
 jobs:
   windows-native:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache LLVM (extracted MSVC dev tarball)
-        id: cache-llvm
-        uses: actions/cache@v4
-        with:
-          path: C:\llvm
-          key: llvm-${{ env.LLVM_VER }}-x86_64-pc-windows-msvc-v1
-
-      - name: Download LLVM ${{ env.LLVM_VER }} (cache miss only)
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VER/clang+llvm-$env:LLVM_VER-x86_64-pc-windows-msvc.tar.xz"
-          curl.exe -sSfL --retry 3 -o llvm.tar.xz $url
-          # Two explicit 7z steps (xz -> tar -> tree): no binary pipe —
-          # PowerShell pipes are string pipes and corrupt binary data.
-          7z x -bso0 -bsp0 llvm.tar.xz
-          New-Item -ItemType Directory -Force -Path C:\llvm | Out-Null
-          7z x -bso0 -bsp0 llvm.tar "-oC:\llvm"
-          Remove-Item llvm.tar.xz, llvm.tar
-
-      - name: MSVC environment -> GITHUB_ENV
-        id: msvc-env
-        shell: pwsh
-        # vcvars64 once, exported for every later step. Twofold: cl.exe
-        # for building, and the INCLUDE variable for the analyzer's own
-        # test snippets — clang's MSVC toolchain reads INCLUDE to
-        # resolve an analyzed `#include <stdlib.h>` natively
-        # (docs/windows-support.md §3, compile-DB tier).
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if (-not $vs) { throw "vswhere found no VC++ toolset" }
-          cmd /s /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" > NUL 2>&1 && set" | ForEach-Object {
-            if ($_ -match '^([^=]+)=(.*)$') {
-              Add-Content $env:GITHUB_ENV "$($Matches[1])=$($Matches[2])"
-            }
-          }
-
-      - name: Patch LLVM exports (stale DIA SDK path)
-        shell: pwsh
-        # The official tarball's LLVMExports.cmake hard-codes the
-        # absolute diaguids.lib path of the machine that BUILT LLVM
-        # (a VS2019 install). Point it at this runner's DIA SDK.
-        # Idempotent: re-run safely on cached trees and VS upgrades.
-        run: |
-          $dia = (Join-Path $env:VSINSTALLDIR "DIA SDK\lib\amd64\diaguids.lib") -replace '\\','/'
-          if (-not (Test-Path $dia)) { throw "DIA SDK not found: $dia" }
-          Get-ChildItem "C:\llvm" -Recurse -Filter *.cmake | ForEach-Object {
-            $c = Get-Content $_.FullName -Raw
-            if ($c -match 'diaguids\.lib') {
-              $n = $c -replace '[A-Za-z]:/[^";]*?DIA SDK/lib/amd64/diaguids\.lib', $dia
-              if ($n -ne $c) { Set-Content $_.FullName $n -NoNewline; Write-Host "patched: $($_.FullName)" }
-            }
-          }
+      - name: Setup MSVC + LLVM (shared with release.yml)
+        uses: ./.github/actions/setup-msvc-llvm
 
       - name: Configure
         id: configure
@@ -162,6 +106,43 @@ jobs:
           # Explicit success: the pwsh shell wrapper otherwise exits
           # with $LASTEXITCODE — which is the analyzer's 1 (= findings,
           # exactly what we asserted FOR).
+          exit 0
+
+      - name: Package rehearsal (release-lane parity, every push)
+        id: package
+        # The Linux packaging path is exercised on every phase push by
+        # the Docker lane; this is the Windows analog — a broken
+        # package must surface at push time, not at tag time.
+        shell: bash
+        run: bash scripts/package_release.sh build/src/codeskeptic.exe dist "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe"
+
+      - name: Relocation smoke (package tree only — LLVM hidden, plain terminal)
+        id: reloc-smoke
+        # The unpacked zip must carry itself: C:\llvm (the baked
+        # resource-dir path AND the build LLVM) is renamed away, the
+        # vcvars family stripped, and the packaged exe must still
+        # analyze docs/demo.c via its exe-relative bundled headers +
+        # driver SDK discovery, with the exit-1 findings contract.
+        shell: pwsh
+        run: |
+          $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'
+          Get-ChildItem Env: | Where-Object { $_.Name -match $family } | ForEach-Object {
+            Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue
+          }
+          Rename-Item C:\llvm C:\llvm-hidden
+          try {
+            $zip = Get-ChildItem dist\codeskeptic-*-windows-*.zip | Select-Object -First 1
+            Expand-Archive $zip.FullName -DestinationPath "$env:TEMP\cs_pkg" -Force
+            $exe = Get-ChildItem "$env:TEMP\cs_pkg" -Recurse -Filter codeskeptic.exe | Select-Object -First 1
+            $out = & $exe.FullName docs\demo.c 2>&1 | Out-String
+            $code = $LASTEXITCODE
+          } finally {
+            Rename-Item C:\llvm-hidden C:\llvm
+          }
+          Write-Host $out
+          if (-not ($code -eq 1 -and $out -match 'finding')) {
+            throw "package relocation smoke failed (exit=$code)"
+          }
           exit 0
 
       - name: Failure diagnostics -> refs/ci-logs/*

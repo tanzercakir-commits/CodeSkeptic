@@ -14,7 +14,7 @@ Get the analyzer one of three ways — LLVM is NOT required for A or B:
   unpack, run `bin/codeskeptic`. Everything (Clang headers, runtime
   libraries) is in the package.
 - **Option B — Docker**: `docker run --rm -v "$PWD:/work"
-  ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 ...` — pin the tag in
+  ghcr.io/tanzercakir-commits/codeskeptic:v0.4.5 ...` — pin the tag in
   CI; `:latest` is fine for a first try.
 - **Option C — build from source**: needs LLVM/Clang development
   libraries; the [README quickstart](../README.md#quickstart) is the

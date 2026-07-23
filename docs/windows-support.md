@@ -11,9 +11,11 @@ and runs the full 682-test unit suite green on `windows-latest` on every
 push, and plain-terminal directory mode is guarded by its own CI step —
 the item-6 ratchet ([windows.yml](../.github/workflows/windows.yml))
 holds both from here on. Tier 2 turned out to need measurement, not
-code (see item 3). Remaining open: a prebuilt Windows release binary.
-The per-item notes below record what landed and what each gap turned
-out to be in practice.
+code (see item 3). Packaging landed with v0.4.5: a prebuilt
+`codeskeptic-windows-x86_64.zip` ships from the release lane, with a
+per-push packaging rehearsal + relocation smoke in windows.yml. The
+per-item notes below record what landed and what each gap turned out
+to be in practice.
 
 ## Starting point: the core is already portable
 
@@ -121,9 +123,16 @@ The 682 C++ unit tests are the portable floor and all run on Windows.
   VS/SDK discovery covers it; guarded by the no-dev-prompt CI step
   instead of new code. What the plan called "the largest single piece"
   cost two probe rounds and zero engine lines.
-- Still open: a prebuilt Windows release binary (packaging —
-  `package_release.sh` is bash; wants a PowerShell/portable port and a
-  clean-container smoke like the Linux/macOS lanes).
+- **Packaging — DONE** (v0.4.5, phase9-windows-package):
+  `package_release.sh` runs under Git Bash on the runner with a small
+  Windows branch (zip via 7z, `codeskeptic.exe`, `cygpath` for the
+  resource dir, no lib bundling — the static-CRT build links only
+  Windows system DLLs). Release lane: build → 682 tests → version/tag
+  check → package → relocation smoke (C:\llvm renamed away + vcvars
+  family stripped: the zip must carry itself) → draft upload; combined
+  `sha256sums.txt` covers Linux + macOS + Windows. The same package +
+  smoke also runs on every push (windows.yml rehearsal) so packaging
+  breaks at push time, not tag time.
 
 ## Invariants
 Everything landed behind the item-6 CI floor with every existing unit test

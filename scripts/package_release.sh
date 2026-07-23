@@ -30,13 +30,22 @@ if [ -z "$CLANG" ]; then
 fi
 [ -n "$CLANG" ] || { echo "PACKAGE_FAIL no clang found for -print-resource-dir"; exit 1; }
 
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+# Git Bash / MSYS on Windows reports MINGW64_NT-... — normalize; the
+# Windows package is a zip with codeskeptic.exe (static-CRT build, no
+# libs to bundle).
+case "$OS" in mingw*|msys*|cygwin*) OS=windows ;; esac
+EXE=""
+[ "$OS" = windows ] && EXE=".exe"
+
 RES_DIR=$("$CLANG" -print-resource-dir)
+# clang.exe prints a native C:\ path; POSIX tools here need /c/...
+[ "$OS" = windows ] && RES_DIR=$(cygpath -u "$RES_DIR")
 [ -d "$RES_DIR/include" ] || { echo "PACKAGE_FAIL resource dir has no include/: $RES_DIR"; exit 1; }
 
 VERSION=$("$BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*' | head -1)
 [ -n "$VERSION" ] || { echo "PACKAGE_FAIL could not parse --version output"; exit 1; }
 
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 NAME="codeskeptic-v${VERSION}-${OS}-${ARCH}"
 STAGE="$OUT/$NAME"
@@ -44,7 +53,7 @@ STAGE="$OUT/$NAME"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/bin"
 
-cp "$BIN" "$STAGE/bin/codeskeptic"
+cp "$BIN" "$STAGE/bin/codeskeptic$EXE"
 
 MAJOR=$(basename "$RES_DIR")
 mkdir -p "$STAGE/lib/clang/$MAJOR"
@@ -60,7 +69,11 @@ cp README.md "$STAGE/README.md"
 # libs (libzstd, zlib, tinfo, libc) are NOT bundled — they stay in
 # DEPENDENCIES.txt.
 mkdir -p "$STAGE/lib"
-if [ "$OS" = "darwin" ]; then
+if [ "$OS" = "windows" ]; then
+    # Nothing to bundle: the official LLVM windows-msvc dist is
+    # static (/MT), so codeskeptic.exe links only Windows system DLLs.
+    :
+elif [ "$OS" = "darwin" ]; then
     otool -L "$STAGE/bin/codeskeptic" | awk 'NR>1{print $1}' \
       | grep -Ei 'libLLVM|libclang' | while read -r so; do
         real="$so"
@@ -91,19 +104,31 @@ fi
 
 # Honest dependency listing: what the binary still links dynamically.
 {
-    echo "# Dynamic dependencies of bin/codeskeptic ($OS-$ARCH)"
+    echo "# Dynamic dependencies of bin/codeskeptic$EXE ($OS-$ARCH)"
     echo "# Analyzing code also needs the TARGET's own headers installed"
-    echo "# (libc6-dev / Xcode Command Line Tools) — as any compiler does."
+    echo "# (libc6-dev / Xcode CLT / MSVC toolset + Windows SDK) — as any"
+    echo "# compiler does."
     if [ "$OS" = "darwin" ]; then
         otool -L "$STAGE/bin/codeskeptic" || true
+    elif [ "$OS" = "windows" ]; then
+        echo "# Static-CRT (/MT) build: only Windows system DLLs."
+        ldd "$STAGE/bin/codeskeptic$EXE" 2>/dev/null || true
     else
         ldd "$STAGE/bin/codeskeptic" || true
     fi
 } > "$STAGE/DEPENDENCIES.txt"
 
 mkdir -p "$OUT"
-tar czf "$OUT/$NAME.tar.gz" -C "$OUT" "$NAME"
-(cd "$OUT" && { command -v sha256sum >/dev/null && sha256sum "$NAME.tar.gz" || shasum -a 256 "$NAME.tar.gz"; } >> sha256sums.txt)
+if [ "$OS" = "windows" ]; then
+    # zip is the Windows convention (Expand-Archive works out of the
+    # box); 7z is present on the runners and in Git Bash PATH.
+    ARCHIVE="$NAME.zip"
+    (cd "$OUT" && rm -f "$ARCHIVE" && 7z a -bso0 -bsp0 "$ARCHIVE" "$NAME" >/dev/null)
+else
+    ARCHIVE="$NAME.tar.gz"
+    tar czf "$OUT/$ARCHIVE" -C "$OUT" "$NAME"
+fi
+(cd "$OUT" && { command -v sha256sum >/dev/null && sha256sum "$ARCHIVE" || shasum -a 256 "$ARCHIVE"; } >> sha256sums.txt)
 
-SIZE=$(du -h "$OUT/$NAME.tar.gz" | cut -f1)
-echo "PACKAGE_RESULT name=$NAME.tar.gz size=$SIZE version=$VERSION resource_major=$MAJOR"
+SIZE=$(du -h "$OUT/$ARCHIVE" | cut -f1)
+echo "PACKAGE_RESULT name=$ARCHIVE size=$SIZE version=$VERSION resource_major=$MAJOR"
