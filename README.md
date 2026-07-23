@@ -187,13 +187,15 @@ Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 
 - **Mature code (NIST Juliet 1.3):** rule precision **1.000** on five
   of six rules (memory-leak 0.714); recall 0.496 / 0.347 / 0.242 /
-  0.193 / 0.098 / 0.052 by CWE — lower bounds with a classified
+  0.193 / 0.108 / 0.052 by CWE — lower bounds with a classified
   denominator (floating-point variants and opaque sources are
   by-design silences, not gaps), every improvement locked by a
   ratcheted CI floor.
-- **First-draft code (blind 24-program AI corpus — the mission axis):**
-  combined recall **0.625 at precision 1.000**, zero false positives
-  including on 9 deliberately-clean programs.
+- **First-draft code (the mission axis):** a frozen 24-program corpus
+  written by rule-blind generators gates every PR
+  (`tests/thesis_corpus/`): **zero false positives across 9
+  genuinely-clean programs, 9/9 in-scope memory-safety/overflow bugs
+  caught** — out-of-scope misses documented per file, not hidden.
 
 Every number is reproducible with one script, and CI enforces pinned
 per-CWE floors, pinned real-world finding counts, and a self-scan

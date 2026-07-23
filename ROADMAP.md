@@ -13,9 +13,10 @@ lives in [`docs/devlog/`](docs/devlog/) (ROADMAP-full.md, changelog.md).
 - Interprocedural v1: deterministic function summaries (nullness,
   zeroness, parameter effects), cross-TU via `--whole-program`,
   serializable for incremental runs and semantic summary-diff gating.
-- Measured on two axes: Juliet (mature-code precision, six pinned
-  per-CWE CI floors) and a blind 24-program AI corpus (first-draft
-  recall 0.625 @ precision 1.000) — [docs/benchmarks.md](docs/benchmarks.md).
+- Measured on three gated axes: Juliet (six pinned per-CWE CI
+  floors), the real-world corpus (pinned counts), and the frozen
+  blind first-draft thesis corpus (0 FP / 9-of-9 in-scope, gating
+  every PR) — [docs/benchmarks.md](docs/benchmarks.md).
 - Proven in the wild: systemd/shadPS4/libgit2/llama.cpp scans triaged
   by hand; two findings fixed and merged upstream by shadPS4
   maintainers; three more reports drafted (libgit2 ×11, rtp2httpd,

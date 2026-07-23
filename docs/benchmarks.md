@@ -18,10 +18,11 @@ this the hard way — see the devlog). CodeSkeptic tracks both:
 
 - **NIST Juliet 1.3** (synthetic, mature-code shapes) — per-CWE
   precision/recall with pinned CI floors.
-- **A blind AI corpus** (24 programs, generated at first-draft quality
-  by a model with no knowledge of our rules, bugs self-annotated) —
-  the mission axis: combined recall **0.625 at precision 1.000**,
-  including zero false positives on 9 deliberately-clean programs.
+- **The thesis corpus** (24 first-draft programs by rule-blind
+  generators, frozen in `tests/thesis_corpus/`, adjudicated manifest)
+  — the mission axis, gating every PR: **0 FP across 9 genuinely-clean
+  programs, 9/9 in-scope bugs caught**; out-of-scope misses pinned and
+  documented (`scripts/run_thesis.sh`).
 - **Real-world corpus** (cJSON, tinyxml2, weekly abseil) — pinned
   finding counts; deviation = semantic regression.
 
@@ -43,7 +44,7 @@ FP-hunting material).
 | CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (140 TP / 0 FP) | 0.347 | **0.516** |
 | CWE-415 Double Free | `double-free` | **1.000** (97 TP / 0 FP) | 0.242 | 0.390 |
 | CWE-401 Memory Leak | `memory-leak` | 0.714 (case-level) | 0.193 | 0.306 |
-| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (39 TP / 0 FP) | 0.098 | 0.178 |
+| CWE-369 Divide by Zero | `div-by-zero` | **1.000** (43 TP / 0 FP) | 0.108 | 0.195 |
 | CWE-190 Integer Overflow | `int-overflow` | **1.000** (21 TP / 0 FP*) | 0.052 | 0.100 |
 
 <sub>* The CWE-190 rand-source family reaches the sink through a
@@ -77,8 +78,9 @@ elimination for value-materialized asserts, and engine-level
 convergence widening. The v0.4 recall round (2026-07-22) worked from
 the FN classification: int-overflow grew from signed 32-bit `*` to
 `+`, 64-bit corner proofs and narrowing stores (0.010 → 0.052);
-div-by-zero zeroness now flows through var-to-var copies
-(0.093 → 0.098); and immutable-flag constant propagation prunes
+div-by-zero zeroness now flows through var-to-var copies and, for
+fully-visible internal callees, across call boundaries
+(0.093 → 0.108); and immutable-flag constant propagation prunes
 provably-dead branches engine-wide — the goodB2G flag-correlation FP
 family died (leak precision 0.684 → 0.714 on the 400-file sample,
 cross-rule noise down on three other CWEs at once). A caveat on
@@ -118,7 +120,7 @@ Results are from the 2026-07-22 run (v0.4.1, 400 files/CWE); grep
 `JULIET_RESULT` in the workflow logs for current numbers. Every
 improvement is locked by a ratcheted floor in
 `scripts/juliet_expected.txt` (CWE-190 recall 0.005 → 0.040, CWE-369
-0.03 → 0.085, CWE-401 precision 0.66 → 0.68) — the guard file's
+0.03 → 0.095, CWE-401 precision 0.66 → 0.68) — the guard file's
 comments carry each move's rationale.
 
 ## Reading the real-world scan numbers

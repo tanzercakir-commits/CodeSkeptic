@@ -2,7 +2,9 @@
 
 > **DURUM (2026-07-22 gece):** Faz 0 ✔ · Faz 1 ✔ (v0.4.0 yayında) ·
 > Faz 3 Claude-tarafı ✔ (3a raporlar kullanıcıda) · Faz 4a ✔ ·
-> Faz 2 ✔ (2c int-overflow, 2b kopya-taint, 2a bayrak-constprop —
+> Faz 2 ✔✔ (2c int-overflow, 2b kopya-taint + interproc zeroness,
+> 2a bayrak-constprop + çağrı-bayrağı/kopya kapanışı, 2d thesis gate
+> CI'da —
 > ölçümler benchmarks.md'de; 2d thesis-gate ile derin dilimler
 > [sabit-dönüş bayrakları, zeroness-özet birleşmesi] sonraki tura
 > devredildi ve guard dosyalarında belgeli). v0.4.1 bu turun kapanış
