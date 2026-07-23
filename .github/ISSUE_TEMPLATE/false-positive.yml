@@ -1,0 +1,38 @@
+name: False positive report
+description: >-
+  A finding you verified is wrong. These are first-class contributions:
+  every FP family so far became an engine feature with a pinned test.
+labels: ["false-positive"]
+body:
+  - type: textarea
+    id: finding
+    attributes:
+      label: The finding (with its trace)
+      description: Paste the console/SARIF output including the dataflow trace lines.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code (or repo + file/line)
+      description: >-
+        Ideally a small self-contained snippet that reproduces it; a
+        link to the exact file/line in a public repo works too.
+      render: c
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the finding is wrong
+      description: What guarantees the reported path cannot happen?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CodeSkeptic version
+      placeholder: v0.4.4 (codeskeptic --version)
+    validations:
+      required: true

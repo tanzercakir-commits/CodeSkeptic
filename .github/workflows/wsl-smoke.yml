@@ -1,0 +1,84 @@
+name: WSL smoke
+
+# The Windows-via-WSL path the README documents, PROVEN on a hosted
+# windows-latest runner — with plain wsl.exe, no third-party actions
+# (round-2 probe: `wsl --install` works, distros run as VERSION 2,
+# kernel reports -microsoft-standard-WSL2). The smoke downloads the
+# latest Linux release inside the distro, analyzes docs/demo.c
+# (fetched at this run's own SHA), and asserts the analyzer contract
+# plus the WSL2 kernel marker — the README's "CI-smoked" claim is
+# exactly this job. wsl.exe's own messages are UTF-16 when redirected;
+# all assertions run on inner-Linux (UTF-8) output only.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  push:
+    branches: ["phase*"]
+    paths: [".github/workflows/wsl-smoke.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsl-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: github.event_name != 'workflow_run' ||
+        github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ubuntu-24.04 under WSL2
+        shell: bash
+        run: |
+          wsl.exe --install Ubuntu-24.04 --no-launch
+          wsl.exe --list --verbose || true
+
+      - name: Run the Linux release inside WSL2
+        shell: bash
+        # The script travels over STDIN — wsl.exe re-joins argv words
+        # when a command is passed inline, which shredded the round-3
+        # quoting (assignments silently vanished). A byte pipe has no
+        # argv to mangle.
+        run: |
+          cat > smoke.sh <<'SCRIPT'
+          set -e
+          uname -a | tee /tmp/uname.txt
+          grep -q "microsoft-standard-WSL2" /tmp/uname.txt
+          cd /root
+          curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+          curl -sL https://raw.githubusercontent.com/tanzercakir-commits/CodeSkeptic/GITSHA/docs/demo.c -o demo.c
+          apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev >/dev/null
+          code=0
+          out=$(./codeskeptic-v*/bin/codeskeptic demo.c 2>&1) || code=$?
+          echo "$out"
+          echo "exit_code=$code"
+          test "$code" -eq 1
+          echo "$out" | grep -qi finding
+          ./codeskeptic-v*/bin/codeskeptic --version
+          SCRIPT
+          sed -i "s/GITSHA/${{ github.sha }}/" smoke.sh
+          wsl.exe -d Ubuntu-24.04 -u root -- bash < smoke.sh | tee smoke_out.txt
+
+      - name: Publish log to refs/ci-logs/*
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f smoke_out.txt 2>/dev/null || true
+          git commit -qm "wsl smoke @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/wsl-smoke"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        shell: bash
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/wsl-smoke/${{ job.status }}"

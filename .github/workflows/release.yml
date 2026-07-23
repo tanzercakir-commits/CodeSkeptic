@@ -62,9 +62,21 @@ jobs:
             echo "=== smoke on $img ==="
             docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/docs:/demo:ro" "$img" bash -c '
               set -e
-              apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev libzstd1 zlib1g libtinfo6 >/dev/null 2>&1 || apt-get install -y -qq libc6-dev libzstd1 zlib1g >/dev/null
+              # ONLY libc6-dev (demo.c needs libc headers). The runtime
+              # libraries (zstd/zlib/tinfo/LLVM/...) must come from the
+              # package itself — installing them here MASKED a missing
+              # bundle for three releases (critique-2 finding).
+              apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev >/dev/null
               tar xzf /dist/codeskeptic-*-linux-*.tar.gz -C /tmp
               cd /tmp/codeskeptic-*
+              # Self-contained proof: no unresolved libraries, and the
+              # bundled ones resolve from the PACKAGE lib dir, not the host.
+              ldd ./bin/codeskeptic | tee /tmp/ldd.txt
+              ! grep -q "not found" /tmp/ldd.txt
+              for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"; do
+                grep -E "$so" /tmp/ldd.txt | grep -qE "=> /tmp/codeskeptic-[^/]+/lib/" || {
+                  echo "SELF-CONTAINED VIOLATION: $so resolves off-package"; exit 1; }
+              done
               code=0; out=$(./bin/codeskeptic /demo/demo.c 2>&1) || code=$?
               echo "$out"
               test "$code" -eq 1

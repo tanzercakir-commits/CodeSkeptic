@@ -34,9 +34,13 @@ inputs:
     required: false
     default: "report-only"
   version:
-    description: "Release tag to use (e.g. v0.4.0); latest release by default"
+    description: >-
+      Release tag to use (e.g. v0.4.4). Default: the tag the action
+      itself is pinned to (uses: ...@v0.4.4 analyzes with the v0.4.4
+      binary), so pinning the action pins the analyzer — set "latest"
+      explicitly if you WANT the newest release every run.
     required: false
-    default: "latest"
+    default: ""
   extra-args:
     description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $PWD/src)"
     required: false
@@ -60,11 +64,30 @@ runs:
         mkdir -p "$DEST"
         REPO="tanzercakir-commits/CodeSkeptic"
         PATTERN="codeskeptic-*-linux-x86_64.tar.gz"
-        if [ "${{ inputs.version }}" = "latest" ]; then
-          gh release download -R "$REPO" -p "$PATTERN" -D "$DEST"
-        else
-          gh release download "${{ inputs.version }}" -R "$REPO" -p "$PATTERN" -D "$DEST"
+        # Version resolution (reproducibility): explicit input wins;
+        # otherwise the action's OWN ref — `uses: ...@v0.4.4` analyzes
+        # with the v0.4.4 binary, so pinning the action really pins
+        # the analyzer. Only an explicit "latest" (or a non-tag ref:
+        # branch names, the self-test's local `uses: ./`) floats.
+        VERSION="${{ inputs.version }}"
+        if [ -z "$VERSION" ]; then
+          VERSION="${{ github.action_ref }}"
+          case "$VERSION" in
+            v[0-9]*) : ;;         # release tag -> pin to it
+            *) VERSION="latest" ;; # branch/sha/empty -> newest release
+          esac
         fi
+        echo "resolved analyzer version: $VERSION"
+        if [ "$VERSION" = "latest" ]; then
+          gh release download -R "$REPO" -p "$PATTERN" -p "sha256sums.txt" -D "$DEST"
+        else
+          gh release download "$VERSION" -R "$REPO" -p "$PATTERN" -p "sha256sums.txt" -D "$DEST"
+        fi
+        # Supply-chain check: the tarball must match the checksum the
+        # Release workflow published next to it. Hard failure on
+        # mismatch or on a release without checksums.
+        TARBALL=$(basename "$DEST"/codeskeptic-*.tar.gz)
+        (cd "$DEST" && grep -F "  $TARBALL" sha256sums.txt | sha256sum -c -)
         tar xzf "$DEST"/codeskeptic-*.tar.gz -C "$DEST"
         BIN_DIR=$(dirname "$(find "$DEST" -name codeskeptic -type f | head -1)")
         echo "$BIN_DIR" >> "$GITHUB_PATH"

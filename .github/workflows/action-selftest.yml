@@ -49,6 +49,28 @@ jobs:
           test -s selftest.sarif
           grep -q '"results"' selftest.sarif
 
+      # Pinned-version lane (critique-2): on a Release-triggered run
+      # the fresh tag is workflow_run.head_branch — run the action
+      # PINNED to it and assert the analyzer that answers is exactly
+      # that version (download + checksum + resolution end to end).
+      - name: Run the action pinned to the fresh release tag
+        if: github.event_name == 'workflow_run'
+        id: pinned
+        uses: ./
+        with:
+          path: docs/demo.c
+          sarif: pinned.sarif
+          upload-sarif: "false"
+          gate: report-only
+          version: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Verify the pinned analyzer version matches the tag
+        if: github.event_name == 'workflow_run'
+        run: |
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          test "${{ steps.pinned.outputs.exit-code }}" = "1"
+          codeskeptic --version | grep -F "${TAG#v}"
+
       - name: Mirror job status to refs/status/*
         if: always()
         run: |

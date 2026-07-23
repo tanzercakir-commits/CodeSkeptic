@@ -1,5 +1,10 @@
 # Windows support — requirements (plan, not yet implemented)
 
+> **Today's working paths** (until this plan lands): WSL2 or Docker
+> — see the [README's Windows section](../README.md#windows-wsl2-or-docker--no-native-binary-yet),
+> including the honest `#ifdef _WIN32` caveat and the CI smoke that
+> backs the claim.
+
 Status: **plan only.** No Windows code has been written. This document
 records, with file:line evidence, exactly what a Windows port needs, so the
 work can be scoped and gated (the ratchet) before any code moves. The core
