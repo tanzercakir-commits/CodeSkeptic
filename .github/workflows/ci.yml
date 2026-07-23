@@ -82,6 +82,14 @@ jobs:
         id: corpus
         run: bash scripts/run_corpus.sh ./build/src/codeskeptic /tmp/corpus
 
+      - name: Thesis gate (blind AI first-draft corpus)
+        id: thesis
+        # The mission-axis gate: a frozen corpus of first-draft C
+        # written by rule-blind generators. Clean files must stay 0
+        # (precision), buggy files must not drop below their pinned
+        # floor (recall). tests/thesis_corpus/thesis_expected.txt.
+        run: bash scripts/run_thesis.sh ./build/src/codeskeptic
+
       - name: Failure diagnostics -> refs/ci-logs/*
         # The sandbox cannot read Actions logs (git protocol only). On
         # failure: record per-step outcomes, re-run the failed tests

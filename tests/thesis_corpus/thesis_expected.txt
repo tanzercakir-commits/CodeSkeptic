@@ -1,0 +1,60 @@
+# Blind AI first-draft corpus — the mission-axis recall/precision gate.
+#
+# 24 small C programs written by generator subagents BLIND to
+# CodeSkeptic's rules (two batches, 2026-07-23), each self-annotated
+# with GROUND_TRUTH_BUG / GROUND_TRUTH_CLEAN. The files are frozen
+# VERBATIM (blindness integrity); this manifest is the adjudicated
+# ground truth CI scores against.
+#
+# Format: <filename> <role> <min_findings>
+#   CLEAN <n>  — a genuinely-correct program: findings MUST equal 0
+#                (any finding is a precision regression -> red).
+#   BUG   <n>  — a program with >=1 real defect: findings MUST be >= n
+#                (a drop is a recall regression -> red; an increase is a
+#                new detection, bump the pin in the same PR).
+#
+# ADJUDICATION NOTES (honest, per the devlog's re-scoring discipline):
+# - matrix_row_copy.c: the generator labeled it CLEAN, but it
+#   dereferences two unchecked mallocs (m[i]=i, memcpy into row) — the
+#   #92 unchecked-allocation class. CodeSkeptic is CORRECT; reclassified
+#   BUG. The analyzer being more careful than the first-draft author is
+#   the mission, not a false positive.
+# - Six buggy files carry OUT-OF-SCOPE defects and are pinned BUG 0
+#   (documented misses, not silent failures): avg_input (float division
+#   — IEEE 754, deliberately silent), csv_count & ring_buffer (pure
+#   logic bugs), format_bytes & length_prefix (POSSIBLE out-of-bounds —
+#   the bounds rule is definite-only by design), temp_convert (scanf
+#   format-string bug). If a future rule catches one, bump its pin.
+#
+# In-scope recall on this corpus: 9/9 (every memory-safety / overflow
+# bug caught). Precision: 0 FP across 9 genuinely-clean programs.
+
+# --- genuinely clean (precision gate: must stay 0) ---
+array_from_int.c   CLEAN 0
+cmd_args.c         CLEAN 0
+concat_heap.c      CLEAN 0
+config_parse.c     CLEAN 0
+port_parse.c       CLEAN 0
+running_product.c  CLEAN 0
+simple_hash.c      CLEAN 0
+tiny_stack.c       CLEAN 0
+tokenize.c         CLEAN 0
+
+# --- in-scope bugs caught (recall floor: must not drop) ---
+alloc_fill.c       BUG 1
+dyn_buffer.c       BUG 1
+int_vector.c       BUG 1
+list_builder.c     BUG 2
+matrix_row_copy.c  BUG 2
+mem_pool.c         BUG 1
+pixel_buffer.c     BUG 1
+scale_numbers.c    BUG 1
+strdup_manual.c    BUG 1
+
+# --- out-of-scope bugs (documented misses; bump if a rule catches one) ---
+avg_input.c        BUG 0
+csv_count.c        BUG 0
+format_bytes.c     BUG 0
+length_prefix.c    BUG 0
+ring_buffer.c      BUG 0
+temp_convert.c     BUG 0
