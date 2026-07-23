@@ -61,7 +61,7 @@ jobs:
           for img in ubuntu:22.04 ubuntu:24.04; do
             echo "=== smoke on $img ==="
             docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/docs:/demo:ro" "$img" bash -c '
-              set -e
+              set -ex
               # ONLY libc6-dev (demo.c needs libc headers). The runtime
               # libraries (zstd/zlib/tinfo/LLVM/...) must come from the
               # package itself — installing them here MASKED a missing
@@ -84,7 +84,7 @@ jobs:
               code=0; out=$(./bin/codeskeptic /demo/demo.c 2>&1) || code=$?
               echo "$out"
               test "$code" -eq 1
-              echo "$out" | grep -qi finding'
+              echo "$out" | grep -qi finding' 2>&1 | tee -a /tmp/smoke.log
           done
 
       - name: Upload to draft release
@@ -102,13 +102,13 @@ jobs:
       - name: Diagnostics -> refs/ci-logs/*
         if: always()
         run: |
-          for f in build ctest package; do
+          for f in build ctest package smoke; do
             tail -c 25000 "/tmp/$f.log" > "$f.tail.log" 2>/dev/null || true
           done
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f build.tail.log ctest.tail.log package.tail.log 2>/dev/null || true
+          git add -f build.tail.log ctest.tail.log package.tail.log smoke.tail.log 2>/dev/null || true
           git commit -qm "release-linux logs @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/release-linux"
 
