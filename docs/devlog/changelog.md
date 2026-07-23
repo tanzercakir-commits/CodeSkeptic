@@ -1,6 +1,6 @@
 # CodeSkeptic — Changelog
 
-## 2026-07-24 — F7-small: untrusted-length→bounds + zero-passthrough summaries
+## 2026-07-24 — v0.4.7: untrusted-length→bounds + zero-passthrough summaries (F7-small)
 
 Two deferred engine slices, both recall moves with pinned precision.
 
