@@ -1,0 +1,15 @@
+exit=1
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: no such file or directory
+json-compilation-database: Error while opening JSON database: no such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+D:\a\CodeSkeptic\CodeSkeptic\probe_dir\probe.c:5:5 [error] bounds: out-of-bounds array access: proven index range [10, 10] lies outside the array bound [0, 4)
+D:\a\CodeSkeptic\CodeSkeptic\probe_dir\probe.c:5:5 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> D:\a\CodeSkeptic\CodeSkeptic\probe_dir\probe.c:4:5 'p' assigned a possibly-null value here (callee may return null)
+D:\a\CodeSkeptic\CodeSkeptic\probe_dir\probe.c:6:1 [warning] memory-leak: Memory leak: allocation stored in 'p' may not be freed
+    -> D:\a\CodeSkeptic\CodeSkeptic\probe_dir\probe.c:4:5 'p' allocated here
+----------------------------------------
+
