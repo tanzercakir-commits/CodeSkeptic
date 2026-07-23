@@ -57,10 +57,16 @@ jobs:
             --alloc-functions git__malloc,git__calloc,git__realloc,git__strdup \
             --free-functions git__free \
             --report-paths "$PWD/libgit2-1.9.0/src" \
-            2>&1 | tee libgit2-scan.log || code=$?
-          n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' libgit2-scan.log || true)
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n" >> results.txt
+            > libgit2-scan.log 2>&1 || code=$?
+          tail -40 libgit2-scan.log
+          # Same counting regex as run_corpus.sh, for comparability.
+          grep -E '^\S+:[0-9]+:[0-9]+ \[(warning|error)\]' libgit2-scan.log \
+            > libgit2-findings.txt || true
+          n=$(wc -l < libgit2-findings.txt)
+          files=$(find libgit2-1.9.0/src -name '*.c' | wc -l)
+          ninfo=$(grep -cE '^\S+:[0-9]+:[0-9]+ \[info\]' libgit2-scan.log || true)
+          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 c_files=$files findings=$n info=$ninfo exit=$code"
+          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 c_files=$files findings=$n info=$ninfo exit=$code" >> results.txt
 
       - name: Scan rtp2httpd (pinned, no profile needed)
         run: |
@@ -73,10 +79,15 @@ jobs:
           code=0
           ./build/src/codeskeptic rtp2httpd/src \
             --report-paths "$PWD/rtp2httpd/src" \
-            2>&1 | tee rtp2httpd-scan.log || code=$?
-          n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log || true)
-          echo "REALWORLD_RESULT project=rtp2httpd findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=rtp2httpd findings=$n" >> results.txt
+            > rtp2httpd-scan.log 2>&1 || code=$?
+          tail -40 rtp2httpd-scan.log
+          grep -E '^\S+:[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log \
+            > rtp2httpd-findings.txt || true
+          n=$(wc -l < rtp2httpd-findings.txt)
+          files=$(find rtp2httpd/src -name '*.c' | wc -l)
+          ninfo=$(grep -cE '^\S+:[0-9]+:[0-9]+ \[info\]' rtp2httpd-scan.log || true)
+          echo "REALWORLD_RESULT project=rtp2httpd c_files=$files findings=$n info=$ninfo exit=$code"
+          echo "REALWORLD_RESULT project=rtp2httpd c_files=$files findings=$n info=$ninfo exit=$code" >> results.txt
 
       - name: Deep corpus (abseil) for good measure
         run: |
@@ -86,12 +97,15 @@ jobs:
       - name: Publish results + logs to refs/ci-logs/*
         if: always()
         run: |
-          tail -c 60000 libgit2-scan.log > libgit2.tail.log 2>/dev/null || true
+          tail -c 80000 libgit2-scan.log > libgit2.tail.log 2>/dev/null || true
           tail -c 30000 rtp2httpd-scan.log > rtp2httpd.tail.log 2>/dev/null || true
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f results.txt libgit2.tail.log rtp2httpd.tail.log 2>/dev/null || true
+          for f in results.txt libgit2-findings.txt rtp2httpd-findings.txt \
+                   libgit2.tail.log rtp2httpd.tail.log; do
+            [ -f "$f" ] && git add -f "$f" || true
+          done
           git commit -qm "realworld scan @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/realworld"
 
