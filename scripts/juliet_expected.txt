@@ -82,7 +82,14 @@ CWE416 0.95 0.48
 # 0.093 -> 0.098 @ rprecision 1.000; floor RAISED 0.03 -> 0.085.
 # Remaining big FN slice (flow-through-calls, 54 files) needs
 # zeroness-through-summaries unification — parked, documented.
-CWE369 0.95 0.085
+# 2026-07-23 (v0.4.2, interprocedural param-zeroness): untrusted
+# zeroness now crosses call boundaries for internal-linkage,
+# address-not-taken callees (all callers visible; MaybeZero never
+# manufactured from Unknown — 6 pinned precision tests). Sampled
+# rhitrate 0.098 -> 0.108 @ rprecision 1.000; floor RAISED to 0.095.
+# Remaining flow FNs: multi-hop chains and function-pointer passing
+# (address-taken -> excluded BY the soundness rule, not a bug).
+CWE369 0.95 0.095
 # 2026-07-22 (v0.4 recall round, int-overflow coverage): BO_Add joins
 # BO_Mul, 64-bit sites proved via __int128 operand corners, implicit
 # narrowing stores checked against the destination width, INT64_MAX
