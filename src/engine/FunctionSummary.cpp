@@ -1010,9 +1010,13 @@ SummaryRegistry& SummaryRegistry::instance() {
     return registry;
 }
 
-void SummaryRegistry::clear() { summaries_.clear(); }
+void SummaryRegistry::clear() {
+    summaries_.clear();
+    stable_ = false;
+}
 
 void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
+    stable_ = false;
     summaries_.clear();
 
     FunctionCollector collector;
@@ -1061,6 +1065,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
         if (!changed) break;
     }
     summaries_ = std::move(current);
+    stable_ = true;  // consumers may now fold on these (see stable())
 }
 
 const SummaryRegistry::FunctionSummary*
