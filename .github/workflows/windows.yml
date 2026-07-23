@@ -67,6 +67,23 @@ jobs:
             }
           }
 
+      - name: Patch LLVM exports (stale DIA SDK path)
+        shell: pwsh
+        # The official tarball's LLVMExports.cmake hard-codes the
+        # absolute diaguids.lib path of the machine that BUILT LLVM
+        # (a VS2019 install). Point it at this runner's DIA SDK.
+        # Idempotent: re-run safely on cached trees and VS upgrades.
+        run: |
+          $dia = (Join-Path $env:VSINSTALLDIR "DIA SDK\lib\amd64\diaguids.lib") -replace '\\','/'
+          if (-not (Test-Path $dia)) { throw "DIA SDK not found: $dia" }
+          Get-ChildItem "C:\llvm" -Recurse -Filter *.cmake | ForEach-Object {
+            $c = Get-Content $_.FullName -Raw
+            if ($c -match 'diaguids\.lib') {
+              $n = $c -replace '[A-Za-z]:/[^";]*?DIA SDK/lib/amd64/diaguids\.lib', $dia
+              if ($n -ne $c) { Set-Content $_.FullName $n -NoNewline; Write-Host "patched: $($_.FullName)" }
+            }
+          }
+
       - name: Configure
         id: configure
         shell: pwsh
