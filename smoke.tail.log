@@ -1,0 +1,13 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 2 finding(s)
+----------------------------------------
+/Users/runner/work/CodeSkeptic/CodeSkeptic/docs/demo.c:7:25 [warning] null-deref: Possible null dereference: 'val' may be null on some paths
+    -> /Users/runner/work/CodeSkeptic/CodeSkeptic/docs/demo.c:6:5 'val' assigned a possibly-null value here (callee may return null)
+/Users/runner/work/CodeSkeptic/CodeSkeptic/docs/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+----------------------------------------
+exit_code=1
+SDKROOT-invalid exit_code=2
