@@ -1,0 +1,12 @@
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_chunked_decoder.c:54:18 [warning] null-deref: Possible null dereference: 'input' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_proxy_rewrite.c:132:5 [warning] bounds: possible buffer overflow: strcpy copies an unbounded amount into a fixed 4096-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1504:7 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 2048-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1523:7 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 2048-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1542:7 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 2048-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1554:7 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 2048-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1567:7 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 2048-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1772:27 [warning] null-deref: Possible null dereference: 'msrc_res' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1838:26 [warning] null-deref: Possible null dereference: 'fcc_res' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/timezone.c:228:55 [warning] int-overflow: possible integer overflow: this addition can exceed 'int'
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/timezone.c:564:33 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/timezone.c:566:33 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
