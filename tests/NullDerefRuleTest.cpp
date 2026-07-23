@@ -1835,3 +1835,62 @@ TEST(NullDerefRuleTest, MemberBaseAddressStored_Reported) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+TEST(NullDerefRuleTest, MemberFlagOutParamFactoryCapOverflow_Clean) {
+    // The full rtp2httpd msrc_res shape: the guarded pointer comes
+    // from an OUT-PARAM factory (Unknown, not proven NonNull), and
+    // enough independent conditions sit between the correlated guards
+    // to overflow the disjunct cap. The mined implication must carry
+    // an Unknown PAYLOAD through the collapse — activation restores
+    // Unknown (silent), not the collapsed MaybeNull.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int has_fcc; };
+        extern void parse(struct comp *out);
+        extern int getlike(const char *s, char **out);
+        extern void logger(const char *);
+        int f(const char *addr, int x, int y, int z, int w) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) {
+                if (getlike(addr, &p) != 0) { logger("fail"); return -1; }
+            }
+            if (x) logger("x");
+            if (y) logger("y");
+            if (z) logger("z");
+            if (w) logger("w");
+            logger("between");
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagOutParamFactoryDivergent_Reported) {
+    // Same construction, DIVERGENT consume guard — the genuine bug
+    // must survive the Unknown-payload machinery.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int has_fcc; };
+        extern void parse(struct comp *out);
+        extern int getlike(const char *s, char **out);
+        extern void logger(const char *);
+        int g(const char *addr, int x, int y, int z, int w) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) {
+                if (getlike(addr, &p) != 0) { return -1; }
+            }
+            if (x) logger("x");
+            if (y) logger("y");
+            if (z) logger("z");
+            if (w) logger("w");
+            if (c.has_fcc) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
