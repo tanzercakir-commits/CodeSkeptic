@@ -30,7 +30,10 @@ struct TempTu {
         }
         {
             std::ofstream db(dir / "compile_commands.json");
-            db << "[{\"directory\": \"" << dir.string()
+            // generic_string(): forward slashes. A native Windows path
+            // ("C:\Users\...") embedded raw is invalid JSON — "\U" is
+            // not an escape — and the whole DB fails to parse.
+            db << "[{\"directory\": \"" << dir.generic_string()
                << "\", \"command\": \"c++ -c bad.cpp\", \"file\": "
                   "\"bad.cpp\"}]";
         }

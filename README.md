@@ -5,7 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/tanzercakir-commits/CodeSkeptic?color=blue)](https://github.com/tanzercakir-commits/CodeSkeptic/releases)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=cplusplus)](https://en.cppreference.com/w/cpp/17)
 ![Built on Clang LibTooling](https://img.shields.io/badge/Clang-LibTooling-262D3A.svg?logo=llvm)
-[![Platform: Linux | macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)](docs/windows-support.md)
+[![Platform: Linux | macOS | Windows (source)](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows%20(source)-lightgrey.svg)](docs/windows-support.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/tanzercakir-commits/CodeSkeptic/pulls)
 
 > **Everyone generates. CodeSkeptic verifies.**
@@ -51,14 +51,16 @@ docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 s
   with: { path: src/, build-path: build }
 ```
 
-### Windows (WSL2 or Docker — no native binary yet)
+### Windows (native build from source, or WSL2/Docker)
 
-CodeSkeptic does not yet run as a native Windows executable. Windows
-users have two working paths:
+Native MSVC builds work and are CI-proven — the full unit-test suite
+runs green on `windows-latest` on every push
+([windows.yml](.github/workflows/windows.yml)). No prebuilt Windows
+binary yet; zero-build trials go through WSL2 or Docker:
 
 ```bash
-# WSL2 (best for Linux-targeted projects; keep the tree in the WSL
-# filesystem, not /mnt/c — faster and the paths stay clean):
+# WSL2 (keep the tree in the WSL filesystem, not /mnt/c) — build your
+# project and its compile_commands.json INSIDE the same WSL env:
 curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
 ./codeskeptic-v*/bin/codeskeptic path/to/source --build-path path/to/build
 
@@ -66,21 +68,17 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 src/
 ```
 
-Build your project and generate `compile_commands.json` INSIDE the
-same WSL environment. One honest caveat — CodeSkeptic analyzes the
-program the compiler sees, not the source text: under WSL that is the
-Linux preprocessor view, so `#ifdef _WIN32` branches are invisible.
-For MSVC-built, Windows-SDK-dependent code this path is not a
-substitute for native analysis
-([the bounded native plan](docs/windows-support.md)):
+One honest caveat on WSL2/Docker — CodeSkeptic analyzes the program
+the compiler sees: the Linux preprocessor view, so `#ifdef _WIN32`
+branches are invisible. MSVC-built, Windows-SDK-dependent code wants
+the native build ([status & remaining work](docs/windows-support.md)):
 
 | Use | Status |
 |---|---|
-| Linux x86_64 native | Supported |
-| macOS arm64 native | Supported |
-| Windows + WSL2, Linux-targeted build | Supported path, CI-smoked on windows-latest |
-| Windows + Docker Desktop | Supported trial path |
-| Native Windows / MSVC analysis | Planned |
+| Linux x86_64 / macOS arm64 native | Supported (prebuilt binary) |
+| Windows + WSL2 or Docker, Linux-targeted build | Supported path, CI-smoked on windows-latest |
+| Native Windows (MSVC, build from source, compile DB or Developer Prompt) | Supported, full test suite CI-proven |
+| Native Windows prebuilt binary · auto SDK discovery | Planned |
 
 ### Build from source
 
@@ -108,9 +106,11 @@ demo.cpp:9:12 [warning] div-by-zero: Possible division by zero: 'z' may be zero 
 ```
 
 macOS (Homebrew): `brew install llvm cmake ninja`, then the same
-`cmake` + build steps (LLVM is found automatically). Requires CMake ≥
-3.20, a C++17 compiler, LLVM/Clang dev libraries (tested with LLVM 18
-and 20). Windows is [planned, not yet implemented](docs/windows-support.md).
+`cmake` + build steps (LLVM found automatically). Windows (MSVC): from
+an *x64 Native Tools* prompt, `cl` as compiler and the official
+clang+llvm windows-msvc tarball as `CMAKE_PREFIX_PATH` — exactly what
+[CI runs](.github/workflows/windows.yml). Requires CMake ≥ 3.20, C++17,
+LLVM/Clang dev libraries (tested with LLVM 18 and 20).
 
 On a real project, point it at your compilation database and get an
 offline HTML report with clickable dataflow traces:

@@ -27,6 +27,16 @@
 
 namespace codeskeptic {
 
+// Checked int64 arithmetic — the single source of truth for "does
+// a ∘ b stay representable in int64" (Interval's saturation AND the
+// overflow rule's 64-bit escape proof both build on these). True on
+// success (*out receives the result), false when the mathematical
+// result leaves int64. Portable: __builtin_*_overflow where available,
+// pre-checked arithmetic under MSVC.
+bool checkedAdd64(int64_t a, int64_t b, int64_t* out);
+bool checkedSub64(int64_t a, int64_t b, int64_t* out);
+bool checkedMul64(int64_t a, int64_t b, int64_t* out);
+
 class Interval {
 public:
     // Default is TOP (fully unknown) — the safe starting point for a

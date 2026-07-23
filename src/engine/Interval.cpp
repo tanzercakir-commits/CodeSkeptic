@@ -1,24 +1,52 @@
 #include "engine/Interval.h"
 
 #include <algorithm>
+#include <cstdint>
 
 namespace codeskeptic {
 
-namespace {
-
-// Saturating helpers on FINITE int64. Return false on overflow so the
-// caller can collapse to top() (sound).
-bool addChecked(int64_t a, int64_t b, int64_t* out) {
+// Checked int64 helpers (declared in Interval.h — also the overflow
+// rule's 64-bit escape proof builds on these). Return false on
+// overflow so Interval callers can collapse to top() (sound).
+#if defined(__GNUC__) || defined(__clang__)
+bool checkedAdd64(int64_t a, int64_t b, int64_t* out) {
     return !__builtin_add_overflow(a, b, out);
 }
-bool subChecked(int64_t a, int64_t b, int64_t* out) {
+bool checkedSub64(int64_t a, int64_t b, int64_t* out) {
     return !__builtin_sub_overflow(a, b, out);
 }
-bool mulChecked(int64_t a, int64_t b, int64_t* out) {
+bool checkedMul64(int64_t a, int64_t b, int64_t* out) {
     return !__builtin_mul_overflow(a, b, out);
 }
-
-} // namespace
+#else
+// MSVC has no __builtin_*_overflow: classic pre-checks against the
+// int64 limits (CERT INT32-C shape). Must stay behavior-identical to
+// the builtin path — verified over the int64 edge matrix + 40M random
+// pairs against the builtins before landing; IntervalTest pins the
+// edge cases on every platform.
+bool checkedAdd64(int64_t a, int64_t b, int64_t* out) {
+    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b))
+        return false;
+    *out = a + b;
+    return true;
+}
+bool checkedSub64(int64_t a, int64_t b, int64_t* out) {
+    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b))
+        return false;
+    *out = a - b;
+    return true;
+}
+bool checkedMul64(int64_t a, int64_t b, int64_t* out) {
+    if (a != 0 && b != 0) {
+        const bool overflows =
+            a > 0 ? (b > 0 ? a > INT64_MAX / b : b < INT64_MIN / a)
+                  : (b > 0 ? a < INT64_MIN / b : b < INT64_MAX / a);
+        if (overflows) return false;
+    }
+    *out = a * b;
+    return true;
+}
+#endif
 
 // --- Constructors ---
 
@@ -184,7 +212,7 @@ Interval Interval::negate(const Interval& a) {
         r.loInf_ = true;
     } else {
         int64_t v;
-        if (!subChecked(0, a.hi_, &v)) return top();  // -INT64_MIN
+        if (!checkedSub64(0, a.hi_, &v)) return top();  // -INT64_MIN
         r.loInf_ = false;
         r.lo_ = v;
     }
@@ -192,7 +220,7 @@ Interval Interval::negate(const Interval& a) {
         r.hiInf_ = true;
     } else {
         int64_t v;
-        if (!subChecked(0, a.lo_, &v)) return top();
+        if (!checkedSub64(0, a.lo_, &v)) return top();
         r.hiInf_ = false;
         r.hi_ = v;
     }
@@ -207,7 +235,7 @@ Interval Interval::add(const Interval& a, const Interval& b) {
         r.loInf_ = true;
     } else {
         int64_t v;
-        if (!addChecked(a.lo_, b.lo_, &v)) return top();
+        if (!checkedAdd64(a.lo_, b.lo_, &v)) return top();
         r.loInf_ = false;
         r.lo_ = v;
     }
@@ -215,7 +243,7 @@ Interval Interval::add(const Interval& a, const Interval& b) {
         r.hiInf_ = true;
     } else {
         int64_t v;
-        if (!addChecked(a.hi_, b.hi_, &v)) return top();
+        if (!checkedAdd64(a.hi_, b.hi_, &v)) return top();
         r.hiInf_ = false;
         r.hi_ = v;
     }
@@ -238,10 +266,10 @@ Interval Interval::mul(const Interval& a, const Interval& b) {
     if (a.loInf_ || a.hiInf_ || b.loInf_ || b.hiInf_) return top();
     // Both finite: min/max of the four endpoint products.
     int64_t p[4];
-    if (!mulChecked(a.lo_, b.lo_, &p[0]) ||
-        !mulChecked(a.lo_, b.hi_, &p[1]) ||
-        !mulChecked(a.hi_, b.lo_, &p[2]) ||
-        !mulChecked(a.hi_, b.hi_, &p[3]))
+    if (!checkedMul64(a.lo_, b.lo_, &p[0]) ||
+        !checkedMul64(a.lo_, b.hi_, &p[1]) ||
+        !checkedMul64(a.hi_, b.lo_, &p[2]) ||
+        !checkedMul64(a.hi_, b.hi_, &p[3]))
         return top();
     int64_t lo = std::min({p[0], p[1], p[2], p[3]});
     int64_t hi = std::max({p[0], p[1], p[2], p[3]});

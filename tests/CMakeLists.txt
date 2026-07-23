@@ -4,6 +4,9 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.14.0
 )
+# MSVC: googletest defaults to the static CRT (/MT) while this project
+# uses CMake's default /MD — mixing them is a hard link error (LNK2038).
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(codeskeptic_tests
@@ -55,6 +58,13 @@ gtest_discover_tests(codeskeptic_tests)
 # hermetic git-repo fixture driven with the real binary. Pins the delta
 # semantics (Baseline-v2 key parity / shift-immunity, rename map, gate
 # ladder). Needs git + python3 — present locally and on the CI runner.
-add_test(NAME ReviewDiffFlow
-         COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
-                 $<TARGET_FILE:codeskeptic>)
+#
+# Not on native Windows: the auxiliary harness is bash+python by design
+# (docs/windows-support.md §6) and its path/exit-code assumptions are
+# POSIX. The 620 C++ unit tests above are the portable floor; this
+# flow stays pinned by the Linux/macOS lanes.
+if(NOT WIN32)
+    add_test(NAME ReviewDiffFlow
+             COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
+                     $<TARGET_FILE:codeskeptic>)
+endif()

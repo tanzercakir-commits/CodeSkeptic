@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
+#include "engine/Interval.h"
 #include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
 #include "engine/ParamIntervals.h"
@@ -52,8 +53,8 @@ std::set<const VarDecl*> collectIntVars(const FunctionDecl* fn) {
 //     on sub-64 operands) and fitsSignedBits answers the escape query;
 //   - the SAME operators at width 64: the int64-based Interval soundly
 //     collapses an overflowing result to top(), so the site is proved
-//     from the two OPERAND intervals instead — corner arithmetic in
-//     __int128 (evalEscapes64 below);
+//     from the two OPERAND intervals instead — checked int64 corner
+//     arithmetic (evalEscapes64 below);
 //   - a result implicitly narrowed into a smaller SIGNED type
 //     (`char r = d + 1;` — the add happens in int, the wrap happens on
 //     the store): the proof runs against the DESTINATION width.
@@ -141,9 +142,13 @@ std::vector<ArithSite> collectArithSites(const FunctionDecl* fn,
     return v.sites;
 }
 
-// 64-bit escape proof: both operand intervals fully bounded, corner
-// results computed in __int128. Escape iff a corner leaves int64 —
-// exactly the case the int64-based Interval must collapse to top().
+// 64-bit escape proof: both operand intervals fully bounded, each
+// corner computed with checked int64 arithmetic (checkedAdd64/
+// checkedMul64 — Interval.h, MSVC-portable; __int128 is a GCC/Clang
+// extension). Escape iff a corner leaves int64 — exactly the case the
+// int64-based Interval must collapse to top(). Equivalent to the
+// previous __int128 hull check: the hull's max exceeds INT64_MAX iff
+// some corner overflows upward, and symmetrically for the min.
 // Any infinite bound -> not proven -> silent (precision-first).
 bool evalEscapes64(const BinaryOperator* op,
                    const codeskeptic::IntervalMap& st, ASTContext& ctx) {
@@ -152,27 +157,20 @@ bool evalEscapes64(const BinaryOperator* op,
     if (l.isEmpty() || r.isEmpty()) return false;
     if (l.loIsInf() || l.hiIsInf() || r.loIsInf() || r.hiIsInf())
         return false;
-    const __int128 corners[4] = {
-        op->getOpcode() == BO_Mul
-            ? (__int128)l.lo() * r.lo() : (__int128)l.lo() + r.lo(),
-        op->getOpcode() == BO_Mul
-            ? (__int128)l.lo() * r.hi() : (__int128)l.lo() + r.hi(),
-        op->getOpcode() == BO_Mul
-            ? (__int128)l.hi() * r.lo() : (__int128)l.hi() + r.lo(),
-        op->getOpcode() == BO_Mul
-            ? (__int128)l.hi() * r.hi() : (__int128)l.hi() + r.hi(),
-    };
-    __int128 lo = corners[0], hi = corners[0];
-    for (__int128 c : corners) {
-        if (c < lo) lo = c;
-        if (c > hi) hi = c;
-    }
-    const __int128 i64min = (__int128)INT64_MIN;
-    const __int128 i64max = (__int128)INT64_MAX;
+    const bool isMul = op->getOpcode() == BO_Mul;
+    const int64_t lhs[4] = {l.lo(), l.lo(), l.hi(), l.hi()};
+    const int64_t rhs[4] = {r.lo(), r.hi(), r.lo(), r.hi()};
     // Same evidence bar as the sub-64 path: the proven range REACHES
     // beyond the type ("possible overflow", warning) — not necessarily
     // entirely outside it.
-    return hi > i64max || lo < i64min;
+    for (int i = 0; i < 4; ++i) {
+        int64_t out;
+        const bool fits = isMul
+            ? codeskeptic::checkedMul64(lhs[i], rhs[i], &out)
+            : codeskeptic::checkedAdd64(lhs[i], rhs[i], &out);
+        if (!fits) return true;
+    }
+    return false;
 }
 
 // The sub-64 escape query, with the FINITE-witness bar: an infinite

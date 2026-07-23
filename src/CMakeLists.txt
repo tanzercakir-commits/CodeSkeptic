@@ -52,13 +52,14 @@ target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 if(APPLE)
     target_link_options(codeskeptic PRIVATE
         "-Wl,-rpath,@executable_path/../lib")
-else()
+elseif(NOT WIN32)
     # --disable-new-dtags => DT_RPATH (not RUNPATH): unlike RUNPATH,
     # DT_RPATH applies transitively, so bundled libLLVM.so's own deps
     # (libedit, libxml2, ...) are also resolved from ../lib.
     target_link_options(codeskeptic PRIVATE
         "-Wl,-rpath,$ORIGIN/../lib" "-Wl,--disable-new-dtags")
 endif()
+# (Windows has no rpath: DLLs resolve from the exe's own directory.)
 
 target_include_directories(codeskeptic_core
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
@@ -76,7 +77,7 @@ target_compile_definitions(codeskeptic_core
 
 # Clang resource dir (for intrinsic headers such as stddef.h, stdarg.h)
 execute_process(
-    COMMAND ${LLVM_TOOLS_BINARY_DIR}/clang -print-resource-dir
+    COMMAND ${LLVM_TOOLS_BINARY_DIR}/clang${CMAKE_EXECUTABLE_SUFFIX} -print-resource-dir
     OUTPUT_VARIABLE CLANG_RESOURCE_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -103,7 +104,19 @@ if(APPLE)
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
-    target_compile_options(codeskeptic_core PUBLIC -fno-rtti)
+    # MSVC spells "no RTTI" as /GR- (docs/windows-support.md §2)
+    if(MSVC)
+        target_compile_options(codeskeptic_core PUBLIC /GR-)
+    else()
+        target_compile_options(codeskeptic_core PUBLIC -fno-rtti)
+    endif()
+endif()
+
+if(MSVC)
+    # The Clang-header-heavy TUs overflow MSVC's default COFF section
+    # limit; PUBLIC so test TUs (which include the same headers via
+    # TestHelper) inherit it (docs/windows-support.md §2).
+    target_compile_options(codeskeptic_core PUBLIC /bigobj)
 endif()
 
 target_link_libraries(codeskeptic_core

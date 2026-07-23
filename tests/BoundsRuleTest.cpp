@@ -172,9 +172,13 @@ TEST(BoundsRuleTest, GuardedIndexInRangeClean) {
 namespace {
 // Inline allocator declarations so the snippets compile in the default
 // C++ harness (where malloc's void* needs an explicit cast).
+// __SIZE_TYPE__: snippets are always parsed by clang, which expands it
+// to the TARGET's real size_t — `unsigned long` would be a mismatched
+// 32-bit type on LLP64 Windows and the extent modeling would not
+// engage (missed finding, caught by the windows-native lane).
 const char* kAlloc =
-    "void* malloc(unsigned long);\n"
-    "void* calloc(unsigned long, unsigned long);\n"
+    "void* malloc(__SIZE_TYPE__);\n"
+    "void* calloc(__SIZE_TYPE__, __SIZE_TYPE__);\n"
     "void take(int**);\n";
 std::string heap(const std::string& body) { return std::string(kAlloc) + body; }
 } // namespace
@@ -249,10 +253,11 @@ TEST(BoundsRuleTest, HeapVariableSizeSilent) {
 // --- Copy-size overflow: memcpy / memmove / memset ---
 
 namespace {
+// __SIZE_TYPE__ for the same LLP64 reason as kAlloc above.
 const char* kCopy =
-    "void* memcpy(void*, const void*, unsigned long);\n"
-    "void* memset(void*, int, unsigned long);\n"
-    "void* malloc(unsigned long);\n";
+    "void* memcpy(void*, const void*, __SIZE_TYPE__);\n"
+    "void* memset(void*, int, __SIZE_TYPE__);\n"
+    "void* malloc(__SIZE_TYPE__);\n";
 std::string copy(const std::string& body) { return std::string(kCopy) + body; }
 } // namespace
 
@@ -367,7 +372,7 @@ TEST(BoundsRuleTest, MemcpyStructMemberOverflow) {
     // member buffer.
     BoundsRule rule;
     auto results = runRule(rule, R"(
-        void* memcpy(void*, const void*, unsigned long);
+        void* memcpy(void*, const void*, __SIZE_TYPE__);
         struct S { char charFirst[16]; void* second; };
         void f(struct S* s, const void* src){
             memcpy(s->charFirst, src, sizeof(struct S));
@@ -378,8 +383,10 @@ TEST(BoundsRuleTest, MemcpyStructMemberOverflow) {
 
 TEST(BoundsRuleTest, MemcpyStructMemberInRangeClean) {
     BoundsRule rule;
+    // __SIZE_TYPE__ so the rule actually ENGAGES on LLP64 too — with a
+    // mismatched size type this clean-test would pass vacuously.
     auto results = runRule(rule, R"(
-        void* memcpy(void*, const void*, unsigned long);
+        void* memcpy(void*, const void*, __SIZE_TYPE__);
         struct S { char buf[16]; };
         void f(struct S* s, const void* src){
             memcpy(s->buf, src, sizeof(s->buf));

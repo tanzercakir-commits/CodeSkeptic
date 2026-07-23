@@ -6,6 +6,10 @@
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #include <vector>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -29,6 +33,17 @@ std::string exeDir() {
     if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
     std::error_code ec;
     fs::path p = fs::canonical(fs::path(buf.data()), ec);
+    if (ec) return {};
+    return p.parent_path().string();
+#elif defined(_WIN32)
+    // GetModuleFileNameW(nullptr, ...): the Win32 "where is this very
+    // executable" API. On truncation (n >= MAX_PATH) fall through to
+    // the baked build path rather than trusting a clipped string.
+    wchar_t buf[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) return {};
+    std::error_code ec;
+    fs::path p = fs::canonical(fs::path(buf), ec);
     if (ec) return {};
     return p.parent_path().string();
 #else

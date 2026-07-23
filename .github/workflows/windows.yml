@@ -1,0 +1,164 @@
+name: Windows
+
+# The native-Windows ratchet (docs/windows-support.md §6): MSVC build
+# against the official LLVM windows-msvc dev tarball + the full ctest
+# suite. Without this floor, the first later change breaks Windows and
+# no one notices. No third-party actions (trust-chain rule): the MSVC
+# environment comes from vswhere+vcvars64 directly.
+
+on:
+  push:
+    branches: [main, "phase*"]
+  pull_request:
+
+# Job-status mirroring (refs/status/*) needs push rights.
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Matches the Linux lane's LLVM 20 (ci.yml installs llvm-20-dev).
+  LLVM_VER: "20.1.8"
+
+jobs:
+  windows-native:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache LLVM (extracted MSVC dev tarball)
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm
+          key: llvm-${{ env.LLVM_VER }}-x86_64-pc-windows-msvc-v1
+
+      - name: Download LLVM ${{ env.LLVM_VER }} (cache miss only)
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VER/clang+llvm-$env:LLVM_VER-x86_64-pc-windows-msvc.tar.xz"
+          curl.exe -sSfL --retry 3 -o llvm.tar.xz $url
+          # Two explicit 7z steps (xz -> tar -> tree): no binary pipe —
+          # PowerShell pipes are string pipes and corrupt binary data.
+          7z x -bso0 -bsp0 llvm.tar.xz
+          New-Item -ItemType Directory -Force -Path C:\llvm | Out-Null
+          7z x -bso0 -bsp0 llvm.tar "-oC:\llvm"
+          Remove-Item llvm.tar.xz, llvm.tar
+
+      - name: MSVC environment -> GITHUB_ENV
+        id: msvc-env
+        shell: pwsh
+        # vcvars64 once, exported for every later step. Twofold: cl.exe
+        # for building, and the INCLUDE variable for the analyzer's own
+        # test snippets — clang's MSVC toolchain reads INCLUDE to
+        # resolve an analyzed `#include <stdlib.h>` natively
+        # (docs/windows-support.md §3, compile-DB tier).
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "vswhere found no VC++ toolset" }
+          cmd /s /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" > NUL 2>&1 && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              Add-Content $env:GITHUB_ENV "$($Matches[1])=$($Matches[2])"
+            }
+          }
+
+      - name: Patch LLVM exports (stale DIA SDK path)
+        shell: pwsh
+        # The official tarball's LLVMExports.cmake hard-codes the
+        # absolute diaguids.lib path of the machine that BUILT LLVM
+        # (a VS2019 install). Point it at this runner's DIA SDK.
+        # Idempotent: re-run safely on cached trees and VS upgrades.
+        run: |
+          $dia = (Join-Path $env:VSINSTALLDIR "DIA SDK\lib\amd64\diaguids.lib") -replace '\\','/'
+          if (-not (Test-Path $dia)) { throw "DIA SDK not found: $dia" }
+          Get-ChildItem "C:\llvm" -Recurse -Filter *.cmake | ForEach-Object {
+            $c = Get-Content $_.FullName -Raw
+            if ($c -match 'diaguids\.lib') {
+              $n = $c -replace '[A-Za-z]:/[^";]*?DIA SDK/lib/amd64/diaguids\.lib', $dia
+              if ($n -ne $c) { Set-Content $_.FullName $n -NoNewline; Write-Host "patched: $($_.FullName)" }
+            }
+          }
+
+      - name: Configure
+        id: configure
+        shell: pwsh
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+          "-DCMAKE_PREFIX_PATH=C:\llvm\clang+llvm-$env:LLVM_VER-x86_64-pc-windows-msvc"
+
+      - name: Build
+        id: build
+        shell: pwsh
+        # ninja -k 0: keep compiling past the first failing TU, so one
+        # CI round surfaces EVERY portability error, not just the first.
+        run: cmake --build build -- -k 0
+
+      - name: Test
+        id: test
+        shell: pwsh
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Test (single process)
+        id: test-single
+        # Same rationale as the Linux lane: ctest per-process isolation
+        # hides global-state leakage; the same binary must also stay
+        # green in a single process.
+        shell: pwsh
+        run: .\build\tests\codeskeptic_tests.exe
+
+      - name: Smoke test (native binary, real finding, exit code 1)
+        id: smoke
+        shell: bash
+        run: |
+          cat > smoke.cpp << 'EOF'
+          void leak() {
+              int* p = new int(42);
+              p = new int(7);
+          }
+          EOF
+          code=0
+          ./build/src/codeskeptic.exe smoke.cpp || code=$?
+          test "$code" -eq 1
+
+      - name: Failure diagnostics -> refs/ci-logs/*
+        # Same contract as ci.yml: the dev sandbox reads Actions results
+        # over the git protocol only. Configure/build logs matter most
+        # here — MSVC compile errors are this lane's likely failure mode.
+        if: failure()
+        shell: bash
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          mkdir -p /tmp/diag
+          echo "$STEPS_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value.outcome)"' \
+            > /tmp/diag/steps.txt 2>/dev/null || echo "$STEPS_JSON" > /tmp/diag/steps.txt
+          cmake --build build > /tmp/diag/build_rerun.txt 2>&1 || true
+          tail -c 30000 /tmp/diag/build_rerun.txt > /tmp/diag/build_tail.txt || true
+          ctest --test-dir build --rerun-failed --output-on-failure \
+            > /tmp/diag/ctest_failed.txt 2>&1 || true
+          tail -c 30000 /tmp/diag/ctest_failed.txt > /tmp/diag/ctest_failed_tail.txt || true
+          tail -c 20000 build/CMakeFiles/CMakeConfigureLog.yaml \
+            > /tmp/diag/configure_tail.txt 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          cp /tmp/diag/steps.txt /tmp/diag/build_tail.txt \
+             /tmp/diag/ctest_failed_tail.txt /tmp/diag/configure_tail.txt . 2>/dev/null || true
+          git add -f steps.txt build_tail.txt ctest_failed_tail.txt configure_tail.txt
+          git commit -qm "windows ci diagnostics @ ${{ github.sha }}"
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/windows-native"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        shell: bash
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/windows-native/${{ job.status }}"
