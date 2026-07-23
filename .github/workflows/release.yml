@@ -75,7 +75,7 @@ jobs:
               ! grep -q "not found" /tmp/ldd.txt
               # ldd prints the rpath literally (.../pkg/./bin/../lib/...),
               # so assert the resolution PREFIX is the extracted package,
-              # not an exact directory shape (first hardened run's lesson:
+              # not an exact directory shape (first hardened run lesson:
               # the bundle was fine, the regex was not).
               for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"; do
                 grep -E "$so" /tmp/ldd.txt | grep -qE "=> /tmp/codeskeptic-" || {
