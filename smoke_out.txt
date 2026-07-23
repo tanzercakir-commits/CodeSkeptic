@@ -1,0 +1,17 @@
+Linux runnervmr7g38 6.18.33.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun 18 21:54:43 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/root/demo.c:7:25 [warning] null-deref: Possible null dereference: 'val' may be null on some paths
+    -> /root/demo.c:6:5 'val' assigned a possibly-null value here (callee may return null)
+    -> /root/demo.c:8:5 'val' is also dereferenced here (same origin)
+/root/demo.c:8:5 [warning] null-deref: Possible null dereference: 'copy' may be null on some paths
+    -> /root/demo.c:7:5 'copy' assigned a possibly-null value here (callee may return null)
+/root/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+----------------------------------------
+exit_code=1
+CodeSkeptic 0.4.3
