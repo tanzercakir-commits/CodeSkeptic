@@ -1,0 +1,7 @@
+cache-llvm=success
+msvc-env=success
+configure=success
+build=failure
+test=skipped
+test-single=skipped
+smoke=skipped

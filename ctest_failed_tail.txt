@@ -1,0 +1,29 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+Problem reading file: D:/a/CodeSkeptic/CodeSkeptic/build/Testing/Temporary/ while generating list of previously failed tests.
+    Start 1: codeskeptic_tests_NOT_BUILT
+Could not find executable codeskeptic_tests_NOT_BUILT
+Looked in the following places:
+codeskeptic_tests_NOT_BUILT
+codeskeptic_tests_NOT_BUILT.exe
+Release/codeskeptic_tests_NOT_BUILT
+Release/codeskeptic_tests_NOT_BUILT.exe
+Debug/codeskeptic_tests_NOT_BUILT
+Debug/codeskeptic_tests_NOT_BUILT.exe
+MinSizeRel/codeskeptic_tests_NOT_BUILT
+MinSizeRel/codeskeptic_tests_NOT_BUILT.exe
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT.exe
+Deployment/codeskeptic_tests_NOT_BUILT
+Deployment/codeskeptic_tests_NOT_BUILT.exe
+Development/codeskeptic_tests_NOT_BUILT
+Development/codeskeptic_tests_NOT_BUILT.exe
+Unable to find executable: codeskeptic_tests_NOT_BUILT
+1/1 Test #1: codeskeptic_tests_NOT_BUILT ......***Not Run   0.00 sec
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.47 sec
+
+The following tests FAILED:
+	  1 - codeskeptic_tests_NOT_BUILT (Not Run)
+Errors while running CTest

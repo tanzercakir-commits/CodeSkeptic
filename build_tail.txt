@@ -1,0 +1,51 @@
+[1/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\ContractParser.cpp.obj
+[2/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\IntOverflowRule.cpp.obj
+FAILED: [code=2] src/CMakeFiles/codeskeptic_core.dir/rules/IntOverflowRule.cpp.obj 
+"C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe"  /nologo /TP -DCLANG_BUILD_STATIC -DCLANG_RESOURCE_DIR=\"C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\lib\clang\20\" -DCODESKEPTIC_VERSION=\"0.4.4\" -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS -D_SCL_SECURE_NO_DEPRECATE -D_SCL_SECURE_NO_WARNINGS -DUNICODE -D_UNICODE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -ID:\a\CodeSkeptic\CodeSkeptic\src -external:IC:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include -external:W0 /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MT /GR- /bigobj /showIncludes /Fosrc\CMakeFiles\codeskeptic_core.dir\rules\IntOverflowRule.cpp.obj /Fdsrc\CMakeFiles\codeskeptic_core.dir\codeskeptic_core.pdb /FS -c D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(155): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(155): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(157): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(157): error C2059: syntax error: ')'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(157): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(159): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(159): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(161): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(161): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(163): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(163): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(164): error C2143: syntax error: missing ';' before '}'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(165): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(165): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(165): error C2065: 'corners': undeclared identifier
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(165): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(165): error C2065: 'corners': undeclared identifier
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(166): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(166): error C2059: syntax error: 'for'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(166): error C2059: syntax error: ')'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(166): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(167): error C2059: syntax error: 'if'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(168): error C2059: syntax error: 'if'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(170): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(170): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(170): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(170): error C2059: syntax error: ')'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(171): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(171): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(171): error C4235: nonstandard extension used: '__int128' keyword not supported on this architecture
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(171): error C2059: syntax error: ')'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(175): error C2059: syntax error: 'return'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(176): error C2059: syntax error: '}'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(176): error C2143: syntax error: missing ';' before '}'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(182): error C2143: syntax error: missing ';' before '{'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(182): error C2447: '{': missing function header (old-style formal list?)
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(232): error C3861: 'escapesSignedFinite': identifier not found
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(287): error C2059: syntax error: '}'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(287): error C2143: syntax error: missing ';' before '}'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(289): error C2143: syntax error: missing ';' before '{'
+D:\a\CodeSkeptic\CodeSkeptic\src\rules\IntOverflowRule.cpp(289): error C2447: '{': missing function header (old-style formal list?)
+[3/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\ContractInfo.cpp.obj
+[4/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\ContractRule.cpp.obj
+[5/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\PolicyRule.cpp.obj
+[6/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\NullDerefRule.cpp.obj
+[7/53] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\AssumptionRule.cpp.obj
+ninja: build stopped: subcommand failed.
