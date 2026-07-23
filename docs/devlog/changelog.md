@@ -1,5 +1,40 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-23 — Windows packaging: no more hard 7z requirement
+
+The first external WINDOWS evaluation (native v0.4.5 build verified
+end to end on a fresh machine, 682/682) left one MEDIUM:
+`package_release.sh` hard-required `7z`, which fresh machines don't
+have. The Windows arm now falls back to PowerShell `Compress-Archive`
+(present on every Windows 10/11) when 7z isn't on PATH, and
+windows.yml gained a second package rehearsal that PROVES the
+fallback arm rather than trusting it: 7-Zip is masked out of PATH
+(with a loud assert that the masking actually worked), packaging must
+still produce the zip, and the zip must expand with codeskeptic.exe
+inside. Also in this commit: the changelog's P1 entry is retitled to
+v0.4.6 and reordered newest-first — the rebase over the sibling
+Windows phases had left it labeled v0.4.5.
+
+## 2026-07-23 — v0.4.6: the first external evaluation's P1
+
+An evaluation run OUTSIDE this project's own loop — the maintainer's
+macOS machine, a different AI toolchain, the docs/evaluate.md
+protocol — confirmed the trust-chain surface end to end and caught
+exactly the class of bug the protocol exists for: darwin binaries
+baked the CI runner's versioned Xcode sysroot, so the no-compile-db
+quickstart on a normal Mac silently analyzed NOTHING and printed
+"Clean!" with exit 0. Fixed at both layers the report proposed:
+runtime SDK resolution (SDKROOT verbatim -> cached xcrun probe ->
+baked-if-exists; resolveMacSdkPath mirrors resolveResourceDir, with
+the resolution order unit-tested) and a fail-loud exit policy
+(all-TUs-broken -> exit 2 + ANALYSIS FAILED; partial breakage keeps
+findings semantics — corpus flows depend on that; the Action already
+escalates exit > 1 even in report-only). Fallout fixes the new policy
+itself surfaced: broken-TU records deduplicated across
+summary-inference re-parses, and a second positional path is now a
+loud usage error instead of a silent no-op. macOS release smoke
+gained the SDKROOT=/nonexistent -> exit-2 proof. 695 tests.
+
 ## 2026-07-23 — v0.4.5: the first native Windows binary
 
 Packaging round (phase9-windows-package). `package_release.sh` gained
@@ -24,26 +59,6 @@ DIA patch) was extracted to a local composite action shared by
 windows.yml and release.yml so the two lanes cannot drift. README
 flips the last "Planned" row: native Windows is now prebuilt-zip or
 build-from-source, both CI-proven; version pins move to v0.4.5.
-
-## 2026-07-23 — v0.4.5: the first external evaluation's P1
-
-An evaluation run OUTSIDE this project's own loop — the maintainer's
-macOS machine, a different AI toolchain, the docs/evaluate.md
-protocol — confirmed the trust-chain surface end to end and caught
-exactly the class of bug the protocol exists for: darwin binaries
-baked the CI runner's versioned Xcode sysroot, so the no-compile-db
-quickstart on a normal Mac silently analyzed NOTHING and printed
-"Clean!" with exit 0. Fixed at both layers the report proposed:
-runtime SDK resolution (SDKROOT verbatim -> cached xcrun probe ->
-baked-if-exists; resolveMacSdkPath mirrors resolveResourceDir, with
-the resolution order unit-tested) and a fail-loud exit policy
-(all-TUs-broken -> exit 2 + ANALYSIS FAILED; partial breakage keeps
-findings semantics — corpus flows depend on that; the Action already
-escalates exit > 1 even in report-only). Fallout fixes the new policy
-itself surfaced: broken-TU records deduplicated across
-summary-inference re-parses, and a second positional path is now a
-loud usage error instead of a silent no-op. macOS release smoke
-gained the SDKROOT=/nonexistent -> exit-2 proof. 695 tests.
 
 ## 2026-07-22 — v0.4.4: the trust-chain round (critique-2)
 

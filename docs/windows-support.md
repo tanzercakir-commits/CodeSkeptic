@@ -125,9 +125,11 @@ The 682 C++ unit tests are the portable floor and all run on Windows.
   cost two probe rounds and zero engine lines.
 - **Packaging — DONE** (v0.4.5, phase9-windows-package):
   `package_release.sh` runs under Git Bash on the runner with a small
-  Windows branch (zip via 7z, `codeskeptic.exe`, `cygpath` for the
-  resource dir, no lib bundling — the static-CRT build links only
-  Windows system DLLs). Release lane: build → 682 tests → version/tag
+  Windows branch (zip via 7z, falling back to PowerShell
+  `Compress-Archive` on machines without 7-Zip — flagged by the first
+  external Windows evaluation and CI-proven by a 7-Zip-masked
+  rehearsal; `codeskeptic.exe`, `cygpath` for the resource dir, no lib
+  bundling — the static-CRT build links only Windows system DLLs). Release lane: build → 682 tests → version/tag
   check → package → relocation smoke (C:\llvm renamed away + vcvars
   family stripped: the zip must carry itself) → draft upload; combined
   `sha256sums.txt` covers Linux + macOS + Windows. The same package +

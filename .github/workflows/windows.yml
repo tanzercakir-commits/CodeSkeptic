@@ -116,6 +116,30 @@ jobs:
         shell: bash
         run: bash scripts/package_release.sh build/src/codeskeptic.exe dist "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe"
 
+      - name: Package rehearsal (fresh machine — 7-Zip masked, PS fallback)
+        id: package-no7z
+        # The first external Windows evaluation's MEDIUM: packaging
+        # hard-required 7z, which fresh machines don't have. The script
+        # now falls back to PowerShell Compress-Archive; this step
+        # proves that arm for real — 7-Zip is removed from PATH (the
+        # exact fresh-machine condition), packaging must still produce
+        # a zip, and the zip must expand with codeskeptic.exe inside.
+        # Output goes to dist-no7z so the 7z-built zip in dist (used by
+        # the relocation smoke below) stays untouched.
+        shell: bash
+        run: |
+          PATH=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -vi '7-zip' | paste -sd:)
+          export PATH
+          if command -v 7z >/dev/null 2>&1; then
+            echo "7z still visible after masking — rehearsal invalid"
+            exit 1
+          fi
+          bash scripts/package_release.sh build/src/codeskeptic.exe dist-no7z "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe"
+          ZIP=$(ls dist-no7z/codeskeptic-*-windows-*.zip)
+          powershell.exe -NoProfile -Command \
+            "Expand-Archive -Path '$ZIP' -DestinationPath 'no7z_check' -Force"
+          find no7z_check -name codeskeptic.exe | grep -q codeskeptic.exe
+
       - name: Relocation smoke (package tree only — LLVM hidden, plain terminal)
         id: reloc-smoke
         # The unpacked zip must carry itself: C:\llvm (the baked

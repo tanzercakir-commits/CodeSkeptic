@@ -121,9 +121,19 @@ fi
 mkdir -p "$OUT"
 if [ "$OS" = "windows" ]; then
     # zip is the Windows convention (Expand-Archive works out of the
-    # box); 7z is present on the runners and in Git Bash PATH.
+    # box). 7z when available (CI runners, most dev setups); fresh
+    # machines without 7-Zip fall back to PowerShell Compress-Archive,
+    # which ships with every Windows 10/11 — the first external Windows
+    # evaluation flagged the bare-7z requirement (MEDIUM). The fallback
+    # arm is CI-proven by the no-7z package rehearsal in windows.yml.
     ARCHIVE="$NAME.zip"
-    (cd "$OUT" && rm -f "$ARCHIVE" && 7z a -bso0 -bsp0 "$ARCHIVE" "$NAME" >/dev/null)
+    if command -v 7z >/dev/null 2>&1; then
+        (cd "$OUT" && rm -f "$ARCHIVE" && 7z a -bso0 -bsp0 "$ARCHIVE" "$NAME" >/dev/null)
+    else
+        (cd "$OUT" && rm -f "$ARCHIVE" && \
+         powershell.exe -NoProfile -Command \
+           "Compress-Archive -Path '$NAME' -DestinationPath '$ARCHIVE' -Force")
+    fi
 else
     ARCHIVE="$NAME.tar.gz"
     tar czf "$OUT/$ARCHIVE" -C "$OUT" "$NAME"
