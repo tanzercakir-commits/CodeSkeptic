@@ -41,22 +41,29 @@ jobs:
 
       - name: Run the Linux release inside WSL2
         shell: bash
+        # The script travels over STDIN — wsl.exe re-joins argv words
+        # when a command is passed inline, which shredded the round-3
+        # quoting (assignments silently vanished). A byte pipe has no
+        # argv to mangle.
         run: |
-          wsl.exe -d Ubuntu-24.04 -u root -- bash -ec '
-            uname -a | tee /tmp/uname.txt
-            grep -q "microsoft-standard-WSL2" /tmp/uname.txt
-            cd /root
-            curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
-            curl -sL https://raw.githubusercontent.com/tanzercakir-commits/CodeSkeptic/${{ github.sha }}/docs/demo.c -o demo.c
-            apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev >/dev/null
-            code=0
-            out=$(./codeskeptic-v*/bin/codeskeptic demo.c 2>&1) || code=$?
-            echo "$out"
-            echo "exit_code=$code"
-            test "$code" -eq 1
-            echo "$out" | grep -qi finding
-            ./codeskeptic-v*/bin/codeskeptic --version
-          ' | tee smoke_out.txt
+          cat > smoke.sh <<'SCRIPT'
+          set -e
+          uname -a | tee /tmp/uname.txt
+          grep -q "microsoft-standard-WSL2" /tmp/uname.txt
+          cd /root
+          curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+          curl -sL https://raw.githubusercontent.com/tanzercakir-commits/CodeSkeptic/GITSHA/docs/demo.c -o demo.c
+          apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev >/dev/null
+          code=0
+          out=$(./codeskeptic-v*/bin/codeskeptic demo.c 2>&1) || code=$?
+          echo "$out"
+          echo "exit_code=$code"
+          test "$code" -eq 1
+          echo "$out" | grep -qi finding
+          ./codeskeptic-v*/bin/codeskeptic --version
+          SCRIPT
+          sed -i "s/GITSHA/${{ github.sha }}/" smoke.sh
+          wsl.exe -d Ubuntu-24.04 -u root -- bash < smoke.sh | tee smoke_out.txt
 
       - name: Publish log to refs/ci-logs/*
         if: always()
