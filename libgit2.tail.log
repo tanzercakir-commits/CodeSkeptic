@@ -1,0 +1,858 @@
+k *GIT_RESTRICT lock);
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/pthread.h:49:51: note: expanded from macro 'git_rwlock_init'
+   49 | #define git_rwlock_init(a)      pthread_rwlock_init(a, NULL)
+      |                                                        ^
+/usr/lib/llvm-20/lib/clang/20/include/__stddef_null.h:26:16: note: expanded from macro 'NULL'
+   26 | #define NULL ((void*)0)
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.h:57:5: error: conflicting types for 'pthread_rwlock_init'
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/pthread.h:49:28: note: expanded from macro 'git_rwlock_init'
+   49 | #define git_rwlock_init(a)      pthread_rwlock_init(a, NULL)
+      |                                 ^
+/usr/include/pthread.h:967:12: note: previous declaration is here
+  967 | extern int pthread_rwlock_init (pthread_rwlock_t *__restrict __rwlock,
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c:13:22: error: expected ')'
+   13 | typedef void (WINAPI *win32_srwlock_fn)(GIT_SRWLOCK *);
+      |                      ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c:13:14: note: to match this '('
+   13 | typedef void (WINAPI *win32_srwlock_fn)(GIT_SRWLOCK *);
+      |              ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c:15:8: error: unknown type name 'win32_srwlock_fn'
+   15 | static win32_srwlock_fn win32_srwlock_initialize;
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+7 warnings and 20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c.
+[146/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.c:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.h:15:10: fatal error: 'io.h' file not found
+   15 | #include <io.h>
+      |          ^~~~~~
+1 warning and 1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.c.
+[147/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/win32-compat.h:18:8: error: redefinition of 'timeval'
+   18 | struct p_timeval {
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:83:19: note: expanded from macro 'p_timeval'
+   83 | #define p_timeval timeval
+      |                   ^
+/usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h:8:8: note: previous definition is here
+    8 | struct timeval
+      |        ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/win32-compat.h:31:2: error: unknown type name '_dev_t'
+   31 |         _dev_t st_dev;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/win32-compat.h:32:2: error: unknown type name '_ino_t'
+   32 |         _ino_t st_ino;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/win32-compat.h:37:2: error: unknown type name '_dev_t'
+   37 |         _dev_t st_rdev;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/win32-compat.h:38:2: error: unknown type name '__int64'; did you mean '__int64_t'?
+   38 |         __int64 st_size;
+      |         ^~~~~~~
+      |         __int64_t
+/usr/include/x86_64-linux-gnu/bits/types.h:44:25: note: '__int64_t' declared here
+   44 | typedef signed long int __int64_t;
+      |                         ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:21:37: error: unknown type name 'git_win32_path'
+   21 | extern int git_win32_path_from_utf8(git_win32_path dest, const char *src);
+      |                                     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:31:46: error: unknown type name 'git_win32_path'
+   31 | extern int git_win32_path_relative_from_utf8(git_win32_path dest, const char *src);
+      |                                              ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:48:40: error: unknown type name 'git_win32_path'
+   48 | extern int git_win32_path_canonicalize(git_win32_path path);
+      |                                        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:57:35: error: unknown type name 'git_win32_utf8_path'
+   57 | extern int git_win32_path_to_utf8(git_win32_utf8_path dest, const wchar_t *src);
+      |                                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:69:38: error: unknown type name 'git_win32_path'
+   69 | extern int git_win32_path_readlink_w(git_win32_path dest, const git_win32_path path);
+      |                                      ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:69:65: error: unknown type name 'git_win32_path'
+   69 | extern int git_win32_path_readlink_w(git_win32_path dest, const git_win32_path path);
+      |                                                                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:89:36: error: unknown type name 'git_win32_path'
+   89 | int git_win32_path_find_executable(git_win32_path fullpath, wchar_t* exe);
+      |                                    ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:20:9: error: unknown type name 'SOCKET'
+   20 | typedef SOCKET GIT_SOCKET;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:22:9: warning: 'p_lseek' macro redefined [-Wmacro-redefined]
+   22 | #define p_lseek(f,n,w) _lseeki64(f, n, w)
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:21:9: note: previous definition is here
+   21 | #define p_lseek(f,n,w) lseek(f, n, w)
+      |         ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:24:12: error: conflicting types for 'fstat'
+   24 | extern int p_fstat(int fd, struct stat *buf);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:22:22: note: expanded from macro 'p_fstat'
+   22 | #define p_fstat(f,b) fstat(f, b)
+      |                      ^
+/usr/include/x86_64-linux-gnu/sys/stat.h:210:12: note: previous declaration is here
+  210 | extern int fstat (int __fd, struct stat *__buf) __THROW __nonnull ((2));
+      |            ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:25:12: error: conflicting types for 'lstat'
+   25 | extern int p_lstat(const char *file_name, struct stat *buf);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:23:22: note: expanded from macro 'p_lstat'
+   23 | #define p_lstat(p,b) lstat(p,b)
+      |                      ^
+/usr/include/x86_64-linux-gnu/sys/stat.h:313:12: note: previous declaration is here
+  313 | extern int lstat (const char *__restrict __file,
+      |            ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:31:12: error: conflicting types for 'readlink'
+   31 | extern int p_readlink(const char *path, char *buf, size_t bufsiz);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:40:29: note: expanded from macro 'p_readlink'
+   40 | #define p_readlink(a, b, c) readlink(a, b, c)
+      |                             ^
+/usr/include/unistd.h:838:16: note: previous declaration is here
+  838 | extern ssize_t readlink (const char *__restrict __path,
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:39:12: error: conflicting types for 'recv'
+   39 | extern int p_recv(GIT_SOCKET socket, void *buffer, size_t length, int flags);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:53:25: note: expanded from macro 'p_recv'
+   53 | #define p_recv(s,b,l,f) recv(s,b,l,f)
+      |                         ^
+/usr/include/x86_64-linux-gnu/sys/socket.h:145:16: note: previous declaration is here
+  145 | extern ssize_t recv (int __fd, void *__buf, size_t __n, int __flags);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:40:12: error: conflicting types for 'send'
+   40 | extern int p_send(GIT_SOCKET socket, const void *buffer, size_t length, int flags);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:54:25: note: expanded from macro 'p_send'
+   54 | #define p_send(s,b,l,f) send(s,b,l,f)
+      |                         ^
+/usr/include/x86_64-linux-gnu/sys/socket.h:138:16: note: previous declaration is here
+  138 | extern ssize_t send (int __fd, const void *__buf, size_t __n, int __flags);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.h:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix.h:48:12: error: conflicting types for 'access'
+   48 | extern int p_access(const char *path, mode_t mode);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/unix/posix.h:61:23: note: expanded from macro 'p_access'
+   61 | #define p_access(p,m) access(p,m)
+      |                       ^
+/usr/include/unistd.h:287:12: note: previous declaration is here
+  287 | extern int access (const char *__name, int __type) __THROW __nonnull ((1));
+      |            ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+2 warnings and 20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c.
+[148/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:21:37: error: unknown type name 'git_win32_path'
+   21 | extern int git_win32_path_from_utf8(git_win32_path dest, const char *src);
+      |                                     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:31:46: error: unknown type name 'git_win32_path'
+   31 | extern int git_win32_path_relative_from_utf8(git_win32_path dest, const char *src);
+      |                                              ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:48:40: error: unknown type name 'git_win32_path'
+   48 | extern int git_win32_path_canonicalize(git_win32_path path);
+      |                                        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:57:35: error: unknown type name 'git_win32_utf8_path'
+   57 | extern int git_win32_path_to_utf8(git_win32_utf8_path dest, const wchar_t *src);
+      |                                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:69:38: error: unknown type name 'git_win32_path'
+   69 | extern int git_win32_path_readlink_w(git_win32_path dest, const git_win32_path path);
+      |                                      ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:69:65: error: unknown type name 'git_win32_path'
+   69 | extern int git_win32_path_readlink_w(git_win32_path dest, const git_win32_path path);
+      |                                                                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.h:89:36: error: unknown type name 'git_win32_path'
+   89 | int git_win32_path_find_executable(git_win32_path fullpath, wchar_t* exe);
+      |                                    ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:18:2: error: unknown type name 'ULONG'
+   18 |         ULONG  ReparseTag;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:19:2: error: unknown type name 'USHORT'
+   19 |         USHORT ReparseDataLength;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:20:2: error: unknown type name 'USHORT'
+   20 |         USHORT Reserved;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:23:4: error: unknown type name 'USHORT'
+   23 |                         USHORT SubstituteNameOffset;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:24:4: error: unknown type name 'USHORT'
+   24 |                         USHORT SubstituteNameLength;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:25:4: error: unknown type name 'USHORT'
+   25 |                         USHORT PrintNameOffset;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:26:4: error: unknown type name 'USHORT'
+   26 |                         USHORT PrintNameLength;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:27:4: error: unknown type name 'ULONG'
+   27 |                         ULONG  Flags;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:28:4: error: unknown type name 'WCHAR'
+   28 |                         WCHAR  PathBuffer[1];
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:31:4: error: unknown type name 'USHORT'
+   31 |                         USHORT SubstituteNameOffset;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:32:4: error: unknown type name 'USHORT'
+   32 |                         USHORT SubstituteNameLength;
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/reparse.h:33:4: error: unknown type name 'USHORT'
+   33 |                         USHORT PrintNameOffset;
+      |                         ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+1 warning and 20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c.
+[149/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c:14:6: warning: implicit declaration of function 'GetLastError' [-Wimplicit-function-declaration]
+   14 |         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      |             ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c:14:24: error: use of undeclared identifier 'ERROR_INSUFFICIENT_BUFFER'
+   14 |         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      |                               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c:37:18: warning: implicit declaration of function 'WideCharToMultiByte' [-Wimplicit-function-declaration]
+   37 |         if ((utf8_len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, string_w, (int)len_w, NULL, 0, NULL, NULL)) == 0)
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c:37:38: error: use of undeclared identifier 'CP_UTF8'
+   37 |         if ((utf8_len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, string_w, (int)len_w, NULL, 0, NULL, NULL)) == 0)
+      |                                             ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c:49:4: error: use of undeclared identifier 'CP_UTF8'
+   49 |                         CP_UTF8, WC_ERR_INVALID_CHARS, string_w, (int)len_w, &buf->ptr[buf->size], utf8_len, NULL, NULL)) == 0)
+      |                         ^
+3 warnings and 3 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c.
+[150/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:12:6: warning: implicit declaration of function 'GetLastError' [-Wimplicit-function-declaration]
+   12 |         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      |             ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:12:24: error: use of undeclared identifier 'ERROR_INSUFFICIENT_BUFFER'
+   12 |         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      |                               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:39:8: warning: implicit declaration of function 'MultiByteToWideChar' [-Wimplicit-function-declaration]
+   39 |         len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:39:28: error: use of undeclared identifier 'CP_UTF8'
+   39 |         len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |                                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:39:37: error: use of undeclared identifier 'MB_ERR_INVALID_CHARS'
+   39 |         len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |                                            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:69:8: warning: implicit declaration of function 'WideCharToMultiByte' [-Wimplicit-function-declaration]
+   69 |         len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+      |               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:69:28: error: use of undeclared identifier 'CP_UTF8'
+   69 |         len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+      |                                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:90:15: warning: implicit declaration of function 'MultiByteToWideChar' [-Wimplicit-function-declaration]
+   90 |         utf16_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |                      ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:90:35: error: use of undeclared identifier 'CP_UTF8'
+   90 |         utf16_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |                                          ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:90:44: error: use of undeclared identifier 'MB_ERR_INVALID_CHARS'
+   90 |         utf16_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+      |                                                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:124:14: warning: implicit declaration of function 'WideCharToMultiByte' [-Wimplicit-function-declaration]
+  124 |         utf8_size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+      |                     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:124:34: error: use of undeclared identifier 'CP_UTF8'
+  124 |         utf8_size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+      |                                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c:135:34: error: use of undeclared identifier 'CP_UTF8'
+  135 |         utf8_size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+      |                                         ^
+6 warnings and 8 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c.
+[151/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:32:2: error: unknown type name 'PROCESS_INFORMATION'
+   32 |         PROCESS_INFORMATION process_info;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:34:2: error: unknown type name 'HANDLE'
+   34 |         HANDLE child_in;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:35:2: error: unknown type name 'HANDLE'
+   35 |         HANDLE child_out;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:36:2: error: unknown type name 'HANDLE'
+   36 |         HANDLE child_err;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:126:14: warning: implicit declaration of function 'git_utf8_to_16' [-Wimplicit-function-declaration]
+  126 |                 if ((ret = git_utf8_to_16(in16, ENV_MAX, in[i])) < 0)
+      |                            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:134:9: warning: implicit declaration of function 'GetEnvironmentStringsW' [-Wimplicit-function-declaration]
+  134 |                 env = GetEnvironmentStringsW();
+      |                       ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:134:7: error: incompatible integer to pointer conversion assigning to 'wchar_t *' (aka 'int *') from 'int' [-Wint-conversion]
+  134 |                 env = GetEnvironmentStringsW();
+      |                     ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:137:12: warning: implicitly declaring library function 'wcslen' with type 'unsigned long (const int *)' [-Wimplicit-function-declaration]
+  137 |                         e_len = wcslen(e);
+      |                                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:137:12: note: include the header <wchar.h> or explicitly provide a declaration for 'wcslen'
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:139:15: warning: implicit declaration of function 'git_utf8_from_16' [-Wimplicit-function-declaration]
+  139 |                         if ((ret = git_utf8_from_16(e8, ENV_MAX, e)) < 0)
+      |                                    ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:156:3: warning: implicit declaration of function 'FreeEnvironmentStringsW' [-Wimplicit-function-declaration]
+  156 |                 FreeEnvironmentStringsW(env);
+      |                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:182:6: warning: implicit declaration of function 'git_utf8_to_16_alloc' [-Wimplicit-function-declaration]
+  182 |             git_utf8_to_16_alloc(&process->appname, appname) < 0) {
+      |             ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:255:2: error: use of undeclared identifier 'STARTUPINFOW'
+  255 |         STARTUPINFOW startup_info;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:256:2: error: use of undeclared identifier 'SECURITY_ATTRIBUTES'; did you mean '_SC_FILE_ATTRIBUTES'?
+  256 |         SECURITY_ATTRIBUTES security_attrs;
+      |         ^~~~~~~~~~~~~~~~~~~
+      |         _SC_FILE_ATTRIBUTES
+/usr/include/x86_64-linux-gnu/bits/confname.h:384:5: note: '_SC_FILE_ATTRIBUTES' declared here
+  384 |     _SC_FILE_ATTRIBUTES,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:256:21: error: expected ';' after expression
+  256 |         SECURITY_ATTRIBUTES security_attrs;
+      |                            ^
+      |                            ;
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:256:22: error: use of undeclared identifier 'security_attrs'
+  256 |         SECURITY_ATTRIBUTES security_attrs;
+      |                             ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:257:2: error: use of undeclared identifier 'DWORD'
+  257 |         DWORD flags = CREATE_UNICODE_ENVIRONMENT;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:258:2: error: use of undeclared identifier 'HANDLE'
+  258 |         HANDLE in[2]  = { NULL, NULL },
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:262:36: error: use of undeclared identifier 'SECURITY_ATTRIBUTES'; did you mean '_SC_FILE_ATTRIBUTES'?
+  262 |         memset(&security_attrs, 0, sizeof(SECURITY_ATTRIBUTES));
+      |                                           ^~~~~~~~~~~~~~~~~~~
+      |                                           _SC_FILE_ATTRIBUTES
+/usr/include/x86_64-linux-gnu/bits/confname.h:384:5: note: '_SC_FILE_ATTRIBUTES' declared here
+  384 |     _SC_FILE_ATTRIBUTES,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:262:10: error: use of undeclared identifier 'security_attrs'
+  262 |         memset(&security_attrs, 0, sizeof(SECURITY_ATTRIBUTES));
+      |                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:263:2: error: use of undeclared identifier 'security_attrs'
+  263 |         security_attrs.bInheritHandle = TRUE;
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:263:34: error: use of undeclared identifier 'TRUE'
+  263 |         security_attrs.bInheritHandle = TRUE;
+      |                                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:265:34: error: use of undeclared identifier 'STARTUPINFOW'
+  265 |         memset(&startup_info, 0, sizeof(STARTUPINFOW));
+      |                                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:265:10: error: use of undeclared identifier 'startup_info'
+  265 |         memset(&startup_info, 0, sizeof(STARTUPINFOW));
+      |                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:266:2: error: use of undeclared identifier 'startup_info'
+  266 |         startup_info.cb = sizeof(STARTUPINFOW);
+      |         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c:266:27: error: use of undeclared identifier 'STARTUPINFOW'
+  266 |         startup_info.cb = sizeof(STARTUPINFOW);
+      |                                  ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+7 warnings and 20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c.
+[152/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/runtime.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[153/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/zstream.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[154/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[155/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/rand.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[156/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/allocators/failalloc.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[157/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/allocators/debugalloc.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[158/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/allocators/win32_leakcheck.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[159/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/allocators/stdalloc.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[160/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/date.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[161/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/fs_path.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[162/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/str.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[163/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/util.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[164/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/pool.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[165/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.h:13:10: fatal error: 'wincrypt.h' file not found
+   13 | #include <wincrypt.h>
+      |          ^~~~~~~~~~~~
+1 warning and 1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.c.
+[166/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/openssl.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[167/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/mbedtls.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[168/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.h:13:10: fatal error: 'CommonCrypto/CommonDigest.h' file not found
+   13 | #include <CommonCrypto/CommonDigest.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning and 1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.c.
+[169/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/sha1dc/sha1.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[170/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/sha1dc/ubc_check.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[171/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/collisiondetect.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[172/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha224-256.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[173/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:122:5: error: redefinition of 'SHA1'
+  122 |     SHA1, SHA224, SHA256, SHA384, SHA512
+      |     ^
+/usr/include/openssl/sha.h:55:16: note: previous definition is here
+   55 | unsigned char *SHA1(const unsigned char *d, size_t n, unsigned char *md);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:122:11: error: redefinition of 'SHA224'
+  122 |     SHA1, SHA224, SHA256, SHA384, SHA512
+      |           ^
+/usr/include/openssl/sha.h:81:16: note: previous definition is here
+   81 | unsigned char *SHA224(const unsigned char *d, size_t n, unsigned char *md);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:122:19: error: redefinition of 'SHA256'
+  122 |     SHA1, SHA224, SHA256, SHA384, SHA512
+      |                   ^
+/usr/include/openssl/sha.h:82:16: note: previous definition is here
+   82 | unsigned char *SHA256(const unsigned char *d, size_t n, unsigned char *md);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:122:27: error: redefinition of 'SHA384'
+  122 |     SHA1, SHA224, SHA256, SHA384, SHA512
+      |                           ^
+/usr/include/openssl/sha.h:131:16: note: previous definition is here
+  131 | unsigned char *SHA384(const unsigned char *d, size_t n, unsigned char *md);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:122:35: error: redefinition of 'SHA512'
+  122 |     SHA1, SHA224, SHA256, SHA384, SHA512
+      |                                   ^
+/usr/include/openssl/sha.h:132:16: note: previous definition is here
+  132 | unsigned char *SHA512(const unsigned char *d, size_t n, unsigned char *md);
+      |                ^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.h:15:8: error: redefinition of 'git_hash_sha256_ctx'
+   15 | struct git_hash_sha256_ctx {
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/openssl.h:50:8: note: previous definition is here
+   50 | struct git_hash_sha256_ctx {
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:28:18: warning: incompatible pointer types passing 'SHA256_CTX *' (aka 'struct SHA256state_st *') to parameter of type 'SHA256Context *' (aka 'struct SHA256Context *') [-Wincompatible-pointer-types]
+   28 |         if (SHA256Reset(&ctx->c)) {
+      |                         ^~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:217:39: note: passing argument to parameter here
+  217 | extern int SHA256Reset(SHA256Context *);
+      |                                       ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:38:18: warning: incompatible pointer types passing 'SHA256_CTX *' (aka 'struct SHA256state_st *') to parameter of type 'SHA256Context *' (aka 'struct SHA256Context *') [-Wincompatible-pointer-types]
+   38 |         if (SHA256Input(&ctx->c, data, len)) {
+      |                         ^~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:218:39: note: passing argument to parameter here
+  218 | extern int SHA256Input(SHA256Context *, const uint8_t *bytes,
+      |                                       ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c:48:19: warning: incompatible pointer types passing 'SHA256_CTX *' (aka 'struct SHA256state_st *') to parameter of type 'SHA256Context *' (aka 'struct SHA256Context *') [-Wincompatible-pointer-types]
+   48 |         if (SHA256Result(&ctx->c, out)) {
+      |                          ^~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/rfc6234/sha.h:222:40: note: passing argument to parameter here
+  222 | extern int SHA256Result(SHA256Context *,
+      |                                        ^
+4 warnings and 6 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c.
+[174/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/net.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[175/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/pqueue.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[176/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/thread.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[177/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/varint.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[178/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/regexp.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[179/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[180/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/posix.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[181/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/errors.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[182/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/strlist.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[183/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/wildmatch.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[184/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/vector.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[185/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/progress.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[186/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/opt_usage.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[187/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/unix/sighandler.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/unix/sighandler.c:11:10: fatal error: 'common.h' file not found
+   11 | #include "common.h"
+      |          ^~~~~~~~~~
+1 warning and 1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/unix/sighandler.c.
+[188/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/sighandler.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/sighandler.c:9:10: fatal error: 'windows.h' file not found
+    9 | #include <windows.h>
+      |          ^~~~~~~~~~~
+1 warning and 1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/sighandler.c.
+[189/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/precompiled.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[190/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/main.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[191/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/opt.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[192/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_hash_object.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[193/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[194/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/common.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[195/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_clone.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[196/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_config.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[197/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_index_pack.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[198/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_cat_file.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[199/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_blame.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[200/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_help.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[201/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/cmd_init.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[CodeSkeptic] 16 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/map.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/unix/sighandler.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/sighandler.c
+CodeSkeptic: 34 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/attrcache.c:157:8 [warning] null-deref: Possible null dereference: 'entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/attrcache.c:148:2 'entry' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:612:1 [warning] memory-leak: Memory leak: allocation stored in 'sg_origin' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:540:3 'sg_origin' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:610:3 'sg_origin' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/clone.c:551:47 [warning] null-deref: Possible null dereference: 'opts' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/clone.c:498:15 'opts' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:616:9 [warning] null-deref: Possible null dereference: 'msg' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:610:8 'msg' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:610:56 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:611:26 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:614:10 'msg' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:673:20 [warning] null-deref: Possible null dereference: 'msg' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:665:8 'msg' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:665:42 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:666:38 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:670:10 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:671:9 'msg' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:286:2 [warning] null-deref: Possible null dereference: 'last_chunk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:243:2 'last_chunk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:251:7 'last_chunk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_list.c:178:2 [warning] null-deref: Possible null dereference: 'map_head' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_list.c:174:3 'map_head' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:118:3 [warning] null-deref: Possible null dereference: 'e' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:103:2 'e' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:110:4 'e' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:116:7 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:117:17 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:119:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:120:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:121:16 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:122:13 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:123:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:124:16 'e' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1665:23 [warning] null-deref: Possible null dereference: 'idx2wd' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1634:10 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1652:14 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1655:4 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1667:13 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1674:9 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1700:6 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1666:20 'idx2wd' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1695:23 [warning] null-deref: Possible null dereference: 'head2idx' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1633:10 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1651:14 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1655:4 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1673:9 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1658:23 'head2idx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1659:20 'head2idx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1696:20 'head2idx' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1096:18 [warning] null-deref: Possible null dereference: 'tgt2src_copy' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:836:2 'tgt2src_copy' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:890:3 'tgt2src_copy' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:891:3 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:946:8 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:980:12 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1139:6 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1092:8 'tgt2src_copy' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'src2tgt' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:884:2 'src2tgt' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1136:2 'src2tgt' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'tgt2src' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:886:2 'tgt2src' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1135:2 'tgt2src' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'tgt2src_copy' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:890:3 'tgt2src_copy' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1137:2 'tgt2src_copy' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:230:4 [warning] null-deref: Possible null dereference: 'match' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:176:2 'match' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:197:7 'match' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:235:4 'match' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:202:3 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:208:4 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:211:5 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:221:8 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:222:13 'match' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3462:5 [warning] null-deref: Possible null dereference: 'old_entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3444:7 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3446:13 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3448:12 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3461:23 'old_entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3462:24 [warning] null-deref: Possible null dereference: 'new_entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3444:7 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3446:12 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3448:12 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3461:39 'new_entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2462:1 [warning] memory-leak: Memory leak: allocation stored in 'cur_items' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2390:2 'cur_items' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2456:2 'cur_items' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2462:1 [warning] memory-leak: Memory leak: allocation stored in 'iterator_item' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2389:2 'iterator_item' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2455:2 'iterator_item' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:515:1 [warning] memory-leak: Memory leak: allocation stored in 'redundant' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:457:2 'redundant' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:511:2 'redundant' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1615:1 [warning] memory-leak: Memory leak: allocation stored in 'similarity_ours' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1563:2 'similarity_ours' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1611:2 'similarity_ours' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1615:1 [warning] memory-leak: Memory leak: allocation stored in 'similarity_theirs' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1567:2 'similarity_theirs' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1612:2 'similarity_theirs' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:265:2 [warning] null-deref: Possible null dereference: 'last_chunk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:216:2 'last_chunk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:229:7 'last_chunk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/mwindow.c:284:3 [warning] null-deref: Possible null dereference: 'list' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/mwindow.c:264:54 'list' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:536:21 [warning] null-deref: Possible null dereference: 'repo' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:534:2 'repo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:537:32 'repo' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:774:53 [warning] null-deref: Possible null dereference: 'elem' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:674:26 'elem' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:826:6 'elem' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:730:13 'elem' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:731:65 'elem' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:733:16 'elem' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:487:5 [warning] null-deref: Possible null dereference: 'm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:404:2 'm' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:419:10 'm' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:420:3 'm' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:658:5 [warning] null-deref: Possible null dereference: 'm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:592:2 'm' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:607:10 'm' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:608:3 'm' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:236:6 [warning] null-deref: Possible null dereference: 'push_spec' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:169:2 'push_spec' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:203:24 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:212:40 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:230:6 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:231:6 'push_spec' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:230:15 [warning] null-deref: Possible null dereference: 'entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:196:2 'entry' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:198:6 'entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:220:2 'entry' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:225:18 'entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:230:32 [warning] null-deref: Possible null dereference: 'previous' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:229:2 'previous' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3914:1 [warning] memory-leak: Memory leak: allocation stored in 'tmp_name' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3898:3 'tmp_name' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3910:2 'tmp_name' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1302:13 [warning] null-deref: Possible null dereference: 'popped' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1290:38 'popped' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1291:10 'popped' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1303:17 'popped' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1305:38 'popped' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1306:24 'popped' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:576:1 [warning] memory-leak: Memory leak: allocation stored in 'tmp_buffer' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:557:5 'tmp_buffer' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:567:3 'tmp_buffer' freed here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:573:2 'tmp_buffer' freed here
+----------------------------------------

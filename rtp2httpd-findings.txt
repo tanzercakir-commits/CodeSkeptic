@@ -1,0 +1,3 @@
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_chunked_decoder.c:54:18 [warning] null-deref: Possible null dereference: 'input' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1772:27 [warning] null-deref: Possible null dereference: 'msrc_res' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c:1838:26 [warning] null-deref: Possible null dereference: 'fcc_res' may be null on some paths
