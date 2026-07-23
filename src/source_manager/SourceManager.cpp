@@ -146,8 +146,13 @@ std::vector<std::string> platformExtraArgs() {
         args.insert(args.end(), {"-resource-dir", resource_dir});
     }
 
-#ifdef MACOS_SDK_PATH
-    args.insert(args.end(), {"-isysroot", MACOS_SDK_PATH});
+#ifdef __APPLE__
+    // Runtime-resolved SDK sysroot (v0.4.5): SDKROOT env -> xcrun
+    // probe -> baked build-machine path — the resource-dir treatment
+    // applied to -isysroot. Empty -> no flag; a hopeless TU then
+    // fails LOUDLY (exit-2 policy) instead of "Clean!".
+    const std::string& sdk = macSdkPath();
+    if (!sdk.empty()) args.insert(args.end(), {"-isysroot", sdk});
 #endif
     return args;
 }
@@ -351,12 +356,24 @@ void SourceManager::setAnalyzeBrokenTUs(bool allow) {
 }
 bool SourceManager::analyzeBrokenTUs() { return g_analyzeBrokenTUs; }
 void SourceManager::recordBrokenTU(const std::string& file) {
-    brokenList().push_back(file);
+    // Deduplicated: summary-inference prepasses re-parse TUs, so the
+    // same broken file can be recorded once per sweep — which made
+    // brokenTUCount() overshoot fileCount() and spuriously trip the
+    // all-TUs-broken exit-2 policy on PARTIALLY broken inputs
+    // (order-dependent, caught while testing the v0.4.5 policy).
+    auto& list = brokenList();
+    for (const auto& f : list)
+        if (f == file) return;
+    list.push_back(file);
 }
 const std::vector<std::string>& SourceManager::brokenTUs() {
     return brokenList();
 }
 void SourceManager::clearBrokenTUs() { brokenList().clear(); }
+
+namespace { size_t g_attempted_tus = 0; }
+void SourceManager::setAttemptedTUCount(size_t n) { g_attempted_tus = n; }
+size_t SourceManager::attemptedTUCount() { return g_attempted_tus; }
 
 size_t SourceManager::fileCount() const {
     return source_files_.size();

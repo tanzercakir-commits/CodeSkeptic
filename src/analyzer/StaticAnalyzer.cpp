@@ -23,6 +23,15 @@
 
 namespace codeskeptic {
 
+std::size_t StaticAnalyzer::totalTUs() const {
+    return source_mgr_ ? source_mgr_->fileCount() : 0;
+}
+
+std::size_t StaticAnalyzer::brokenTUCount() const {
+    return SourceManager::brokenTUs().size();
+}
+
+
 StaticAnalyzer::StaticAnalyzer(Config config)
     : config_(std::move(config)) {
     setLang(parseLang(config_.lang()));
@@ -192,6 +201,7 @@ int StaticAnalyzer::run() {
 
     SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
     SourceManager::clearBrokenTUs();
+    SourceManager::setAttemptedTUCount(source_mgr_->fileCount());
 
     source_mgr_->processAll([this](clang::ASTContext& ctx) {
         auto findings = engine_.runAll(ctx);

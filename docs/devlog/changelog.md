@@ -1,5 +1,25 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-23 — v0.4.5: the first external evaluation's P1
+
+An evaluation run OUTSIDE this project's own loop — the maintainer's
+macOS machine, a different AI toolchain, the docs/evaluate.md
+protocol — confirmed the trust-chain surface end to end and caught
+exactly the class of bug the protocol exists for: darwin binaries
+baked the CI runner's versioned Xcode sysroot, so the no-compile-db
+quickstart on a normal Mac silently analyzed NOTHING and printed
+"Clean!" with exit 0. Fixed at both layers the report proposed:
+runtime SDK resolution (SDKROOT verbatim -> cached xcrun probe ->
+baked-if-exists; resolveMacSdkPath mirrors resolveResourceDir, with
+the resolution order unit-tested) and a fail-loud exit policy
+(all-TUs-broken -> exit 2 + ANALYSIS FAILED; partial breakage keeps
+findings semantics — corpus flows depend on that; the Action already
+escalates exit > 1 even in report-only). Fallout fixes the new policy
+itself surfaced: broken-TU records deduplicated across
+summary-inference re-parses, and a second positional path is now a
+loud usage error instead of a silent no-op. macOS release smoke
+gained the SDKROOT=/nonexistent -> exit-2 proof. 695 tests.
+
 ## 2026-07-22 — v0.4.4: the trust-chain round (critique-2)
 
 Reproducibility gaps between LOOKING pinned and BEING pinned, all

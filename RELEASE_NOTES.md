@@ -1,56 +1,45 @@
-# CodeSkeptic v0.4.4 — the trust-chain round
+# CodeSkeptic v0.4.5 — the first external evaluation's P1, fixed
 
-No engine changes. This release closes the reproducibility and
-supply-chain gaps the second external critique identified — the gap
-between LOOKING pinned and BEING pinned.
+An external evaluation on real user hardware (macOS arm64, a separate
+AI toolchain driving the docs/evaluate.md protocol) validated the
+whole surface — source build with LLVM 22, 683/683 tests, 7/8
+deliberate bugs caught with the 8th correctly identified as a
+documented by-design silence, checksums, relocation, compile-db
+parity — and found one P1: the worst failure mode a static analyzer
+can have.
 
-## GitHub Action: pinning the action now pins the analyzer
+## The P1: baked SDK path -> silent "Clean!" with zero coverage
 
-- `uses: tanzercakir-commits/CodeSkeptic@v0.4.4` previously downloaded
-  the LATEST release binary regardless of the pinned ref — the
-  analyzer could drift under a "pinned" workflow. The `version` input
-  now defaults to the action's own ref: pin the action, and that exact
-  release binary is what analyzes your code. Explicit `version:
-  latest` still floats for those who want it.
-- The action now verifies the downloaded tarball against the
-  `sha256sums.txt` published with the release — a mismatch (or a
-  missing checksum file) fails the job.
-- The action self-test gained a pinned lane: after every release it
-  runs the action pinned to the fresh tag and asserts the analyzer
-  that answers is exactly that version.
+Darwin release binaries carried the CI runner's versioned Xcode
+sysroot (`/Applications/Xcode_15.4.app/...`) baked at build time. On
+machines without that exact path — almost all of them — the
+no-compile-db quickstart failed to find `stdlib.h`, skipped the TU,
+and reported **"Clean! No issues found." with exit 0**: a green tick
+with nothing analyzed. Both suggested fix layers are in:
 
-## Self-contained releases: now proven, not just claimed
+- **Runtime SDK resolution** (`resolveMacSdkPath`, mirroring the v0.4
+  resource-dir treatment): `SDKROOT` env (honored verbatim — explicit
+  intent fails loudly, never silently second-guessed) -> one cached
+  `xcrun --show-sdk-path` probe -> the baked path only while it
+  exists. Unit-tested for the full resolution order.
+- **Fail-loud exit policy**: when EVERY attempted translation unit
+  fails to compile (and `--analyze-broken-tus` is not given), the exit
+  code is now **2** with an ANALYSIS FAILED message — never a clean
+  report. Partial breakage keeps the honest per-TU warning and
+  findings-based exit codes. The GitHub Action already propagates
+  exit > 1 as a job failure, in report-only mode too. The macOS
+  release smoke now proves the loud path (`SDKROOT=/nonexistent`
+  must exit 2).
 
-The clean-container release smoke used to install `libzstd1`,
-`zlib1g` and `libtinfo6` before running the packaged binary — which
-would MASK a broken bundle (the critique's sharpest catch). The smoke
-now installs only `libc6-dev` (the demo's libc headers), asserts
-`ldd` reports no missing libraries, and asserts the bundled runtime
-libraries (LLVM, zstd, zlib, tinfo) resolve from the PACKAGE lib
-directory, not the host.
+## Also in this release
 
-## Docs and templates
+- A second positional source path is now a loud usage error (it used
+  to be silently ignored — pass a directory or `--files`).
+- Broken-TU records are deduplicated across summary-inference
+  re-parses (they could overcount and spuriously trip the new exit-2
+  policy).
+- Exit codes documented in docs/usage.md: 0 clean, 1 findings,
+  2 nothing-analyzed/usage failure modes explained.
 
-- README examples pin versions (`@v0.4.4`, `ghcr.io/...:v0.4.4`)
-  with `:latest` noted as the explicit floating choice.
-- `docs/evaluate.md` prerequisites rewritten for the binary/Docker
-  era: Option A (release binary), B (Docker), C (build from source —
-  only C needs LLVM dev libraries), with your project's
-  `compile_commands.json` explained as a separate concern.
-- New issue templates: **false-positive report** (traces welcome —
-  every FP family so far became an engine feature) and **evaluation
-  report** (independent evaluations are the most valuable
-  contribution this project can receive).
-
-## Windows, honestly framed
-
-No native binary yet — and the README now says exactly that while
-giving Windows users two working paths: WSL2 (best for Linux-targeted
-projects; with the `#ifdef _WIN32`-branches-are-invisible caveat
-stated up front, because the analyzer sees the compiler's view) and
-Docker Desktop (fastest trial). The WSL path is exercised by a new CI
-smoke on a windows-latest runner — the support table claims only what
-that job proves. Native MSVC analysis remains a separately planned
-effort (docs/windows-support.md).
-
-Full engine history: docs/devlog/changelog.md.
+695 tests (was 683). No analysis-engine changes — Juliet floors,
+corpus pins and the thesis gate ride along unchanged.

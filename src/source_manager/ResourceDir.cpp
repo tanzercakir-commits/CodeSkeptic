@@ -1,5 +1,8 @@
 #include "source_manager/ResourceDir.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include <cstdlib>
 #include <filesystem>
 
@@ -101,6 +104,55 @@ const std::string& resourceDir() {
         return resolveResourceDir(env ? env : "", exeDir(), baked);
     }();
     return resolved;
+}
+
+std::string resolveMacSdkPath(const std::string& env_sdkroot,
+                              const std::string& xcrun_sdk,
+                              const std::string& baked_sdk) {
+    // 1. SDKROOT: explicit user intent, verbatim — a wrong value must
+    //    fail loudly downstream, not be silently second-guessed.
+    if (!env_sdkroot.empty()) return env_sdkroot;
+    // 2. xcrun probe: the path every Mac with Command Line Tools has.
+    if (!xcrun_sdk.empty() && fs::exists(xcrun_sdk)) return xcrun_sdk;
+    // 3. Baked build-machine path, only while it still exists.
+    if (!baked_sdk.empty() && fs::exists(baked_sdk)) return baked_sdk;
+    return "";
+}
+
+namespace {
+
+// One xcrun probe per process; "" off-macOS or when xcrun is absent.
+std::string probeXcrunSdkPath() {
+#ifdef __APPLE__
+    FILE* p = popen("/usr/bin/xcrun --show-sdk-path 2>/dev/null", "r");
+    if (!p) return "";
+    std::string out;
+    char buf[512];
+    while (fgets(buf, sizeof(buf), p)) out += buf;
+    pclose(p);
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r' ||
+                            out.back() == ' '))
+        out.pop_back();
+    return out;
+#else
+    return "";
+#endif
+}
+
+} // anonymous namespace
+
+const std::string& macSdkPath() {
+    static const std::string cached = [] {
+        const char* env = std::getenv("SDKROOT");
+#ifdef MACOS_SDK_PATH
+        const std::string baked = MACOS_SDK_PATH;
+#else
+        const std::string baked;
+#endif
+        return resolveMacSdkPath(env ? env : "", probeXcrunSdkPath(),
+                                 baked);
+    }();
+    return cached;
 }
 
 } // namespace codeskeptic

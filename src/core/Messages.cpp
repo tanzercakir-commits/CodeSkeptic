@@ -230,6 +230,24 @@ const MsgEntry kMessages[] = {
      "olasi tampon tasmasi: {0} sabit {1} baytlik tampona sinirsiz miktar "
      "kopyaliyor; kaynak uzunlugu kontrol edilmiyor (sinirli kopya kullanin "
      "veya sigdigini dogrulayin)"},
+    // NothingAnalyzed
+    {"[CodeSkeptic] ANALYSIS FAILED: every translation unit failed to "
+     "compile - NOTHING was analyzed, so this is not a clean result "
+     "(exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), "
+     "pass --build-path with your compile_commands.json, or use "
+     "--analyze-broken-tus to force analysis on error-recovery ASTs.",
+     "[CodeSkeptic] ANALIZ BASARISIZ: hicbir ceviri birimi derlenemedi - "
+     "HICBIR SEY analiz edilmedi, bu temiz bir sonuc degildir (exit 2). "
+     "Include yollarini/bayraklari duzeltin (macOS: SDKROOT / xcrun), "
+     "compile_commands.json ile --build-path verin ya da "
+     "--analyze-broken-tus ile zorlayin."},
+    // MultipleSourcePaths
+    {"[CodeSkeptic] multiple source paths given ('{0}' then '{1}') - "
+     "only one positional path is accepted. Pass a DIRECTORY to analyze "
+     "several files, or --files <list-file>.",
+     "[CodeSkeptic] birden fazla kaynak yolu verildi ('{0}' sonra '{1}') - "
+     "tek konumsal yol kabul edilir. Birden fazla dosya icin bir KLASOR "
+     "verin ya da --files <liste-dosyasi> kullanin."},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

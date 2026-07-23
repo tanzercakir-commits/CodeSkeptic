@@ -153,3 +153,14 @@ The MCP `analyze` tool accepts the same file via its optional
 Stale or malformed summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the
 weaker claim, so a wrong strong claim cannot enter through the file.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Analysis ran; no findings. |
+| 1 | Analysis ran; findings were reported (also: usage errors). |
+| 2 | **Nothing was analyzed** — every attempted translation unit failed to compile (missing headers/SDK, wrong flags). Never treat this as clean: fix the include paths (macOS: `SDKROOT` / `xcrun`), pass `--build-path` with your `compile_commands.json`, or force with `--analyze-broken-tus`. |
+
+A partially broken run (some TUs compiled, some skipped) keeps the
+findings-based exit code and prints an honest per-TU coverage warning.
