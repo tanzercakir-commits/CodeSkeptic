@@ -1,6 +1,7 @@
 #include "engine/Interval.h"
 
 #include <algorithm>
+#include <cstdint>
 
 namespace codeskeptic {
 
@@ -8,6 +9,7 @@ namespace {
 
 // Saturating helpers on FINITE int64. Return false on overflow so the
 // caller can collapse to top() (sound).
+#if defined(__GNUC__) || defined(__clang__)
 bool addChecked(int64_t a, int64_t b, int64_t* out) {
     return !__builtin_add_overflow(a, b, out);
 }
@@ -17,6 +19,33 @@ bool subChecked(int64_t a, int64_t b, int64_t* out) {
 bool mulChecked(int64_t a, int64_t b, int64_t* out) {
     return !__builtin_mul_overflow(a, b, out);
 }
+#else
+// MSVC has no __builtin_*_overflow: classic pre-checks against the
+// int64 limits (CERT INT32-C shape). Must stay behavior-identical to
+// the builtin path — IntervalTest pins the edge cases on both.
+bool addChecked(int64_t a, int64_t b, int64_t* out) {
+    if ((b > 0 && a > INT64_MAX - b) || (b < 0 && a < INT64_MIN - b))
+        return false;
+    *out = a + b;
+    return true;
+}
+bool subChecked(int64_t a, int64_t b, int64_t* out) {
+    if ((b < 0 && a > INT64_MAX + b) || (b > 0 && a < INT64_MIN + b))
+        return false;
+    *out = a - b;
+    return true;
+}
+bool mulChecked(int64_t a, int64_t b, int64_t* out) {
+    if (a != 0 && b != 0) {
+        const bool overflows =
+            a > 0 ? (b > 0 ? a > INT64_MAX / b : b < INT64_MIN / a)
+                  : (b > 0 ? a < INT64_MIN / b : b < INT64_MAX / a);
+        if (overflows) return false;
+    }
+    *out = a * b;
+    return true;
+}
+#endif
 
 } // namespace
 

@@ -19,6 +19,11 @@
 #include <optional>
 #include <string>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 namespace json = llvm::json;
 
 namespace {
@@ -268,8 +273,19 @@ std::string handleMcpMessage(const std::string& line) {
 }
 
 int runMcpServer() {
+#ifdef _WIN32
+    // Newline-delimited JSON-RPC framing: Windows text-mode stdio
+    // would expand "\n" to "\r\n" on write and leave stray '\r's in
+    // reads. Binary mode keeps the frames byte-exact
+    // (docs/windows-support.md §5).
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
     std::string line;
     while (std::getline(std::cin, line)) {
+        // Tolerate CRLF-framing clients on every platform: getline
+        // splits at '\n', so a client's "\r\n" leaves a trailing '\r'.
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
         std::string response = handleMcpMessage(line);
         if (!response.empty()) {
