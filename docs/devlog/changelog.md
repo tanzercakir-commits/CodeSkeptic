@@ -1,6 +1,30 @@
 # CodeSkeptic — Changelog
 
-## 2026-07-22 — v0.4.4: the trust-chain round (critique-2)
+## 2026-07-23 — Native Windows Tier 1: MSVC build + windows-latest ratchet
+
+The bounded port that windows-support.md scoped, landed exactly along
+its tiers (phase7-windows-native). The engine now compiles, links and
+runs its full 682-test unit suite green on `windows-latest` with MSVC
+against the official LLVM 20.1.8 windows-msvc dev tarball — guarded
+from here on by a dedicated lane (windows.yml: cached LLVM, vcvars64
+env exported so the analyzed snippets resolve MSVC system headers via
+`INCLUDE`, single-process rerun, native-binary smoke, no third-party
+actions, status mirrored to refs/status). What the port actually took,
+each verified before landing: a portable checked-int64 layer replacing
+`__builtin_*_overflow` AND the `__int128` corner arithmetic (exported
+as `checkedAdd64/Sub64/Mul64`, proven behavior-identical to the
+builtins over the edge matrix + 40M random pairs); MSVC toolchain
+guards (`/GR-`, `/bigobj`, rpath gated off Windows, gtest CRT match);
+MCP stdio binary mode with CRLF-tolerant framing; a Win32 exe-dir
+branch for the relocatable resource dir; and an LLP64 honesty pass on
+the test fixtures (`__SIZE_TYPE__` size params so rules ENGAGE on
+Windows instead of passing vacuously, `long long` for 64-bit intent,
+forward-slash paths in hand-built JSON). One infrastructure papercut
+patched in CI: the official tarball's cmake exports hard-code the
+builder's DIA SDK path. Remaining, deliberately out of scope:
+automatic Windows SDK discovery (Tier 2) and a prebuilt Windows
+binary. README reflects the honest claim: build from source, compile
+DB or Developer Prompt — CI-proven; nothing more.
 
 Reproducibility gaps between LOOKING pinned and BEING pinned, all
 verified against the repo before fixing: the Action's `version`
