@@ -60,8 +60,10 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        DEST="$RUNNER_TEMP/codeskeptic-dist"
-        mkdir -p "$DEST"
+        # Unique per invocation: a workflow may run this action twice
+        # (the self-test's latest + pinned lanes) and gh release
+        # download refuses to overwrite existing files.
+        DEST=$(mktemp -d "$RUNNER_TEMP/codeskeptic-dist-XXXXXX")
         REPO="tanzercakir-commits/CodeSkeptic"
         PATTERN="codeskeptic-*-linux-x86_64.tar.gz"
         # Version resolution (reproducibility): explicit input wins;

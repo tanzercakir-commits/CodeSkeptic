@@ -17,7 +17,7 @@ on:
     types: [completed]
   push:
     branches: ["phase*"]
-    paths: [".github/workflows/action-selftest.yml"]
+    paths: [".github/workflows/action-selftest.yml", "action.yml"]
 
 permissions:
   contents: write
@@ -53,8 +53,11 @@ jobs:
       # the fresh tag is workflow_run.head_branch — run the action
       # PINNED to it and assert the analyzer that answers is exactly
       # that version (download + checksum + resolution end to end).
-      - name: Run the action pinned to the fresh release tag
-        if: github.event_name == 'workflow_run'
+      # Second invocation runs on BOTH lanes: on workflow_run it pins
+      # to the fresh tag; on push it re-runs latest — either way it
+      # exercises the two-invocations-in-one-workflow path (the shared
+      # download dir collision that broke the v0.4.4 pinned lane).
+      - name: Run the action a second time (pinned on releases)
         id: pinned
         uses: ./
         with:
@@ -62,14 +65,15 @@ jobs:
           sarif: pinned.sarif
           upload-sarif: "false"
           gate: report-only
-          version: ${{ github.event.workflow_run.head_branch }}
+          version: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || 'latest' }}
 
-      - name: Verify the pinned analyzer version matches the tag
-        if: github.event_name == 'workflow_run'
+      - name: Verify the second invocation (version identity on releases)
         run: |
-          TAG="${{ github.event.workflow_run.head_branch }}"
           test "${{ steps.pinned.outputs.exit-code }}" = "1"
-          codeskeptic --version | grep -F "${TAG#v}"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            TAG="${{ github.event.workflow_run.head_branch }}"
+            codeskeptic --version | grep -F "${TAG#v}"
+          fi
 
       - name: Mirror job status to refs/status/*
         if: always()
