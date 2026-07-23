@@ -10,11 +10,13 @@
 > devredildi ve guard dosyalarında belgeli). v0.4.1 bu turun kapanış
 > sürümüdür.
 >
-> **Faz 5 (plan-dışı, 2026-07-22): gerçek-dünya FP turu.** v0.4.2
-> sonrası realworld.yml taramaları 4 FP ailesi çıkardı; dördü de kökten
-> kapatıldı (entailment-farkındalı korelasyon madencisi, üye fact
-> anahtarları, scanf genişlik modeli, bounds strlen-guard tanıklığı) —
-> 678 test, ayrıntı devlog/changelog.md 2026-07-22.
+> **Faz 5 (plan-dışı, 2026-07-22): gerçek-dünya FP turu ✔ — v0.4.3.**
+> realworld.yml taramaları 37 FP çıkardı; ALTI kök neden kapatıldı
+> (madenci entailment'ı, üye fact anahtarları, ima payload'ları,
+> getaddrinfo kontratları, madenci slot disiplini, scanf genişlik +
+> bounds strlen tanıklığı). CI-doğrulamalı sonuç: libgit2 61→34
+> (kararlı çekirdek birebir), rtp2httpd 12→0. 683 test; ayrıntı
+> devlog/changelog.md 2026-07-22. v0.4.3 bu turun kapanış sürümüdür.
 
 Tarih: 2026-07-22 · Girdi: dış AI değerlendirmesi (`CodeSkeptic_plan.txt`) · Repo durumu: `main @ 4c62bde`, 158 commit, v0.3.0
 

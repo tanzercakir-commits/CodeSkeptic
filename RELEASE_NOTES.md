@@ -1,65 +1,66 @@
-# CodeSkeptic v0.4.2 — the mission-axis gate
+# CodeSkeptic v0.4.3 — the real-world FP round
 
-v0.4.1 closed addressable Juliet recall slices one root cause at a
-time. v0.4.2 finishes that round across call boundaries — and, the
-reason this project exists, it puts the **thesis axis** under CI
-guard: a frozen, blind-generated AI first-draft corpus that every PR
-must now pass with zero false positives.
+v0.4.2 put the thesis axis under CI guard and shipped an on-demand
+real-world scan lane. This release is what that lane was FOR: the
+first scans reproduced the analyzer's stable core exactly — and
+surfaced 37 false positives on libgit2 and rtp2httpd. Every one was
+adjudicated against upstream source, reduced to a reproducer, and
+fixed at a root cause. Six roots, four engine rounds, zero
+suppression lists.
 
-## The thesis gate (new — gates every PR)
+## The numbers (CI-verified on pinned versions)
 
-- 24 small C programs written by generator subagents **blind to
-  CodeSkeptic's rules** — first-draft everyday/systems C,
-  self-annotated, frozen verbatim in `tests/thesis_corpus/`.
-  Regenerating them would break the blindness that makes the number
-  meaningful, so they never change.
-- An **adjudicated manifest** is the scored truth, not the raw
-  annotations — a first-draft author's self-labels are noisy. One file
-  the generator called clean actually dereferences two unchecked
-  mallocs; CodeSkeptic flags it and is correct. Every such call is
-  documented in the manifest.
-- Current state, now pinned in CI: **0 false positives across the 9
-  genuinely-clean programs; 9/9 in-scope memory-safety/overflow bugs
-  caught.** Out-of-scope misses (float division, pure logic errors)
-  are pinned at 0 as documented misses — if a future rule catches one,
-  its pin moves up, Juliet-floor style. `scripts/run_thesis.sh`, wired
-  as a `ci.yml` step; `docs/benchmarks.md` now tracks all three gated
-  axes.
+- **libgit2 v1.9.0** (201 files): 61 → **34** — exactly the
+  documented stable core (23 triaged null-derefs + the 11 confirmed
+  OOM-path leaks reported upstream). The 27-finding hashmap-macro
+  family is gone.
+- **rtp2httpd** (39 files): 12 → **0**.
+- Unchanged and green throughout: all Juliet per-CWE floors, the
+  real-world corpus pins (cJSON 53 / tinyxml2 9 / abseil 4 /
+  Catch2 0), the frozen thesis-corpus gate (0 FP, 9/9 in-scope), and
+  the self-scan. 683 unit tests (was 661) — every fix pinned in both
+  directions.
 
-## Engine
+## Engine — six root causes
 
-- **div-by-zero goes interprocedural** (recall 0.098 → 0.108 @
-  precision 1.000): zeroness now crosses call boundaries for
-  fully-visible internal callees (internal linkage, address never
-  taken — the ParamIntervals discipline). A parameter is seeded
-  zero-able only when some call site *provably* passes a zero-able
-  value; Unknown never seeds, so externally-callable and escaping
-  functions behave exactly as before. CWE-369 recall floor ratcheted
-  0.085 → 0.095.
-- **Call-flag and flag-copy folding** (leak FP family, round 2):
-  immutable-flag constant propagation now also folds branch conditions
-  that are *calls* to functions with a stable never-zero return
-  summary, and local copies of immutable flags join the closure
-  (`int c = staticFalse; if (c) …` is provably dead). Mutated flags,
-  address-taken flags, and maybe-zero callees are never folded — both
-  directions pinned by unit tests.
-
-## Infrastructure
-
-- **Real-world scan lane** (`.github/workflows/realworld.yml`):
-  pushing a `realworld-scan` branch builds the analyzer and runs full
-  scans of libgit2 v1.9.0 (project allocators via profile flags),
-  rtp2httpd, and a deep abseil pass, publishing per-project
-  `REALWORLD_RESULT` counts and complete logs to a git-readable ref —
-  release-scale validation on demand.
-- **Draft-release janitor** (`housekeeping.yml`): orphaned draft
-  releases left behind by retried release runs are pruned
-  automatically after every successful Release.
+- **Correlation-miner entailment**: the disjunct-collapse miner
+  matched facts by exact key, blind to stamped equalities on other
+  literals (`(j EQ 1)=true` neither excluded the `j == 0` disjunct
+  nor witnessed the consumable implication). Compatibility, witness
+  and activation now run through stamp entailment — the khash
+  `j`-flag/pointer correlation survives the collapse.
+- **Member fact keys**: `if (c.has_x) produce; ... if (c.has_x)
+  consume;` on a local struct's field had no correlation support at
+  all. Dot-members join the fact domain (conditions, literal-store
+  stamps, erasure at `&c`-receiving calls), with a documented
+  deliberate limit mirroring the keyed-globals trade.
+- **Implication payloads**: mined guard implications can now promise
+  "guarded absence of null-info" (Unknown), not just NonNull — the
+  out-param-factory-under-a-guard shape survives disjunct-cap
+  collapses.
+- **Out-param success contracts**: `rc = getaddrinfo(..., &res)`
+  with `rc == 0` guarantees a non-null result (POSIX); the call
+  splits success/failure disjuncts so the caller's own error check
+  proves the happy path — and an UNCHECKED rc keeps the failure
+  side reportable. Curated: getaddrinfo, posix_memalign.
+- **Miner slot discipline**: implications never key on the pointer's
+  own nullness (a tautology that burned the slot), and the
+  anti-vacuity witness runs strict-then-loose, accepting a
+  complement-deciding disjunct for compound contracts
+  (`if (!p && len > 0) return;`) only when the strict pass mines
+  nothing — so nothing previously mined can be shadowed.
+- **scanf field widths + strlen-guard witness**: `%2d` now seeds
+  [-9, 99] instead of a full int range that manufactured overflow
+  "witnesses" (conversion/argument pairing handles `%*d`), and the
+  CWE-120 unbounded-copy heuristic finally checks the claim in its
+  own message — a dominating `strlen(src)` guard suppresses it,
+  while dst-only, after-the-fact and other-variable measurements
+  still fire.
 
 ## Everything else
 
-The onboarding surface is unchanged and re-validated by this release's
-clean-container smokes: binaries for Linux x86_64 and macOS arm64 (no
-LLVM install needed), the Docker image on ghcr.io, the
-report-only-by-default GitHub Action, idiom profiles, and the layered
-docs. 661 unit tests. Full plan and status: `docs/PLAN-v0.4.md`.
+The onboarding surface is unchanged and re-validated by this
+release's clean-container smokes: binaries for Linux x86_64 and
+macOS arm64, the Docker image on ghcr.io, the report-only GitHub
+Action, idiom profiles, and the layered docs. Full history:
+`docs/devlog/changelog.md` (2026-07-22).
