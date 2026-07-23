@@ -1947,3 +1947,58 @@ TEST(NullDerefRuleTest, GetaddrinfoUncheckedResult_Reported) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+TEST(NullDerefRuleTest, CompoundContractLoopDeref_Clean) {
+    // The chunked-decoder shape: `if (!p && len > 0) return;` is a
+    // compound contract — p may be null ONLY when len is 0 — and the
+    // loop `while (offset < len)` re-establishes len != 0 on every
+    // body edge. The correlation must survive the in-loop disjunct
+    // collapses (two compound conditions in the body force them):
+    // the miner may not burn the implication slot on p's own
+    // nullness key (self-key skip), and the p-null disjunct's
+    // complement recording (len EQ 0)=true is a valid partition
+    // witness (loose pass, after the strict pass finds nothing).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        typedef unsigned char uint8_t;
+        struct dec { int state; unsigned long size; };
+        extern int emitcb(void *opaque, const uint8_t *buf, size_t n);
+        extern int helper(struct dec *d);
+        int feed(struct dec *decoder, const uint8_t *input,
+                 size_t input_len, void *opaque, size_t *consumed) {
+            size_t offset = 0;
+            if (consumed)
+                *consumed = 0;
+            if (!decoder || (!input && input_len > 0))
+                return -1;
+            if (decoder->state == 7)
+                return -1;
+            while (offset < input_len) {
+                uint8_t ch = input[offset];
+                switch (decoder->state) {
+                case 0:
+                    if (ch == '\n' || (ch < 0x20 && ch != '\t') || ch == 0x7f)
+                        return -2;
+                    offset++;
+                    break;
+                case 3: {
+                    size_t avail = input_len - offset;
+                    if (avail > 0 && (!opaque ||
+                                      emitcb(opaque, input + offset, avail) < 0))
+                        return -2;
+                    offset += avail;
+                    break;
+                }
+                default:
+                    if (helper(decoder) < 0)
+                        return -2;
+                    offset++;
+                    break;
+                }
+            }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

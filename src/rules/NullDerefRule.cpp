@@ -529,7 +529,16 @@ void mineGuardImplications(
 
     for (auto& [var, val] : widened.vars) {
         if (val.st != NullState::MaybeNull || val.fact) continue;
+        for (int pass = 0; pass < 2 && !val.fact; ++pass) {
+        const bool loosePass = pass == 1;
         for (const auto& key : candidates) {
+            // A key on the pointer's OWN nullness ((p EQ 0) for p) is
+            // a tautology — it could only activate at a p-null-check
+            // edge, where plain refinement already sharpens p. Mining
+            // it burns the single implication slot and shadows the
+            // useful cross-variable candidate (the chunked-decoder
+            // length contract, 2026-07-22).
+            if (key.var == var) continue;
             for (bool wanted : {true, false}) {
                 // The witness keeps the implication non-vacuous (#84):
                 // either a disjunct that RECORDED key=wanted, or one
@@ -547,6 +556,7 @@ void mineGuardImplications(
                 bool sawWitness = false;
                 bool allNoNullInfo = true;
                 NullState payload = NullState::NonNull;
+                bool anyComplement = false;
                 for (const auto& d : pre) {
                     // Entailment-aware compatibility and witness (the
                     // libgit2 hashmap __resize family, 2026-07-22).
@@ -564,11 +574,23 @@ void mineGuardImplications(
                     // with F=v (excluded, vacuous truth), one
                     // contradicting key=!wanted entails F=v (witness;
                     // covers the old exact-recording case too).
-                    const bool compatible =
-                        !codeskeptic::factsContradict(d.facts, key, wanted);
+                    // A disjunct DECIDING the key — either
+                    // polarity — proves a real partition exists on it
+                    // (#84's anti-vacuity purpose). The complement-
+                    // recording case is the chunked-decoder contract
+                    // shape: `if (!p && len > 0) return;` puts
+                    // (len EQ 0)=TRUE only on the p-null disjunct; no
+                    // live path records =false, yet "len != 0 ⟹ p
+                    // non-null" is exactly the truth the loop edge
+                    // (`offset < len`, unsigned) later activates.
+                    // Soundness never rested on the witness — the
+                    // compatible-set check carries it.
+                    const bool decidesAgainst =
+                        codeskeptic::factsContradict(d.facts, key, wanted);
+                    if (decidesAgainst) anyComplement = true;
                     if (codeskeptic::factsContradict(d.facts, key, !wanted))
                         sawWitness = true;
-                    if (!compatible) continue;
+                    if (decidesAgainst) continue;
                     auto it = d.vars.find(var);
                     const bool viaImpl =
                         it != d.vars.end() && it->second.fact &&
@@ -601,7 +623,20 @@ void mineGuardImplications(
                         break;
                     }
                 }
-                if (sawWitness && allNoNullInfo) {
+                // Two-pass witness (2026-07-22): pass 1 demands
+                // the ORIGINAL witness (a positive recording or a
+                // carried implication) — everything mined before the
+                // complement loosening is mined identically, in the
+                // same candidate order, so no weaker candidate can
+                // shadow it (the hashmap regression the one-pass
+                // loosening caused). Pass 2 runs only when pass 1
+                // found nothing and additionally accepts a
+                // complement-deciding disjunct as the partition
+                // witness — the chunked-decoder length-contract
+                // shape, where (len EQ 0)=true exists only on the
+                // p-null disjunct and no live path records =false.
+                if (allNoNullInfo &&
+                    (sawWitness || (loosePass && anyComplement))) {
                     val.fact = key;
                     val.factVal = wanted;
                     val.condSt = payload;
@@ -609,6 +644,7 @@ void mineGuardImplications(
                 }
             }
             if (val.fact) break;
+        }
         }
     }
 }
