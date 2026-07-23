@@ -1,0 +1,8 @@
+libgit2-1.9.0/src/util/hashmap_str.h
+libgit2-1.9.0/src/util/hash.h
+libgit2-1.9.0/src/util/hashmap.h
+libgit2-1.9.0/src/util/hash.c
+libgit2-1.9.0/src/util/hash
+libgit2-1.9.0/src/cli/cmd_hash_object.c
+libgit2-1.9.0/src/libgit2/hashsig.c
+libgit2-1.9.0/src/libgit2/hashmap_oid.h
