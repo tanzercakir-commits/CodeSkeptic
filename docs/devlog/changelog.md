@@ -1,5 +1,61 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-22 — The real-world FP round: four families from the v0.4.2 scans
+
+The post-release real-world scans (libgit2 v1.9.0 at 201 files,
+rtp2httpd at current HEAD, via the new `realworld.yml` lane) reproduced
+the stable core EXACTLY — the 23 triaged nulls, the 11 confirmed
+OOM-path leaks, every deep-corpus pin — and surfaced four new
+false-positive families. Each was adjudicated against upstream source,
+reduced to a local reproducer, and fixed at its root, with
+both-direction pinned tests (678 total, was 661):
+
+- **Entailment-blind correlation miner** (27 findings, ALL of libgit2's
+  hashmap `__resize` macro expansions — the khash `j`-flag shape). The
+  disjunct-collapse miner tested compatibility and witness by EXACT
+  fact key, so a stamped `(j EQ 1)=true` neither excluded the
+  `(j EQ 0)=true` disjunct from the wrong candidate nor witnessed the
+  right one — the consumable "j != 0 ⟹ new_flags NonNull" implication
+  was never mined. Both tests now go through `factsContradict`'s
+  stamp entailment (and implication ACTIVATION got the same upgrade).
+  The diagnosis burned three wrong hypotheses (widening memory, nested
+  loops, condition misattribution) before segment-minimization pinned
+  the trigger to the disjunct-cap collapse.
+- **Member fact keys** (rtp2httpd `msrc_res`/`fcc_res`, plus the
+  clean-room `if (c.has_x) produce; ... if (c.has_x) consume;` shape,
+  which had NO correlation support at all — even `c.f = 1` directly
+  above the guards false-positived). Dot-members of admitted local
+  structs now join the fact domain: keyed in conditions, stamped and
+  erased flow-sensitively at field stores, ERASED WHOLESALE at any
+  call receiving the base's address, banned entirely when `&c` is
+  stored outside a call argument. Deliberate limit, mirroring the
+  keyed-globals one: a callee stashing the pointer for a LATER call to
+  mutate through is ignored (FN direction, documented in PathFacts.h).
+  Opt-in per analysis run (`MemberFactScope`) — only null-deref keys
+  members today; every other rule is byte-for-byte unchanged.
+- **scanf field-width blindness** (rtp2httpd timezone.c ×3): the
+  untrusted-source model seeded `%2d` output at the full int range,
+  and those pseudo-finite endpoints doubled as overflow "witnesses"
+  downstream (`tz_hours * 3600` "can exceed int" — with at most two
+  digits parsed). Conversions are now PAIRED with their arguments
+  (`%*d` suppression included — a blind sweep would seed the wrong
+  variable) and an explicit width bounds the seed: `%2d` → [-9, 99],
+  `%x`/`%o` by radix, `%n` non-negative. Widthless `%d` keeps the
+  full-range untrusted model — `sscanf("%d") * 100` still reports.
+- **strlen-guard-blind bounds heuristic** (rtp2httpd ×6 — every one a
+  correctly guarded copy). The CWE-120 message says "the source length
+  is not checked"; the rule now actually looks: a `strlen(src)` (same
+  source expression) in a dominating guard — the copy inside the
+  guarded branch, or below a measure-and-exit if — suppresses the
+  heuristic. Destination-only measurement, checks AFTER the copy,
+  measured-then-ignored guards, and other-variable measurements all
+  still fire (each shape pinned).
+
+Scores: all 678 unit tests, the thesis gate (0 FP, 9/15, floors held)
+and the self-scan pass locally; Juliet floors and corpus pins ride CI
+as always. The real-world rerun gate: libgit2 61 → the 34 stable
+findings, rtp2httpd 12 → ≤1.
+
 ## 2026-07-20 — Config: untrusted length sources (`--untrusted-int-sources`)
 
 Protocol/parser code reads a length or count field off the wire (a USB

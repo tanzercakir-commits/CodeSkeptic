@@ -442,11 +442,26 @@ void mineGuardImplications(
                 bool sawWitness = false;
                 bool allNonNull = true;
                 for (const auto& d : pre) {
-                    auto f = d.facts.find(key);
-                    const bool exact =
-                        f != d.facts.end() && f->second == wanted;
-                    const bool compatible = exact || f == d.facts.end();
-                    if (exact) sawWitness = true;
+                    // Entailment-aware compatibility and witness (the
+                    // libgit2 hashmap __resize family, 2026-07-22).
+                    // Exact-key tests were blind to STAMPED equalities
+                    // on other literals: with D1{(j EQ 0)=true, Null}
+                    // and D2{(j EQ 1)=true, NonNull}, the consumable
+                    // candidate ((j EQ 0), false) failed both ways —
+                    // D1 never recorded that exact key (so it wrongly
+                    // stayed "compatible" for the (j EQ 1) candidate),
+                    // and D2's stamp, which ENTAILS (j EQ 0)=false,
+                    // did not count as a witness. factsContradict
+                    // already decides every EQ/LT/LE key from an
+                    // EQ=true stamp — use it for both directions:
+                    // a disjunct contradicting key=wanted has no path
+                    // with F=v (excluded, vacuous truth), one
+                    // contradicting key=!wanted entails F=v (witness;
+                    // covers the old exact-recording case too).
+                    const bool compatible =
+                        !codeskeptic::factsContradict(d.facts, key, wanted);
+                    if (codeskeptic::factsContradict(d.facts, key, !wanted))
+                        sawWitness = true;
                     if (!compatible) continue;
                     auto it = d.vars.find(var);
                     const bool viaImpl =
@@ -665,6 +680,29 @@ public:
                     if (val.fact && val.fact->var == target)
                         val.fact.reset();
         }
+        // Member-keyed implications mirror the member fact lifecycle
+        // (2026-07-22): a store to c.f stales implications keyed on
+        // exactly (c, f); a call receiving &c stales every (c, *) one.
+        if (auto ma = codeskeptic::assignedMemberFact(stmt)) {
+            for (auto& d : in)
+                for (auto& [var, val] : d.vars)
+                    if (val.fact && val.fact->var == ma->base &&
+                        val.fact->field == ma->field)
+                        val.fact.reset();
+        }
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            if (const auto* bases = codeskeptic::activeMemberFactBases()) {
+                for (const Expr* arg : call->arguments()) {
+                    const VarDecl* base = codeskeptic::addrOfBaseVar(arg);
+                    if (!base || !bases->count(base)) continue;
+                    for (auto& d : in)
+                        for (auto& [var, val] : d.vars)
+                            if (val.fact && val.fact->var == base &&
+                                val.fact->field)
+                                val.fact.reset();
+                }
+            }
+        }
 
         // A tracked pointer passed by non-const reference is an
         // out-param: the callee may rebind it, so its fact drops to
@@ -746,8 +784,15 @@ public:
                     if (!val.fact || val.st == NullState::NonNull ||
                         val.st == NullState::Null)
                         continue;
-                    auto f = d.facts.find(*val.fact);
-                    if (f != d.facts.end() && f->second == val.factVal)
+                    // Entailment-aware activation (same principle as
+                    // the miner, 2026-07-22): the disjunct's facts
+                    // ENTAIL key=factVal when they contradict its
+                    // negation — covers both the exact recording the
+                    // old find() saw and a stamped equality on the
+                    // guard ((j EQ 1)=true activating the mined
+                    // (j EQ 0)=false implication).
+                    if (codeskeptic::factsContradict(d.facts, *val.fact,
+                                                     !val.factVal))
                         val.st = NullState::NonNull;
                 }
             });
@@ -1194,6 +1239,15 @@ public:
         codeskeptic::IntervalMap soleDefs =
             codeskeptic::soleDefIntervals(func, *result.Context);
         SoleDefScope soleDefScope(&soleDefs, result.Context);
+
+        // Member fact keying (2026-07-22): dot-members of admitted
+        // local structs join the fact domain for this run — the
+        // `if (c.has_x) produce; ... if (c.has_x) consume;` correlation
+        // (rtp2httpd service.c msrc_res/fcc_res family). Scoped RAII:
+        // no other rule sees member keys.
+        std::set<const VarDecl*> memberBases =
+            codeskeptic::collectMemberFactBases(func, *result.Context);
+        codeskeptic::MemberFactScope memberScope(&memberBases);
 
         NullDerefAnalysis analysis(
             trackedVars, codeskeptic::collectUnkeyableDecls(func),

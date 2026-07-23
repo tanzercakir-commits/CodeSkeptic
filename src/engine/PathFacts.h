@@ -45,17 +45,28 @@ namespace codeskeptic {
 
 // Canonical condition key: "var REL literal". REL is only EQ/LT/LE —
 // NE/GT/GE reduce to these by flipping the value (X!=5 ≡ !(X==5)).
+//
+// MEMBER keys (2026-07-22, the rtp2httpd msrc_res / libgit2-battery
+// family): `field` non-null keys a single dot-member of a local
+// struct — "base.field REL literal" (`components.has_source`). The
+// guard idiom `if (c.has_flag) produce; ... if (c.has_flag) consume;`
+// is the struct-field twin of the flag correlation this layer exists
+// for. Member keying is OPT-IN per analysis run via
+// MemberFactScope — with no scope active, conditionFact never
+// produces member keys and every other client is unchanged.
 struct FactKey {
     const clang::ValueDecl* var = nullptr;
     clang::BinaryOperatorKind rel = clang::BO_EQ;  // BO_EQ | BO_LT | BO_LE
     int64_t literal = 0;
+    const clang::ValueDecl* field = nullptr;  // dot-member of var, or null
 
     bool operator==(const FactKey& o) const {
-        return var == o.var && rel == o.rel && literal == o.literal;
+        return var == o.var && rel == o.rel && literal == o.literal &&
+               field == o.field;
     }
     bool operator<(const FactKey& o) const {
-        return std::tie(var, rel, literal) <
-               std::tie(o.var, o.rel, o.literal);
+        return std::tie(var, rel, literal, field) <
+               std::tie(o.var, o.rel, o.literal, o.field);
     }
 };
 
@@ -148,6 +159,62 @@ std::optional<std::pair<FactKey, bool>> compareFact(
 // (have EQ 0)=false). Unknown -> no contradiction.
 bool factsContradict(const std::map<FactKey, bool>& facts,
                      const FactKey& key, bool wanted);
+
+// --- Member fact keying (opt-in scope) ---
+//
+// DELIBERATE LIMIT, mirroring the global-variable one above: that a
+// call may mutate an ESCAPED local struct through a retained alias is
+// ignored. The bases admitted by collectMemberFactBases only escape as
+// direct call arguments, and member facts are ERASED at every call
+// that receives the base's address (the callee legitimately writes
+// fields — that is what a parse(&c) is for); a callee STASHING the
+// pointer for a later call to mutate through would hide a defect (FN
+// direction), the same accepted trade as the keyed-globals limit.
+
+// Local record (struct/union) variables admissible as member-fact
+// bases: non-static, non-volatile locals whose address is taken ONLY
+// as a direct call argument (any innermost `&c` / `&c.f` use outside
+// a call argument position — stored, returned, arithmetic — bans the
+// base; so does `volatile`).
+std::set<const clang::VarDecl*> collectMemberFactBases(
+    const clang::FunctionDecl* func, clang::ASTContext& ctx);
+
+// RAII opt-in for member keys: while a scope object is alive,
+// conditionFact keys dot-members of the given bases and the
+// applyStmtFacts lifecycle stamps/erases them. Analyses that never
+// set a scope see identical behavior to before.
+class MemberFactScope {
+public:
+    explicit MemberFactScope(const std::set<const clang::VarDecl*>* bases);
+    ~MemberFactScope();
+    MemberFactScope(const MemberFactScope&) = delete;
+    MemberFactScope& operator=(const MemberFactScope&) = delete;
+};
+
+// The active scope's base set (nullptr when no scope is active).
+const std::set<const clang::VarDecl*>* activeMemberFactBases();
+
+// `base.field` (dot access, base a scope-admitted local, field an
+// integer-typed FieldDecl) -> {base, field}. nullopt otherwise or
+// when no scope is active.
+std::optional<std::pair<const clang::VarDecl*, const clang::ValueDecl*>>
+memberFactRef(const clang::Expr* expr);
+
+// Member-assignment lifecycle: `c.f = X` / `c.f op= X` / `c.f++` ->
+// {base, field, literal-if-plain-int-constant-store}. Drives the
+// erase-and-restamp in applyStmtFacts. nullopt when the statement is
+// not a store to a scope-admitted dot-member.
+struct MemberAssign {
+    const clang::VarDecl* base = nullptr;
+    const clang::ValueDecl* field = nullptr;
+    std::optional<int64_t> literal;  // set only for `c.f = <int const>`
+};
+std::optional<MemberAssign> assignedMemberFact(const clang::Stmt* stmt);
+
+// Innermost base VarDecl of an address-of argument (`&c`, `&c.f`,
+// `&c.arr[i]`) — the erase trigger for call statements. nullptr when
+// the expression is not an address-of rooted in a variable.
+const clang::VarDecl* addrOfBaseVar(const clang::Expr* expr);
 
 } // namespace codeskeptic
 
