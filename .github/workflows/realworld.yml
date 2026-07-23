@@ -134,8 +134,8 @@ jobs:
             | tar xz
           git clone --quiet --depth 1 https://github.com/stackia/rtp2httpd
           mkdir -p inspect
-          { cd rtp2httpd && echo "HEAD $(git rev-parse HEAD)" && \
-            git log -1 --format='date %cI'; } > inspect/rtp2httpd-head.txt
+          { echo "HEAD $(git -C rtp2httpd rev-parse HEAD)"; \
+            git -C rtp2httpd log -1 --format='date %cI'; } > inspect/rtp2httpd-head.txt
           # Discover the hashmap implementation files (name drifted).
           find libgit2-1.9.0/src -name '*hash*' > inspect/lg2-hash-files.txt
           for f in $(cat inspect/lg2-hash-files.txt); do
