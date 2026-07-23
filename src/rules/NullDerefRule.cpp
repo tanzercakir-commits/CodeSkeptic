@@ -375,6 +375,87 @@ Effect classifyStmt(const Stmt* stmt) {
     return {};
 }
 
+// --- Out-param success contracts (2026-07-22, the FINAL msrc_res root) ---
+//
+// POSIX factories with the shape `int rc = f(..., &p)`: rc == success
+// GUARANTEES p was written non-null. Without the contract, p stays
+// Unknown after the call — and Unknown INCLUDES null, so the caller's
+// own defensive `if (p && p->next)` ambiguity check refines the
+// short-circuit edge to a legitimate-looking Null that a later
+// correlated deref inherits (rtp2httpd service.c: getaddrinfo under
+// `if (c.has_source)`, ambiguity warning mid-function, memcpy at the
+// second `if (c.has_source)` — two engine rounds of correlation
+// machinery could not remove what is, to a contract-blind analysis, a
+// REAL null possibility). The curated table is the same intrinsic-
+// signal discipline as isIntrinsicNullSource: only callees whose
+// documented contract makes the guarantee are listed.
+//
+// Modeling: at `rc = f(..., &p)` every disjunct SPLITS —
+//   success: fact (rc EQ successValue)=true,  p = NonNull
+//   failure: fact (rc EQ successValue)=false, p keeps its prior state
+// The caller's own `if (rc != 0) return/goto` then drops the failure
+// disjunct on the surviving edge (plain fact contradiction), leaving
+// the proven-NonNull result — and an UNCHECKED rc leaves the failure
+// disjunct (with the untouched pre-call state) alive at any use,
+// which is exactly the real bug the contract also catches.
+struct OutParamContract {
+    unsigned argIdx;        // which argument is the &result out-param
+    int64_t successValue;   // return value that guarantees the write
+};
+
+std::optional<OutParamContract> outParamSuccessContract(
+        const CallExpr* call) {
+    const FunctionDecl* fd = call->getDirectCallee();
+    if (!fd || !fd->getIdentifier()) return std::nullopt;
+    const llvm::StringRef n = fd->getName();
+    if (n == "getaddrinfo" && call->getNumArgs() == 4)
+        return OutParamContract{3, 0};
+    if (n == "posix_memalign" && call->getNumArgs() == 3)
+        return OutParamContract{0, 0};
+    return std::nullopt;
+}
+
+// `rc = f(...)` / `int rc = f(...);` — the assigned int var and the
+// call, when the statement has that shape.
+std::pair<const VarDecl*, const CallExpr*> intAssignFromCall(
+        const Stmt* stmt) {
+    const Expr* value = nullptr;
+    const VarDecl* target = nullptr;
+    if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
+        if (bin->getOpcode() == BO_Assign) {
+            if (const auto* ref = dyn_cast<DeclRefExpr>(
+                    bin->getLHS()->IgnoreParenImpCasts()))
+                target = dyn_cast<VarDecl>(ref->getDecl());
+            value = bin->getRHS();
+        }
+    } else if (const auto* ds = dyn_cast<DeclStmt>(stmt)) {
+        if (ds->isSingleDecl())
+            if (const auto* vd = dyn_cast<VarDecl>(ds->getSingleDecl()))
+                if (vd->hasInit()) {
+                    target = vd;
+                    value = vd->getInit();
+                }
+    }
+    if (!target || !value || !target->getType()->isIntegerType())
+        return {nullptr, nullptr};
+    const auto* call =
+        dyn_cast<CallExpr>(value->IgnoreParenImpCasts());
+    return {target, call};
+}
+
+// The tracked pointer variable behind an `&p` argument.
+const VarDecl* addrOfPtrVar(const Expr* e) {
+    if (!e) return nullptr;
+    e = e->IgnoreParenImpCasts();
+    const auto* un = dyn_cast<UnaryOperator>(e);
+    if (!un || un->getOpcode() != UO_AddrOf) return nullptr;
+    const Expr* sub = un->getSubExpr()->IgnoreParenImpCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(sub))
+        if (const auto* vd = dyn_cast<VarDecl>(ref->getDecl()))
+            if (vd->getType()->isPointerType()) return vd;
+    return nullptr;
+}
+
 // libc functions that UNCONDITIONALLY dereference a pointer argument — a
 // NULL there is definite UB, with NO length parameter that could be 0 to
 // excuse it. Passing a Null/MaybeNull pointer to one of these is a
@@ -744,6 +825,54 @@ public:
                             if (val.fact && val.fact->var == base &&
                                 val.fact->field)
                                 val.fact.reset();
+                }
+            }
+        }
+
+        // Out-param success contract (getaddrinfo family): at
+        // `rc = f(..., &p)` split every disjunct into
+        // success{(rc EQ 0)=true, p NonNull} and
+        // failure{(rc EQ 0)=false, p unchanged}. The caller's own
+        // rc-check then prunes one side per edge. rc must be a
+        // keyable local (facts on an address-taken var would never be
+        // consumed soundly).
+        {
+            auto [rcVar, callRhs] = intAssignFromCall(stmt);
+            if (rcVar && callRhs && !mutated_.count(rcVar)) {
+                if (auto contract = outParamSuccessContract(callRhs)) {
+                    const VarDecl* outp = addrOfPtrVar(
+                        callRhs->getArg(contract->argIdx));
+                    if (outp) {
+                        State split;
+                        split.reserve(in.size() * 2);
+                        const codeskeptic::FactKey rcKey{
+                            rcVar, clang::BO_EQ, contract->successValue};
+                        for (auto& d : in) {
+                            auto success = d;
+                            success.facts[rcKey] = true;
+                            auto it = success.vars.find(outp);
+                            if (it != success.vars.end())
+                                it->second = NullState::NonNull;
+                            auto failure = std::move(d);
+                            failure.facts[rcKey] = false;
+                            // On failure the result is UNSPECIFIED per
+                            // POSIX and, with the universal
+                            // `res = NULL; rc = getaddrinfo(&res);`
+                            // idiom, still null in practice. MaybeNull
+                            // (not the AddrOf-havocked Unknown the
+                            // generic path left behind) makes an
+                            // UNCHECKED rc's dereference reportable —
+                            // the same intrinsic-source bet as
+                            // malloc's MaybeNull return.
+                            auto fit = failure.vars.find(outp);
+                            if (fit != failure.vars.end())
+                                fit->second = NullState::MaybeNull;
+                            split.push_back(std::move(success));
+                            split.push_back(std::move(failure));
+                        }
+                        codeskeptic::normalizeGuardedOps(split, ops());
+                        return split;
+                    }
                 }
             }
         }

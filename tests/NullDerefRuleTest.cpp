@@ -1894,3 +1894,56 @@ TEST(NullDerefRuleTest, MemberFlagOutParamFactoryDivergent_Reported) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+// --- Out-param success contracts (2026-07-22, the final msrc_res
+// root): rc == 0 from getaddrinfo GUARANTEES the result was written
+// non-null; an unchecked rc keeps the failure path alive. ---
+
+TEST(NullDerefRuleTest, GetaddrinfoCheckedResult_Clean) {
+    // The full rtp2httpd shape, including the defensive ambiguity
+    // check whose short-circuit edge used to manufacture the null.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct addrinfo { struct addrinfo *ai_next; };
+        extern int getaddrinfo(const char*, const char*,
+                               const struct addrinfo*, struct addrinfo**);
+        extern void logger(const char*);
+        struct comp { int has_source; };
+        extern void parse(struct comp *out);
+        int f(const char *addr) {
+            struct comp c;
+            parse(&c);
+            struct addrinfo *res = 0;
+            int rr = 0;
+            if (c.has_source) {
+                rr = getaddrinfo(addr, 0, 0, &res);
+                if (rr != 0) return -1;
+            }
+            if (res && res->ai_next) logger("ambiguous");
+            if (c.has_source) {
+                struct addrinfo *use = res->ai_next;
+                (void)use;
+            }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, GetaddrinfoUncheckedResult_Reported) {
+    // No rc check: the failure disjunct (res still null) reaches the
+    // dereference — the REAL bug the contract must keep reportable.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct addrinfo { struct addrinfo *ai_next; };
+        extern int getaddrinfo(const char*, const char*,
+                               const struct addrinfo*, struct addrinfo**);
+        int f(const char *addr) {
+            struct addrinfo *res = 0;
+            int rr = getaddrinfo(addr, 0, 0, &res);
+            (void)rr;
+            return res->ai_next != 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
