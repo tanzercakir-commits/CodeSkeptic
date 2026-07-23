@@ -134,9 +134,17 @@ public:
     size_t size() const { return summaries_.size(); }
     size_t globalSize() const { return globalStore_.size(); }
 
+    // True once rebuild() has COMPLETED for the current TU. Consumers
+    // that would otherwise read half-built summaries during the
+    // inference fixpoint (the engine's call-flag edge folding,
+    // ImmutableFlags.cpp) must check this — folding on an unstable
+    // table would make results depend on function processing order.
+    bool stable() const { return stable_; }
+
 private:
     std::map<const clang::FunctionDecl*, FunctionSummary> summaries_;
     std::map<std::string, FunctionSummary> globalStore_;
+    bool stable_ = false;
 };
 
 } // namespace codeskeptic

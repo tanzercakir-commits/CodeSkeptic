@@ -1,5 +1,7 @@
 #include "engine/ImmutableFlags.h"
 
+#include "engine/FunctionSummary.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
@@ -106,6 +108,36 @@ ImmutableFlagMap buildImmutableFlags(ASTContext& ctx) {
     MutationScan scan;
     scan.TraverseDecl(ctx.getTranslationUnitDecl());
     for (const auto* vd : scan.tainted) map.erase(vd);
+
+    // Pass 3: local copy closure (the Juliet *_31/_33 flag-copy
+    // variants). A local `int c = staticFalse;` that is never itself
+    // mutated carries the flag's value for its whole lifetime — its
+    // init runs unconditionally at its declaration point, wherever
+    // that point executes. Fixpoint handles copy chains.
+    struct CopyCollector : RecursiveASTVisitor<CopyCollector> {
+        std::map<const VarDecl*, const VarDecl*> initFrom;  // dst -> src
+        bool VisitVarDecl(VarDecl* vd) {
+            if (!vd->hasLocalStorage() || vd->isStaticLocal()) return true;
+            QualType t = vd->getType();
+            if (!t->isIntegerType() || t.isVolatileQualified()) return true;
+            if (!vd->hasInit()) return true;
+            if (const auto* src = refTo(vd->getInit())) initFrom[vd] = src;
+            return true;
+        }
+    } copies;
+    copies.TraverseDecl(ctx.getTranslationUnitDecl());
+    bool grew = true;
+    while (grew) {
+        grew = false;
+        for (const auto& [dst, src] : copies.initFrom) {
+            if (map.count(dst) || scan.tainted.count(dst)) continue;
+            auto it = map.find(src);
+            if (it != map.end()) {
+                map[dst] = it->second;
+                grew = true;
+            }
+        }
+    }
     return map;
 }
 
@@ -155,6 +187,24 @@ bool edgeInfeasibleByFlags(const Stmt* leafCond, bool edgeIsTrue,
     };
 
     const Expr* stripped = expr->IgnoreParenImpCasts();
+
+    // Call flag: `if (staticReturnsTrue())` — a visible-body callee
+    // whose summary proves NeverZero makes the condition certainly
+    // true, so the FALSE edge is infeasible. The call itself (and any
+    // side effects) still executes — only the impossible successor
+    // edge is pruned. Guarded on stable(): during the summary
+    // inference fixpoint the table is half-built, and folding there
+    // would make results depend on processing order.
+    if (const auto* call = dyn_cast<CallExpr>(stripped)) {
+        const auto& reg = SummaryRegistry::instance();
+        if (!reg.stable()) return false;
+        if (const auto* summary = reg.lookup(call->getDirectCallee())) {
+            using RZ = SummaryRegistry::ReturnZeroness;
+            if (summary->returnZeroness == RZ::NeverZero)
+                return !edgeIsTrue;  // condition certainly true
+        }
+        return false;
+    }
 
     // Bare flag: `if (flag)` — truth is value != 0.
     if (auto v = flagValue(stripped)) {

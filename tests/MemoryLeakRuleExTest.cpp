@@ -1529,3 +1529,91 @@ TEST(MemoryLeakRuleExTest, AddressTakenFlag_NotConstantFolded) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+// --- v0.4.2: call-flag folding + flag-copy closure ---
+
+TEST(MemoryLeakRuleExTest, NeverZeroCallFlagCorrelation_Clean) {
+    // `if (staticReturnsTrue())`: a visible-body callee whose summary
+    // proves NeverZero makes the false edge infeasible — the Juliet
+    // variant-08 goodB2G shape. The call's side effects still run;
+    // only the impossible successor edge is pruned.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        extern void free(void*);
+        extern void exit(int);
+        static int staticReturnsTrue(void) { return 1; }
+        void goodB2G(void) {
+            long* data = 0;
+            if (staticReturnsTrue()) {
+                data = (long*)malloc(100 * sizeof(long));
+                if (data == 0) { exit(-1); }
+            }
+            if (staticReturnsTrue()) {
+                free(data);
+            }
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(MemoryLeakRuleExTest, MaybeZeroCallFlag_NotFolded) {
+    // A callee that CAN return zero must never fold — this leak is
+    // real on the zero path.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        static int mayReturnZero(int x) { return x > 0 ? 1 : 0; }
+        void f(int x) {
+            long* p = 0;
+            if (mayReturnZero(x)) {
+                p = (long*)malloc(8);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(MemoryLeakRuleExTest, FlagCopyCorrelation_Clean) {
+    // `int flagCopy = staticFalse;` — the copy closure carries the
+    // provable value; the leak path behind if(flagCopy) cannot run
+    // (the Juliet *_31/_33 flag-copy variants).
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        extern void free(void*);
+        extern void exit(int);
+        static int staticFalse = 0;
+        void goodB2G(void) {
+            int flagCopy = staticFalse;
+            long* d = (long*)malloc(16);
+            if (d == 0) { exit(-1); }
+            if (flagCopy) {
+                /* infeasible: no free */
+            } else {
+                free(d);
+            }
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(MemoryLeakRuleExTest, MutatedFlagCopy_NotFolded) {
+    // The copy is reassigned — its value is no longer the flag's;
+    // folding would hide this real leak.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        static int staticFalse = 0;
+        void f(int x) {
+            int c = staticFalse;
+            if (x) { c = 1; }
+            long* p = 0;
+            if (c) {
+                p = (long*)malloc(8);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
