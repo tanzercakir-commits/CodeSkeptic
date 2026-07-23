@@ -1,0 +1,154 @@
+[1/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\core\Messages.cpp.obj
+[2/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\AllocFunctions.cpp.obj
+[3/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\source_manager\ResourceDir.cpp.obj
+D:\a\CodeSkeptic\CodeSkeptic\src\source_manager\ResourceDir.cpp(115): warning C4129: 'l': unrecognized character escape sequence
+D:\a\CodeSkeptic\CodeSkeptic\src\source_manager\ResourceDir.cpp(115): warning C4129: 'c': unrecognized character escape sequence
+[4/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\core\FunctionFilter.cpp.obj
+[5/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\FatalCalls.cpp.obj
+[6/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\SummaryDiff.cpp.obj
+[7/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\RuleEngine.cpp.obj
+[8/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\CfgCache.cpp.obj
+[9/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\Interval.cpp.obj
+[10/86] Building CXX object _deps\googletest-build\googletest\CMakeFiles\gtest.dir\src\gtest-all.cc.obj
+[11/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\source_manager\SourceManager.cpp.obj
+[12/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\ImmutableFlags.cpp.obj
+[13/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\CoverageReport.cpp.obj
+[14/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\AssumptionMode.cpp.obj
+[15/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\IntervalEval.cpp.obj
+[16/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\reporter\ConsoleReporter.cpp.obj
+[17/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\reporter\HtmlReporter.cpp.obj
+[18/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\reporter\JsonReporter.cpp.obj
+[19/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\ExtentMap.cpp.obj
+[20/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\reporter\SarifReporter.cpp.obj
+[21/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\config\Config.cpp.obj
+[22/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\analyzer\SuppressionFilter.cpp.obj
+[23/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\analyzer\Baseline.cpp.obj
+[24/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\analyzer\StaticAnalyzer.cpp.obj
+[25/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\PathFacts.cpp.obj
+[26/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\server\McpServer.cpp.obj
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): warning C4244: 'initializing': conversion from 'T' to 'double', possible loss of data
+        with
+        [
+            T=int64_t
+        ]
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): note: the template instantiation context (the oldest one first) is
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(421): note: see reference to function template instantiation 'std::optional<double>::optional<T&,0>(_Ty2) noexcept' being compiled
+        with
+        [
+            T=int64_t,
+            _Ty2=int64_t &
+        ]
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(421): note: see the first reference to 'std::optional<double>::optional' in 'llvm::json::Value::getAsNumber'
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(307): note: see reference to function template instantiation 'std::_Optional_construct_base<_Ty>::_Optional_construct_base<T&>(std::in_place_t,T &)' being compiled
+        with
+        [
+            _Ty=double,
+            T=int64_t
+        ]
+D:\a\CodeSkeptic\CodeSkeptic\src\server\McpServer.cpp(299): note: see reference to function template instantiation 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<T&>(std::in_place_t,T &) noexcept' being compiled
+        with
+        [
+            _Ty=double,
+            T=int64_t
+        ]
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): warning C4244: 'initializing': conversion from 'size_t' to 'double', possible loss of data
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): note: the template instantiation context (the oldest one first) is
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(423): note: see reference to function template instantiation 'std::optional<double>::optional<T&,0>(_Ty2) noexcept' being compiled
+        with
+        [
+            T=uint64_t,
+            _Ty2=uint64_t &
+        ]
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(423): note: see the first reference to 'std::optional<double>::optional' in 'llvm::json::Value::getAsNumber'
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(307): note: see reference to function template instantiation 'std::_Optional_construct_base<_Ty>::_Optional_construct_base<size_t&>(std::in_place_t,size_t &)' being compiled
+        with
+        [
+            _Ty=double
+        ]
+D:\a\CodeSkeptic\CodeSkeptic\src\server\McpServer.cpp(299): note: see reference to function template instantiation 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<size_t&>(std::in_place_t,size_t &) noexcept' being compiled
+        with
+        [
+            _Ty=double
+        ]
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): warning C4244: 'initializing': conversion from '_Ty' to '__int64', possible loss of data
+        with
+        [
+            _Ty=double
+        ]
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(83): note: the template instantiation context (the oldest one first) is
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(441): note: see reference to function template instantiation 'std::optional<int64_t>::optional<double,0>(_Ty2 &&) noexcept' being compiled
+        with
+        [
+            _Ty2=double
+        ]
+C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc\include\llvm/Support/JSON.h(441): note: see the first reference to 'std::optional<int64_t>::optional' in 'llvm::json::Value::getAsInteger'
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\optional(307): note: see reference to function template instantiation 'std::_Optional_construct_base<_Ty>::_Optional_construct_base<double>(std::in_place_t,double &&)' being compiled
+        with
+        [
+            _Ty=int64_t
+        ]
+D:\a\CodeSkeptic\CodeSkeptic\src\server\McpServer.cpp(299): note: see reference to function template instantiation 'std::_Optional_destruct_base<_Ty,true>::_Optional_destruct_base<double>(std::in_place_t,double &&) noexcept' being compiled
+        with
+        [
+            _Ty=int64_t
+        ]
+[27/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\ParamIntervals.cpp.obj
+[28/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\MemoryLeakRule_Ex.cpp.obj
+[29/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\IntOverflowRule.cpp.obj
+[30/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\UninitPointerRule_Ex.cpp.obj
+[31/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\engine\FunctionSummary.cpp.obj
+[32/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\DivByZeroRule.cpp.obj
+[33/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\ContractParser.cpp.obj
+[34/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\AssumptionRule.cpp.obj
+[35/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\ContractRule.cpp.obj
+[36/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\Policy.cpp.obj
+[37/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\NullDerefRule.cpp.obj
+[38/86] Linking CXX static library lib\gtest.lib
+[39/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\ContractInfo.cpp.obj
+[40/86] Building CXX object _deps\googletest-build\googletest\CMakeFiles\gtest_main.dir\src\gtest_main.cc.obj
+[41/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\PolicyRule.cpp.obj
+[42/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\rules\BoundsRule.cpp.obj
+[43/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\GuardContracts.cpp.obj
+[44/86] Building CXX object src\CMakeFiles\codeskeptic.dir\main.cpp.obj
+[45/86] Building CXX object src\CMakeFiles\codeskeptic_core.dir\contracts\Sidecar.cpp.obj
+[46/86] Linking CXX static library src\codeskeptic_core.lib
+[47/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\DiagnosticTest.cpp.obj
+[48/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\UninitPointerRuleExTest.cpp.obj
+[49/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\DivByZeroRuleTest.cpp.obj
+[50/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\MemoryLeakRuleExTest.cpp.obj
+[51/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\IntOverflowRuleTest.cpp.obj
+[52/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\BoundsRuleTest.cpp.obj
+[53/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\SarifReporterTest.cpp.obj
+[54/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\CfgCacheTest.cpp.obj
+[55/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\NullDerefRuleTest.cpp.obj
+[56/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\HtmlReporterTest.cpp.obj
+[57/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\TestHelper.cpp.obj
+[58/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\IntervalTest.cpp.obj
+[59/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\CoverageReportTest.cpp.obj
+[60/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\AssumptionRuleTest.cpp.obj
+[61/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\SummaryDiffTest.cpp.obj
+[62/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\FatalCallsTest.cpp.obj
+[63/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\SuppressionFilterTest.cpp.obj
+[64/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\BaselineTest.cpp.obj
+[65/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\DisjunctsV2bTest.cpp.obj
+[66/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\StressEdgeCaseTest.cpp.obj
+[67/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\FunctionFilterTest.cpp.obj
+[68/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\ReportPathsTest.cpp.obj
+[69/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\ContractTest.cpp.obj
+[70/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\BrokenTuTest.cpp.obj
+[71/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\McpServerTest.cpp.obj
+[72/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\MacSdkPathTest.cpp.obj
+[73/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\ResourceDirTest.cpp.obj
+[74/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\InterproceduralTest.cpp.obj
+[75/86] Building CXX object _deps\googletest-build\googlemock\CMakeFiles\gmock.dir\src\gmock-all.cc.obj
+[76/86] Building CXX object _deps\googletest-build\googlemock\CMakeFiles\gmock_main.dir\src\gmock_main.cc.obj
+[77/86] Building CXX object _deps\googletest-build\googlemock\CMakeFiles\gmock_main.dir\src\gmock-all.cc.obj
+[78/86] Linking CXX static library lib\gtest_main.lib
+[79/86] Building CXX object _deps\googletest-build\googlemock\CMakeFiles\gmock.dir\__\googletest\src\gtest-all.cc.obj
+[80/86] Linking CXX static library lib\gmock.lib
+[81/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\ParamIntervalsTest.cpp.obj
+[82/86] Building CXX object _deps\googletest-build\googlemock\CMakeFiles\gmock_main.dir\__\googletest\src\gtest-all.cc.obj
+[83/86] Linking CXX static library lib\gmock_main.lib
+[84/86] Building CXX object tests\CMakeFiles\codeskeptic_tests.dir\IntervalAnalysisTest.cpp.obj
+[85/86] Linking CXX executable src\codeskeptic.exe
+[86/86] Linking CXX executable tests\codeskeptic_tests.exe
