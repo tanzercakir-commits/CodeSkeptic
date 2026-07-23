@@ -159,6 +159,10 @@ jobs:
             Write-Host $out
             throw "no-dev-prompt directory mode regressed (exit=$code)"
           }
+          # Explicit success: the pwsh shell wrapper otherwise exits
+          # with $LASTEXITCODE — which is the analyzer's 1 (= findings,
+          # exactly what we asserted FOR).
+          exit 0
 
       - name: Failure diagnostics -> refs/ci-logs/*
         # Same contract as ci.yml: the dev sandbox reads Actions results
