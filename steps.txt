@@ -1,0 +1,8 @@
+cache-llvm=success
+msvc-env=success
+configure=success
+build=success
+test=success
+test-single=success
+smoke=success
+nodev-dirmode=failure
