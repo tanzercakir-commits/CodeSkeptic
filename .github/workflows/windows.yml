@@ -139,8 +139,16 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
-          Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
-          Remove-Item Env:EXTERNAL_INCLUDE -ErrorAction SilentlyContinue
+          # Simulate a PLAIN terminal: strip the ENTIRE vcvars family,
+          # not just INCLUDE — clang's VC discovery also reads
+          # VCToolsInstallDir/VSINSTALLDIR/WindowsSdkDir etc. What must
+          # remain for a PASS is only the driver's COM/registry lookup.
+          $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'
+          $removed = @()
+          Get-ChildItem Env: | Where-Object { $_.Name -match $family } | ForEach-Object {
+            $removed += $_.Name; Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue
+          }
+          "cleared: $($removed -join ', ')" | Set-Content probe_env.txt
           New-Item -ItemType Directory -Force -Path probe_dir | Out-Null
           @'
           #include <stdio.h>
@@ -153,6 +161,7 @@ jobs:
           $out = & .\build\src\codeskeptic.exe probe_dir 2>&1 | Out-String
           $code = $LASTEXITCODE
           "exit=$code" | Set-Content probe_result.txt
+          Get-Content probe_env.txt | Add-Content probe_result.txt
           Add-Content probe_result.txt $out
           if ($code -eq 1 -and $out -match 'bounds') {
             Add-Content probe_result.txt "PROBE: PASS — native dir mode works without a Developer Prompt"
