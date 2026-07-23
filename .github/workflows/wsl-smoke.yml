@@ -1,0 +1,65 @@
+name: WSL smoke
+
+# The Windows-via-WSL path the README documents, PROVEN instead of
+# assumed (critique-3): on a windows-latest runner, install WSL, pull
+# the latest Linux release tarball inside it, analyze docs/demo.c and
+# assert the analyzer's contract (exit 1, findings present). The
+# README's support-table row claims exactly what this job proves.
+# WSL version is echoed into the log so the claim stays honest about
+# WSL1 vs WSL2 on hosted runners.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  push:
+    branches: ["phase*"]
+    paths: [".github/workflows/wsl-smoke.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wsl-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: github.event_name != 'workflow_run' ||
+        github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Vampire/setup-wsl@v5
+        with:
+          distribution: Ubuntu-24.04
+
+      - name: WSL environment report
+        shell: pwsh
+        run: |
+          wsl.exe --version
+          wsl.exe --status
+
+      - name: Download + run the Linux release inside WSL
+        shell: wsl-bash {0}
+        run: |
+          set -euo pipefail
+          uname -a
+          cd ~
+          curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+          cp "$(wslpath '${{ github.workspace }}')/docs/demo.c" ~/demo.c
+          code=0
+          out=$(./codeskeptic-v*/bin/codeskeptic ~/demo.c 2>&1) || code=$?
+          echo "$out"
+          echo "exit_code=$code"
+          test "$code" -eq 1
+          echo "$out" | grep -qi finding
+          ./codeskeptic-v*/bin/codeskeptic --version
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        shell: bash
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/wsl-smoke/${{ job.status }}"

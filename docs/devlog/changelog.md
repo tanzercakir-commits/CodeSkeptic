@@ -13,7 +13,13 @@ package claims to bundle (three releases of masking) and now proves
 the self-contained claim via `ldd`: nothing missing, bundled deps
 resolving from the package. README/Docker examples pin versions;
 evaluate.md prerequisites rewritten for the binary/Docker era; FP and
-evaluation issue templates added. No engine changes.
+evaluation issue templates added. Windows positioned honestly
+(critique-3): a README WSL2/Docker section with the
+compiler's-view caveat (`#ifdef _WIN32` branches are invisible under
+WSL), a support table that separates "supported path" from "planned
+native", and a windows-latest CI smoke that runs the Linux release
+inside WSL against demo.c — the claim extends exactly as far as the
+proof. No engine changes.
 
 ## 2026-07-22 — The real-world FP round: six root causes from the v0.4.2 scans
 

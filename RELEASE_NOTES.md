@@ -42,4 +42,15 @@ directory, not the host.
   report** (independent evaluations are the most valuable
   contribution this project can receive).
 
+## Windows, honestly framed
+
+No native binary yet — and the README now says exactly that while
+giving Windows users two working paths: WSL2 (best for Linux-targeted
+projects; with the `#ifdef _WIN32`-branches-are-invisible caveat
+stated up front, because the analyzer sees the compiler's view) and
+Docker Desktop (fastest trial). The WSL path is exercised by a new CI
+smoke on a windows-latest runner — the support table claims only what
+that job proves. Native MSVC analysis remains a separately planned
+effort (docs/windows-support.md).
+
 Full engine history: docs/devlog/changelog.md.

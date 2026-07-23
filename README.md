@@ -51,6 +51,37 @@ docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 s
   with: { path: src/, build-path: build }
 ```
 
+### Windows (WSL2 or Docker — no native binary yet)
+
+CodeSkeptic does not yet run as a native Windows executable. Windows
+users have two working paths:
+
+```bash
+# WSL2 (best for Linux-targeted projects; keep the tree in the WSL
+# filesystem, not /mnt/c — faster and the paths stay clean):
+curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+./codeskeptic-v*/bin/codeskeptic path/to/source --build-path path/to/build
+
+# Docker Desktop (fastest trial):
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 src/
+```
+
+Build your project and generate `compile_commands.json` INSIDE the
+same WSL environment. One honest caveat — CodeSkeptic analyzes the
+program the compiler sees, not the source text: under WSL that is the
+Linux preprocessor view, so `#ifdef _WIN32` branches are invisible.
+For MSVC-built, Windows-SDK-dependent code this path is not a
+substitute for native analysis
+([the bounded native plan](docs/windows-support.md)):
+
+| Use | Status |
+|---|---|
+| Linux x86_64 native | Supported |
+| macOS arm64 native | Supported |
+| Windows + WSL2, Linux-targeted build | Supported path, CI-smoked on windows-latest |
+| Windows + Docker Desktop | Supported trial path |
+| Native Windows / MSVC analysis | Planned |
+
 ### Build from source
 
 Linux (Ubuntu 24.04) — four commands from clone to first report (this
