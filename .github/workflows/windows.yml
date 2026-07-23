@@ -128,6 +128,51 @@ jobs:
           ./build/src/codeskeptic.exe smoke.cpp || code=$?
           test "$code" -eq 1
 
+      - name: Probe — directory mode OUTSIDE a Developer Prompt (Tier 2 discovery)
+        id: probe-nodev
+        # continue-on-error: a red probe must not fail the lane (and
+        # spam the owner's inbox) — the verdict is read from the
+        # win-probe ref below. Question being measured: does clang's
+        # MSVC toolchain (registry/COM-based VS discovery built into
+        # the driver) resolve <stdio.h> for analyzed code when INCLUDE
+        # is NOT set, i.e. outside vcvars?
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+          Remove-Item Env:EXTERNAL_INCLUDE -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path probe_dir | Out-Null
+          @'
+          #include <stdio.h>
+          #include <stdlib.h>
+          void f(void) {
+              int* p = (int*)malloc(4 * sizeof(int));
+              p[10] = 1;
+          }
+          '@ | Set-Content probe_dir\probe.c
+          $out = & .\build\src\codeskeptic.exe probe_dir 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          "exit=$code" | Set-Content probe_result.txt
+          Add-Content probe_result.txt $out
+          if ($code -eq 1 -and $out -match 'bounds') {
+            Add-Content probe_result.txt "PROBE: PASS — native dir mode works without a Developer Prompt"
+          } else {
+            Add-Content probe_result.txt "PROBE: FAIL — SDK discovery code (Tier 2) is needed"
+            exit 1
+          }
+
+      - name: Publish probe verdict -> refs/ci-logs/*
+        if: always()
+        shell: bash
+        run: |
+          [ -f probe_result.txt ] || echo "probe did not run" > probe_result.txt
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f probe_result.txt
+          git commit -qm "win probe @ ${{ github.sha }}"
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/win-probe"
+
       - name: Failure diagnostics -> refs/ci-logs/*
         # Same contract as ci.yml: the dev sandbox reads Actions results
         # over the git protocol only. Configure/build logs matter most
