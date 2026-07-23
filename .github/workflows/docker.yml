@@ -65,8 +65,19 @@ jobs:
           git commit -qm "ci diagnostics: docker @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docker"
 
-      - name: Publish to ghcr.io (releases only)
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+      - name: Publish to ghcr.io (releases; manual republish lane)
+        # The [docker-publish] escape hatch exists for exactly one
+        # failure mode: the Release chain is green but THIS publish
+        # step lost a coin toss with ghcr (v0.4.3: build+smoke green,
+        # push failed with no diagnostics possible). Pushing a phase*
+        # branch whose head commit message contains [docker-publish]
+        # re-runs build+smoke and publishes the freshly smoked image —
+        # no full release re-tag needed.
+        if: >-
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success') ||
+          (github.event_name == 'push' &&
+           contains(github.event.head_commit.message, '[docker-publish]'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
