@@ -478,6 +478,17 @@ public:
         }
     }
 
+    // Seed a parameter to MaybeZero from the interprocedural
+    // param-zeroness pass — the caller(s) provably pass a possibly-zero
+    // value (never manufactured from Unknown; see buildParamZeroness).
+    // Only lifts an Unknown seed, so a `requires` NonZero contract or a
+    // literal never loses to it.
+    void seedParamMaybeZero(const VarDecl* param) {
+        auto it = initState_.find(param);
+        if (it != initState_.end() && it->second == ZeroState::Unknown)
+            it->second = ZeroState::MaybeZero;
+    }
+
     // The per-variable ZeroState chain makes at most 3 transitions
     unsigned latticeHeight() const {
         return static_cast<unsigned>(trackedVars_.size()) * 3 + 1;
@@ -560,10 +571,22 @@ public:
         }
     }
 
+    // The entry state at a call site (for the interprocedural
+    // param-zeroness pass: it reads back the zeroness of each argument
+    // as the caller passes it). Populated only when recordCallStates_
+    // is on — the ordinary rule pass does not pay for it.
+    const State* stateAtCall(const Stmt* call) const {
+        auto it = atCall_.find(call);
+        return it == atCall_.end() ? nullptr : &it->second;
+    }
+    void enableCallStateRecording() { recordCallStates_ = true; }
+
     void onStatement(const Stmt* stmt, const State& before,
                      const State& after, ASTContext& ctx) {
-        if (const auto* call = dyn_cast<CallExpr>(stmt))
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             checkCallContracts(call, before, ctx);
+            if (recordCallStates_) atCall_[call] = before;
+        }
 
         // Dataflow trace: record transitions to zero / possibly-zero
         for (const auto& [var, afterState] : after) {
@@ -719,13 +742,162 @@ private:
     std::map<const VarDecl*, std::vector<codeskeptic::TraceNote>> events_;
     std::vector<std::pair<size_t, const VarDecl*>> noteTargets_;
     std::set<std::pair<unsigned, std::string>> reportedContracts_;
+    bool recordCallStates_ = false;
+    std::map<const Stmt*, VarState> atCall_;
 };
+
+// --- Interprocedural param-zeroness (v0.4.2) ---
+//
+// The Juliet CWE369 "flow" slice: an untrusted value crosses a call
+// boundary before the division (`data = atoi(buf); sink(data)` where
+// sink does `100 / d`). The divisor's zeroness lives in the CALLER, so
+// the intraprocedural pass sees an unconstrained parameter and stays
+// silent. This pass bridges it, mirroring ParamIntervals exactly:
+// only for INTERNAL-LINKAGE, address-not-taken callees (every caller
+// visible), join the zeroness each call site passes.
+//
+// PRECISION INVARIANT: a parameter is seeded MaybeZero ONLY when a call
+// site provably passes a possibly-zero value (an atoi/scanf/rand
+// source, a literal 0, or a MaybeZero summary return). An Unknown
+// argument NEVER manufactures MaybeZero — that is the same bar that
+// keeps unguarded parameters from spamming warnings.
+using ParamZeronessMap =
+    std::map<const FunctionDecl*, std::vector<ZeroState>>;
+
+const FunctionDecl* zeronessCandidate(const FunctionDecl* fn) {
+    if (!fn) return nullptr;
+    fn = fn->getCanonicalDecl();
+    if (fn->isExternallyVisible()) return nullptr;
+    return fn;
+}
+
+// Zeroness of a call argument as the caller passes it: a proven source
+// (atoi/literal/summary) evaluates directly; a bare tracked variable
+// reads the caller's state; everything else is Unknown.
+ZeroState argZeroness(const Expr* arg, const VarState& callerState) {
+    if (!arg) return ZeroState::Unknown;
+    ZeroState direct = evaluateAssignedValue(arg);
+    if (direct != ZeroState::Unknown) return direct;
+    if (const auto* var = getReferencedVar(arg)) {
+        auto it = callerState.find(var);
+        if (it != callerState.end()) return it->second;
+    }
+    return ZeroState::Unknown;
+}
+
+ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
+    struct TuV : RecursiveASTVisitor<TuV> {
+        std::set<const FunctionDecl*> candidates;
+        std::set<const FunctionDecl*> addressTaken;
+        std::set<const Expr*> calleeRefs;
+        std::vector<const FunctionDecl*> bodies;
+        bool VisitFunctionDecl(FunctionDecl* fn) {
+            if (fn->isThisDeclarationADefinition() && fn->hasBody()) {
+                bodies.push_back(fn);
+                if (const auto* c = zeronessCandidate(fn))
+                    candidates.insert(c);
+            }
+            return true;
+        }
+        bool VisitCallExpr(CallExpr* call) {
+            if (call->getDirectCallee())
+                if (const auto* ref = dyn_cast<DeclRefExpr>(
+                        call->getCallee()->IgnoreParenImpCasts()))
+                    calleeRefs.insert(ref);
+            return true;
+        }
+        bool VisitDeclRefExpr(DeclRefExpr* ref) {
+            if (const auto* fn = dyn_cast<FunctionDecl>(ref->getDecl()))
+                if (const auto* c = zeronessCandidate(fn))
+                    if (!calleeRefs.count(ref)) addressTaken.insert(c);
+            return true;
+        }
+    } v;
+    v.TraverseDecl(ctx.getTranslationUnitDecl());
+
+    std::set<const FunctionDecl*> tracked;
+    for (const auto* fn : v.candidates)
+        if (!v.addressTaken.count(fn)) tracked.insert(fn);
+    if (tracked.empty()) return {};
+
+    // Accumulator per (callee, param): sawZeroable / allNonZero / any.
+    struct Acc { bool sawZeroable = false; bool allNonZero = true;
+                 bool any = false; };
+    std::map<const FunctionDecl*, std::vector<Acc>> acc;
+    for (const auto* c : tracked)
+        acc[c] = std::vector<Acc>(c->getNumParams());
+
+    for (const auto* caller : v.bodies) {
+        // Calls from this caller into a tracked callee.
+        struct CallV : RecursiveASTVisitor<CallV> {
+            const std::set<const FunctionDecl*>* tracked;
+            std::vector<const CallExpr*> calls;
+            bool VisitCallExpr(CallExpr* call) {
+                if (const auto* c = zeronessCandidate(call->getDirectCallee()))
+                    if (tracked->count(c)) calls.push_back(call);
+                return true;
+            }
+        } cv;
+        cv.tracked = &tracked;
+        cv.TraverseStmt(caller->getBody());
+        if (cv.calls.empty()) continue;
+
+        // Track the argument variables so their zeroness is computed at
+        // each call site (an atoi-assigned local, a guarded value, …).
+        std::set<const VarDecl*> argVars;
+        for (const auto* call : cv.calls)
+            for (const Expr* a : call->arguments())
+                if (const auto* var = getReferencedVar(a))
+                    argVars.insert(var);
+
+        codeskeptic::DiagnosticList sink;   // discarded
+        std::set<unsigned> sinkLines;
+        DivByZeroAnalysis analysis(argVars, caller->getQualifiedNameAsString(),
+                                   sink, sinkLines);
+        analysis.enableCallStateRecording();
+        codeskeptic::runDataflow(caller, ctx, analysis);
+
+        for (const auto* call : cv.calls) {
+            const FunctionDecl* callee =
+                zeronessCandidate(call->getDirectCallee());
+            auto it = acc.find(callee);
+            if (it == acc.end()) continue;
+            const VarState* st = analysis.stateAtCall(call);
+            VarState empty;
+            const VarState& state = st ? *st : empty;
+            const unsigned nArgs = call->getNumArgs();
+            for (unsigned i = 0; i < it->second.size(); ++i) {
+                ZeroState z = (i < nArgs)
+                    ? argZeroness(call->getArg(i), state)
+                    : ZeroState::Unknown;
+                Acc& a = it->second[i];
+                a.any = true;
+                if (z == ZeroState::Zero || z == ZeroState::MaybeZero)
+                    a.sawZeroable = true;
+                if (z != ZeroState::NonZero) a.allNonZero = false;
+            }
+        }
+    }
+
+    ParamZeronessMap out;
+    for (const auto& [fn, accs] : acc) {
+        std::vector<ZeroState> entry(accs.size(), ZeroState::Unknown);
+        bool useful = false;
+        for (size_t i = 0; i < accs.size(); ++i) {
+            if (accs[i].sawZeroable) { entry[i] = ZeroState::MaybeZero;
+                                       useful = true; }
+        }
+        if (useful) out[fn] = std::move(entry);
+    }
+    return out;
+}
 
 // --- Function-level analysis ---
 
 void analyzeFunction(const FunctionDecl* funcDecl,
                      ASTContext& ctx,
-                     codeskeptic::DiagnosticList& results) {
+                     codeskeptic::DiagnosticList& results,
+                     const ParamZeronessMap& paramZeroness) {
     if (!funcDecl->hasBody()) return;
 
     const SourceManager& sm = ctx.getSourceManager();
@@ -769,6 +941,16 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         auto req = codeskeptic::analyzeRequires(ownContracts, funcDecl);
         analysis.seedRequires(funcDecl, req.enforced);
     }
+    // Interprocedural seeding (v0.4.2): a parameter the callers provably
+    // pass a possibly-zero value into starts MaybeZero, so an unguarded
+    // division by it warns; a guard inside refines it back to NonZero.
+    auto pz = paramZeroness.find(funcDecl->getCanonicalDecl());
+    if (pz != paramZeroness.end()) {
+        for (unsigned i = 0; i < funcDecl->getNumParams() &&
+                             i < pz->second.size(); ++i)
+            if (pz->second[i] == ZeroState::MaybeZero)
+                analysis.seedParamMaybeZero(funcDecl->getParamDecl(i));
+    }
     auto df = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!df.converged)
         codeskeptic::CoverageReport::instance().recordNonConvergence(
@@ -780,8 +962,9 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
 class DivByZeroCallback : public MatchFinder::MatchCallback {
 public:
-    explicit DivByZeroCallback(codeskeptic::DiagnosticList& results)
-        : results_(results) {}
+    DivByZeroCallback(codeskeptic::DiagnosticList& results,
+                      const ParamZeronessMap& paramZeroness)
+        : results_(results), paramZeroness_(paramZeroness) {}
 
     void run(const MatchFinder::MatchResult& result) override {
         const auto* func = result.Nodes.getNodeAs<FunctionDecl>("func");
@@ -792,11 +975,12 @@ public:
         if (!codeskeptic::functionFilterAllows(*func)) return;
         if (!codeskeptic::lineFilterAllows(*func, sm)) return;
 
-        analyzeFunction(func, *result.Context, results_);
+        analyzeFunction(func, *result.Context, results_, paramZeroness_);
     }
 
 private:
     codeskeptic::DiagnosticList& results_;
+    const ParamZeronessMap& paramZeroness_;
 };
 
 } // anonymous namespace
@@ -816,8 +1000,12 @@ Severity DivByZeroRule::defaultSeverity() const {
 }
 
 void DivByZeroRule::check(clang::ASTContext& ctx, DiagnosticList& results) {
+    // Built once per TU: the interprocedural zeroness each internal
+    // callee's parameters receive from their (fully visible) callers.
+    ParamZeronessMap paramZeroness = buildParamZeroness(ctx);
+
     MatchFinder finder;
-    DivByZeroCallback callback(results);
+    DivByZeroCallback callback(results, paramZeroness);
 
     auto matcher = functionDecl(
         isDefinition(),
