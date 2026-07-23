@@ -136,7 +136,11 @@ Two things make those numbers move:
   cleanup attributes (`_cleanup_free_`, `g_autofree`) are recognized
   so the analysis sees the code the way the project means it.
 - **Every false-positive family became an engine feature with a
-  pinned test**: pointer-relational validity (systemd's
+  pinned test**: the v0.4.3 round alone turned 37 real-world FPs into
+  six engine roots (miner entailment, member fact keys, implication
+  payloads, out-param success contracts, miner slot discipline, scanf
+  widths + strlen-guard witness — changelog 2026-07-22);
+  pointer-relational validity (systemd's
   `FOREACH_ARRAY`, 235 findings from one root cause),
   cross-variable correlation (flag/status guards, `assert(p || len
   <= 0)` contracts), value-selection rewind (llama's defensive

@@ -1,60 +1,75 @@
 # CodeSkeptic — Changelog
 
-## 2026-07-22 — The real-world FP round: four families from the v0.4.2 scans
+## 2026-07-22 — The real-world FP round: six root causes from the v0.4.2 scans
 
 The post-release real-world scans (libgit2 v1.9.0 at 201 files,
 rtp2httpd at current HEAD, via the new `realworld.yml` lane) reproduced
 the stable core EXACTLY — the 23 triaged nulls, the 11 confirmed
-OOM-path leaks, every deep-corpus pin — and surfaced four new
-false-positive families. Each was adjudicated against upstream source,
-reduced to a local reproducer, and fixed at its root, with
-both-direction pinned tests (678 total, was 661):
+OOM-path leaks, every deep-corpus pin — and surfaced 37 false
+positives. Every one was adjudicated against upstream source, reduced
+(where possible) to a local reproducer, and fixed at a ROOT — six of
+them, across four engine rounds, each locked by both-direction pinned
+tests (661 -> 683):
 
-- **Entailment-blind correlation miner** (27 findings, ALL of libgit2's
-  hashmap `__resize` macro expansions — the khash `j`-flag shape). The
+- **Correlation-miner entailment** (27 findings — every hashmap
+  `__resize` expansion in libgit2, the khash `j`-flag shape): the
   disjunct-collapse miner tested compatibility and witness by EXACT
-  fact key, so a stamped `(j EQ 1)=true` neither excluded the
-  `(j EQ 0)=true` disjunct from the wrong candidate nor witnessed the
-  right one — the consumable "j != 0 ⟹ new_flags NonNull" implication
-  was never mined. Both tests now go through `factsContradict`'s
-  stamp entailment (and implication ACTIVATION got the same upgrade).
-  The diagnosis burned three wrong hypotheses (widening memory, nested
-  loops, condition misattribution) before segment-minimization pinned
-  the trigger to the disjunct-cap collapse.
-- **Member fact keys** (rtp2httpd `msrc_res`/`fcc_res`, plus the
-  clean-room `if (c.has_x) produce; ... if (c.has_x) consume;` shape,
-  which had NO correlation support at all — even `c.f = 1` directly
-  above the guards false-positived). Dot-members of admitted local
-  structs now join the fact domain: keyed in conditions, stamped and
-  erased flow-sensitively at field stores, ERASED WHOLESALE at any
-  call receiving the base's address, banned entirely when `&c` is
-  stored outside a call argument. Deliberate limit, mirroring the
-  keyed-globals one: a callee stashing the pointer for a LATER call to
-  mutate through is ignored (FN direction, documented in PathFacts.h).
-  Opt-in per analysis run (`MemberFactScope`) — only null-deref keys
-  members today; every other rule is byte-for-byte unchanged.
-- **scanf field-width blindness** (rtp2httpd timezone.c ×3): the
-  untrusted-source model seeded `%2d` output at the full int range,
-  and those pseudo-finite endpoints doubled as overflow "witnesses"
-  downstream (`tz_hours * 3600` "can exceed int" — with at most two
-  digits parsed). Conversions are now PAIRED with their arguments
-  (`%*d` suppression included — a blind sweep would seed the wrong
-  variable) and an explicit width bounds the seed: `%2d` → [-9, 99],
-  `%x`/`%o` by radix, `%n` non-negative. Widthless `%d` keeps the
-  full-range untrusted model — `sscanf("%d") * 100` still reports.
-- **strlen-guard-blind bounds heuristic** (rtp2httpd ×6 — every one a
-  correctly guarded copy). The CWE-120 message says "the source length
-  is not checked"; the rule now actually looks: a `strlen(src)` (same
-  source expression) in a dominating guard — the copy inside the
-  guarded branch, or below a measure-and-exit if — suppresses the
-  heuristic. Destination-only measurement, checks AFTER the copy,
-  measured-then-ignored guards, and other-variable measurements all
-  still fire (each shape pinned).
+  fact key, blind to stamped equalities on other literals. Both tests
+  now run through `factsContradict`'s stamp entailment; implication
+  ACTIVATION got the same upgrade. Diagnosis burned three wrong
+  hypotheses (widening memory, nested loops, condition misattribution)
+  before segment-minimization pinned the disjunct-cap collapse.
+- **Member fact keys** (the `if (c.has_x) produce; ... if (c.has_x)
+  consume;` struct-field correlation had NO support at all — even
+  `c.f = 1` directly above the guards false-positived). Dot-members of
+  admitted local structs join the fact domain: keyed in conditions,
+  stamped/erased flow-sensitively at field stores, erased wholesale at
+  calls receiving `&c`, banned when `&c` escapes a call-argument
+  position. Deliberate limit documented in PathFacts.h, mirroring the
+  keyed-globals trade. Opt-in per analysis (`MemberFactScope`).
+- **Implication payloads** (`condSt`): mined guards used to promise
+  only NonNull; an out-param factory under a guard leaves the pointer
+  UNKNOWN-not-proven-NonNull, which the cap-collapse decayed to an
+  unrecoverable MaybeNull. Implications now carry the guarded state
+  itself — "guarded absence of null-info" — and activation restores
+  it. Default NonNull keeps every prior implication byte-identical.
+- **Out-param success contracts** (the final msrc_res/fcc_res root):
+  `rc = getaddrinfo(..., &res)` with rc == 0 GUARANTEES res non-null
+  (POSIX). Contract-blind Unknown includes null, so the caller's OWN
+  defensive `if (res && res->ai_next)` ambiguity check refined the
+  short-circuit edge into a real-looking Null. The call now splits
+  success{(rc EQ 0)=true, res NonNull} / failure{=false, res
+  MaybeNull — the malloc bet}; an unchecked rc keeps the failure
+  disjunct reportable. Curated: getaddrinfo, posix_memalign.
+- **Miner slot discipline** (the chunked-decoder finding, diagnosed by
+  state-dump instrumentation): the single implication slot went to a
+  TAUTOLOGY — the pointer's own nullness key, first in FactKey order —
+  shadowing the consumable length-contract candidate. Self-keys are
+  skipped, and the witness runs in TWO passes: the original strict
+  witness first (everything previously mined is mined identically — a
+  one-pass loosening regressed the hashmap family and was caught by
+  the local battery), then a complement-decider witness for the
+  `if (!p && len > 0) return;` contract shape where no live path ever
+  records the positive polarity.
+- **scanf field-width blindness** (timezone.c ×3): `%2d` seeded the
+  full int range, whose pseudo-finite endpoints doubled as overflow
+  "witnesses". Conversions are now PAIRED with their arguments (`%*d`
+  suppression included) and an explicit width bounds the seed
+  (`%2d` -> [-9, 99], `%x`/`%o` by radix, `%n` non-negative).
+  Widthless `%d` keeps the full-range untrusted model and still
+  reports.
+- **strlen-guard-blind bounds heuristic** (×6 — every one a correctly
+  guarded copy): the CWE-120 message says "the source length is not
+  checked"; the rule now actually looks. A `strlen(src)` of the same
+  source expression in a dominating guard — the copy inside the
+  guarded branch, or below a measure-and-exit if — suppresses;
+  dst-only measurement, checks after the copy, measured-then-ignored
+  and other-variable shapes all still fire.
 
-Scores: all 678 unit tests, the thesis gate (0 FP, 9/15, floors held)
-and the self-scan pass locally; Juliet floors and corpus pins ride CI
-as always. The real-world rerun gate: libgit2 61 → the 34 stable
-findings, rtp2httpd 12 → ≤1.
+End state, CI-verified on the frozen pinned versions: libgit2
+61 -> **34** (exactly the stable documented core), rtp2httpd
+12 -> **0**, all Juliet floors, corpus pins, the thesis gate and the
+self-scan green throughout. 683 unit tests.
 
 ## 2026-07-20 — Config: untrusted length sources (`--untrusted-int-sources`)
 
