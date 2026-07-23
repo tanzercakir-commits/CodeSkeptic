@@ -1,0 +1,214 @@
+Unable to find image 'ubuntu:22.04' locally
+22.04: Pulling from library/ubuntu
+d6834b4a794c: Pulling fs layer
+d6834b4a794c: Verifying Checksum
+d6834b4a794c: Download complete
+d6834b4a794c: Pull complete
+Digest: sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982
+Status: Downloaded newer image for ubuntu:22.04
++ apt-get update -qq
++ apt-get install -y -qq libc6-dev
+debconf: delaying package configuration, since apt-utils is not installed
++ tar xzf /dist/codeskeptic-v0.4.4-linux-x86_64.tar.gz -C /tmp
++ cd /tmp/codeskeptic-v0.4.4-linux-x86_64
++ ldd ./bin/codeskeptic
++ tee /tmp/ldd.txt
+	linux-vdso.so.1 (0x00007ffeb5bb6000)
+	libLLVM.so.20.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libLLVM.so.20.1 (0x00007f319d0fb000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f319ced0000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f31a838e000)
+	libffi.so.8 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libffi.so.8 (0x00007f319cec3000)
+	libedit.so.2 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libedit.so.2 (0x00007f319ce89000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f319cda2000)
+	libz.so.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libz.so.1 (0x00007f319cd84000)
+	libzstd.so.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libzstd.so.1 (0x00007f319ccb5000)
+	libxml2.so.2 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libxml2.so.2 (0x00007f319cad3000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f319c8a7000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f319c887000)
+	libtinfo.so.6 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libtinfo.so.6 (0x00007f319c853000)
+	libbsd.so.0 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libbsd.so.0 (0x00007f319c83b000)
+	libicuuc.so.70 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libicuuc.so.70 (0x00007f319c640000)
+	liblzma.so.5 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/liblzma.so.5 (0x00007f319c615000)
+	libmd.so.0 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libmd.so.0 (0x00007f319c608000)
+	libicudata.so.70 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libicudata.so.70 (0x00007f319a9e8000)
++ grep -q 'not found' /tmp/ldd.txt
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -qE '=> /tmp/codeskeptic-'
++ grep -E 'libLLVM\.so' /tmp/ldd.txt
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libzstd\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libz\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libtinfo\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ code=0
+++ ./bin/codeskeptic /demo/demo.c
++ out='[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
++ code=1
++ echo '[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
++ test 1 -eq 1
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: 'val' may be null on some paths
+    -> /demo/demo.c:6:5 'val' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 'val' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: 'copy' may be null on some paths
+    -> /demo/demo.c:7:5 'copy' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+----------------------------------------
++ grep -qi finding
++ echo '[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
+Unable to find image 'ubuntu:24.04' locally
+24.04: Pulling from library/ubuntu
+ca2678b20700: Pulling fs layer
+ca2678b20700: Verifying Checksum
+ca2678b20700: Download complete
+ca2678b20700: Pull complete
+Digest: sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+Status: Downloaded newer image for ubuntu:24.04
++ apt-get update -qq
++ apt-get install -y -qq libc6-dev
+debconf: delaying package configuration, since apt-utils is not installed
++ tar xzf /dist/codeskeptic-v0.4.4-linux-x86_64.tar.gz -C /tmp
++ cd /tmp/codeskeptic-v0.4.4-linux-x86_64
++ ldd ./bin/codeskeptic
++ tee /tmp/ldd.txt
+	linux-vdso.so.1 (0x00007ffe5e7cd000)
+	libLLVM.so.20.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libLLVM.so.20.1 (0x00007f60132b6000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f60130a2000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f601e549000)
+	libffi.so.8 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libffi.so.8 (0x00007f6013095000)
+	libedit.so.2 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libedit.so.2 (0x00007f601305b000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f6012f72000)
+	libz.so.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libz.so.1 (0x00007f6012f54000)
+	libzstd.so.1 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libzstd.so.1 (0x00007f6012e85000)
+	libxml2.so.2 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/../lib/libxml2.so.2 (0x00007f6012ca3000)
+	libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f6012a25000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f60129f7000)
+	libtinfo.so.6 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libtinfo.so.6 (0x00007f60129c3000)
+	libbsd.so.0 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libbsd.so.0 (0x00007f60129ab000)
+	libicuuc.so.70 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libicuuc.so.70 (0x00007f60127b0000)
+	liblzma.so.5 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/liblzma.so.5 (0x00007f6012785000)
+	libmd.so.0 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libmd.so.0 (0x00007f6012778000)
+	libicudata.so.70 => /tmp/codeskeptic-v0.4.4-linux-x86_64/./bin/../lib/libicudata.so.70 (0x00007f6010b58000)
++ grep -q 'not found' /tmp/ldd.txt
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -qE '=> /tmp/codeskeptic-'
++ grep -E 'libLLVM\.so' /tmp/ldd.txt
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libzstd\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libz\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"
++ grep -E 'libtinfo\.so' /tmp/ldd.txt
++ grep -qE '=> /tmp/codeskeptic-'
++ code=0
+++ ./bin/codeskeptic /demo/demo.c
++ out='[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
++ code=1
++ echo '[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
++ test 1 -eq 1
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: 'val' may be null on some paths
+    -> /demo/demo.c:6:5 'val' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 'val' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: 'copy' may be null on some paths
+    -> /demo/demo.c:7:5 'copy' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+----------------------------------------
++ grep -qi finding
++ echo '[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+/demo/demo.c:7:25 [warning] null-deref: Possible null dereference: '\''val'\'' may be null on some paths
+    -> /demo/demo.c:6:5 '\''val'\'' assigned a possibly-null value here (callee may return null)
+    -> /demo/demo.c:8:5 '\''val'\'' is also dereferenced here (same origin)
+/demo/demo.c:8:5 [warning] null-deref: Possible null dereference: '\''copy'\'' may be null on some paths
+    -> /demo/demo.c:7:5 '\''copy'\'' assigned a possibly-null value here (callee may return null)
+/demo/demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed '\''int'\''
+----------------------------------------'
