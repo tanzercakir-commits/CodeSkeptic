@@ -128,17 +128,35 @@ jobs:
         # the relocation smoke below) stays untouched.
         shell: bash
         run: |
-          PATH=$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -vi '7-zip' | paste -sd:)
-          export PATH
-          if command -v 7z >/dev/null 2>&1; then
-            echo "7z still visible after masking — rehearsal invalid"
-            exit 1
-          fi
-          bash scripts/package_release.sh build/src/codeskeptic.exe dist-no7z "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe"
-          ZIP=$(ls dist-no7z/codeskeptic-*-windows-*.zip)
-          powershell.exe -NoProfile -Command \
-            "Expand-Archive -Path '$ZIP' -DestinationPath 'no7z_check' -Force"
-          find no7z_check -name codeskeptic.exe | grep -q codeskeptic.exe
+          {
+            # Surgical mask: drop every PATH dir that provides a 7z
+            # executable (Program Files\7-Zip AND any shim dir like
+            # chocolatey's), keep the rest. Name-substring filtering
+            # missed second providers on the first round.
+            NEWPATH=""
+            IFS=':'
+            for d in $PATH; do
+              if [ -x "$d/7z" ] || [ -x "$d/7z.exe" ]; then
+                echo "masking PATH entry with 7z: $d"
+              else
+                NEWPATH="${NEWPATH:+$NEWPATH:}$d"
+              fi
+            done
+            unset IFS
+            PATH="$NEWPATH"
+            export PATH
+            if command -v 7z >/dev/null 2>&1; then
+              echo "7z still visible after masking — rehearsal invalid: $(command -v 7z)"
+              exit 1
+            fi
+            bash scripts/package_release.sh build/src/codeskeptic.exe dist-no7z "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe"
+            ZIP=$(ls dist-no7z/codeskeptic-*-windows-*.zip)
+            echo "fallback zip: $ZIP"
+            powershell.exe -NoProfile -Command \
+              "Expand-Archive -Path '$ZIP' -DestinationPath 'no7z_check' -Force"
+            find no7z_check -name codeskeptic.exe | grep -q codeskeptic.exe
+            echo "NO7Z-REHEARSAL-OK"
+          } 2>&1 | tee /tmp/no7z_out.txt
 
       - name: Relocation smoke (package tree only — LLVM hidden, plain terminal)
         id: reloc-smoke
@@ -195,6 +213,8 @@ jobs:
              /tmp/diag/ctest_failed_tail.txt /tmp/diag/configure_tail.txt . 2>/dev/null || true
           git add -f steps.txt build_tail.txt ctest_failed_tail.txt configure_tail.txt
           [ -f probe_result.txt ] && git add -f probe_result.txt || true
+          cp /tmp/no7z_out.txt no7z_out.txt 2>/dev/null || true
+          [ -f no7z_out.txt ] && git add -f no7z_out.txt || true
           git commit -qm "windows ci diagnostics @ ${{ github.sha }}"
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/windows-native"
 

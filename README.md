@@ -40,14 +40,14 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 **Docker** — nothing installed at all:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.5 src/ --sarif out.sarif  # :latest floats
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.6 src/ --sarif out.sarif  # :latest floats
 ```
 
 **CI** — the [packaged action](action.yml), report-only by default:
 
 ```yaml
 # Pinning the action pins the analyzer binary too (same tag).
-- uses: tanzercakir-commits/CodeSkeptic@v0.4.5
+- uses: tanzercakir-commits/CodeSkeptic@v0.4.6
   with: { path: src/, build-path: build }
 ```
 
@@ -62,10 +62,10 @@ code resolves real headers, as with any compiler:
 ```powershell
 curl.exe -sLO https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-windows-x86_64.zip
 Expand-Archive codeskeptic-windows-x86_64.zip -DestinationPath .
-.\codeskeptic-v0.4.5-windows-x86_64\bin\codeskeptic.exe path\to\source --build-path path\to\build
+.\codeskeptic-v0.4.6-windows-x86_64\bin\codeskeptic.exe path\to\source --build-path path\to\build
 ```
 
-WSL2/Docker remain as Linux-view paths (`docker run ... :v0.4.5`, or
+WSL2/Docker remain as Linux-view paths (`docker run ... :v0.4.6`, or
 the Linux tarball inside WSL). One honest caveat there — CodeSkeptic
 analyzes the program the compiler sees: the Linux preprocessor view,
 so `#ifdef _WIN32` branches are invisible; MSVC-targeted code wants
