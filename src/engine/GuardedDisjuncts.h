@@ -486,13 +486,77 @@ void refineGuardedFacts(GuardedState<VarMap>& state,
 // separate disjuncts, which is exactly the flag/status correlation
 // (`have = 1; ... if (have) use(x);`). Returns whether anything
 // changed.
+// Member-assignment lifecycle shared by both applyStmtFacts variants:
+// `c.f = X` erases the (c, f) facts in every disjunct and re-stamps
+// when X is an integer constant (scope admission of the base is the
+// stamping gate — assignedMemberFact answers only for admitted
+// bases). Facts on OTHER fields of c survive: a field store cannot
+// change its siblings.
+template <typename VarMap>
+bool applyMemberStmtFacts(GuardedState<VarMap>& state,
+                          const clang::Stmt* stmt) {
+    auto ma = assignedMemberFact(stmt);
+    if (!ma) return false;
+    bool changed = false;
+    for (auto& d : state) {
+        for (auto it = d.facts.begin(); it != d.facts.end();) {
+            if (it->first.var == ma->base && it->first.field == ma->field) {
+                it = d.facts.erase(it);
+                changed = true;
+            } else {
+                ++it;
+            }
+        }
+        if (ma->literal) {
+            d.facts[FactKey{ma->base, clang::BO_EQ, *ma->literal,
+                            ma->field}] = true;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+// Call-statement lifecycle for member facts: a call that receives the
+// BASE'S ADDRESS may write any of its fields (that is what a
+// parse(&c) is for) — every (c, *) fact dies. Calls without &c cannot
+// reach an admitted base (see the deliberate-limit note in
+// PathFacts.h) and erase nothing.
+template <typename VarMap>
+bool eraseMemberFactsAtCall(GuardedState<VarMap>& state,
+                            const clang::CallExpr* call) {
+    const auto* bases = activeMemberFactBases();
+    if (!bases || bases->empty()) return false;
+    bool changed = false;
+    for (const clang::Expr* arg : call->arguments()) {
+        const clang::VarDecl* base = addrOfBaseVar(arg);
+        if (!base || !bases->count(base)) continue;
+        for (auto& d : state) {
+            for (auto it = d.facts.begin(); it != d.facts.end();) {
+                if (it->first.var == base && it->first.field) {
+                    it = d.facts.erase(it);
+                    changed = true;
+                } else {
+                    ++it;
+                }
+            }
+        }
+    }
+    return changed;
+}
+
 template <typename VarMap, typename MergeVal>
 bool applyStmtFacts(GuardedState<VarMap>& state, const clang::Stmt* stmt,
                     const std::set<const clang::ValueDecl*>& stampable,
                     const std::set<const clang::ValueDecl*>& ptrStampable,
                     MergeVal mergeVal) {
     const clang::ValueDecl* target = assignedDecl(stmt);
-    if (!target) return false;
+    if (!target) {
+        if (applyMemberStmtFacts(state, stmt)) {
+            normalizeGuarded(state, mergeVal);
+            return true;
+        }
+        return false;
+    }
 
     auto lit = assignedIntLiteral(stmt);
     // Integer stamp: any constant. Pointer stamp: only the null
@@ -537,7 +601,13 @@ bool applyStmtFactsOps(GuardedState<VarMap>& state, const clang::Stmt* stmt,
                        const std::set<const clang::ValueDecl*>& ptrStampable,
                        const Ops& ops) {
     const clang::ValueDecl* target = assignedDecl(stmt);
-    if (!target) return false;
+    if (!target) {
+        bool memberChanged = applyMemberStmtFacts(state, stmt);
+        if (const auto* call = clang::dyn_cast<clang::CallExpr>(stmt))
+            memberChanged |= eraseMemberFactsAtCall(state, call);
+        if (memberChanged) normalizeGuardedOps(state, ops);
+        return memberChanged;
+    }
 
     auto lit = assignedIntLiteral(stmt);
     const bool stamp =

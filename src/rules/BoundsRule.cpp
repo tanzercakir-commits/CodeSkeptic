@@ -145,6 +145,134 @@ bool literalFits(const Expr* src, int64_t capacityBytes) {
     return static_cast<int64_t>(lit->getByteLength()) + 1 <= capacityBytes;
 }
 
+// --- Length-check witness for the unbounded-copy heuristic (2026-07-22,
+// the rtp2httpd service.c / http_proxy_rewrite.c FP family) ---
+//
+// The CWE-120 message claims "the source length is not checked", so the
+// rule must actually LOOK for the check. The two idioms that guard
+// virtually every deliberate strcpy/strcat in real C:
+//
+//   A) the copy sits INSIDE a branch whose condition measures the
+//      source:      if (strlen(dst) + strlen(src) < sizeof(dst))
+//                       strcat(dst, src);
+//   B) an EARLIER statement in an enclosing block is an if whose
+//      then-branch unconditionally exits and whose condition measures
+//      the source:  if (strlen(src) >= sizeof(dst)) return -1;
+//                   ...
+//                   strcpy(dst, src);
+//
+// The witness is deliberately about MEASUREMENT, not about proving the
+// comparison arithmetically: a strlen/strnlen of the SAME source
+// expression inside such a dominating guard is evidence of length
+// diligence, and this heuristic's job is flagging OBLIVIOUSLY
+// unbounded copies. Measuring only the DESTINATION does not count
+// (`if (strlen(dst) < 100) strcat(dst, src)` never bounds src), a
+// check AFTER the copy does not count (shape B looks only at earlier
+// siblings), and a measured-then-ignored guard does not count (shape A
+// requires the copy INSIDE the guarded branch). gets() has no source
+// and is never excused.
+
+// Same-source comparison for the witness: identical variable, or the
+// same member chain over identical variables (`s->buf`, `c.name`).
+bool sameSourceExpr(const Expr* a, const Expr* b) {
+    if (!a || !b) return false;
+    a = a->IgnoreParenImpCasts();
+    b = b->IgnoreParenImpCasts();
+    if (const auto* ra = dyn_cast<DeclRefExpr>(a)) {
+        const auto* rb = dyn_cast<DeclRefExpr>(b);
+        return rb && ra->getDecl()->getCanonicalDecl() ==
+                         rb->getDecl()->getCanonicalDecl();
+    }
+    if (const auto* ma = dyn_cast<MemberExpr>(a)) {
+        const auto* mb = dyn_cast<MemberExpr>(b);
+        return mb && ma->getMemberDecl() == mb->getMemberDecl() &&
+               sameSourceExpr(ma->getBase(), mb->getBase());
+    }
+    return false;
+}
+
+// Does `e` contain a strlen/strnlen call whose measured argument is
+// the copy's source expression?
+bool mentionsStrlenOfSrc(const Expr* e, const Expr* src) {
+    if (!e) return false;
+    struct V : RecursiveASTVisitor<V> {
+        const Expr* src;
+        bool found = false;
+        explicit V(const Expr* s) : src(s) {}
+        bool VisitCallExpr(CallExpr* call) {
+            const FunctionDecl* fd = call->getDirectCallee();
+            if (!fd || !fd->getIdentifier()) return true;
+            const llvm::StringRef n = fd->getName();
+            if ((n == "strlen" || n == "strnlen") &&
+                call->getNumArgs() >= 1 &&
+                sameSourceExpr(call->getArg(0), src)) {
+                found = true;
+                return false;  // stop
+            }
+            return true;
+        }
+    } v(src);
+    v.TraverseStmt(const_cast<Expr*>(const_cast<Expr*>(e)));
+    return v.found;
+}
+
+// The last effective statement of a branch, unwrapping one compound.
+const Stmt* lastStmtOf(const Stmt* s) {
+    if (!s) return nullptr;
+    if (const auto* comp = dyn_cast<CompoundStmt>(s))
+        return comp->body_empty() ? nullptr : comp->body_back();
+    return s;
+}
+
+// Unconditional-exit test for shape B's then-branch: the branch's
+// final statement leaves the surrounding flow (return/goto/break/
+// continue). This is what makes the guard's FALSE edge dominate the
+// copy that follows the if.
+bool branchExits(const Stmt* s) {
+    const Stmt* last = lastStmtOf(s);
+    return last && (isa<ReturnStmt>(last) || isa<GotoStmt>(last) ||
+                    isa<BreakStmt>(last) || isa<ContinueStmt>(last));
+}
+
+bool hasLengthCheckWitness(const CallExpr* copyCall, const Expr* src,
+                           ASTContext& ctx) {
+    using DynNode = clang::DynTypedNode;
+    DynNode node = DynNode::create(*copyCall);
+    const Stmt* childStmt = copyCall;
+
+    // Walk up the tree. At every IfStmt whose then/else contains us,
+    // test shape A; at every CompoundStmt, test shape B against the
+    // earlier siblings of the statement we came from.
+    for (unsigned depth = 0; depth < 64; ++depth) {
+        auto parents = ctx.getParents(node);
+        if (parents.empty()) return false;
+        const Stmt* parent = parents[0].get<Stmt>();
+        if (!parent) {
+            // Function boundary (or non-stmt parent): stop.
+            return false;
+        }
+        if (const auto* ifs = dyn_cast<IfStmt>(parent)) {
+            const bool inThen = ifs->getThen() == childStmt;
+            const bool inElse = ifs->getElse() == childStmt;
+            if ((inThen || inElse) &&
+                mentionsStrlenOfSrc(ifs->getCond(), src))
+                return true;  // shape A
+        }
+        if (const auto* comp = dyn_cast<CompoundStmt>(parent)) {
+            for (const Stmt* sib : comp->body()) {
+                if (sib == childStmt) break;  // only EARLIER siblings
+                const auto* sibIf = dyn_cast<IfStmt>(sib);
+                if (!sibIf || !branchExits(sibIf->getThen())) continue;
+                if (mentionsStrlenOfSrc(sibIf->getCond(), src))
+                    return true;  // shape B
+            }
+        }
+        childStmt = parent;
+        node = DynNode::create(*parent);
+    }
+    return false;
+}
+
 // Byte size of one element of a buffer variable — the factor that turns
 // the ExtentMap's element count into a byte capacity. 0 when unknown
 // (including a type too deep for the size budget — see
@@ -333,6 +461,9 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         if (sc.hasSource &&
             literalFits(sc.call->getArg(sc.srcArg), capacity.hi()))
             continue;  // `strcpy(buf32, "hi")` — provably safe
+        if (sc.hasSource &&
+            hasLengthCheckWitness(sc.call, sc.call->getArg(sc.srcArg), ctx))
+            continue;  // guarded by a strlen(src) check — not oblivious
 
         SourceLocation loc = sm.getExpansionLoc(sc.call->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);

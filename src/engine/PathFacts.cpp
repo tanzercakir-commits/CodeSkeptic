@@ -2,6 +2,8 @@
 
 #include <clang/AST/RecursiveASTVisitor.h>
 
+#include <vector>
+
 using namespace clang;
 
 namespace {
@@ -301,6 +303,10 @@ std::optional<std::pair<FactKey, bool>> conditionFact(
         return {{FactKey{var, BO_EQ, 0}, false}};
     if (const ValueDecl* var = ptrDeclRef(cond, unkeyable, ptrKeyable))
         return {{FactKey{var, BO_EQ, 0}, false}};
+    // if (c.flag): dot-member truthiness of a scope-admitted local
+    // struct (member keying, 2026-07-22; nullopt without a scope).
+    if (auto mem = memberFactRef(cond))
+        return {{FactKey{mem->first, BO_EQ, 0, mem->second}, false}};
 
     // if (f()): constant-returning helpers key on the callee
     // (FunctionDecl is a ValueDecl — the key structure is unchanged)
@@ -347,6 +353,23 @@ std::optional<std::pair<FactKey, bool>> conditionFact(
     if (const ValueDecl* var = stableDeclRef(rhs, unkeyable)) {
         if (auto lit = intLiteralValue(lhs))
             return normalizeCompare(var, opc, *lit, /*varOnLeft=*/false);
+        return std::nullopt;
+    }
+
+    // `c.flag ==/!= <int const>` — member keys stay in the EQ family
+    // (v1 scope: no relational member keys).
+    if (opc == BO_EQ || opc == BO_NE) {
+        auto mem = memberFactRef(lhs);
+        const Expr* other = rhs;
+        if (!mem) {
+            mem = memberFactRef(rhs);
+            other = lhs;
+        }
+        if (mem) {
+            if (auto lit = intLiteralValue(other))
+                return {{FactKey{mem->first, BO_EQ, *lit, mem->second},
+                         opc == BO_EQ}};
+        }
     }
     return std::nullopt;
 }
@@ -504,8 +527,11 @@ bool factsContradict(const std::map<FactKey, bool>& facts,
     // Only EQ=true stamps entail; inequalities are left alone (partial
     // information, no contradiction derivable in the simple cases we
     // stamp). The maps hold a handful of entries — a plain scan.
+    // Member keys entail only within the SAME (base, field) pair.
     for (const auto& [known, value] : facts) {
-        if (known.var != key.var || known.rel != BO_EQ || !value) continue;
+        if (known.var != key.var || known.field != key.field ||
+            known.rel != BO_EQ || !value)
+            continue;
         bool holds = false;
         switch (key.rel) {
             case BO_EQ: holds = (known.literal == key.literal); break;
@@ -516,6 +542,145 @@ bool factsContradict(const std::map<FactKey, bool>& facts,
         if (holds != wanted) return true;
     }
     return false;
+}
+
+// --- Member fact keying (opt-in scope; see the header's deliberate-
+// limit note — the keyed-globals trade applied to escaped locals) ---
+
+namespace {
+
+// Single-threaded analyzer: a plain global, same discipline as the
+// SoleDefScope registry in NullDerefRule.
+const std::set<const VarDecl*>* g_memberFactBases = nullptr;
+
+} // anonymous namespace
+
+MemberFactScope::MemberFactScope(const std::set<const VarDecl*>* bases) {
+    g_memberFactBases = bases;
+}
+MemberFactScope::~MemberFactScope() { g_memberFactBases = nullptr; }
+
+const std::set<const VarDecl*>* activeMemberFactBases() {
+    return g_memberFactBases;
+}
+
+std::optional<std::pair<const VarDecl*, const ValueDecl*>>
+memberFactRef(const Expr* expr) {
+    if (!g_memberFactBases || g_memberFactBases->empty() || !expr)
+        return std::nullopt;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* mem = dyn_cast<MemberExpr>(expr);
+    if (!mem || mem->isArrow()) return std::nullopt;  // dot access only
+    const auto* field = dyn_cast<FieldDecl>(mem->getMemberDecl());
+    if (!field || !field->getType()->isIntegerType() ||
+        field->getType().isVolatileQualified())
+        return std::nullopt;
+    const Expr* base = mem->getBase()->IgnoreParenImpCasts();
+    const auto* ref = dyn_cast<DeclRefExpr>(base);
+    if (!ref) return std::nullopt;
+    const auto* vd = dyn_cast<VarDecl>(ref->getDecl());
+    if (!vd || !g_memberFactBases->count(vd)) return std::nullopt;
+    return {{vd, field}};
+}
+
+std::optional<MemberAssign> assignedMemberFact(const Stmt* stmt) {
+    if (!g_memberFactBases || g_memberFactBases->empty() || !stmt)
+        return std::nullopt;
+    const Expr* lhs = nullptr;
+    const Expr* value = nullptr;
+    bool plainAssign = false;
+    if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
+        if (!bin->isAssignmentOp()) return std::nullopt;
+        lhs = bin->getLHS();
+        plainAssign = bin->getOpcode() == BO_Assign;
+        value = bin->getRHS();
+    } else if (const auto* un = dyn_cast<UnaryOperator>(stmt)) {
+        if (!un->isIncrementDecrementOp()) return std::nullopt;
+        lhs = un->getSubExpr();
+    } else {
+        return std::nullopt;
+    }
+    auto mem = memberFactRef(lhs);
+    if (!mem) return std::nullopt;
+    MemberAssign out;
+    out.base = mem->first;
+    out.field = mem->second;
+    if (plainAssign) out.literal = intLiteralValue(value);
+    return out;
+}
+
+const VarDecl* addrOfBaseVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenCasts();
+    const auto* un = dyn_cast<UnaryOperator>(expr);
+    if (!un || un->getOpcode() != UO_AddrOf) return nullptr;
+    const Expr* e = un->getSubExpr();
+    while (e) {
+        e = e->IgnoreParenImpCasts();
+        if (const auto* mem = dyn_cast<MemberExpr>(e)) {
+            if (mem->isArrow()) return nullptr;  // pointee, not our var
+            e = mem->getBase();
+            continue;
+        }
+        if (const auto* sub = dyn_cast<ArraySubscriptExpr>(e)) {
+            e = sub->getBase();
+            continue;
+        }
+        break;
+    }
+    if (const auto* ref = dyn_cast_or_null<DeclRefExpr>(e))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+namespace {
+
+// Address-taking census for member-fact admission: every `&c`-rooted
+// expression must sit in a DIRECT call-argument position. The visitor
+// walks call expressions and marks their argument roots as
+// call-consumed; a second pass over ALL AddrOf nodes bans any base
+// whose address-of was not consumed by a call.
+class MemberBaseCollector
+    : public RecursiveASTVisitor<MemberBaseCollector> {
+public:
+    std::set<const VarDecl*> candidates;
+    std::set<const UnaryOperator*> callConsumed;
+    std::vector<std::pair<const UnaryOperator*, const VarDecl*>> addrOfs;
+
+    bool VisitVarDecl(VarDecl* vd) {
+        if (vd->hasLocalStorage() && !vd->isStaticLocal() &&
+            vd->getType()->isRecordType() &&
+            !vd->getType().isVolatileQualified())
+            candidates.insert(vd);
+        return true;
+    }
+    bool VisitCallExpr(CallExpr* call) {
+        for (const Expr* arg : call->arguments()) {
+            const Expr* a = arg->IgnoreParenCasts();
+            if (const auto* un = dyn_cast<UnaryOperator>(a))
+                if (un->getOpcode() == UO_AddrOf) callConsumed.insert(un);
+        }
+        return true;
+    }
+    bool VisitUnaryOperator(UnaryOperator* un) {
+        if (un->getOpcode() != UO_AddrOf) return true;
+        if (const VarDecl* base = addrOfBaseVar(un)) addrOfs.push_back({un, base});
+        return true;
+    }
+};
+
+} // anonymous namespace
+
+std::set<const VarDecl*> collectMemberFactBases(const FunctionDecl* func,
+                                                ASTContext& /*ctx*/) {
+    std::set<const VarDecl*> out;
+    if (!func || !func->hasBody()) return out;
+    MemberBaseCollector c;
+    c.TraverseStmt(func->getBody());
+    out = std::move(c.candidates);
+    for (const auto& [un, base] : c.addrOfs)
+        if (!c.callConsumed.count(un)) out.erase(base);
+    return out;
 }
 
 } // namespace codeskeptic

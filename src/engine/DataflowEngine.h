@@ -351,8 +351,26 @@ DataflowResult<Analysis> runDataflow(
     // single-disjunct state can still alternate fact VALUES across
     // visits (merge_query_strings kept cycling until the join-with-
     // previous was added).
+    //
+    // WHAT counts as a visit matters as much as the cap (the libgit2
+    // hashmap FP family, 2026-07-22). Nested loops re-enqueue their
+    // inner blocks once per OUTER iteration, so a perfectly converging
+    // inner loop can rack up visits until the cap trips — and the
+    // memory-join then resurrects a PRE-fixpoint entry (in this
+    // non-monotone domain an early state can be strictly WORSE than
+    // the fixpoint: a MaybeNull recorded before the null-check edge
+    // had propagated poisons every later join, and a proven-NonNull
+    // pointer degrades back to a false "may be null"). Oscillation —
+    // the thing the fuse exists for — means the entry KEEPS CHANGING;
+    // a re-visit that arrives with the same entry as last time is the
+    // worklist doing bookkeeping, not a climb. So the counter only
+    // advances when the entry state actually changed. True cyclers
+    // (merge_query_strings) change entry every visit and trip the cap
+    // exactly as before; converging nested loops stabilize their
+    // entries, stop counting, and keep their precision.
     std::vector<unsigned> visitCounts(numBlocks, 0);
     std::map<unsigned, State> widenMemory;
+    std::map<unsigned, State> lastEntry;
     const unsigned widenAfter = latticeHeight + 2;
 
     while (!worklist.empty() && iterations < maxIterations) {
@@ -367,12 +385,22 @@ DataflowResult<Analysis> runDataflow(
 
         if constexpr (detail::HasWiden<Analysis>::value) {
             const unsigned id = block->getBlockID();
-            if (++visitCounts[id] > widenAfter) {
+            auto le = lastEntry.find(id);
+            const bool entryChanged =
+                le == lastEntry.end() || le->second != entryState;
+            if (entryChanged) {
+                lastEntry[id] = entryState;
+                ++visitCounts[id];
+            }
+            if (visitCounts[id] > widenAfter) {
                 auto mem = widenMemory.find(id);
                 if (mem != widenMemory.end())
                     entryState = analysis.merge(mem->second, entryState);
                 analysis.widen(entryState);
                 widenMemory[id] = entryState;
+                // The widened entry is this visit's real entry — keep
+                // the change detector honest about it.
+                lastEntry[id] = entryState;
             }
         }
 

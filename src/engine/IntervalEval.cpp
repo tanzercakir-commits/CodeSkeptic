@@ -17,6 +17,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <vector>
 
 using namespace clang;
 
@@ -136,6 +137,140 @@ bool isScanfFamily(const CallExpr* call) {
     const llvm::StringRef n = id->getName();
     return n == "scanf" || n == "fscanf" || n == "sscanf" || n == "vscanf" ||
            n == "vfscanf" || n == "vsscanf";
+}
+
+// Index of the format-string argument for a scanf-family callee:
+// scanf(fmt, ...) -> 0; fscanf(f, fmt, ...) / sscanf(s, fmt, ...) -> 1.
+unsigned scanfFormatArgIndex(const CallExpr* call) {
+    const llvm::StringRef n =
+        call->getDirectCallee()->getIdentifier()->getName();
+    return (n == "scanf" || n == "vscanf") ? 0 : 1;
+}
+
+// One conversion specification of a scanf format string, as far as the
+// interval model cares: assignment suppression (`%*d` consumes input
+// but NO argument — pairing must skip none), the maximum field width,
+// and the conversion character (length modifiers hh/h/l/ll/j/z/t/L are
+// skipped — the ARGUMENT's declared type already carries the width).
+struct ScanfConv {
+    bool suppressed = false;
+    uint64_t width = 0;  // 0 = no explicit field width
+    char conv = 0;
+};
+
+// Parse the conversions of a scanf format literal, in argument order.
+// `%%` consumes no argument and is not emitted. A scanset (`%[...]`)
+// is parsed to its closing bracket (leading `]` is literal per C11).
+// Returns false for a malformed format (trailing '%', unterminated
+// scanset) — the caller then falls back to the widthless model.
+bool parseScanfFormat(llvm::StringRef fmt, std::vector<ScanfConv>& out) {
+    for (size_t i = 0; i < fmt.size(); ++i) {
+        if (fmt[i] != '%') continue;
+        if (++i >= fmt.size()) return false;
+        if (fmt[i] == '%') continue;  // literal %
+        ScanfConv c;
+        if (fmt[i] == '*') {
+            c.suppressed = true;
+            if (++i >= fmt.size()) return false;
+        }
+        while (i < fmt.size() && fmt[i] >= '0' && fmt[i] <= '9') {
+            c.width = c.width * 10 + (uint64_t)(fmt[i] - '0');
+            if (c.width > 1000000) c.width = 1000000;  // clamp, keep sane
+            ++i;
+        }
+        while (i < fmt.size() &&
+               (fmt[i] == 'h' || fmt[i] == 'l' || fmt[i] == 'j' ||
+                fmt[i] == 'z' || fmt[i] == 't' || fmt[i] == 'L' ||
+                fmt[i] == 'q'))
+            ++i;
+        if (i >= fmt.size()) return false;
+        c.conv = fmt[i];
+        if (c.conv == '[') {
+            size_t j = i + 1;
+            if (j < fmt.size() && fmt[j] == '^') ++j;
+            if (j < fmt.size() && fmt[j] == ']') ++j;  // literal ] first
+            while (j < fmt.size() && fmt[j] != ']') ++j;
+            if (j >= fmt.size()) return false;
+            i = j;
+        }
+        out.push_back(c);
+    }
+    return true;
+}
+
+// base^exp as int64 with an overflow ceiling; nullopt past the ceiling
+// (the caller then uses the plain type range).
+std::optional<int64_t> powCapped(int64_t base, uint64_t exp) {
+    int64_t r = 1;
+    for (uint64_t k = 0; k < exp; ++k) {
+        if (r > INT64_MAX / base) return std::nullopt;
+        r *= base;
+    }
+    return r;
+}
+
+// The value range an EXPLICIT FIELD WIDTH imposes on a numeric scanf
+// conversion — the piece the untrusted-source model was missing (the
+// rtp2httpd timezone FP family, 2026-07-22): `%2d` reads at most two
+// characters, so the parsed value is in [-9, 99] no matter what the
+// input holds; treating it as a full-range int manufactured a finite
+// "overflow witness" out of a bound that cannot occur. A sign, when
+// the conversion accepts one, consumes one of the width characters —
+// hence the asymmetric negative bound (10^(w-1) - 1). `%i` accepts
+// hex with a 0x prefix, so its magnitude ceiling is 16^w (covers the
+// decimal and octal cases too); conservative but finite and small.
+// No width, or a width too large for int64 -> nullopt (the existing
+// full-type-range model applies).
+std::optional<Interval> scanfWidthBound(const ScanfConv& c) {
+    if (c.width == 0) return std::nullopt;
+    const uint64_t w = c.width;
+    switch (c.conv) {
+        case 'd': case 'u': {
+            auto hi = powCapped(10, w);
+            if (!hi) return std::nullopt;
+            if (c.conv == 'u') return Interval::range(0, *hi - 1);
+            auto mag = powCapped(10, w - 1);
+            if (!mag) return std::nullopt;
+            return Interval::range(-(*mag - 1), *hi - 1);
+        }
+        case 'x': case 'X': {
+            auto hi = powCapped(16, w);
+            if (!hi) return std::nullopt;
+            return Interval::range(0, *hi - 1);
+        }
+        case 'o': {
+            auto hi = powCapped(8, w);
+            if (!hi) return std::nullopt;
+            return Interval::range(0, *hi - 1);
+        }
+        case 'i': {
+            auto hi = powCapped(16, w);
+            auto mag = powCapped(16, w > 0 ? w - 1 : 0);
+            if (!hi || !mag) return std::nullopt;
+            return Interval::range(-(*mag - 1), *hi - 1);
+        }
+        default:
+            return std::nullopt;
+    }
+}
+
+// Whether a conversion character consumes a pointer argument that the
+// numeric-interval model should seed at all. %n yields the number of
+// characters consumed so far — non-negative by definition, unbounded
+// above (input-length dependent).
+bool isNumericScanfConv(char conv) {
+    return conv == 'd' || conv == 'i' || conv == 'u' || conv == 'o' ||
+           conv == 'x' || conv == 'X' || conv == 'n';
+}
+
+// The format string literal of a scanf-family call, if it is one.
+const clang::StringLiteral* scanfFormatLiteral(const CallExpr* call) {
+    const unsigned idx = scanfFormatArgIndex(call);
+    if (idx >= call->getNumArgs()) return nullptr;
+    const Expr* fmt = call->getArg(idx)->IgnoreParenImpCasts();
+    const auto* lit = dyn_cast<clang::StringLiteral>(fmt);
+    if (!lit || lit->getCharByteWidth() != 1) return nullptr;
+    return lit;
 }
 
 // `&x` where x is a tracked integer variable — the shape a scanf output
@@ -401,7 +536,43 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
         // source delivered by pointer. Seed its type's FULL FINITE range
         // (not top()), the same model as an atoi return, so a downstream
         // `n * k` proves overflow and a guard re-narrows on its edge.
+        //
+        // Width-aware refinement (2026-07-22, the rtp2httpd timezone FP
+        // family): when the format string is a literal, conversions are
+        // PAIRED with their arguments (`%*d` consumes no argument — a
+        // blind per-arg sweep would misalign and seed the wrong
+        // variable) and an explicit field width bounds the value the
+        // conversion can produce: `%2d` cannot exceed 99 no matter the
+        // input, so the full-type-range model — whose finite endpoints
+        // double as overflow witnesses downstream — would claim a bound
+        // the parse cannot reach. Widthless conversions keep the
+        // full-range untrusted-source model unchanged; %n is
+        // non-negative by definition. Non-literal formats fall back to
+        // the old per-arg sweep (sound: full type range).
         if (ctx && isScanfFamily(call)) {
+            std::vector<ScanfConv> convs;
+            const clang::StringLiteral* fmt = scanfFormatLiteral(call);
+            if (fmt && parseScanfFormat(fmt->getString(), convs)) {
+                unsigned argIdx = scanfFormatArgIndex(call) + 1;
+                for (const ScanfConv& c : convs) {
+                    if (c.suppressed) continue;
+                    if (argIdx >= call->getNumArgs()) break;
+                    const Expr* arg = call->getArg(argIdx++);
+                    const VarDecl* v = addrOfIntVar(arg);
+                    if (!v || !isNumericScanfConv(c.conv)) continue;
+                    auto tr = intTypeRange(v->getType(), *ctx);
+                    if (!tr) continue;
+                    Interval seed = *tr;
+                    if (c.conv == 'n') {
+                        seed = Interval::meet(
+                            seed, Interval::atLeast(0));
+                    } else if (auto wb = scanfWidthBound(c)) {
+                        seed = Interval::meet(seed, *wb);
+                    }
+                    if (!seed.isEmpty()) set(v, seed);
+                }
+                return;
+            }
             for (const Expr* arg : call->arguments())
                 if (const VarDecl* v = addrOfIntVar(arg))
                     if (auto iv = intTypeRange(v->getType(), *ctx)) set(v, *iv);

@@ -9,6 +9,12 @@
 > [sabit-dönüş bayrakları, zeroness-özet birleşmesi] sonraki tura
 > devredildi ve guard dosyalarında belgeli). v0.4.1 bu turun kapanış
 > sürümüdür.
+>
+> **Faz 5 (plan-dışı, 2026-07-22): gerçek-dünya FP turu.** v0.4.2
+> sonrası realworld.yml taramaları 4 FP ailesi çıkardı; dördü de kökten
+> kapatıldı (entailment-farkındalı korelasyon madencisi, üye fact
+> anahtarları, scanf genişlik modeli, bounds strlen-guard tanıklığı) —
+> 678 test, ayrıntı devlog/changelog.md 2026-07-22.
 
 Tarih: 2026-07-22 · Girdi: dış AI değerlendirmesi (`CodeSkeptic_plan.txt`) · Repo durumu: `main @ 4c62bde`, 158 commit, v0.3.0
 
