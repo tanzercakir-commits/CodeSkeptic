@@ -5,13 +5,15 @@
 > [README's Windows section](../README.md#windows-native-build-from-source-or-wsl2docker),
 > including the honest `#ifdef _WIN32` caveat on the WSL2/Docker paths.
 
-Status: **Tier 1 landed** (phase7-windows-native, 2026-07-23). The
-native MSVC build compiles, links, and runs the full 682-test unit
-suite green on `windows-latest` on every push — the item-6 ratchet
-([windows.yml](../.github/workflows/windows.yml)) guards it from here
-on. Tier 2 (automatic Windows SDK header discovery) remains open; the
-per-item notes below record what landed and what each gap turned out
-to be in practice.
+Status: **Tier 1 + Tier 2 landed** (phase7-windows-native +
+phase8-windows-sdk, 2026-07-23). The native MSVC build compiles, links,
+and runs the full 682-test unit suite green on `windows-latest` on every
+push, and plain-terminal directory mode is guarded by its own CI step —
+the item-6 ratchet ([windows.yml](../.github/workflows/windows.yml))
+holds both from here on. Tier 2 turned out to need measurement, not
+code (see item 3). Remaining open: a prebuilt Windows release binary.
+The per-item notes below record what landed and what each gap turned
+out to be in practice.
 
 ## Starting point: the core is already portable
 
@@ -62,22 +64,25 @@ DIA SDK (idempotent, survives caching). Note the package is a static-CRT
   forward-slash (`generic_string()`). The windows lane now enforces all
   of this.
 
-### 3. System-header discovery for the *analyzed* code (the real functional gap) — OPEN (Tier 2)
-`SourceManager.cpp` has an `#ifdef __APPLE__` branch (adds
-`-isystem /usr/include`, isysroot) and relies on the Clang resource dir on
-Linux — but **no Windows branch.** Automatic discovery (`vswhere`,
-`-fms-compatibility`) is the remaining Tier 2 work.
+### 3. System-header discovery for the *analyzed* code (the real functional gap) — LANDED (by measurement, not code)
+The plan assumed a Windows branch in `SourceManager.cpp` (mirroring the
+`#ifdef __APPLE__` isysroot logic) would have to discover MSVC + SDK
+include paths. **Measured on CI: unnecessary.** Clang's MSVC toolchain
+driver carries its own discovery — `INCLUDE` env when present (Developer
+Prompt), otherwise VS via COM setup-API/registry and the Windows SDK via
+registry. Two probe rounds on `windows-latest` proved it: with the entire
+28-variable vcvars family stripped from the environment (plain-terminal
+simulation), the freshly built exe still resolved `#include <stdio.h>` in
+analyzed code, in plain point-at-a-directory mode, and reported the
+planted bounds/null-deref/leak findings with exit 1. That behavior is now
+pinned by a hard windows.yml step ("Directory mode without a Developer
+Prompt") — if a future LLVM upgrade regresses it, the lane goes red and
+the vswhere-style fallback becomes real work again.
 
-**What works today, CI-backed:** clang's MSVC toolchain reads the
-`INCLUDE` environment variable — inside a *VS Developer Command Prompt*
-(or CI's exported `vcvars64` env, which is exactly how the windows lane's
-test snippets resolve `#include <stdlib.h>`), analyzed code finds its
-system headers without any discovery code. And if the user supplies a real
-`compile_commands.json` (from their own MSVC/clang build), include paths
-come from there and this item is largely bypassed. Only "point at a
-directory" *outside* a Developer Prompt — the synthesized `-fsyntax-only`
-command in `SourceManager.cpp` — strictly needs SDK discovery. This is why
-the effort tiers below split on it.
+Inherent requirement (not a gap): an MSVC toolset + Windows SDK must be
+installed on the machine — there is nothing to discover otherwise. A
+user-supplied `compile_commands.json` bypasses discovery entirely, on
+every platform.
 
 ### 4. SARIF absolute-path detection (small correctness bug) — LANDED
 `SarifReporter.cpp` used to classify a path as absolute only when
@@ -111,10 +116,12 @@ The 682 C++ unit tests are the portable floor and all run on Windows.
 - **Tier 1 — "builds and runs with a `compile_commands.json` (or from a
   Developer Prompt)":** items 1 + 2 + 4 + 5 + 6. **DONE** — landed as
   phase7-windows-native with the ratchet guarding it.
-- **Tier 2 — "point-at-a-directory" parity anywhere:** item 3 (automatic
-  Windows SDK header discovery via `vswhere`). Windows-specific and
-  brittle; the largest single piece. **OPEN.**
-- Also open: a prebuilt Windows release binary (packaging —
+- **Tier 2 — "point-at-a-directory" parity anywhere:** item 3. **DONE** —
+  closed by measurement (phase8-windows-sdk): the clang driver's own
+  VS/SDK discovery covers it; guarded by the no-dev-prompt CI step
+  instead of new code. What the plan called "the largest single piece"
+  cost two probe rounds and zero engine lines.
+- Still open: a prebuilt Windows release binary (packaging —
   `package_release.sh` is bash; wants a PowerShell/portable port and a
   clean-container smoke like the Linux/macOS lanes).
 

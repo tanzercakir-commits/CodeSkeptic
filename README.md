@@ -77,8 +77,8 @@ the native build ([status & remaining work](docs/windows-support.md)):
 |---|---|
 | Linux x86_64 / macOS arm64 native | Supported (prebuilt binary) |
 | Windows + WSL2 or Docker, Linux-targeted build | Supported path, CI-smoked on windows-latest |
-| Native Windows (MSVC, build from source, compile DB or Developer Prompt) | Supported, full test suite CI-proven |
-| Native Windows prebuilt binary · auto SDK discovery | Planned |
+| Native Windows (MSVC, build from source; compile DB or plain dir mode) | Supported — tests + no-dev-prompt guard, CI-proven |
+| Native Windows prebuilt binary | Planned |
 
 ### Build from source
 

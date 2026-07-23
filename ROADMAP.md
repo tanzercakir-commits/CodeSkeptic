@@ -53,10 +53,11 @@ per phase — the working plan is committed at
   `docs/reproduce.md`; per-project idiom `profiles/`; CONTRIBUTING and
   good-first-issues.
 - **Phase 4 — Windows, staged honestly:** the SARIF drive-letter/UNC
-  absolute-path fix landed early; Tier 1 of the native port (MSVC
-  build + full test suite, `windows-latest` ratchet) landed as
-  phase7-windows-native — [status](docs/windows-support.md). Tier 2
-  (automatic SDK discovery) and a prebuilt binary remain open.
+  absolute-path fix landed early; Tier 1 (MSVC build + full test
+  suite, `windows-latest` ratchet, phase7-windows-native) and Tier 2
+  (plain-terminal directory mode, closed by measurement and guarded,
+  phase8-windows-sdk) are done — [status](docs/windows-support.md).
+  Prebuilt Windows binary remains open.
 
 ## 4. Open architectural decisions
 
@@ -74,7 +75,7 @@ per phase — the working plan is committed at
 
 ## 5. After v0.4 (unordered backlog)
 
-Windows Tier 2 + prebuilt binary (per [docs/windows-support.md](docs/windows-support.md)) ·
+Windows prebuilt binary + packaging (per [docs/windows-support.md](docs/windows-support.md)) ·
 remaining real-world FP families (fstab-util correlation, llama
 header-template convergence residue, ternary-value FN) · Redis idiom
 round 2 · whole-program global-flow tracking for the Juliet 44/45
