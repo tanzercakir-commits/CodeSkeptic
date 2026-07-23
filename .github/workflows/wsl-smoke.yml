@@ -1,11 +1,14 @@
 name: WSL smoke
 
-# ROUND 2 — pure diagnostics (the Vampire/setup-wsl@v5 attempt failed
-# with no logs readable from the sandbox). This round probes what the
-# hosted windows-latest runner can actually do WSL-wise, publishes
-# everything to refs/ci-logs, and always reports success so the
-# probe's verdict is read from the logs, not guessed from redness.
-# The real smoke gets designed on these facts.
+# The Windows-via-WSL path the README documents, PROVEN on a hosted
+# windows-latest runner — with plain wsl.exe, no third-party actions
+# (round-2 probe: `wsl --install` works, distros run as VERSION 2,
+# kernel reports -microsoft-standard-WSL2). The smoke downloads the
+# latest Linux release inside the distro, analyzes docs/demo.c
+# (fetched at this run's own SHA), and asserts the analyzer contract
+# plus the WSL2 kernel marker — the README's "CI-smoked" claim is
+# exactly this job. wsl.exe's own messages are UTF-16 when redirected;
+# all assertions run on inner-Linux (UTF-8) output only.
 on:
   workflow_run:
     workflows: ["Release"]
@@ -30,39 +33,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe WSL capabilities
-        shell: pwsh
-        continue-on-error: true
+      - name: Install Ubuntu-24.04 under WSL2
+        shell: bash
         run: |
-          $ErrorActionPreference = "Continue"
-          "=== wsl --version ===" | Out-File -Append probe.txt
-          wsl.exe --version 2>&1 | Out-File -Append probe.txt
-          "=== wsl --status ===" | Out-File -Append probe.txt
-          wsl.exe --status 2>&1 | Out-File -Append probe.txt
-          "=== systeminfo hyper-v ===" | Out-File -Append probe.txt
-          (systeminfo | Select-String -Pattern "Hyper-V") 2>&1 | Out-File -Append probe.txt
-          "=== try: wsl --install Ubuntu-24.04 --no-launch ===" | Out-File -Append probe.txt
-          wsl.exe --install Ubuntu-24.04 --no-launch 2>&1 | Out-File -Append probe.txt
-          "install exit: $LASTEXITCODE" | Out-File -Append probe.txt
-          "=== wsl --list --verbose (post-install) ===" | Out-File -Append probe.txt
-          wsl.exe --list --verbose 2>&1 | Out-File -Append probe.txt
-          "=== try: run uname in default distro ===" | Out-File -Append probe.txt
-          wsl.exe -- uname -a 2>&1 | Out-File -Append probe.txt
-          "uname exit: $LASTEXITCODE" | Out-File -Append probe.txt
-          "=== try: set-default-version 2 ===" | Out-File -Append probe.txt
-          wsl.exe --set-default-version 2 2>&1 | Out-File -Append probe.txt
-          Get-Content probe.txt
+          wsl.exe --install Ubuntu-24.04 --no-launch
+          wsl.exe --list --verbose || true
 
-      - name: Publish probe to refs/ci-logs/*
+      - name: Run the Linux release inside WSL2
+        shell: bash
+        run: |
+          wsl.exe -d Ubuntu-24.04 -u root -- bash -ec '
+            uname -a | tee /tmp/uname.txt
+            grep -q "microsoft-standard-WSL2" /tmp/uname.txt
+            cd /root
+            curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
+            curl -sL https://raw.githubusercontent.com/tanzercakir-commits/CodeSkeptic/${{ github.sha }}/docs/demo.c -o demo.c
+            apt-get update -qq >/dev/null && apt-get install -y -qq libc6-dev >/dev/null
+            code=0
+            out=$(./codeskeptic-v*/bin/codeskeptic demo.c 2>&1) || code=$?
+            echo "$out"
+            echo "exit_code=$code"
+            test "$code" -eq 1
+            echo "$out" | grep -qi finding
+            ./codeskeptic-v*/bin/codeskeptic --version
+          ' | tee smoke_out.txt
+
+      - name: Publish log to refs/ci-logs/*
         if: always()
         shell: bash
         run: |
-          iconv -f UTF-16LE -t UTF-8 probe.txt > probe.utf8.txt 2>/dev/null || cp probe.txt probe.utf8.txt
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f probe.utf8.txt
-          git commit -qm "wsl probe @ ${{ github.sha }}" || true
+          git add -f smoke_out.txt 2>/dev/null || true
+          git commit -qm "wsl smoke @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/wsl-smoke"
 
       - name: Mirror job status to refs/status/*
