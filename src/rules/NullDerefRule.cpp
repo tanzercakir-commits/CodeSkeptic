@@ -121,6 +121,15 @@ struct NullVal {
     NullState st = NullState::Unknown;
     std::optional<codeskeptic::FactKey> fact;
     bool factVal = true;
+    // The state this pointer holds ON PATHS WHERE fact=factVal — the
+    // implication's payload (2026-07-22 generalization; was implicitly
+    // NonNull). Unknown is a legitimate payload: an out-param factory
+    // (`getaddrinfo(&res)` under `if (c.has_x)`) leaves the pointer
+    // Unknown-not-proven-NonNull on the guarded path, and the
+    // cap-collapse used to decay it to an unrecoverable MaybeNull the
+    // second `if (c.has_x)` could not repair — the surviving
+    // rtp2httpd msrc_res/fcc_res family. Activation restores condSt.
+    NullState condSt = NullState::NonNull;
 
     NullVal() = default;
     /*implicit*/ NullVal(NullState s) : st(s) {}
@@ -128,7 +137,8 @@ struct NullVal {
     bool operator==(const NullVal& o) const {
         if (st != o.st || fact.has_value() != o.fact.has_value())
             return false;
-        return !fact || (*fact == *o.fact && factVal == o.factVal);
+        return !fact || (*fact == *o.fact && factVal == o.factVal &&
+                         condSt == o.condSt);
     }
     bool operator!=(const NullVal& o) const { return !(*this == o); }
     bool operator<(const NullVal& o) const {
@@ -137,26 +147,39 @@ struct NullVal {
             return !fact.has_value();
         if (!fact) return false;
         if (!(*fact == *o.fact)) return *fact < *o.fact;
-        return factVal < o.factVal;
+        if (factVal != o.factVal) return factVal < o.factVal;
+        return condSt < o.condSt;
     }
 };
 
+// No null-knowledge: the states an implication may promise (payload)
+// and that a plain side may hold without breaking one.
+bool hasNoNullInfo(NullState s) {
+    return s == NullState::NonNull || s == NullState::Unknown;
+}
+
 NullVal mergeNullVals(const NullVal& a, const NullVal& b) {
     NullVal out(mergeNullStates(a.st, b.st));
-    // Implication meet: (F=v ⟹ NonNull) survives the join when each
-    // side either carries the SAME implication or is NonNull outright
-    // (a NonNull side satisfies any NonNull implication trivially).
+    // Implication meet: (F=v ⟹ condSt) survives the join when the
+    // other side either carries the SAME implication (payloads merge)
+    // or holds a no-null-info state outright — such a side cannot put
+    // null on any F=v path, it merely weakens the payload (NonNull
+    // side keeps it as-is, an Unknown side degrades a NonNull promise
+    // to Unknown; both remain silent at a dereference).
     const NullVal* impl = a.fact ? &a : (b.fact ? &b : nullptr);
     if (impl) {
         const NullVal& other = (impl == &a) ? b : a;
-        const bool otherOk =
-            other.st == NullState::NonNull ||
-            (other.fact && *other.fact == *impl->fact &&
-             other.factVal == impl->factVal);
-        if (otherOk) {
+        if (other.fact && *other.fact == *impl->fact &&
+            other.factVal == impl->factVal) {
             out.fact = impl->fact;
             out.factVal = impl->factVal;
+            out.condSt = mergeNullStates(impl->condSt, other.condSt);
+        } else if (hasNoNullInfo(other.st)) {
+            out.fact = impl->fact;
+            out.factVal = impl->factVal;
+            out.condSt = mergeNullStates(impl->condSt, other.st);
         }
+        if (out.fact && !hasNoNullInfo(out.condSt)) out.fact.reset();
     }
     return out;
 }
@@ -179,6 +202,7 @@ NullVal meetNullVals(const std::map<codeskeptic::FactKey, bool>& facts,
         codeskeptic::factsContradict(facts, *impl->fact, impl->factVal)) {
         out.fact = impl->fact;
         out.factVal = impl->factVal;
+        out.condSt = impl->condSt;  // vacuous survival keeps the payload
     }
     return out;
 }
@@ -440,7 +464,8 @@ void mineGuardImplications(
                 // still-valid implication at every such collapse —
                 // the exact last link of the #70 residual FP.
                 bool sawWitness = false;
-                bool allNonNull = true;
+                bool allNoNullInfo = true;
+                NullState payload = NullState::NonNull;
                 for (const auto& d : pre) {
                     // Entailment-aware compatibility and witness (the
                     // libgit2 hashmap __resize family, 2026-07-22).
@@ -469,17 +494,36 @@ void mineGuardImplications(
                         *it->second.fact == key &&
                         it->second.factVal == wanted;
                     if (viaImpl) sawWitness = true;
-                    const bool nonNull =
-                        it != d.vars.end() &&
-                        (it->second.st == NullState::NonNull || viaImpl);
-                    if (!nonNull) {
-                        allNonNull = false;
+                    // The mined payload is the merge over compatible
+                    // disjuncts of what F=v promises there: the plain
+                    // state, or a same-key implication's own payload.
+                    // ANY null-info kills the candidate — the point of
+                    // the implication is that F=v paths carry none.
+                    // Unknown is a legitimate payload (out-param
+                    // factories — the msrc_res family): activation
+                    // restores Unknown, which a dereference reporter
+                    // treats as silence, instead of the collapsed
+                    // MaybeNull it would otherwise inherit.
+                    NullState contrib;
+                    if (viaImpl) {
+                        contrib = it->second.condSt;
+                    } else if (it != d.vars.end() &&
+                               hasNoNullInfo(it->second.st)) {
+                        contrib = it->second.st;
+                    } else {
+                        allNoNullInfo = false;
+                        break;
+                    }
+                    payload = mergeNullStates(payload, contrib);
+                    if (!hasNoNullInfo(payload)) {
+                        allNoNullInfo = false;
                         break;
                     }
                 }
-                if (sawWitness && allNonNull) {
+                if (sawWitness && allNoNullInfo) {
                     val.fact = key;
                     val.factVal = wanted;
+                    val.condSt = payload;
                     break;
                 }
             }
@@ -790,10 +834,14 @@ public:
                     // negation — covers both the exact recording the
                     // old find() saw and a stamped equality on the
                     // guard ((j EQ 1)=true activating the mined
-                    // (j EQ 0)=false implication).
+                    // (j EQ 0)=false implication). The restored state
+                    // is the implication's PAYLOAD — NonNull for the
+                    // classic mined guard, Unknown for the out-param-
+                    // factory shape (silent at a dereference either
+                    // way).
                     if (codeskeptic::factsContradict(d.facts, *val.fact,
                                                      !val.factVal))
-                        val.st = NullState::NonNull;
+                        val.st = val.condSt;
                 }
             });
     }
