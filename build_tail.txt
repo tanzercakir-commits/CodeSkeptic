@@ -1,0 +1,1 @@
+ninja: error: 'C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/DIA SDK/lib/amd64/diaguids.lib', needed by 'src/codeskeptic.exe', missing and no known rule to make it
