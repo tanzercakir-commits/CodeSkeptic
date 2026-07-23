@@ -73,8 +73,12 @@ jobs:
               # bundled ones resolve from the PACKAGE lib dir, not the host.
               ldd ./bin/codeskeptic | tee /tmp/ldd.txt
               ! grep -q "not found" /tmp/ldd.txt
+              # ldd prints the rpath literally (.../pkg/./bin/../lib/...),
+              # so assert the resolution PREFIX is the extracted package,
+              # not an exact directory shape (first hardened run's lesson:
+              # the bundle was fine, the regex was not).
               for so in "libLLVM\.so" "libzstd\.so" "libz\.so" "libtinfo\.so"; do
-                grep -E "$so" /tmp/ldd.txt | grep -qE "=> /tmp/codeskeptic-[^/]+/lib/" || {
+                grep -E "$so" /tmp/ldd.txt | grep -qE "=> /tmp/codeskeptic-" || {
                   echo "SELF-CONTAINED VIOLATION: $so resolves off-package"; exit 1; }
               done
               code=0; out=$(./bin/codeskeptic /demo/demo.c 2>&1) || code=$?
