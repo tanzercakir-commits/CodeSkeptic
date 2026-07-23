@@ -38,6 +38,7 @@ add_executable(codeskeptic_tests
     BrokenTuTest.cpp
     McpServerTest.cpp
     InterproceduralTest.cpp
+    MacSdkPathTest.cpp
     ResourceDirTest.cpp
 )
 

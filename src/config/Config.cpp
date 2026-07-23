@@ -1,5 +1,7 @@
 #include "config/Config.h"
 
+#include "core/Messages.h"
+
 #include <fstream>
 #include <iostream>
 
@@ -206,6 +208,14 @@ bool Config::parseArgs(int argc, char* argv[]) {
             return false;
         } else if (arg[0] != '-' && source_path_.empty()) {
             source_path_ = arg;
+        } else if (arg[0] != '-') {
+            // A second positional used to be SILENTLY ignored — the
+            // caller believed both files were analyzed (v0.4.5,
+            // caught while testing the exit-2 policy). Fail loudly:
+            // one path (file or directory) or --files <list>.
+            std::cerr << msg(MsgId::MultipleSourcePaths, source_path_, arg)
+                      << "\n";
+            return false;
         }
     }
 

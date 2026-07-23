@@ -1,44 +1,42 @@
-# CodeSkeptic v0.4.5 — native Windows
+# CodeSkeptic v0.4.6 — the first external evaluation's P1, fixed
 
-The first release with a native Windows binary:
-`codeskeptic-windows-x86_64.zip` — a static-CRT MSVC build carrying its
-own Clang intrinsic headers, smoke-tested on the release runner with
-the build LLVM renamed away and the entire vcvars environment stripped
-(the same exit-1-with-findings contract the Linux clean-container
-smoke enforces).
+v0.4.5 shipped the first native Windows binary. This release fixes
+the P1 that the first external evaluation (the maintainer's macOS
+hardware, a separate AI toolchain driving the docs/evaluate.md
+protocol) found in the darwin binaries — including the v0.4.5 one:
+the worst failure mode a static analyzer can have.
 
-## Native Windows, staged honestly (docs/windows-support.md)
+## The P1: baked SDK path -> silent "Clean!" with zero coverage
 
-- **Tier 1 — MSVC port:** the engine compiles and links with MSVC
-  against the official LLVM 20.1.8 windows-msvc dev tarball, and the
-  full 682-test unit suite runs green on `windows-latest` on every
-  push (windows.yml — the ratchet). Portability layer verified before
-  landing: the `__builtin_*_overflow` / `__int128` arithmetic was
-  replaced by shared checked-int64 helpers proven behavior-identical
-  to the builtins over the int64 edge matrix plus 40M random pairs.
-- **Tier 2 — "point at a directory" anywhere:** closed by measurement,
-  not code. With the entire 28-variable vcvars family stripped, clang's
-  MSVC toolchain still locates Visual Studio (COM setup-API/registry)
-  and the Windows SDK (registry) on its own; a dedicated CI step guards
-  exactly that behavior from here on.
-- **Packaging:** `package_release.sh` gained a Windows branch (zip,
-  `codeskeptic.exe`, bundled `lib/clang/20/include`, no dynamic libs to
-  carry — the official LLVM Windows dist is static). The release lane
-  builds, tests, version-checks, packages, relocation-smokes and
-  uploads the zip alongside the Linux/macOS tarballs; `sha256sums.txt`
-  covers all three.
+Darwin release binaries carried the CI runner's versioned Xcode
+sysroot (`/Applications/Xcode_15.4.app/...`) baked at build time. On
+machines without that exact path — almost all of them — the
+no-compile-db quickstart failed to find `stdlib.h`, skipped the TU,
+and reported **"Clean! No issues found." with exit 0**: a green tick
+with nothing analyzed. Both suggested fix layers are in:
 
-Requirement, stated plainly: analyzing code on Windows needs an MSVC
-toolset + Windows SDK installed (any Visual Studio or Build Tools
-install) — analyzed code resolves real system headers, as with any
-compiler. `compile_commands.json` mode and MCP stdio (now binary-mode,
-CRLF-tolerant) work as on Linux/macOS.
+- **Runtime SDK resolution** (`resolveMacSdkPath`, mirroring the v0.4
+  resource-dir treatment): `SDKROOT` env (honored verbatim — explicit
+  intent fails loudly, never silently second-guessed) -> one cached
+  `xcrun --show-sdk-path` probe -> the baked path only while it
+  exists. Unit-tested for the full resolution order.
+- **Fail-loud exit policy**: when EVERY attempted translation unit
+  fails to compile (and `--analyze-broken-tus` is not given), the exit
+  code is now **2** with an ANALYSIS FAILED message — never a clean
+  report. Partial breakage keeps the honest per-TU warning and
+  findings-based exit codes. The GitHub Action already propagates
+  exit > 1 as a job failure, in report-only mode too. The macOS
+  release smoke now proves the loud path (`SDKROOT=/nonexistent`
+  must exit 2).
 
-## Engine
+## Also in this release
 
-No intended behavior changes. The only engine-adjacent change is the
-checked-arithmetic substitution above, pinned by IntervalTest on every
-platform and equivalence-fuzzed against the GCC/Clang builtins before
-merge. All existing floors stay green: 682 unit tests on three
-platforms, NIST Juliet, the real-world corpus, the thesis gate, and
-the self-scan dogfood gate.
+- A second positional source path is now a loud usage error (it used
+  to be silently ignored — pass a directory or `--files`).
+- Broken-TU records are deduplicated across summary-inference
+  re-parses (they could overcount and spuriously trip the new exit-2
+  policy).
+- Exit codes documented in docs/usage.md.
+
+No analysis-engine changes — Juliet floors, corpus pins, the thesis
+gate and the new Windows lanes ride along unchanged.

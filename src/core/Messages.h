@@ -78,6 +78,9 @@ enum class MsgId {
     AssumptionNonNullParam,     // {0} = parameter name
     BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
     BoundsUnboundedStrCopy,     // {0} = function name, {1} = dest capacity bytes
+    NothingAnalyzed,            // every attempted TU failed to compile
+    MultipleSourcePaths,        // {0} = kept path, {1} = rejected extra
+
 };
 
 // Replaces the {0}, {1} and {2} placeholders with the arguments.

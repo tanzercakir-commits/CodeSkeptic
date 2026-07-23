@@ -162,6 +162,15 @@ jobs:
           echo "exit_code=$code" >> /tmp/smoke.log
           test "$code" -eq 1
           echo "$out" | grep -qi finding
+          # P1 proof (external macOS evaluation, v0.4.5): a hopeless
+          # sysroot must fail LOUDLY (exit 2), never report a silent
+          # Clean + exit 0 with zero coverage. SDKROOT is honored
+          # verbatim by design, so pointing it nowhere reproduces the
+          # broken-user-machine case on this runner.
+          code2=0; out2=$(SDKROOT=/nonexistent/sdk ./bin/codeskeptic "$GITHUB_WORKSPACE/docs/demo.c" 2>&1) || code2=$?
+          echo "SDKROOT-invalid exit_code=$code2" | tee -a /tmp/smoke.log
+          test "$code2" -eq 2
+          echo "$out2" | grep -q "ANALYSIS FAILED"
 
       - name: Upload to draft release
         env:

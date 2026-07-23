@@ -1,4 +1,5 @@
 #include "analyzer/StaticAnalyzer.h"
+#include "core/ExitPolicy.h"
 #include "config/Config.h"
 #include "core/Messages.h"
 #include "engine/SummaryDiff.h"
@@ -56,6 +57,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    const bool analyze_broken = config.analyzeBrokenTUs();
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
 
     analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
@@ -70,5 +72,11 @@ int main(int argc, char* argv[]) {
 
     int findings = analyzer.run();
 
-    return (findings > 0) ? 1 : 0;
+    const int exit_code = codeskeptic::analysisExitCode(
+        findings, analyzer.totalTUs(), analyzer.brokenTUCount(),
+        analyze_broken);
+    if (exit_code == 2)
+        std::cerr << codeskeptic::msg(codeskeptic::MsgId::NothingAnalyzed)
+                  << "\n";
+    return exit_code;
 }

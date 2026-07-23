@@ -14,6 +14,10 @@ namespace codeskeptic {
 
 class StaticAnalyzer {
 public:
+    // Post-run coverage stats for the exit-code policy (ExitPolicy.h).
+    std::size_t totalTUs() const;
+    std::size_t brokenTUCount() const;
+
     explicit StaticAnalyzer(Config config);
 
     // Reverts the global filter state set by the ctor. In long-lived

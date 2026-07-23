@@ -58,6 +58,11 @@ public:
     static void recordBrokenTU(const std::string& file);
     static const std::vector<std::string>& brokenTUs();
     static void clearBrokenTUs();
+    // Attempted-TU count for THIS run, published as a static so the
+    // decoupled console reporter can detect the nothing-was-analyzed
+    // case (set by StaticAnalyzer::run before processing).
+    static void setAttemptedTUCount(size_t n);
+    static size_t attemptedTUCount();
 
     size_t fileCount() const;
     const std::vector<std::string>& files() const;
