@@ -147,6 +147,7 @@ jobs:
           cp rtp2httpd/src/service.c                 inspect/rtp-service.c
           cp rtp2httpd/src/http_chunked_decoder.c    inspect/rtp-http_chunked_decoder.c
           cp rtp2httpd/src/http_proxy_rewrite.c      inspect/rtp-http_proxy_rewrite.c
+          tar czf inspect/rtp2httpd-full.tgz rtp2httpd/
           wc -l inspect/* || true
           exit 0
       - name: Publish to refs/ci-logs/*
