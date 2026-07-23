@@ -35,8 +35,8 @@ inputs:
     default: "report-only"
   version:
     description: >-
-      Release tag to use (e.g. v0.4.4). Default: the tag the action
-      itself is pinned to (uses: ...@v0.4.4 analyzes with the v0.4.4
+      Release tag to use (e.g. v0.4.5). Default: the tag the action
+      itself is pinned to (uses: ...@v0.4.5 analyzes with the v0.4.5
       binary), so pinning the action pins the analyzer — set "latest"
       explicitly if you WANT the newest release every run.
     required: false
@@ -67,8 +67,8 @@ runs:
         REPO="tanzercakir-commits/CodeSkeptic"
         PATTERN="codeskeptic-*-linux-x86_64.tar.gz"
         # Version resolution (reproducibility): explicit input wins;
-        # otherwise the action's OWN ref — `uses: ...@v0.4.4` analyzes
-        # with the v0.4.4 binary, so pinning the action really pins
+        # otherwise the action's OWN ref — `uses: ...@v0.4.5` analyzes
+        # with the v0.4.5 binary, so pinning the action really pins
         # the analyzer. Only an explicit "latest" (or a non-tag ref:
         # branch names, the self-test's local `uses: ./`) floats.
         VERSION="${{ inputs.version }}"

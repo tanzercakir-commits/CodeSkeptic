@@ -40,45 +40,42 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 **Docker** — nothing installed at all:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 src/ --sarif out.sarif  # :latest floats
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.5 src/ --sarif out.sarif  # :latest floats
 ```
 
 **CI** — the [packaged action](action.yml), report-only by default:
 
 ```yaml
 # Pinning the action pins the analyzer binary too (same tag).
-- uses: tanzercakir-commits/CodeSkeptic@v0.4.4
+- uses: tanzercakir-commits/CodeSkeptic@v0.4.5
   with: { path: src/, build-path: build }
 ```
 
-### Windows (native build from source, or WSL2/Docker)
+### Windows (native binary, or WSL2/Docker)
 
-Native MSVC builds work and are CI-proven — the full unit-test suite
-runs green on `windows-latest` on every push
-([windows.yml](.github/workflows/windows.yml)). No prebuilt Windows
-binary yet; zero-build trials go through WSL2 or Docker:
+Native Windows is supported and CI-proven — full test suite + a
+packaged-zip relocation smoke on `windows-latest`, every push
+([windows.yml](.github/workflows/windows.yml)). Needs an MSVC toolset
++ Windows SDK on the machine (any VS/Build Tools install) — analyzed
+code resolves real headers, as with any compiler:
 
-```bash
-# WSL2 (keep the tree in the WSL filesystem, not /mnt/c) — build your
-# project and its compile_commands.json INSIDE the same WSL env:
-curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-linux-x86_64.tar.gz | tar xz
-./codeskeptic-v*/bin/codeskeptic path/to/source --build-path path/to/build
-
-# Docker Desktop (fastest trial):
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 src/
+```powershell
+curl.exe -sLO https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-windows-x86_64.zip
+Expand-Archive codeskeptic-windows-x86_64.zip -DestinationPath .
+.\codeskeptic-v0.4.5-windows-x86_64\bin\codeskeptic.exe path\to\source --build-path path\to\build
 ```
 
-One honest caveat on WSL2/Docker — CodeSkeptic analyzes the program
-the compiler sees: the Linux preprocessor view, so `#ifdef _WIN32`
-branches are invisible. MSVC-built, Windows-SDK-dependent code wants
-the native build ([status & remaining work](docs/windows-support.md)):
+WSL2/Docker remain as Linux-view paths (`docker run ... :v0.4.5`, or
+the Linux tarball inside WSL). One honest caveat there — CodeSkeptic
+analyzes the program the compiler sees: the Linux preprocessor view,
+so `#ifdef _WIN32` branches are invisible; MSVC-targeted code wants
+the native binary above ([status](docs/windows-support.md)):
 
 | Use | Status |
 |---|---|
 | Linux x86_64 / macOS arm64 native | Supported (prebuilt binary) |
+| Native Windows (MSVC) — prebuilt zip or build from source | Supported — tests + zip smoke, CI-proven |
 | Windows + WSL2 or Docker, Linux-targeted build | Supported path, CI-smoked on windows-latest |
-| Native Windows (MSVC, build from source; compile DB or plain dir mode) | Supported — tests + no-dev-prompt guard, CI-proven |
-| Native Windows prebuilt binary | Planned |
 
 ### Build from source
 

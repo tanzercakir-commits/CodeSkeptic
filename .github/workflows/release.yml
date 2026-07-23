@@ -194,8 +194,108 @@ jobs:
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/release-macos/${{ job.status }}"
 
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC + LLVM (shared with windows.yml)
+        uses: ./.github/actions/setup-msvc-llvm
+
+      - name: Build
+        shell: pwsh
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+          "-DCMAKE_PREFIX_PATH=C:\llvm\clang+llvm-$env:LLVM_VER-x86_64-pc-windows-msvc"
+          && cmake --build build 2>&1 | Tee-Object -FilePath $env:TEMP\build.log
+
+      - name: Test
+        shell: pwsh
+        run: ctest --test-dir build --output-on-failure 2>&1 | Tee-Object -FilePath $env:TEMP\ctest.log
+
+      - name: Version must match the tag
+        shell: pwsh
+        run: |
+          $v = & .\build\src\codeskeptic.exe --version
+          Write-Host "binary: $v  tag: $env:GITHUB_REF_NAME"
+          if ($v -ne "CodeSkeptic $($env:GITHUB_REF_NAME.Substring(1))") { throw "version/tag mismatch" }
+          exit 0
+
+      - name: Package
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/package_release.sh build/src/codeskeptic.exe dist \
+            "/c/llvm/clang+llvm-${LLVM_VER}-x86_64-pc-windows-msvc/bin/clang.exe" \
+            2>&1 | tee /tmp/package.log
+
+      - name: Relocation smoke (LLVM hidden, plain terminal)
+        # Same contract as the Linux clean-container smoke, in Windows
+        # terms: the vcvars family is stripped, C:\llvm (build LLVM AND
+        # the baked resource dir) is renamed away, and the packaged exe
+        # must analyze docs/demo.c from its own bundled headers with
+        # exactly exit 1 + findings.
+        shell: pwsh
+        run: |
+          $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'
+          Get-ChildItem Env: | Where-Object { $_.Name -match $family } | ForEach-Object {
+            Remove-Item "Env:$($_.Name)" -ErrorAction SilentlyContinue
+          }
+          Rename-Item C:\llvm C:\llvm-hidden
+          try {
+            $zip = Get-ChildItem dist\codeskeptic-*-windows-*.zip | Select-Object -First 1
+            Expand-Archive $zip.FullName -DestinationPath "$env:TEMP\cs_pkg" -Force
+            $exe = Get-ChildItem "$env:TEMP\cs_pkg" -Recurse -Filter codeskeptic.exe | Select-Object -First 1
+            $out = & $exe.FullName docs\demo.c 2>&1 | Out-String
+            $code = $LASTEXITCODE
+          } finally {
+            Rename-Item C:\llvm-hidden C:\llvm
+          }
+          Write-Host $out
+          $out | Set-Content $env:TEMP\smoke.log
+          Add-Content $env:TEMP\smoke.log "exit_code=$code"
+          if (-not ($code -eq 1 -and $out -match 'finding')) {
+            throw "package relocation smoke failed (exit=$code)"
+          }
+          exit 0
+
+      - name: Upload to draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$env:GITHUB_REF_NAME" --draft --title "CodeSkeptic $env:GITHUB_REF_NAME" --notes "Draft - assets uploading." 2>$null
+          $zip = Get-ChildItem dist\codeskeptic-*-windows-*.zip | Select-Object -First 1
+          Copy-Item $zip.FullName codeskeptic-windows-x86_64.zip
+          gh release upload "$env:GITHUB_REF_NAME" $zip.FullName codeskeptic-windows-x86_64.zip --clobber
+          exit 0
+
+      - name: Diagnostics -> refs/ci-logs/*
+        if: always()
+        shell: bash
+        run: |
+          for f in build ctest package smoke; do
+            tail -c 25000 "$(cygpath -u "$TEMP")/$f.log" > "$f.tail.log" 2>/dev/null || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f build.tail.log ctest.tail.log package.tail.log smoke.tail.log 2>/dev/null || true
+          git commit -qm "release-windows logs @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/release-windows"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        shell: bash
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/release-windows/${{ job.status }}"
+
   publish:
-    needs: [linux, macos]
+    needs: [linux, macos, windows]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -203,8 +303,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "$GITHUB_REF_NAME" -p '*.tar.gz' -D assets
-          (cd assets && sha256sum *.tar.gz) > sha256sums.txt
+          gh release download "$GITHUB_REF_NAME" -p '*.tar.gz' -p '*.zip' -D assets
+          (cd assets && sha256sum *.tar.gz *.zip) > sha256sums.txt
           cat sha256sums.txt
           gh release upload "$GITHUB_REF_NAME" sha256sums.txt --clobber
           gh release edit "$GITHUB_REF_NAME" \

@@ -1,0 +1,71 @@
+name: Setup MSVC + LLVM (Windows)
+description: >
+  Shared Windows toolchain bootstrap for windows.yml and release.yml —
+  one source of truth so the lanes cannot drift: cache/download the
+  official LLVM windows-msvc dev tarball, export the vcvars64
+  environment (cl.exe AND the INCLUDE var clang's MSVC toolchain reads
+  for analyzed code), and patch the tarball's stale DIA SDK path.
+
+inputs:
+  llvm-version:
+    description: LLVM release to install (matches the Linux lane's major)
+    required: false
+    default: "20.1.8"
+
+runs:
+  using: composite
+  steps:
+    - name: Cache LLVM (extracted MSVC dev tarball)
+      id: cache-llvm
+      uses: actions/cache@v4
+      with:
+        path: C:\llvm
+        key: llvm-${{ inputs.llvm-version }}-x86_64-pc-windows-msvc-v1
+
+    - name: Download LLVM ${{ inputs.llvm-version }} (cache miss only)
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $ver = "${{ inputs.llvm-version }}"
+        $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/clang+llvm-$ver-x86_64-pc-windows-msvc.tar.xz"
+        curl.exe -sSfL --retry 3 -o llvm.tar.xz $url
+        # Two explicit 7z steps (xz -> tar -> tree): no binary pipe —
+        # PowerShell pipes are string pipes and corrupt binary data.
+        7z x -bso0 -bsp0 llvm.tar.xz
+        New-Item -ItemType Directory -Force -Path C:\llvm | Out-Null
+        7z x -bso0 -bsp0 llvm.tar "-oC:\llvm"
+        Remove-Item llvm.tar.xz, llvm.tar
+
+    - name: MSVC environment -> GITHUB_ENV
+      shell: pwsh
+      # vcvars64 once, exported for every later step. Twofold: cl.exe
+      # for building, and INCLUDE for the analyzer's own test snippets
+      # (docs/windows-support.md §3).
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (-not $vs) { throw "vswhere found no VC++ toolset" }
+        cmd /s /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" > NUL 2>&1 && set" | ForEach-Object {
+          if ($_ -match '^([^=]+)=(.*)$') {
+            Add-Content $env:GITHUB_ENV "$($Matches[1])=$($Matches[2])"
+          }
+        }
+        Add-Content $env:GITHUB_ENV "LLVM_VER=${{ inputs.llvm-version }}"
+
+    - name: Patch LLVM exports (stale DIA SDK path)
+      shell: pwsh
+      # The official tarball's LLVMExports.cmake hard-codes the
+      # absolute diaguids.lib path of the machine that BUILT LLVM.
+      # Idempotent: re-run safely on cached trees and VS upgrades.
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        $dia = (Join-Path $vs "DIA SDK\lib\amd64\diaguids.lib") -replace '\\','/'
+        if (-not (Test-Path $dia)) { throw "DIA SDK not found: $dia" }
+        Get-ChildItem "C:\llvm" -Recurse -Filter *.cmake | ForEach-Object {
+          $c = Get-Content $_.FullName -Raw
+          if ($c -match 'diaguids\.lib') {
+            $n = $c -replace '[A-Za-z]:/[^";]*?DIA SDK/lib/amd64/diaguids\.lib', $dia
+            if ($n -ne $c) { Set-Content $_.FullName $n -NoNewline; Write-Host "patched: $($_.FullName)" }
+          }
+        }

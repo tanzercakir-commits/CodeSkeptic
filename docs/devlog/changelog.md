@@ -1,5 +1,30 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-23 — v0.4.5: the first native Windows binary
+
+Packaging round (phase9-windows-package). `package_release.sh` gained
+a Windows branch and runs under the runner's Git Bash: MINGW uname
+normalization, `codeskeptic.exe`, `cygpath` for the clang resource
+dir, zip via 7z, and no lib bundling at all — the official LLVM
+windows-msvc dist is static-CRT, so the exe links only Windows system
+DLLs (DEPENDENCIES.txt says exactly that). The release lane gained a
+windows job (build → 682 tests → version/tag assert → package →
+relocation smoke → draft upload) and publish now checksums all three
+platforms' assets together. The relocation smoke is the Windows analog
+of the Linux clean-container proof: C:\llvm — simultaneously the build
+LLVM and the binary's baked resource-dir path — is renamed away and
+the vcvars family stripped before the packaged exe must analyze
+demo.c purely from its exe-relative bundled headers (the
+GetModuleFileNameW branch added in Tier 1 doing its job) plus the
+driver's own SDK discovery. The same package + smoke runs on every
+push as a windows.yml rehearsal, mirroring how the Docker lane
+exercises the Linux packaging path — packaging breaks at push time,
+not tag time. The MSVC+LLVM bootstrap (cache, tarball, vcvars export,
+DIA patch) was extracted to a local composite action shared by
+windows.yml and release.yml so the two lanes cannot drift. README
+flips the last "Planned" row: native Windows is now prebuilt-zip or
+build-from-source, both CI-proven; version pins move to v0.4.5.
+
 ## 2026-07-23 — Windows Tier 2 closed by measurement: the driver already discovers the SDK
 
 The plan's "largest, most brittle piece" — automatic MSVC/Windows-SDK
