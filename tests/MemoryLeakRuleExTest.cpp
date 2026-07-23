@@ -902,7 +902,7 @@ TEST(FprimeFpTest, NothrowNew_IsARealAllocation) {
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         namespace std { struct nothrow_t {}; extern const nothrow_t nothrow; }
-        void* operator new(unsigned long, const std::nothrow_t&) noexcept;
+        void* operator new(__SIZE_TYPE__, const std::nothrow_t&) noexcept;
         struct T { int v; };
         void f() {
             T* p = new (std::nothrow) T();

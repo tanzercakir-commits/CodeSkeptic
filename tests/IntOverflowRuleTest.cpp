@@ -179,13 +179,15 @@ TEST(IntOverflowRuleTest, StaticHelperBoundedButSafeClean) {
 TEST(IntOverflowRuleTest, SixtyFourBitProductReported) {
     // v0.4 recall round: a 64-bit product still collapses to top() in
     // the int64-based interval math, so the site is proved from the
-    // OPERAND intervals via __int128 corner arithmetic instead
+    // OPERAND intervals via checked int64 corner arithmetic instead
     // (evalEscapes64) — this pinned FN became a finding deliberately.
+    // `long long`, not `long`: the 64-bit intent must survive LLP64
+    // Windows, where long is 32 bits.
     IntOverflowRule rule;
     auto results = runRule(rule, R"(
-        long f() {
-            long a = 100000000000L;
-            long b = 100000000000L;
+        long long f() {
+            long long a = 100000000000LL;
+            long long b = 100000000000LL;
             return a * b;
         }
     )");

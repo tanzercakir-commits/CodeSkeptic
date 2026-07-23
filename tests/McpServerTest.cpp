@@ -4,6 +4,7 @@
 #include "source_manager/SourceManager.h"
 
 #include <fstream>
+#include <filesystem>
 #include <string>
 #include <gtest/gtest.h>
 
@@ -16,7 +17,10 @@ std::string writeTempSource(const std::string& name,
     std::string path = ::testing::TempDir() + name;
     std::ofstream file(path);
     file << content;
-    return path;
+    // Generic (forward-slash) form: the tests splice this path into a
+    // hand-built JSON request, where raw Windows backslashes would be
+    // invalid escape sequences.
+    return std::filesystem::path(path).generic_string();
 }
 
 } // anonymous namespace
