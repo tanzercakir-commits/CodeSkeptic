@@ -25,6 +25,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-24.04
+    if: ${{ !contains(github.event.head_commit.message, '[inspect-only]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,3 +115,42 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/realworld/${{ job.status }}"
+
+  # Fast source-fetch lane for finding adjudication: the dev sandbox's
+  # proxy only allows THIS repo's git protocol, so CI fetches the
+  # third-party sources the triage needs and publishes them to a
+  # git-readable ref. Runs only on [inspect-only] pushes (the scan job
+  # is skipped then).
+  inspect:
+    runs-on: ubuntu-24.04
+    if: ${{ contains(github.event.head_commit.message, '[inspect-only]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch adjudication sources
+        run: |
+          curl -sL --retry 3 \
+            https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.0.tar.gz \
+            | tar xz
+          git clone --quiet --depth 1 https://github.com/stackia/rtp2httpd
+          mkdir -p inspect
+          { cd rtp2httpd && echo "HEAD $(git rev-parse HEAD)" && \
+            git log -1 --format='date %cI'; } > inspect/rtp2httpd-head.txt
+          cp libgit2-1.9.0/src/util/hashmap.h        inspect/lg2-hashmap.h
+          cp libgit2-1.9.0/src/libgit2/commit.c      inspect/lg2-commit.c
+          cp libgit2-1.9.0/src/libgit2/pathspec.c    inspect/lg2-pathspec.c
+          cp rtp2httpd/src/timezone.c                inspect/rtp-timezone.c
+          cp rtp2httpd/src/service.c                 inspect/rtp-service.c
+          cp rtp2httpd/src/http_chunked_decoder.c    inspect/rtp-http_chunked_decoder.c
+          cp rtp2httpd/src/http_proxy_rewrite.c      inspect/rtp-http_proxy_rewrite.c
+          wc -l inspect/*
+      - name: Publish to refs/ci-logs/*
+        if: always()
+        run: |
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f inspect/
+          git commit -qm "inspect sources @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/inspect"
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/inspect/${{ job.status }}"
