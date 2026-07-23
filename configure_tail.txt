@@ -1,0 +1,254 @@
+\\Microsoft Visual Studio\\18\\Enterprise\\VC\\vcpkg"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/CodeSkeptic"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "C:/Program Files/CMake"
+        - "C:/Program Files (x86)/CodeSkeptic"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindPython/Support.cmake:2585 (find_program)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindPython3.cmake:684 (include)"
+      - "build/_deps/googletest-src/googletest/cmake/internal_utils.cmake:250 (find_package)"
+      - "build/_deps/googletest-src/googletest/CMakeLists.txt:81 (include)"
+    mode: "program"
+    variable: "_Python3_EXECUTABLE_DEBUG"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "python3.14_d"
+      - "python3_d"
+      - "python_d"
+    candidate_directories:
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/"
+    searched_directories:
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3.14_d.com"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3.14_d.exe"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3.14_d"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3_d.com"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3_d.exe"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python3_d"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python_d.com"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python_d.exe"
+      - "C:/hostedtoolcache/windows/Python/3.14.6/x64/python_d"
+    found: false
+    search_context:
+      CMAKE_PREFIX_PATH:
+        - "C:\\llvm\\clang+llvm-20.1.8-x86_64-pc-windows-msvc"
+      ENV{PATH}:
+        - "C:\\Program Files\\PowerShell\\7"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\VC\\VCPackages"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\x64\\"
+        - "C:\\Program Files (x86)\\HTML Help Workshop"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\FSharp\\Tools"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Team Tools\\DiagnosticsHub\\Collector"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\\\x64"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\\\x64"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\Tools\\"
+        - "C:\\Program Files\\PowerShell\\7"
+        - "C:\\Program Files\\MongoDB\\Server\\7.0\\bin"
+        - "C:\\vcpkg"
+        - "C:\\tools\\zstd"
+        - "C:\\hostedtoolcache\\windows\\stack\\3.11.1\\x64"
+        - "C:\\cabal\\bin"
+        - "C:\\\\ghcup\\bin"
+        - "C:\\mingw64\\bin"
+        - "C:\\Program Files\\dotnet"
+        - "C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin"
+        - "C:\\Program Files\\R\\R-4.6.1\\bin\\x64"
+        - "C:\\SeleniumWebDrivers\\GeckoDriver"
+        - "C:\\SeleniumWebDrivers\\EdgeDriver\\"
+        - "C:\\SeleniumWebDrivers\\ChromeDriver"
+        - "C:\\Program Files (x86)\\sbt\\bin"
+        - "C:\\Program Files (x86)\\GitHub CLI"
+        - "C:\\Program Files\\Git\\bin"
+        - "C:\\Program Files (x86)\\pipx_bin"
+        - "C:\\npm\\prefix"
+        - "C:\\hostedtoolcache\\windows\\go\\1.24.13\\x64\\bin"
+        - "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\Scripts"
+        - "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64"
+        - "C:\\hostedtoolcache\\windows\\Ruby\\3.3.11\\x64\\bin"
+        - "C:\\Program Files\\OpenSSL\\bin"
+        - "C:\\tools\\kotlinc\\bin"
+        - "C:\\hostedtoolcache\\windows\\Java_Temurin-Hotspot_jdk\\17.0.19-10\\x64\\bin"
+        - "C:\\Program Files\\ImageMagick-7.1.2-Q16-HDRI"
+        - "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin"
+        - "C:\\ProgramData\\kind"
+        - "C:\\ProgramData\\Chocolatey\\bin"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\PowerShell\\7\\"
+        - "C:\\Program Files\\Microsoft\\Web Platform Installer\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\Tools\\Binn\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
+        - "C:\\Program Files (x86)\\WiX Toolset v3.14\\bin"
+        - "C:\\Program Files\\Microsoft SQL Server\\130\\DTS\\Binn\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\140\\DTS\\Binn\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\150\\DTS\\Binn\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\170\\DTS\\Binn\\"
+        - "C:\\ProgramData\\chocolatey\\lib\\pulumi\\tools\\Pulumi\\bin"
+        - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Strawberry\\c\\bin"
+        - "C:\\Strawberry\\perl\\site\\bin"
+        - "C:\\Strawberry\\perl\\bin"
+        - "C:\\ProgramData\\chocolatey\\lib\\maven\\apache-maven-3.9.16\\bin"
+        - "C:\\Program Files\\Microsoft Service Fabric\\bin\\Fabric\\Fabric.Code"
+        - "C:\\Program Files\\Microsoft SDKs\\Service Fabric\\Tools\\ServiceFabricLocalClusterManager"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+        - "C:\\Program Files\\Git\\usr\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
+        - "c:\\tools\\php"
+        - "C:\\Program Files (x86)\\sbt\\bin"
+        - "C:\\Program Files\\Amazon\\AWSCLIV2\\"
+        - "C:\\Program Files\\Amazon\\SessionManagerPlugin\\bin\\"
+        - "C:\\Program Files\\Amazon\\AWSSAMCLI\\bin\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\130\\Tools\\Binn\\"
+        - "C:\\Program Files\\mongosh\\"
+        - "C:\\Program Files\\LLVM\\bin"
+        - "C:\\Program Files (x86)\\LLVM\\bin"
+        - "C:\\Users\\runneradmin\\.dotnet\\tools"
+        - "C:\\Users\\runneradmin\\.cargo\\bin"
+        - "C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\Llvm\\x64\\bin"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\vcpkg"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/CodeSkeptic"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "C:/Program Files/CMake"
+        - "C:/Program Files (x86)/CodeSkeptic"
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/Internal/CheckSourceCompiles.cmake:138 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CheckCSourceCompiles.cmake:103 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:160 (check_c_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:226 (_threads_check_libc)"
+      - "build/_deps/googletest-src/googletest/cmake/internal_utils.cmake:66 (find_package)"
+      - "build/_deps/googletest-src/googletest/CMakeLists.txt:83 (config_compiler_and_linker)"
+    checks:
+      - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
+    directories:
+      source: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-w4o319"
+      binary: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-w4o319"
+    cmakeVariables:
+      CMAKE_CXX_STDLIB_MODULES_JSON: ""
+      CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
+      CMAKE_C_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm;C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm"
+      CMAKE_MSVC_RUNTIME_LIBRARY: "MultiThreaded"
+    buildResult:
+      variable: "CMAKE_HAVE_LIBC_PTHREAD"
+      cached: true
+      stdout: |
+        Change Dir: 'D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-w4o319'
+        
+        Run Build Command(s): C:/ProgramData/chocolatey/bin/ninja.exe -v cmTC_42fe9
+        [1/2] "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe"  /nologo -DCMAKE_HAVE_LIBC_PTHREAD -D_MBCS  /DWIN32 /D_WINDOWS  /Zi /Ob0 /Od /RTC1 -MT /showIncludes /FoCMakeFiles\\cmTC_42fe9.dir\\src.c.obj /FdCMakeFiles\\cmTC_42fe9.dir\\ /FS -c D:\\a\\CodeSkeptic\\CodeSkeptic\\build\\CMakeFiles\\CMakeScratch\\TryCompile-w4o319\\src.c
+        FAILED: [code=2] CMakeFiles/cmTC_42fe9.dir/src.c.obj 
+        "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe"  /nologo -DCMAKE_HAVE_LIBC_PTHREAD -D_MBCS  /DWIN32 /D_WINDOWS  /Zi /Ob0 /Od /RTC1 -MT /showIncludes /FoCMakeFiles\\cmTC_42fe9.dir\\src.c.obj /FdCMakeFiles\\cmTC_42fe9.dir\\ /FS -c D:\\a\\CodeSkeptic\\CodeSkeptic\\build\\CMakeFiles\\CMakeScratch\\TryCompile-w4o319\\src.c
+        D:\\a\\CodeSkeptic\\CodeSkeptic\\build\\CMakeFiles\\CMakeScratch\\TryCompile-w4o319\\src.c(1): fatal error C1083: Cannot open include file: 'pthread.h': No such file or directory
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: 2
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CheckLibraryExists.cmake:154 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:175 (check_library_exists)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:238 (_threads_check_lib)"
+      - "build/_deps/googletest-src/googletest/cmake/internal_utils.cmake:66 (find_package)"
+      - "build/_deps/googletest-src/googletest/CMakeLists.txt:83 (config_compiler_and_linker)"
+    checks:
+      - "Looking for pthread_create in pthreads"
+    directories:
+      source: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-r0gws8"
+      binary: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-r0gws8"
+    cmakeVariables:
+      CMAKE_CXX_STDLIB_MODULES_JSON: ""
+      CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
+      CMAKE_C_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm;C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm"
+      CMAKE_MSVC_RUNTIME_LIBRARY: "MultiThreaded"
+    buildResult:
+      variable: "CMAKE_HAVE_PTHREADS_CREATE"
+      cached: true
+      stdout: |
+        Change Dir: 'D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-r0gws8'
+        
+        Run Build Command(s): C:/ProgramData/chocolatey/bin/ninja.exe -v cmTC_00318
+        [1/2] "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe"  /nologo -D_MBCS  /DWIN32 /D_WINDOWS -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -MT /showIncludes /FoCMakeFiles\\cmTC_00318.dir\\CheckFunctionExists.c.obj /FdCMakeFiles\\cmTC_00318.dir\\ /FS -c D:\\a\\CodeSkeptic\\CodeSkeptic\\build\\CMakeFiles\\CMakeScratch\\TryCompile-r0gws8\\CheckFunctionExists.c
+        [2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && "C:\\Program Files\\CMake\\bin\\cmake.exe" -E vs_link_exe --msvc-ver=1951 --intdir=CMakeFiles\\cmTC_00318.dir --rc="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe" --mt="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\mt.exe" --manifests  -- "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe" /nologo CMakeFiles\\cmTC_00318.dir\\CheckFunctionExists.c.obj  /out:cmTC_00318.exe /implib:cmTC_00318.lib /pdb:cmTC_00318.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        FAILED: [code=4294967295] cmTC_00318.exe 
+        C:\\Windows\\system32\\cmd.exe /C "cd . && "C:\\Program Files\\CMake\\bin\\cmake.exe" -E vs_link_exe --msvc-ver=1951 --intdir=CMakeFiles\\cmTC_00318.dir --rc="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe" --mt="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\mt.exe" --manifests  -- "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe" /nologo CMakeFiles\\cmTC_00318.dir\\CheckFunctionExists.c.obj  /out:cmTC_00318.exe /implib:cmTC_00318.lib /pdb:cmTC_00318.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        LINK Pass 1: command "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_00318.dir\\CheckFunctionExists.c.obj /out:cmTC_00318.exe /implib:cmTC_00318.lib /pdb:cmTC_00318.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_00318.dir/intermediate.manifest CMakeFiles\\cmTC_00318.dir/manifest.res" failed (exit code 1104) with the following output:
+        LINK : fatal error LNK1104: cannot open file 'pthreads.lib'\x0d
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: -1
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CheckLibraryExists.cmake:154 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:175 (check_library_exists)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/FindThreads.cmake:239 (_threads_check_lib)"
+      - "build/_deps/googletest-src/googletest/cmake/internal_utils.cmake:66 (find_package)"
+      - "build/_deps/googletest-src/googletest/CMakeLists.txt:83 (config_compiler_and_linker)"
+    checks:
+      - "Looking for pthread_create in pthread"
+    directories:
+      source: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-ldt6d3"
+      binary: "D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-ldt6d3"
+    cmakeVariables:
+      CMAKE_CXX_STDLIB_MODULES_JSON: ""
+      CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
+      CMAKE_C_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm;C:/llvm/clang+llvm-20.1.8-x86_64-pc-windows-msvc/lib/cmake/llvm"
+      CMAKE_MSVC_RUNTIME_LIBRARY: "MultiThreaded"
+    buildResult:
+      variable: "CMAKE_HAVE_PTHREAD_CREATE"
+      cached: true
+      stdout: |
+        Change Dir: 'D:/a/CodeSkeptic/CodeSkeptic/build/CMakeFiles/CMakeScratch/TryCompile-ldt6d3'
+        
+        Run Build Command(s): C:/ProgramData/chocolatey/bin/ninja.exe -v cmTC_46520
+        [1/2] "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe"  /nologo -D_MBCS  /DWIN32 /D_WINDOWS -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -MT /showIncludes /FoCMakeFiles\\cmTC_46520.dir\\CheckFunctionExists.c.obj /FdCMakeFiles\\cmTC_46520.dir\\ /FS -c D:\\a\\CodeSkeptic\\CodeSkeptic\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ldt6d3\\CheckFunctionExists.c
+        [2/2] C:\\Windows\\system32\\cmd.exe /C "cd . && "C:\\Program Files\\CMake\\bin\\cmake.exe" -E vs_link_exe --msvc-ver=1951 --intdir=CMakeFiles\\cmTC_46520.dir --rc="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe" --mt="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\mt.exe" --manifests  -- "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe" /nologo CMakeFiles\\cmTC_46520.dir\\CheckFunctionExists.c.obj  /out:cmTC_46520.exe /implib:cmTC_46520.lib /pdb:cmTC_46520.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        FAILED: [code=4294967295] cmTC_46520.exe 
+        C:\\Windows\\system32\\cmd.exe /C "cd . && "C:\\Program Files\\CMake\\bin\\cmake.exe" -E vs_link_exe --msvc-ver=1951 --intdir=CMakeFiles\\cmTC_46520.dir --rc="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\rc.exe" --mt="C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\mt.exe" --manifests  -- "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe" /nologo CMakeFiles\\cmTC_46520.dir\\CheckFunctionExists.c.obj  /out:cmTC_46520.exe /implib:cmTC_46520.lib /pdb:cmTC_46520.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        LINK Pass 1: command "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_46520.dir\\CheckFunctionExists.c.obj /out:cmTC_46520.exe /implib:cmTC_46520.lib /pdb:cmTC_46520.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_46520.dir/intermediate.manifest CMakeFiles\\cmTC_46520.dir/manifest.res" failed (exit code 1104) with the following output:
+        LINK : fatal error LNK1104: cannot open file 'pthread.lib'\x0d
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: -1
+...
