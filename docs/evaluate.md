@@ -7,10 +7,23 @@ into anything that can block a merge.
 
 ## 0. Prerequisites
 
-A Linux or macOS machine with LLVM/Clang development libraries (the
-[README quickstart](../README.md#quickstart) is the 4-command build),
-and a real `compile_commands.json` for your project
-(`cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, or `bear -- make`).
+Get the analyzer one of three ways — LLVM is NOT required for A or B:
+
+- **Option A — release binary** (Linux x86_64 / macOS arm64): download
+  from [Releases](https://github.com/tanzercakir-commits/CodeSkeptic/releases),
+  unpack, run `bin/codeskeptic`. Everything (Clang headers, runtime
+  libraries) is in the package.
+- **Option B — Docker**: `docker run --rm -v "$PWD:/work"
+  ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 ...` — pin the tag in
+  CI; `:latest` is fine for a first try.
+- **Option C — build from source**: needs LLVM/Clang development
+  libraries; the [README quickstart](../README.md#quickstart) is the
+  4-command build.
+
+Separately from all three, YOUR project needs a real
+`compile_commands.json` (`cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`,
+or `bear -- make`) — that is about your code's compile flags, not
+about building CodeSkeptic.
 
 ## 1. Pick a real slice, not a toy
 

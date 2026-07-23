@@ -40,13 +40,14 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 **Docker** — nothing installed at all:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic src/ --sarif out.sarif
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.4 src/ --sarif out.sarif  # :latest floats
 ```
 
 **CI** — the [packaged action](action.yml), report-only by default:
 
 ```yaml
-- uses: tanzercakir-commits/CodeSkeptic@v0.4.0
+# Pinning the action pins the analyzer binary too (same tag).
+- uses: tanzercakir-commits/CodeSkeptic@v0.4.4
   with: { path: src/, build-path: build }
 ```
 

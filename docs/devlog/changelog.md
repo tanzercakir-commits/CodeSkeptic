@@ -1,5 +1,20 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-22 — v0.4.4: the trust-chain round (critique-2)
+
+Reproducibility gaps between LOOKING pinned and BEING pinned, all
+verified against the repo before fixing: the Action's `version`
+defaulted to `latest` (a pinned `uses:` ref still floated the
+binary) — it now defaults to the action's own ref, with checksum
+verification against the release's `sha256sums.txt` and a pinned
+self-test lane asserting version identity after every release. The
+clean-container smoke stopped installing the very libraries the
+package claims to bundle (three releases of masking) and now proves
+the self-contained claim via `ldd`: nothing missing, bundled deps
+resolving from the package. README/Docker examples pin versions;
+evaluate.md prerequisites rewritten for the binary/Docker era; FP and
+evaluation issue templates added. No engine changes.
+
 ## 2026-07-22 — The real-world FP round: six root causes from the v0.4.2 scans
 
 The post-release real-world scans (libgit2 v1.9.0 at 201 files,

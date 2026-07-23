@@ -1,0 +1,42 @@
+name: Evaluation report
+description: >-
+  Ran the docs/evaluate.md protocol on your code? Share the outcome —
+  good or bad. Independent evaluations are the most valuable
+  contribution this project can receive.
+labels: ["evaluation"]
+body:
+  - type: input
+    id: project
+    attributes:
+      label: Project (name/link, or "private codebase" + rough size)
+      placeholder: e.g. myproject (~40 kLOC C), or private, ~200 files C++
+    validations:
+      required: true
+  - type: textarea
+    id: numbers
+    attributes:
+      label: The numbers
+      description: "TUs analyzed / findings / how many verified meaningful / how many false"
+      placeholder: |
+        28 TUs, 11 findings: 7 meaningful (2 real bugs, 5 true statements), 3 false, 1 unclear
+    validations:
+      required: true
+  - type: textarea
+    id: falses
+    attributes:
+      label: False positives, if any (traces welcome)
+      description: Each one is engine-improvement input — paste traces or open separate FP issues.
+  - type: textarea
+    id: verdict
+    attributes:
+      label: Your verdict
+      description: Would you keep it in report-only? Gate a CI job with it? Drop it? Why?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CodeSkeptic version + how you ran it
+      placeholder: v0.4.4 binary / Docker / source; with/without compile_commands.json
+    validations:
+      required: true

@@ -1,66 +1,45 @@
-# CodeSkeptic v0.4.3 — the real-world FP round
+# CodeSkeptic v0.4.4 — the trust-chain round
 
-v0.4.2 put the thesis axis under CI guard and shipped an on-demand
-real-world scan lane. This release is what that lane was FOR: the
-first scans reproduced the analyzer's stable core exactly — and
-surfaced 37 false positives on libgit2 and rtp2httpd. Every one was
-adjudicated against upstream source, reduced to a reproducer, and
-fixed at a root cause. Six roots, four engine rounds, zero
-suppression lists.
+No engine changes. This release closes the reproducibility and
+supply-chain gaps the second external critique identified — the gap
+between LOOKING pinned and BEING pinned.
 
-## The numbers (CI-verified on pinned versions)
+## GitHub Action: pinning the action now pins the analyzer
 
-- **libgit2 v1.9.0** (201 files): 61 → **34** — exactly the
-  documented stable core (23 triaged null-derefs + the 11 confirmed
-  OOM-path leaks reported upstream). The 27-finding hashmap-macro
-  family is gone.
-- **rtp2httpd** (39 files): 12 → **0**.
-- Unchanged and green throughout: all Juliet per-CWE floors, the
-  real-world corpus pins (cJSON 53 / tinyxml2 9 / abseil 4 /
-  Catch2 0), the frozen thesis-corpus gate (0 FP, 9/9 in-scope), and
-  the self-scan. 683 unit tests (was 661) — every fix pinned in both
-  directions.
+- `uses: tanzercakir-commits/CodeSkeptic@v0.4.4` previously downloaded
+  the LATEST release binary regardless of the pinned ref — the
+  analyzer could drift under a "pinned" workflow. The `version` input
+  now defaults to the action's own ref: pin the action, and that exact
+  release binary is what analyzes your code. Explicit `version:
+  latest` still floats for those who want it.
+- The action now verifies the downloaded tarball against the
+  `sha256sums.txt` published with the release — a mismatch (or a
+  missing checksum file) fails the job.
+- The action self-test gained a pinned lane: after every release it
+  runs the action pinned to the fresh tag and asserts the analyzer
+  that answers is exactly that version.
 
-## Engine — six root causes
+## Self-contained releases: now proven, not just claimed
 
-- **Correlation-miner entailment**: the disjunct-collapse miner
-  matched facts by exact key, blind to stamped equalities on other
-  literals (`(j EQ 1)=true` neither excluded the `j == 0` disjunct
-  nor witnessed the consumable implication). Compatibility, witness
-  and activation now run through stamp entailment — the khash
-  `j`-flag/pointer correlation survives the collapse.
-- **Member fact keys**: `if (c.has_x) produce; ... if (c.has_x)
-  consume;` on a local struct's field had no correlation support at
-  all. Dot-members join the fact domain (conditions, literal-store
-  stamps, erasure at `&c`-receiving calls), with a documented
-  deliberate limit mirroring the keyed-globals trade.
-- **Implication payloads**: mined guard implications can now promise
-  "guarded absence of null-info" (Unknown), not just NonNull — the
-  out-param-factory-under-a-guard shape survives disjunct-cap
-  collapses.
-- **Out-param success contracts**: `rc = getaddrinfo(..., &res)`
-  with `rc == 0` guarantees a non-null result (POSIX); the call
-  splits success/failure disjuncts so the caller's own error check
-  proves the happy path — and an UNCHECKED rc keeps the failure
-  side reportable. Curated: getaddrinfo, posix_memalign.
-- **Miner slot discipline**: implications never key on the pointer's
-  own nullness (a tautology that burned the slot), and the
-  anti-vacuity witness runs strict-then-loose, accepting a
-  complement-deciding disjunct for compound contracts
-  (`if (!p && len > 0) return;`) only when the strict pass mines
-  nothing — so nothing previously mined can be shadowed.
-- **scanf field widths + strlen-guard witness**: `%2d` now seeds
-  [-9, 99] instead of a full int range that manufactured overflow
-  "witnesses" (conversion/argument pairing handles `%*d`), and the
-  CWE-120 unbounded-copy heuristic finally checks the claim in its
-  own message — a dominating `strlen(src)` guard suppresses it,
-  while dst-only, after-the-fact and other-variable measurements
-  still fire.
+The clean-container release smoke used to install `libzstd1`,
+`zlib1g` and `libtinfo6` before running the packaged binary — which
+would MASK a broken bundle (the critique's sharpest catch). The smoke
+now installs only `libc6-dev` (the demo's libc headers), asserts
+`ldd` reports no missing libraries, and asserts the bundled runtime
+libraries (LLVM, zstd, zlib, tinfo) resolve from the PACKAGE lib
+directory, not the host.
 
-## Everything else
+## Docs and templates
 
-The onboarding surface is unchanged and re-validated by this
-release's clean-container smokes: binaries for Linux x86_64 and
-macOS arm64, the Docker image on ghcr.io, the report-only GitHub
-Action, idiom profiles, and the layered docs. Full history:
-`docs/devlog/changelog.md` (2026-07-22).
+- README examples pin versions (`@v0.4.4`, `ghcr.io/...:v0.4.4`)
+  with `:latest` noted as the explicit floating choice.
+- `docs/evaluate.md` prerequisites rewritten for the binary/Docker
+  era: Option A (release binary), B (Docker), C (build from source —
+  only C needs LLVM dev libraries), with your project's
+  `compile_commands.json` explained as a separate concern.
+- New issue templates: **false-positive report** (traces welcome —
+  every FP family so far became an engine feature) and **evaluation
+  report** (independent evaluations are the most valuable
+  contribution this project can receive).
+
+Full engine history: docs/devlog/changelog.md.
