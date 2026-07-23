@@ -1,0 +1,47 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: no such file or directory
+json-compilation-database: Error while opening JSON database: no such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:6:17: warning: 'getenv' is deprecated: This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+    6 |     char *val = getenv(name);              /* may be NULL when unset   */
+      |                 ^
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt\stdlib.h:1183:20: note: 'getenv' has been explicitly marked deprecated here
+ 1183 |     _Check_return_ _CRT_INSECURE_DEPRECATE(_dupenv_s)
+      |                    ^
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\vcruntime.h:358:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+  358 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+      |                                                       ^
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\vcruntime.h:348:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+  348 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+      |                                               ^
+D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:8:5: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+    8 |     strcpy(copy, val);                     /* and copy has no null chk */
+      |     ^
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+      | ^
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt\corecrt.h:874:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+  874 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+      |     ^
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt\corecrt.h:1933:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+ 1933 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+      |                 ^
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\vcruntime.h:358:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+  358 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+      |                                                       ^
+C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.51.36231\include\vcruntime.h:348:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+  348 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+      |                                               ^
+2 warnings generated.
+CodeSkeptic: 3 finding(s)
+----------------------------------------
+D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:7:25 [warning] null-deref: Possible null dereference: 'val' may be null on some paths
+    -> D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:6:5 'val' assigned a possibly-null value here (callee may return null)
+    -> D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:8:5 'val' is also dereferenced here (same origin)
+D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:8:5 [warning] null-deref: Possible null dereference: 'copy' may be null on some paths
+    -> D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:7:5 'copy' assigned a possibly-null value here (callee may return null)
+D:\a\CodeSkeptic\CodeSkeptic\docs\demo.c:14:14 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+----------------------------------------
+
+exit_code=1
