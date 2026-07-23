@@ -485,3 +485,65 @@ TEST(UntrustedIntSourceTest, NotConfigured_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);   // unknown callee -> not assumed unbounded
 }
+
+// --- scanf field-width modeling (2026-07-22, the rtp2httpd timezone
+// FP family): an explicit width bounds the parsed value; widthless
+// conversions keep the untrusted-source full-range model. ---
+
+TEST(IntOverflowRuleTest, ScanfWidthBounded_Silent) {
+    // %2d cannot exceed 99: 99 * 3600 fits int comfortably.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int sscanf(const char*, const char*, ...);
+        int f(const char* p) {
+            int h = 0, m = 0;
+            if (sscanf(p, "%2d:%2d", &h, &m) != 2) return -1;
+            if (h > 14 || m < 0 || m > 59) return -1;
+            return h * 3600 + m * 60;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, ScanfWidthless_Reported) {
+    // No width -> full int range stays the honest untrusted model.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int sscanf(const char*, const char*, ...);
+        int f(const char* p) {
+            int v = 0;
+            sscanf(p, "%d", &v);
+            return v * 100;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(IntOverflowRuleTest, ScanfSuppressedPairing_Silent) {
+    // %*d consumes NO argument: &v pairs with %3d, not with the
+    // suppressed conversion — a blind sweep would misalign.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int sscanf(const char*, const char*, ...);
+        int f(const char* p) {
+            int v = 0;
+            sscanf(p, "%*d %3d", &v);
+            return v * 100;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, ScanfWideWidth_Reported) {
+    // %9d reaches 999999999; times 100 escapes int — a real risk.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        extern int sscanf(const char*, const char*, ...);
+        int f(const char* p) {
+            int v = 0;
+            sscanf(p, "%9d", &v);
+            return v * 100;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}

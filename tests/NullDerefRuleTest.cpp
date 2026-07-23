@@ -1636,3 +1636,202 @@ TEST(ReadmeCompareTest, CustomC_HandWrittenNullReturner_NullDeref) {
     ASSERT_GE(results.size(), 1u);
     for (const auto& d : results) EXPECT_EQ(d.rule_id, "null-deref");
 }
+
+// --- Entailment-aware correlation miner + member fact keys
+// (2026-07-22, the libgit2 hashmap __resize and rtp2httpd
+// msrc_res/fcc_res FP families). ---
+
+TEST(NullDerefRuleTest, KhashResizeJFlagCorrelation_Clean) {
+    // The khash resize shape: j==1 exactly when new_flags was
+    // allocated non-null (the null path returns), then nested kick-out
+    // loops dereference under `if (j)`. The extra alloc-failure paths
+    // push the disjunct count over the cap; the collapse's miner must
+    // preserve "j != 0 => new_flags NonNull" via stamp entailment.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        extern void* realloc(void*, size_t);
+        extern void free(void*);
+        extern void* memset(void*, int, size_t);
+        struct map { unsigned n_buckets, size; unsigned *flags; int *keys; int *vals; };
+        static unsigned hashfn(int k) { return (unsigned)k * 2654435761u; }
+        int map_resize(struct map *h, unsigned nb) {
+            unsigned *new_flags = 0;
+            unsigned j = 1;
+            {
+                if (nb < 4) nb = 4;
+                if (h->size >= (unsigned)(nb * 0.77 + 0.5)) {
+                    j = 0;
+                } else {
+                    new_flags = malloc((nb >> 4) * sizeof(unsigned));
+                    if (!new_flags) return -1;
+                    memset(new_flags, 0xaa, (nb >> 4) * sizeof(unsigned));
+                    if (h->n_buckets < nb) {
+                        int *nk = realloc(h->keys, nb * sizeof(int));
+                        if (!nk) { free(new_flags); return -1; }
+                        h->keys = nk;
+                        int *nv = realloc(h->vals, nb * sizeof(int));
+                        if (!nv) { free(new_flags); return -1; }
+                        h->vals = nv;
+                    }
+                }
+            }
+            if (j) {
+                for (j = 0; j != h->n_buckets; ++j) {
+                    int key = h->keys[j];
+                    unsigned mask = nb - 1;
+                    while (1) {
+                        unsigned k, i, step = 0;
+                        k = hashfn(key);
+                        i = k & mask;
+                        while (!((new_flags[i>>4] >> ((i & 0xfU) << 1)) & 2))
+                            i = (i + (++step)) & mask;
+                        new_flags[i>>4] &= ~(2ul << ((i & 0xfU) << 1));
+                        if (i < h->n_buckets) {
+                            int tmp = h->keys[i]; h->keys[i] = key; key = tmp;
+                        } else {
+                            h->keys[i] = key;
+                            break;
+                        }
+                    }
+                }
+                free(h->flags);
+                h->flags = new_flags;
+            }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagCorrelation_Clean) {
+    // Field-flag twin of the int flag correlation: produce and consume
+    // under the SAME dot-member guard of a local struct.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagCorrelationEscaped_Clean) {
+    // The rtp2httpd msrc_res shape: the struct's address goes to a
+    // parser ONCE (before the correlated region), unrelated calls sit
+    // between the guards. Per the documented deliberate limit (the
+    // keyed-globals trade), the correlation survives those calls.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        extern void parse(struct comp *out);
+        extern void logger(const char *msg);
+        int f(void) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            logger("between");
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDivergent_Reported) {
+    // Different fields do NOT correlate — the genuine bug keeps firing.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        extern void parse(struct comp *out);
+        int f(void) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            if (c.other) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagCallClobber_Reported) {
+    // A call receiving &c BETWEEN the guards may rewrite the flag —
+    // the facts are erased there and the correlation must NOT survive.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        extern void parse(struct comp *out);
+        int f(void) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            parse(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagReassignedBetween_Reported) {
+    // A direct store to the flag between the guards breaks the
+    // correlation the same way (erase-and-restamp lifecycle).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        extern void parse(struct comp *out);
+        int f(void) {
+            struct comp c;
+            parse(&c);
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            c.has_source = 1;
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberBaseAddressStored_Reported) {
+    // `&c` stored outside a call-argument position bans the base:
+    // an alias may rewrite fields invisibly, so no member correlation.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        struct comp { int has_source; int other; };
+        extern struct comp *g_saved;
+        int f(void) {
+            struct comp c;
+            c.has_source = 1;
+            g_saved = &c;
+            char *p = 0;
+            if (c.has_source) { p = malloc(8); if (!p) return -1; }
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}

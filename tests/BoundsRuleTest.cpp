@@ -508,3 +508,115 @@ TEST(BoundsRuleTest, StrcpyIntoHeap_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Length-check witness (2026-07-22, the rtp2httpd guarded-copy
+// FP family): a strlen(src) measurement in a dominating guard excuses
+// the heuristic; anything less keeps firing. ---
+
+TEST(BoundsRuleTest, StrcatStrlenSumGuard_Clean) {
+    // Shape A: the canonical guarded append.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcat(char*, const char*);
+        int f(const char* param) {
+            char merged[2048];
+            merged[0] = 0;
+            if (strlen(merged) + strlen(param) < sizeof(merged)) {
+                strcat(merged, param);
+                return 1;
+            }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, StrcpyPrecheckEarlyReturn_Clean) {
+    // Shape B: measure-and-bail before the copy.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcpy(char*, const char*);
+        int f(const char* url) {
+            char absolute[4096];
+            if (strlen(url) >= sizeof(absolute))
+                return -1;
+            strcpy(absolute, url);
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, StrcatDstOnlyGuard_Reported) {
+    // Measuring the DESTINATION never bounds the source.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcat(char*, const char*);
+        int f(const char* s) {
+            char buf[64];
+            buf[0] = 0;
+            if (strlen(buf) < 60) strcat(buf, s);
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, StrcpyCheckAfterCopy_Reported) {
+    // The check must DOMINATE the copy; checking afterwards is theater.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcpy(char*, const char*);
+        int f(const char* s) {
+            char buf[64];
+            strcpy(buf, s);
+            if (strlen(s) >= sizeof(buf)) return -1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, StrcpyMeasuredThenIgnored_Reported) {
+    // A guard whose then-branch does NOT exit leaves the fall-through
+    // copy unprotected — measured-then-ignored is a bug, not diligence.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcpy(char*, const char*);
+        extern void log_warn(void);
+        int f(const char* s) {
+            char buf[64];
+            if (strlen(s) >= sizeof(buf)) { log_warn(); }
+            strcpy(buf, s);
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, StrcpyOtherVarGuard_Reported) {
+    // The measurement must be of the SAME source expression.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern size_t strlen(const char*);
+        extern char* strcpy(char*, const char*);
+        int f(const char* s, const char* t) {
+            char buf[64];
+            if (strlen(t) >= sizeof(buf)) return -1;
+            strcpy(buf, s);
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
