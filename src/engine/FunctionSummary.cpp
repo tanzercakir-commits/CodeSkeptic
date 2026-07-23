@@ -114,6 +114,17 @@ VState zstateOf(const Expr* expr, const SummaryTable& previous) {
                 return VState::NonBad;
             if (summary->returnZeroness == ReturnZeroness::MaybeZero)
                 return VState::MaybeBad;
+            // Zero-passthrough: the call's zero-state IS argument
+            // #zeroFromParam's (`x = id(5)` -> NonBad). Recursion is
+            // over the finite expression tree. A variable argument
+            // stays Unknown here (this evaluator is stateless); the
+            // PT harvest pass and the DivByZero copy path own that
+            // case.
+            if (summary->zeroFromParam >= 0 &&
+                static_cast<unsigned>(summary->zeroFromParam) <
+                    call->getNumArgs())
+                return zstateOf(call->getArg(summary->zeroFromParam),
+                                previous);
         }
         return VState::Unknown;
     }
@@ -360,12 +371,126 @@ ReturnNullness computeReturnNullness(const FunctionDecl* func,
     return ReturnNullness::Unknown;
 }
 
+// --- Zero-passthrough harvest (the zeroness-through-summaries slice) ---
+//
+// Parameters whose entry value survives the whole function: never the
+// target of an assignment / compound assignment / ++ / --, never
+// address-taken. C parameters are copies, so `return p;` on ANY path
+// then returns the caller's argument verbatim — path-independently,
+// which is what lets this pass run structurally after the flow.
+std::set<const VarDecl*> unwrittenParams(const FunctionDecl* func) {
+    std::set<const VarDecl*> params(func->param_begin(), func->param_end());
+    struct V : RecursiveASTVisitor<V> {
+        std::set<const VarDecl*>* params;
+        bool VisitBinaryOperator(BinaryOperator* bin) {
+            if (bin->isAssignmentOp())
+                if (const VarDecl* v = exprAsVar(bin->getLHS()))
+                    params->erase(v);
+            return true;
+        }
+        bool VisitUnaryOperator(UnaryOperator* u) {
+            if (u->isIncrementDecrementOp() || u->getOpcode() == UO_AddrOf)
+                if (const VarDecl* v = exprAsVar(u->getSubExpr()))
+                    params->erase(v);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } v;
+    v.params = &params;
+    if (func->getBody()) v.TraverseStmt(func->getBody());
+    return params;
+}
+
+// One return expression's contribution to the passthrough claim.
+// NonZero (proven never zero), Passthrough (returns param #*pt's entry
+// value — directly or through a passthrough chain), or Blocked (kills
+// the claim).
+//
+// WIDTH DISCIPLINE: the claim "result == 0 implies the source value was
+// 0" survives integer conversions only when no step NARROWS — a
+// truncation maps 2^32 to 0, fabricating a zero from a nonzero
+// argument. `targetWidth` is the width of the slot this expression's
+// value flows into; every node whose own width exceeds it is Blocked,
+// and each cast / callee-parameter hop re-anchors the target. Same- or
+// widening conversions (any signedness) preserve zeroness exactly.
+enum class PtRes { NonZero, Passthrough, Blocked };
+
+PtRes resolveZeroReturn(const Expr* e, const FunctionDecl* func,
+                        const std::set<const VarDecl*>& unwritten,
+                        const SummaryTable& previous, ASTContext& ctx,
+                        unsigned targetWidth, int* pt) {
+    if (!e) return PtRes::Blocked;
+    e = e->IgnoreParens();
+    if (!e->getType()->isIntegerType()) return PtRes::Blocked;
+    if (ctx.getIntWidth(e->getType()) > targetWidth) return PtRes::Blocked;
+
+    if (const auto* lit = dyn_cast<IntegerLiteral>(e))
+        return lit->getValue() == 0 ? PtRes::Blocked : PtRes::NonZero;
+    if (const auto* cast = dyn_cast<CastExpr>(e))
+        return resolveZeroReturn(cast->getSubExpr(), func, unwritten,
+                                 previous, ctx,
+                                 ctx.getIntWidth(e->getType()), pt);
+    if (const auto* u = dyn_cast<UnaryOperator>(e)) {
+        // -x == 0 iff x == 0, at any width.
+        if (u->getOpcode() == UO_Minus)
+            return resolveZeroReturn(u->getSubExpr(), func, unwritten,
+                                     previous, ctx, targetWidth, pt);
+        return PtRes::Blocked;
+    }
+    if (const auto* ref = dyn_cast<DeclRefExpr>(e)) {
+        const auto* parm = dyn_cast<ParmVarDecl>(ref->getDecl());
+        if (!parm || !unwritten.count(parm)) return PtRes::Blocked;
+        int idx = -1;
+        for (unsigned i = 0; i < func->getNumParams(); ++i)
+            if (func->getParamDecl(i) == parm) {
+                idx = static_cast<int>(i);
+                break;
+            }
+        if (idx < 0) return PtRes::Blocked;
+        if (*pt >= 0 && *pt != idx) return PtRes::Blocked;  // mixed params
+        *pt = idx;
+        return PtRes::Passthrough;
+    }
+    if (const auto* call = dyn_cast<CallExpr>(e)) {
+        const auto* summary = lookupPrev(previous, call->getDirectCallee());
+        if (!summary) return PtRes::Blocked;
+        if (summary->returnZeroness == ReturnZeroness::NeverZero)
+            return PtRes::NonZero;
+        if (summary->zeroFromParam >= 0 &&
+            static_cast<unsigned>(summary->zeroFromParam) <
+                call->getNumArgs()) {
+            // The argument flows into the CALLEE PARAMETER's slot; the
+            // callee's own harvest enforced param -> its return.
+            const FunctionDecl* callee = call->getDirectCallee();
+            unsigned argTarget = targetWidth;
+            if (callee &&
+                static_cast<unsigned>(summary->zeroFromParam) <
+                    callee->getNumParams()) {
+                QualType pt_ty =
+                    callee
+                        ->getParamDecl(
+                            static_cast<unsigned>(summary->zeroFromParam))
+                        ->getType();
+                if (!pt_ty->isIntegerType()) return PtRes::Blocked;
+                argTarget = ctx.getIntWidth(pt_ty);
+            }
+            return resolveZeroReturn(call->getArg(summary->zeroFromParam),
+                                     func, unwritten, previous, ctx,
+                                     argTarget, pt);
+        }
+        return PtRes::Blocked;
+    }
+    return PtRes::Blocked;
+}
+
 ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
                                      ASTContext& ctx,
-                                     const SummaryTable& previous) {
+                                     const SummaryTable& previous,
+                                     int* zeroFromParam) {
     // bool excluded: the falses in the `return ok;` pattern would count
     // as zero, yielding MaybeZero everywhere; a bool divisor is
     // meaningless anyway
+    *zeroFromParam = -1;
     QualType retType = func->getReturnType();
     if (!retType->isIntegerType() || retType->isBooleanType())
         return ReturnZeroness::Unknown;
@@ -377,6 +502,28 @@ ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
     if (flags.empty) return ReturnZeroness::Unknown;
     if (flags.sawBad) return ReturnZeroness::MaybeZero;
     if (flags.allNonBad) return ReturnZeroness::NeverZero;
+
+    // Neither strong claim held — try the conditional one: every path
+    // either proven NeverZero or returns param #k's entry value. Runs
+    // structurally: an unwritten param's entry value holds at every
+    // return regardless of path, and NeverZero contributions do not
+    // depend on which param the claim names.
+    std::set<const VarDecl*> unwritten = unwrittenParams(func);
+    if (unwritten.empty()) return ReturnZeroness::Unknown;
+    ReturnCollector collector;
+    collector.TraverseStmt(func->getBody());
+    const unsigned retWidth = ctx.getIntWidth(retType);
+    int pt = -1;
+    bool sawPassthrough = false;
+    for (const auto* ret : collector.returns) {
+        switch (resolveZeroReturn(ret, func, unwritten, previous, ctx,
+                                  retWidth, &pt)) {
+            case PtRes::NonZero: break;
+            case PtRes::Passthrough: sawPassthrough = true; break;
+            case PtRes::Blocked: return ReturnZeroness::Unknown;
+        }
+    }
+    if (sawPassthrough && pt >= 0) *zeroFromParam = pt;
     return ReturnZeroness::Unknown;
 }
 
@@ -1033,7 +1180,8 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
         for (const auto* func : collector.functions) {
             FunctionSummary summary;
             summary.returnNullness = computeReturnNullness(func, ctx, current);
-            summary.returnZeroness = computeReturnZeroness(func, ctx, current);
+            summary.returnZeroness = computeReturnZeroness(
+                func, ctx, current, &summary.zeroFromParam);
             summary.params = computeParamEffects(func, current);
 
             // #69b: try to strengthen a plain MaybeNull into the
@@ -1055,6 +1203,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             if (prev == current.end() ||
                 prev->second.returnNullness != summary.returnNullness ||
                 prev->second.returnZeroness != summary.returnZeroness ||
+                prev->second.zeroFromParam != summary.zeroFromParam ||
                 prev->second.nullCondParam != summary.nullCondParam ||
                 prev->second.nullCondRange != summary.nullCondRange ||
                 prev->second.params != summary.params) {
@@ -1107,6 +1256,11 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     }
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
+    // The passthrough claim survives a merge only on exact agreement,
+    // and only in its defined home (returnZeroness == Unknown).
+    if (into.zeroFromParam != from.zeroFromParam ||
+        into.returnZeroness != RZ::Unknown)
+        into.zeroFromParam = -1;
     if (into.params.size() != from.params.size()) {
         into.params.clear();  // paramEffect() defaults to Opaque
         return;
@@ -1121,7 +1275,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v3";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v4";
+constexpr const char* kSummaryFileHeaderV3 = "codeskeptic-summaries v3";
 constexpr const char* kSummaryFileHeaderV2 = "codeskeptic-summaries v2";
 constexpr const char* kSummaryFileHeaderV1 = "codeskeptic-summaries v1";
 
@@ -1229,6 +1384,10 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
             if (summary.nullCondRange.hiIsInf()) out << '~';
             else out << summary.nullCondRange.hi();
         }
+        // v4 column: zero-passthrough param index, "-" when absent.
+        out << '\t';
+        if (summary.zeroFromParam < 0) out << '-';
+        else out << summary.zeroFromParam;
         out << '\n';
     }
     return out.good();
@@ -1243,13 +1402,14 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 3;
+    if (line == kSummaryFileHeader) version = 4;
+    else if (line == kSummaryFileHeaderV3) version = 3;
     else if (line == kSummaryFileHeaderV2) version = 2;
     else if (line == kSummaryFileHeaderV1) version = 1;
     else return false;
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
-    const size_t maxFields = (version == 3) ? 5 : 4;
+    const size_t maxFields = (version >= 4) ? 6 : (version == 3) ? 5 : 4;
 
     // Parse fully first, then hand over: a corrupt file is rejected
     // without leaving partial state behind
@@ -1266,7 +1426,8 @@ bool SummaryRegistry::parseSummaryFile(
         }
         fields.push_back(line.substr(start));
 
-        // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null cond)
+        // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null
+        // cond); v4: 6 (zero-passthrough param)
         if (fields.size() < 3 || fields.size() > maxFields) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
@@ -1280,7 +1441,7 @@ bool SummaryRegistry::parseSummaryFile(
                 !rzFromChar(fields[3][0], summary.returnZeroness))
                 return false;
         }
-        if (fields.size() == 5 && fields[4] != "-") {
+        if (fields.size() >= 5 && fields[4] != "-") {
             // "paramIdx:lo:hi", "~" = infinite bound
             const std::string& cond = fields[4];
             size_t c1 = cond.find(':');
@@ -1322,6 +1483,18 @@ bool SummaryRegistry::parseSummaryFile(
                 summary.nullCondRange = codeskeptic::Interval::range(lo, hi);
             else
                 return false;
+        }
+        if (fields.size() == 6 && fields[5] != "-") {
+            const std::string& zf = fields[5];
+            errno = 0;
+            char* end = nullptr;
+            long long idx = std::strtoll(zf.c_str(), &end, 10);
+            if (errno != 0 || end != zf.c_str() + zf.size() || idx < 0)
+                return false;
+            // The claim lives only where it is defined: zeroness Unknown.
+            if (summary.returnZeroness != ReturnZeroness::Unknown)
+                return false;
+            summary.zeroFromParam = static_cast<int>(idx);
         }
         if (pe != "-") {
             summary.params.reserve(pe.size());

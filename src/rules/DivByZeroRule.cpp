@@ -76,6 +76,41 @@ bool isUntrustedZeroSource(const CallExpr* call) {
            n == "rand" || n == "random";
 }
 
+// Unwrap zero-passthrough call chains: when `id`'s summary proves
+// "result is zero only if argument #k is zero", `id(e)` stands for `e`
+// zeroness-wise, so the copy/state machinery can flow the ARGUMENT's
+// zero-state into the assignment target. WIDTH DISCIPLINE mirrors the
+// harvest: the (implicit-cast-stripped) argument's width must not
+// exceed the callee parameter's slot, or a narrowing conversion could
+// fabricate a zero from a nonzero value and the propagated NonZero
+// would wrongly SUPPRESS a real division hazard. An explicit cast in
+// the argument simply stops the unwrap (IgnoreParenImpCasts keeps it),
+// which downgrades to Unknown - sound.
+const Expr* unwrapZeroPassthrough(const Expr* expr, const ASTContext& ctx) {
+    while (expr) {
+        const Expr* stripped = expr->IgnoreParenImpCasts();
+        const auto* call = dyn_cast<CallExpr>(stripped);
+        if (!call) break;
+        const FunctionDecl* callee = call->getDirectCallee();
+        const auto* summary =
+            codeskeptic::SummaryRegistry::instance().lookup(callee);
+        if (!summary || summary->zeroFromParam < 0) break;
+        const unsigned idx = static_cast<unsigned>(summary->zeroFromParam);
+        if (idx >= call->getNumArgs()) break;
+        QualType paramTy;
+        if (callee && idx < callee->getNumParams())
+            paramTy = callee->getParamDecl(idx)->getType();
+        const Expr* arg = call->getArg(idx);
+        const Expr* argCore = arg->IgnoreParenImpCasts();
+        if (paramTy.isNull() || !paramTy->isIntegerType() ||
+            !argCore->getType()->isIntegerType() ||
+            ctx.getIntWidth(argCore->getType()) > ctx.getIntWidth(paramTy))
+            break;
+        expr = arg;
+    }
+    return expr;
+}
+
 ZeroState evaluateAssignedValue(const Expr* expr) {
     ZeroState lit = evaluateAsZero(expr);
     if (lit != ZeroState::Unknown) return lit;
@@ -179,9 +214,13 @@ std::set<const VarDecl*> collectDivisorVars(const FunctionDecl* funcDecl,
     struct CopyEdges : RecursiveASTVisitor<CopyEdges> {
         // target -> direct sources
         std::map<const VarDecl*, std::set<const VarDecl*>> edges;
+        const ASTContext* ctx = nullptr;
         void addEdge(const VarDecl* dst, const Expr* rhs) {
             if (!dst || !rhs) return;
-            if (const auto* src = getReferencedVar(rhs))
+            // `r = id(d)` copies d zeroness-wise (zero-passthrough) —
+            // the edge must exist or d's state is never computed.
+            if (const auto* src =
+                    getReferencedVar(unwrapZeroPassthrough(rhs, *ctx)))
                 edges[dst].insert(src);
         }
         bool VisitBinaryOperator(BinaryOperator* op) {
@@ -195,6 +234,7 @@ std::set<const VarDecl*> collectDivisorVars(const FunctionDecl* funcDecl,
             return true;
         }
     } copies;
+    copies.ctx = &ctx;
     copies.TraverseStmt(funcDecl->getBody());
     bool grew = true;
     while (grew) {
@@ -262,10 +302,13 @@ StmtEffect effectOfValue(ZeroState val) {
 }
 
 StmtEffect classifyStmt(const Stmt* stmt, const VarDecl* targetVar,
-                        const VarDecl** copySrc) {
+                        const VarDecl** copySrc, const ASTContext& ctx) {
     // The RHS value's effect; when it is opaque but a plain var-to-var
     // copy, the state flows from the source (resolved in transfer).
+    // Zero-passthrough calls unwrap to their argument first, so
+    // `r = id(d)` classifies exactly like `r = d` (value or copy).
     auto effectOfRhs = [&](const Expr* rhs) {
+        rhs = unwrapZeroPassthrough(rhs, ctx);
         StmtEffect e = effectOfValue(evaluateAssignedValue(rhs));
         if (e == StmtEffect::AssignsUnknown) {
             if (const auto* src = getReferencedVar(rhs)) {
@@ -518,11 +561,11 @@ public:
     }
 
     State transfer(const Stmt* stmt, const State& in,
-                   ASTContext& /*ctx*/) const {
+                   ASTContext& ctx) const {
         State out = in;
         for (const auto* var : trackedVars_) {
             const VarDecl* copySrc = nullptr;
-            StmtEffect effect = classifyStmt(stmt, var, &copySrc);
+            StmtEffect effect = classifyStmt(stmt, var, &copySrc, ctx);
             switch (effect) {
                 case StmtEffect::AssignsZero:
                     out[var] = ZeroState::Zero; break;
@@ -774,8 +817,10 @@ const FunctionDecl* zeronessCandidate(const FunctionDecl* fn) {
 // Zeroness of a call argument as the caller passes it: a proven source
 // (atoi/literal/summary) evaluates directly; a bare tracked variable
 // reads the caller's state; everything else is Unknown.
-ZeroState argZeroness(const Expr* arg, const VarState& callerState) {
+ZeroState argZeroness(const Expr* arg, const VarState& callerState,
+                      const ASTContext& ctx) {
     if (!arg) return ZeroState::Unknown;
+    arg = unwrapZeroPassthrough(arg, ctx);
     ZeroState direct = evaluateAssignedValue(arg);
     if (direct != ZeroState::Unknown) return direct;
     if (const auto* var = getReferencedVar(arg)) {
@@ -847,7 +892,8 @@ ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
         std::set<const VarDecl*> argVars;
         for (const auto* call : cv.calls)
             for (const Expr* a : call->arguments())
-                if (const auto* var = getReferencedVar(a))
+                if (const auto* var =
+                        getReferencedVar(unwrapZeroPassthrough(a, ctx)))
                     argVars.insert(var);
 
         codeskeptic::DiagnosticList sink;   // discarded
@@ -868,7 +914,7 @@ ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
             const unsigned nArgs = call->getNumArgs();
             for (unsigned i = 0; i < it->second.size(); ++i) {
                 ZeroState z = (i < nArgs)
-                    ? argZeroness(call->getArg(i), state)
+                    ? argZeroness(call->getArg(i), state, ctx)
                     : ZeroState::Unknown;
                 Acc& a = it->second[i];
                 a.any = true;

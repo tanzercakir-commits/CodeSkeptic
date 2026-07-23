@@ -787,3 +787,149 @@ TEST(DivByZeroRuleTest, InterprocExternalCallee_NotSeeded) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Zero-passthrough summaries (the zeroness-through-summaries slice) ---
+// `int id(int x) { return x; }` used to leave the summary Unknown (the
+// documented v1 limit); the passthrough claim now flows the ARGUMENT's
+// zero-state through the call: r = id(d) behaves like r = d. Unknown
+// arguments still produce nothing — MaybeZero is never manufactured.
+
+TEST(DivByZeroRuleTest, PassthroughIdentity_ScanfArg_Warns) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        static int id(int x) { return x; }
+        int f(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return 0;
+            int r = id(d);
+            return 100 / r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, PassthroughIdentity_NonZeroArg_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int id(int x) { return x; }
+        int f(void) {
+            int r = id(5);
+            return 100 / r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughTwoHop_Warns) {
+    // hop1 -> hop2 composes: the claim survives a passthrough chain.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        static int hop2(int y) { return y; }
+        static int hop1(int y) { return hop2(y); }
+        int f(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return 0;
+            int r = hop1(d);
+            return 100 / r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughGuardedResult_Clean) {
+    // The result guard refines the copied state on its own edge.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        static int id(int x) { return x; }
+        int f(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return 0;
+            int r = id(d);
+            if (r != 0) return 100 / r;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughLiteralZero_DefiniteError) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int id(int x) { return x; }
+        int f(void) {
+            int r = id(0);
+            return 100 / r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(DivByZeroRuleTest, PassthroughMixedNonZeroPaths_Warns) {
+    // guarded_id: some paths proven NeverZero, the rest return the
+    // param — the conditional claim still holds and a zeroable
+    // argument warns.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        static int guarded_id(int x) { if (x > 100) return 1; return x; }
+        int f(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return 0;
+            int r = guarded_id(d);
+            return 100 / r;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughNarrowing_NoClaimEitherWay) {
+    // (int)narrow_id(2^32) is 0 from a NONZERO argument: a narrowing
+    // hop must neither propagate NonZero (false suppression) nor
+    // manufacture a warning.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int narrow_id(long long x) { return x; }
+        int f(void) {
+            long long big = 4294967296LL;
+            int r = narrow_id(big);
+            return 100 / r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughUnknownArg_Clean) {
+    // Unknown in, unknown out: no manufactured MaybeZero.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int id(int x) { return x; }
+        int f(int unknown_arg) {
+            int r = id(unknown_arg);
+            return 100 / r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, PassthroughWrittenParam_NoClaim) {
+    // A param the callee REASSIGNS is not a passthrough — `return x;`
+    // after `x = 7` returns the new value; the claim must not form
+    // (here it would wrongly warn: the result is never zero).
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        static int rewrites(int x) { x = 7; return x; }
+        int f(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return 0;
+            int r = rewrites(d);
+            return 100 / r;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

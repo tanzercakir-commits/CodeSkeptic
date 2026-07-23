@@ -55,6 +55,17 @@ public:
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
         std::vector<ParamEffect> params;
 
+        // Zero-passthrough (the zeroness-through-summaries slice): when
+        // returnZeroness is Unknown ONLY because some paths return
+        // parameter #zeroFromParam's UNMODIFIED entry value (directly,
+        // or through a chain of such functions) and every other path is
+        // proven NeverZero, the claim "the result is zero only if
+        // argument #zeroFromParam is zero" is recorded here. A caller
+        // that knows its argument's zero-state may substitute it for
+        // the call's; an Unknown argument stays Unknown — MaybeZero is
+        // never manufactured. -1 = no claim.
+        int zeroFromParam = -1;
+
         // Value-conditioned null return (#69b). When returnNullness is
         // MaybeNull AND the harvest PROVED that every null-returning
         // path is guarded by "parameter #nullCondParam outside

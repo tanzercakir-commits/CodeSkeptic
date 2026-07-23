@@ -1,5 +1,48 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-24 — F7-small: untrusted-length→bounds + zero-passthrough summaries
+
+Two deferred engine slices, both recall moves with pinned precision.
+
+**Untrusted-length → bounds sink** (docs/untrusted-length.md's design
+placeholder, now landed). The interval dataflow's state gained an
+untrusted-origin set — vars whose CURRENT value derives from a declared
+untrusted-integer source (atoi/strtol family, scanf outputs,
+--untrusted-int-sources). Plain reassignment recomputes membership from
+the RHS (no stale taint), merge is set-union, and guards deliberately
+do NOT clear it: the RANGE is the sole safety decider. The sized-copy
+check (now including strncpy — it pads to exactly n bytes; its
+constant arm is definite CWE-787) gained the possible arm: length
+derives from an untrusted source AND its proven FINITE range exceeds
+the destination capacity → CWE-120 warning. Unknown (top) lengths
+never report — provenance alone cannot fire, which is what keeps
+ordinary size parameters silent. 10 pinned tests both ways.
+
+**Zero-passthrough summaries** (the zeroness-through-summaries
+deferral). `int id(int x) { return x; }` left returnZeroness Unknown —
+the documented v1 limit — so `r = id(d); 100 / r` lost d's zeroness.
+Summaries now carry zeroFromParam: "the result is zero only if
+argument #k is zero", harvested by a structural pass that runs only
+when neither strong claim held (paths must be NeverZero or return an
+UNWRITTEN param's entry value; an unwritten param's value is
+path-independent, which is what makes the structural pass sound).
+WIDTH DISCIPLINE throughout: a narrowing hop (int ← long long) can
+fabricate zero from nonzero, so any step whose width exceeds its
+target slot blocks the claim — on the harvest side AND on the
+consumer unwrap (a false NonZero would wrongly SUPPRESS a real
+hazard). Consumption reuses the copy machinery: unwrapZeroPassthrough
+makes `r = id(d)` classify exactly like `r = d` (the copy-source
+closure learns the same unwrap, or d's state is never computed);
+zstateOf recurses through PT summaries for chains (two-hop pinned).
+MaybeZero is never manufactured from Unknown. Summary file format v4
+(zeroFromParam column; v1-v3 accepted on load — including the ==5 →
+>=5 null-cond parse trap a compat pin now guards). 12 pinned tests.
+
+Verification: 717/717 tests, thesis gate 0 FP / 9-of-9, rtp2httpd
+re-scan 0, self-scan clean. Juliet floors + corpus pins referee in CI;
+the CWE369 sampled hitrate and a possible floor raise land with the
+lane's numbers.
+
 ## 2026-07-23 — Windows packaging: no more hard 7z requirement
 
 The first external WINDOWS evaluation (native v0.4.5 build verified

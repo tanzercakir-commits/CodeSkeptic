@@ -782,13 +782,15 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
 
     auto outPath = ::testing::TempDir() + "sum_roundtrip_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
-    // #69b format bump: save always writes v3 (extra null-condition
-    // column, "-" when absent); loading old v1/v2 stays accepted.
+    // Format bumps: #69b added the null-condition column (v3), the
+    // zero-passthrough slice added zeroFromParam (v4) — save always
+    // writes the newest ("-" when absent); loading old versions stays
+    // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v3\n"
-              "alpha/1\tN\tR\tU\t-\n"
-              "beta/2\tM\tOF\tM\t-\n"
-              "gamma/0\tU\t-\tN\t-\n");
+              "codeskeptic-summaries v4\n"
+              "alpha/1\tN\tR\tU\t-\t-\n"
+              "beta/2\tM\tOF\tM\t-\t-\n"
+              "gamma/0\tU\t-\tN\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -806,7 +808,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v3\nlegacy/1\tN\tR\tU\t-\n");
+              "codeskeptic-summaries v4\nlegacy/1\tN\tR\tU\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -828,7 +830,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v3\nfoo/1\tU\tO\tU\t-\n");
+              "codeskeptic-summaries v4\nfoo/1\tU\tO\tU\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -871,7 +873,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v3\nkeep/1\tN\tR\tU\t-\n");
+              "codeskeptic-summaries v4\nkeep/1\tN\tR\tU\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1334,4 +1336,44 @@ TEST(ConditionedNullTest, V3FileRoundtrip) {
     EXPECT_EQ(reparsed["getHuffVal/1"].nullCondParam, 0);
     EXPECT_EQ(reparsed["getHuffVal/1"].nullCondRange, Interval::range(0, 3));
     registry.clearGlobal();
+}
+
+// --- v4 persistence: the zero-passthrough column ---
+
+TEST(SummaryPersistTest, V4File_ZeroFromParamParses) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v4\n"
+        "id/1\tU\tR\tU\t-\t0\n"
+        "plain/1\tU\tR\tU\t-\t-\n";
+    auto p = writePersistFile("sum_v4_zf.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
+    EXPECT_EQ(parsed["id/1"].zeroFromParam, 0);
+    EXPECT_EQ(parsed["plain/1"].zeroFromParam, -1);
+}
+
+TEST(SummaryPersistTest, V4File_ZeroFromParamOnNonUnknown_Rejected) {
+    // The claim lives only where it is defined (zeroness Unknown);
+    // a file pairing it with N/M is corrupt and rejected wholesale.
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v4\n"
+        "bad/1\tU\tR\tN\t-\t0\n";
+    auto p = writePersistFile("sum_v4_zf_bad.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(p, parsed));
+}
+
+TEST(SummaryPersistTest, V3File_NullCondStillParses) {
+    // The == 5 -> >= 5 regression trap: v3 files' null-condition column
+    // must keep parsing after the v4 bump.
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v3\n"
+        "cond/1\tM\tR\tU\t0:0:3\n";
+    auto p = writePersistFile("sum_v3_cond_compat.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
+    EXPECT_EQ(parsed["cond/1"].nullCondParam, 0);
 }
