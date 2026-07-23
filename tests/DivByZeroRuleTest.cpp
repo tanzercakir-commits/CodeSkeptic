@@ -707,3 +707,83 @@ TEST(DivByZeroRuleTest, ImmutableFlagDeadAssign_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- v0.4.2: interprocedural param-zeroness ---
+// The Juliet CWE369 "flow" slice: an untrusted value crosses a call
+// boundary before the division. Sound only for internal-linkage,
+// address-not-taken callees (all callers visible); MaybeZero is never
+// manufactured from an Unknown argument (the precision invariant).
+
+TEST(DivByZeroRuleTest, InterprocUntrustedArg_Reports) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        static int sink(int d) { return 100 / d; }
+        void source(const char* s) { int data = atoi(s); sink(data); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, InterprocCallerGuards_Clean) {
+    // The caller refines the argument NonZero before the call.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        static int sink(int d) { return 100 / d; }
+        void source(const char* s) {
+            int data = atoi(s);
+            if (data != 0) sink(data);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, InterprocCalleeGuards_Clean) {
+    // Seeded MaybeZero, but the callee's own guard refines it back.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        static int sink(int d) { if (d == 0) return 0; return 100 / d; }
+        void source(const char* s) { sink(atoi(s)); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, InterprocUnknownChain_Clean) {
+    // The precision invariant: an Unknown argument (a bare external
+    // parameter passed through) must NEVER manufacture MaybeZero.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        static int sink(int d) { return 100 / d; }
+        static void mid(int v) { sink(v); }
+        void source(int ext) { mid(ext); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, InterprocMixedCallers_ReportsZeroablePath) {
+    // One caller provably passes a zero-able value; that path is a real
+    // possible division by zero even though another caller is safe.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        static int sink(int d) { return 100 / d; }
+        void bad(const char* s) { sink(atoi(s)); }
+        void ok(void) { sink(7); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(DivByZeroRuleTest, InterprocExternalCallee_NotSeeded) {
+    // An externally-visible callee has callers we cannot see — its
+    // parameters must stay unconstrained (no seeding, no FP).
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        int sink(int d) { return 100 / d; }   /* external linkage */
+        void source(const char* s) { sink(atoi(s)); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
