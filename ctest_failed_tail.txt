@@ -1,0 +1,466 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+      Start 104: FprimeFpTest.NothrowNew_IsARealAllocation
+ 1/17 Test #104: FprimeFpTest.NothrowNew_IsARealAllocation .......................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = FprimeFpTest.NothrowNew_IsARealAllocation
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from FprimeFpTest
+[ RUN      ] FprimeFpTest.NothrowNew_IsARealAllocation
+test.cpp:3:15: error: 'operator new' takes type size_t ('unsigned long long') as first parameter
+    3 |         void* operator new(unsigned long, const std::nothrow_t&) noexcept;
+      |               ^
+test.cpp:6:20: error: no matching function for call to 'operator new'
+    6 |             T* p = new (std::nothrow) T();
+      |                    ^   ~~~~~~~~~~~~~~
+note: candidate function not viable: requires 1 argument, but 2 were provided
+2 errors generated.
+D:\a\CodeSkeptic\CodeSkeptic\tests\MemoryLeakRuleExTest.cpp(912): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1
+
+[  FAILED  ] FprimeFpTest.NothrowNew_IsARealAllocation (5 ms)
+[----------] 1 test from FprimeFpTest (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] FprimeFpTest.NothrowNew_IsARealAllocation
+
+ 1 FAILED TEST
+
+      Start 205: IntOverflowRuleTest.SixtyFourBitProductReported
+ 2/17 Test #205: IntOverflowRuleTest.SixtyFourBitProductReported .................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = IntOverflowRuleTest.SixtyFourBitProductReported
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from IntOverflowRuleTest
+[ RUN      ] IntOverflowRuleTest.SixtyFourBitProductReported
+test.cpp:3:22: warning: implicit conversion from 'long long' to 'long' changes value from 100000000000 to 1215752192 [-Wconstant-conversion]
+    3 |             long a = 100000000000L;
+      |                  ~   ^~~~~~~~~~~~~
+test.cpp:4:22: warning: implicit conversion from 'long long' to 'long' changes value from 100000000000 to 1215752192 [-Wconstant-conversion]
+    4 |             long b = 100000000000L;
+      |                  ~   ^~~~~~~~~~~~~
+2 warnings generated.
+D:\a\CodeSkeptic\CodeSkeptic\tests\IntOverflowRuleTest.cpp(192): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] IntOverflowRuleTest.SixtyFourBitProductReported (4 ms)
+[----------] 1 test from IntOverflowRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] IntOverflowRuleTest.SixtyFourBitProductReported
+
+ 1 FAILED TEST
+
+      Start 244: BoundsRuleTest.HeapMallocPastEnd
+ 3/17 Test #244: BoundsRuleTest.HeapMallocPastEnd ................................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BoundsRuleTest.HeapMallocPastEnd
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BoundsRuleTest
+[ RUN      ] BoundsRuleTest.HeapMallocPastEnd
+D:\a\CodeSkeptic\CodeSkeptic\tests\BoundsRuleTest.cpp(187): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BoundsRuleTest.HeapMallocPastEnd (4 ms)
+[----------] 1 test from BoundsRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BoundsRuleTest.HeapMallocPastEnd
+
+ 1 FAILED TEST
+
+      Start 247: BoundsRuleTest.HeapCallocPastEnd
+ 4/17 Test #247: BoundsRuleTest.HeapCallocPastEnd ................................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BoundsRuleTest.HeapCallocPastEnd
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BoundsRuleTest
+[ RUN      ] BoundsRuleTest.HeapCallocPastEnd
+D:\a\CodeSkeptic\CodeSkeptic\tests\BoundsRuleTest.cpp(212): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BoundsRuleTest.HeapCallocPastEnd (4 ms)
+[----------] 1 test from BoundsRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BoundsRuleTest.HeapCallocPastEnd
+
+ 1 FAILED TEST
+
+      Start 258: BoundsRuleTest.MemcpySizeofOversizedType
+ 5/17 Test #258: BoundsRuleTest.MemcpySizeofOversizedType ........................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BoundsRuleTest.MemcpySizeofOversizedType
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BoundsRuleTest
+[ RUN      ] BoundsRuleTest.MemcpySizeofOversizedType
+D:\a\CodeSkeptic\CodeSkeptic\tests\BoundsRuleTest.cpp(314): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BoundsRuleTest.MemcpySizeofOversizedType (4 ms)
+[----------] 1 test from BoundsRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BoundsRuleTest.MemcpySizeofOversizedType
+
+ 1 FAILED TEST
+
+      Start 259: BoundsRuleTest.MemcpyCountTimesSizeofOverflow
+ 6/17 Test #259: BoundsRuleTest.MemcpyCountTimesSizeofOverflow ...................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BoundsRuleTest.MemcpyCountTimesSizeofOverflow
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BoundsRuleTest
+[ RUN      ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow
+D:\a\CodeSkeptic\CodeSkeptic\tests\BoundsRuleTest.cpp(322): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow (4 ms)
+[----------] 1 test from BoundsRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow
+
+ 1 FAILED TEST
+
+      Start 264: BoundsRuleTest.MemcpyStructMemberOverflow
+ 7/17 Test #264: BoundsRuleTest.MemcpyStructMemberOverflow .......................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BoundsRuleTest.MemcpyStructMemberOverflow
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BoundsRuleTest
+[ RUN      ] BoundsRuleTest.MemcpyStructMemberOverflow
+D:\a\CodeSkeptic\CodeSkeptic\tests\BoundsRuleTest.cpp(376): error: Expected equality of these values:
+  results.size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BoundsRuleTest.MemcpyStructMemberOverflow (4 ms)
+[----------] 1 test from BoundsRuleTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BoundsRuleTest.MemcpyStructMemberOverflow
+
+ 1 FAILED TEST
+
+      Start 592: BrokenTuTest.BrokenTuIsSkippedAndRecorded
+ 8/17 Test #592: BrokenTuTest.BrokenTuIsSkippedAndRecorded .......................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BrokenTuTest.BrokenTuIsSkippedAndRecorded
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.BrokenTuIsSkippedAndRecorded
+YAML:1:35: error: Unrecognized escape code
+[{"directory": "C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_skip", "command": "c++ -c bad.cpp", "file": "bad.cpp"}]
+                                  ^
+Skipping C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_skip\bad.cpp. Compile command not found.
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(58): error: Expected equality of these values:
+  SourceManager::brokenTUs().size()
+    Which is: 0
+  1u
+    Which is: 1
+
+[  FAILED  ] BrokenTuTest.BrokenTuIsSkippedAndRecorded (4 ms)
+[----------] 1 test from BrokenTuTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BrokenTuTest.BrokenTuIsSkippedAndRecorded
+
+ 1 FAILED TEST
+
+      Start 593: BrokenTuTest.AnalyzeBrokenTUsOverride
+ 9/17 Test #593: BrokenTuTest.AnalyzeBrokenTUsOverride ...........................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BrokenTuTest.AnalyzeBrokenTUsOverride
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.AnalyzeBrokenTUsOverride
+YAML:1:35: error: Unrecognized escape code
+[{"directory": "C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_force", "command": "c++ -c bad.cpp", "file": "bad.cpp"}]
+                                  ^
+Skipping C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_force\bad.cpp. Compile command not found.
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(72): error: Expected equality of these values:
+  callbacks
+    Which is: 0
+  1
+
+[  FAILED  ] BrokenTuTest.AnalyzeBrokenTUsOverride (3 ms)
+[----------] 1 test from BrokenTuTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BrokenTuTest.AnalyzeBrokenTUsOverride
+
+ 1 FAILED TEST
+
+      Start 594: BrokenTuTest.CleanTuStillAnalyzed
+10/17 Test #594: BrokenTuTest.CleanTuStillAnalyzed ...............................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BrokenTuTest.CleanTuStillAnalyzed
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.CleanTuStillAnalyzed
+YAML:1:35: error: Unrecognized escape code
+[{"directory": "C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_clean", "command": "c++ -c bad.cpp", "file": "bad.cpp"}]
+                                  ^
+Skipping C:\Users\RUNNER~1\AppData\Local\Temp\cs_broken_tu_clean\bad.cpp. Compile command not found.
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(87): error: Expected equality of these values:
+  callbacks
+    Which is: 0
+  1
+
+[  FAILED  ] BrokenTuTest.CleanTuStillAnalyzed (3 ms)
+[----------] 1 test from BrokenTuTest (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BrokenTuTest.CleanTuStillAnalyzed
+
+ 1 FAILED TEST
+
+      Start 602: McpServerTest.AnalyzeCallReturnsFindingsWithTrace
+11/17 Test #602: McpServerTest.AnalyzeCallReturnsFindingsWithTrace ...............***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.AnalyzeCallReturnsFindingsWithTrace
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.AnalyzeCallReturnsFindingsWithTrace
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(82): error: Expected: (response.find("use-after-free")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(83): error: Expected: (response.find("allocated here")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(84): error: Expected: (response.find("freed here")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(86): error: Expected: (response.find("\\\"count\\\":")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.AnalyzeCallReturnsFindingsWithTrace (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.AnalyzeCallReturnsFindingsWithTrace
+
+ 1 FAILED TEST
+
+      Start 603: McpServerTest.AnalyzeWithFunctionScope
+12/17 Test #603: McpServerTest.AnalyzeWithFunctionScope ..........................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.AnalyzeWithFunctionScope
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.AnalyzeWithFunctionScope
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(102): error: Expected: (response.find("'b'")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(103): error: Expected: (response.find("\\\"count\\\":1")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.AnalyzeWithFunctionScope (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.AnalyzeWithFunctionScope
+
+ 1 FAILED TEST
+
+      Start 605: McpServerTest.WarmCache_SecondCallHits
+13/17 Test #605: McpServerTest.WarmCache_SecondCallHits ..........................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.WarmCache_SecondCallHits
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.WarmCache_SecondCallHits
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(155): error: Expected: (SourceManager::warmCacheMisses()) >= (1u), actual: 0 vs 1
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(159): error: Expected: (SourceManager::warmCacheHits()) >= (1u), actual: 0 vs 1
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(161): error: Expected: (first.find("use-after-free")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(162): error: Expected: (second.find("use-after-free")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(163): error: Expected: (second.find("\\\"count\\\":1")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.WarmCache_SecondCallHits (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.WarmCache_SecondCallHits
+
+ 1 FAILED TEST
+
+      Start 606: McpServerTest.WarmCache_InvalidatedOnChange
+14/17 Test #606: McpServerTest.WarmCache_InvalidatedOnChange .....................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.WarmCache_InvalidatedOnChange
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.WarmCache_InvalidatedOnChange
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(182): error: Expected: (first.find("use-after-free")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(196): error: Expected: (second.find("div-by-zero")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.WarmCache_InvalidatedOnChange (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.WarmCache_InvalidatedOnChange
+
+ 1 FAILED TEST
+
+      Start 607: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
+15/17 Test #607: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge ...........***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(225): error: Expected: (with.find("null-deref")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
+
+ 1 FAILED TEST
+
+      Start 612: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
+16/17 Test #612: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall ...***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(274): error: Expected: (response.find("\\\"count\\\":0")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(283): error: Expected: (response.find("null-deref")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
+
+ 1 FAILED TEST
+
+      Start 613: McpServerTest.AllocFunctions_ExtendLeakTracking
+17/17 Test #613: McpServerTest.AllocFunctions_ExtendLeakTracking .................***Failed    0.01 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = McpServerTest.AllocFunctions_ExtendLeakTracking
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from McpServerTest
+[ RUN      ] McpServerTest.AllocFunctions_ExtendLeakTracking
+D:\a\CodeSkeptic\CodeSkeptic\tests\McpServerTest.cpp(302): error: Expected: (response.find("memory-leak")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+
+[  FAILED  ] McpServerTest.AllocFunctions_ExtendLeakTracking (0 ms)
+[----------] 1 test from McpServerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] McpServerTest.AllocFunctions_ExtendLeakTracking
+
+ 1 FAILED TEST
+
+
+0% tests passed, 17 tests failed out of 17
+
+Total Test time (real) =   0.29 sec
+
+The following tests FAILED:
+	104 - FprimeFpTest.NothrowNew_IsARealAllocation (Failed)
+	205 - IntOverflowRuleTest.SixtyFourBitProductReported (Failed)
+	244 - BoundsRuleTest.HeapMallocPastEnd (Failed)
+	247 - BoundsRuleTest.HeapCallocPastEnd (Failed)
+	258 - BoundsRuleTest.MemcpySizeofOversizedType (Failed)
+	259 - BoundsRuleTest.MemcpyCountTimesSizeofOverflow (Failed)
+	264 - BoundsRuleTest.MemcpyStructMemberOverflow (Failed)
+	592 - BrokenTuTest.BrokenTuIsSkippedAndRecorded (Failed)
+	593 - BrokenTuTest.AnalyzeBrokenTUsOverride (Failed)
+	594 - BrokenTuTest.CleanTuStillAnalyzed (Failed)
+	602 - McpServerTest.AnalyzeCallReturnsFindingsWithTrace (Failed)
+	603 - McpServerTest.AnalyzeWithFunctionScope (Failed)
+	605 - McpServerTest.WarmCache_SecondCallHits (Failed)
+	606 - McpServerTest.WarmCache_InvalidatedOnChange (Failed)
+	607 - McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge (Failed)
+	612 - McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall (Failed)
+	613 - McpServerTest.AllocFunctions_ExtendLeakTracking (Failed)
+Errors while running CTest
