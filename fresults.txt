@@ -1,0 +1,3 @@
+FRIEND_RESULT repo=Fourier-Series lang=C++ findings=0 broken=1 processed=24 exit=0 db=no
+FRIEND_RESULT repo=raylib-modern lang=C++ findings=20 broken=1 processed=229 exit=1 db=no
+FRIEND_RESULT repo=TeXRender lang=C++ findings=0 broken=1 processed=36 exit=0 db=no

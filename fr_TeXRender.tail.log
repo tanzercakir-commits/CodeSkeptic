@@ -1,0 +1,260 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (36 files, 9 rules)
+[1/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/offscreen.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/offscreen.cpp:4:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    4 | #include <texrender/headless_surface.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/offscreen.cpp.
+[2/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/live_edit.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/live_edit.cpp:7:10: fatal error: 'raylib.h' file not found
+    7 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/live_edit.cpp.
+[3/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/minimal.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/minimal.cpp:1:10: fatal error: 'raylib.h' file not found
+    1 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/minimal.cpp.
+[4/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/svg_export.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/svg_export.cpp:4:10: fatal error: 'texrender/latex_document.hpp' file not found
+    4 | #include <texrender/latex_document.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/svg_export.cpp.
+[5/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/headless_batch.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/headless_batch.cpp:5:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    5 | #include <texrender/headless_surface.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/headless_batch.cpp.
+[6/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/untrusted_worker.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/untrusted_worker.cpp:6:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    6 | #include <texrender/headless_surface.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/untrusted_worker.cpp.
+[7/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/realtime_values.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/realtime_values.cpp:8:10: fatal error: 'raylib.h' file not found
+    8 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/realtime_values.cpp.
+[8/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/sdl2_minimal.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/sdl2_minimal.cpp:2:10: fatal error: 'SDL.h' file not found
+    2 | #include <SDL.h>
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/sdl2_minimal.cpp.
+[9/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/custom_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/custom_surface.cpp:3:10: fatal error: 'texrender/draw_surface.hpp' file not found
+    3 | #include <texrender/draw_surface.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/custom_surface.cpp.
+[10/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/texrender_wasm.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/texrender_wasm.cpp:5:10: fatal error: 'emscripten/emscripten.h' file not found
+    5 | #include <emscripten/emscripten.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/texrender_wasm.cpp.
+[11/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/raylib_wasm.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/raylib_wasm.cpp:6:10: fatal error: 'raylib.h' file not found
+    6 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/raylib_wasm.cpp.
+[12/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/formula_label_widget.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/formula_label_widget.cpp:5:10: fatal error: 'texrender/formula_layout.hpp' file not found
+    5 | #include <texrender/formula_layout.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/formula_label_widget.cpp.
+[13/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/demo_main.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/demo_main.cpp:3:10: fatal error: 'raylib.h' file not found
+    3 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/demo_main.cpp.
+[14/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/raylib_overlay.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/raylib_overlay.cpp:1:10: fatal error: 'raylib.h' file not found
+    1 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/raylib_overlay.cpp.
+[15/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_options_tests.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_options_tests.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/test_helpers.hpp:6:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    6 | #include "texrender/headless_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_options_tests.cpp.
+[16/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_smoke.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_smoke.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/test_helpers.hpp:6:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    6 | #include "texrender/headless_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_smoke.cpp.
+[17/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/surface_tests.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/surface_tests.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/test_helpers.hpp:6:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    6 | #include "texrender/headless_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/surface_tests.cpp.
+[18/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/build/CMakeFiles/3.31.6/CompilerIdCXX/CMakeCXXCompilerId.cpp.
+[19/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/document_state.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/document_state.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/document_state.hpp:6:10: fatal error: 'texrender/draw_surface.hpp' file not found
+    6 | #include "texrender/draw_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/document_state.cpp.
+[20/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/render_handle.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/render_handle.cpp:1:10: fatal error: 'texrender/render_handle.hpp' file not found
+    1 | #include "texrender/render_handle.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/render_handle.cpp.
+[21/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/latex_document.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/latex_document.cpp:1:10: fatal error: 'texrender/latex_document.hpp' file not found
+    1 | #include "texrender/latex_document.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/latex_document.cpp.
+[22/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/cache_options.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/cache_options.cpp:1:10: fatal error: 'texrender/cache_options.hpp' file not found
+    1 | #include "texrender/cache_options.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/cache_options.cpp.
+[23/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_font.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_font.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_font.hpp:4:10: fatal error: 'graphic/graphic.h' file not found
+    4 | #include "graphic/graphic.h"
+      |          ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_font.cpp.
+[24/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/glyph_cache.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/glyph_cache.cpp:9:10: fatal error: 'ft2build.h' file not found
+    9 | #include <ft2build.h>
+      |          ^~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/glyph_cache.cpp.
+[25/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_text_layout.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_text_layout.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_text_layout.hpp:5:10: fatal error: 'graphic/graphic.h' file not found
+    5 | #include "graphic/graphic.h"
+      |          ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_text_layout.cpp.
+[26/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/graphics2d_adapter.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/graphics2d_adapter.cpp:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/graphics2d_adapter.hpp:3:10: fatal error: 'graphic/graphic.h' file not found
+    3 | #include "graphic/graphic.h"
+      |          ^~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/graphics2d_adapter.cpp.
+[27/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/draw_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/draw_surface.cpp:1:10: fatal error: 'texrender/draw_surface.hpp' file not found
+    1 | #include "texrender/draw_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/draw_surface.cpp.
+[28/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_surface.cpp:1:10: fatal error: 'texrender/svg_surface.hpp' file not found
+    1 | #include "texrender/svg_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_surface.cpp.
+[29/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_factory.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_factory.cpp:2:10: fatal error: 'render/surface_factory.hpp' file not found
+    2 | #include "render/surface_factory.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_factory.cpp.
+[30/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_factory.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_factory.cpp:1:10: fatal error: 'render/surface_factory.hpp' file not found
+    1 | #include "render/surface_factory.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_factory.cpp.
+[31/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_surface.cpp:1:10: fatal error: 'texrender/sdl2_surface.hpp' file not found
+    1 | #include "texrender/sdl2_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_surface.cpp.
+[32/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_surface.cpp:1:10: fatal error: 'texrender/raylib_surface.hpp' file not found
+    1 | #include "texrender/raylib_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_surface.cpp.
+[33/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_factory.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_factory.cpp:2:10: fatal error: 'render/surface_factory.hpp' file not found
+    2 | #include "render/surface_factory.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_factory.cpp.
+[34/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_surface.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_surface.cpp:1:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    1 | #include "texrender/headless_surface.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_surface.cpp.
+[35/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_factory.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_factory.cpp:2:10: fatal error: 'render/surface_factory.hpp' file not found
+    2 | #include "render/surface_factory.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_factory.cpp.
+[36/36] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/benchmarks/render_benchmark.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/benchmarks/render_benchmark.cpp:1:10: fatal error: 'texrender/headless_surface.hpp' file not found
+    1 | #include <texrender/headless_surface.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/benchmarks/render_benchmark.cpp.
+[CodeSkeptic] 35 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/offscreen.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/live_edit.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/minimal.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/svg_export.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/headless_batch.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/untrusted_worker.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/realtime_values.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/sdl2_minimal.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/custom_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/texrender_wasm.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/wasm/raylib_wasm.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/formula_label_widget.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/demo_main.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/examples/raylib_overlay.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_options_tests.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/render_smoke.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/tests/surface_tests.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/document_state.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/render_handle.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/latex_document.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/core/cache_options.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_font.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/glyph_cache.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/ft_text_layout.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/graphics2d_adapter.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/render/draw_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/svg/svg_factory.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_factory.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/sdl2/sdl2_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/raylib/raylib_factory.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_surface.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/source/backend/headless/headless_factory.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_TeXRender/benchmarks/render_benchmark.cpp
+CodeSkeptic: Clean! No issues found.
