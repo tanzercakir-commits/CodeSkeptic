@@ -127,15 +127,25 @@ jobs:
           cmake --build build
 
       - name: Configure ReactOS (compile db only)
+        id: cfg
         run: |
           git clone --quiet --depth 1 https://github.com/reactos/reactos
           cd reactos
+          echo "== toolchain files present:"; ls toolchain-*.cmake || true
+          code=0
           cmake -B build-ros -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=toolchain-clang.cmake \
-            -DARCH=i386 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null 2>&1
-          test -f build-ros/compile_commands.json
+            -DARCH=i386 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            2>&1 | tee /tmp/ros_cfg.log || code=$?
+          echo "CONFIGURE_EXIT=$code" | tee -a /tmp/ros_cfg.log
+          if [ -f build-ros/compile_commands.json ]; then
+            echo "COMPILE_DB=present entries=$(grep -c '\"file\"' build-ros/compile_commands.json)" | tee -a /tmp/ros_cfg.log
+          else
+            echo "COMPILE_DB=absent" | tee -a /tmp/ros_cfg.log
+          fi
 
       - name: Scan sdk/lib/rtl + drivers/filesystems (NT/RTL idioms)
+        if: hashFiles('reactos/build-ros/compile_commands.json') != ''
         run: |
           set -o pipefail
           A=ExAllocatePool,ExAllocatePoolWithTag,ExAllocatePoolZero,ExAllocatePoolWithTagPriority,RtlAllocateHeap,RtlReAllocateHeap,ExAllocatePoolWithQuotaTag
@@ -162,7 +172,8 @@ jobs:
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f ros_results.txt ros_*.tail.log 2>/dev/null || true
+          cp /tmp/ros_cfg.log ros_cfg.tail.log 2>/dev/null || true
+          git add -f ros_cfg.tail.log ros_results.txt ros_*.tail.log 2>/dev/null || true
           git commit -qm "reactos scan @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/reactos-scan"
 
