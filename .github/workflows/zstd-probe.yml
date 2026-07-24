@@ -1,0 +1,30 @@
+name: zstd source probe
+on:
+  push:
+    branches: ["probe-zstd-src"]
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch zstd_compress.c context around 5505
+        run: |
+          curl -sL --retry 3 https://github.com/facebook/zstd/archive/refs/tags/v1.5.6.tar.gz | tar xz
+          sed -n '5470,5525p' zstd-1.5.6/lib/compress/zstd_compress.c > ctx.txt
+          echo "=== callee of line 5505 (what assigns cdict) ==="
+          sed -n '5500,5512p' zstd-1.5.6/lib/compress/zstd_compress.c
+          # find the function cdict is assigned from + its return contract
+          grep -n "cdict = " zstd-1.5.6/lib/compress/zstd_compress.c | head
+      - name: Publish -> refs/ci-logs/*
+        if: always()
+        run: |
+          git config user.name "ci-logs"; git config user.email "ci@localhost"
+          git checkout --detach -q
+          git add -f ctx.txt
+          git commit -qm "zstd src probe @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/zstd-src"
+      - name: Mirror status
+        if: always()
+        run: git push --force origin "HEAD:refs/status/${{ github.sha }}/zstd-src/${{ job.status }}"
