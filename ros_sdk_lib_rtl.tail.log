@@ -1,0 +1,662 @@
+11 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+[92/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+[93/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+[94/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+[95/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+[96/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+[97/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  277 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:11: note: did you mean '_mm_setzero_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:125:8: note: '_mm_setzero_ps' declared here
+  125 | __m128 _mm_setzero_ps(void);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:277:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  277 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: error: call to undeclared function '_mm_cmpgt_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:278:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  278 |     __b = _mm_cmpgt_pi16(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:11: note: did you mean '_mm_unpackhi_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:193:8: note: '_mm_unpackhi_ps' declared here
+  193 | __m128 _mm_unpackhi_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:279:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  279 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:283:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  283 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  295 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:295:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  295 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:11: error: call to undeclared function '_mm_unpackhi_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:296:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  296 |     __c = _mm_unpackhi_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:11: error: call to undeclared function '_mm_unpacklo_pi16'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:300:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  300 |     __c = _mm_unpacklo_pi16(__a, __b);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:11: error: call to undeclared function '_mm_setzero_si64'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  311 |     __b = _mm_setzero_si64();
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:311:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  311 |     __b = _mm_setzero_si64();
+      |         ^ ~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: error: call to undeclared function '_mm_cmpgt_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:11: note: did you mean '_mm_cmpgt_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:163:8: note: '_mm_cmpgt_ps' declared here
+  163 | __m128 _mm_cmpgt_ps(__m128 a, __m128 b);
+      |        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:312:9: error: assigning to '__m64' (vector of 1 'long long' value) from incompatible type 'int'
+  312 |     __b = _mm_cmpgt_pi8(__b, __a);
+      |         ^ ~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: error: call to undeclared function '_mm_unpacklo_pi8'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+  313 |     __b = _mm_unpacklo_pi8(__a, __b);
+      |           ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:313:11: note: did you mean '_mm_unpacklo_ps'?
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:194:8: note: '_mm_unpacklo_ps' declared here
+  194 | __m128 _mm_unpacklo_ps(__m128 a, __m128 b);
+      |        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+[CodeSkeptic] 85 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/vectoreh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/processor.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode_vista.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/arm/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/generictable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/byteswap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/process.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/actctx.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/luid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/message.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wait.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rangelist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/atom.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/propvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/product.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avlsupp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c
+[CodeSkeptic] ANALYSIS FAILED: every translation unit failed to compile - NOTHING was analyzed, so this is not a clean result (exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), pass --build-path with your compile_commands.json, or use --analyze-broken-tus to force analysis on error-recovery ASTs.
