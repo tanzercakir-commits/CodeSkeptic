@@ -173,7 +173,14 @@ jobs:
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
           cp /tmp/ros_cfg.log ros_cfg.tail.log 2>/dev/null || true
-          git add -f ros_cfg.tail.log ros_results.txt ros_*.tail.log 2>/dev/null || true
+          # git add is ATOMIC across pathspecs: one missing name and
+          # NOTHING stages (round 4 published an empty commit exactly
+          # this way). Add one-by-one, each behind its own existence
+          # check.
+          for f in ros_cfg.tail.log ros_results.txt \
+                   ros_sdk_lib_rtl.tail.log ros_drivers_filesystems.tail.log; do
+            if [ -f "$f" ]; then git add -f "$f"; fi
+          done
           git commit -qm "reactos scan @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/reactos-scan"
 
