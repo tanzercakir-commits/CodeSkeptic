@@ -160,6 +160,20 @@ jobs:
           done
           find build-ros -name winnt.h | head -3 | tee -a /tmp/ros_cfg.log
           echo "WINNT_GENERATED=$(find build-ros -name winnt.h | wc -l)" | tee -a /tmp/ros_cfg.log
+          # Round 8's wall: GCC's mmintrin.h (pulled via the mingw
+          # sysroot) uses __builtin_ia32_* MMX builtins that clang 19+
+          # REMOVED. Neutralize at the db level: pretend GCC's MMX
+          # header family is already included (their guards), and drop
+          # MMX-enabling march/mmmx flags. TUs that genuinely use
+          # _mm_* fail honestly; the ~everything else that merely
+          # includes intrin.h transitively compiles.
+          BLOCK="-D_MMINTRIN_H_INCLUDED -D_MM3DNOW_H_INCLUDED -D_XMMINTRIN_H_INCLUDED -D_EMMINTRIN_H_INCLUDED"
+          jq --arg blk "$BLOCK" \
+            '[.[] | .command = ((.command // "") | gsub(" -mmmx"; "") | gsub(" -m3dnow"; "") | gsub(" -march=pentium[a-z0-9-]*"; " -march=i686")) + " " + $blk]' \
+            build-ros/compile_commands.json > build-ros/cc_fixed.json \
+            && mv build-ros/cc_fixed.json build-ros/compile_commands.json \
+            && echo "DB_POSTPROCESS=ok" | tee -a /tmp/ros_cfg.log \
+            || echo "DB_POSTPROCESS=failed" | tee -a /tmp/ros_cfg.log
 
       - name: Scan sdk/lib/rtl + drivers/filesystems (NT/RTL idioms)
         if: hashFiles('reactos/build-ros/compile_commands.json') != ''
