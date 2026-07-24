@@ -100,3 +100,65 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/realworld/${{ job.status }}"
+
+  # --- ReactOS probe (round 1: pure recon, no scan) ---
+  # An OS is the heavyweight case: full builds need RosBE, but ANALYSIS
+  # only needs the compile db, which CMake CONFIGURE produces. ReactOS
+  # officially supports Unix-host configuration via mingw-w64
+  # (RosBE-Unix path). This round measures exactly that: does a plain
+  # runner configure succeed, how many compile-db entries come out, and
+  # what breaks if it fails - results to refs/ci-logs for the sandbox.
+  reactos-probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain (mingw-w64 + host tools)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-i686 g++-mingw-w64-i686 \
+            ninja-build flex bison
+
+      - name: Clone ReactOS (shallow)
+        run: git clone --quiet --depth 1 https://github.com/reactos/reactos
+
+      - name: Configure attempt (i386, gcc toolchain, compile db on)
+        id: cfg
+        run: |
+          set -o pipefail
+          cd reactos
+          code=0
+          cmake -B build-ros -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=toolchain-gcc.cmake \
+            -DARCH=i386 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            2>&1 | tee /tmp/ros_cfg.log || code=$?
+          echo "PROBE_RESULT configure_exit=$code"
+          if [ -f build-ros/compile_commands.json ]; then
+            n=$(grep -c '"file"' build-ros/compile_commands.json || true)
+            echo "PROBE_RESULT compile_db_entries=$n"
+            grep -o '"file": "[^"]*"' build-ros/compile_commands.json \
+              | sed 's/.*reactos\///' | cut -d/ -f1-2 | sort | uniq -c \
+              | sort -rn | head -30 > /tmp/ros_dirs.txt || true
+          else
+            echo "PROBE_RESULT compile_db_entries=0"
+          fi
+
+      - name: Publish probe results -> refs/ci-logs/*
+        if: always()
+        run: |
+          tail -c 40000 /tmp/ros_cfg.log > ros_cfg.tail.log 2>/dev/null || true
+          cp /tmp/ros_dirs.txt ros_dirs.txt 2>/dev/null || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f ros_cfg.tail.log 2>/dev/null || true
+          [ -f ros_dirs.txt ] && git add -f ros_dirs.txt || true
+          git commit -qm "reactos probe @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/reactos-probe"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/reactos-probe/${{ job.status }}"
