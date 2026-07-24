@@ -1,0 +1,22 @@
+REALWORLD_RESULT project=libgit2 v=1.9.0 findings=34
+REALWORLD_RESULT project=rtp2httpd findings=0
+[94/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_compact.cpp.
+[95/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_console.cpp.
+[96/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_cumulative_base.cpp.
+[97/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_event_listener.cpp.
+[98/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_helpers.cpp.
+[99/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_json.cpp.
+[100/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_junit.cpp.
+[101/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_multi.cpp.
+[102/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_registrars.cpp.
+[103/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_sonarqube.cpp.
+[104/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_streaming_base.cpp.
+[105/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_tap.cpp.
+[106/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_teamcity.cpp.
+[107/107] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/corpus-work/catch2/src/catch2/reporters/catch_reporter_xml.cpp.
+CodeSkeptic: Clean! No issues found.
+[catch2] exit code: 0
+CORPUS_RESULT catch2 findings=0
+[catch2] finding count within expected range (0 ±2)
+
+[corpus] OK — all projects analyzed crash-free
