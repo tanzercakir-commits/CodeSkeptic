@@ -101,64 +101,71 @@ jobs:
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/realworld/${{ job.status }}"
 
-  # --- ReactOS probe (round 1: pure recon, no scan) ---
-  # An OS is the heavyweight case: full builds need RosBE, but ANALYSIS
-  # only needs the compile db, which CMake CONFIGURE produces. ReactOS
-  # officially supports Unix-host configuration via mingw-w64
-  # (RosBE-Unix path). This round measures exactly that: does a plain
-  # runner configure succeed, how many compile-db entries come out, and
-  # what breaks if it fails - results to refs/ci-logs for the sandbox.
-  reactos-probe:
+  # --- ReactOS scoped scan (round 2: sdk/lib/rtl + drivers/filesystems) ---
+  # Round 1 proved a plain runner configures ReactOS and emits a
+  # 10k-entry compile db in seconds. This round scans the two
+  # highest-signal C subtrees through that db with the NT pool / RTL
+  # heap idiom profile. Findings + a directory histogram go to
+  # refs/ci-logs; the sandbox adjudicates before any upstream action.
+  reactos-scan:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Toolchain (mingw-w64 + host tools)
+      - name: Install LLVM 20 and the ReactOS toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-i686 g++-mingw-w64-i686 \
-            ninja-build flex bison
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build flex bison \
+            gcc-mingw-w64-i686 g++-mingw-w64-i686
 
-      - name: Clone ReactOS (shallow)
-        run: git clone --quiet --depth 1 https://github.com/reactos/reactos
-
-      - name: Configure attempt (i386, gcc toolchain, compile db on)
-        id: cfg
+      - name: Build CodeSkeptic
         run: |
-          set -o pipefail
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build
+
+      - name: Configure ReactOS (compile db only)
+        run: |
+          git clone --quiet --depth 1 https://github.com/reactos/reactos
           cd reactos
-          code=0
           cmake -B build-ros -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=toolchain-gcc.cmake \
-            -DARCH=i386 \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            2>&1 | tee /tmp/ros_cfg.log || code=$?
-          echo "PROBE_RESULT configure_exit=$code"
-          if [ -f build-ros/compile_commands.json ]; then
-            n=$(grep -c '"file"' build-ros/compile_commands.json || true)
-            echo "PROBE_RESULT compile_db_entries=$n"
-            grep -o '"file": "[^"]*"' build-ros/compile_commands.json \
-              | sed 's/.*reactos\///' | cut -d/ -f1-2 | sort | uniq -c \
-              | sort -rn | head -30 > /tmp/ros_dirs.txt || true
-          else
-            echo "PROBE_RESULT compile_db_entries=0"
-          fi
+            -DARCH=i386 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null 2>&1
+          test -f build-ros/compile_commands.json
 
-      - name: Publish probe results -> refs/ci-logs/*
+      - name: Scan sdk/lib/rtl + drivers/filesystems (NT/RTL idioms)
+        run: |
+          set -o pipefail
+          A=ExAllocatePool,ExAllocatePoolWithTag,ExAllocatePoolZero,ExAllocatePoolWithTagPriority,RtlAllocateHeap,RtlReAllocateHeap,ExAllocatePoolWithQuotaTag
+          F=ExFreePool,ExFreePoolWithTag,RtlFreeHeap
+          for sub in sdk/lib/rtl drivers/filesystems; do
+            code=0
+            ./build/src/codeskeptic "reactos/$sub" \
+              --build-path reactos/build-ros \
+              --alloc-functions "$A" --free-functions "$F" \
+              --report-paths "$PWD/reactos/$sub" \
+              2>&1 | tee "ros_${sub//\//_}.log" || code=$?
+            n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' "ros_${sub//\//_}.log" || true)
+            echo "REACTOS_RESULT sub=$sub findings=$n exit=$code" | tee -a ros_results.txt
+          done
+
+      - name: Publish findings -> refs/ci-logs/*
         if: always()
         run: |
-          tail -c 40000 /tmp/ros_cfg.log > ros_cfg.tail.log 2>/dev/null || true
-          cp /tmp/ros_dirs.txt ros_dirs.txt 2>/dev/null || true
+          for sub in sdk_lib_rtl drivers_filesystems; do
+            tail -c 60000 "ros_${sub}.log" > "ros_${sub}.tail.log" 2>/dev/null || true
+          done
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f ros_cfg.tail.log 2>/dev/null || true
-          [ -f ros_dirs.txt ] && git add -f ros_dirs.txt || true
-          git commit -qm "reactos probe @ ${{ github.sha }}" || true
-          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/reactos-probe"
+          git add -f ros_results.txt ros_*.tail.log 2>/dev/null || true
+          git commit -qm "reactos scan @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/reactos-scan"
 
       - name: Mirror job status to refs/status/*
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/reactos-probe/${{ job.status }}"
+            "HEAD:refs/status/${{ github.sha }}/reactos-scan/${{ job.status }}"
