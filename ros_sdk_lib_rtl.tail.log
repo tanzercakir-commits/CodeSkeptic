@@ -1,0 +1,597 @@
+work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+[92/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+[93/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+[94/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+[95/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+[96/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+[97/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/sdk/include/psdk/winnt.h:39:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/excpt.h:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh2.h:103:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/pseh/include/pseh/pseh3.h:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/intrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/immintrin.h:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/emmintrin.h:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/xmmintrin.h:25:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:19: error: use of unknown builtin '__builtin_ia32_vec_init_v2si' [-Wimplicit-function-declaration]
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:281:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  281 |     return (__m64)__builtin_ia32_vec_init_v2si(i, 0);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:287:12: error: use of unknown builtin '__builtin_ia32_vec_ext_v2si' [-Wimplicit-function-declaration]
+  287 |     return __builtin_ia32_vec_ext_v2si((__v2si)m, 0);
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:19: error: use of unknown builtin '__builtin_ia32_packsswb' [-Wimplicit-function-declaration]
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:293:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  293 |     return (__m64)__builtin_ia32_packsswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:19: error: use of unknown builtin '__builtin_ia32_packssdw' [-Wimplicit-function-declaration]
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:299:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  299 |     return (__m64)__builtin_ia32_packssdw((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:19: error: use of unknown builtin '__builtin_ia32_packuswb' [-Wimplicit-function-declaration]
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:305:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  305 |     return (__m64)__builtin_ia32_packuswb((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:19: error: use of unknown builtin '__builtin_ia32_punpckhbw' [-Wimplicit-function-declaration]
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:311:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  311 |     return (__m64)__builtin_ia32_punpckhbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:19: error: use of unknown builtin '__builtin_ia32_punpckhwd' [-Wimplicit-function-declaration]
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:317:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  317 |     return (__m64)__builtin_ia32_punpckhwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:19: error: use of unknown builtin '__builtin_ia32_punpckhdq' [-Wimplicit-function-declaration]
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:323:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  323 |     return (__m64)__builtin_ia32_punpckhdq((__v2si)a, (__v2si)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:19: error: use of unknown builtin '__builtin_ia32_punpcklbw' [-Wimplicit-function-declaration]
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:329:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  329 |     return (__m64)__builtin_ia32_punpcklbw((__v8qi)a, (__v8qi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:19: error: use of unknown builtin '__builtin_ia32_punpcklwd' [-Wimplicit-function-declaration]
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |                   ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/vcruntime/mmintrin.h:335:12: error: invalid conversion between vector type '__m64' (vector of 2 'float' values) and integer type 'int' of different size
+  335 |     return (__m64)__builtin_ia32_punpcklwd((__v4hi)a, (__v4hi)b);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+[CodeSkeptic] 85 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/vectoreh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/processor.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode_vista.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/arm/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/generictable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/byteswap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/process.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/actctx.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/luid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/message.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wait.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rangelist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/atom.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/propvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/product.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avlsupp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c
+[CodeSkeptic] ANALYSIS FAILED: every translation unit failed to compile - NOTHING was analyzed, so this is not a clean result (exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), pass --build-path with your compile_commands.json, or use --analyze-broken-tus to force analysis on error-recovery ASTs.
