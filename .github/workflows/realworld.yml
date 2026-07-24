@@ -300,3 +300,149 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/lessons/${{ job.status }}"
+
+  # --- Graphics round: raylib (pre-validated leads from the friend
+  # scan: unchecked LoadFileText chains in its own tools), sokol
+  # (single-header C graphics family, stb-style driver), LVGL (embedded
+  # GUI, 1M+ devices, its own lv_malloc/lv_free wrapper family). ---
+  scan-graphics:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build
+
+      - name: Build CodeSkeptic
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build
+
+      - name: raylib upstream (pre-validated parser leads)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/raysan5/raylib/archive/refs/tags/5.5.tar.gz | tar xz
+          cmake -S raylib-5.5 -B raylib-5.5/build -G Ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=OFF \
+            >/dev/null 2>&1 || true
+          code=0
+          ./build/src/codeskeptic raylib-5.5/src \
+            --build-path raylib-5.5/build \
+            --report-paths "$PWD/raylib-5.5/src" 2>&1 | tee raylib.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' raylib.log || true)
+          broken=$(grep -c "failed to COMPILE" raylib.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" raylib.log || true)
+          echo "GFX_RESULT target=raylib-src findings=$n broken=$broken processed=$proc exit=$code" | tee -a gresults.txt
+          # the pre-validated leads live in parser/ tools — scan them too
+          code2=0
+          ./build/src/codeskeptic raylib-5.5/parser \
+            --report-paths "$PWD/raylib-5.5/parser" 2>&1 | tee raylib-tools.log || code2=$?
+          n2=$(grep -cE ' \[(warning|error)\] ' raylib-tools.log || true)
+          b2=$(grep -c "failed to COMPILE" raylib-tools.log || true)
+          p2=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" raylib-tools.log || true)
+          echo "GFX_RESULT target=raylib-parser findings=$n2 broken=$b2 processed=$p2 exit=$code2" | tee -a gresults.txt
+
+      - name: sokol (single-header family via drivers)
+        run: |
+          set -o pipefail
+          mkdir -p sokolwork
+          for h in sokol_gfx sokol_app sokol_audio sokol_fetch sokol_args; do
+            curl -sL --retry 3 -o "sokolwork/$h.h" \
+              "https://raw.githubusercontent.com/floooh/sokol/master/$h.h"
+            printf '#define %s_IMPL\n#define SOKOL_DUMMY_BACKEND\n#include "%s.h"\n' \
+              "$(echo $h | tr a-z A-Z)" "$h" > "sokolwork/drv_$h.c"
+          done
+          code=0
+          ./build/src/codeskeptic sokolwork --report-paths "$PWD/sokolwork" \
+            2>&1 | tee sokol.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' sokol.log || true)
+          broken=$(grep -c "failed to COMPILE" sokol.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" sokol.log || true)
+          echo "GFX_RESULT target=sokol findings=$n broken=$broken processed=$proc exit=$code" | tee -a gresults.txt
+
+      - name: LVGL (embedded GUI, lv_ allocator family)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/lvgl/lvgl/archive/refs/tags/v9.2.2.tar.gz | tar xz
+          cd lvgl-9.2.2
+          # standalone config: enable the template config wholesale
+          sed 's/#if 0/#if 1/' lv_conf_template.h > lv_conf.h
+          cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DLV_CONF_PATH="$PWD/lv_conf.h" >/dev/null 2>&1 || true
+          cd ..
+          test -f lvgl-9.2.2/build/compile_commands.json && DB=yes || DB=no
+          echo "LVGL_DB=$DB"
+          code=0
+          ./build/src/codeskeptic lvgl-9.2.2/src \
+            --build-path lvgl-9.2.2/build \
+            --alloc-functions lv_malloc,lv_malloc_zeroed,lv_realloc,lv_calloc \
+            --free-functions lv_free \
+            --report-paths "$PWD/lvgl-9.2.2/src" 2>&1 | tee lvgl.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' lvgl.log || true)
+          broken=$(grep -c "failed to COMPILE" lvgl.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" lvgl.log || true)
+          echo "GFX_RESULT target=lvgl db=$DB findings=$n broken=$broken processed=$proc exit=$code" | tee -a gresults.txt
+
+      - name: zstd upstream (closes the ReactOS vendored-copy loop)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/facebook/zstd/archive/refs/tags/v1.5.6.tar.gz | tar xz
+          cmake -S zstd-1.5.6/build/cmake -B zstd-1.5.6/bld -G Ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DZSTD_BUILD_PROGRAMS=OFF \
+            -DZSTD_BUILD_TESTS=OFF >/dev/null 2>&1 || true
+          code=0
+          ./build/src/codeskeptic zstd-1.5.6/lib \
+            --build-path zstd-1.5.6/bld \
+            --report-paths "$PWD/zstd-1.5.6/lib" 2>&1 | tee zstd.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' zstd.log || true)
+          broken=$(grep -c "failed to COMPILE" zstd.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" zstd.log || true)
+          echo "GFX_RESULT target=zstd findings=$n broken=$broken processed=$proc exit=$code" | tee -a gresults.txt
+          # loop-closure check: do the two ReactOS-vendored sites recur upstream?
+          grep -E "zstd_compress\.c.*(cdict)|zstd_ldm\.c.*(lastHashed)" zstd.log \
+            | head -4 | tee -a gresults.txt || true
+          grep -qE "zstd_compress\.c.*cdict|zstd_ldm\.c.*lastHashed" zstd.log \
+            && echo "ZSTD_LOOP=recurs_upstream" | tee -a gresults.txt \
+            || echo "ZSTD_LOOP=not_present_upstream" | tee -a gresults.txt
+
+      - name: box2d v3 (physics, pure-C rewrite)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/erincatto/box2d/archive/refs/tags/v3.0.0.tar.gz | tar xz
+          cmake -S box2d-3.0.0 -B box2d-3.0.0/build -G Ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOX2D_SAMPLES=OFF \
+            -DBOX2D_UNIT_TESTS=OFF >/dev/null 2>&1 || true
+          code=0
+          ./build/src/codeskeptic box2d-3.0.0/src \
+            --build-path box2d-3.0.0/build \
+            --report-paths "$PWD/box2d-3.0.0/src" 2>&1 | tee box2d.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' box2d.log || true)
+          broken=$(grep -c "failed to COMPILE" box2d.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" box2d.log || true)
+          echo "GFX_RESULT target=box2d findings=$n broken=$broken processed=$proc exit=$code" | tee -a gresults.txt
+
+      - name: Publish results + logs -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in raylib raylib-tools sokol lvgl zstd box2d; do
+            [ -f "$f.log" ] && tail -c 50000 "$f.log" > "$f.tail.log" || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          for f in gresults.txt raylib.tail.log raylib-tools.tail.log sokol.tail.log lvgl.tail.log zstd.tail.log box2d.tail.log; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git commit -qm "graphics round @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/graphics"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/graphics/${{ job.status }}"
