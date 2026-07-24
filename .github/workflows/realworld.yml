@@ -100,3 +100,100 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/realworld/${{ job.status }}"
+
+  # --- New-target probe+scan: curl + libexpat (F7A / CWE-120 showcase) ---
+  # Both are plain CMake C projects: one configure emits a Clang-native
+  # compile db, no OS-scale header generation. curl exercises the
+  # Curl_c*/malloc wrappers and the null-passthrough slice; libexpat is
+  # the natural home for the untrusted-length -> bounds arm (XML length
+  # fields). Round 1 for each: configure, scan, and publish
+  # processed/broken counts so a 0 is never mistaken for a clean (the
+  # ReactOS lesson).
+  scan-curl-expat:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build libssl-dev
+
+      - name: Build CodeSkeptic
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build
+
+      - name: Scan curl (pinned tag, Curl_ allocator idioms)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 \
+            https://github.com/curl/curl/archive/refs/tags/curl-8_11_0.tar.gz \
+            | tar xz
+          cd curl-curl-8_11_0
+          cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF \
+            -DCURL_USE_LIBPSL=OFF >/dev/null 2>&1 || \
+          cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF >/dev/null 2>&1 || true
+          cd ..
+          test -f curl-curl-8_11_0/build/compile_commands.json && DB=ok || DB=absent
+          echo "CURL_DB=$DB"
+          code=0
+          ./build/src/codeskeptic curl-curl-8_11_0/lib \
+            --build-path curl-curl-8_11_0/build \
+            --alloc-functions Curl_cmalloc,Curl_ccalloc,Curl_crealloc,Curl_cstrdup,curl_malloc,curl_calloc \
+            --free-functions Curl_cfree,curl_free \
+            --report-paths "$PWD/curl-curl-8_11_0/lib" \
+            2>&1 | tee curl-scan.log || code=$?
+          n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' curl-scan.log || true)
+          broken=$(grep -c "failed to COMPILE" curl-scan.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" curl-scan.log || true)
+          echo "REALWORLD_RESULT project=curl v=8.11.0 findings=$n broken=$broken processed=$proc exit=$code" | tee -a results2.txt
+
+      - name: Scan libexpat (pinned tag, untrusted-length showcase)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 \
+            https://github.com/libexpat/libexpat/archive/refs/tags/R_2_6_4.tar.gz \
+            | tar xz
+          cd libexpat-R_2_6_4/expat
+          cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DEXPAT_BUILD_TESTS=OFF -DEXPAT_BUILD_EXAMPLES=OFF \
+            -DEXPAT_BUILD_TOOLS=OFF >/dev/null 2>&1 || true
+          cd ../..
+          test -f libexpat-R_2_6_4/expat/build/compile_commands.json && DB=ok || DB=absent
+          echo "EXPAT_DB=$DB"
+          code=0
+          ./build/src/codeskeptic libexpat-R_2_6_4/expat/lib \
+            --build-path libexpat-R_2_6_4/expat/build \
+            --report-paths "$PWD/libexpat-R_2_6_4/expat/lib" \
+            2>&1 | tee expat-scan.log || code=$?
+          n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' expat-scan.log || true)
+          broken=$(grep -c "failed to COMPILE" expat-scan.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" expat-scan.log || true)
+          echo "REALWORLD_RESULT project=libexpat v=2.6.4 findings=$n broken=$broken processed=$proc exit=$code" | tee -a results2.txt
+
+      - name: Publish results + logs -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in curl expat; do
+            tail -c 60000 "${f}-scan.log" > "${f}.tail.log" 2>/dev/null || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          for f in results2.txt curl.tail.log expat.tail.log; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git commit -qm "curl+expat scan @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/curl-expat"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/curl-expat/${{ job.status }}"
