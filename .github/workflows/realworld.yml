@@ -167,7 +167,23 @@ jobs:
           # MMX-enabling march/mmmx flags. TUs that genuinely use
           # _mm_* fail honestly; the ~everything else that merely
           # includes intrin.h transitively compiles.
-          BLOCK="-D_MMINTRIN_H_INCLUDED -D_MM3DNOW_H_INCLUDED -D_XMMINTRIN_H_INCLUDED -D_EMMINTRIN_H_INCLUDED"
+          # Round 9 taught: winnt.h itself USES the __m64 type, so
+          # masking mmintrin.h alone removes the definition its users
+          # need. The shim supplies the vector TYPES (analysis-grade,
+          # no GCC builtins); the guards still mask GCC's function
+          # bodies. TUs calling _mm_* fail honestly - the rest parse.
+          cat > /tmp/mmx_shim.h <<'SHIM'
+          #ifndef CODESKEPTIC_MMX_SHIM
+          #define CODESKEPTIC_MMX_SHIM
+          typedef long long __m64 __attribute__((__vector_size__(8), __may_alias__));
+          typedef float __v2sf __attribute__((__vector_size__(8)));
+          typedef int __v2si __attribute__((__vector_size__(8)));
+          typedef short __v4hi __attribute__((__vector_size__(8)));
+          typedef char __v8qi __attribute__((__vector_size__(8)));
+          #endif
+          SHIM
+          sed -i 's/^          //' /tmp/mmx_shim.h
+          BLOCK="-D_MMINTRIN_H_INCLUDED -D_MM3DNOW_H_INCLUDED -D_XMMINTRIN_H_INCLUDED -D_EMMINTRIN_H_INCLUDED -include /tmp/mmx_shim.h"
           jq --arg blk "$BLOCK" \
             '[.[] | .command = ((.command // "") | gsub(" -mmmx"; "") | gsub(" -m3dnow"; "") | gsub(" -march=pentium[a-z0-9-]*"; " -march=i686")) + " " + $blk]' \
             build-ros/compile_commands.json > build-ros/cc_fixed.json \
