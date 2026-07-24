@@ -144,6 +144,7 @@ exposed were fixed.
 | [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **0** | clean (with `--fatal-asserts SwAssert` declaring F´'s assert handler) |
 | [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
+| [libexpat](https://github.com/libexpat/libexpat) | 2.6.4, full lib | **0** | clean — the untrusted-length bounds arm fired no FP on a hardened XML parser |
 
 The two merged shadPS4 fixes are the canonical
 looks-right-reads-wrong bugs this project exists to catch: a null

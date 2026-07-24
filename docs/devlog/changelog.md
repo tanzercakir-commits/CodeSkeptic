@@ -1,5 +1,21 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — New targets: libexpat clean, curl parked for triage
+
+Two plain-CMake C targets scanned on the realworld lane, both with
+real coverage (broken=0, verified via the processed/broken counts the
+ReactOS campaign taught us to print). **libexpat 2.6.4**: 0 findings
+across its ~5-file core — a hardened XML parser came back clean and
+the v0.4.7 untrusted-length→bounds arm produced no false positive on
+its length-field code; recorded in the README trophy table.
+**curl 8.11.0**: 86 findings over 170 clean TUs (83 null-deref +
+3 unbounded-strcpy). Not triaged — curl is heavily audited, so 83
+null-derefs is an FP FAMILY (libgit2 149→34 shape), leading suspect
+the DEBUGASSERT macro the engine does not yet know establishes
+non-null. Parked with the full hypothesis, the 3 strcpy real-candidate
+sites, and the resumption recipe in docs/curl-campaign.md — an FP-hunt
+round reserved for fresh quota + max, not started at 84% used.
+
 ## 2026-07-24 — F7A.3: multi-hop parameter seeding (intervals + zeroness)
 
 Both C3 seeding passes (ParamIntervals, param-zeroness) were
