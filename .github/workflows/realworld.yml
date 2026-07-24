@@ -145,6 +145,21 @@ jobs:
           else
             echo "COMPILE_DB=absent" | tee -a /tmp/ros_cfg.log
           fi
+          # ReactOS GENERATES its SDK headers (winnt.h & friends come
+          # from xdk templates at build time) - round 7's 75x
+          # "winnt.h file not found" says so. Build just the header/
+          # generation side: discover plausible target names, try them
+          # tolerantly, then verify the header exists.
+          ninja -C build-ros -t targets all > /tmp/ros_targets.txt 2>&1 || true
+          grep -iE "xdk|winnt|psdk|ntstatus|bugcodes" /tmp/ros_targets.txt \
+            | head -20 | tee -a /tmp/ros_cfg.log || true
+          for tgt in xdk psdk ntstatus bugcodes buildno_header; do
+            ninja -C build-ros "$tgt" >/dev/null 2>&1 \
+              && echo "TARGET_OK $tgt" | tee -a /tmp/ros_cfg.log \
+              || echo "TARGET_SKIP $tgt" | tee -a /tmp/ros_cfg.log
+          done
+          find build-ros -name winnt.h | head -3 | tee -a /tmp/ros_cfg.log
+          echo "WINNT_GENERATED=$(find build-ros -name winnt.h | wc -l)" | tee -a /tmp/ros_cfg.log
 
       - name: Scan sdk/lib/rtl + drivers/filesystems (NT/RTL idioms)
         if: hashFiles('reactos/build-ros/compile_commands.json') != ''
