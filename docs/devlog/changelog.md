@@ -1,5 +1,24 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — ReactOS campaign: ten rounds, parked at the MMX wall
+
+An OS-scale target probed end to end on plain CI runners. Proven:
+ReactOS configures WITHOUT a full build (10 s, 9160-entry compile
+db; clang toolchain still needs mingw gcc for ASM), generated SDK
+headers materialize via `ninja xdk psdk`, PCH disabled at configure.
+Walled: the mingw sysroot headers use GCC MMX builtins that clang
+19+ removed — masking the header kills the __m64 type winnt.h needs,
+shimming the type leaves header-inlined _mm_* calls undeclared. A
+toolchain-version mismatch, not an analyzer defect; resumption paths
+(ReactOS's own CI container first) in docs/reactos-campaign.md, plus
+profiles/reactos.conf and two vendored-zstd findings recorded.
+Process lessons banked: git add's cross-pathspec atomicity can
+swallow diagnostics; Actions' default bash has NO pipefail — both
+now written into the lane. The 0-findings runs were correctly
+distrusted twice (false-clean via wrong-compiler db, then via
+missing PCH) — reading the logs, not the exit code, is the product's
+own doctrine applied to its harness.
+
 ## 2026-07-24 — F7A.3: multi-hop parameter seeding (intervals + zeroness)
 
 Both C3 seeding passes (ParamIntervals, param-zeroness) were
