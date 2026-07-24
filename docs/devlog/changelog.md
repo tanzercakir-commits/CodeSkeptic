@@ -1,5 +1,20 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — Assert-refinement plan: the hypothesis CORRECTED by measurement
+
+The survey's "engine doesn't narrow asserts" hypothesis was tested
+before planning — and REFUTED: a live glibc assert already narrows
+correctly (noreturn false-edge + refineOnEdge; pinned experiment in
+docs/PLAN-assert.md). The real gap is asserts COMPILED OUT by default
+(zstd DEBUGLEVEL, lua LUAI_ASSERT, curl DEBUGBUILD, sqlite
+SQLITE_DEBUG) - the invariant never reaches the AST. The plan
+therefore leads with measurement: AR.1 pins today's correct live
+behavior, AR.2 establishes the assertion-enabled-scan doctrine and
+RE-MEASURES all five witnesses (config work, ~3%, no fresh quota
+needed), and only AR.2's collapse numbers decide between AR.3 (a new
+PPCallbacks vanished-assert recovery subsystem, medium) and Phase
+7A.2. Plan-by-evidence, not plan-by-guess.
+
 ## 2026-07-25 — Scan survey: 11 targets, and an ecosystem-wide FP family
 
 A breadth sweep (hobby code, libraries, an OS earlier, graphics
