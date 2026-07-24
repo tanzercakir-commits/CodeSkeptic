@@ -1,0 +1,358 @@
+n)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:4921:24 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:4923:24 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:4924:13 'animations' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5123:13 [warning] null-deref: Possible null dereference: 'data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5116:9 'data' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5168:9 [warning] null-deref: Possible null dereference: 'bones' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5145:5 'bones' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5152:21 'bones' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5153:13 'bones' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5520:111 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5517:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5534:87 [warning] null-deref: Possible null dereference: 'texcoordPtr' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5496:25 'texcoordPtr' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5505:33 'texcoordPtr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5513:33 'texcoordPtr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5527:33 'texcoordPtr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5548:33 'texcoordPtr' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5508:33 'texcoordPtr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5520:87 'texcoordPtr' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5534:111 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5531:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5571:73 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5566:33 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5572:77 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5573:77 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5591:97 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5586:33 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5592:101 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5593:101 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5611:89 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5606:33 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5612:93 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5613:93 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5641:147 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5638:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5655:139 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5652:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5816:89 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5803:33 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5809:42 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5842:135 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5812:41 'temp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5839:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5856:135 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:5853:33 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6190:52 [warning] null-deref: Possible null dereference: 'boneChannels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6117:21 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6123:29 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6127:29 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6131:29 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6172:29 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6174:52 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6180:29 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6182:52 'boneChannels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6188:29 'boneChannels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6206:17 [warning] null-deref: Possible null dereference: 'animations' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6054:5 'animations' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6079:13 'animations' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6083:63 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6094:49 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6154:29 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6155:21 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6158:17 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6159:44 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6161:37 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6163:51 'animations' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6775:21 [warning] null-deref: Possible null dereference: 'animations' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6688:5 'animations' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6718:9 'animations' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6723:13 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6724:13 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6725:13 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6726:40 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6727:21 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6728:13 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6730:13 'animations' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rmodels.c:6734:17 'animations' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:653:26 [warning] null-deref: Possible null dereference: 'codepoints' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:640:17 'codepoints' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:642:17 'codepoints' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:643:58 'codepoints' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:716:52 [warning] null-deref: Possible null dereference: 'chars' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:615:5 'chars' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:647:13 'chars' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:654:17 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:670:144 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:671:213 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:675:25 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:677:68 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:678:58 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:683:25 'chars' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:684:25 'chars' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:733:1 [warning] memory-leak: Memory leak: allocation stored in 'codepoints' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:642:17 'codepoints' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:728:27 'codepoints' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:880:13 [warning] null-deref: Possible null dereference: 'recs' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:754:5 'recs' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:830:25 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:831:25 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:832:25 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:833:25 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:849:13 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:850:13 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:851:13 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:852:13 'recs' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:881:13 'recs' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:892:56 [warning] null-deref: Possible null dereference: 'rects' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:864:9 'rects' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:869:13 'rects' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:870:13 'rects' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:871:13 'rects' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:880:25 'rects' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:881:25 'rects' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:885:17 'rects' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:922:9 [warning] null-deref: Possible null dereference: 'dataGrayAlpha' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:918:5 'dataGrayAlpha' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:923:9 'dataGrayAlpha' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:933:1 [warning] memory-leak: Memory leak: allocation stored in 'dataGrayAlpha' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:918:5 'dataGrayAlpha' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1620:5 [warning] null-deref: Possible null dereference: 'result' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1614:5 'result' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1616:40 'result' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1617:59 'result' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1618:74 'result' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1890:9 [warning] null-deref: Possible null dereference: 'codepoints' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:1886:5 'codepoints' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2255:55 [warning] int-overflow: possible integer overflow: this multiplication can exceed 'int'
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2261:34 [warning] null-deref: Possible null dereference: 'imFonts' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2219:5 'imFonts' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2312:9 'imFonts' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2223:9 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2225:13 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2229:25 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2230:26 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2231:27 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2236:42 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2239:82 'imFonts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtext.c:2242:25 'imFonts' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:770:5 [warning] bounds: possible buffer overflow: strcpy copies an unbounded amount into a fixed 256-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:804:44 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:802:5 'pixels' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:815:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:802:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:853:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:824:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:854:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:855:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:856:13 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:869:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:824:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:890:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:874:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:891:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:892:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:893:13 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:906:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:874:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:939:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:911:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:940:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:941:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:942:13 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:955:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:911:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:967:18 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:960:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:966:49 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:980:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:960:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:991:14 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:986:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:990:59 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1003:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:986:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1040:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1008:5 'pixels' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1053:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1008:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1092:44 [warning] null-deref: Possible null dereference: 'seeds' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1064:5 'seeds' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1070:9 'seeds' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1103:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1058:5 'pixels' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1118:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1058:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1701:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1600:5 'pixels' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1708:1 [warning] memory-leak: Memory leak: allocation stored in 'pixels' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1600:5 'pixels' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1731:13 [warning] null-deref: Possible null dereference: 'output' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1717:5 'output' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1731:40 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:1716:5 'pixels' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2033:17 [warning] null-deref: Possible null dereference: 'data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2028:13 'data' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2034:17 'data' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2076:28 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2064:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2068:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2070:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2071:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2072:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2074:18 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2077:50 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2078:50 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2079:50 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2190:29 [warning] null-deref: Possible null dereference: 'pixelsCopy2' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2104:5 'pixelsCopy2' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2154:17 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2155:17 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2156:17 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2157:17 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2172:25 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2173:25 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2174:25 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2175:29 'pixelsCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2182:29 'pixelsCopy2' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2217:34 [warning] null-deref: Possible null dereference: 'pixelsCopy1' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2103:5 'pixelsCopy1' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2108:9 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2109:9 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2110:9 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2111:9 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2128:25 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2129:25 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2130:25 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2131:29 'pixelsCopy1' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2138:29 'pixelsCopy1' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2218:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2100:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2108:28 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2109:28 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2110:28 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2111:28 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2210:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2211:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2212:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2213:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2219:13 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2338:17 [warning] null-deref: Possible null dereference: 'temp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2253:5 'temp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2257:9 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2258:9 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2259:9 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2260:9 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2295:25 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2296:25 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2297:25 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2298:25 'temp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2302:25 'temp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2348:30 [warning] null-deref: Possible null dereference: 'imageCopy2' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2252:5 'imageCopy2' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2326:13 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2327:13 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2328:13 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2329:13 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2350:40 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2351:40 'imageCopy2' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2352:40 'imageCopy2' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2350:9 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2250:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2302:69 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2303:69 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2304:69 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2305:69 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2351:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2352:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2353:9 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2536:21 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2460:9 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2494:28 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2508:17 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2513:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2514:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2515:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2520:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2521:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2522:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2527:21 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2597:57 [warning] null-deref: Possible null dereference: 'flippedData' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2587:9 'flippedData' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2667:25 [warning] null-deref: Possible null dereference: 'rotatedData' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2639:9 'rotatedData' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2698:57 [warning] null-deref: Possible null dereference: 'rotatedData' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2691:9 'rotatedData' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2730:57 [warning] null-deref: Possible null dereference: 'rotatedData' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2723:9 'rotatedData' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2754:49 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2750:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2755:49 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2756:49 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2757:49 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2759:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2760:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2761:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2762:9 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2784:29 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2780:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2785:29 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2786:29 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2845:9 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2817:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2821:27 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2829:27 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2837:27 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2846:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2847:9 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2886:9 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2869:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2873:18 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2874:18 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2875:18 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2887:9 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2888:9 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2915:13 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2906:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2910:14 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2911:14 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2912:14 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2913:14 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2916:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2917:13 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2918:13 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3067:21 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2938:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2957:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2958:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2959:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2960:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2965:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2966:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2967:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2968:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:2976:21 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3117:21 [warning] null-deref: Possible null dereference: 'palette' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3089:5 'palette' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3094:9 'palette' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3096:50 'palette' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:3107:25 'palette' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5533:21 [warning] null-deref: Possible null dereference: 'pixels' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5415:5 'pixels' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5426:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5427:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5428:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5429:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5434:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5435:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5436:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5437:21 'pixels' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/rtextures.c:5445:21 'pixels' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:317:5 [warning] bounds: possible buffer overflow: strcpy copies an unbounded amount into a fixed 256-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:381:21 [warning] null-deref: Possible null dereference: 'text' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:347:5 'text' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:370:17 'text' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:372:21 'text' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/src/utils.c:378:39 'text' assigned a possibly-null value here (callee may return null)
+----------------------------------------

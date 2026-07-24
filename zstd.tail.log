@@ -1,0 +1,111 @@
+[CodeSkeptic] Analysis starting... (39 files, 9 rules)
+[1/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/threading.c.
+[2/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/threading.c.
+[3/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/zstd_common.c.
+[4/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/zstd_common.c.
+[5/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/fse_decompress.c.
+[6/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/fse_decompress.c.
+[7/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/entropy_common.c.
+[8/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/entropy_common.c.
+[9/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/xxhash.c.
+[10/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/xxhash.c.
+[11/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/pool.c.
+[12/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/pool.c.
+[13/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/debug.c.
+[14/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/debug.c.
+[15/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/error_private.c.
+[16/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/common/error_private.c.
+[17/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/huf_decompress.c.
+[18/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/huf_decompress.c.
+[19/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_decompress_block.c.
+[20/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_decompress_block.c.
+[21/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_ddict.c.
+[22/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_ddict.c.
+[23/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_decompress.c.
+[24/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/decompress/zstd_decompress.c.
+[25/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_ldm.c.
+[26/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_ldm.c.
+[27/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_superblock.c.
+[28/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_superblock.c.
+[29/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_sequences.c.
+[30/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_sequences.c.
+[31/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_opt.c.
+[32/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_opt.c.
+[33/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstdmt_compress.c.
+[34/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstdmt_compress.c.
+[35/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_lazy.c.
+[36/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_lazy.c.
+[37/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_double_fast.c.
+[38/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_double_fast.c.
+[39/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/fse_compress.c.
+[40/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/fse_compress.c.
+[41/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/hist.c.
+[42/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/hist.c.
+[43/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_fast.c.
+[44/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_fast.c.
+[45/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c.
+[46/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c.
+[47/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_literals.c.
+[48/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress_literals.c.
+[49/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c.
+[50/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c.
+[51/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v06.c.
+[52/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v06.c.
+[53/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v05.c.
+[54/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v05.c.
+[55/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v01.c.
+[56/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v01.c.
+[57/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v04.c.
+[58/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v04.c.
+[59/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v07.c.
+[60/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v07.c.
+[61/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v03.c.
+[62/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v03.c.
+[63/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v02.c.
+[64/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/legacy/zstd_v02.c.
+[65/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/divsufsort.c.
+[66/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/divsufsort.c.
+[67/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/zdict.c.
+[68/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/zdict.c.
+[69/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/fastcover.c.
+[70/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/fastcover.c.
+[71/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/cover.c.
+[72/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/dictBuilder/cover.c.
+[73/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/deprecated/zbuff_decompress.c.
+[74/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/deprecated/zbuff_compress.c.
+[75/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/deprecated/zbuff_common.c.
+CodeSkeptic: 5 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:180:9 [warning] null-deref: Possible null dereference: 'wksp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:157:5 'wksp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:165:53 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:171:5 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:174:9 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:179:5 'wksp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:287:31 [warning] null-deref: Possible null dereference: 'wksp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:255:5 'wksp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:267:5 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:269:9 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:271:31 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:275:9 'wksp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:285:5 'wksp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:778:47 [warning] null-deref: Possible null dereference: 'wksp_tables' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:759:5 'wksp_tables' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:761:32 'wksp_tables' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1433:51 [warning] null-deref: Possible null dereference: 'table' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1340:5 'table' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1371:13 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1375:13 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1382:9 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1391:43 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1402:70 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1403:53 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1405:46 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1412:9 'table' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/huf_compress.c:1416:76 'table' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5507:26 [warning] null-deref: Possible null dereference: 'cdict' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5505:9 'cdict' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5508:9 'cdict' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5509:9 'cdict' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5510:9 'cdict' is also dereferenced here (same origin)
+----------------------------------------

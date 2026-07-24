@@ -1,0 +1,11 @@
+GFX_RESULT target=raylib-src findings=177 broken=1 processed=53 exit=1
+GFX_RESULT target=raylib-parser findings=8 broken=0 processed=0 exit=1
+GFX_RESULT target=sokol findings=1 broken=1 processed=5 exit=1
+GFX_RESULT target=lvgl db=yes findings=47 broken=0 processed=361 exit=1
+GFX_RESULT target=zstd findings=5 broken=0 processed=75 exit=1
+/home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5507:26 [warning] null-deref: Possible null dereference: 'cdict' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5505:9 'cdict' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5508:9 'cdict' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/zstd-1.5.6/lib/compress/zstd_compress.c:5509:9 'cdict' is also dereferenced here (same origin)
+ZSTD_LOOP=recurs_upstream
+GFX_RESULT target=box2d findings=0 broken=0 processed=35 exit=0

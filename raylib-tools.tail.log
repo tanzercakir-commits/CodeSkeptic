@@ -1,0 +1,58 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (1 files, 9 rules)
+CodeSkeptic: 8 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:387:31 [warning] null-deref: Possible null dereference: 'defineLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:240:5 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:270:13 'defineLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:613:34 [warning] null-deref: Possible null dereference: 'structLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:243:5 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:295:13 'structLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:771:30 [warning] null-deref: Possible null dereference: 'aliasLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:246:5 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:319:13 'aliasLines' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:773:31 'aliasLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:820:35 [warning] null-deref: Possible null dereference: 'enumLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:249:5 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:332:13 'enumLines' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:808:22 'enumLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:913:31 [warning] null-deref: Possible null dereference: 'callbackLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:252:5 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:357:17 'callbackLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:969:31 [warning] null-deref: Possible null dereference: 'funcLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:255:5 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:287:54 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:311:50 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:347:50 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:351:71 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:369:13 'funcLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1215:17 [warning] null-deref: Possible null dereference: 'text' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1185:5 'text' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1202:17 'text' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1251:13 [warning] null-deref: Possible null dereference: 'lines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1235:5 'lines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/raylib-5.5/parser/raylib_parser.c:1241:9 'lines' is also dereferenced here (same origin)
+----------------------------------------

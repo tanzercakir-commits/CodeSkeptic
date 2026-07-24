@@ -1,0 +1,31 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (5 files, 9 rules)
+[1/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_fetch.c.
+[2/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_app.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_app.c:3:
+/home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_app.h:2395:10: error: ("sokol_app.h: unknown 3D API selected for Linux, must be SOKOL_GLCORE, SOKOL_GLES3, SOKOL_WGPU or SOKOL_VULKAN")
+ 2395 |         #error("sokol_app.h: unknown 3D API selected for Linux, must be SOKOL_GLCORE, SOKOL_GLES3, SOKOL_WGPU or SOKOL_VULKAN")
+      |          ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_app.h:2569:14: fatal error: 'X11/Xlib.h' file not found
+ 2569 |     #include <X11/Xlib.h>
+      |              ^~~~~~~~~~~~
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_app.c.
+[3/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_args.c.
+[4/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_gfx.c.
+[5/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_audio.c.
+[CodeSkeptic] 1 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/drv_sokol_app.c
+CodeSkeptic: 1 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23217:25 [warning] null-deref: Possible null dereference: 'img' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23176:9 'img' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23188:13 'img' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23189:13 'img' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23190:17 'img' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23196:13 'img' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sokolwork/sokol_gfx.h:23197:13 'img' is null on this branch (per this condition)
+----------------------------------------

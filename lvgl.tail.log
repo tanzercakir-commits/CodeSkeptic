@@ -1,0 +1,368 @@
+tic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_img.c.
+[199/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_vg_lite_pending.c.
+[200/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_mask_rect.c.
+[201/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_box_shadow.c.
+[202/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_vg_lite_utils.c.
+[203/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_buf_vg_lite.c.
+[204/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_vector.c.
+[205/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_label.c.
+[206/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_triangle.c.
+[207/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_draw_vg_lite_line.c.
+[208/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/vg_lite/lv_vg_lite_stroke.c.
+[209/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_border.c.
+[210/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d.c.
+[211/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_triangle.c.
+[212/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_mask_rectangle.c.
+[213/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_arc.c.
+[214/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_line.c.
+[215/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_fill.c.
+[216/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_image.c.
+[217/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_utils.c.
+[218/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/renesas/dave2d/lv_draw_dave2d_label.c.
+[219/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_arc.c.
+[220/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_triangle.c.
+[221/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_image_decoder.c.
+[222/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_vector.c.
+[223/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_buf.c.
+[224/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_line.c.
+[225/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sdl/lv_draw_sdl.c.
+[226/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_layer.c.
+[227/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_label.c.
+[228/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_arc.c.
+[229/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_vglite_buf.c.
+[230/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_fill.c.
+[231/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_vglite_utils.c.
+[232/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_line.c.
+[233/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_border.c.
+[234/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite.c.
+[235/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_vglite_matrix.c.
+[236/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_img.c.
+[237/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_vglite_path.c.
+[238/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_buf_vglite.c.
+[239/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/vglite/lv_draw_vglite_triangle.c.
+[240/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_pxp_osa.c.
+[241/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_pxp_cfg.c.
+[242/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_draw_buf_pxp.c.
+[243/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_draw_pxp_img.c.
+[244/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_draw_pxp_layer.c.
+[245/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_draw_pxp_fill.c.
+[246/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_draw_pxp.c.
+[247/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/nxp/pxp/lv_pxp_utils.c.
+[248/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_mask.c.
+[249/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c.
+[250/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_image.c.
+[251/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_draw.c.
+[252/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_refr.c.
+[253/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_style.c.
+[254/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_style_gen.c.
+[255/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_group.c.
+[256/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_scroll.c.
+[257/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c.
+[258/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_pos.c.
+[259/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_property.c.
+[260/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_id_builtin.c.
+[261/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_class.c.
+[262/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_event.c.
+[263/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c.
+[264/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/lv_mem.c.
+[265/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/micropython/lv_mem_core_micropython.c.
+[266/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/builtin/lv_sprintf_builtin.c.
+[267/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/builtin/lv_mem_core_builtin.c.
+[268/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/builtin/lv_tlsf.c.
+[269/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/builtin/lv_string_builtin.c.
+[270/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/clib/lv_string_clib.c.
+[271/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/clib/lv_sprintf_clib.c.
+[272/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/clib/lv_mem_core_clib.c.
+[273/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/rtthread/lv_mem_core_rtthread.c.
+[274/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/rtthread/lv_string_rtthread.c.
+[275/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/stdlib/rtthread/lv_sprintf_rtthread.c.
+[276/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/ime/lv_ime_pinyin.c.
+[277/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/vg_lite_tvg/vg_lite_matrix.c.
+[278/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/vg_lite_tvg/vg_lite_tvg.cpp.
+[279/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/fragment/lv_fragment_manager.c.
+[280/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/fragment/lv_fragment.c.
+[281/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/gridnav/lv_gridnav.c.
+[282/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/imgfont/lv_imgfont.c.
+[283/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/observer/lv_observer.c.
+[284/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/monkey/lv_monkey.c.
+[285/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/snapshot/lv_snapshot.c.
+[286/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/file_explorer/lv_file_explorer.c.
+[287/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/sysmon/lv_sysmon.c.
+[288/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_anim_timeline.c.
+[289/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_text_ap.c.
+[290/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_profiler_builtin.c.
+[291/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_area.c.
+[292/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_event.c.
+[293/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_palette.c.
+[294/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_anim.c.
+[295/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_fs.c.
+[296/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_math.c.
+[297/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_style_gen.c.
+[298/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_lru.c.
+[299/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_image_cache.c.
+[300/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_image_header_cache.c.
+[301/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_cache_lru_rb.c.
+[302/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_cache_entry.c.
+[303/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_cache.c.
+[304/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_matrix.c.
+[305/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_timer.c.
+[306/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_rb.c.
+[307/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_color.c.
+[308/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_ll.c.
+[309/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_style.c.
+[310/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_color_op.c.
+[311/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_utils.c.
+[312/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_log.c.
+[313/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_bidi.c.
+[314/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_array.c.
+[315/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_templ.c.
+[316/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_async.c.
+[317/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_text.c.
+[318/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/dropdown/lv_dropdown.c.
+[319/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/imagebutton/lv_imagebutton.c.
+[320/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/switch/lv_switch.c.
+[321/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/button/lv_button.c.
+[322/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/objx_templ/lv_objx_templ.c.
+[323/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/chart/lv_chart.c.
+[324/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/span/lv_span.c.
+[325/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/tileview/lv_tileview.c.
+[326/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/keyboard/lv_keyboard.c.
+[327/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/table/lv_table.c.
+[328/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/led/lv_led.c.
+[329/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/lottie/lv_lottie.c.
+[330/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/line/lv_line.c.
+[331/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/spinner/lv_spinner.c.
+[332/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/canvas/lv_canvas.c.
+[333/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/textarea/lv_textarea.c.
+[334/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/list/lv_list.c.
+[335/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_dropdown_properties.c.
+[336/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_image_properties.c.
+[337/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_textarea_properties.c.
+[338/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_keyboard_properties.c.
+[339/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_label_properties.c.
+[340/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_roller_properties.c.
+[341/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_style_properties.c.
+[342/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/property/lv_obj_properties.c.
+[343/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/msgbox/lv_msgbox.c.
+[344/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/buttonmatrix/lv_buttonmatrix.c.
+[345/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/checkbox/lv_checkbox.c.
+[346/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/roller/lv_roller.c.
+[347/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/label/lv_label.c.
+[348/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/bar/lv_bar.c.
+[349/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/win/lv_win.c.
+[350/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/calendar/lv_calendar_header_arrow.c.
+[351/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/calendar/lv_calendar_header_dropdown.c.
+[352/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/calendar/lv_calendar_chinese.c.
+[353/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/calendar/lv_calendar.c.
+[354/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/menu/lv_menu.c.
+[355/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/animimage/lv_animimage.c.
+[356/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/slider/lv_slider.c.
+[357/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/scale/lv_scale.c.
+[358/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/arc/lv_arc.c.
+[359/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/image/lv_image.c.
+[360/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/tabview/lv_tabview.c.
+[361/361] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/spinbox/lv_spinbox.c.
+CodeSkeptic: 47 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:951:61 [warning] null-deref: Possible null dereference: 'ts' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:912:5 'ts' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:945:17 'ts' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:931:48 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:934:20 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:939:17 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:940:17 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:941:17 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:942:17 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:943:17 'ts' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj.c:944:17 'ts' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_event.c:135:12 [warning] null-deref: Possible null dereference: 'dsc' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:267:5 [warning] null-deref: Possible null dereference: 'parent' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:258:5 'parent' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:270:5 [warning] null-deref: Possible null dereference: 'parent2' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:259:5 'parent2' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:574:9 [warning] null-deref: Possible null dereference: 'disp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:563:9 'disp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:566:24 'disp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:567:16 'disp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:571:25 'disp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:572:32 'disp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/core/lv_obj_tree.c:575:36 'disp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:83:5 [warning] null-deref: Possible null dereference: 'new_unit' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:81:5 'new_unit' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:95:5 [warning] null-deref: Possible null dereference: 'new_task' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:93:5 'new_task' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:96:5 'new_task' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:97:5 'new_task' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw.c:101:5 'new_task' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_image.c:107:49 [warning] null-deref: Possible null dereference: 'new_image_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_image.c:105:5 'new_image_dsc' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:154:9 [warning] null-deref: Possible null dereference: 'shadow_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:149:9 'shadow_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:155:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:156:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:157:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:158:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:159:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:160:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:161:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:162:9 'shadow_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:163:9 'shadow_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:183:9 [warning] null-deref: Possible null dereference: 'bg_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:180:9 'bg_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:184:9 'bg_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:185:9 'bg_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:186:9 'bg_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:187:9 'bg_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:188:9 'bg_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:224:17 [warning] null-deref: Possible null dereference: 'bg_image_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:221:17 'bg_image_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:225:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:226:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:227:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:228:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:229:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:230:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:231:17 'bg_image_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:232:17 'bg_image_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:247:17 [warning] null-deref: Possible null dereference: 'bg_label_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:244:17 'bg_label_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:248:17 'bg_label_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:249:17 'bg_label_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:250:17 'bg_label_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:251:17 'bg_label_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:263:9 [warning] null-deref: Possible null dereference: 'border_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:261:9 'border_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:264:9 'border_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:265:9 'border_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:266:9 'border_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:267:9 'border_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:268:9 'border_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:269:9 'border_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:285:9 [warning] null-deref: Possible null dereference: 'outline_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:279:9 'outline_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:283:9 'outline_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:284:9 'outline_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:287:9 'outline_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:288:9 'outline_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:289:9 'outline_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/lv_draw_rect.c:290:9 'outline_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_arc.c:212:31 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_arc.c:116:5 'mask_buf' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:607:44 [warning] null-deref: Possible null dereference: 'mask_line' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:594:5 'mask_line' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:604:34 'mask_line' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:606:20 'mask_line' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:723:33 [warning] null-deref: Possible null dereference: 'sh_ups_blur_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:664:5 'sh_ups_blur_buf' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:674:13 'sh_ups_blur_buf' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_box_shadow.c:705:13 'sh_ups_blur_buf' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:246:69 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:86:5 'mask_buf' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:90:9 'mask_buf' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:204:13 'mask_buf' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:314:8 'mask_buf' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:200:69 'mask_buf' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:246:83 [warning] null-deref: Possible null dereference: 'grad_opa_map' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:108:5 'grad_opa_map' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:204:13 'grad_opa_map' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:200:83 'grad_opa_map' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:294:42 [warning] null-deref: Possible null dereference: 'grad' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:110:8 'grad' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:204:13 'grad' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:318:8 'grad' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:172:39 'grad' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:173:37 'grad' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:213:39 'grad' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:214:37 'grad' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:292:39 'grad' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_fill.c:293:59 'grad' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_line.c:164:21 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_line.c:144:9 'mask_buf' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_line.c:368:25 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_line.c:348:5 'mask_buf' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_line.c:366:60 'mask_buf' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1212:34 [warning] null-deref: Possible null dereference: 'cir_x' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1095:5 'cir_x' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1096:24 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1123:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1131:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1137:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1145:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1151:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1159:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1165:13 'cir_x' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask.c:1178:8 'cir_x' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask_rect.c:108:40 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask_rect.c:90:5 'mask_buf' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_mask_rect.c:107:20 'mask_buf' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:155:31 [warning] null-deref: Possible null dereference: 'grad' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:141:8 'grad' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:185:8 'grad' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:156:29 'grad' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:165:72 [warning] null-deref: Possible null dereference: 'mask_buf' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/draw/sw/lv_draw_sw_triangle.c:124:5 'mask_buf' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:413:12 [warning] null-deref: Possible null dereference: 'glyph_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:322:5 'glyph_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:332:47 'glyph_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:438:54 [warning] null-deref: Possible null dereference: 'glyph_bmp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:393:5 'glyph_bmp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:421:32 'glyph_bmp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:427:17 'glyph_bmp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:432:13 'glyph_bmp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:520:13 [warning] null-deref: Possible null dereference: 'glyph_offset' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:511:5 'glyph_offset' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:551:9 [warning] null-deref: Possible null dereference: 'font_dsc' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:461:5 'font_dsc' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:487:5 'font_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:488:5 'font_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:489:5 'font_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:552:9 'font_dsc' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:553:9 'font_dsc' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:602:9 [warning] null-deref: Possible null dereference: 'kern_pair' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:579:9 'kern_pair' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:603:9 'kern_pair' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:604:9 'kern_pair' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:605:9 'kern_pair' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:640:9 [warning] null-deref: Possible null dereference: 'kern_classes' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:617:9 'kern_classes' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:641:9 'kern_classes' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:642:9 'kern_classes' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:643:9 'kern_classes' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/font/lv_binfont_loader.c:644:9 'kern_classes' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/layouts/grid/lv_grid.c:294:9 [warning] null-deref: Possible null dereference: 'col_templ_sub' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/layouts/grid/lv_grid.c:292:9 'col_templ_sub' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/layouts/grid/lv_grid.c:386:9 [warning] null-deref: Possible null dereference: 'row_templ_sub' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/layouts/grid/lv_grid.c:384:9 'row_templ_sub' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:296:28 [warning] null-deref: Possible null dereference: 'decoder_data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:290:13 'decoder_data' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:335:9 'decoder_data' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:338:9 [warning] null-deref: Possible null dereference: 'decoder_data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:337:9 'decoder_data' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:360:5 [warning] null-deref: Possible null dereference: 'decoder_data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/libs/bin_decoder/lv_bin_decoder.c:359:5 'decoder_data' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_cache_entry.c:147:1 [warning] memory-leak: Memory leak: allocation stored in 'res' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/cache/lv_cache_entry.c:138:5 'res' allocated here
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_text.c:219:13 [warning] null-deref: Possible null dereference: 'word_w_ptr' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_text.c:225:12 'word_w_ptr' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/misc/lv_text.c:269:8 'word_w_ptr' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/observer/lv_observer.c:587:5 [warning] null-deref: Possible null dereference: 'observable' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/others/observer/lv_observer.c:586:5 'observable' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/buttonmatrix/lv_buttonmatrix.c:159:60 [warning] div-by-zero: Possible division by zero: 'unit_cnt' may be zero on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/buttonmatrix/lv_buttonmatrix.c:133:9 'unit_cnt' assigned zero here
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/buttonmatrix/lv_buttonmatrix.c:160:70 [warning] div-by-zero: Possible division by zero: 'unit_cnt' may be zero on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/buttonmatrix/lv_buttonmatrix.c:133:9 'unit_cnt' assigned zero here
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/dropdown/lv_dropdown.c:1026:20 [warning] null-deref: Possible null dereference: 'label' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/dropdown/lv_dropdown.c:1024:5 'label' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/keyboard/lv_keyboard.c:481:13 [warning] null-deref: Possible null dereference: 'ctrl_map' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/keyboard/lv_keyboard.c:475:9 'ctrl_map' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/menu/lv_menu.c:383:5 [warning] null-deref: Possible null dereference: 'event_data' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/menu/lv_menu.c:382:5 'event_data' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/menu/lv_menu.c:384:5 'event_data' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/roller/lv_roller.c:173:9 [warning] null-deref: Possible null dereference: 'opt_extra' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/roller/lv_roller.c:167:9 'opt_extra' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/roller/lv_roller.c:170:24 'opt_extra' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/roller/lv_roller.c:171:13 'opt_extra' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/textarea/lv_textarea.c:1112:5 [warning] null-deref: Possible null dereference: 'txt_tmp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/textarea/lv_textarea.c:1106:5 'txt_tmp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lvgl-9.2.2/src/widgets/textarea/lv_textarea.c:1110:20 'txt_tmp' is also dereferenced here (same origin)
+----------------------------------------
