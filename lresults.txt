@@ -1,0 +1,5 @@
+LEARN_RESULT target=zlib findings=12 broken=1 processed=64 exit=1
+LEARN_RESULT target=mbedtls findings=0 broken=1 processed=108 exit=2
+LEARN_RESULT target=stb_image findings=0 broken=0 processed=0 exit=0
+LEARN_RESULT target=lua findings=36 broken=1 processed=40 exit=1
+LEARN_RESULT target=sqlite findings=132 broken=0 seconds=234 exit=1
