@@ -100,3 +100,71 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/realworld/${{ job.status }}"
+
+  # --- AR.2 doctrine probe: assertion-enabled re-scan of curl. The scan
+  # survey found curl's ~83 null-derefs are the assert-nonnull FP family
+  # (DEBUGASSERT compiled out by default). This re-scans with
+  # -DENABLE_DEBUG=ON (curl's DEBUGBUILD -> DEBUGASSERT live). AR.1
+  # proved a live assert narrows, so if the doctrine holds the null-deref
+  # count collapses. Honest note (from PLAN-assert.md): DEBUGBUILD also
+  # enables other debug code, so NEW findings/coverage shifts are
+  # possible - measured and reported, never suppressed. ---
+  ar2-curl:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build libssl-dev
+      - name: Build CodeSkeptic
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build
+      - name: curl re-scan, assertions DISABLED (baseline) vs ENABLED
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 \
+            https://github.com/curl/curl/archive/refs/tags/curl-8_11_0.tar.gz | tar xz
+          cd curl-curl-8_11_0
+          # baseline: default (assertions off)
+          cmake -B b_off -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF -DCURL_USE_LIBPSL=OFF \
+            >/dev/null 2>&1 || true
+          # assertion-enabled: DEBUGBUILD -> DEBUGASSERT live
+          cmake -B b_on -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF -DCURL_USE_LIBPSL=OFF \
+            -DENABLE_DEBUG=ON >/dev/null 2>&1 || true
+          cd ..
+          for mode in off on; do
+            code=0
+            ./build/src/codeskeptic curl-curl-8_11_0/lib \
+              --build-path "curl-curl-8_11_0/b_$mode" \
+              --alloc-functions Curl_cmalloc,Curl_ccalloc,Curl_crealloc,Curl_cstrdup \
+              --free-functions Curl_cfree \
+              --report-paths "$PWD/curl-curl-8_11_0/lib" \
+              2>&1 | tee "curl_$mode.log" || code=$?
+            nd=$(grep -cE ' \[warning\] null-deref' "curl_$mode.log" || true)
+            tot=$(grep -cE ' \[(warning|error)\] ' "curl_$mode.log" || true)
+            brk=$(grep -c "failed to COMPILE" "curl_$mode.log" || true)
+            proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" "curl_$mode.log" || true)
+            echo "AR2_RESULT mode=assertions_$mode null_deref=$nd total=$tot broken=$brk processed=$proc exit=$code" | tee -a ar2.txt
+          done
+      - name: Publish -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in off on; do
+            [ -f "curl_$f.log" ] && tail -c 50000 "curl_$f.log" > "curl_$f.tail.log" || true
+          done
+          git config user.name "ci-logs"; git config user.email "ci@localhost"
+          git checkout --detach -q
+          for f in ar2.txt curl_off.tail.log curl_on.tail.log; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git commit -qm "ar2 curl probe @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/ar2-curl"
+      - name: Mirror status
+        if: always()
+        run: git push --force origin "HEAD:refs/status/${{ github.sha }}/ar2-curl/${{ job.status }}"
