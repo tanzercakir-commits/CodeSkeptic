@@ -1,0 +1,587 @@
+tion]
+1 warning generated.
+[98/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/httpclient.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[99/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/auth_ntlmclient.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[100/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/smart_pkt.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[101/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/smart_protocol.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[102/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/ssh.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[103/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/git.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[104/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/http.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[105/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/winhttp.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[106/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/auth_sspi.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[107/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/ssh_exec.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[108/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/httpparser.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[109/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transports/local.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[110/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object_api.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[111/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/worktree.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[112/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/strarray.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[113/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transaction.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[114/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[115/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge_driver.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[116/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reset.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[117/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/clone.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[118/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/revert.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[119/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_snapshot.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[120/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree-cache.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[121/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/patch_generate.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[122/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/delta.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[123/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/indexer.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[124/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[125/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/checkout.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[126/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/odb.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[127/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/filter.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[128/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[129/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/refdb.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[130/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/odb_pack.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[131/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/email.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[132/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/refspec.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[133/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/odb_mempack.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[134/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/buf.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[135/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[136/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_file.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[137/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/transport.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[138/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/patch.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[139/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_driver.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[140/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/branch.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[141/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reader.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[142/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_parse.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[143/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/trailer.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[144/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[145/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index_map.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[146/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[147/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ident.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[148/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[149/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/stash.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[150/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_list.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[151/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/path.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[152/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[153/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[154/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[155/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[156/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[157/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[158/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/status.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[159/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[160/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/rebase.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[161/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blob.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[162/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/fetchhead.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[163/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[164/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/openssl_dynamic.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[165/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/socket.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[166/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/schannel.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[167/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/openssl_legacy.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[168/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/mbedtls.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[169/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/tls.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[170/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/registry.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[171/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/openssl.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[172/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/streams/stransport.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[173/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/sysdir.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[174/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_list.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[175/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/crlf.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[176/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/mwindow.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[177/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/signature.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[178/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tag.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[179/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/oidarray.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[180/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_xdiff.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[181/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/refs.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[182/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[183/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_parse.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[184/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/apply.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[185/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_cache.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[186/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/proxy.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[187/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/revparse.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[188/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_stats.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[189/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/attr.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[190/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[191/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/settings.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[192/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/trace.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[193/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/fetch.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[194/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_print.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[195/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/notes.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[196/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/grafts.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[197/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/remote.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[198/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_file.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[199/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/cherrypick.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[200/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge_file.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[201/201] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/cache.c.
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+warning: unknown warning option '-Wc99-c11-compat'; did you mean '-Wpre-c11-compat'? [-Wunknown-warning-option]
+1 warning generated.
+[CodeSkeptic] 16 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/process.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/path_w32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_buffer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/dir.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/w32_util.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/map.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/utf-conv.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/posix_w32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/precompiled.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/win32/thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/common_crypto.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/builtin.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/hash/win32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/unix/sighandler.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/cli/win32/sighandler.c
+CodeSkeptic: 34 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/attrcache.c:157:8 [warning] null-deref: Possible null dereference: 'entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/attrcache.c:148:2 'entry' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:612:1 [warning] memory-leak: Memory leak: allocation stored in 'sg_origin' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:540:3 'sg_origin' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/blame_git.c:610:3 'sg_origin' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/clone.c:551:47 [warning] null-deref: Possible null dereference: 'opts' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/clone.c:498:15 'opts' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:616:9 [warning] null-deref: Possible null dereference: 'msg' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:610:8 'msg' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:610:56 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:611:26 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:614:10 'msg' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:673:20 [warning] null-deref: Possible null dereference: 'msg' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:665:8 'msg' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:665:42 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:666:38 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:670:10 'msg' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit.c:671:9 'msg' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:286:2 [warning] null-deref: Possible null dereference: 'last_chunk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:243:2 'last_chunk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/commit_graph.c:251:7 'last_chunk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_list.c:178:2 [warning] null-deref: Possible null dereference: 'map_head' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/config_list.c:174:3 'map_head' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:118:3 [warning] null-deref: Possible null dereference: 'e' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:103:2 'e' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:110:4 'e' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:116:7 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:117:17 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:119:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:120:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:121:16 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:122:13 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:123:3 'e' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/describe.c:124:16 'e' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1665:23 [warning] null-deref: Possible null dereference: 'idx2wd' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1634:10 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1652:14 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1655:4 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1667:13 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1674:9 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1700:6 'idx2wd' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1666:20 'idx2wd' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1695:23 [warning] null-deref: Possible null dereference: 'head2idx' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1633:10 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1651:14 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1655:4 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1673:9 'head2idx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1658:23 'head2idx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1659:20 'head2idx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_generate.c:1696:20 'head2idx' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1096:18 [warning] null-deref: Possible null dereference: 'tgt2src_copy' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:836:2 'tgt2src_copy' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:890:3 'tgt2src_copy' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:891:3 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:899:15 'tgt2src_copy' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:946:8 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:980:12 'tgt2src_copy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1092:8 'tgt2src_copy' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'src2tgt' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:884:2 'src2tgt' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1136:2 'src2tgt' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'tgt2src' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:886:2 'tgt2src' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1135:2 'tgt2src' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1151:1 [warning] memory-leak: Memory leak: allocation stored in 'tgt2src_copy' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:890:3 'tgt2src_copy' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/diff_tform.c:1137:2 'tgt2src_copy' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:230:4 [warning] null-deref: Possible null dereference: 'match' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:176:2 'match' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:197:7 'match' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:235:4 'match' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:202:3 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:208:4 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:211:5 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:221:8 'match' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/ignore.c:222:13 'match' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3462:5 [warning] null-deref: Possible null dereference: 'old_entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3444:7 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3446:13 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3448:12 'old_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3461:23 'old_entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3462:24 [warning] null-deref: Possible null dereference: 'new_entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3444:7 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3446:12 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3448:12 'new_entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/index.c:3461:39 'new_entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2462:1 [warning] memory-leak: Memory leak: allocation stored in 'cur_items' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2390:2 'cur_items' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2456:2 'cur_items' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2462:1 [warning] memory-leak: Memory leak: allocation stored in 'iterator_item' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2389:2 'iterator_item' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/iterator.c:2455:2 'iterator_item' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:515:1 [warning] memory-leak: Memory leak: allocation stored in 'redundant' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:457:2 'redundant' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:511:2 'redundant' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1615:1 [warning] memory-leak: Memory leak: allocation stored in 'similarity_ours' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1563:2 'similarity_ours' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1611:2 'similarity_ours' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1615:1 [warning] memory-leak: Memory leak: allocation stored in 'similarity_theirs' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1567:2 'similarity_theirs' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/merge.c:1612:2 'similarity_theirs' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:265:2 [warning] null-deref: Possible null dereference: 'last_chunk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:216:2 'last_chunk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/midx.c:229:7 'last_chunk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/mwindow.c:284:3 [warning] null-deref: Possible null dereference: 'list' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/mwindow.c:264:54 'list' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:536:21 [warning] null-deref: Possible null dereference: 'repo' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:534:2 'repo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/object.c:537:32 'repo' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:774:53 [warning] null-deref: Possible null dereference: 'elem' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:674:26 'elem' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:826:6 'elem' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:730:13 'elem' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:731:65 'elem' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pack.c:733:16 'elem' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:487:5 [warning] null-deref: Possible null dereference: 'm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:404:2 'm' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:419:10 'm' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:420:3 'm' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:658:5 [warning] null-deref: Possible null dereference: 'm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:592:2 'm' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:607:10 'm' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/pathspec.c:608:3 'm' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:236:6 [warning] null-deref: Possible null dereference: 'push_spec' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:169:2 'push_spec' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:203:24 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:212:40 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:230:6 'push_spec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/push.c:231:6 'push_spec' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:230:15 [warning] null-deref: Possible null dereference: 'entry' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:196:2 'entry' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:198:6 'entry' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:220:2 'entry' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:225:18 'entry' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:230:32 [warning] null-deref: Possible null dereference: 'previous' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/reflog.c:229:2 'previous' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3914:1 [warning] memory-leak: Memory leak: allocation stored in 'tmp_name' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3898:3 'tmp_name' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/repository.c:3910:2 'tmp_name' freed here
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1302:13 [warning] null-deref: Possible null dereference: 'popped' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1290:38 'popped' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1291:10 'popped' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1303:17 'popped' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1305:38 'popped' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/libgit2/tree.c:1306:24 'popped' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:576:1 [warning] memory-leak: Memory leak: allocation stored in 'tmp_buffer' may not be freed
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:557:5 'tmp_buffer' allocated here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:567:3 'tmp_buffer' freed here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/libgit2-1.9.0/src/util/filebuf.c:573:2 'tmp_buffer' freed here
+----------------------------------------
