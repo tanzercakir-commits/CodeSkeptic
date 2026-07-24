@@ -2126,3 +2126,45 @@ TEST(NullDerefRuleTest, NullPassthrough_MixedNonNullPaths_Warns) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+// --- Live assert narrows (AR.1 pin, 2026-07-25 scan survey) ---
+// A COMPILED-IN assert(ptr) already establishes non-null on the
+// fall-through edge today: assert's failure path is noreturn
+// (__assert_fail), so the engine's noreturn handling kills the
+// may-be-null edge and the deref after it is clean. This pins that
+// correct behavior against regression — the survey's five-witness FP
+// family is about asserts COMPILED OUT (invisible to the AST), a
+// separate gap tracked in docs/PLAN-assert.md, NOT this path.
+TEST(NullDerefRuleTest, LiveAssertNonNull_NarrowsClean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        extern void __assert_fail(const char*, const char*, unsigned,
+                                  const char*) __attribute__((noreturn));
+        #define assert(e) ((e) ? (void)0 : __assert_fail(#e,__FILE__,__LINE__,__func__))
+        int f(void) {
+            int* p = (int*)malloc(4);
+            assert(p != (void*)0);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, NoAssertControl_StillWarns) {
+    // The control: without the assert, the unchecked malloc deref
+    // MUST still warn — proves the clean result above comes from the
+    // assert, not from the engine going quiet on malloc.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        int g(void) {
+            int* q = (int*)malloc(4);
+            return *q;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}

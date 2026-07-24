@@ -34,7 +34,7 @@ invariant AST'de HİÇ YOK; motor görmediğini daraltamaz:
 
 ## Dilimler (ölçüm-öncelikli sıra)
 
-### AR.1 — Canlı-assert davranışını pinle (TRİVİAL, ~%0.5)
+### AR.1 — Canlı-assert davranışını pinle (TRİVİAL, ~%0.5) — ✔ TAMAM (2026-07-25)
 Yukarıdaki deneyi çift yönlü kalıcı teste çevir (canlı assert →
 sessiz; assert'siz kontrol → uyarı). Bugünkü doğru davranış
 regresyona kapansın.
