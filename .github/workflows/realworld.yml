@@ -137,6 +137,7 @@ jobs:
           cmake -B build-ros -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=toolchain-clang.cmake \
             -DARCH=i386 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
             2>&1 | tee /tmp/ros_cfg.log || code=$?
           echo "CONFIGURE_EXIT=$code" | tee -a /tmp/ros_cfg.log
           if [ -f build-ros/compile_commands.json ]; then
