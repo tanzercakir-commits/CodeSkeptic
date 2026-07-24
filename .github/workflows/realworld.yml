@@ -184,3 +184,119 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/friend/${{ job.status }}"
+
+  # --- Lessons battery: five small targets, each chosen to exercise a
+  # DIFFERENT engine muscle. The learning is the product: macro state
+  # machines (zlib), ret-code/goto-cleanup contracts (mbedTLS),
+  # CVE-class parser + untrusted lengths (stb_image), the no-compile-db
+  # fallback on portable C89 + setjmp (lua), and single-giant-TU
+  # convergence/perf (sqlite amalgamation, timeout-guarded). Every
+  # target prints processed/broken so a 0 is never mistaken for clean.
+  scan-lessons:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
+            libzstd-dev zlib1g-dev ninja-build
+
+      - name: Build CodeSkeptic
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build
+
+      - name: zlib (macro state machines)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz | tar xz
+          cmake -S zlib-1.3.1 -B zlib-1.3.1/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON >/dev/null 2>&1 || true
+          code=0
+          ./build/src/codeskeptic zlib-1.3.1 --build-path zlib-1.3.1/build \
+            --report-paths "$PWD/zlib-1.3.1" 2>&1 | tee zlib.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' zlib.log || true)
+          broken=$(grep -c "failed to COMPILE" zlib.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" zlib.log || true)
+          echo "LEARN_RESULT target=zlib findings=$n broken=$broken processed=$proc exit=$code" | tee -a lresults.txt
+
+      - name: mbedTLS (ret-code contract style)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.2.tar.gz | tar xz
+          cmake -S mbedtls-3.6.2 -B mbedtls-3.6.2/build -G Ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_TESTING=OFF \
+            -DENABLE_PROGRAMS=OFF >/dev/null 2>&1 || true
+          code=0
+          ./build/src/codeskeptic mbedtls-3.6.2/library \
+            --build-path mbedtls-3.6.2/build \
+            --report-paths "$PWD/mbedtls-3.6.2/library" 2>&1 | tee mbedtls.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' mbedtls.log || true)
+          broken=$(grep -c "failed to COMPILE" mbedtls.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" mbedtls.log || true)
+          echo "LEARN_RESULT target=mbedtls findings=$n broken=$broken processed=$proc exit=$code" | tee -a lresults.txt
+
+      - name: stb_image (CVE-class parser, untrusted lengths)
+        run: |
+          set -o pipefail
+          mkdir -p stbwork
+          curl -sL --retry 3 -o stbwork/stb_image.h \
+            https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
+          printf '#define STB_IMAGE_IMPLEMENTATION\n#include "stb_image.h"\n' > stbwork/driver.c
+          code=0
+          ./build/src/codeskeptic stbwork --report-paths "$PWD/stbwork" \
+            2>&1 | tee stb.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' stb.log || true)
+          broken=$(grep -c "failed to COMPILE" stb.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" stb.log || true)
+          echo "LEARN_RESULT target=stb_image findings=$n broken=$broken processed=$proc exit=$code" | tee -a lresults.txt
+
+      - name: lua (no-db fallback on portable C89)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 https://github.com/lua/lua/archive/refs/tags/v5.4.7.tar.gz | tar xz
+          code=0
+          ./build/src/codeskeptic lua-5.4.7 --report-paths "$PWD/lua-5.4.7" \
+            2>&1 | tee lua.log || code=$?
+          n=$(grep -cE ' \[(warning|error)\] ' lua.log || true)
+          broken=$(grep -c "failed to COMPILE" lua.log || true)
+          proc=$(grep -cE "^\[[0-9]+/[0-9]+\] Processing" lua.log || true)
+          echo "LEARN_RESULT target=lua findings=$n broken=$broken processed=$proc exit=$code" | tee -a lresults.txt
+
+      - name: sqlite amalgamation (single-giant-TU stress, 10 min cap)
+        run: |
+          set -o pipefail
+          curl -sL --retry 3 -o sq.zip https://sqlite.org/2024/sqlite-amalgamation-3470000.zip
+          unzip -q sq.zip && mv sqlite-amalgamation-3470000 sqwork
+          code=0
+          start=$(date +%s)
+          timeout 600 ./build/src/codeskeptic sqwork/sqlite3.c \
+            --report-paths "$PWD/sqwork" 2>&1 | tee sqlite.log || code=$?
+          dur=$(( $(date +%s) - start ))
+          n=$(grep -cE ' \[(warning|error)\] ' sqlite.log || true)
+          broken=$(grep -c "failed to COMPILE" sqlite.log || true)
+          echo "LEARN_RESULT target=sqlite findings=$n broken=$broken seconds=$dur exit=$code" | tee -a lresults.txt
+
+      - name: Publish results + logs -> refs/ci-logs/*
+        if: always()
+        run: |
+          for f in zlib mbedtls stb lua sqlite; do
+            [ -f "$f.log" ] && tail -c 40000 "$f.log" > "$f.tail.log" || true
+          done
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          for f in lresults.txt zlib.tail.log mbedtls.tail.log stb.tail.log lua.tail.log sqlite.tail.log; do
+            [ -f "$f" ] && git add -f "$f"
+          done
+          git commit -qm "lessons battery @ ${{ github.sha }}" || true
+          git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/lessons"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/lessons/${{ job.status }}"
