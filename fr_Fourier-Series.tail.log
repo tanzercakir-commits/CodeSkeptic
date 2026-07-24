@@ -1,0 +1,191 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (24 files, 9 rules)
+[1/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/tests/fourier_core_tests.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/tests/fourier_core_tests.cpp:10:10: fatal error: 'config.hpp' file not found
+   10 | #include "config.hpp"
+      |          ^~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/tests/fourier_core_tests.cpp.
+[2/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/build/CMakeFiles/3.31.6/CompilerIdCXX/CMakeCXXCompilerId.cpp.
+[3/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/build/CMakeFiles/3.31.6/CompilerIdC/CMakeCCompilerId.c.
+[4/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/chart_renderer.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/chart_renderer.cpp:7:10: fatal error: 'raylib.h' file not found
+    7 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/chart_renderer.cpp.
+[5/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/wave_renderer.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/wave_renderer.cpp:9:10: fatal error: 'raylib.h' file not found
+    9 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/wave_renderer.cpp.
+[6/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/formula_renderer.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/formula_renderer.cpp:10:10: fatal error: 'raylib.h' file not found
+   10 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/formula_renderer.cpp.
+[7/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/settings.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/settings.cpp:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/settings.hpp:10:10: fatal error: 'boost/circular_buffer.hpp' file not found
+   10 | #include <boost/circular_buffer.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/settings.cpp.
+[8/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/drawing_input.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/drawing_input.cpp:8:10: fatal error: 'imgui.h' file not found
+    8 | #include <imgui.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/drawing_input.cpp.
+[9/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/gui.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/gui.cpp:8:10: fatal error: 'imgui.h' file not found
+    8 | #include <imgui.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/gui.cpp.
+[10/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/formula_tex.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/formula_tex.cpp:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.hpp:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/compute_params.hpp:16:14: error: no template named 'span' in namespace 'std'
+   16 |         std::span<const bool> enabled_mask;
+      |         ~~~~~^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/formula_tex.cpp:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.hpp:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/compute_result.hpp:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/epicycle_step.hpp:7:10: fatal error: 'raylib.h' file not found
+    7 | #include <raylib.h>
+      |          ^~~~~~~~~~
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/formula_tex.cpp.
+[11/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/triangle.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/triangle.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/triangle.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/triangle.cpp.
+[12/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/full_wave_rectified_sine.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/full_wave_rectified_sine.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/full_wave_rectified_sine.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/full_wave_rectified_sine.cpp.
+[13/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/half_wave_rectified_sine.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/half_wave_rectified_sine.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/half_wave_rectified_sine.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/half_wave_rectified_sine.cpp.
+[14/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/parabolic.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/parabolic.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/parabolic.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/parabolic.cpp.
+[15/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/sawtooth.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/sawtooth.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/sawtooth.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/sawtooth.cpp.
+[16/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/cosine.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/cosine.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/cosine.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/cosine.cpp.
+[17/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/ataturk_signature.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/ataturk_signature.cpp:8:10: fatal error: 'raylib.h' file not found
+    8 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/ataturk_signature.cpp.
+[18/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/user_path.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/user_path.cpp:6:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/user_path.hpp:9:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    9 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/user_path.cpp.
+[19/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/heart.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/heart.cpp:7:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/heart.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/heart.cpp.
+[20/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/square.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/square.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/square.hpp:8:10: fatal error: 'waves/harmonic_term.hpp' file not found
+    8 | #include "waves/harmonic_term.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/square.cpp.
+[21/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/semicircle.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/semicircle.cpp:5:10: fatal error: 'boost/math/special_functions/bessel.hpp' file not found
+    5 | #include <boost/math/special_functions/bessel.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/semicircle.cpp.
+[22/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/dft.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/dft.cpp:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/dft.hpp:9:10: fatal error: 'raylib.h' file not found
+    9 | #include <raylib.h>
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/dft.cpp.
+[23/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.cpp:7:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.hpp:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/compute_params.hpp:16:14: error: no template named 'span' in namespace 'std'
+   16 |         std::span<const bool> enabled_mask;
+      |         ~~~~~^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.cpp:7:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.hpp:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/compute_result.hpp:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/epicycle_step.hpp:7:10: fatal error: 'raylib.h' file not found
+    7 | #include <raylib.h>
+      |          ^~~~~~~~~~
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.cpp.
+[24/24] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/main.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/main.cpp:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/gui.hpp:8:10: fatal error: 'gui/settings.hpp' file not found
+    8 | #include "gui/settings.hpp"
+      |          ^~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/main.cpp.
+[CodeSkeptic] 22 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/tests/fourier_core_tests.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/chart_renderer.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/wave_renderer.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/renderers/formula_renderer.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/settings.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/drawing_input.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/gui/gui.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/formula_tex.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/triangle.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/full_wave_rectified_sine.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/half_wave_rectified_sine.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/parabolic.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/sawtooth.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/cosine.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/ataturk_signature.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/user_path.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/heart.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/square.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/shapes/semicircle.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/dft.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/waves/wave_variant.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_Fourier-Series/source/main.cpp
+CodeSkeptic: Clean! No issues found.

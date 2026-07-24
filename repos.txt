@@ -1,0 +1,10 @@
+Analysis-of-Finding-Quadratic-Regression-Polynomial	MATLAB	false
+Digital-Clock-Using-Microcontroller	Assembly	false
+Fourier-Series	C++	false
+Motion-of-Objects-in-Frictional-and-Frictionless-Environments	MATLAB	false
+raylib-modern	C++	false
+real-black-clion-theme	Java	false
+recastnavigation	-	true
+Rust-Snake	Rust	false
+Testing-and-Comparison-of-True-and-Pseudo-Random-Number-Generators	MATLAB	false
+TeXRender	C++	false

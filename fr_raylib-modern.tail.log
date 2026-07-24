@@ -1,0 +1,339 @@
+                       ~~~~~^
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raudio.cpp:222:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/stb_vorbis.c:1404:75: warning: pointer comparison always evaluates to false [-Wtautological-compare]
+ 1404 |       if (f->stream_start + loc >= f->stream_end || f->stream_start + loc < f->stream_start) {
+      |                                                                           ^
+1 warning and 3 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raudio.cpp.
+[190/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/posix_time.c.
+[191/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/posix_thread.c.
+[192/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/posix_poll.c.
+[193/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/wl_monitor.c.
+[194/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c.
+[195/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/null_joystick.c.
+[196/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/platform.c.
+[197/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/null_window.c.
+[198/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/wgl_context.c.
+[199/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_joystick.c.
+[200/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_module.c.
+[201/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/xkb_unicode.c.
+[202/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/null_init.c.
+[203/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/x11_monitor.c.
+[204/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/wl_init.c.
+[205/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_monitor.c.
+[206/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/x11_window.c.
+[207/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/linux_joystick.c.
+[208/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/context.c.
+[209/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_init.c.
+[210/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_thread.c.
+[211/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/window.c.
+[212/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/posix_module.c.
+[213/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/egl_context.c.
+[214/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_time.c.
+[215/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/input.c.
+[216/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/wl_window.c.
+[217/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/cocoa_time.c.
+[218/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/vulkan.c.
+[219/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/win32_window.c.
+[220/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/null_monitor.c.
+[221/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/glx_context.c.
+[222/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/monitor.c.
+[223/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/x11_init.c.
+[224/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/osmesa_context.c.
+[225/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/deps/getopt.c.
+[226/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/stb_vorbis.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/stb_vorbis.c:1404:75: warning: pointer comparison always evaluates to false [-Wtautological-compare]
+ 1404 |       if (f->stream_start + loc >= f->stream_end || f->stream_start + loc < f->stream_start) {
+      |                                                                           ^
+1 warning generated.
+[227/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp:32:
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raylib.h:129:33: error: no member named 'numbers' in namespace 'std'
+  129 | static constexpr auto PI = std::numbers::pi;
+      |                            ~~~~~^
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raylib.h:752:51: error: no member named 'to_underlying' in namespace 'std'
+  752 | static constexpr auto MATERIAL_MAP_DIFFUSE = std::to_underlying(MaterialMapIndex::MATERIAL_MAP_ALBEDO);
+      |                                              ~~~~~^
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raylib.h:753:52: error: no member named 'to_underlying' in namespace 'std'
+  753 | static constexpr auto MATERIAL_MAP_SPECULAR = std::to_underlying(MaterialMapIndex::MATERIAL_MAP_METALNESS);
+      |                                               ~~~~~^
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp:143:15: warning: using enum declaration is a C++20 extension [-Wc++20-extensions]
+  143 |         using enum TraceLogLevel;
+      |               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp:203:15: warning: using enum declaration is a C++20 extension [-Wc++20-extensions]
+  203 |         using enum TraceLogLevel;
+      |               ^
+2 warnings and 3 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp.
+[228/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c.
+[229/229] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/rexm/rexm.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/rexm/rexm.c:51:10: fatal error: 'raylib.h' file not found
+   51 | #include "raylib.h"
+      |          ^~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/rexm/rexm.c.
+[CodeSkeptic] 188 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_mesh_picking.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_yaw_pitch_roll.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_textured_cube.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_heightmap_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_animation_playing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_first_person_maze.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_loading_vox.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_cubicmap_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_box_collisions.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_rlgl_solar_system.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_waving_cubes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_loading_gltf.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_bone_socket.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_billboard_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_geometric_shapes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_orthographic_projection.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_mesh_generation.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_tesseract_view.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_animation_gpu_skinning.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_skybox_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_loading_m3d.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/models/models_point_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_sound_positioning.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_raw_stream.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_module_playing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_sound_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_music_stream.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_sound_multi.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_mixed_processor.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/audio/audio_stream_effects.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_writing_anim.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_3d_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_unicode_emojis.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_codepoints_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_input_box.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_sprite_fonts.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_font_filters.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_font_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_inline_styling.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_format_text.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_unicode_ranges.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_rectangle_bounds.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_font_spritefont.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/text/text_font_sdf.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_easings_box.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_easings_rectangles.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_colors_palette.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_logo_raylib.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_bouncing_ball.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_rectangle_advanced.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_collision_area.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_splines_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_logo_raylib_anim.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_ring_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_following_eyes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_basic_shapes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_double_pendulum.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_circle_sector_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_rounded_rectangle_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_digital_clock.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_top_down_lights.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_lines_bezier.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_rectangle_scaling.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shapes/shapes_easings_ball.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/examples_template.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_2d_camera_platformer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_gestures.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_vr_simulator.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_storage_values.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_render_texture.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_keys.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_undo_redo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_window_flags.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_high_dpi.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_gestures_testbed.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_camera_mode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_basic_screen_manager.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_scissor_test.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_world_screen.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_multitouch.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_custom_logging.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_gamepad.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_random_sequence.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_2d_camera.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_drop_files.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_mouse.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_picking.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_2d_camera_mouse_zoom.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_custom_frame_control.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_window_letterbox.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_random_values.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_automation_events.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_smooth_pixelperfect.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_camera_split_screen.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_mouse_wheel.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_input_virtual_controls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_camera_fps.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_camera_first_person.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_3d_camera_free.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_window_should_close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/core/core_2d_camera_split_screen.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_kernel.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_polygon_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_gif_player.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_sprite_animation.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_tiled_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_srcrec_dstrec.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_sprite_explosion.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_bunnymark.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_blend_modes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_text.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_channel.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_fog_of_war.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_background_scrolling.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_processing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_raw_data.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_textured_curve.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_npatch_drawing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_to_image.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_generation.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_particles_blending.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_image_rotate.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_sprite_button.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_mouse_painting.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/textures/textures_logo_raylib.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/rlgl_compute_shader.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/rlgl_standalone.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/web_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/raylib_opengl_interop.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/easings_testbed.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/raymath_vector_angle.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/others/embedded_files_loading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_julia_set.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_basic_lighting.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_shadowmap_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_mesh_instancing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_basic_pbr.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_rounded_rectangle.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_palette_switch.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_normalmap_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_lightmap_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_fog_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_spotlight_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_deferred_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_texture_tiling.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_shapes_textures.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_raymarching_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_texture_outline.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_hot_reloading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_postprocessing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_model_shader.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_eratosthenes_sieve.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_hybrid_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_vertex_displacement.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_simple_mask.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_texture_waves.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_texture_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_multi_sample2d.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_depth_writing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_custom_uniform.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/examples/shaders/shaders_depth_rendering.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/VSCode/main.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/CodeBlocks/core_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Geany/core_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/VS2019-Android/raylib_android/raylib_android.NativeActivity/main.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/VS2019-Android/raylib_android/raylib_android.NativeActivity/android_native_app_glue.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/scripts/core_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/CMake/core_basic_window.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/4coder/main.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rshapes.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rcore.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_android.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_desktop_win32.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_drm.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_desktop_rgfw.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_desktop_sdl.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/platforms/rcore_template.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rtext.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rtextures.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rmodels.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/rglfw.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/raudio.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/utils.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/rexm/rexm.c
+CodeSkeptic: 20 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/input.c:494:63 [error] bounds: out-of-bounds array access: proven index range [-inf, -1] lies outside the array bound [0, 0)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/platform.c:103:17 [error] bounds: out-of-bounds array access: proven index range [-inf, -1] lies outside the array bound [0, 0)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/platform.c:113:17 [error] bounds: out-of-bounds array access: proven index range [-inf, -1] lies outside the array bound [0, 0)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/platform.c:114:24 [error] bounds: out-of-bounds array access: proven index range [-inf, -1] lies outside the array bound [0, 0)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/platform.c:153:27 [error] bounds: out-of-bounds array access: proven index range [-inf, -1] lies outside the array bound [0, 0)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:82:21 [warning] bounds: possible buffer overflow: strcat copies an unbounded amount into a fixed 64-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:85:23 [warning] null-deref: Possible null dereference: 'buffer' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:52:9 'buffer' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:60:79 'buffer' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:61:22 'buffer' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/projects/Notepad++/raylib_npp_parser/raylib_npp_parser.c:90:23 'buffer' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:210:9 [warning] null-deref: Possible null dereference: 'paths' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:184:5 'paths' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:221:17 [warning] null-deref: Possible null dereference: 'path' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:217:17 'path' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:235:5 [warning] null-deref: Possible null dereference: 'result' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:234:5 'result' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:374:5 [warning] null-deref: Possible null dereference: 'error' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:361:14 'error' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:363:13 'error' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:366:13 'error' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:375:12 'error' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/src/external/glfw/src/init.c:375:5 [warning] bounds: possible buffer overflow: strcpy copies an unbounded amount into a fixed 1024-byte buffer; the source length is not checked (use a bounded copy or verify it fits)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:387:31 [warning] null-deref: Possible null dereference: 'defineLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:240:5 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'defineLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:270:13 'defineLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:613:34 [warning] null-deref: Possible null dereference: 'structLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:243:5 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'structLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:295:13 'structLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:771:30 [warning] null-deref: Possible null dereference: 'aliasLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:246:5 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'aliasLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:319:13 'aliasLines' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:773:31 'aliasLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:819:35 [warning] null-deref: Possible null dereference: 'enumLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:249:5 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'enumLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:332:13 'enumLines' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:807:22 'enumLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:912:31 [warning] null-deref: Possible null dereference: 'callbackLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:252:5 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'callbackLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:357:17 'callbackLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:968:31 [warning] null-deref: Possible null dereference: 'funcLines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:255:5 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:287:54 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:311:50 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:347:50 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:351:71 'funcLines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:369:13 'funcLines' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1214:17 [warning] null-deref: Possible null dereference: 'text' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1184:5 'text' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1201:17 'text' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1250:13 [warning] null-deref: Possible null dereference: 'lines' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1234:5 'lines' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/fr_raylib-modern/tools/parser/raylib_parser.c:1240:9 'lines' is also dereferenced here (same origin)
+----------------------------------------
