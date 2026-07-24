@@ -30,7 +30,7 @@ adresi-alınmamış çağrılılar; fonksiyon işaretçisi KAPSAM DIŞI (bilinç
 
 ## Dilimler (değer/risk sırasıyla)
 
-### 7A.1 — Null passthrough (işaretçi kimlik sarmalayıcıları)
+### 7A.1 — Null passthrough (işaretçi kimlik sarmalayıcıları) — ✔ TAMAM (2026-07-24, erken dilim)
 `void* keep(void* p) { return p; }` → dönüş nullness'ı argümanınki.
 - Mekanizma: zeroFromParam'ın birebir simetriği (nullFromParam);
   hasat resolveZeroReturn'ün null ikizi (genişlik disiplini POINTER'da

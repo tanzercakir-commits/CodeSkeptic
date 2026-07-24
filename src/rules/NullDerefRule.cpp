@@ -296,6 +296,18 @@ NullState evaluateNullness(const Expr* expr) {
                 }
                 return NullState::MaybeNull;
             }
+            // Null-passthrough (F7A.1): the call's nullness IS argument
+            // #nullFromParam's — `p = keep(fopen(...))` inherits
+            // fopen's MaybeNull, `keep(&buf)` stays NonNull. Finite
+            // recursion over the expression tree; a plain-variable
+            // argument evaluates Unknown here exactly like a direct
+            // `p = q` copy does (stateless evaluator — consistent,
+            // never a manufactured MaybeNull).
+            if (summary->nullFromParam >= 0 &&
+                static_cast<unsigned>(summary->nullFromParam) <
+                    call->getNumArgs())
+                return evaluateNullness(
+                    call->getArg(summary->nullFromParam));
         }
         // No summary (opaque call). A KNOWN intrinsic null source
         // (allocator, getenv, fopen family) can return NULL: MaybeNull so

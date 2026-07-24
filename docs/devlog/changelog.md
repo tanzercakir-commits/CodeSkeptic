@@ -1,5 +1,28 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-24 — F7A.1: null-passthrough summaries (early slice, high effort)
+
+The pointer twin of v0.4.7's zero-passthrough, pulled forward from
+docs/PLAN-f7a.md because the machinery was still warm: summaries gain
+nullFromParam ("the result is null only if argument #k is null"),
+harvested by the same structural pass with POINTER discipline in
+place of width discipline — every hop must be pointer-typed,
+dynamic_cast blocks the claim (it can produce null FROM non-null),
+integer hops block it too. Consumption is one stateless hook:
+evaluateNullness's call case recurses into the argument, so
+`p = keep(fopen(...))` inherits fopen's MaybeNull, `keep(&buf)` stays
+NonNull, chains compose (two-hop pinned), and a plain-variable
+argument stays Unknown exactly like a direct `p = q` copy — never a
+manufactured MaybeNull. vstateOf recurses the same way, so summary
+harvest composes across wrapper chains. Summary file format v5
+(nullFromParam column; v1-v4 accepted, the >=-not-== parse trap
+pinned one version forward this time).
+
+Verification: 728/728 tests (+11: keep/two-hop/guard/written-param/
+plain-var/alloc-through-wrapper/mixed-paths + v5 persistence), thesis
+gate 0 FP, rtp2httpd 0, self-scan clean. Juliet CWE476 floor referees
+in CI. PLAN-f7a.md updated: 7A.1 DONE.
+
 ## 2026-07-24 — v0.4.7: untrusted-length→bounds + zero-passthrough summaries (F7-small)
 
 Two deferred engine slices, both recall moves with pinned precision.

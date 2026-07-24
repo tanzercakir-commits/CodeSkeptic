@@ -66,6 +66,16 @@ public:
         // never manufactured. -1 = no claim.
         int zeroFromParam = -1;
 
+        // The pointer twin (F7A.1): when returnNullness is Unknown
+        // ONLY because some paths return pointer parameter
+        // #nullFromParam's UNMODIFIED entry value (directly or through
+        // a chain of such functions) and every other path is proven
+        // NeverNull, the claim "the result is null only if argument
+        // #nullFromParam is null" is recorded. dynamic_cast and any
+        // non-pointer hop block the claim (either can break the
+        // null-correspondence). -1 = no claim.
+        int nullFromParam = -1;
+
         // Value-conditioned null return (#69b). When returnNullness is
         // MaybeNull AND the harvest PROVED that every null-returning
         // path is guarded by "parameter #nullCondParam outside

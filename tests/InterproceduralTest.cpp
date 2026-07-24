@@ -787,10 +787,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v4\n"
-              "alpha/1\tN\tR\tU\t-\t-\n"
-              "beta/2\tM\tOF\tM\t-\t-\n"
-              "gamma/0\tU\t-\tN\t-\t-\n");
+              "codeskeptic-summaries v5\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -808,7 +808,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v4\nlegacy/1\tN\tR\tU\t-\t-\n");
+              "codeskeptic-summaries v5\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -830,7 +830,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v4\nfoo/1\tU\tO\tU\t-\t-\n");
+              "codeskeptic-summaries v5\nfoo/1\tU\tO\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -873,7 +873,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v4\nkeep/1\tN\tR\tU\t-\t-\n");
+              "codeskeptic-summaries v5\nkeep/1\tN\tR\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1376,4 +1376,42 @@ TEST(SummaryPersistTest, V3File_NullCondStillParses) {
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
     EXPECT_EQ(parsed["cond/1"].nullCondParam, 0);
+}
+
+// --- v5 persistence: the null-passthrough column ---
+
+TEST(SummaryPersistTest, V5File_NullFromParamParses) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v5\n"
+        "keep/1\tU\tR\tU\t-\t-\t0\n"
+        "plain/1\tU\tR\tU\t-\t-\t-\n";
+    auto p = writePersistFile("sum_v5_nf.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
+    EXPECT_EQ(parsed["keep/1"].nullFromParam, 0);
+    EXPECT_EQ(parsed["plain/1"].nullFromParam, -1);
+}
+
+TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v5\n"
+        "bad/1\tN\tR\tU\t-\t-\t0\n";
+    auto p = writePersistFile("sum_v5_nf_bad.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(p, parsed));
+}
+
+TEST(SummaryPersistTest, V4File_ZeroFromParamStillParses) {
+    // The >= regression trap, one version later: v4 files' zeroFromParam
+    // column must keep parsing after the v5 bump.
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v4\n"
+        "id/1\tU\tR\tU\t-\t0\n";
+    auto p = writePersistFile("sum_v4_zf_compat.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
+    EXPECT_EQ(parsed["id/1"].zeroFromParam, 0);
 }

@@ -88,6 +88,15 @@ VState vstateOf(const Expr* expr, const SummaryTable& previous) {
                 return VState::NonBad;
             if (summary->returnNullness == ReturnNullness::MaybeNull)
                 return VState::MaybeBad;
+            // Null-passthrough: the call's nullness IS argument
+            // #nullFromParam's (`p = keep(fopen(...))` -> MaybeBad).
+            // Finite recursion over the expression tree; a variable
+            // argument stays Unknown here (stateless evaluator).
+            if (summary->nullFromParam >= 0 &&
+                static_cast<unsigned>(summary->nullFromParam) <
+                    call->getNumArgs())
+                return vstateOf(call->getArg(summary->nullFromParam),
+                                previous);
         }
         return VState::Unknown;
     }
@@ -356,20 +365,6 @@ AggregateFlags computeReturnFlow(const FunctionDecl* func, ASTContext& ctx,
     return aggregateFlags(analysis.contributions);
 }
 
-ReturnNullness computeReturnNullness(const FunctionDecl* func,
-                                     ASTContext& ctx,
-                                     const SummaryTable& previous) {
-    if (!func->getReturnType()->isPointerType())
-        return ReturnNullness::Unknown;
-
-    AggregateFlags flags = computeReturnFlow<vstateOf, applyNullCond>(
-        func, ctx, previous,
-        [](QualType t) { return t->isPointerType(); });
-    if (flags.empty) return ReturnNullness::Unknown;
-    if (flags.sawBad) return ReturnNullness::MaybeNull;
-    if (flags.allNonBad) return ReturnNullness::NeverNull;
-    return ReturnNullness::Unknown;
-}
 
 // --- Zero-passthrough harvest (the zeroness-through-summaries slice) ---
 //
@@ -400,6 +395,102 @@ std::set<const VarDecl*> unwrittenParams(const FunctionDecl* func) {
     if (func->getBody()) v.TraverseStmt(func->getBody());
     return params;
 }
+
+// Null-passthrough resolver (F7A.1) — the pointer twin of
+// resolveZeroReturn. POINTER DISCIPLINE replaces width discipline:
+// every node must be pointer-typed and every cast a plain
+// pointer-to-pointer conversion. dynamic_cast is Blocked (it can
+// produce null FROM non-null), as is any integer hop (an intptr
+// round-trip's null-correspondence is not this pass's business).
+enum class PtrRes { NonNull, Passthrough, Blocked };
+
+PtrRes resolveNullReturn(const Expr* e, const FunctionDecl* func,
+                         const std::set<const VarDecl*>& unwritten,
+                         const SummaryTable& previous, int* pt) {
+    if (!e) return PtrRes::Blocked;
+    e = e->IgnoreParens();
+    if (!e->getType()->isPointerType()) return PtrRes::Blocked;
+
+    if (const auto* cast = dyn_cast<CastExpr>(e)) {
+        if (isa<CXXDynamicCastExpr>(e)) return PtrRes::Blocked;
+        const Expr* sub = cast->getSubExpr();
+        if (!sub->getType()->isPointerType()) {
+            // Array decay / new / string are NonNull via the
+            // structural evaluator below, not through the cast walk.
+            return vstateOf(e, previous) == VState::NonBad
+                       ? PtrRes::NonNull
+                       : PtrRes::Blocked;
+        }
+        return resolveNullReturn(sub, func, unwritten, previous, pt);
+    }
+    if (const auto* ref = dyn_cast<DeclRefExpr>(e)) {
+        const auto* parm = dyn_cast<ParmVarDecl>(ref->getDecl());
+        if (!parm || !unwritten.count(parm))
+            return vstateOf(e, previous) == VState::NonBad
+                       ? PtrRes::NonNull
+                       : PtrRes::Blocked;
+        int idx = -1;
+        for (unsigned i = 0; i < func->getNumParams(); ++i)
+            if (func->getParamDecl(i) == parm) {
+                idx = static_cast<int>(i);
+                break;
+            }
+        if (idx < 0) return PtrRes::Blocked;
+        if (*pt >= 0 && *pt != idx) return PtrRes::Blocked;  // mixed
+        *pt = idx;
+        return PtrRes::Passthrough;
+    }
+    if (const auto* call = dyn_cast<CallExpr>(e)) {
+        const auto* summary = lookupPrev(previous, call->getDirectCallee());
+        if (!summary) return PtrRes::Blocked;
+        if (summary->returnNullness == ReturnNullness::NeverNull)
+            return PtrRes::NonNull;
+        if (summary->nullFromParam >= 0 &&
+            static_cast<unsigned>(summary->nullFromParam) <
+                call->getNumArgs())
+            return resolveNullReturn(call->getArg(summary->nullFromParam),
+                                     func, unwritten, previous, pt);
+        return PtrRes::Blocked;
+    }
+    return vstateOf(e, previous) == VState::NonBad ? PtrRes::NonNull
+                                                   : PtrRes::Blocked;
+}
+
+ReturnNullness computeReturnNullness(const FunctionDecl* func,
+                                     ASTContext& ctx,
+                                     const SummaryTable& previous,
+                                     int* nullFromParam) {
+    *nullFromParam = -1;
+    if (!func->getReturnType()->isPointerType())
+        return ReturnNullness::Unknown;
+
+    AggregateFlags flags = computeReturnFlow<vstateOf, applyNullCond>(
+        func, ctx, previous,
+        [](QualType t) { return t->isPointerType(); });
+    if (flags.empty) return ReturnNullness::Unknown;
+    if (flags.sawBad) return ReturnNullness::MaybeNull;
+    if (flags.allNonBad) return ReturnNullness::NeverNull;
+
+    // The passthrough pass (mirror of the zero domain's): every return
+    // must be proven NonNull or hand back an unwritten pointer
+    // parameter's entry value.
+    std::set<const VarDecl*> unwritten = unwrittenParams(func);
+    if (unwritten.empty()) return ReturnNullness::Unknown;
+    ReturnCollector collector;
+    collector.TraverseStmt(func->getBody());
+    int pt = -1;
+    bool sawPassthrough = false;
+    for (const auto* ret : collector.returns) {
+        switch (resolveNullReturn(ret, func, unwritten, previous, &pt)) {
+            case PtrRes::NonNull: break;
+            case PtrRes::Passthrough: sawPassthrough = true; break;
+            case PtrRes::Blocked: return ReturnNullness::Unknown;
+        }
+    }
+    if (sawPassthrough && pt >= 0) *nullFromParam = pt;
+    return ReturnNullness::Unknown;
+}
+
 
 // One return expression's contribution to the passthrough claim.
 // NonZero (proven never zero), Passthrough (returns param #*pt's entry
@@ -1179,7 +1270,8 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
         bool changed = false;
         for (const auto* func : collector.functions) {
             FunctionSummary summary;
-            summary.returnNullness = computeReturnNullness(func, ctx, current);
+            summary.returnNullness = computeReturnNullness(
+                func, ctx, current, &summary.nullFromParam);
             summary.returnZeroness = computeReturnZeroness(
                 func, ctx, current, &summary.zeroFromParam);
             summary.params = computeParamEffects(func, current);
@@ -1204,6 +1296,7 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
                 prev->second.returnNullness != summary.returnNullness ||
                 prev->second.returnZeroness != summary.returnZeroness ||
                 prev->second.zeroFromParam != summary.zeroFromParam ||
+                prev->second.nullFromParam != summary.nullFromParam ||
                 prev->second.nullCondParam != summary.nullCondParam ||
                 prev->second.nullCondRange != summary.nullCondRange ||
                 prev->second.params != summary.params) {
@@ -1256,11 +1349,14 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     }
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
-    // The passthrough claim survives a merge only on exact agreement,
-    // and only in its defined home (returnZeroness == Unknown).
+    // The passthrough claims survive a merge only on exact agreement,
+    // and only in their defined homes (the Unknown side of each axis).
     if (into.zeroFromParam != from.zeroFromParam ||
         into.returnZeroness != RZ::Unknown)
         into.zeroFromParam = -1;
+    if (into.nullFromParam != from.nullFromParam ||
+        into.returnNullness != RN::Unknown)
+        into.nullFromParam = -1;
     if (into.params.size() != from.params.size()) {
         into.params.clear();  // paramEffect() defaults to Opaque
         return;
@@ -1275,7 +1371,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v4";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v5";
+constexpr const char* kSummaryFileHeaderV4 = "codeskeptic-summaries v4";
 constexpr const char* kSummaryFileHeaderV3 = "codeskeptic-summaries v3";
 constexpr const char* kSummaryFileHeaderV2 = "codeskeptic-summaries v2";
 constexpr const char* kSummaryFileHeaderV1 = "codeskeptic-summaries v1";
@@ -1388,6 +1485,10 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
         out << '\t';
         if (summary.zeroFromParam < 0) out << '-';
         else out << summary.zeroFromParam;
+        // v5 column: null-passthrough param index, "-" when absent.
+        out << '\t';
+        if (summary.nullFromParam < 0) out << '-';
+        else out << summary.nullFromParam;
         out << '\n';
     }
     return out.good();
@@ -1402,14 +1503,16 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 4;
+    if (line == kSummaryFileHeader) version = 5;
+    else if (line == kSummaryFileHeaderV4) version = 4;
     else if (line == kSummaryFileHeaderV3) version = 3;
     else if (line == kSummaryFileHeaderV2) version = 2;
     else if (line == kSummaryFileHeaderV1) version = 1;
     else return false;
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
-    const size_t maxFields = (version >= 4) ? 6 : (version == 3) ? 5 : 4;
+    const size_t maxFields =
+        (version >= 5) ? 7 : (version == 4) ? 6 : (version == 3) ? 5 : 4;
 
     // Parse fully first, then hand over: a corrupt file is rejected
     // without leaving partial state behind
@@ -1484,7 +1587,7 @@ bool SummaryRegistry::parseSummaryFile(
             else
                 return false;
         }
-        if (fields.size() == 6 && fields[5] != "-") {
+        if (fields.size() >= 6 && fields[5] != "-") {
             const std::string& zf = fields[5];
             errno = 0;
             char* end = nullptr;
@@ -1495,6 +1598,17 @@ bool SummaryRegistry::parseSummaryFile(
             if (summary.returnZeroness != ReturnZeroness::Unknown)
                 return false;
             summary.zeroFromParam = static_cast<int>(idx);
+        }
+        if (fields.size() == 7 && fields[6] != "-") {
+            const std::string& nf = fields[6];
+            errno = 0;
+            char* end = nullptr;
+            long long idx = std::strtoll(nf.c_str(), &end, 10);
+            if (errno != 0 || end != nf.c_str() + nf.size() || idx < 0)
+                return false;
+            if (summary.returnNullness != ReturnNullness::Unknown)
+                return false;
+            summary.nullFromParam = static_cast<int>(idx);
         }
         if (pe != "-") {
             summary.params.reserve(pe.size());

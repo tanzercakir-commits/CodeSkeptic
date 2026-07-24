@@ -2002,3 +2002,127 @@ TEST(NullDerefRuleTest, CompoundContractLoopDeref_Clean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Null-passthrough summaries (F7A.1 — the pointer twin of the
+// zero-passthrough slice) ---
+// `char* keep(char* p) { return p; }` left the summary Unknown; the
+// nullFromParam claim now flows the ARGUMENT's nullness through the
+// call. A plain-variable argument stays Unknown — exactly like a
+// direct `p = q` copy, never a manufactured MaybeNull.
+
+TEST(NullDerefRuleTest, NullPassthrough_MaybeNullSource_Warns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        static char* keep(char* p) { return p; }
+        char f(void) {
+            char* s = keep(getenv("HOME"));
+            return *s;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_NonNullArg_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static char* keep(char* p) { return p; }
+        char f(void) {
+            char buf[8];
+            char* s = keep(buf);
+            return *s;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_TwoHop_Warns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        static char* keep(char* p) { return p; }
+        static char* keep2(char* p) { return keep(p); }
+        char f(void) {
+            char* s = keep2(getenv("HOME"));
+            return *s;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_Guarded_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        static char* keep(char* p) { return p; }
+        char f(void) {
+            char* s = keep(getenv("HOME"));
+            if (!s) return 0;
+            return *s;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_WrittenParam_NoClaim) {
+    // The callee reassigns its param: `return p;` hands back the NEW
+    // value, so no claim may form (warning here would be an FP).
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        static char* rewrites(char* p) { p = (char*)0x1000; return p; }
+        char f(void) {
+            char* s = rewrites(getenv("HOME"));
+            return *s;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_PlainVarArg_Clean) {
+    // Unknown in, unknown out — same as a direct q = p copy.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        static char* keep(char* p) { return p; }
+        char f(char* q) {
+            char* s = keep(q);
+            return *s;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_AllocThroughKeep_Warns) {
+    // The unchecked-allocation class survives the wrapper hop.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* malloc(size_t);
+        static char* keep(char* p) { return p; }
+        void f(void) {
+            char* s = keep((char*)malloc(16));
+            *s = 'x';
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, NullPassthrough_MixedNonNullPaths_Warns) {
+    // Some paths proven non-null, the rest hand back the param: the
+    // conditional claim still holds.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        extern char* getenv(const char*);
+        static char fallback[4];
+        static char* pick(char* p, int use) {
+            if (use) return fallback;
+            return p;
+        }
+        char f(void) {
+            char* s = pick(getenv("HOME"), 0);
+            return *s;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
