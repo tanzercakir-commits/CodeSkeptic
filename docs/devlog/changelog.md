@@ -1,5 +1,22 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — AR.2 measured: the assert-define doctrine is a dirty switch
+
+The scan survey proposed enabling a project's assert define as the
+cheap fix for the assert-nonnull FP family. Measured on curl
+(off-vs-on probe e9b5c3f) and REFUTED as a clean fix: assertions off
+= 82 null-derefs, assertions on (-DENABLE_DEBUG=ON) = 110 - it went
+UP. The site diff explains why: ~181 sites DID go silent when asserts
+were enabled (the narrowing mechanism works, the family is real), but
+DEBUGBUILD also switched on unrelated debug-only code (curl's multi.c
+block) that added more findings than it removed. So the mechanism is
+right but the delivery is wrong - telling users to compile with the
+debug define changes semantics and adds noise. This makes AR.3 (the
+PPCallbacks vanished-assert recovery that reads the compiled-out
+assert's condition WITHOUT enabling the debug build) REQUIRED, not
+optional - promoted from a maybe to the one clean path, by
+measurement not guess. docs/PLAN-assert.md updated.
+
 ## 2026-07-25 — Assert-refinement plan: the hypothesis CORRECTED by measurement
 
 The survey's "engine doesn't narrow asserts" hypothesis was tested

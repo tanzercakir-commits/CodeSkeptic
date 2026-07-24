@@ -39,7 +39,24 @@ Yukarıdaki deneyi çift yönlü kalıcı teste çevir (canlı assert →
 sessiz; assert'siz kontrol → uyarı). Bugünkü doğru davranış
 regresyona kapansın.
 
-### AR.2 — "Assertion-enabled scan" doktrini + 5 tanığın yeniden ölçümü (~%2-3, çoğu CI)
+### AR.2 — "Assertion-enabled scan" doktrini — ✘ ÖLÇÜLDÜ, ÇÜRÜDÜ (2026-07-25)
+
+**Sonuç: define-tabanlı yaklaşım KİRLİ ANAHTAR, temiz düzeltme DEĞİL.**
+curl off-vs-on kanıt sondası (e9b5c3f):
+- assertions_off: 82 null-deref (baseline)
+- assertions_on (-DENABLE_DEBUG=ON → DEBUGBUILD → DEBUGASSERT canlı): 110
+- Site diff: ~181 konum assert AÇILINCA SUSTU (mekanizma ÇALIŞIYOR,
+  assert-ailesi gerçek) AMA DEBUGBUILD alakasız debug kodunu da açtı
+  (multi.c debug-only bloğu) → susandan çok gürültü ekledi, net ARTTI.
+
+Ders: assert-daraltma DOĞRU çalışıyor (AR.1 + bu 181 konum), ama
+"kullanıcı debug define'ıyla derlesin" teslim mekanizması yanlış —
+semantiği değiştirir, gürültü katar. Kalan 4 tanık için tekrar
+ölçmeye GEREK YOK; define-yolu elendi.
+
+**Sonuç AR.3'ü ZORUNLU kılar** (aşağıda) — tercih değil, tek temiz yol.
+
+### AR.2-eski — [define doktrini, çürütüldü — yukarı bakın]
 Profil katmanı işi, motor işi DEĞİL: tarama compile db'si assertion
 define'larıyla üretilir (tablodaki -D'ler; realworld lane'de configure
 bayrağı). Doktrin gerekçesi: assert, geliştiricinin KENDİ yazdığı
@@ -48,7 +65,7 @@ taranır; FP çöküşü ÖLÇÜLÜR (beklenti: lua 36→~0, sqlite/curl büyük
 düşüş). Yan etki dürüstlüğü: debug define'ları başka kod da açar
 (sqlite'ta çok); sayılar bunu da gösterecek — susturulmaz, raporlanır.
 
-### AR.3 — Kaybolan-assert kurtarma (MOTOR dilimi, ORTA, ~%5-8, max)
+### AR.3 — Kaybolan-assert kurtarma (MOTOR dilimi, ORTA, ~%5-8, max) — ★ ZORUNLU (AR.2 ölçümü define-yolunu eledi)
 AR.2 sayıları "define'la açmak yetmiyor/istenmiyor" derse: Clang
 PPCallbacks ile, kayıtlı assert-benzeri makroların (assert,
 lua_assert, DEBUGASSERT, ... — config listesi) BOŞ genişleyen
@@ -67,9 +84,10 @@ kaydı düş; akış transferi o konumda refineOnEdge eşdeğerini uygular.
 AR.1 (pin) → AR.2 (doktrin + ÖLÇÜM) → [sayılara bak] → AR.3 mü, 7A.2 mi?
 ```
 
-AR.2'nin çöküş sayıları karar verdirir: define-yolu FP'lerin %80+'ını
-düşürüyorsa AR.3 ertelenebilir (7A.2 UAF dilimi öne geçer); düşüş
-sınırlıysa AR.3 motor dilimi önceliklidir. Tahminle değil ölçümle.
+KARAR VERİLDİ (ölçümle): AR.2 define-yolu net gürültü ARTIRDI (curl
+82→110), yani elendi. AR.3 (PPCallbacks kurtarma) tek temiz yol ve
+ZORUNLU. Sıra: AR.3 (max, taze kota) → sonra 7A.2. curl'ün gerçek
+assert-ailesi (~181 konum) AR.3 landing'inde ölçülür.
 
 ## Bütçe ve Go
 
