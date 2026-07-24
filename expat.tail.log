@@ -1,0 +1,7 @@
+[CodeSkeptic] Analysis starting... (5 files, 9 rules)
+[1/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libexpat-R_2_6_4/expat/lib/xmltok_impl.c.
+[2/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libexpat-R_2_6_4/expat/lib/xmlparse.c.
+[3/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libexpat-R_2_6_4/expat/lib/xmltok.c.
+[4/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libexpat-R_2_6_4/expat/lib/xmltok_ns.c.
+[5/5] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/libexpat-R_2_6_4/expat/lib/xmlrole.c.
+CodeSkeptic: Clean! No issues found.
