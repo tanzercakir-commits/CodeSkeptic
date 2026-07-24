@@ -78,8 +78,15 @@ Dört kapı (hepsi geçilmeden kayıt yok):
 1. **Gövde koşulu atıyor mu** — makro gövdesi argümanı KULLANIYORSA
    koşul zaten AST'de; kurtarma yok (AR.1'in pinlediği canlı yol
    dokunulmadan çalışır, çift-işleme yapısal olarak imkânsız).
+   **Ayrıca TAM BİR parametre**, variadic değil: çok argümanlı bir
+   assert argümanları arasında BAĞINTI kurar, tek başına 0. argüman
+   başka bir iddiadır — `ASSERT_EQ(p, NULL)` örneğinde tam TERSİ.
 2. **Adı assert-benzeri mi** — "assert" alt-dizisi (harf duyarsız)
-   veya `--assert-macros` ile açıkça bildirilmiş.
+   veya `--assert-macros` ile açıkça bildirilmiş. **OLUMSUZ iddia
+   duyuran ad yazımla veto edilir** (`null`, `false`, `zero`, `not`,
+   `fail`): cmocka `assert_null`, Unity `TEST_ASSERT_NULL` pointer'ın
+   null OLDUĞUNU söyler; tersten inanmak kanıtlanmış olguyu ters
+   çevirir. Açık bildirim vetoyu ezer (anlamı orada kullanıcı verir).
 3. **Token şekli dar mı** — `x`, `x != NULL`, `NULL != x`, `A && B`
    (üstünde `||` YOKSA konjonktler ayrı ayrı düşürülebilir; `||`
    varsa TÜM kayıt reddedilir). NULL yazımları: `NULL`, `nullptr`,
@@ -88,6 +95,10 @@ Dört kapı (hepsi geçilmeden kayıt yok):
 4. **Konum kanıtlanabilir mi** — guard, genişlemeden SONRAKİ ilk
    deyime bağlanır; parantezsiz `if`/`while` gövdesi, `switch`
    düşmesi, `goto`/etiket, gölgelenmiş/çift isim → reddedilir.
+   **Hedef DÖNGÜ olamaz**: guard, deyim her transfer edildiğinde
+   yeniden ateşlenir; döngüden ÖNCEKİ assert ise bir kez çalışıp
+   sadece GİRİŞİ domine eder — döngüye bağlamak, gövdede yeniden
+   atanan pointer'ı her turun başında temize çıkarırdı.
 
 **Dürüst kayıt:** bu bir SAĞLAMLIK düzeltmesi DEĞİL. NDEBUG'lu build
 o kontrolü gerçekten çalıştırmaz. Bu, "yazarın assert'i, olduğunu
@@ -98,9 +109,24 @@ build'in gördüğü koda birebir uyar).
 v1 kapsam dışı: tamsayı `!= 0` assert'leri, alan/dizi özneleri, başka
 bir makro genişlemesi içine gömülü assert'ler, MCP sıcak-AST yolu.
 
-Batarya: `tests/AssertRecoveryTest.cpp`, 31 test (kontrol / susan
+Batarya: `tests/AssertRecoveryTest.cpp`, 38 test (kontrol / susan
 şekiller / dört kapının reddettikleri / canlı-yol regresyonu / config
-/ mekanizma sayacı). Toplam süit 734 → 765, sıfır regresyon.
+/ mekanizma sayacı). Toplam süit 734 → 772, sıfır regresyon.
+
+**Düşman gözüyle inceleme (adversarial review) — 3 SESSİZ HATA.**
+İlk 33 testlik batarya YEŞİLKEN, kodu "ne yaptığına" değil "neye
+İNANDIĞINA" bakarak okuyan bir gözden geçirme üç yanlış-negatif buldu;
+üçü de bulguyu sessizce emekliye ayırıyordu:
+
+| # | Hata | Kapı | Kapanış |
+|---|---|---|---|
+| 1 | Döngüden önceki assert döngüye bağlanıp her turda yeniden ateşleniyordu → gövdede `malloc`'a yeniden atanan pointer'ın deref'i susuyordu | 4 | while/do/for/range-for hedefleri reddedilir |
+| 2 | Çok parametreli makroda yalnız 0. argüman ayrıştırılıyordu → `ASSERT_EQ(p, NULL)` "p non-null" diye kaydediliyordu | 1 | tam 1 parametre, variadic değil |
+| 3 | "assert" alt-dizisi iddianın YÖNÜNÜ hiç sormuyordu → `assert_null(p)` **kesin-null** bir bulguyu susturuyordu | 2 | olumsuz-ad vetosu |
+
+Ders: yeşil süit, kapsanmamış bir varsayımı kanıtlamaz. Üçü de
+`tests/AssertRecoveryTest.cpp` C2 bölümünde pinli ve her biri
+düzeltme-öncesi ikilide DÜŞTÜĞÜ doğrulanarak yazıldı.
 
 ## Sıra ve karar kapısı
 

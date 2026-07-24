@@ -523,6 +523,173 @@ TEST(AssertRecoveryTest, Gate4_ShadowedName_StillWarns) {
     EXPECT_GE(results.size(), 1u);
 }
 
+// ---------------------------------------------------------------------
+// C2. THE THREE THE FIRST BATTERY MISSED
+//
+// Everything above was written alongside the implementation, and all of
+// it passed while the three bugs below were live. An adversarial review
+// pass found them by reading the code for what it BELIEVED rather than
+// for what it did. Each was a silent false negative — a real finding
+// retired by an assert that did not say what the recovery thought it
+// said — so each gets a permanent test here, in the section for what
+// must keep warning.
+// ---------------------------------------------------------------------
+
+// BUG 1 (loop target). A guard is attached to a statement and re-applied
+// every time the engine transfers it, but an assert placed BEFORE a loop
+// ran once — it dominates loop ENTRY, not each iteration. Attaching it
+// to the loop re-asserted the condition on every back edge, so a pointer
+// reassigned in the body was scrubbed clean at the top of iteration two
+// and its deref went quiet. `p` starts provably non-null so that the
+// ONLY thing the assert can be silencing is the loop-carried malloc.
+TEST(AssertRecoveryTest, Bug1_AssertBeforeWhile_LoopCarriedDerefStillWarns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        int g;
+        int f(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            while (n-- > 0) {
+                total += *p;
+                p = (int*)malloc(4);
+            }
+            return total;
+        }
+    )"));
+    EXPECT_GE(results.size(), 1u);
+}
+
+// BUG 1, the other three loop forms. `while` was how it was found; the
+// rejection has to cover every statement that can carry a back edge, or
+// the bug simply moves to whichever one was left out. The C++ range-for
+// is here because it is the one whose loop variable makes it look least
+// like the others.
+TEST(AssertRecoveryTest, Bug1_AssertBeforeDoForRangeFor_StillWarn) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        int g;
+        struct V { int* begin(); int* end(); };
+        int with_do(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            do {
+                total += *p;
+                p = (int*)malloc(4);
+            } while (n-- > 0);
+            return total;
+        }
+        int with_for(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            for (int i = 0; i < n; ++i) {
+                total += *p;
+                p = (int*)malloc(4);
+            }
+            return total;
+        }
+        int with_range_for(V v) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            for (int x : v) {
+                total += *p + x;
+                p = (int*)malloc(4);
+            }
+            return total;
+        }
+    )"));
+    EXPECT_GE(results.size(), 3u);
+}
+
+// BUG 2 (arity). A multi-argument assert states a RELATION between its
+// arguments; argument 0 read alone is a different claim, and here the
+// exact opposite one — `ASSERT_EQ(p, NULL)` asserts that p IS null, and
+// taking `p` by itself recorded "p is non-null" and retired the true
+// finding. gtest's `ASSERT_LT(p, q)` and message-first spellings like
+// `ASSERT_MSG(msg, cond)` fail the same way, and all three are picked up
+// by the name rule with no opt-in. Only the one-argument form has an
+// argument that IS the condition.
+TEST(AssertRecoveryTest, Bug2_MultiParamAssertMacros_StillWarn) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define ASSERT_EQ(a, b)
+        #define ASSERT_LT(a, b)
+        #define ASSERT_MSG(msg, cond)
+        int inverted(void) {
+            int* p = (int*)malloc(4);
+            ASSERT_EQ(p, (void*)0);
+            return *p;
+        }
+        int relational(void) {
+            int* p = (int*)malloc(4);
+            int* q = (int*)malloc(4);
+            ASSERT_LT(p, q);
+            return *p;
+        }
+        int message_first(void) {
+            int* p = (int*)malloc(4);
+            int* q = (int*)malloc(4);
+            ASSERT_MSG(p, q != (void*)0);
+            return *p;
+        }
+    )"));
+    EXPECT_GE(results.size(), 3u);
+}
+
+// BUG 3 (negative names). The substring rule reads a NAME as evidence of
+// a MEANING, and never asked what the assert claimed. cmocka's
+// `assert_null`, Unity's `TEST_ASSERT_NULL`, CUnit's `CU_ASSERT_PTR_NULL`
+// and Criterion's `cr_assert_null` all assert the pointer IS null.
+// Believing one backwards suppressed a *definitely*-null finding — the
+// `if (p) return 0;` below makes p null by proof, not by maybe — so this
+// was not a lost warning but an inverted fact.
+TEST(AssertRecoveryTest, Bug3_NegativeAssertNames_StillWarn) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define assert_null(x)
+        #define TEST_ASSERT_FALSE(x)
+        int cmocka_shape(void) {
+            int* p = (int*)malloc(4);
+            if (p) return 0;
+            assert_null(p);
+            return *p;
+        }
+        int unity_shape(void) {
+            int* q = (int*)malloc(4);
+            if (q) return 0;
+            TEST_ASSERT_FALSE(q);
+            return *q;
+        }
+    )"));
+    EXPECT_GE(results.size(), 2u);
+}
+
+// The veto is a guess about SPELLING, so an explicit `--assert-macros`
+// declaration overrides it: that is the only way to opt in a genuine
+// non-null assert whose name happens to contain a vetoed word, such as
+// `ASSERT_NOT_NULL`. The cost is that the same door admits a macro that
+// asserts a negative, which is why the docs say not to list one. Pinned
+// here so the precedence cannot be reversed by accident.
+TEST(AssertRecoveryTest, Bug3_ExplicitDeclarationOverridesTheVeto) {
+    NullDerefRule rule;
+    RecoveryScope scope;
+    setExtraAssertMacros({"ASSERT_NOT_NULL"});
+    auto results = runRule(rule, src(R"(
+        #define ASSERT_NOT_NULL(x)
+        int f(void) {
+            int* p = (int*)malloc(4);
+            ASSERT_NOT_NULL(p);
+            return *p;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
 // =====================================================================
 // D. NO REGRESSION ON THE LIVE PATH (gate 1)
 // =====================================================================

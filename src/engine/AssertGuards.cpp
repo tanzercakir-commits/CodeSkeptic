@@ -11,6 +11,7 @@
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/Stmt.h>
+#include <clang/AST/StmtCXX.h>
 #include <clang/Analysis/CFG.h>
 #include <clang/Basic/SourceLocation.h>
 #include <clang/Basic/SourceManager.h>
@@ -208,7 +209,16 @@ parseAssertShape(const std::vector<std::string>& toks) {
 // edge already narrows it (AR.1). Only the discarded ones are
 // invisible, and only those are recovered here.
 bool bodyDiscardsCondition(const clang::MacroInfo* mi) {
-    if (!mi || !mi->isFunctionLike() || mi->getNumParams() < 1) return false;
+    if (!mi || !mi->isFunctionLike()) return false;
+    // EXACTLY one parameter, never variadic. A multi-argument assert
+    // states a RELATION between its arguments, and argument 0 read on
+    // its own is not that relation — it is a different claim, often the
+    // OPPOSITE one. `ASSERT_EQ(p, NULL)` asserts that p IS null; taking
+    // `p` alone as the condition would record "p is non-null" and
+    // silently retire the true finding. Same for gtest's ASSERT_LT(p,q)
+    // and message-first shapes like ASSERT_MSG(msg, cond). Only the
+    // one-argument form has an argument that IS the condition.
+    if (mi->getNumParams() != 1 || mi->isVariadic()) return false;
     const clang::IdentifierInfo* param = *mi->param_begin();
     if (!param) return false;
     for (const clang::Token& t : mi->tokens())
@@ -387,13 +397,29 @@ void setExtraAssertMacros(std::set<std::string> names) {
 const std::set<std::string>& extraAssertMacros() { return extraNames(); }
 
 bool isAssertMacroName(const std::string& name) {
+    // An explicitly declared name wins outright: there the USER supplies
+    // the meaning, and the spelling stops being evidence about it.
     if (extraNames().count(name)) return true;
     std::string lower;
     lower.reserve(name.size());
     for (char c : name)
         lower.push_back(
             static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    return lower.find("assert") != std::string::npos;
+    if (lower.find("assert") == std::string::npos) return false;
+    // The substring rule reads a NAME as evidence of a MEANING, so a
+    // name that announces a NEGATIVE claim must never be read as the
+    // positive one. cmocka's assert_null, Unity's TEST_ASSERT_NULL,
+    // CUnit's CU_ASSERT_PTR_NULL and Criterion's cr_assert_null all
+    // assert that the pointer IS null; believing one backwards
+    // suppressed a *definitely-null* finding — inverting a proven fact,
+    // not merely losing a maybe. Vetoed by spelling. This also refuses
+    // assert_non_null and ASSERT_NOT_NULL, which really are non-null
+    // assertions: guessing right on those is not worth guessing wrong
+    // on their opposites, and --assert-macros recovers them by
+    // declaration.
+    for (const char* negative : {"null", "false", "zero", "not", "fail"})
+        if (lower.find(negative) != std::string::npos) return false;
+    return true;
 }
 
 void installAssertRecovery(clang::CompilerInstance& ci) {
@@ -502,6 +528,27 @@ const AssertGuardMap& AssertGuardCache::get(const clang::FunctionDecl* func,
             // Fully contained: this is the expansion itself. Skip it.
         }
         if (straddled || !next) continue;
+
+        // The target must not be a LOOP. A guard is attached to a
+        // statement and re-applied every time the engine transfers it,
+        // but an assert placed BEFORE a loop executed once, dominating
+        // loop ENTRY only. Attaching it to the loop makes the condition
+        // fire again on the back edge, so a pointer reassigned inside
+        // the body is scrubbed clean at the top of every iteration:
+        //
+        //     assert(p != NULL);
+        //     while (n-- > 0) { total += *p; p = malloc(4); }
+        //
+        // The second iteration's deref of a may-fail malloc was being
+        // silently retired by an assert that never ran again. An assert
+        // written INSIDE the body is unaffected — it really does
+        // re-execute each iteration, and its target is the next
+        // statement of the body, not the loop.
+        if (llvm::isa<clang::WhileStmt>(next) ||
+            llvm::isa<clang::DoStmt>(next) ||
+            llvm::isa<clang::ForStmt>(next) ||
+            llvm::isa<clang::CXXForRangeStmt>(next))
+            continue;
 
         auto nb = offsetIn(sm, fid, next->getBeginLoc());
         auto ne = offsetIn(sm, fid, next->getEndLoc());

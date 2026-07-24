@@ -36,7 +36,7 @@ deliberate, declared decision to treat the author's assert as the
 invariant they said it was — `--no-assert-recovery` turns it off and
 reports the code exactly as the shipped build sees it. On by default.
 
-33 new tests (`tests/AssertRecoveryTest.cpp`), suite 734 -> 767, zero
+38 new tests (`tests/AssertRecoveryTest.cpp`), suite 734 -> 772, zero
 regressions; thesis gate and self-scan unchanged. Two of the tests use
 the REAL `<assert.h>`/`<cassert>` under NDEBUG rather than a paraphrase
 of them, each with an in-snippet control so a box without system
@@ -51,6 +51,41 @@ macro's EXPANSION POINT, so an enclosing `if`'s end offset lands at
 the macro's BEGIN, never past its end — `if (c) assert(p); return *p;`
 was being silently believed. Rewritten as a three-way containment
 classification.
+
+Then three more, and these are the ones worth reading. With all 33
+tests green, an adversarial review pass over the landed code — reading
+it for what it BELIEVED rather than for what it did — found three
+silent false negatives, each retiring a real finding on the strength of
+an assert that did not say what the recovery thought it said. A guard
+attached to a loop re-fired on every back edge, so `assert(p); while
+(...) { use(*p); p = malloc(4); }` scrubbed the pointer clean at the
+top of iteration two and the loop-carried deref of a may-fail malloc
+went quiet — an assert before a loop dominates ENTRY, once, not each
+iteration. Multi-parameter macros had only argument 0 parsed, so
+`ASSERT_EQ(p, NULL)` — which asserts that p IS null — was recorded as
+"p is non-null"; gtest's `ASSERT_LT(p, q)` and message-first spellings
+like `ASSERT_MSG(msg, cond)` failed identically, all three recognised
+with no opt-in. Worst of the three, the "assert" substring rule never
+asked what the assert CLAIMED: cmocka's `assert_null`, Unity's
+`TEST_ASSERT_NULL`, CUnit's `CU_ASSERT_PTR_NULL` all assert the pointer
+IS null, and believing one backwards suppressed a *definitely*-null
+finding — an inverted proof, not a lost maybe.
+
+Closed by three new sub-gates: loop statements are refused as guard
+targets, the macro must take exactly one non-variadic parameter, and a
+name announcing a negative claim is vetoed by spelling (an explicit
+`--assert-macros` entry still overrides the veto, which is how a real
+`ASSERT_NOT_NULL` stays usable and why listing a negative one is
+documented as harmful). All three cost some recovery value and buy
+soundness, which is the trade this project takes every time.
+
+The lesson is the one worth keeping: 33 green tests written alongside
+an implementation prove that the implementation does what its author
+was already thinking about. They say nothing about the assumption
+nobody wrote down. The three regression tests now in section C2 of
+`AssertRecoveryTest.cpp` were each verified to FAIL on the pre-fix
+binary before being kept — a test that passes on the buggy build is
+not a regression test.
 
 ## 2026-07-25 — AR.2 measured: the assert-define doctrine is a dirty switch
 

@@ -46,10 +46,19 @@
 //     macro body must not mention its first parameter. A live assert
 //     mentions it and is skipped here; the AST already handles that
 //     one. So this subsystem can never double-count or contradict the
-//     ordinary path.
+//     ordinary path. The macro must also take EXACTLY ONE parameter
+//     and not be variadic: a multi-argument assert states a RELATION
+//     between its arguments, and argument 0 read alone is a different
+//     claim — often the opposite one, as in `ASSERT_EQ(p, NULL)`.
 //  2. The macro NAME must look like an assertion (case-insensitive
 //     "assert", plus --assert-macros for the rest). `UNUSED(p)` also
-//     discards its argument and must never mean "p is non-null".
+//     discards its argument and must never mean "p is non-null". A
+//     name announcing a NEGATIVE claim is vetoed by spelling — cmocka's
+//     assert_null and Unity's TEST_ASSERT_NULL assert that the pointer
+//     IS null, and believing one backwards inverts a proven fact. An
+//     explicit --assert-macros entry overrides the veto, because there
+//     the user supplies the meaning and the spelling stops being
+//     evidence about it.
 //  3. The argument must match a narrow token shape: `x`, `x != NULL`,
 //     `NULL != x`, and `&&`-conjunctions of those. Any other token
 //     (parenthesis, `->`, `*`, `!`, `||`, a call) rejects the whole
@@ -58,7 +67,20 @@
 //     / try in the function, no case label in the enclosing block, the
 //     macro must sit in a GAP between two statements of that block
 //     (not inside one), and the target must be the first CFG element
-//     of the next real statement. Anything else drops the guard.
+//     of the next real statement. The target must not be a LOOP: a
+//     guard re-fires every time the engine transfers its statement, but
+//     an assert written before a loop ran once and dominates ENTRY
+//     only, so attaching it to the loop would scrub clean a pointer
+//     reassigned inside the body. Anything else drops the guard.
+//
+// The arity half of gate 1, the negative-name veto in gate 2 and the
+// loop rejection in gate 4 were all added AFTER the implementation
+// landed, by an adversarial review that read the code for what it
+// believed rather than for what it did. Each closed a silent FALSE
+// NEGATIVE that the original 33-test battery passed straight through —
+// which is the honest measure of how much a green suite proves here.
+// They are pinned in section C2 of tests/AssertRecoveryTest.cpp, each
+// verified to FAIL on the pre-fix binary.
 //
 // Deliberately out of scope for v1 (each is a separate, pinned step):
 // integer `!= 0` asserts (the div-by-zero twin), field and array
@@ -100,6 +122,11 @@ bool assertRecoveryEnabled();
 // (CHECK, VERIFY, ...). The built-in case-insensitive "assert"
 // substring rule already covers assert / ASSERT / DEBUGASSERT /
 // lua_assert / Q_ASSERT / SDL_assert / BOOST_ASSERT.
+//
+// A name listed here bypasses the negative-name veto of gate 2, which
+// is what makes a genuine ASSERT_NOT_NULL usable — and equally what
+// makes listing a macro that asserts a NEGATIVE (assert_null and
+// friends) actively harmful. Do not list one.
 void setExtraAssertMacros(std::set<std::string> names);
 const std::set<std::string>& extraAssertMacros();
 

@@ -34,7 +34,13 @@ codeskeptic <source_path> [options]
                          list). Macro names containing "assert" (any
                          case) are recognised automatically; use this
                          for project spellings that do not
-                         (e.g. --assert-macros CHECK_PTR,REQUIRE)
+                         (e.g. --assert-macros CHECK_PTR,REQUIRE).
+                         Only single-argument macros are recovered. A
+                         name listed here also overrides the veto on
+                         negative-sounding names, so list ASSERT_NOT_NULL
+                         if you have one -- but never a macro that
+                         asserts a NEGATIVE (cmocka's assert_null and
+                         friends): it would be believed backwards
   --no-assert-recovery   Disable vanished-assert recovery. By default,
                          an assertion compiled out by NDEBUG (its
                          condition never reaches the parser) is
