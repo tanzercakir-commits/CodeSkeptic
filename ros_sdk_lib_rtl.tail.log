@@ -1,0 +1,779 @@
+unner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c.
+[23/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c.
+[24/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c:4:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c.
+[25/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c.
+[26/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c.
+[27/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:50:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/rtlfuncs.h:25:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/umtypes.h:46:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c.
+[28/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c.
+[29/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c.
+[30/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:50:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/rtlfuncs.h:25:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/umtypes.h:46:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c.
+[31/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c.
+[32/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c.
+[33/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c.
+[34/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c.
+[35/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c.
+[36/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c.
+[37/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c.
+[38/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c.
+[39/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c.
+[40/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:50:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/rtlfuncs.h:25:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/umtypes.h:46:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c.
+[41/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c.
+[42/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c:27:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c.
+[43/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c.
+[44/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c.
+[45/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c.
+[46/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c:9:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c.
+[47/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c.
+[48/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c.
+[49/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c.
+[50/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:50:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/rtlfuncs.h:25:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/umtypes.h:46:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c.
+[51/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c:15:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c.
+[52/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c.
+[53/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c.
+[54/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c.
+[55/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c.
+[56/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c.
+[57/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c:3:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c.
+[58/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c.
+[59/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:50:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/rtlfuncs.h:25:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/ndk/umtypes.h:46:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c.
+[60/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c.
+[61/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c.
+[62/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c.
+[63/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c.
+[64/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c.
+[65/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c.
+[66/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c:22:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c.
+[67/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c.
+[68/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c:23:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c.
+[69/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c.
+[70/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c.
+[71/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c:13:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c.
+[72/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c.
+[73/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c.
+[74/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c.
+[75/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c.
+[76/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c.
+[77/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+[78/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+[79/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c.
+[80/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c:8:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c.
+[81/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c.
+[82/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c.
+[83/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c:24:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+[84/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c:24:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+[85/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c.
+[86/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c.
+[87/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c:9:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c.
+[88/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c.
+[89/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c.
+[90/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c:12:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c.
+[91/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+[92/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl_vista.h:18:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+[93/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c:11:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+[94/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c:10:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+[95/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+[96/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c:16:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+[97/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c:14:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rtl.h:28:
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/windef.h:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/include/psdk/minwindef.h:171:10: fatal error: 'winnt.h' file not found
+  171 | #include <winnt.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+[CodeSkeptic] 85 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/vectoreh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/processor.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode_vista.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/arm/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/generictable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/byteswap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/process.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/actctx.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/luid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/message.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wait.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rangelist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/atom.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/propvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/product.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avlsupp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/crc32.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/runonce.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timerqueue.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dbgbuffer.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/security.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/largeint.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/avltable.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/name.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/assert.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sd.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/rxact.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/i386/thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/unicodeprefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bitmap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/res.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/locale.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/time.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/prefix.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/version.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/path.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/encode.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/image.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/mem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/utf8.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/nls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/access.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wine_debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/splaytree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/random.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/network.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapdbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/env.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/interlck.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heapuser.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c
+[CodeSkeptic] ANALYSIS FAILED: every translation unit failed to compile - NOTHING was analyzed, so this is not a clean result (exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), pass --build-path with your compile_commands.json, or use --analyze-broken-tus to force analysis on error-recovery ASTs.

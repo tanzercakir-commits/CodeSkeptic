@@ -1,0 +1,719 @@
+ime'
+   33 |     TimeFields.Hour = (USHORT)(UdfTime->hour);
+      |                                ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp:34:23: error: use of undeclared identifier 'USHORT'
+   34 |     TimeFields.Day = (USHORT)(UdfTime->day);
+      |                       ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp:34:31: error: use of undeclared identifier 'UdfTime'
+   34 |     TimeFields.Day = (USHORT)(UdfTime->day);
+      |                               ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp:35:25: error: use of undeclared identifier 'USHORT'
+   35 |     TimeFields.Month = (USHORT)(UdfTime->month);
+      |                         ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp:35:33: error: use of undeclared identifier 'UdfTime'
+   35 |     TimeFields.Month = (USHORT)(UdfTime->month);
+      |                                 ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp:36:24: error: use of undeclared identifier 'USHORT'
+   36 |     TimeFields.Year = (USHORT)((UdfTime->year < 1601) ? 1601 : UdfTime->year);
+      |                        ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp.
+[291/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:8:1: error: unknown type name 'ULONG'
+    8 | ULONG
+      | ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:10:5: error: unknown type name 'PVOID'
+   10 |     PVOID s1,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:11:5: error: unknown type name 'PVOID'
+   11 |     PVOID s2,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:12:5: error: unknown type name 'ULONG'
+   12 |     ULONG len
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:15:5: error: unknown type name 'ULONG'
+   15 |     ULONG i;
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:30:1: error: unknown type name 'ULONG'
+   30 | ULONG
+      | ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:32:5: error: unknown type name 'PUNICODE_STRING'
+   32 |     PUNICODE_STRING s1,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:33:5: error: unknown type name 'PUNICODE_STRING'
+   33 |     PUNICODE_STRING s2,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:34:5: error: unknown type name 'BOOLEAN'
+   34 |     BOOLEAN UpCase
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:37:5: error: unknown type name 'ULONG'
+   37 |     ULONG i;
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:45:1: error: unknown type name 'NTSTATUS'
+   45 | NTSTATUS
+      | ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:47:5: error: unknown type name 'PUNICODE_STRING'
+   47 |     PUNICODE_STRING dst,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:48:5: error: unknown type name 'PUNICODE_STRING'
+   48 |     PUNICODE_STRING src,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:49:5: error: unknown type name 'BOOLEAN'
+   49 |     BOOLEAN Alloc
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:54:36: error: use of undeclared identifier 'WCHAR'
+   54 |     dst->Buffer[src->Length/sizeof(WCHAR)] = 0;
+      |                                    ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:57:12: error: use of undeclared identifier 'STATUS_SUCCESS'
+   57 |     return STATUS_SUCCESS;
+      |            ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:61:1: error: unknown type name 'NTSTATUS'
+   61 | NTSTATUS
+      | ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:63:5: error: unknown type name 'IN'
+   63 |     IN PUNICODE_STRING Str1,
+      |     ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:63:24: error: expected ')'
+   63 |     IN PUNICODE_STRING Str1,
+      |                        ^
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp:62:25: note: to match this '('
+   62 | RtlAppendUnicodeToString(
+      |                         ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp.
+[292/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c.
+[293/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c.
+[294/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c.
+[295/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c.
+[296/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c.
+[297/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c.
+[298/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c.
+[299/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c.
+[300/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c.
+[301/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c.
+[302/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c.
+[303/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c.
+[304/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c:18:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c.
+[305/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c.
+[306/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c:1:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c.
+[307/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c.
+[308/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c.
+[309/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c.
+[310/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c.
+[311/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c.
+[312/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c.
+[313/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c.
+[314/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c.
+[315/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c.
+[316/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c.
+[317/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c.
+[318/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c.
+[319/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c.
+[320/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c.
+[321/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c.
+[322/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c.
+[323/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c:17:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c.
+[324/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c.
+[325/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocs.h:28:10: fatal error: 'ntifs.h' file not found
+   28 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c.
+[326/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c.
+[327/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c.
+[328/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c:10:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c.
+[329/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c.
+[330/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c.
+[331/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c.
+[332/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c.
+[333/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c.
+[334/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c.
+[335/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c.
+[336/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.h:13:10: fatal error: 'ntifs.h' file not found
+   13 | #include <ntifs.h>
+      |          ^~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c.
+[CodeSkeptic] 308 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/finfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/fsctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/rw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/msfssup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/msfs/msfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/finfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/volume.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/shutdown.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/flush.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/iface.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/dir.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/fsctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/fcb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/rw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/fastio.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/dirwr.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/string.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/blockdev.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/direntry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/ea.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/fat.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/kdbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/vfatfs/misc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cachesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/shutdown.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fspdisp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/dirctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/dirsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cdprocssrc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/prefxsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/lockctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/pathsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cddata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fsctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/deviosup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/verfysup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/namesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cdinit.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/allocsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/devctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/filobsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/resrcsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/strucsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/workque.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fieldoff.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/nfs/nfs41_driver.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/nfs/nfs41_debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/mup/dfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/mup/mup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/attrib.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/ntfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/finfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/dirctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/fsctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/fcb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/rw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/fastio.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/btree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/mft.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/blockdev.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/devctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/dispatch.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ntfs/misc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/volume.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/dirctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/boot.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/btrfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/balance.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/treefuncs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fsctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/security.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/free-space.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/calcthread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fastio.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/extent-tree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/send.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/scrub.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/galois.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/fse_decompress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/fse_compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/guid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/devctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/reparse.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/registry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/search.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/flushthread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/worker-thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/xxhash.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fsrtl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/cache.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-3.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp866.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp1251.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp855.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-15.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp865.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp1255.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_koi8-ru.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp863.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_koi8-u.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp869.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp949.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-5.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp860.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-1.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp775.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-13.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-14.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp850.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-6.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp852.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp936.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp862.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_base.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_koi8-r.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-4.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp737.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp861.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp874.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp950.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp864.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp932.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_euc-jp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_utf8.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-7.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp437.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp1250.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-9.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_iso8859-2.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_cp857.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls/nls_ascii.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext3/indirect.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext3/generic.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext3/htree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext3/recover.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/dirctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/shutdown.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/jbd/replay.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/jbd/recovery.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/jbd/revoke.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/flush.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/init.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/linux.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/fsctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/fastio.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/block.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext4/ext4_bh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext4/ext4_extents.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext4/ext4_xattr.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext4/ext4_jbd2.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ext4/extents.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/nls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/access.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/lock.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/devctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/rbtree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/dispatch.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/ea.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/memory.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/except.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/cmcb.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/ext2/src/misc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/writesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/secursup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/main.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/prefxsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/readsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/waitsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/fsctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/datasup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/seinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/statesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/fileobsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/strucsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/npfs/flushbuf.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/volinfo.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/close.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/cleanup.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/unload.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/env_spec.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/dldetect.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/read.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/sys_spec.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udfinit.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/create.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/lockctrl.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/misc.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/mem.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/pnp.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/devcntrl.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/shutdown.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/write.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/namesup.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_dbg.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/filter.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fileinfo.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/wcache.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/verfysup.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/dircntrl.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/phys_eject.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/dirtree.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/prec_hdr2.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/remap.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/udf_info.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/mount.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/alloc.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/physical.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/extent.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/secursup.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fastio.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/flush.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fscntrl.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/user_lib.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/tools.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/getopt.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/regtools.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/env_spec_w32.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/format_common.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/wcache_lib.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/udferr_usr.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/misc_common.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/phys_lib.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c
+CodeSkeptic: 2 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3431:26 [warning] null-deref: Possible null dereference: 'cdict' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3429:9 'cdict' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3432:9 'cdict' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3433:9 'cdict' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:293:64 [warning] null-deref: Possible null dereference: 'lastHashed' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:284:5 'lastHashed' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:294:51 'lastHashed' is also dereferenced here (same origin)
+----------------------------------------
