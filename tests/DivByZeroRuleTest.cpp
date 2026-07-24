@@ -933,3 +933,54 @@ TEST(DivByZeroRuleTest, PassthroughWrittenParam_NoClaim) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Multi-hop param-zeroness (F7A.3) ---
+// A proven possibly-zero value now crosses A -> B -> C: each pass
+// seeds callers with the previous pass's proven MaybeZero params, so
+// the evidence chain stays proof-backed at every hop.
+
+TEST(DivByZeroRuleTest, TwoHopParamZeroness_Warns) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        extern int printf(const char*, ...);
+        static void b_sink(int y) { printf("%d", 100 / y); }
+        static void a_mid(int x) { b_sink(x); }
+        void drive(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return;
+            a_mid(d);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(DivByZeroRuleTest, TwoHopGuardedMidHop_Clean) {
+    // The middle hop guards: the argument at ITS call site is proven
+    // nonzero, so nothing reaches the sink.
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        extern int printf(const char*, ...);
+        static void b_sink(int y) { printf("%d", 100 / y); }
+        static void a_mid(int x) { if (x == 0) return; b_sink(x); }
+        void drive(void) {
+            int d;
+            if (scanf("%d", &d) != 1) return;
+            a_mid(d);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(DivByZeroRuleTest, TwoHopNonZeroChain_Clean) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int printf(const char*, ...);
+        static void b_sink(int y) { printf("%d", 100 / y); }
+        static void a_mid(int x) { b_sink(x); }
+        void drive(void) { a_mid(7); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

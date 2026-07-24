@@ -830,6 +830,11 @@ ZeroState argZeroness(const Expr* arg, const VarState& callerState,
     return ZeroState::Unknown;
 }
 
+ParamZeronessMap runZeronessPass(ASTContext& ctx,
+                                 const std::set<const FunctionDecl*>& tracked,
+                                 const std::vector<const FunctionDecl*>& bodies,
+                                 const ParamZeronessMap& prev);
+
 ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
     struct TuV : RecursiveASTVisitor<TuV> {
         std::set<const FunctionDecl*> candidates;
@@ -865,6 +870,28 @@ ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
         if (!v.addressTaken.count(fn)) tracked.insert(fn);
     if (tracked.empty()) return {};
 
+    // Multi-hop seeding (F7A.3): iterate so a proven possibly-zero
+    // value crosses A -> B -> C chains — each pass re-analyzes callers
+    // with THEIR params seeded from the previous pass. The evidence
+    // chain stays proof-backed at every hop (a pass-k MaybeZero exists
+    // only because pass-(k-1) proved the caller's own param possibly
+    // zero), so MaybeZero is still never manufactured from Unknown.
+    // Passes are each independently derived from proven facts; the cap
+    // is a precision knob with early exit on stabilization.
+    constexpr unsigned kMaxZeronessPasses = 3;
+    ParamZeronessMap map;  // pass 0: empty
+    for (unsigned pass = 0; pass < kMaxZeronessPasses; ++pass) {
+        ParamZeronessMap next = runZeronessPass(ctx, tracked, v.bodies, map);
+        if (next == map) break;
+        map = std::move(next);
+    }
+    return map;
+}
+
+ParamZeronessMap runZeronessPass(ASTContext& ctx,
+                                 const std::set<const FunctionDecl*>& tracked,
+                                 const std::vector<const FunctionDecl*>& bodies,
+                                 const ParamZeronessMap& prev) {
     // Accumulator per (callee, param): sawZeroable / allNonZero / any.
     struct Acc { bool sawZeroable = false; bool allNonZero = true;
                  bool any = false; };
@@ -872,7 +899,7 @@ ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
     for (const auto* c : tracked)
         acc[c] = std::vector<Acc>(c->getNumParams());
 
-    for (const auto* caller : v.bodies) {
+    for (const auto* caller : bodies) {
         // Calls from this caller into a tracked callee.
         struct CallV : RecursiveASTVisitor<CallV> {
             const std::set<const FunctionDecl*>* tracked;
@@ -901,6 +928,14 @@ ParamZeronessMap buildParamZeroness(ASTContext& ctx) {
         DivByZeroAnalysis analysis(argVars, caller->getQualifiedNameAsString(),
                                    sink, sinkLines);
         analysis.enableCallStateRecording();
+        // Multi-hop: the caller's own proven-possibly-zero params (from
+        // the previous pass) flow into the arguments it passes on.
+        auto pz = prev.find(caller->getCanonicalDecl());
+        if (pz != prev.end())
+            for (unsigned i = 0; i < caller->getNumParams() &&
+                                 i < pz->second.size(); ++i)
+                if (pz->second[i] == ZeroState::MaybeZero)
+                    analysis.seedParamMaybeZero(caller->getParamDecl(i));
         codeskeptic::runDataflow(caller, ctx, analysis);
 
         for (const auto* call : cv.calls) {

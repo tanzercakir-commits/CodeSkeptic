@@ -89,41 +89,31 @@ std::vector<const CallExpr*> callsToCandidates(
 
 } // namespace
 
-ParamIntervalMap buildParamIntervals(ASTContext& ctx) {
-    TuVisitor v;
-    v.TraverseDecl(ctx.getTranslationUnitDecl());
-
-    // Tracked = candidate (internal linkage, has body) and address never
-    // taken. Its parameters start at bottom(); each call site joins in an
-    // argument interval.
-    std::set<const FunctionDecl*> tracked;
+// One seeding pass: recompute every tracked callee's parameter joins
+// from scratch, evaluating each call's arguments in the CALLER's local
+// state — with the caller's OWN parameters seeded from `prev` (empty on
+// the first pass = the original single-pass behaviour).
+//
+// SOUNDNESS BY INDUCTION (the multi-hop upgrade's core argument): if
+// `prev` over-approximates every actual entry value, then evaluating
+// arguments under `prev` over-approximates every actual argument, so
+// the recomputed map is sound too. The all-top pass-0 is trivially
+// sound; therefore EVERY pass is independently sound — recursion and
+// cycles included — and capping the iteration at any pass keeps a
+// correct result (cycles simply stabilise at top instead of narrowing).
+ParamIntervalMap runSeedingPass(ASTContext& ctx,
+                                const std::set<const FunctionDecl*>& tracked,
+                                const std::vector<const FunctionDecl*>& fns,
+                                const ParamIntervalMap& prev) {
     ParamIntervalMap map;
-    for (const auto* fn : v.candidates) {
-        if (v.addressTaken.count(fn)) continue;
-        tracked.insert(fn);
+    for (const auto* fn : tracked)
         map[fn] = std::vector<Interval>(fn->getNumParams(), Interval::bottom());
-    }
-    if (tracked.empty()) return map;
 
-    // Pass 1: over every function that calls a tracked callee, run the
-    // interval dataflow (parameters = top, no seeding — so there is no
-    // fixpoint and no optimistic recursion) and evaluate each call's
-    // arguments in the CALLER's local state at that call site.
-    struct FnCollector : RecursiveASTVisitor<FnCollector> {
-        std::vector<const FunctionDecl*> fns;
-        bool VisitFunctionDecl(FunctionDecl* fn) {
-            if (fn->isThisDeclarationADefinition() && fn->hasBody())
-                fns.push_back(fn);
-            return true;
-        }
-    } fc;
-    fc.TraverseDecl(ctx.getTranslationUnitDecl());
-
-    for (const auto* caller : fc.fns) {
+    for (const auto* caller : fns) {
         auto calls = callsToCandidates(caller, tracked);
         if (calls.empty()) continue;
 
-        IntervalAnalysis analysis(intVars(caller));
+        IntervalAnalysis analysis(intVars(caller), paramSeeds(prev, caller));
         runDataflow(caller, ctx, analysis);
 
         const IntervalMap empty;
@@ -161,6 +151,42 @@ ParamIntervalMap buildParamIntervals(ASTContext& ctx) {
         for (Interval& iv : entry)
             if (iv.isEmpty()) iv = Interval::top();
 
+    return map;
+}
+
+ParamIntervalMap buildParamIntervals(ASTContext& ctx) {
+    TuVisitor v;
+    v.TraverseDecl(ctx.getTranslationUnitDecl());
+
+    // Tracked = candidate (internal linkage, has body) and address never
+    // taken.
+    std::set<const FunctionDecl*> tracked;
+    for (const auto* fn : v.candidates)
+        if (!v.addressTaken.count(fn)) tracked.insert(fn);
+    if (tracked.empty()) return {};
+
+    struct FnCollector : RecursiveASTVisitor<FnCollector> {
+        std::vector<const FunctionDecl*> fns;
+        bool VisitFunctionDecl(FunctionDecl* fn) {
+            if (fn->isThisDeclarationADefinition() && fn->hasBody())
+                fns.push_back(fn);
+            return true;
+        }
+    } fc;
+    fc.TraverseDecl(ctx.getTranslationUnitDecl());
+
+    // Multi-hop seeding (F7A.3): iterate the pass so a bounded caller
+    // parameter reaches through A -> B -> C chains. Each pass is
+    // independently sound (see runSeedingPass), so the cap is a pure
+    // precision knob, not a correctness one; 3 passes cover the chains
+    // real code has, and early-exit fires when a pass changes nothing.
+    constexpr unsigned kMaxSeedingPasses = 3;
+    ParamIntervalMap map;  // pass 0: empty = all params top
+    for (unsigned pass = 0; pass < kMaxSeedingPasses; ++pass) {
+        ParamIntervalMap next = runSeedingPass(ctx, tracked, fc.fns, map);
+        if (next == map) break;
+        map = std::move(next);
+    }
     return map;
 }
 

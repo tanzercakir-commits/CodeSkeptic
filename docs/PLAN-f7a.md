@@ -55,7 +55,7 @@ ikinci free double-free — bugün görünmez.
   pinli; libgit2 (custom free: git__free zaten --free-functions'ta)
   ve rtp2httpd pinleri hakem. Tahmin: ~%4-6.
 
-### 7A.3 — Çok-hop param tohumlama (fixpoint)
+### 7A.3 — Çok-hop param tohumlama (fixpoint) — ✔ TAMAM (2026-07-24, erken dilim; 7A-core tamamlandı)
 buildParamZeroness tek hop: A→B tohumlanıyor, B→C'ye taşınmıyor
 (CWE369 54-dosyalık dilimin belgeli kalıntısı; fn-pointer hariç).
 - Mekanizma: tohum haritasını sabit noktaya kadar yinele (callee'nin

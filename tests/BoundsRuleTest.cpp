@@ -827,3 +827,38 @@ TEST(BoundsRuleTest, ConfiguredUntrustedSource_WarnAndRestore) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
+
+// --- Multi-hop parameter seeding (F7A.3) ---
+// Bounded (or wild) arguments now cross A -> B -> C chains: each
+// seeding pass re-evaluates callers with the previous pass's proven
+// entry ranges. Every pass is independently sound, so the pass cap is
+// a precision knob only.
+
+TEST(BoundsRuleTest, TwoHopParamIndex_DefiniteOOB) {
+    // b(9) -> c(j) -> table[k]: [9,9] crosses two hops into a[8].
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        static int table[8];
+        static int c_leaf(int k) { return table[k]; }
+        static int b_mid(int j) { return c_leaf(j); }
+        int use(void) { return b_mid(9); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(BoundsRuleTest, TwoHopParamIndex_BoundedClean) {
+    // All call chains stay within the extent: silent — and a WILD
+    // caller param joins to top, also silent (no guessing).
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        static int table[8];
+        static int c_leaf(int k) { return table[k]; }
+        static int b_mid(int j) { return c_leaf(j); }
+        int use(void) { return b_mid(3) + b_mid(0); }
+        static int c2(int k) { return table[k]; }
+        static int b2(int j) { return c2(j); }
+        int use2(int wild) { return b2(wild); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

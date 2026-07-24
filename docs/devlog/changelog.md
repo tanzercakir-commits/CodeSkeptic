@@ -1,5 +1,27 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-24 — F7A.3: multi-hop parameter seeding (intervals + zeroness)
+
+Both C3 seeding passes (ParamIntervals, param-zeroness) were
+deliberately single-shot — "no fixpoint, no optimistic recursion". The
+multi-hop upgrade keeps that caution but gains the chains: the pass is
+ITERATED (cap 3, early exit on stabilization), each round re-analyzing
+callers from scratch with THEIR params seeded from the previous
+round. Soundness is by induction, not by monotonicity: pass-0
+(all-top / empty) trivially over-approximates, and any pass computed
+under a sound predecessor is sound itself — recursion and cycles
+included, they simply stabilize at top instead of narrowing. So the
+cap is a precision knob, never a correctness one. On the zeroness
+side the evidence chain stays proof-backed at every hop (a pass-k
+MaybeZero exists only because pass-(k-1) PROVED the caller's param
+possibly zero) — MaybeZero is still never manufactured from Unknown.
+
+Measured shapes: b(9) -> c(j) -> table[k] is now a definite OOB
+through two hops; scanf'd d -> a -> b -> 100/y warns through two
+hops; a guard at the middle hop silences; wild callers stay silent.
+733/733 tests (+5 pinned both ways), thesis gate 0 FP, rtp2httpd 0,
+self-scan clean. PLAN-f7a.md: 7A.3 DONE — F7A-core complete.
+
 ## 2026-07-24 — F7A.1: null-passthrough summaries (early slice, high effort)
 
 The pointer twin of v0.4.7's zero-passthrough, pulled forward from
