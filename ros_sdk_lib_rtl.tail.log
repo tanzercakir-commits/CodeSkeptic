@@ -1,0 +1,426 @@
+ warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/acl.c.
+[68/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/error.c.
+[69/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/handle.c.
+[70/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/registry.c.
+[71/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/resource.c.
+[72/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/timezone.c.
+[73/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/appverifier.c.
+[74/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/priv.c.
+[75/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/bootdata.c.
+[76/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/workitem.c.
+[77/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+[78/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/slist.c.
+[79/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/unwind.c.
+[80/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/dynfntbl.c.
+[81/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/except.c.
+[82/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/amd64/stubs.c.
+[83/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+[84/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/threadpool.c.
+[85/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/critical.c.
+[86/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/memstream.c.
+[87/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/trace.c.
+[88/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/ppb.c.
+[89/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/sysvol.c.
+[90/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/debug.c.
+[91/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/condvar.c.
+[92/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/srw.c.
+[93/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/dos8dot3.c.
+[94/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/wow64.c.
+[95/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/exception.c.
+[96/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/heappage.c.
+[97/85] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown argument: '-fno-aggressive-loop-optimizations'
+error: unknown argument: '-femit-struct-debug-detailed=none'
+error: unknown argument: '-mpreferred-stack-boundary=3'
+error: unknown argument: '-fno-set-stack-executable'
+error: unknown warning option '-Wold-style-declaration'; did you mean '-Wout-of-line-declaration'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-maybe-uninitialized'; did you mean '-Wno-uninitialized'? [-Werror,-Wunknown-warning-option]
+error: unknown warning option '-Wno-nonnull-compare' [-Werror,-Wunknown-warning-option]
+error: unknown target CPU 'pentium'
+note: valid target CPU values are: nocona, core2, penryn, bonnell, atom, silvermont, slm, goldmont, goldmont-plus, tremont, nehalem, corei7, westmere, sandybridge, corei7-avx, ivybridge, core-avx-i, haswell, core-avx2, broadwell, skylake, skylake-avx512, skx, cascadelake, cooperlake, cannonlake, icelake-client, rocketlake, icelake-server, tigerlake, sapphirerapids, alderlake, raptorlake, meteorlake, arrowlake, arrowlake-s, lunarlake, gracemont, pantherlake, sierraforest, grandridge, graniterapids, graniterapids-d, emeraldrapids, clearwaterforest, diamondrapids, knl, knm, k8, athlon64, athlon-fx, opteron, k8-sse3, athlon64-sse3, opteron-sse3, amdfam10, barcelona, btver1, btver2, bdver1, bdver2, bdver3, bdver4, znver1, znver2, znver3, znver4, znver5, x86-64, x86-64-v2, x86-64-v3, x86-64-v4
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/sdk/lib/rtl/thread.c.
+CodeSkeptic: Clean! No issues found.
