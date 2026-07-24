@@ -1,5 +1,24 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — Scan survey: 11 targets, and an ecosystem-wide FP family
+
+A breadth sweep (hobby code, libraries, an OS earlier, graphics
+engines, compression) surfaced one dominant lesson, documented in
+docs/scan-survey-2026-07-25.md: across FIVE independently-audited C
+codebases (curl, lua, sqlite, raylib, zstd) the top "finding" is the
+same false positive — a pointer from a may-return-null call, then
+`assert(ptr)`, then dereferenced, with the engine not treating the
+assert as narrowing the pointer non-null. Adjudicated on zstd 1.5.6
+(zstd_compress.c:5505, the site first seen in ReactOS's vendored copy
+and re-confirmed upstream — loop closed). Recommendation on record:
+model assert(cond) as a fall-through refinement (distinct from
+--fatal-asserts) as the NEXT engine round's #1, precision-first,
+ahead of the Phase 7A recall slices — low risk, five ready repros,
+collapses hundreds of FPs at once. Genuine wins banked: box2d 3.0.0
+and libexpat 2.6.4 both genuinely clean (libexpat in the README
+trophy table). Two false-cleans (mbedTLS generated header, stb_image
+driver) correctly distrusted via the processed/broken counts.
+
 ## 2026-07-25 — New targets: libexpat clean, curl parked for triage
 
 Two plain-CMake C targets scanned on the realworld lane, both with
