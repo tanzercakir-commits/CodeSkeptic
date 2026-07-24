@@ -1,0 +1,2 @@
+REACTOS_RESULT sub=sdk/lib/rtl findings=0 broken_signals=98 processed=97 exit=0
+REACTOS_RESULT sub=drivers/filesystems findings=2 broken_signals=312 processed=336 exit=1

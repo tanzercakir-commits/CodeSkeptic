@@ -1,0 +1,504 @@
+ic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/lockctrl.cpp.
+[252/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/misc.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/misc.cpp.
+[253/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/mem.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/mem.cpp.
+[254/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/pnp.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/pnp.cpp.
+[255/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/devcntrl.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/devcntrl.cpp.
+[256/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/shutdown.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/shutdown.cpp.
+[257/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/write.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/write.cpp.
+[258/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/namesup.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/namesup.cpp.
+[259/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_dbg.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_dbg.cpp.
+[260/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/filter.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/filter.cpp.
+[261/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fileinfo.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fileinfo.cpp.
+[262/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/wcache.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/wcache.cpp.
+[263/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/verfysup.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/verfysup.cpp.
+[264/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/dircntrl.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/dircntrl.cpp.
+[265/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/phys_eject.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/phys_eject.cpp.
+[266/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/dirtree.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/dirtree.cpp.
+[267/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/prec_hdr2.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/prec_hdr2.cpp.
+[268/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/remap.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/remap.cpp.
+[269/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/udf_info.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/udf_info.cpp.
+[270/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/mount.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/mount.cpp.
+[271/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/alloc.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/alloc.cpp.
+[272/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/physical.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/physical.cpp.
+[273/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/extent.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/udf_info/extent.cpp.
+[274/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/secursup.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/secursup.cpp.
+[275/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fastio.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fastio.cpp.
+[276/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/flush.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/flush.cpp.
+[277/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fscntrl.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/fscntrl.cpp.
+[278/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/env_spec_nt.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/env_spec_nt.cpp.
+[279/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/user_lib.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/user_lib.cpp.
+[280/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/tools.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/tools.cpp.
+[281/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/getopt.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/getopt.cpp.
+[282/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/regtools.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/regtools.cpp.
+[283/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/env_spec_w32.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/env_spec_w32.cpp.
+[284/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/format_common.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/format_common.cpp.
+[285/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/wcache_lib.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/wcache_lib.cpp.
+[286/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/udferr_usr.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/udferr_usr.cpp.
+[287/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/mem_tools.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/mem_tools.cpp.
+[288/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/misc_common.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/misc_common.cpp.
+[289/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/phys_lib.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/phys_lib.cpp.
+[290/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/Sys_spec_lib.cpp.
+[291/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/udfs/CMakeFiles/udfs.dir/cmake_pch.hxx.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/udfs/Include/string_lib.cpp.
+[292/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatinit.c.
+[293/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cachesup.c.
+[294/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/create.c.
+[295/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/shutdown.c.
+[296/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fspdisp.c.
+[297/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirctrl.c.
+[298/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/flush.c.
+[299/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dirsup.c.
+[300/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/close.c.
+[301/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/pnp.c.
+[302/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/lockctrl.c.
+[303/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/timesup.c.
+[304/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fsctrl.c.
+[305/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/deviosup.c.
+[306/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatprocssrc.c.
+[307/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/verfysup.c.
+[308/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fatdata.c.
+[309/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/volinfo.c.
+[310/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/namesup.c.
+[311/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/dumpsup.c.
+[312/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/allocsup.c.
+[313/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/cleanup.c.
+[314/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/devctrl.c.
+[315/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/filobsup.c.
+[316/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/write.c.
+[317/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/easup.c.
+[318/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/resrcsup.c.
+[319/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/read.c.
+[320/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/strucsup.c.
+[321/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/fileinfo.c.
+[322/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/workque.c.
+[323/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/ea.c.
+[324/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/splaysup.c.
+[325/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fastfat/CMakeFiles/fastfat.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fastfat/acchksup.c.
+[326/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ntfs.c.
+[327/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/cdfs.c.
+[328/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fatx.c.
+[329/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/udfs.c.
+[330/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/btrfs.c.
+[331/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ffs.c.
+[332/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/reiserfs.c.
+[333/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/ext.c.
+[334/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fs_rec.c.
+[335/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/blockdev.c.
+[336/331] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c.
+error: unable to read PCH file /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch: 'No such file or directory'
+fatal error: PCH file '/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/build-ros/drivers/filesystems/fs_rec/CMakeFiles/fs_rec.dir/cmake_pch.h.gch' not found: module file not found
+2 errors generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/fs_rec/fat.c.
+[CodeSkeptic] 65 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cachesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/shutdown.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fspdisp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/dirctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/dirsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/close.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cdprocssrc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/prefxsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/lockctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/pathsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cddata.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fsctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/deviosup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/verfysup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/volinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/namesup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cdinit.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/allocsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/cleanup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/devctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/filobsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/resrcsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/strucsup.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/workque.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/cdfs/fieldoff.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/nfs/nfs41_driver.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/nfs/nfs41_debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/volume.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/dirctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/boot.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/pnp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/btrfs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/balance.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/treefuncs.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fsctl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/security.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/free-space.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/calcthread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fastio.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/extent-tree.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/send.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/scrub.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/galois.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/fse_decompress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/fse_compress.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/guid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/devctrl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/reparse.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/registry.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/read.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/search.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/flushthread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fileinfo.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/worker-thread.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/xxhash.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/fsrtl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/cache.c
+CodeSkeptic: 2 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3431:26 [warning] null-deref: Possible null dereference: 'cdict' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3429:9 'cdict' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3432:9 'cdict' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_compress.c:3433:9 'cdict' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:293:64 [warning] null-deref: Possible null dereference: 'lastHashed' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:284:5 'lastHashed' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/reactos/drivers/filesystems/btrfs/zstd/zstd_ldm.c:294:51 'lastHashed' is also dereferenced here (same origin)
+----------------------------------------
