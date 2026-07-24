@@ -1,0 +1,2 @@
+AR2_RESULT mode=assertions_off null_deref=82 total=86 broken=0 processed=170 exit=1
+AR2_RESULT mode=assertions_on null_deref=110 total=114 broken=0 processed=170 exit=1
