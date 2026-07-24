@@ -1,0 +1,514 @@
+dtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509write.c.
+[52/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdsa.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdsa.c:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdsa.c.
+[53/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_trace.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_trace.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_trace.c.
+[54/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk.c.
+[55/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/asn1write.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/asn1write.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/asn1write.c.
+[56/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_cipher.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_cipher.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_cipher.c.
+[57/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version.c.
+[58/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/lmots.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/lmots.c:21:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/lmots.c.
+[59/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_pake.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_pake.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_pake.c.
+[60/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecjpake.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecjpake.c:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecjpake.c.
+[61/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cipher_wrap.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cipher_wrap.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cipher_wrap.c.
+[62/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdh.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdh.c:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdh.c.
+[63/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/nist_kw.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/nist_kw.c:18:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/nist_kw.c.
+[64/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/hmac_drbg.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/hmac_drbg.c:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/hmac_drbg.c.
+[65/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod_raw.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod_raw.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod_raw.c.
+[66/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp_curves.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp_curves.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp_curves.c.
+[67/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_client.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_client.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_client.c.
+[68/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/gcm.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/gcm.c:18:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/gcm.c.
+[69/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkwrite.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkwrite.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkwrite.c.
+[70/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp.c:32:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp.c.
+[71/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy_poll.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy_poll.c:15:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy_poll.c.
+[72/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version_features.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version_features.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version_features.c.
+[73/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_util.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_util.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_util.c.
+[74/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_cache.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_cache.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_cache.c.
+[75/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_crl.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_crl.c:18:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_crl.c.
+[76/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_driver_wrappers_no_static.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_driver_wrappers_no_static.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_driver_wrappers_no_static.c.
+[77/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/des.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/des.c:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/des.c.
+[78/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha256.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha256.c:51:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha256.c.
+[79/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs7.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs7.c:5:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs7.c.
+[80/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pem.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pem.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pem.c.
+[81/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_reader.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_reader.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_reader.c.
+[82/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/poly1305.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/poly1305.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/poly1305.c.
+[83/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_debug_helpers_generated.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_debug_helpers_generated.c:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_debug_helpers_generated.c.
+[84/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesce.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesce.c:42:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesce.c.
+[85/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/block_cipher.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/block_cipher.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/block_cipher.c.
+[86/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/error.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/error.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/error.c.
+[87/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cmac.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cmac.c:29:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cmac.c.
+[88/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_its_file.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_its_file.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_its_file.c.
+[89/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_ffdh.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_ffdh.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_ffdh.c.
+[90/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aes.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aes.c:14:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aes.c.
+[91/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_ticket.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_ticket.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_ticket.c.
+[92/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/platform_util.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/platform_util.c:23:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/platform_util.c.
+[93/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto.c.
+[94/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy.c.
+[95/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/rsa_alt_helpers.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/rsa_alt_helpers.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/rsa_alt_helpers.c.
+[96/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_aead.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_aead.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_aead.c.
+[97/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls12_client.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls12_client.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls12_client.c.
+[98/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_storage.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_storage.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_storage.c.
+[99/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_client.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_client.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_client.c.
+[100/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_mac.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_mac.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_mac.c.
+[101/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chachapoly.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chachapoly.c:9:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chachapoly.c.
+[102/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod.c.
+[103/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chacha20.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chacha20.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chacha20.c.
+[104/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/debug.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/debug.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/debug.c.
+[105/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/md.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/md.c:12:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/md.c.
+[106/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/timing.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/timing.c:8:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/timing.c.
+[107/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/dhm.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/dhm.c:16:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/dhm.c.
+[108/108] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesni.c.
+In file included from /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesni.c:13:
+/home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/common.h:14:10: fatal error: 'mbedtls/build_info.h' file not found
+   14 | #include "mbedtls/build_info.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesni.c.
+[CodeSkeptic] 108 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_create.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/base64.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/asn1parse.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/oid.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509write_crt.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha1.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_client.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/lms.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha512.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_ecp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ctr_drbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk_ecc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_crt.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/memory_buffer_alloc.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_rsa.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs12.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_msg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_csr.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/rsa.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk_wrap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkparse.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/platform.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_core.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ccm.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp_curves_new.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/padlock.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_slot_management.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509write_csr.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_hash.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/camellia.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_ciphersuites.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls12_server.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ripemd160.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_keys.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/net_sockets.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/threading.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/md5.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/constant_time.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs5.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/hkdf.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_server.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aria.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_se.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_generic.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cipher.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha3.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_cookie.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdsa.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_trace.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pk.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/asn1write.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_cipher.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/lmots.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_pake.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecjpake.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cipher_wrap.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecdh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/nist_kw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/hmac_drbg.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod_raw.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp_curves.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_client.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/gcm.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkwrite.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ecp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy_poll.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/version_features.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_util.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_cache.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/x509_crl.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_driver_wrappers_no_static.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/des.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/sha256.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pkcs7.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/pem.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/mps_reader.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/poly1305.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_debug_helpers_generated.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesce.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/block_cipher.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/error.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/cmac.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_its_file.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_ffdh.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aes.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_ticket.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/platform_util.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/entropy.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/rsa_alt_helpers.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_aead.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls12_client.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_storage.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/ssl_tls13_client.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/psa_crypto_mac.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chachapoly.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/bignum_mod.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/chacha20.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/debug.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/md.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/timing.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/dhm.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/mbedtls-3.6.2/library/aesni.c
+[CodeSkeptic] ANALYSIS FAILED: every translation unit failed to compile - NOTHING was analyzed, so this is not a clean result (exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), pass --build-path with your compile_commands.json, or use --analyze-broken-tus to force analysis on error-recovery ASTs.

@@ -1,0 +1,301 @@
+sible null dereference: 'pNew' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:127698:5 'pNew' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:127700:5 'pNew' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:127792:9 [warning] null-deref: Possible null dereference: 'pColl2' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128786:13 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128777:7 'pPk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128784:7 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128819:9 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128848:11 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128893:15 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:128934:15 'pPk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129603:26 [warning] null-deref: Possible null dereference: 'zHaystack' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129576:7 'zHaystack' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129580:7 'zHaystack' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129585:7 'zHaystack' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129586:11 'zHaystack' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129594:9 'zHaystack' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:129597:12 'zHaystack' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130437:39 [warning] null-deref: Possible null dereference: 'zBlob' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130429:7 'zBlob' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130438:39 'zBlob' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130563:25 [warning] null-deref: Possible null dereference: 'pBlob' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130557:3 'pBlob' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130849:17 [warning] null-deref: Possible null dereference: 'aLen' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130792:3 'aLen' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130837:17 'aLen' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130850:48 [warning] null-deref: Possible null dereference: 'azChar' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130793:3 'azChar' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130818:7 'azChar' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130820:11 'azChar' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:130838:39 'azChar' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:131568:5 [warning] null-deref: Possible null dereference: 'pDef' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:131569:5 'pDef' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133559:5 [warning] null-deref: Possible null dereference: 'pStep' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133396:5 'pStep' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133548:9 'pStep' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133552:11 'pStep' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133557:9 'pStep' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133563:5 [warning] null-deref: Possible null dereference: 'pTrigger' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133391:7 'pTrigger' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133513:5 'pTrigger' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133518:9 'pTrigger' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133560:5 'pTrigger' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133561:5 'pTrigger' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133694:40 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:133691:5 'pPk' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134093:13 [warning] null-deref: Possible null dereference: 'pInfo' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134079:12 'pInfo' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134080:9 'pInfo' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134081:7 'pInfo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134085:7 'pInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134087:7 'pInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134088:7 'pInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134090:7 'pInfo' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134413:15 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134348:5 'p' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135165:35 [warning] null-deref: Possible null dereference: 'pList' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134564:3 'pList' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134659:38 'pList' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134671:7 'pList' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:134855:9 'pList' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135163:11 'pList' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135187:7 'pList' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135077:18 'pList' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135108:33 'pList' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135160:22 'pList' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136199:60 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135556:3 'pPk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135595:5 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135885:7 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136340:10 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:135596:16 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136178:22 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136180:49 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136194:52 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136198:22 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136200:17 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136825:40 [warning] null-deref: Possible null dereference: 'pSrcExpr' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136760:27 'pSrcExpr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136818:7 'pSrcExpr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136915:5 'pSrcExpr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136921:5 'pSrcExpr' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:137000:14 [warning] null-deref: Possible null dereference: 'pSrcIdx' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136835:31 'pSrcIdx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136838:9 'pSrcIdx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136969:31 'pSrcIdx' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136973:45 'pSrcIdx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136996:18 'pSrcIdx' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:136997:29 'pSrcIdx' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:137128:21 [warning] null-deref: Possible null dereference: 'azCols' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:137080:3 'azCols' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:137116:15 'azCols' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:137160:5 'azCols' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140052:7 [warning] null-deref: Possible null dereference: 'aOp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140050:7 'aOp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140053:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140054:7 'aOp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140315:9 [warning] null-deref: Possible null dereference: 'aOp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140313:9 'aOp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140316:9 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140317:9 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140318:9 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:140319:9 'aOp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141323:44 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141319:11 'pPk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141322:11 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141364:15 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141626:13 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141324:51 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141527:39 [warning] null-deref: Possible null dereference: 'pCheck' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141517:11 'pCheck' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141524:19 'pCheck' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141525:42 'pCheck' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141814:9 [warning] null-deref: Possible null dereference: 'aOp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141804:7 'aOp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141806:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141807:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141808:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141809:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141810:7 'aOp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141827:7 [warning] null-deref: Possible null dereference: 'aOp' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141825:7 'aOp' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141828:7 'aOp' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:141829:7 'aOp' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144293:26 [warning] null-deref: Possible null dereference: 'pE2' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144924:7 [warning] null-deref: Possible null dereference: 'pSort' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144811:7 'pSort' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144812:7 'pSort' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144822:9 'pSort' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144858:9 'pSort' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:144941:9 'pSort' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145006:11 'pSort' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145911:33 [warning] null-deref: Possible null dereference: 'pEList' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145897:7 'pEList' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145934:17 [warning] null-deref: Possible null dereference: 'pColExpr' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145919:14 'pColExpr' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145957:29 'pColExpr' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145923:11 'pColExpr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145924:11 'pColExpr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145925:11 'pColExpr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145928:20 'pColExpr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145929:16 'pColExpr' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145932:17 'pColExpr' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145978:25 [warning] null-deref: Possible null dereference: 'aCol' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145899:5 'aCol' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145904:5 'aCol' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:145957:29 'aCol' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:146445:3 [warning] null-deref: Possible null dereference: 'pFirstRec' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:146402:20 'pFirstRec' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:146412:12 'pFirstRec' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:146449:3 'pFirstRec' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:147249:20 [warning] null-deref: Possible null dereference: 'pOrderBy' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:147233:13 'pOrderBy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:147222:22 'pOrderBy' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150440:9 [warning] null-deref: Possible null dereference: 'pKeyInfo' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150654:24 [warning] null-deref: Possible null dereference: 'pList' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150624:15 'pList' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150678:5 'pList' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150706:18 [warning] null-deref: Possible null dereference: 'pIdx' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:150702:19 'pIdx' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:152361:37 [warning] null-deref: Possible null dereference: 'pAggInfo' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151078:3 'pAggInfo' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151886:5 'pAggInfo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151887:9 'pAggInfo' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:152317:39 'pAggInfo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151894:5 'pAggInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151903:5 'pAggInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151904:5 'pAggInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151917:30 'pAggInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151918:44 'pAggInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:151919:36 'pAggInfo' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153598:40 [warning] null-deref: Possible null dereference: 'pNew' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153574:3 'pNew' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153589:42 'pNew' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153740:22 [warning] null-deref: Possible null dereference: 'pNew' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153717:3 'pNew' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153722:29 'pNew' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:153734:18 'pNew' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155009:41 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154696:19 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154714:11 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154893:5 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154896:11 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154904:11 'pPk' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:154906:11 'pPk' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155464:13 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155450:5 'pPk' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155461:7 'pPk' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155521:13 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155518:7 'pPk' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155886:45 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155879:7 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155880:17 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155909:53 [warning] null-deref: Possible null dereference: 'pUpsert' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155869:3 'pUpsert' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:155910:25 'pUpsert' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157117:10 [warning] null-deref: Possible null dereference: 'pTab' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157113:3 'pTab' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157287:7 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157272:27 'p' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157278:5 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157279:16 'p' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157280:34 'p' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:157283:19 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159316:11 [warning] null-deref: Possible null dereference: 'zAff' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159252:3 'zAff' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159302:13 'zAff' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159312:44 'zAff' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159313:11 'zAff' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159315:54 'zAff' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160001:11 [warning] null-deref: Possible null dereference: 'pCompare' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159990:13 'pCompare' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159992:13 'pCompare' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:159994:11 'pCompare' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160518:39 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160511:7 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160512:47 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160513:18 'pPk' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160514:45 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160669:59 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160667:9 'pPk' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160788:28 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:160781:25 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161088:20 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161084:7 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161085:13 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161248:20 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161244:7 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161245:13 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161586:29 [warning] null-deref: Possible null dereference: 'pRight' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161473:3 'pRight' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161474:8 'pRight' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161477:16 'pRight' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161486:15 'pRight' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:161584:34 'pRight' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:162455:15 [warning] null-deref: Possible null dereference: 'pLeft' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:162447:5 'pLeft' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164505:5 [warning] null-deref: Possible null dereference: 'pLoop' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164513:11 'pLoop' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164484:9 'pLoop' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164490:21 'pLoop' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164491:15 'pLoop' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164689:18 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164686:5 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164688:16 'pPk' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164755:27 [warning] null-deref: Possible null dereference: 'pOrderBy' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164615:7 'pOrderBy' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:164749:19 'pOrderBy' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167403:10 [warning] null-deref: Possible null dereference: 'pTerm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167402:10 'pTerm' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167504:9 [warning] null-deref: Possible null dereference: 'pbRetryLimit' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167404:10 'pbRetryLimit' is null on this branch (per this condition)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167622:27 [warning] null-deref: Possible null dereference: 'pTerm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:167618:7 'pTerm' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168396:46 [warning] null-deref: Possible null dereference: 'pIndex' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168274:11 'pIndex' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168278:9 'pIndex' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168280:17 'pIndex' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168349:13 'pIndex' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168401:11 'pIndex' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168389:29 'pIndex' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168556:54 [warning] div-by-zero: Possible division by zero: 'nOrderBy' may be zero on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168820:47 [warning] null-deref: Possible null dereference: 'aSortCost' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168687:3 'aSortCost' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168811:15 'aSortCost' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:168812:13 'aSortCost' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170219:61 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170147:9 'pPk' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170151:9 'pPk' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170283:3 [warning] null-deref: Possible null dereference: 'pWInfo' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169721:3 'pWInfo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169724:5 'pWInfo' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170151:9 'pWInfo' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170288:7 'pWInfo' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169727:3 'pWInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169728:3 'pWInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169729:3 'pWInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169733:3 'pWInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169734:29 'pWInfo' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:169735:3 'pWInfo' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:170605:17 [warning] null-deref: Possible null dereference: 'pPk' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171571:11 [warning] null-deref: Possible null dereference: 'pSub' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171572:11 'pSub' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171573:11 'pSub' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171744:7 [warning] null-deref: Possible null dereference: 'pSub' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171625:5 'pSub' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171728:5 'pSub' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:171746:7 'pSub' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:178280:39 [warning] null-deref: Possible null dereference: 'pList' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:178275:3 'pList' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:178279:9 'pList' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184653:5 [warning] null-deref: Possible null dereference: 'db' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184375:3 'db' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184376:7 'db' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184385:7 'db' assigned null here
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184642:7 'db' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:184651:5 'db' assigned null here
+/home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:185862:10 [warning] null-deref: Possible null dereference: 'zFilename' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:185855:7 'zFilename' is null on this branch (per this condition)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/sqwork/sqlite3.c:185858:10 'zFilename' is null on this branch (per this condition)
+----------------------------------------

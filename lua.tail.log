@@ -1,0 +1,171 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (40 files, 9 rules)
+[1/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldump.c.
+[2/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c.
+[3/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstring.c.
+[4/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ltablib.c.
+[5/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ltable.c.
+[6/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lfunc.c.
+[7/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstate.c.
+[8/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldebug.c.
+[9/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lapi.c.
+[10/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lobject.c.
+[11/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lctype.c.
+[12/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/llex.c.
+[13/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lutf8lib.c.
+[14/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/linit.c.
+[15/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib21.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib21.c:1:10: fatal error: 'lua.h' file not found
+    1 | #include "lua.h"
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib21.c.
+[16/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib2.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib2.c:1:10: fatal error: 'lua.h' file not found
+    1 | #include "lua.h"
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib2.c.
+[17/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib11.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib11.c:1:10: fatal error: 'lua.h' file not found
+    1 | #include "lua.h"
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib11.c.
+[18/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib1.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib1.c:1:10: fatal error: 'lua.h' file not found
+    1 | #include "lua.h"
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib1.c.
+[19/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib22.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib22.c:1:10: fatal error: 'lua.h' file not found
+    1 | #include "lua.h"
+      |          ^~~~~~~
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib22.c.
+[20/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lvm.c.
+[21/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmem.c.
+[22/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lauxlib.c.
+[23/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lgc.c.
+[24/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ltests.c.
+[25/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lzio.c.
+[26/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldo.c.
+[27/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lcode.c.
+[28/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loadlib.c.
+[29/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lparser.c.
+[30/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lcorolib.c.
+[31/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c.
+[32/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lopcodes.c.
+[33/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmathlib.c.
+[34/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/onelua.c.
+[35/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c.
+[36/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lundump.c.
+[37/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lbaselib.c.
+[38/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lua.c.
+[39/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loslib.c.
+[40/40] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ltm.c.
+[CodeSkeptic] 5 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib21.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib2.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib11.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib1.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/testes/libs/lib22.c
+CodeSkeptic: 36 finding(s)
+----------------------------------------
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lauxlib.c:485:3 [warning] null-deref: Possible null dereference: 'box' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lauxlib.c:479:3 'box' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lauxlib.c:480:27 'box' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lauxlib.c:486:3 'box' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:197:7 [warning] null-deref: Possible null dereference: 'options' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:153:3 'options' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:155:3 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:170:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:178:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:180:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:185:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:189:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:193:7 'options' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/ldblib.c:195:7 'options' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lgc.c:1195:18 [warning] null-deref: Possible null dereference: 'next' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:182:37 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:178:3 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:179:7 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:192:10 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:188:3 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:189:7 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:216:31 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:215:3 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:217:3 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:237:23 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:236:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:249:37 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:247:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:287:29 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:285:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:295:3 [warning] null-deref: Possible null dereference: 'mode' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:293:3 'mode' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:317:10 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:314:3 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:315:7 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:590:17 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:589:13 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:643:17 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:634:3 'p' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:637:7 'p' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:812:3 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/liolib.c:811:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmathlib.c:578:24 [warning] null-deref: Possible null dereference: 'state' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmathlib.c:577:3 'state' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmathlib.c:643:16 [warning] null-deref: Possible null dereference: 'state' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lmathlib.c:636:3 'state' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loadlib.c:557:10 [warning] null-deref: Possible null dereference: 'modname' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loadlib.c:556:3 'modname' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loadlib.c:582:19 [warning] null-deref: Possible null dereference: 'name' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loadlib.c:581:3 'name' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loslib.c:319:7 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loslib.c:306:3 's' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/loslib.c:310:7 's' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lparser.c:1452:54 [warning] null-deref: Possible null dereference: 'lb' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lparser.c:1449:3 'lb' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstate.c:111:3 [warning] null-deref: Possible null dereference: 'ci' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstate.c:108:3 'ci' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstate.c:112:3 'ci' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstate.c:113:3 'ci' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:118:12 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:115:3 's' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:131:20 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:128:3 's' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:144:20 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:141:3 's' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:190:24 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:179:3 's' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:795:19 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:776:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:846:17 [warning] null-deref: Possible null dereference: 'gm' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:839:3 'gm' assigned a possibly-null value here (callee may return null)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:841:3 'gm' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:842:30 'gm' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:844:18 'gm' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:845:58 'gm' is also dereferenced here (same origin)
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:847:29 'gm' is also dereferenced here (same origin)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:949:17 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:945:3 'p' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1355:13 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1610:10 [warning] null-deref: Possible null dereference: 'fmt' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1604:3 'fmt' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1683:9 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1705:10 [warning] null-deref: Possible null dereference: 'fmt' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1702:3 'fmt' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1763:10 [warning] null-deref: Possible null dereference: 'fmt' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lstrlib.c:1756:3 'fmt' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lua.c:536:9 [warning] null-deref: Possible null dereference: 'line' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lua.c:531:3 'line' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lua.c:634:17 [warning] null-deref: Possible null dereference: 'argv' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lua.c:628:3 'argv' assigned a possibly-null value here (callee may return null)
+/home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lutf8lib.c:261:3 [warning] null-deref: Possible null dereference: 's' may be null on some paths
+    -> /home/runner/work/CodeSkeptic/CodeSkeptic/lua-5.4.7/lutf8lib.c:260:3 's' assigned a possibly-null value here (callee may return null)
+----------------------------------------
