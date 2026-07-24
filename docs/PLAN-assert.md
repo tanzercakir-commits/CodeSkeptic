@@ -65,18 +65,42 @@ taranır; FP çöküşü ÖLÇÜLÜR (beklenti: lua 36→~0, sqlite/curl büyük
 düşüş). Yan etki dürüstlüğü: debug define'ları başka kod da açar
 (sqlite'ta çok); sayılar bunu da gösterecek — susturulmaz, raporlanır.
 
-### AR.3 — Kaybolan-assert kurtarma (MOTOR dilimi, ORTA, ~%5-8, max) — ★ ZORUNLU (AR.2 ölçümü define-yolunu eledi)
-AR.2 sayıları "define'la açmak yetmiyor/istenmiyor" derse: Clang
-PPCallbacks ile, kayıtlı assert-benzeri makroların (assert,
-lua_assert, DEBUGASSERT, ... — config listesi) BOŞ genişleyen
-çağrılarını yakala; argüman token'larını dar v1 şekillerinde çöz
-(`x`, `x != NULL`, `x && y`); genişleme konumuna bir "sanal guard"
-kaydı düş; akış transferi o konumda refineOnEdge eşdeğerini uygular.
-- Repo'da PP altyapısı HENÜZ YOK (grep doğrulandı) → yeni alt sistem.
-- Risk ORTA: token-düzeyi çözümleme + konum eşleme incelikleri;
-  v1 şekil listesi bilinçli dar, her genişletme pinli.
-- Not: --fatal-asserts'ten FARKLI iş (o, görünür ÇAĞRIları noreturn
-  sayar; bu, GÖRÜNMEYEN makroları kurtarır). İkisi tamamlayıcı.
+### AR.3 — Kaybolan-assert kurtarma (MOTOR dilimi) — ✔ UYGULANDI (2026-07-25)
+
+Clang `PPCallbacks::MacroExpands` ile, koşulunu ATAN assert-benzeri
+makroların çağrıları yakalanır; argüman token'ları dar bir null-sabiti
+grameriyle çözülür; genişleme konumuna "sanal guard" düşer;
+`DataflowEngine` sonraki deyimden ÖNCE `applyAssertGuard`'ı çağırır
+(NullDerefRule NonNull'a daraltır). `--fatal-asserts`ten FARKLI iş: o,
+görünür ÇAĞRIları noreturn sayar; bu, GÖRÜNMEYEN makroları kurtarır.
+
+Dört kapı (hepsi geçilmeden kayıt yok):
+1. **Gövde koşulu atıyor mu** — makro gövdesi argümanı KULLANIYORSA
+   koşul zaten AST'de; kurtarma yok (AR.1'in pinlediği canlı yol
+   dokunulmadan çalışır, çift-işleme yapısal olarak imkânsız).
+2. **Adı assert-benzeri mi** — "assert" alt-dizisi (harf duyarsız)
+   veya `--assert-macros` ile açıkça bildirilmiş.
+3. **Token şekli dar mı** — `x`, `x != NULL`, `NULL != x`, `A && B`
+   (üstünde `||` YOKSA konjonktler ayrı ayrı düşürülebilir; `||`
+   varsa TÜM kayıt reddedilir). NULL yazımları: `NULL`, `nullptr`,
+   `0`, `(void*)0`, `((void*)0)` — hepsi dilin kurallarınca null
+   pointer sabiti, ek varsayım eklemez.
+4. **Konum kanıtlanabilir mi** — guard, genişlemeden SONRAKİ ilk
+   deyime bağlanır; parantezsiz `if`/`while` gövdesi, `switch`
+   düşmesi, `goto`/etiket, gölgelenmiş/çift isim → reddedilir.
+
+**Dürüst kayıt:** bu bir SAĞLAMLIK düzeltmesi DEĞİL. NDEBUG'lu build
+o kontrolü gerçekten çalıştırmaz. Bu, "yazarın assert'i, olduğunu
+söylediği invaryanttır" kararının bilinçli, ilan edilmiş kabulüdür —
+`--no-assert-recovery` ile kapatılır (o zaman rapor, sevk edilen
+build'in gördüğü koda birebir uyar).
+
+v1 kapsam dışı: tamsayı `!= 0` assert'leri, alan/dizi özneleri, başka
+bir makro genişlemesi içine gömülü assert'ler, MCP sıcak-AST yolu.
+
+Batarya: `tests/AssertRecoveryTest.cpp`, 31 test (kontrol / susan
+şekiller / dört kapının reddettikleri / canlı-yol regresyonu / config
+/ mekanizma sayacı). Toplam süit 734 → 765, sıfır regresyon.
 
 ## Sıra ve karar kapısı
 

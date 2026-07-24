@@ -30,6 +30,17 @@ codeskeptic <source_path> [options]
                          handler deliberately lacks [[noreturn]]: kills
                          the failure path so guarded code stops warning
                          (e.g. --fatal-asserts assert_fail_impl)
+  --assert-macros <names> Also treat these macros as assertions (comma
+                         list). Macro names containing "assert" (any
+                         case) are recognised automatically; use this
+                         for project spellings that do not
+                         (e.g. --assert-macros CHECK_PTR,REQUIRE)
+  --no-assert-recovery   Disable vanished-assert recovery. By default,
+                         an assertion compiled out by NDEBUG (its
+                         condition never reaches the parser) is
+                         recovered from the preprocessor and its
+                         null-check believed. This flag reports the
+                         code exactly as the shipped build sees it
   --alloc-functions <names> Treat these functions as heap allocators
                          (comma list). Extends leak/double-free/UAF
                          analysis to project wrappers
@@ -74,7 +85,8 @@ Set it only when analyzing with a resource dir in a non-standard place.
 Options can also be set in a `.codeskeptic.conf` file (`key=value` lines:
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
-`function`, `fatal_asserts`, `alloc_functions`, `free_functions`).
+`function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
+`alloc_functions`, `free_functions`).
 
 Project idioms are configuration, not code: allocator wrappers, fatal
 assert handlers and owning smart pointers belong in the project's conf

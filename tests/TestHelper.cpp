@@ -1,6 +1,7 @@
 #include "TestHelper.h"
 
 #include "contracts/Sidecar.h"
+#include "engine/AssertGuards.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "engine/ImmutableFlags.h"
@@ -30,6 +31,7 @@ public:
         codeskeptic::CfgCache::instance().clear();
         codeskeptic::ParamIntervalCache::instance().clear();
         codeskeptic::ImmutableFlagCache::instance().clear();
+        codeskeptic::AssertGuardCache::instance().clear();
         codeskeptic::clearSidecarCache();
     }
 
@@ -44,8 +46,12 @@ public:
         : rule_(rule), results_(results) {}
 
     std::unique_ptr<clang::ASTConsumer>
-    CreateASTConsumer(clang::CompilerInstance& /*ci*/,
+    CreateASTConsumer(clang::CompilerInstance& ci,
                       llvm::StringRef /*file*/) override {
+        // Same wiring as production (SourceManager.cpp): the vanished-
+        // assert PP hook must be installed before preprocessing runs,
+        // otherwise AR.3 is silently inert in the whole test suite.
+        codeskeptic::installAssertRecovery(ci);
         return std::make_unique<TestASTConsumer>(rule_, results_);
     }
 
@@ -63,14 +69,16 @@ public:
         registry.harvestGlobal();
         registry.clear();
         codeskeptic::CfgCache::instance().clear();
+        codeskeptic::AssertGuardCache::instance().clear();
     }
 };
 
 class HarvestAction : public clang::ASTFrontendAction {
 public:
     std::unique_ptr<clang::ASTConsumer>
-    CreateASTConsumer(clang::CompilerInstance& /*ci*/,
+    CreateASTConsumer(clang::CompilerInstance& ci,
                       llvm::StringRef /*file*/) override {
+        codeskeptic::installAssertRecovery(ci);
         return std::make_unique<HarvestASTConsumer>();
     }
 };

@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/AssertGuards.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/FunctionSummary.h"
@@ -1021,6 +1022,26 @@ public:
                         val.st = val.condSt;
                 }
             });
+    }
+
+    // Vanished-assert guard (AR.3). The condition was thrown away by
+    // the preprocessor, so there is no edge and no Expr to refine on —
+    // AssertGuards.cpp already resolved the subject to a VarDecl and
+    // proved the placement dominates this statement. All that is left
+    // is the same narrowing refineOnEdge would have produced.
+    //
+    // Applied to EVERY disjunct: the assert holds on whatever path
+    // reaches it, so no disjunct may keep a weaker belief. setIfTracked
+    // only touches variables the domain is already tracking (an
+    // untracked var stays untracked — a guard is not a reason to start
+    // tracking) and resets the guard implication, exactly as a real
+    // narrowing does.
+    void applyAssertGuard(const codeskeptic::AssertGuard& g, State& state,
+                          ASTContext& /*ctx*/) const {
+        if (g.kind != codeskeptic::AssertGuard::Kind::NonNull) return;
+        if (!g.var) return;
+        for (auto& d : state)
+            setIfTracked(d.vars, g.var, NullState::NonNull);
     }
 
     // Caller-side contract check (CONTRACTS.md Round C): every

@@ -1,6 +1,7 @@
 #include "source_manager/SourceManager.h"
 
 #include "core/Messages.h"
+#include "engine/AssertGuards.h"
 #include "source_manager/ResourceDir.h"
 
 #include <filesystem>
@@ -66,8 +67,14 @@ public:
         : callback_(std::move(callback)) {}
 
     std::unique_ptr<clang::ASTConsumer>
-    CreateASTConsumer(clang::CompilerInstance& /*ci*/,
+    CreateASTConsumer(clang::CompilerInstance& ci,
                       llvm::StringRef /*file*/) override {
+        // AR.3: the vanished-assert recorder is a PPCallbacks hook, so
+        // it must be installed HERE, before preprocessing. The warm-AST
+        // path (processAllOnWorker) never reaches this point and is
+        // therefore inert — AssertGuardCache's SourceManager fence
+        // makes that a no-op rather than a stale-pointer read.
+        codeskeptic::installAssertRecovery(ci);
         return std::make_unique<CodeSkepticASTConsumer>(callback_);
     }
 

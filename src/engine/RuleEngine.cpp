@@ -2,6 +2,7 @@
 
 #include "engine/ImmutableFlags.h"
 
+#include "engine/AssertGuards.h"
 #include "engine/CfgCache.h"
 #include "engine/FunctionSummary.h"
 #include "engine/ParamIntervals.h"
@@ -41,6 +42,11 @@ DiagnosticList RuleEngine::runAll(clang::ASTContext& ctx) {
     CfgCache::instance().clear();
     ParamIntervalCache::instance().clear();
     ImmutableFlagCache::instance().clear();
+    // AR.3: the guard cache is keyed by FunctionDecl* and holds Stmt*
+    // values — the same dangling-pointer exposure, plus a worse one. A
+    // recycled FunctionDecl address in the next TU would not just be
+    // stale, it would silently apply ANOTHER file's asserts as facts.
+    AssertGuardCache::instance().clear();
     return results;
 }
 

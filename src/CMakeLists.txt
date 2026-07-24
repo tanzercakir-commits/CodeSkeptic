@@ -4,6 +4,7 @@ add_library(codeskeptic_core STATIC
     source_manager/SourceManager.cpp
     source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
+    engine/AssertGuards.cpp
     engine/CfgCache.cpp
     engine/FatalCalls.cpp
     engine/ImmutableFlags.cpp

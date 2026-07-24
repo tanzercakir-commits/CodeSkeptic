@@ -130,9 +130,8 @@ Synthetic benchmarks reward pattern coverage; real codebases punish
 every false positive. Each project below was built with its own build
 system, analyzed from its compilation database, and every surviving
 finding was triaged by hand. All numbers are from one analyzer build
-(2026-07-12); the "initial" column is what the same scan reported when
-the project was first tried, before the false-positive families it
-exposed were fixed.
+(2026-07-12); "initial" is what the same scan reported the first time
+the project was tried, before the FP families it exposed were fixed.
 
 | Project | Scope | Initial → now | Hand-verified real bugs |
 |---------|-------|--------------:|------------------------|
@@ -156,8 +155,7 @@ null `FILE*` on the next line
 ([#4702](https://github.com/shadps4-emu/shadPS4/pull/4702)). Real
 bugs, found from a compilation database, accepted by the people who
 own the code. How these numbers are kept honest — idiom configuration
-and the FP-family process — is in
-[docs/benchmarks.md](docs/benchmarks.md#reading-the-real-world-scan-numbers).
+and the FP-family process — is in [docs/benchmarks.md](docs/benchmarks.md#reading-the-real-world-scan-numbers).
 
 ## What it won't catch
 
@@ -170,13 +168,15 @@ Read its silence accordingly:
 - **Recall is bounded and measured.** On Juliet, recall ranges from
   0.496 (use-after-free) down to 0.052 (integer overflow) — and every
   missed case is *classified*: by-design silences (float division,
-  opaque `rand()` sources) vs addressable gaps, so the denominator is
-  honest. Numbers, classification and why: [docs/benchmarks.md](docs/benchmarks.md).
+  opaque `rand()`) vs addressable gaps, so the denominator is honest.
+  Numbers and why: [docs/benchmarks.md](docs/benchmarks.md).
 - **`memory-leak` is the one noisy rule** (Juliet precision 0.714 vs
-  1.000 for the others) and the standing improvement target. Evaluate
+  1.000 for the others) and the standing improvement target — evaluate
   it separately ([how](docs/evaluate.md)).
-- Checked bug classes only: the [rules below](#rules) — not style, not
-  concurrency, not undefined behavior at large.
+- **A compiled-out assert is believed, not checked.** Under `NDEBUG` the
+  condition never runs, but CodeSkeptic recovers it from the preprocessor
+  and trusts it — `--no-assert-recovery` reports the shipped build instead.
+- Checked bug classes only: the [rules below](#rules) — not style, not concurrency, not undefined behavior at large.
 
 ## Use it alongside, not instead
 

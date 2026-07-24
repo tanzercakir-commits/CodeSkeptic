@@ -18,6 +18,7 @@ add_executable(codeskeptic_tests
     IntOverflowRuleTest.cpp
     BoundsRuleTest.cpp
     NullDerefRuleTest.cpp
+    AssertRecoveryTest.cpp
     SarifReporterTest.cpp
     HtmlReporterTest.cpp
     CfgCacheTest.cpp

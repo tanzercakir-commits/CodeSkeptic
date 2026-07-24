@@ -1,5 +1,57 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-25 — AR.3: recovering the assert the compiler threw away
+
+The ecosystem FP family that five independent audits kept producing
+has an engine answer now. Under NDEBUG an assert's condition never
+reaches the parser — curl's DEBUGASSERT expands to NOTHING, glibc's
+assert to `(__ASSERT_VOID_CAST (0))` — so there is no AST node to
+narrow and no amount of dataflow work can find one. New subsystem
+`src/engine/AssertGuards.{h,cpp}` intercepts the expansion itself via
+`PPCallbacks::MacroExpands`, parses the argument tokens, and records a
+"virtual guard" that `DataflowEngine` applies to the following
+statement (`applyAssertGuard`, an optional SFINAE hook alongside the
+existing `refineOnEdge`/`widen` family; NullDerefRule implements it).
+Different work from `--fatal-asserts`, which makes VISIBLE calls
+noreturn — this recovers INVISIBLE macros. The two compose.
+
+Four gates, all of which must pass before anything is recorded: the
+macro body must genuinely DISCARD its argument (if the body uses it,
+the condition is already in the AST and AR.1's live path handles it —
+double-handling is structurally impossible, not merely avoided); the
+name must look like an assertion ("assert" substring, case-insensitive,
+plus `--assert-macros` for project spellings); the token shape must
+match a deliberately narrow null-constant grammar (`x`, `x != NULL`,
+`NULL != x`, conjunctions — with a top-level `||` vetoing the whole
+record, since `p || q && r` does not prove `r`); and the placement
+must provably dominate (braceless if/while bodies, switch fallthrough,
+goto/labels and shadowed names are all refused). Every NULL spelling
+accepted — `NULL`, `nullptr`, `0`, `(void*)0`, `((void*)0)` — is a
+null pointer constant by the language rules, so collapsing them adds
+no assumption; `(int)0` and `(void*)q` are rejected.
+
+Stated plainly, because it matters: this is NOT a soundness fix. The
+shipped NDEBUG build really does not run that check. It is a
+deliberate, declared decision to treat the author's assert as the
+invariant they said it was — `--no-assert-recovery` turns it off and
+reports the code exactly as the shipped build sees it. On by default.
+
+33 new tests (`tests/AssertRecoveryTest.cpp`), suite 734 -> 767, zero
+regressions; thesis gate and self-scan unchanged. Two of the tests use
+the REAL `<assert.h>`/`<cassert>` under NDEBUG rather than a paraphrase
+of them, each with an in-snippet control so a box without system
+headers fails loudly instead of passing vacuously on a broken TU.
+
+Two bugs found and fixed by the battery, both real rather than test
+artifacts. Null-constant casts were rejected outright, which would
+have missed every `assert(p != (void*)0)` in real C — replaced the
+flat token whitelist with a recursive grammar. And the straddle check
+could never fire: a location inside a macro body decomposes to the
+macro's EXPANSION POINT, so an enclosing `if`'s end offset lands at
+the macro's BEGIN, never past its end — `if (c) assert(p); return *p;`
+was being silently believed. Rewritten as a three-way containment
+classification.
+
 ## 2026-07-25 — AR.2 measured: the assert-define doctrine is a dirty switch
 
 The scan survey proposed enabling a project's assert define as the

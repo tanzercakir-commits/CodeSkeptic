@@ -1,6 +1,7 @@
 #ifndef CODESKEPTIC_DATAFLOW_ENGINE_H
 #define CODESKEPTIC_DATAFLOW_ENGINE_H
 
+#include "engine/AssertGuards.h"
 #include "engine/CfgCache.h"
 #include "engine/ConditionWalk.h"
 #include "engine/FatalCalls.h"
@@ -63,6 +64,19 @@ template <typename A>
 struct HasWiden<A, std::void_t<decltype(
     std::declval<const A&>().widen(
         std::declval<typename A::State&>()))>> : std::true_type {};
+
+// A domain that can consume a recovered vanished-assert guard (AR.3).
+// Without this hook the guards are collected and simply ignored, so
+// every other analysis stays byte-identical.
+template <typename A, typename = void>
+struct HasAssertGuard : std::false_type {};
+
+template <typename A>
+struct HasAssertGuard<A, std::void_t<decltype(
+    std::declval<A>().applyAssertGuard(
+        std::declval<const AssertGuard&>(),
+        std::declval<typename A::State&>(),
+        std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
 template <typename A, typename = void>
 struct HasOnEdgeRefined : std::false_type {};
@@ -163,6 +177,32 @@ DataflowResult<Analysis> runDataflow(
     // options — including setAllAlwaysAdd — live in CfgCache)
     clang::CFG* cfg = CfgCache::instance().get(func, ctx);
     if (!cfg) return result;
+
+    // Vanished-assert guards (AR.3). Built lazily per function and
+    // empty for every function that contains no compiled-out assert —
+    // which, outside the projects that lean on the idiom, is nearly all
+    // of them. Domains without applyAssertGuard never even look.
+    const AssertGuardMap* guards = nullptr;
+    if constexpr (detail::HasAssertGuard<Analysis>::value)
+        guards = &AssertGuardCache::instance().get(func, ctx);
+    (void)guards;
+
+    // The guard fires as if the assert's condition had survived to the
+    // AST and refined this statement's incoming edge: BEFORE transfer,
+    // and — in the reporting pass — before the `before` snapshot the
+    // rule adjudicates on.
+    auto applyGuards = [&](const clang::Stmt* stmt, State& st) {
+        if constexpr (detail::HasAssertGuard<Analysis>::value) {
+            if (!guards || guards->empty()) return;
+            auto git = guards->find(stmt);
+            if (git == guards->end()) return;
+            for (const AssertGuard& g : git->second)
+                analysis.applyAssertGuard(g, st, ctx);
+        } else {
+            (void)stmt;
+            (void)st;
+        }
+    };
 
     const unsigned numBlocks = cfg->getNumBlockIDs();
 
@@ -388,6 +428,7 @@ DataflowResult<Analysis> runDataflow(
             // successors treat this edge like one from an unreachable
             // predecessor. Elements after the call are dead code.
             if (isFatalCall(stmt)) { pathKilled = true; break; }
+            applyGuards(stmt, currentState);
             currentState = analysis.transfer(stmt, currentState, ctx);
         }
         // Real [[noreturn]] calls (exit, abort, __assert_fail) get the
@@ -442,6 +483,7 @@ DataflowResult<Analysis> runDataflow(
                 // executes, so nothing there is reported either.
                 if (isFatalCall(stmt)) break;
 
+                applyGuards(stmt, currentState);
                 State before = currentState;
                 currentState = analysis.transfer(stmt, currentState, ctx);
                 analysis.onStatement(stmt, before, currentState, ctx);

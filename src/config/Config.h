@@ -82,6 +82,18 @@ public:
         return fatal_asserts_;
     }
 
+    // Vanished-assert recovery (AR.3). Under NDEBUG an assert's
+    // condition never reaches the parser; the engine recovers it from
+    // the preprocessor. On by default — --no-assert-recovery turns it
+    // off, --assert-macros names macros that are assertions but are
+    // not spelled "assert" (see engine/AssertGuards.h).
+    void setAssertRecovery(bool on) { assert_recovery_ = on; }
+    bool assertRecovery() const { return assert_recovery_; }
+    void addAssertMacros(const std::string& list);
+    const std::set<std::string>& assertMacros() const {
+        return assert_macros_;
+    }
+
     // Custom allocator wrappers (--alloc-functions / --free-functions):
     // extend the leak/double-free/UAF domain to project-specific heap
     // wrappers (git__malloc, zmalloc, ...).
@@ -145,6 +157,7 @@ private:
     std::string lang_;
     std::set<std::string> functions_;
     std::set<std::string> fatal_asserts_;
+    std::set<std::string> assert_macros_;
     std::set<std::string> alloc_functions_;
     std::set<std::string> untrusted_int_sources_;
     std::set<std::string> free_functions_;
@@ -156,6 +169,7 @@ private:
     bool serve_ = false;
     bool whole_program_ = false;
     bool analyze_broken_tus_ = false;
+    bool assert_recovery_ = true;
     bool assumptions_ = false;
     bool warm_cache_ = false;
     std::string summary_in_path_;

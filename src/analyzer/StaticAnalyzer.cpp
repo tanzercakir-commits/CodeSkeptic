@@ -7,6 +7,7 @@
 #include "contracts/Policy.h"
 #include "contracts/Sidecar.h"
 #include "engine/AllocFunctions.h"
+#include "engine/AssertGuards.h"
 #include "engine/AssumptionMode.h"
 #include "engine/CfgCache.h"
 #include "engine/CoverageReport.h"
@@ -38,6 +39,8 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setFunctionFilter(config_.functions());
     setLineRanges(config_.lines());
     setFatalCallNames(config_.fatalAsserts());
+    setAssertRecoveryEnabled(config_.assertRecovery());
+    setExtraAssertMacros(config_.assertMacros());
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
     setOwningPointerNames(config_.owningPointers());
@@ -100,6 +103,8 @@ StaticAnalyzer::~StaticAnalyzer() {
     setFunctionFilter({});
     setLineRanges({});
     setFatalCallNames({});
+    setAssertRecoveryEnabled(true);
+    setExtraAssertMacros({});
     setAllocFunctionNames({});
     setFreeFunctionNames({});
     setOwningPointerNames({});
@@ -110,6 +115,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     // analyses in the same process)
     SummaryRegistry::instance().clearGlobal();
     CfgCache::instance().clear();
+    AssertGuardCache::instance().clear();
     CoverageReport::instance().clear();
 }
 
