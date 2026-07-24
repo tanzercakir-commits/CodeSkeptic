@@ -1,0 +1,65 @@
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
+json-compilation-database: Error while opening JSON database: No such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] Analysis starting... (39 files, 9 rules)
+[1/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/utils.c.
+[2/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/epg.c.
+[3/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/stream.c.
+[4/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/poller_kqueue.c.
+[5/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rs_fec.c.
+[6/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/connection.c.
+[7/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/snapshot.c.
+[8/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/hashmap.c.
+[9/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtp2httpd.c.
+[10/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/buffer_pool.c.
+[11/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/timezone.c.
+[12/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/fcc.c.
+[13/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/fcc_telecom.c.
+[14/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/access_log.c.
+[15/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/md5.c.
+[16/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtsp.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtsp.c:31:59: error: expected ';' after top level declarator
+   31 | static const char rtsp_default_user_agent[] = "rtp2httpd/" VERSION;
+      |                                                           ^
+      |                                                           ;
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtsp.c.
+[17/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/supervisor.c.
+[18/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/m3u.c.
+[19/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/embedded_web.c.
+[20/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/status.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/status.c:790:57: error: use of undeclared identifier 'VERSION'
+  790 |                       status_shared->current_log_level, VERSION, config.maxclients) < 0)
+      |                                                         ^
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/status.c.
+[21/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/multicast.c.
+[22/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/worker.c.
+[23/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http.c.
+[24/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtp_fec.c.
+[25/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/fcc_huawei.c.
+[26/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/service.c.
+[27/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/stun.c.
+[28/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_proxy_rewrite.c.
+[29/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/unix_socket.c.
+[30/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtp_reorder.c.
+[31/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_chunked_decoder.c.
+[32/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_fetch.c.
+[33/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/poller_epoll.c.
+[34/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/zerocopy.c.
+[35/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/url_template.c.
+[36/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/pid_file.c.
+[37/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/configuration.c.
+/home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/configuration.c:1278:14: error: use of undeclared identifier 'PACKAGE'
+ 1278 |   fprintf(f, PACKAGE " - Multicast RTP to Unicast HTTP stream convertor\n"
+      |              ^
+1 error generated.
+Error while processing /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/configuration.c.
+[38/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtp.c.
+[39/39] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/http_proxy.c.
+[CodeSkeptic] 3 translation unit(s) failed to COMPILE and were skipped - findings from an error-recovery AST are unreliable. Fix the include paths/flags, or pass --analyze-broken-tus to analyze anyway:
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/rtsp.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/status.c
+  - /home/runner/work/CodeSkeptic/CodeSkeptic/rtp2httpd/src/configuration.c
+CodeSkeptic: Clean! No issues found.
