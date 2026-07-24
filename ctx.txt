@@ -1,0 +1,56 @@
+            FORWARD_IF_ERROR(dictID, "ZSTD_compress_insertDictionary failed");
+            assert(dictID <= (size_t)(U32)-1);
+            cdict->dictID = (U32)dictID;
+        }
+    }
+
+    return 0;
+}
+
+static ZSTD_CDict* ZSTD_createCDict_advanced_internal(size_t dictSize,
+                                      ZSTD_dictLoadMethod_e dictLoadMethod,
+                                      ZSTD_compressionParameters cParams,
+                                      ZSTD_paramSwitch_e useRowMatchFinder,
+                                      U32 enableDedicatedDictSearch,
+                                      ZSTD_customMem customMem)
+{
+    if ((!customMem.customAlloc) ^ (!customMem.customFree)) return NULL;
+
+    {   size_t const workspaceSize =
+            ZSTD_cwksp_alloc_size(sizeof(ZSTD_CDict)) +
+            ZSTD_cwksp_alloc_size(HUF_WORKSPACE_SIZE) +
+            ZSTD_sizeof_matchState(&cParams, useRowMatchFinder, enableDedicatedDictSearch, /* forCCtx */ 0) +
+            (dictLoadMethod == ZSTD_dlm_byRef ? 0
+             : ZSTD_cwksp_alloc_size(ZSTD_cwksp_align(dictSize, sizeof(void*))));
+        void* const workspace = ZSTD_customMalloc(workspaceSize, customMem);
+        ZSTD_cwksp ws;
+        ZSTD_CDict* cdict;
+
+        if (!workspace) {
+            ZSTD_customFree(workspace, customMem);
+            return NULL;
+        }
+
+        ZSTD_cwksp_init(&ws, workspace, workspaceSize, ZSTD_cwksp_dynamic_alloc);
+
+        cdict = (ZSTD_CDict*)ZSTD_cwksp_reserve_object(&ws, sizeof(ZSTD_CDict));
+        assert(cdict != NULL);
+        ZSTD_cwksp_move(&cdict->workspace, &ws);
+        cdict->customMem = customMem;
+        cdict->compressionLevel = ZSTD_NO_CLEVEL; /* signals advanced API usage */
+        cdict->useRowMatchFinder = useRowMatchFinder;
+        return cdict;
+    }
+}
+
+ZSTD_CDict* ZSTD_createCDict_advanced(const void* dictBuffer, size_t dictSize,
+                                      ZSTD_dictLoadMethod_e dictLoadMethod,
+                                      ZSTD_dictContentType_e dictContentType,
+                                      ZSTD_compressionParameters cParams,
+                                      ZSTD_customMem customMem)
+{
+    ZSTD_CCtx_params cctxParams;
+    ZSTD_memset(&cctxParams, 0, sizeof(cctxParams));
+    ZSTD_CCtxParams_init(&cctxParams, 0);
+    cctxParams.cParams = cParams;
+    cctxParams.customMem = customMem;
