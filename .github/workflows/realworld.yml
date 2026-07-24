@@ -117,7 +117,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y llvm-20-dev libclang-20-dev clang-20 \
             libzstd-dev zlib1g-dev ninja-build flex bison \
-            clang-20 lld-20
+            clang-20 lld-20 gcc-mingw-w64-i686 g++-mingw-w64-i686
 
       - name: Build CodeSkeptic
         run: |
@@ -129,6 +129,7 @@ jobs:
       - name: Configure ReactOS (compile db only)
         id: cfg
         run: |
+          set -o pipefail
           git clone --quiet --depth 1 https://github.com/reactos/reactos
           cd reactos
           echo "== toolchain files present:"; ls toolchain-*.cmake || true
