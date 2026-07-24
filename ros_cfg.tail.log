@@ -1,0 +1,42 @@
+CMake Warning at CMakeLists.txt:5 (message):
+  Building with "/usr/local/bin/cmake", which is not the custom CMake
+  included in RosBE, might cause build issues...
+
+
+-- Using linker LD_EXECUTABLE-NOTFOUND
+-- Using linker LD_EXECUTABLE-NOTFOUND
+-- The C compiler identification is Clang 18.1.3
+-- The CXX compiler identification is Clang 18.1.3
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Setting build type to Debug as none was specified.
+-- Found Git: /usr/bin/git (found version "2.54.0")
+-- Found BISON: /usr/bin/bison (found version "3.8.2")
+-- Found FLEX: /usr/bin/flex (found version "2.6.4")
+Cross-compiling on non-msvc, no special host-tools cmake command
+-- Build type: Debug
+-- The ASM compiler identification is GNU
+-- Found assembler: i686-w64-mingw32-gcc
+CMake Error at CMakeLists.txt:293 (enable_language):
+  The CMAKE_ASM_COMPILER:
+
+    i686-w64-mingw32-gcc
+
+  is not a full path and was not found in the PATH.
+
+  Tell CMake where to find the compiler by setting either the environment
+  variable "ASM" or the CMake cache entry CMAKE_ASM_COMPILER to the full path
+  to the compiler, or to the compiler name if it is in the PATH.
+
+
+-- Configuring incomplete, errors occurred!
+CONFIGURE_EXIT=0
+COMPILE_DB=absent
