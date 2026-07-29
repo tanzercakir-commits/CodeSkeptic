@@ -384,6 +384,50 @@ const clang::Stmt* firstElementIn(clang::CFG* cfg,
     return best;
 }
 
+bool isLoopStmt(const clang::Stmt* s) {
+    return llvm::isa<clang::WhileStmt>(s) || llvm::isa<clang::DoStmt>(s) ||
+           llvm::isa<clang::ForStmt>(s) ||
+           llvm::isa<clang::CXXForRangeStmt>(s);
+}
+
+// Gate 4's loop rejection, asked of the object it is actually about.
+//
+// The guard never fires on `next`. It fires on the CFG element that
+// firstElementIn() picks out of `next`, so testing the CLASS of `next`
+// tests the wrong object: anything standing between the two — a
+// `#pragma clang loop` (which wraps the loop in an AttributedStmt), a
+// bare `{ ... }`, nested blocks — leaves the class check satisfied while
+// the guard still lands on a loop condition. That reopened the exact
+// false negative the rejection exists to prevent, one pair of braces
+// apart, and the whole first battery passed over it because every case
+// in it writes the loop directly after the assert.
+//
+// True only when `target` is reachable from `root` WITHOUT descending
+// through a loop. A target that is not in the subtree at all is false as
+// well: placement that cannot be proven is dropped, which is the
+// standing rule of this gate.
+bool targetOutsideEveryLoop(const clang::Stmt* root,
+                            const clang::Stmt* target) {
+    if (!root || !target) return false;
+    bool reached = false;
+    bool viaLoop = false;
+    std::function<void(const clang::Stmt*, bool)> walk =
+        [&](const clang::Stmt* s, bool inLoop) {
+            if (!s || reached) return;
+            // Evaluated BEFORE the identity test, so a target that IS
+            // the loop is rejected on the same footing as one inside it.
+            const bool nowInLoop = inLoop || isLoopStmt(s);
+            if (s == target) {
+                reached = true;
+                viaLoop = nowInLoop;
+                return;
+            }
+            for (const clang::Stmt* c : s->children()) walk(c, nowInLoop);
+        };
+    walk(root, false);
+    return reached && !viaLoop;
+}
+
 } // anonymous namespace
 
 // --- Public configuration -------------------------------------------
@@ -529,12 +573,19 @@ const AssertGuardMap& AssertGuardCache::get(const clang::FunctionDecl* func,
         }
         if (straddled || !next) continue;
 
-        // The target must not be a LOOP. A guard is attached to a
-        // statement and re-applied every time the engine transfers it,
+        auto nb = offsetIn(sm, fid, next->getBeginLoc());
+        auto ne = offsetIn(sm, fid, next->getEndLoc());
+        if (!nb || !ne) continue;
+
+        const clang::Stmt* target = firstElementIn(cfg, sm, fid, *nb, *ne);
+        if (!target) continue;
+
+        // The target must not sit inside a LOOP. A guard is attached to
+        // a statement and re-applied every time the engine transfers it,
         // but an assert placed BEFORE a loop executed once, dominating
-        // loop ENTRY only. Attaching it to the loop makes the condition
-        // fire again on the back edge, so a pointer reassigned inside
-        // the body is scrubbed clean at the top of every iteration:
+        // loop ENTRY only. Attaching it inside the loop makes the
+        // condition fire again on the back edge, so a pointer reassigned
+        // in the body is scrubbed clean at the top of every iteration:
         //
         //     assert(p != NULL);
         //     while (n-- > 0) { total += *p; p = malloc(4); }
@@ -544,18 +595,15 @@ const AssertGuardMap& AssertGuardCache::get(const clang::FunctionDecl* func,
         // written INSIDE the body is unaffected — it really does
         // re-execute each iteration, and its target is the next
         // statement of the body, not the loop.
-        if (llvm::isa<clang::WhileStmt>(next) ||
-            llvm::isa<clang::DoStmt>(next) ||
-            llvm::isa<clang::ForStmt>(next) ||
-            llvm::isa<clang::CXXForRangeStmt>(next))
-            continue;
-
-        auto nb = offsetIn(sm, fid, next->getBeginLoc());
-        auto ne = offsetIn(sm, fid, next->getEndLoc());
-        if (!nb || !ne) continue;
-
-        const clang::Stmt* target = firstElementIn(cfg, sm, fid, *nb, *ne);
-        if (!target) continue;
+        //
+        // This is asked of the TARGET, not of `next`: the guard lands on
+        // the target, and a wrapper — a loop pragma, a bare block — puts
+        // a non-loop statement in `next` while the target stays a loop
+        // condition. It is also not "does `next` contain a loop
+        // anywhere", which would throw away the legitimate case where a
+        // real statement runs once before the loop and the assert does
+        // dominate it.
+        if (!targetOutsideEveryLoop(next, target)) continue;
 
         for (const std::string& name : rec.names) {
             auto it = byName.find(name);

@@ -691,6 +691,172 @@ TEST(AssertRecoveryTest, Bug3_ExplicitDeclarationOverridesTheVeto) {
 }
 
 // =====================================================================
+// C3. WHAT THE SECOND REVIEW FOUND — BUG 1 WAS ONLY HALF FIXED
+// =====================================================================
+//
+// The loop rejection above asked "is the next STATEMENT a loop?". But
+// the guard is never attached to that statement: it is attached to
+// firstElementIn(), the earliest-evaluated CFG element anywhere inside
+// it. The check tested one object and the guard landed on another, so
+// anything standing between the two reopened the hole — a pragma, or a
+// single pair of braces. Every test in section C2 stayed green because
+// every one of them writes the loop DIRECTLY after the assert, which is
+// the one shape where the two objects coincide.
+//
+// The rule is now asked of the object it is about: can the target be
+// reached from the next statement WITHOUT passing through a loop? A
+// target that cannot be located at all is dropped as well — placement
+// that cannot be proven is precisely what gate 4 refuses to believe.
+//
+// In every case below `p` starts provably non-null (`&g`), so the ONLY
+// finding recovery can be silencing is the deref of the may-fail malloc
+// the body reassigns into it. Each was verified to FAIL on the pre-fix
+// binary — i.e. each really does catch the bug it is named after.
+// ---------------------------------------------------------------------
+
+// A loop attribute is the realistic form: `#pragma clang loop` above a
+// hot loop with an assert above that is ordinary in codecs and
+// compression libraries. The pragma wraps the loop in an AttributedStmt,
+// so `next` is no longer a loop by class while the target is still the
+// loop condition. `_Pragma` is the same shape spelled for macros.
+TEST(AssertRecoveryTest, Bug1b_LoopBehindPragma_StillWarns) {
+    NullDerefRule rule;
+    // Custom raw-string delimiter: the body below contains `)"`, which
+    // would close an ordinary R"( ... )" literal in the middle of a
+    // _Pragma argument.
+    auto results = runRule(rule, src(R"CS(
+        #define DEBUGASSERT(x)
+        int g;
+        int with_pragma(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            #pragma clang loop unroll(disable)
+            while (n-- > 0) {
+                total += *p;
+                p = (int*)malloc(4);
+            }
+            return total;
+        }
+        int with_underscore_pragma(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            _Pragma("clang loop unroll(disable)")
+            while (n-- > 0) {
+                total += *p;
+                p = (int*)malloc(4);
+            }
+            return total;
+        }
+    )CS"));
+    EXPECT_GE(results.size(), 2u);
+}
+
+// One pair of braces was enough. `{ while ... }` makes `next` a
+// CompoundStmt, and nesting them changes nothing about where the guard
+// lands — the target is still the loop's own condition. The `do` form is
+// here because its condition sits at the BOTTOM, so the first element in
+// range is a body statement instead, and the rejection has to hold for
+// that path too.
+TEST(AssertRecoveryTest, Bug1b_LoopBehindBraces_StillWarns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        int g;
+        int braced_while(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            {
+                while (n-- > 0) {
+                    total += *p;
+                    p = (int*)malloc(4);
+                }
+            }
+            return total;
+        }
+        int braced_do(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            {
+                do {
+                    total += *p;
+                    p = (int*)malloc(4);
+                } while (n-- > 0);
+            }
+            return total;
+        }
+        int nested_braces_for(int n) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            {
+                {
+                    for (int i = 0; i < n; ++i) {
+                        total += *p;
+                        p = (int*)malloc(4);
+                    }
+                }
+            }
+            return total;
+        }
+    )"));
+    EXPECT_GE(results.size(), 3u);
+}
+
+// The C++ range-for behind braces: its loop variable makes it the form
+// least likely to be recognised by a class-based check, and it is the
+// one whose first in-range CFG element is the range initialiser rather
+// than a condition.
+TEST(AssertRecoveryTest, Bug1b_BracedRangeFor_StillWarns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        int g;
+        struct V { int* begin(); int* end(); };
+        int braced_range_for(V v) {
+            int total = 0;
+            int* p = &g;
+            DEBUGASSERT(p);
+            {
+                for (int x : v) {
+                    total += *p + x;
+                    p = (int*)malloc(4);
+                }
+            }
+            return total;
+        }
+    )"));
+    EXPECT_GE(results.size(), 1u);
+}
+
+// The other half of the rule, and the reason it cannot be written as
+// "reject any next statement that CONTAINS a loop": here the assert
+// genuinely dominates `total += *p`, which runs once, before the loop
+// and outside it. Recovery must still fire. Without this pin the
+// cheapest fix for the three tests above would quietly delete a whole
+// class of legitimate recovery and no test would notice.
+TEST(AssertRecoveryTest, Bug1b_StatementBeforeLoopStillRecovers) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        int f(int n) {
+            int total = 0;
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            {
+                total += *p;
+                while (n-- > 0) total += n;
+            }
+            return total;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// =====================================================================
 // D. NO REGRESSION ON THE LIVE PATH (gate 1)
 // =====================================================================
 
