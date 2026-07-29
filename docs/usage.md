@@ -48,6 +48,21 @@ codeskeptic <source_path> [options]
                          body leaves only the name to judge by), and
                          believing it hides real findings behind a
                          check that never stopped anything
+  --negative-assert-macros <names> Macro names that assert a pointer IS
+                         null/empty/unset (comma list). A vanished assert
+                         leaves only its NAME to judge direction by, so a
+                         built-in null-ness vocabulary (null, nil, false,
+                         zero, not, fail, none, empty, absent, missing,
+                         unset) is vetoed automatically -- a negative
+                         macro using one of those words is never believed
+                         as non-null. That list cannot be complete;
+                         RESIDUAL FAILS-OPEN: a negative macro whose name
+                         uses none of those words (say ASSERT_CLEARED)
+                         would be believed backwards, silencing a
+                         definitely-null finding. List such a name here to
+                         veto it. A negative declaration wins over
+                         --assert-macros on conflict -- over-vetoing costs
+                         only recall, inverting a fact costs correctness
   --no-assert-recovery   Disable vanished-assert recovery. By default,
                          an assertion compiled out by NDEBUG (its
                          condition never reaches the parser) is

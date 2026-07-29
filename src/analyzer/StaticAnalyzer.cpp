@@ -41,6 +41,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setFatalCallNames(config_.fatalAsserts());
     setAssertRecoveryEnabled(config_.assertRecovery());
     setExtraAssertMacros(config_.assertMacros());
+    setNegativeAssertMacros(config_.negativeAssertMacros());
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
     setOwningPointerNames(config_.owningPointers());
@@ -105,6 +106,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     setFatalCallNames({});
     setAssertRecoveryEnabled(true);
     setExtraAssertMacros({});
+    setNegativeAssertMacros({});
     setAllocFunctionNames({});
     setFreeFunctionNames({});
     setOwningPointerNames({});

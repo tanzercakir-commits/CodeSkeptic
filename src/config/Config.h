@@ -93,6 +93,12 @@ public:
     const std::set<std::string>& assertMacros() const {
         return assert_macros_;
     }
+    // --negative-assert-macros: names that assert a pointer IS null and
+    // must be vetoed even when the spelling heuristic misses them.
+    void addNegativeAssertMacros(const std::string& list);
+    const std::set<std::string>& negativeAssertMacros() const {
+        return negative_assert_macros_;
+    }
 
     // Custom allocator wrappers (--alloc-functions / --free-functions):
     // extend the leak/double-free/UAF domain to project-specific heap
@@ -158,6 +164,7 @@ private:
     std::set<std::string> functions_;
     std::set<std::string> fatal_asserts_;
     std::set<std::string> assert_macros_;
+    std::set<std::string> negative_assert_macros_;
     std::set<std::string> alloc_functions_;
     std::set<std::string> untrusted_int_sources_;
     std::set<std::string> free_functions_;

@@ -45,6 +45,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "function")      addFunctions(value);
         else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "assert_macros") addAssertMacros(value);
+        else if (key == "negative_assert_macros") addNegativeAssertMacros(value);
         else if (key == "assert_recovery")
             assert_recovery_ = (value == "true" || value == "1");
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
@@ -94,6 +95,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addFatalAsserts(argv[++i]);
         } else if (arg == "--assert-macros" && i + 1 < argc) {
             addAssertMacros(argv[++i]);
+        } else if (arg == "--negative-assert-macros" && i + 1 < argc) {
+            addNegativeAssertMacros(argv[++i]);
         } else if (arg == "--no-assert-recovery") {
             assert_recovery_ = false;
         } else if (arg == "--alloc-functions" && i + 1 < argc) {
@@ -183,6 +186,12 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         argument macros only. Never list one that\n"
                       << "                         asserts a NEGATIVE (assert_null and\n"
                       << "                         friends) - it would be believed backwards\n"
+                      << "  --negative-assert-macros <names> Macro names that assert a\n"
+                      << "                         pointer IS null/empty/unset (comma list).\n"
+                      << "                         The spelling heuristic vetoes a null-ness\n"
+                      << "                         vocabulary already; list here any negative\n"
+                      << "                         macro whose name uses none of those words\n"
+                      << "                         (wins over --assert-macros on conflict)\n"
                       << "  --no-assert-recovery   Do not recover assert conditions that\n"
                       << "                         NDEBUG compiled out. On by default: a\n"
                       << "                         release-build assert() leaves no trace in\n"
@@ -264,6 +273,10 @@ void Config::addFunctions(const std::string& list) {
 
 void Config::addFatalAsserts(const std::string& list) {
     addNamesTo(fatal_asserts_, list);
+}
+
+void Config::addNegativeAssertMacros(const std::string& list) {
+    addNamesTo(negative_assert_macros_, list);
 }
 
 void Config::addAssertMacros(const std::string& list) {

@@ -32,6 +32,12 @@ std::set<std::string>& extraNames() {
     static std::set<std::string> names;
     return names;
 }
+// Project-declared NEGATIVE asserts (--negative-assert-macros): names
+// the spelling heuristic cannot recognise as negative. Force-vetoed.
+std::set<std::string>& negativeNames() {
+    static std::set<std::string> names;
+    return names;
+}
 
 // --- Per-TU record list --------------------------------------------
 //
@@ -551,8 +557,13 @@ void setExtraAssertMacros(std::set<std::string> names) {
 const std::set<std::string>& extraAssertMacros() { return extraNames(); }
 
 bool isAssertMacroName(const std::string& name) {
-    // An explicitly declared name wins outright: there the USER supplies
-    // the meaning, and the spelling stops being evidence about it.
+    // A project-declared NEGATIVE assert is vetoed outright, and wins on
+    // conflict with the positive list: over-vetoing costs only recall,
+    // inverting a fact costs correctness, so the safe direction takes
+    // precedence (2026-07-30, FINDING 2's escape hatch).
+    if (negativeNames().count(name)) return false;
+    // An explicitly declared positive name wins next: there the USER
+    // supplies the meaning, and the spelling stops being evidence.
     if (extraNames().count(name)) return true;
     std::string lower;
     lower.reserve(name.size());
@@ -571,10 +582,28 @@ bool isAssertMacroName(const std::string& name) {
     // assertions: guessing right on those is not worth guessing wrong
     // on their opposites, and --assert-macros recovers them by
     // declaration.
-    for (const char* negative : {"null", "false", "zero", "not", "fail"})
+    //
+    // FINDING 2: the list is the null-ness VOCABULARY, not five words.
+    // It failed open before — assert_nil, ASSERT_EMPTY, assert_missing
+    // slipped through and were believed backwards. Widening is
+    // safe-by-construction: the only cost of vetoing a name that turns
+    // out positive is not recovering it (recall), never a wrong guard.
+    // "nil" is listed separately from "null" (distinct token); short
+    // fragments that collide with innocent names ("no", "err") are
+    // deliberately excluded — a project needing them uses
+    // --negative-assert-macros. Residual fails-open is documented in
+    // usage.md.
+    for (const char* negative :
+         {"null", "nil", "false", "zero", "not", "fail", "none", "empty",
+          "absent", "missing", "unset"})
         if (lower.find(negative) != std::string::npos) return false;
     return true;
 }
+
+void setNegativeAssertMacros(std::set<std::string> names) {
+    negativeNames() = std::move(names);
+}
+const std::set<std::string>& negativeAssertMacros() { return negativeNames(); }
 
 void installAssertRecovery(clang::CompilerInstance& ci) {
     records().clear();

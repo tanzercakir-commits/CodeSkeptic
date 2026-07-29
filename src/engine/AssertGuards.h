@@ -130,6 +130,17 @@ bool assertRecoveryEnabled();
 void setExtraAssertMacros(std::set<std::string> names);
 const std::set<std::string>& extraAssertMacros();
 
+// --negative-assert-macros <names>: exact names that assert a NEGATIVE
+// (the pointer IS null/empty/unset). The spelling heuristic vetoes the
+// null-ness vocabulary (null, nil, empty, none, absent, missing, ...),
+// but that list is inherently incomplete — a framework whose negative
+// macro uses none of those words would be believed backwards. This is
+// the escape hatch: a declared negative name is force-vetoed and wins
+// over --assert-macros on conflict (over-vetoing costs only recall,
+// inverting a fact costs correctness).
+void setNegativeAssertMacros(std::set<std::string> names);
+const std::set<std::string>& negativeAssertMacros();
+
 // True if `name` is treated as an assert-like macro.
 bool isAssertMacroName(const std::string& name);
 

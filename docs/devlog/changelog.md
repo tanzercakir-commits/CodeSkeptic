@@ -1,5 +1,35 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — FINDING 2: the negative-name veto failed open
+
+AR.3 gate 2 vetoes a recovered assert whose NAME announces the pointer
+is null (cmocka's assert_null &c), because a vanished assert leaves only
+its name to judge direction by and believing a negative one backwards
+INVERTS a proven fact — silences a definitely-null finding. The veto
+was a five-word denylist (null/false/zero/not/fail) and failed OPEN:
+assert_nil, ASSERT_EMPTY, assert_missing use none of those words, so
+they were recovered as positive non-null assertions and their derefs
+went silent. Proven RED/GREEN on a probe: the pre-fix binary reports
+Clean on `if (p) return 0; assert_nil(p); return *p;`, the fixed one
+warns.
+
+Two-part close, both safe-by-construction (over-vetoing costs only
+recall — an over-vetoed positive is merely not recovered; inverting a
+fact costs correctness):
+- the denylist is widened to the null-ness VOCABULARY (adds nil, none,
+  empty, absent, missing, unset; "nil" distinct from "null"). Short
+  fragments that collide with innocent names ("no", "err") are
+  deliberately left out;
+- `--negative-assert-macros` is the escape hatch for the residual
+  fails-open — a negative macro whose name uses no vocabulary word
+  (ASSERT_CLEARED) is declared and force-vetoed, winning over
+  --assert-macros on conflict. usage.md documents the residual openly.
+
+No positive-path regression: DEBUGASSERT/lua_assert still recover (unit
+pin), and real-world recovery is unchanged — curl re-scan 76 = 76 (its
+DEBUGASSERT carries no vocabulary word). Suite 791 -> 794, thesis
+clean_fp=0, corpus unchanged (cjson 54, tinyxml2 9).
+
 ## 2026-07-30 — sign-conversion rule: untrusted signed → unsigned length
 
 The nlohmann campaign's proven false negative closed. #3491/#3492 —

@@ -28,12 +28,15 @@ namespace {
 struct RecoveryScope {
     bool prevEnabled;
     std::set<std::string> prevExtra;
+    std::set<std::string> prevNegative;
     RecoveryScope()
         : prevEnabled(assertRecoveryEnabled()),
-          prevExtra(extraAssertMacros()) {}
+          prevExtra(extraAssertMacros()),
+          prevNegative(negativeAssertMacros()) {}
     ~RecoveryScope() {
         setAssertRecoveryEnabled(prevEnabled);
         setExtraAssertMacros(prevExtra);
+        setNegativeAssertMacros(prevNegative);
     }
 };
 
@@ -686,6 +689,76 @@ TEST(AssertRecoveryTest, Bug3_ExplicitDeclarationOverridesTheVeto) {
             ASSERT_NOT_NULL(p);
             return *p;
         }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// FINDING 2 (the review's second, 2026-07-30). The negative-name veto
+// was a FIVE-word denylist (null/false/zero/not/fail) and failed OPEN:
+// a macro whose name announces null-ness with any OTHER word slipped
+// through and was believed as a positive non-null assertion, inverting
+// a definitely-null fact exactly as Bug 3 did. Each shape below makes
+// its pointer null by proof (`if (p) return`), so recovery must NOT
+// silence the deref. Vetoing costs only recall (an over-vetoed
+// positive is merely not recovered), so the denylist is widened
+// generously to the null-ness vocabulary.
+TEST(AssertRecoveryTest, Finding2_NegativeVocabulary_StillWarns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define assert_nil(x)
+        #define ASSERT_EMPTY(x)
+        #define check_none(x)
+        #define expect_absent(x)
+        #define assert_missing(x)
+        int a(void){ int* p=(int*)malloc(4); if(p) return 0; assert_nil(p);     return *p; }
+        int b(void){ int* p=(int*)malloc(4); if(p) return 0; ASSERT_EMPTY(p);   return *p; }
+        int c(void){ int* p=(int*)malloc(4); if(p) return 0; check_none(p);     return *p; }
+        int d(void){ int* p=(int*)malloc(4); if(p) return 0; expect_absent(p);  return *p; }
+        int e(void){ int* p=(int*)malloc(4); if(p) return 0; assert_missing(p); return *p; }
+    )"));
+    // 'check_none' and 'expect_absent' contain no "assert" substring, so
+    // they were never recovered to begin with (that is fine — they warn
+    // for the ordinary reason). The regression is the assert-substring
+    // ones: assert_nil / ASSERT_EMPTY / assert_missing must NOT be
+    // believed as non-null. All five derefs warn either way.
+    EXPECT_GE(results.size(), 5u);
+}
+
+// The escape hatch for the residual fails-open: a project whose
+// negative-assert macro has a name in NO vocabulary can declare it with
+// --negative-assert-macros, and it is vetoed even though it looks
+// positive. Inverse of --assert-macros; the negative declaration wins
+// on conflict (safer direction).
+TEST(AssertRecoveryTest, Finding2_NegativeAssertMacrosFlag_Vetoes) {
+    NullDerefRule rule;
+    RecoveryScope scope;
+    // 'ASSERT_CLEARED' contains "assert" and NO vocabulary word, so
+    // without the flag it would recover and silence the deref (the very
+    // fails-open the flag exists to close). Declared negative -> vetoed.
+    setNegativeAssertMacros({"ASSERT_CLEARED"});
+    auto results = runRule(rule, src(R"(
+        #define ASSERT_CLEARED(x)
+        int f(void) {
+            int* p = (int*)malloc(4);
+            if (p) return 0;
+            ASSERT_CLEARED(p);
+            return *p;
+        }
+    )"));
+    setNegativeAssertMacros({});
+    EXPECT_GE(results.size(), 1u);
+}
+
+// The widened denylist must not swallow the positive path: plain
+// assert(p), DEBUGASSERT(p), lua_assert(p) still recover and silence.
+// (No vocabulary word appears in these — the guard against over-reach.)
+TEST(AssertRecoveryTest, Finding2_PositivePathUnbroken) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        #define lua_assert(x)
+        int a(void){ int* p=(int*)malloc(4); DEBUGASSERT(p); return *p; }
+        int b(void){ int* q=(int*)malloc(4); lua_assert(q);  return *q; }
     )"));
     EXPECT_EQ(results.size(), 0u);
 }
