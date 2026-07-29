@@ -956,6 +956,80 @@ TEST(AssertRecoveryTest, Sqlite_LoopWritesThePointer_RejectionHolds) {
 }
 
 // =====================================================================
+// C5. WHAT CURL MEASURED — THE COMPOUND-BODY BLIND SPOT
+// =====================================================================
+//
+// curl's default DEBUGASSERT erases to `do { } while(0)`
+// (curl_setup_once.h) and the witness campaign measured the cost:
+// recovery silenced ZERO of curl's 82 null-derefs while silencing the
+// proven families in sqlite (6) and zstd (1). Cause: a location inside
+// a macro body decomposes to the EXPANSION POINT, so the do-while's
+// own `{ }` "contains" the expansion offset and innermostCompound
+// picks it as the scope — an empty block with no next statement, and
+// the record dies unplaced. GLib's G_STMT_START spelling is the same
+// shape, which makes this the default idiom of a large part of the C
+// ecosystem, not a curl quirk.
+//
+// The fix is one refusal: a CompoundStmt whose own begin location is a
+// macro location cannot be the SCOPE — the scope is a block the assert
+// stands IN, which is necessarily written in the file. (An assert
+// whose every enclosing block comes from some other macro's expansion
+// then finds no scope and is dropped — the standing v1 refusal for
+// macro-inside-macro placement, unchanged.)
+// ---------------------------------------------------------------------
+
+// The curl shape, verbatim. (RED before the fix: the guard died
+// unplaced and the deref warned.)
+TEST(AssertRecoveryTest, CompoundBody_DoWhile_RecoversGuard) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x) do { } while(0)
+        int f() {
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            return *p;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// The GLib spelling: the braces arrive through THREE macros. Same
+// blind spot, same fix.
+TEST(AssertRecoveryTest, CompoundBody_GLibStyle_RecoversGuard) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define G_STMT_START do
+        #define G_STMT_END while(0)
+        #define custom_assert(expr) G_STMT_START { (void) 0; } G_STMT_END
+        int f() {
+            int* p = (int*)malloc(4);
+            custom_assert(p);
+            return *p;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Composition control: the compound BODY must not weaken any other
+// gate. Behind a do-while assert, a loop that rebinds the pointer
+// still rejects the guard (gate 4, per variable) and the first-
+// iteration deref of the may-fail malloc keeps warning.
+TEST(AssertRecoveryTest, CompoundBody_LoopStillRejectsRebound) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x) do { } while(0)
+        int f(int n) {
+            int total = 0;
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            while (n-- > 0) { total += *p; p = (int*)malloc(4); }
+            return total;
+        }
+    )"));
+    EXPECT_GE(results.size(), 1u);
+}
+
+// =====================================================================
 // D. NO REGRESSION ON THE LIVE PATH (gate 1)
 // =====================================================================
 

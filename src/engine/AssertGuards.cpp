@@ -307,6 +307,18 @@ bool containsSwitchCase(const clang::Stmt* s) {
 
 // Innermost CompoundStmt whose source range contains `off`. DFS
 // assigns on the way down, so the deepest container wins.
+//
+// A compound whose own begin location is a MACRO location is refused
+// as a candidate: a location inside a macro body decomposes to the
+// expansion point, so the `{ }` of a `do { } while(0)` assert body
+// "contains" the expansion offset and would win as the deepest
+// container — an empty scope with no next statement, and the record
+// dies unplaced. curl's DEBUGASSERT and GLib's G_STMT_START are
+// exactly this shape (measured: recovery silenced 0 of curl's 82).
+// The scope is a block the assert stands IN, which is necessarily
+// written in the file. An assert whose every enclosing block comes
+// from some other macro's expansion finds no scope and is dropped —
+// the standing v1 refusal for macro-inside-macro placement.
 const clang::CompoundStmt* innermostCompound(const clang::Stmt* body,
                                              const clang::SourceManager& sm,
                                              clang::FileID fid, unsigned off) {
@@ -314,9 +326,11 @@ const clang::CompoundStmt* innermostCompound(const clang::Stmt* body,
     std::function<void(const clang::Stmt*)> walk = [&](const clang::Stmt* s) {
         if (!s) return;
         if (const auto* cs = llvm::dyn_cast<clang::CompoundStmt>(s)) {
-            auto b = offsetIn(sm, fid, cs->getBeginLoc());
-            auto e = offsetIn(sm, fid, cs->getEndLoc());
-            if (b && e && *b <= off && off <= *e) best = cs;
+            if (!cs->getBeginLoc().isMacroID()) {
+                auto b = offsetIn(sm, fid, cs->getBeginLoc());
+                auto e = offsetIn(sm, fid, cs->getEndLoc());
+                if (b && e && *b <= off && off <= *e) best = cs;
+            }
         }
         for (const clang::Stmt* c : s->children()) walk(c);
     };

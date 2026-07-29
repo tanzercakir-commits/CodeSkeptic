@@ -1,5 +1,32 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-29 — AR.3 placement: the compound-body blind spot (curl's find)
+
+The witness campaign (docs/ar3-witness-campaign-2026-07-29.md) measured
+recovery silencing 6 of sqlite's findings and zstd's adjudicated
+proof-case — and ZERO of curl's 82. Cause, not guess: curl's default
+`DEBUGASSERT` erases to `do { } while(0)`, a location inside a macro
+body decomposes to the expansion point, so the macro's own `{ }` won
+the innermostCompound walk as deepest container — an empty scope with
+no next statement, and every record died unplaced. GLib's
+`G_STMT_START` is the same shape, which made this the default idiom of
+a large part of the C ecosystem, not a curl quirk.
+
+One refusal fixes it: a CompoundStmt whose own begin location is a
+macro location cannot be the SCOPE — the block an assert stands in is
+necessarily written in the file. An assert whose every enclosing block
+comes from some other macro's expansion still finds no scope and is
+dropped, the standing v1 refusal for macro-inside-macro placement.
+
+Re-measured with exact lane recipes: curl 82 -> 76 null-deref, six
+silenced (conncache's `DEBUGASSERT(cpool)`, splay's
+`DEBUGASSERT(t)`/`(x)` — covering asserts verified at each), zero
+added; the 76 that remain are dominated by field-subject asserts
+(`DEBUGASSERT(data->conn)`), which are the declared v1 grammar
+boundary, not a placement failure. No movement anywhere else: sqlite
+57, zstd 4, lua 36, probe matrix identical. Three pins (do-while
+shape, GLib shape, loop-rebind composition); suite 778 -> 781.
+
 ## 2026-07-29 — AR.3 gate 4, asked twice more precisely (sqlite's find)
 
 The first real-codebase delta measurement for assert recovery — sqlite,
