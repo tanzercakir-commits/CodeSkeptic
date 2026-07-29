@@ -16,6 +16,7 @@ add_executable(codeskeptic_tests
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
     IntOverflowRuleTest.cpp
+    SignConversionRuleTest.cpp
     BoundsRuleTest.cpp
     NullDerefRuleTest.cpp
     AssertRecoveryTest.cpp

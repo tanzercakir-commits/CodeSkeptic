@@ -255,6 +255,13 @@ const MsgEntry kMessages[] = {
      "olasi tampon tasmasi: kopya uzunlugu guvenilmeyen girdiden turuyor "
      "(ispatlanan aralik {0}) ve hedefin {1} baytlik kapasitesini asabilir "
      "- kopyalamadan once uzunlugu dogrulayin"},
+    // SignConversionUntrusted
+    {"possible negative length: untrusted signed '{0}' value may be "
+     "negative, and converting it to '{1}' turns it into a huge value - "
+     "check for negative before the conversion",
+     "olasi negatif uzunluk: guvenilmeyen isaretli '{0}' deger negatif "
+     "olabilir; '{1}' donusumu onu devasa bir degere cevirir - donusumden "
+     "once negatiflik kontrolu yapin"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

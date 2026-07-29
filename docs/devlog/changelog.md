@@ -1,5 +1,50 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — sign-conversion rule: untrusted signed → unsigned length
+
+The nlohmann campaign's proven false negative closed. #3491/#3492 —
+`get_ubjson_size_value` converts an attacker-chosen `std::int8_t` to a
+`std::size_t` with no negativity guard, so a negative wraps to a huge
+length and the read walks off the buffer. CodeSkeptic missed it
+pre-fix (scanned three ways, clean); the cause was diagnosed by
+source-reading as a SCOPE gap, not a tuning miss — IntOverflowRule
+excludes the pattern twice on purpose (explicit-cast = stated intent,
+unsigned-wrap = defined), both correct for ITS question and unchanged.
+
+New rule `sign-conversion` (CWE-195 neighbourhood, off unless the
+provenance flag opts in) asks a different question of the same
+expression: does an UNTRUSTED signed value reach an unsigned integer
+type while provably able to be negative? Three gates: declared
+untrusted provenance (never guessed), a finite negative witness in the
+proven interval, and so a dominating `x >= 0` / `x < 0` guard silences
+on its edge while an upper-bound-only guard (`if (x > 100)`) does NOT —
+the negative range survives it, which was nlohmann's exact shape.
+
+Plus the out-param half of the untrusted-source model (3b): a declared
+`--untrusted-int-sources` function now taints its integer out-params
+(C++ reference and C `&x` pointer), not only its return —
+nlohmann's `get_number(format, number)` delivers the value through a
+reference, which the return-only model let arrive trusted.
+
+Retro-detection, both directions on the real trees:
+- pre-fix (`6a739205`), unit-bjdata.cpp, `--untrusted-int-sources
+  get_number`: **4 findings**, exactly the `i`/`I`/`l`/`L` signed
+  cases at `result = static_cast<std::size_t>(number)`; the unsigned
+  `U` case correctly silent;
+- fixed (`93c9e0c7`), same scan: **0** — the upstream `if (number < 0)`
+  guards silence on their edge, the machinery agreeing with the human
+  fix.
+
+Default unchanged (flag empty): sqlite re-scan 57 = 57, zero
+sign-conversion without the flag. 11 new tests
+(`SignConversionRuleTest`, the four probe shapes RED-verified on the
+pre-rule binary, guard/unsigned/provenance/ signed-narrowing-boundary
+negatives), suite 781 -> 790. NOT re-measured this round: the tinyusb
+untrusted-length receipt (out-param seeding is new; the flag is opt-in
+so default projects are untouched, but a project using both the flag
+and out-param sources could see new — genuine, by the doctrine —
+findings). Rule name is registered in main.cpp and McpServer.cpp.
+
 ## 2026-07-29 — AR.3 placement: the compound-body blind spot (curl's find)
 
 The witness campaign (docs/ar3-witness-campaign-2026-07-29.md) measured

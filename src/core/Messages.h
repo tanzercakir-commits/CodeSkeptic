@@ -81,6 +81,7 @@ enum class MsgId {
     NothingAnalyzed,            // every attempted TU failed to compile
     MultipleSourcePaths,        // {0} = kept path, {1} = rejected extra
     BoundsCopyUntrustedLen,     // {0} = copy size range, {1} = dest capacity bytes
+    SignConversionUntrusted,    // {0} = signed source type, {1} = unsigned target type
 
 };
 

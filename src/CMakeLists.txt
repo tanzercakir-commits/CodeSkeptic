@@ -31,6 +31,7 @@ add_library(codeskeptic_core STATIC
     rules/MemoryLeakRule_Ex.cpp
     rules/DivByZeroRule.cpp
     rules/IntOverflowRule.cpp
+    rules/SignConversionRule.cpp
     rules/BoundsRule.cpp
     rules/AssumptionRule.cpp
     rules/NullDerefRule.cpp

@@ -630,6 +630,36 @@ void applyIntervalAssign(IntervalMap& state, const Stmt* stmt,
                     }
             return;
         }
+        // A DECLARED untrusted source (--untrusted-int-sources) fills
+        // its integer out-params the way its return is modeled: full
+        // finite type range, untrusted origin (2026-07-29, the
+        // out-param half of docs/PLAN-untrusted-sign.md). The proven
+        // false negative behind this: nlohmann's
+        // `get_number(format, number)` delivers the attacker's value
+        // through a REFERENCE out-param, so the flag's return-only
+        // model let it arrive trusted and fully unknown. Both C++
+        // reference args and C-style `&x` pointer args are seeded —
+        // same discipline as the scanf block above, which keeps its
+        // own path for format-width refinement. The atoi intrinsics
+        // return by value and never reach this branch in practice.
+        if (ctx && isUntrustedIntSource(call)) {
+            forEachNonConstRefArg(call, [&](const Expr* arg) {
+                if (const VarDecl* v = asIntVar(arg))
+                    if (auto tr = intTypeRange(v->getType(), *ctx)) {
+                        set(v, *tr);
+                        if (untrusted && vars.count(v))
+                            untrusted->insert(v);
+                    }
+            });
+            for (const Expr* arg : call->arguments())
+                if (const VarDecl* v = addrOfIntVar(arg))
+                    if (auto tr = intTypeRange(v->getType(), *ctx)) {
+                        set(v, *tr);
+                        if (untrusted && vars.count(v))
+                            untrusted->insert(v);
+                    }
+            return;
+        }
         // An int passed by non-const reference may be rewritten.
         forEachNonConstRefArg(call, [&](const Expr* arg) {
             if (const VarDecl* v = asIntVar(arg)) {
