@@ -40,7 +40,14 @@ codeskeptic <source_path> [options]
                          negative-sounding names, so list ASSERT_NOT_NULL
                          if you have one -- but never a macro that
                          asserts a NEGATIVE (cmocka's assert_null and
-                         friends): it would be believed backwards
+                         friends): it would be believed backwards.
+                         Every recognised macro -- listed or automatic --
+                         must TERMINATE on failure. A log-and-continue
+                         "soft assert" compiled out by NDEBUG is
+                         indistinguishable from a real one (the erased
+                         body leaves only the name to judge by), and
+                         believing it hides real findings behind a
+                         check that never stopped anything
   --no-assert-recovery   Disable vanished-assert recovery. By default,
                          an assertion compiled out by NDEBUG (its
                          condition never reaches the parser) is

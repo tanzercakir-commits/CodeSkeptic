@@ -857,6 +857,105 @@ TEST(AssertRecoveryTest, Bug1b_StatementBeforeLoopStillRecovers) {
 }
 
 // =====================================================================
+// C4. WHAT SQLITE MEASURED — THE REJECTION IS ABOUT THE VARIABLE
+// =====================================================================
+//
+// The first real-codebase delta (sqlite, 125 TUs) surfaced the other
+// half of gate 4. In convertToWithoutRowidTable() the guard for `pPk`
+// did not vanish — it MOVED: baseline warned after the join
+// (build.c:2536), recovery warned inside the branch (build.c:2468), at
+// a deref sitting directly under an assert. Minimal repro (x5.c, 14
+// lines): an if/else whose else-branch holds assert, then a loop that
+// only READS the pointer, then a deref. The loop rejection fired on
+// loop-ness alone and threw the guard away.
+//
+// The rejection exists because a guard attached inside a loop re-fires
+// on the back edge, scrubbing a pointer REASSIGNED in the body. Re-firing
+// a fact about a variable the loop never writes is harmless — the fact
+// stays true on every iteration. So the question is not "is the target
+// in a loop?" but "does that loop write THIS variable?" — asked per
+// name, since one assert can cover several.
+//
+// "Write" is conservative: plain and compound assignment, ++/--,
+// address-of, binding to a non-const reference, an unknown-signature
+// call taking the variable, any appearance under an asm statement.
+// ---------------------------------------------------------------------
+
+// The x5 shape. The loop reads *p and passes p around by value and by
+// const reference — none of which can change that p is non-null. The
+// guard must survive; every deref here is assert-covered.
+// (RED on the pre-fix binary: it warned at the first in-branch deref.)
+TEST(AssertRecoveryTest, Sqlite_LoopInBranch_UnwrittenPointer_GuardSurvives) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        void use_by_value(int* q);
+        void look(int* const& q);
+        int f(int k, int n) {
+            int* p; int total = 0;
+            if (k > 0) { p = (int*)malloc(4); DEBUGASSERT(p); }
+            else {
+                p = (int*)malloc(4);
+                DEBUGASSERT(p);
+                for (int i = 0; i < n; ++i) {
+                    total += *p;
+                    use_by_value(p);
+                    look(p);
+                }
+                total += *p;
+            }
+            DEBUGASSERT(p);
+            return total + *p;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Every way the loop CAN write the pointer, one function each: plain
+// reassignment (the `next`-walk class), pointer arithmetic via compound
+// assignment, address-of handed to a callee, and binding to a non-const
+// reference — the C++ shape that leaves no & in the source. In each the
+// first-iteration deref of the may-fail malloc must keep warning: the
+// guard would re-fire on the back edge over a pointer the body changes.
+TEST(AssertRecoveryTest, Sqlite_LoopWritesThePointer_RejectionHolds) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(x)
+        void take_addr(int** out);
+        void rebind(int*& r);
+        int reassigned(int k, int n) {
+            int* p; int total = 0;
+            if (k > 0) { p = (int*)malloc(4); DEBUGASSERT(p); }
+            else {
+                p = (int*)malloc(4);
+                DEBUGASSERT(p);
+                for (int i = 0; i < n; ++i) { total += *p; p = (int*)malloc(4); }
+            }
+            return total;
+        }
+        int arithmetic(int n) {
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            { for (int i = 0; i < n; ++i) { int t = *p; p += 1; (void)t; } }
+            return 0;
+        }
+        int addr_taken(int n) {
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            { for (int i = 0; i < n; ++i) { int t = *p; take_addr(&p); (void)t; } }
+            return 0;
+        }
+        int ref_bound(int n) {
+            int* p = (int*)malloc(4);
+            DEBUGASSERT(p);
+            { for (int i = 0; i < n; ++i) { int t = *p; rebind(p); (void)t; } }
+            return 0;
+        }
+    )"));
+    EXPECT_GE(results.size(), 4u);
+}
+
+// =====================================================================
 // D. NO REGRESSION ON THE LIVE PATH (gate 1)
 // =====================================================================
 

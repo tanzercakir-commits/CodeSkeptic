@@ -390,7 +390,7 @@ bool isLoopStmt(const clang::Stmt* s) {
            llvm::isa<clang::CXXForRangeStmt>(s);
 }
 
-// Gate 4's loop rejection, asked of the object it is actually about.
+// Gate 4's placement question, asked of the object it is actually about.
 //
 // The guard never fires on `next`. It fires on the CFG element that
 // firstElementIn() picks out of `next`, so testing the CLASS of `next`
@@ -402,30 +402,126 @@ bool isLoopStmt(const clang::Stmt* s) {
 // apart, and the whole first battery passed over it because every case
 // in it writes the loop directly after the assert.
 //
-// True only when `target` is reachable from `root` WITHOUT descending
-// through a loop. A target that is not in the subtree at all is false as
-// well: placement that cannot be proven is dropped, which is the
-// standing rule of this gate.
-bool targetOutsideEveryLoop(const clang::Stmt* root,
-                            const clang::Stmt* target) {
+// Returns whether `target` was located in the subtree at all — an
+// unlocatable target is dropped, the standing rule of this gate — and
+// reports the OUTERMOST loop the walk descended through to reach it
+// (null when the path is loop-free). The outermost loop suffices for
+// the write question below: everything between its entry and the
+// target, inner loops included, sits inside its subtree.
+bool locateTarget(const clang::Stmt* root, const clang::Stmt* target,
+                  const clang::Stmt*& outermostLoop) {
+    outermostLoop = nullptr;
     if (!root || !target) return false;
     bool reached = false;
-    bool viaLoop = false;
-    std::function<void(const clang::Stmt*, bool)> walk =
-        [&](const clang::Stmt* s, bool inLoop) {
+    const clang::Stmt* found = nullptr;
+    std::function<void(const clang::Stmt*, const clang::Stmt*)> walk =
+        [&](const clang::Stmt* s, const clang::Stmt* outer) {
             if (!s || reached) return;
             // Evaluated BEFORE the identity test, so a target that IS
-            // the loop is rejected on the same footing as one inside it.
-            const bool nowInLoop = inLoop || isLoopStmt(s);
+            // the loop counts as inside it: its own back edge re-fires
+            // a guard attached to it.
+            const clang::Stmt* now = outer;
+            if (!now && isLoopStmt(s)) now = s;
             if (s == target) {
                 reached = true;
-                viaLoop = nowInLoop;
+                found = now;
                 return;
             }
-            for (const clang::Stmt* c : s->children()) walk(c, nowInLoop);
+            for (const clang::Stmt* c : s->children()) walk(c, now);
         };
-    walk(root, false);
-    return reached && !viaLoop;
+    walk(root, nullptr);
+    outermostLoop = found;
+    return reached;
+}
+
+// Can `stmt` change which object `vd` points to (or hand that ability
+// to code we cannot see)? Asked of the loop a guard would sit inside:
+// re-firing assert(p != NULL) on the back edge is harmless while p is
+// the SAME p on every iteration, and unsound the moment the body can
+// rebind it. Conservative on purpose — a maybe is a yes:
+//
+//   - plain or compound assignment with vd as the left-hand side
+//     (p = q, p += n); a member store through vd (p->a = n) is a READ
+//     of vd and does not count,
+//   - ++/-- on vd (pointer arithmetic rebinds),
+//   - &vd anywhere — the address escapes, anyone may store through it,
+//   - vd bound to a non-const lvalue reference parameter: the C++
+//     shape that rebinds with no & in the source. By-value and
+//     const-ref uses cannot rebind and do not count. A call whose
+//     parameter types cannot be seen is treated as able to rebind,
+//   - vd appearing anywhere under an asm statement.
+bool writesVar(const clang::Stmt* stmt, const clang::VarDecl* vd) {
+    if (!stmt || !vd) return false;
+    const clang::Decl* canon = vd->getCanonicalDecl();
+    auto refersToVd = [&](const clang::Expr* e) {
+        if (!e) return false;
+        const auto* dre =
+            llvm::dyn_cast<clang::DeclRefExpr>(e->IgnoreParenImpCasts());
+        return dre && dre->getDecl()->getCanonicalDecl() == canon;
+    };
+    bool wrote = false;
+    std::function<void(const clang::Stmt*)> walk = [&](const clang::Stmt* s) {
+        if (!s || wrote) return;
+        if (const auto* bo = llvm::dyn_cast<clang::BinaryOperator>(s)) {
+            if (bo->isAssignmentOp() && refersToVd(bo->getLHS())) {
+                wrote = true;
+                return;
+            }
+        } else if (const auto* uo = llvm::dyn_cast<clang::UnaryOperator>(s)) {
+            if ((uo->isIncrementDecrementOp() ||
+                 uo->getOpcode() == clang::UO_AddrOf) &&
+                refersToVd(uo->getSubExpr())) {
+                wrote = true;
+                return;
+            }
+        } else if (const auto* call = llvm::dyn_cast<clang::CallExpr>(s)) {
+            const clang::FunctionDecl* fd = call->getDirectCallee();
+            const clang::FunctionProtoType* proto = nullptr;
+            if (!fd) {
+                clang::QualType ct =
+                    call->getCallee()->IgnoreParenImpCasts()->getType();
+                if (ct->isPointerType()) ct = ct->getPointeeType();
+                proto = ct->getAs<clang::FunctionProtoType>();
+            }
+            for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+                if (!refersToVd(call->getArg(i))) continue;
+                clang::QualType pt;
+                if (fd) {
+                    if (i < fd->getNumParams())
+                        pt = fd->getParamDecl(i)->getType();
+                    else if (fd->isVariadic())
+                        continue;  // variadic tail: by value, cannot rebind
+                } else if (proto) {
+                    if (i < proto->getNumParams())
+                        pt = proto->getParamType(i);
+                    else if (proto->isVariadic())
+                        continue;
+                }
+                if (pt.isNull()) { wrote = true; return; }  // unseeable
+                if (const auto* ref =
+                        pt->getAs<clang::LValueReferenceType>()) {
+                    if (!ref->getPointeeType().isConstQualified()) {
+                        wrote = true;
+                        return;
+                    }
+                }
+            }
+        } else if (llvm::isa<clang::AsmStmt>(s)) {
+            bool mentions = false;
+            std::function<void(const clang::Stmt*)> scan =
+                [&](const clang::Stmt* t) {
+                    if (!t || mentions) return;
+                    if (const auto* e = llvm::dyn_cast<clang::Expr>(t))
+                        if (refersToVd(e)) { mentions = true; return; }
+                    for (const clang::Stmt* c : t->children()) scan(c);
+                };
+            scan(s);
+            if (mentions) { wrote = true; return; }
+        }
+        for (const clang::Stmt* c : s->children()) walk(c);
+    };
+    walk(stmt);
+    return wrote;
 }
 
 } // anonymous namespace
@@ -580,36 +676,40 @@ const AssertGuardMap& AssertGuardCache::get(const clang::FunctionDecl* func,
         const clang::Stmt* target = firstElementIn(cfg, sm, fid, *nb, *ne);
         if (!target) continue;
 
-        // The target must not sit inside a LOOP. A guard is attached to
-        // a statement and re-applied every time the engine transfers it,
-        // but an assert placed BEFORE a loop executed once, dominating
-        // loop ENTRY only. Attaching it inside the loop makes the
-        // condition fire again on the back edge, so a pointer reassigned
-        // in the body is scrubbed clean at the top of every iteration:
+        // A target inside a LOOP is a question about the VARIABLE, not
+        // about the loop. A guard is attached to a statement and
+        // re-applied every time the engine transfers it; an assert
+        // placed BEFORE a loop executed once, dominating loop ENTRY
+        // only. Attaching it inside the loop makes the condition fire
+        // again on the back edge — unsound when the body REBINDS the
+        // pointer, because the second iteration's value never met the
+        // assert:
         //
         //     assert(p != NULL);
         //     while (n-- > 0) { total += *p; p = malloc(4); }
         //
-        // The second iteration's deref of a may-fail malloc was being
-        // silently retired by an assert that never ran again. An assert
-        // written INSIDE the body is unaffected — it really does
-        // re-execute each iteration, and its target is the next
-        // statement of the body, not the loop.
+        // and perfectly sound when the body never writes it: the fact
+        // re-fired is the same fact, true on every iteration. sqlite
+        // measured the difference (convertToWithoutRowidTable): a
+        // blanket loop rejection did not remove the pPk finding, it
+        // MOVED it onto a deref sitting directly under the assert.
         //
-        // This is asked of the TARGET, not of `next`: the guard lands on
-        // the target, and a wrapper — a loop pragma, a bare block — puts
-        // a non-loop statement in `next` while the target stays a loop
-        // condition. It is also not "does `next` contain a loop
-        // anywhere", which would throw away the legitimate case where a
-        // real statement runs once before the loop and the assert does
-        // dominate it.
-        if (!targetOutsideEveryLoop(next, target)) continue;
+        // This is asked of the TARGET, not of `next`: the guard lands
+        // on the target, and a wrapper — a loop pragma, a bare block —
+        // puts a non-loop statement in `next` while the target stays a
+        // loop condition. And it is asked PER NAME below: one assert
+        // can cover several variables, and the loop may write only one
+        // of them.
+        const clang::Stmt* enclosingLoop = nullptr;
+        if (!locateTarget(next, target, enclosingLoop)) continue;
 
         for (const std::string& name : rec.names) {
             auto it = byName.find(name);
             if (it == byName.end() || !it->second) continue;  // unknown
             const clang::VarDecl* vd = it->second;
             if (!vd->getType()->isPointerType()) continue;   // v1: pointers
+            if (enclosingLoop && writesVar(enclosingLoop, vd))
+                continue;  // back edge would re-assert a rebound pointer
             map[target].push_back({AssertGuard::Kind::NonNull, vd});
         }
     }
