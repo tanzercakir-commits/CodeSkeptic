@@ -1,5 +1,53 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-29 — AR.3 gate 4, asked twice more precisely (sqlite's find)
+
+The first real-codebase delta measurement for assert recovery — sqlite,
+125 TUs, run independently on two machines with identical results —
+showed gate 4's loop rejection doing something no unit test had asked
+about: not REMOVING a finding but MOVING it. In
+`convertToWithoutRowidTable()` the baseline warned after the join
+(build.c:2536) and recovery warned inside the branch (build.c:2468) —
+same function, same `pPk`, a deref sitting directly under an assert.
+Minimal repro is 14 lines: if/else, assert in the else-branch, a loop
+that only READS the pointer, then a deref. Six-variant ablation
+isolated the trigger (loop inside a conditional branch; neither alone)
+and `--no-assert-recovery` pinned the mechanism to recovery itself.
+
+Two commits close it, each asking gate 4's question of a more precise
+object:
+
+- **Target, not class** (796c90e): the rejection tested whether the
+  statement after the assert IS a loop, but the guard lands on
+  `firstElementIn()` INSIDE it — so a `#pragma clang loop`
+  (AttributedStmt) or one pair of braces reopened the exact false
+  negative the rejection exists to prevent. Rejection now walks to the
+  target. Four pins, each verified RED on the pre-fix binary.
+- **Variable, not loop** (9c12db7): re-firing a guard on the back edge
+  is only unsound when the body can REBIND the pointer; re-asserting
+  an unwritten variable re-states a true fact. The gate now locates
+  the target's outermost enclosing loop and rejects PER NAME, only
+  when that loop writes the variable — write detection deliberately
+  conservative (assignment, `++/--`, address-of, non-const-ref
+  binding, unseeable signatures, asm).
+
+Measured on sqlite, same tree, three binaries: baseline 63 findings,
+blanket rejection 59 (5 silenced + the relocation), per-variable
+**57 — six eliminations, zero relocations, zero additions**. The sixth
+(select.c:6976, `pList->a` in a for-init directly under
+`assert( pList!=0 )`, loop never writes `pList`) was invisible to the
+relocation analysis — blanket rejection had produced the same line as
+baseline there — and was hand-verified against the source. nlohmann
+parity: the known single finding, identical before and after. Suite
+774 -> 778, all six CI lanes green.
+
+Also documented (usage.md): a recognised assert macro must TERMINATE
+on failure. A log-and-continue soft assert erased by NDEBUG leaves
+only its name to judge by — the erased body is structurally invisible
+— and believing it hides real findings. Found by a second independent
+route (a non-terminating `SOFT_ASSERT` probe) converging with the
+review's name-based-trust finding.
+
 ## 2026-07-25 — AR.3: recovering the assert the compiler threw away
 
 The ecosystem FP family that five independent audits kept producing

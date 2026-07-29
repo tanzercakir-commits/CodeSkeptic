@@ -95,10 +95,18 @@ Dört kapı (hepsi geçilmeden kayıt yok):
 4. **Konum kanıtlanabilir mi** — guard, genişlemeden SONRAKİ ilk
    deyime bağlanır; parantezsiz `if`/`while` gövdesi, `switch`
    düşmesi, `goto`/etiket, gölgelenmiş/çift isim → reddedilir.
-   **Hedef DÖNGÜ olamaz**: guard, deyim her transfer edildiğinde
-   yeniden ateşlenir; döngüden ÖNCEKİ assert ise bir kez çalışıp
-   sadece GİRİŞİ domine eder — döngüye bağlamak, gövdede yeniden
-   atanan pointer'ı her turun başında temize çıkarırdı.
+   **Döngü sorusu DEĞİŞKENE sorulur** (2026-07-29, sqlite ölçümüyle
+   iki kez rafine edildi): guard, deyim her transfer edildiğinde
+   yeniden ateşlenir; döngüden ÖNCEKİ assert bir kez çalışıp sadece
+   GİRİŞİ domine eder. Geri-kenarda yeniden ateşleme, gövde pointer'ı
+   YENİDEN BAĞLIYORSA (atama, ++/--, adres alma, non-const referans,
+   görünmez imza, asm — hepsi muhafazakâr) tehlikelidir; hiç
+   yazmıyorsa aynı doğru olgunun tekrarıdır. Red bu yüzden (a) sınıfa
+   değil firstElementIn HEDEFİNE bakar (pragma/çıplak-blok sarmalayıcı
+   deliği), (b) döngüye değil İSME uygulanır. sqlite kanıtı:
+   battaniye red bulguyu SİLMİYOR, assert'in dibindeki satıra
+   TAŞIYORDU (build.c pPk 2536→2468); isim-bazlı red ile 63→57,
+   6 eliminasyon / 0 taşınma / 0 yeni.
 
 **Dürüst kayıt:** bu bir SAĞLAMLIK düzeltmesi DEĞİL. NDEBUG'lu build
 o kontrolü gerçekten çalıştırmaz. Bu, "yazarın assert'i, olduğunu
