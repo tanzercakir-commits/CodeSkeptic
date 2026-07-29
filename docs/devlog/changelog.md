@@ -14,11 +14,22 @@ unsigned-wrap = defined), both correct for ITS question and unchanged.
 New rule `sign-conversion` (CWE-195 neighbourhood, off unless the
 provenance flag opts in) asks a different question of the same
 expression: does an UNTRUSTED signed value reach an unsigned integer
-type while provably able to be negative? Three gates: declared
-untrusted provenance (never guessed), a finite negative witness in the
-proven interval, and so a dominating `x >= 0` / `x < 0` guard silences
-on its edge while an upper-bound-only guard (`if (x > 100)`) does NOT —
-the negative range survives it, which was nlohmann's exact shape.
+type while provably able to be negative? Gates: declared untrusted
+provenance (never guessed), a finite negative witness in the proven
+interval, so a dominating `x >= 0` / `x < 0` guard silences on its
+edge while an upper-bound-only guard (`if (x > 100)`) does NOT — the
+negative range survives it, which was nlohmann's exact shape.
+
+Precision boundary, caught by the thesis gate before merge: an
+ALLOCATOR argument is out of scope. `n = atoi(argv[1]); calloc(n, ...);
+if (!p) ...` (the corpus's array_from_int.c, ground-truth clean) is the
+commonest untrusted-alloc idiom — a negative n makes calloc return
+NULL, handled by the check; the allocator's NULL-on-over-large contract
+owns this case, and an unchecked result is the null-deref rule's
+finding. The rule's territory is the NON-allocator use nlohmann showed:
+a length stored/returned/copied with no NULL net. The malloc/calloc
+intrinsics plus --alloc-functions wrappers are excluded; the nlohmann
+sites (a store to a reference param) are untouched.
 
 Plus the out-param half of the untrusted-source model (3b): a declared
 `--untrusted-int-sources` function now taints its integer out-params
@@ -36,14 +47,16 @@ Retro-detection, both directions on the real trees:
   fix.
 
 Default unchanged (flag empty): sqlite re-scan 57 = 57, zero
-sign-conversion without the flag. 11 new tests
-(`SignConversionRuleTest`, the four probe shapes RED-verified on the
-pre-rule binary, guard/unsigned/provenance/ signed-narrowing-boundary
-negatives), suite 781 -> 790. NOT re-measured this round: the tinyusb
-untrusted-length receipt (out-param seeding is new; the flag is opt-in
-so default projects are untouched, but a project using both the flag
-and out-param sources could see new — genuine, by the doctrine —
-findings). Rule name is registered in main.cpp and McpServer.cpp.
+sign-conversion without the flag; corpus (cjson 54, tinyxml2 9) and
+thesis (clean_fp=0, bug 9/15) at their pinned levels. 10 new tests
+(`SignConversionRuleTest`: the trophy, return-value and out-param
+sources, the upper-bound-only guard that must still report, the
+allocator-argument and signed-narrowing boundaries, guard/unsigned/
+provenance negatives), suite 781 -> 791. NOT re-measured this round:
+the tinyusb untrusted-length receipt (out-param seeding is new; the
+flag is opt-in so default projects are untouched, but a project using
+both the flag and out-param sources could see new — genuine, by the
+doctrine — findings). Rule registered in main.cpp and McpServer.cpp.
 
 ## 2026-07-29 — AR.3 placement: the compound-body blind spot (curl's find)
 

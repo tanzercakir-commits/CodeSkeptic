@@ -2,6 +2,7 @@
 
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
+#include "engine/AllocFunctions.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
 #include "engine/Interval.h"
@@ -63,12 +64,60 @@ struct ConvSite {
     std::string dstType;
 };
 
+// A call to a heap allocator whose size argument, over-large, is met by
+// a NULL return — the intrinsic C family plus any --alloc-functions
+// wrapper. The conversion that feeds such an argument is DELIBERATELY
+// out of this rule's scope: a negative-turned-huge allocation request
+// is caught by the allocator's own contract (calloc even proves the
+// nmemb*size overflow) and, when the result is used unchecked, it is
+// the null-deref rule's finding, not a sign story. Excluding it is what
+// keeps the ubiquitous `n = atoi(argv[1]); p = calloc(n, ...); if (!p)`
+// idiom silent — the thesis corpus's array_from_int.c, ground-truth
+// clean. The rule's own territory is the NON-allocator use nlohmann
+// showed: a length stored/returned/used for access with no NULL net.
+bool isAllocatorCallee(const CallExpr* call) {
+    const FunctionDecl* fd = call->getDirectCallee();
+    if (!fd || !fd->getIdentifier()) return false;
+    const std::string n = fd->getName().str();
+    static const std::set<std::string> kIntrinsic = {
+        "malloc",  "calloc",       "realloc",    "reallocarray",
+        "alloca",  "aligned_alloc", "valloc",    "pvalloc",
+        "memalign",
+    };
+    if (kIntrinsic.count(n)) return true;
+    const auto& extra = codeskeptic::allocFunctionNames();
+    return !extra.empty() && extra.count(n);
+}
+
 std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
         std::vector<ConvSite> sites;
+        // Every Expr under an allocator call's arguments — a size
+        // request whose over-large failure mode is a NULL return, not a
+        // silent overflow, so its conversion is out of scope here.
+        std::set<const Expr*> allocArgExprs;
+
+        // Traverse allocator calls first so allocArgExprs is populated
+        // before any contained conversion is considered. RAV visits
+        // parents before children, so recording the argument subtree on
+        // the way DOWN covers every nested conversion.
+        bool VisitCallExpr(CallExpr* call) {
+            if (!isAllocatorCallee(call)) return true;
+            for (const Expr* arg : call->arguments()) {
+                std::function<void(const Stmt*)> mark = [&](const Stmt* s) {
+                    if (!s) return;
+                    if (const auto* e = llvm::dyn_cast<Expr>(s))
+                        allocArgExprs.insert(e);
+                    for (const Stmt* c : s->children()) mark(c);
+                };
+                mark(arg);
+            }
+            return true;
+        }
 
         void consider(const Expr* cast, const Expr* operand, QualType dst) {
             if (!operand) return;
+            if (allocArgExprs.count(cast)) return;  // allocator size arg
             QualType src = operand->getType();
             if (!dst->isIntegerType() || !dst->isUnsignedIntegerType())
                 return;

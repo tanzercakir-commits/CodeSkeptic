@@ -89,18 +89,48 @@ TEST(SignConversionRuleTest, UpperBoundOnlyGuard_StillReports) {
     EXPECT_EQ(results[0].rule_id, "sign-conversion");
 }
 
-// --- Probe shape D: the malloc sink — the conversion feeding an
-// allocation size is the same site, reported once. ---
-TEST(SignConversionRuleTest, MallocSizeFromOutParam_Reports) {
+// --- Probe shape D, corrected by the thesis corpus: an ALLOCATOR
+// argument is NOT this rule's domain. array_from_int.c (ground-truth
+// clean) is `n = atoi(argv[1]); calloc(n, ...); if (!p) ...` — a
+// negative n makes calloc return NULL, which the null check handles;
+// flagging it floods the commonest untrusted-alloc idiom. The
+// allocator's NULL-on-over-large contract owns this case (and an
+// unchecked result is the null-deref rule's finding). Silent here. ---
+TEST(SignConversionRuleTest, AllocatorArgument_NotThisRulesDomain) {
     SourceScope scope({"get_number"});
     SignConversionRule rule;
     auto results = runRule(rule, R"(
         extern void* malloc(unsigned long);
+        extern void* calloc(unsigned long, unsigned long);
         bool get_number(int format, signed char& out);
-        void* f(int format) {
+        void* via_malloc(int format) {
             signed char number = 0;
             if (!get_number(format, number)) return 0;
             return malloc(static_cast<unsigned long>(number));
+        }
+        void* via_calloc(int format) {
+            signed char number = 0;
+            if (!get_number(format, number)) return 0;
+            return calloc(static_cast<unsigned long>(number), 4);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// --- The real harm shape that IS in scope: the converted length used
+// for a memory COPY, no allocator NULL net. This is the nlohmann
+// danger class — a huge length driving access. ---
+TEST(SignConversionRuleTest, LengthUsedForCopy_Reports) {
+    SourceScope scope({"get_number"});
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern void* memcpy(void*, const void*, unsigned long);
+        bool get_number(int format, signed char& out);
+        void f(int format, char* dst, const char* src) {
+            signed char number = 0;
+            if (!get_number(format, number)) return;
+            unsigned long len = static_cast<unsigned long>(number);
+            memcpy(dst, src, len);
         }
     )");
     ASSERT_GE(results.size(), 1u);
