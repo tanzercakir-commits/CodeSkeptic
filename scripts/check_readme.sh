@@ -3,8 +3,11 @@
 #
 # Enforces the "first five minutes" contract so the README cannot
 # silently regrow into a wall of text:
-#   1. Line budget: README.md <= 300 lines (the deep content lives in
-#      docs/ — layered, not deleted).
+#   1. Line budget: README.md <= 315 lines (the deep content lives in
+#      docs/ — layered, not deleted). Raised 300 -> 315 on 2026-07-30
+#      when the Rules table gained resource-leak / sign-conversion /
+#      alloc-size-overflow / assumption — real rule-count growth, not
+#      prose bloat; the cap still catches a runaway.
 #   2. Required sections: the questions a first-time reader must be
 #      able to answer on the first screen(s).
 #   3. Relative-link integrity: every relative markdown link in the
@@ -17,7 +20,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 fail=0
 
 # --- 1. Line budget -------------------------------------------------
-MAX_LINES=300
+MAX_LINES=315
 lines=$(wc -l < README.md)
 if [ "$lines" -gt "$MAX_LINES" ]; then
     echo "FAIL: README.md is $lines lines (budget: $MAX_LINES)." \

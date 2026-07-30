@@ -46,5 +46,39 @@ else
     echo "note: changelog-freshness check skipped (no shared base)"
 fi
 
-[ "$fail" -eq 0 ] && echo "ok: docs in sync (canonical files, no scatter, changelog fresh)"
+# 4. Rule registry <-> README Rules table: every finding rule_id the
+#    code can emit must appear in README.md, so a shipped rule can never
+#    be silently absent from the public capability list (the drift an
+#    external review flagged, 2026-07-30). Skip-list holds ids that are
+#    diagnostics, not detection rules (malformed-contract reporting).
+rule_skip=" contract-syntax "
+ids=$( { grep -rhoE 'return "[a-z0-9-]+";' src/rules/*.cpp src/rules/*.h;
+         grep -rhoE 'rule_id = "[a-z0-9-]+"' src/rules/*.cpp; } \
+       | grep -oE '"[a-z0-9-]+"' | tr -d '"' | sort -u )
+for id in $ids; do
+    case "$rule_skip" in *" $id "*) continue ;; esac
+    if ! grep -qF "$id" README.md; then
+        echo "FAIL: rule '$id' is emitted by the code but not in README.md."
+        echo "      Add it to the Rules table (or the skip-list if it is not a detection rule)."
+        fail=1
+    fi
+done
+
+# 5. Doc version pins agree with the canonical CMake version, so a
+#    release bumps the install docs in the same commit (README already
+#    did; evaluate.md drifted to an older tag before this guard).
+ver=$(grep -oE 'VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1 | awk '{print $2}')
+if [ -n "$ver" ]; then
+    for f in README.md docs/evaluate.md; do
+        [ -f "$f" ] || continue
+        bad=$(grep -oE '(:v|@v)[0-9]+\.[0-9]+\.[0-9]+' "$f" | grep -vF "v$ver" || true)
+        if [ -n "$bad" ]; then
+            echo "FAIL: $f pins a version other than the canonical v$ver (CMakeLists):"
+            echo "$bad" | sed 's/^/  /'
+            fail=1
+        fi
+    done
+fi
+
+[ "$fail" -eq 0 ] && echo "ok: docs in sync (canonical files, no scatter, changelog fresh, rules listed, versions pinned)"
 exit "$fail"

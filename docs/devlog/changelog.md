@@ -1,5 +1,24 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — docs: README rule table synced + two consistency guards
+
+An external review flagged the gap the doc-hygiene guard had left open:
+the README Rules table listed the old rule set while main had shipped
+resource-leak, sign-conversion, alloc-size-overflow and the CWE-191
+underflow expansion. Closed both the drift and the door.
+
+- README Rules table: added resource-leak (CWE-404), sign-conversion
+  (CWE-195), alloc-size-overflow (CWE-131), assumption; int-overflow
+  row now names CWE-191 subtraction underflow. Budget raised 300 -> 315
+  for the real rule-count growth (not prose).
+- evaluate.md Docker tag v0.4.5 -> v0.4.7 (drift from README).
+- check_docs_sync.sh gains two mechanical guards, both negative-tested:
+  (4) every finding rule_id the code emits must appear in README
+  (skip-list for non-detection diagnostic ids); (5) version pins in
+  README + evaluate.md must match the canonical CMakeLists version, so
+  a release bumps the install docs in the same commit. The registry
+  <-> README drift and the version drift can no longer recur silently.
+
 ## 2026-07-30 — docs: first-scan triage guide (adoption)
 
 New docs/first-scan.md, the adoption-critical guide missing until now:

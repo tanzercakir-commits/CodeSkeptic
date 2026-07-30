@@ -200,10 +200,14 @@ others are weakest: gating *new* changes (human or AI-generated).
 | Memory leak | `memory-leak` | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
 | Double free | `double-free` | Freeing a pointer already in freed state (shares the memory-leak dataflow) |
 | Use after free | `use-after-free` | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
+| Resource leak | `resource-leak` | A `FILE*`/`DIR*` from `fopen`/`freopen`/`fdopen`/`tmpfile`/`opendir` lost without a matching `fclose`/`closedir` (CWE-404) — built-in, classified apart from heap `memory-leak` |
 | Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
 | Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
 | Array/heap bounds | `bounds` | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
-| Integer overflow | `int-overflow` | Signed `*`/`+` whose proven ranges escape the type (CWE-190) — including 64-bit operands, results implicitly narrowed into a smaller type (`char r = d + 1`), and untrusted sources (`int n = atoi(s); n * k`) |
+| Integer overflow / underflow | `int-overflow` | Signed `*`/`+`/`-` whose proven ranges escape the type (CWE-190 overflow, CWE-191 subtraction underflow) — including 64-bit operands, results implicitly narrowed into a smaller type (`char r = d + 1`), and untrusted sources (`int n = atoi(s); n * k`) |
+| Sign conversion | `sign-conversion` | An untrusted signed value converted to unsigned while provably able to be negative (CWE-195), turning a small length into a huge one — opt-in via `--untrusted-int-sources`; allocator sizes are the alloc-size rule's domain |
+| Alloc-size overflow | `alloc-size-overflow` | An untrusted length that wraps an unsigned allocation-size computation (`malloc(sizeof(T) * (n + 1))`) to a small value before the allocator sees it (CWE-131) — opt-in via `--untrusted-int-sources` |
+| Assumption | `assumption` | An honest **may**-warning where null-safety rests on an unproven invariant (an accessor that may return null, a param dereferenced without a check) — the class a `// cs:` contract or a baseline resolves |
 | Contract verification | `contract` | Violations of declared `// cs:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries |
 | Policy enforcement | `policy` | `cs:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
 
