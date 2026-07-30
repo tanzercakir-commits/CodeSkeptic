@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Doc-hygiene guard (canonical files, no scatter, changelog fresh)
+        run: bash scripts/check_docs_sync.sh
+
       - name: Install LLVM 20 and build tools
         id: install
         run: |

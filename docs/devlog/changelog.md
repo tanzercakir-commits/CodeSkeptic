@@ -1,5 +1,14 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — CI: doc-hygiene guard automates the working agreement
+
+scripts/check_docs_sync.sh, wired into the required build-and-test lane,
+enforces mechanically what used to rest on memory: the canonical trio
+(PLAN.md / TODO.md / changelog.md) exists, NO scattered per-feature
+PLAN-*.md briefs are added (the no-scatter decision, now a CI gate), and
+a src/ change ships with a changelog entry (best-effort against the
+merge base; skipped gracefully when no base). A miss blocks merge.
+
 ## 2026-07-30 — CWE-404: resource leak (fopen/opendir), built-in
 
 A FILE*/DIR* left un-closed is a resource leak, and a FILE* is a

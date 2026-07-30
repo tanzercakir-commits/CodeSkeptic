@@ -41,3 +41,4 @@ kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
 
 Yeni PLAN-*.md AÇMA. Her iş: changelog'a giriş + bu TODO güncellenir +
 PLAN sabit. Ölçüm makbuzları changelog'a yazılır (ayrı dated dosya değil).
+Bu kural artık CI ile zorunlu: scripts/check_docs_sync.sh (build-and-test).
