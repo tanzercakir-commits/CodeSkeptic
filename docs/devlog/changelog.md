@@ -1,5 +1,28 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — CWE-191: signed subtraction underflow, folded into IntOverflowRule
+
+The roadmap parked `-` as "CWE-191, out of scope." It turned out to be
+one predicate away: `escapesSignedFinite` already tested BOTH bounds
+(`hi > max` for overflow, `lo < min` for underflow), so underflow
+detection was latent — the only thing keeping subtraction out was
+`isGrowthOp` admitting just `*` and `+`. Admitting `-` (renamed
+`isArithOp`) turns it on with no new engine: same interval dataflow,
+same finite-witness bar, same guard refinement.
+
+Signed subtraction whose proven range provably leaves the type (either
+direction — `a - b` below INT_MIN, or minus-a-negative above INT_MAX,
+both UB) now reports with a subtraction-specific message. `x - x` is
+skipped (provably 0). Unsigned subtraction stays out (its wrap is
+defined, a different non-UB story). Guards refine and silence; unknown
+operands stay top() and silent.
+
+RED/GREEN proven (-2e9 - 2e9 = -4e9: pre-change Clean -> reports). 5
+tests (underflow, in-range, guarded, unknown, unsigned-excluded). Suite
+801 -> 806, thesis clean_fp=0, corpus unchanged (cjson 54, tinyxml2 9),
+Juliet floors held (CI). CWE-190 and CWE-191 now share one rule and one
+proof discipline.
+
 ## 2026-07-30 — alloc-size-overflow rule (CWE-131), the binfont hunt's answer
 
 The LVGL binfont hunt named a scope gap; this is the rule. An untrusted

@@ -549,3 +549,76 @@ TEST(IntOverflowRuleTest, ScanfWideWidth_Reported) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+// --- CWE-191: signed subtraction underflow (2026-07-30). Same interval
+// machinery, same finite-witness bar, same guard-refinement — the only
+// change was admitting `-` as a reportable operator. escapesSignedFinite
+// already checked the lower bound, so underflow detection came for free.
+
+TEST(IntOverflowRuleTest, SubtractionUnderflows) {
+    // -2e9 - 2e9 = -4e9, below int32's -2.147e9 floor.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f() {
+            int a = -2000000000;
+            int b =  2000000000;
+            return a - b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "int-overflow");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(IntOverflowRuleTest, SubtractionInRangeClean) {
+    // 100 - 50 stays comfortably inside int; no finite witness escapes.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f() {
+            int a = 100;
+            int b = 50;
+            return a - b;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, GuardedSubtractionClean) {
+    // A lower bound on the minuend keeps the difference in range: the
+    // guard refines the interval on its own edge, same as for overflow.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a) {
+            if (a < 0) return 0;
+            if (a > 1000) return 0;
+            return a - 500;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, UnknownSubtractionSilent) {
+    // Unbounded operands -> top() -> no finite witness -> silent
+    // (precision-first: a missed underflow beats a false alarm).
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        int f(int a, int b) {
+            return a - b;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(IntOverflowRuleTest, UnsignedSubtractionNotThisRule) {
+    // Unsigned wrap is defined behaviour (CWE-191 unsigned is a
+    // different, non-UB story); this rule stays signed-only.
+    IntOverflowRule rule;
+    auto results = runRule(rule, R"(
+        unsigned f() {
+            unsigned a = 0;
+            unsigned b = 5;
+            return a - b;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

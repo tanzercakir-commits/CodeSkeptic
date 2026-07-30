@@ -192,6 +192,11 @@ const MsgEntry kMessages[] = {
      "narrower target type '{0}'",
      "olasi tamsayi tasmasi: aritmetik sonuc, daraltilan hedef tip '{0}' "
      "sinirini kanitlanabilir bicimde asiyor"},
+    // IntUnderflowSub
+    {"possible integer underflow: this subtraction can leave the "
+     "representable range of '{0}'",
+     "olasi tamsayi eksilmesi (underflow): bu cikarma '{0}' tipinin "
+     "gosterilebilir araligindan cikabilir"},
     // BoundsArrayDefinite
     {"out-of-bounds array access: proven index range {0} lies outside the "
      "array bound [0, {1})",

@@ -72,6 +72,7 @@ enum class MsgId {
     IntOverflowMul,             // {0} = the arithmetic type name
     IntOverflowAdd,             // {0} = the arithmetic type name
     IntOverflowNarrow,          // {0} = the narrow target type name
+    IntUnderflowSub,            // {0} = the arithmetic type name (subtraction)
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
     BrokenTuSkipped,            // {0} = count of TUs that failed to compile

@@ -91,19 +91,26 @@ bool isSelfSquare(const BinaryOperator* op) {
     return l && l == r;
 }
 
-// A growth operator this rule reasons about. `-` belongs to CWE-191
-// (underflow) and stays out of scope.
-bool isGrowthOp(const BinaryOperator* op) {
-    return op->getOpcode() == BO_Mul || op->getOpcode() == BO_Add;
+// An arithmetic operator this rule reasons about. `*` and `+` grow a
+// value past the type's MAX (CWE-190); `-` drops it below the type's
+// MIN (CWE-191 underflow). Both are undefined behaviour for signed
+// integers, and the interval escape check already tests BOTH bounds —
+// the only thing that kept subtraction out was this predicate
+// (2026-07-30: CWE-191 folded in, same machinery, no new engine).
+bool isArithOp(const BinaryOperator* op) {
+    const auto k = op->getOpcode();
+    return k == BO_Mul || k == BO_Add || k == BO_Sub;
 }
 
 bool isReportableOp(const BinaryOperator* op) {
-    if (!isGrowthOp(op)) return false;
+    if (!isArithOp(op)) return false;
     QualType t = op->getType();
     if (!t->isIntegerType() || !t->isSignedIntegerType()) return false;
     // abs/sqrt-guarded squares are indistinguishable from unguarded
     // ones at any width — documented FN, precision over recall.
     if (op->getOpcode() == BO_Mul && isSelfSquare(op)) return false;
+    // x - x is provably 0, never escapes; skip the noise.
+    if (op->getOpcode() == BO_Sub && isSelfSquare(op)) return false;
     return true;
 }
 
@@ -249,11 +256,14 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             diag.message = codeskeptic::msg(
                 codeskeptic::MsgId::IntOverflowNarrow, site.narrowType);
         } else {
-            diag.message = codeskeptic::msg(
-                site.op->getOpcode() == BO_Add
-                    ? codeskeptic::MsgId::IntOverflowAdd
-                    : codeskeptic::MsgId::IntOverflowMul,
-                site.op->getType().getAsString());
+            codeskeptic::MsgId mid;
+            switch (site.op->getOpcode()) {
+                case BO_Add: mid = codeskeptic::MsgId::IntOverflowAdd; break;
+                case BO_Sub: mid = codeskeptic::MsgId::IntUnderflowSub; break;
+                default:     mid = codeskeptic::MsgId::IntOverflowMul; break;
+            }
+            diag.message =
+                codeskeptic::msg(mid, site.op->getType().getAsString());
         }
         results.push_back(std::move(diag));
     }

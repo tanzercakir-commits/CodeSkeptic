@@ -14,9 +14,9 @@ Uçuşta: phase-triage-close + phase-binfont-hunt (doc-only, CI'da)
 
 ## Sıradaki iş (kod)
 
-**CWE-191 integer underflow** — IntOverflowRule'a `-` operatörü
-genişlemesi (kapsam-dışı notu var). Sonra CWE-775/404 fd/kaynak sızıntısı.
-(alloc-size-overflow / CWE-131 TAMAMLANDI — changelog 2026-07-30.)
+**CWE-775/404 fd/kaynak sızıntısı** — MemoryLeakRule genellemesi
+(open/fopen/socket → close/fclose eşleşmesi). (CWE-131 ve CWE-191
+TAMAMLANDI — changelog 2026-07-30.)
 
 ## Açık kullanıcı kararları
 
@@ -29,9 +29,8 @@ genişlemesi (kapsam-dışı notu var). Sonra CWE-775/404 fd/kaynak sızıntıs�
 ## Backlog (öncelik sırası)
 
 ```
-1. CWE-191 integer underflow ('-' operatörü)     ← sıradaki
-2. CWE-775/404 fd/kaynak sızıntısı genellemesi
-3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
+1. CWE-775/404 fd/kaynak sızıntısı genellemesi   ← sıradaki (3. CWE)
+2. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
 5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
 6. tinyusb untrusted-length makbuzu → changelog'a resmi kayıt (ölçüldü, temiz)
 ```
