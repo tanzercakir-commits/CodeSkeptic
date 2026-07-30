@@ -70,8 +70,10 @@ Cluster classification (44 null-deref, 2 div-by-zero, 1 leak):
 
 ## Disposition
 
-- zlib: two real contrib findings could be upstreamed (untgz strcpy,
-  untgz strdup) — user's call; core-clean is a trophy-table candidate.
+- zlib: the two real contrib findings were run through the upstream
+  criteria (docs/upstream-criteria.md) and KILLED at gate A/4 — current
+  zlib HEAD has deleted contrib/untgz entirely, so there is no code to
+  report against. Core-clean remains a trophy-table candidate.
 - LVGL: no per-finding follow-up; the class-level answer is
   contract/baseline, plus the binfont untrusted-length hunt as a
   separate future item.
