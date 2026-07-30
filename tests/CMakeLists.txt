@@ -17,6 +17,7 @@ add_executable(codeskeptic_tests
     DivByZeroRuleTest.cpp
     IntOverflowRuleTest.cpp
     SignConversionRuleTest.cpp
+    AllocSizeOverflowRuleTest.cpp
     BoundsRuleTest.cpp
     NullDerefRuleTest.cpp
     AssertRecoveryTest.cpp

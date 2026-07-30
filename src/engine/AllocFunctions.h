@@ -4,6 +4,10 @@
 #include <set>
 #include <string>
 
+namespace clang {
+class CallExpr;
+}
+
 namespace codeskeptic {
 
 // Custom allocator registry (--alloc-functions / --free-functions).
@@ -20,6 +24,12 @@ namespace codeskeptic {
 
 void setAllocFunctionNames(std::set<std::string> names);
 const std::set<std::string>& allocFunctionNames();
+
+// True if `call` targets a heap allocator (intrinsic malloc family +
+// --alloc-functions). Shared by the sign-conversion and
+// alloc-size-overflow rules so their opposite treatments of an
+// allocator size argument stay in lockstep.
+bool isAllocatorCall(const clang::CallExpr* call);
 
 void setFreeFunctionNames(std::set<std::string> names);
 const std::set<std::string>& freeFunctionNames();

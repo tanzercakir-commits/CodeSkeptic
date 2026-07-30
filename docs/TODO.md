@@ -14,9 +14,9 @@ Uçuşta: phase-triage-close + phase-binfont-hunt (doc-only, CI'da)
 
 ## Sıradaki iş (kod)
 
-**alloc-size-overflow kuralı (CWE-131)** — spec `PLAN.md §4`.
-Güvenilmez operand + allocator sink + kanıtlı unsigned wrap. Varsayılan
-kapalı. RED-önce + yerel kapılar (suite/thesis/corpus) şart.
+**CWE-191 integer underflow** — IntOverflowRule'a `-` operatörü
+genişlemesi (kapsam-dışı notu var). Sonra CWE-775/404 fd/kaynak sızıntısı.
+(alloc-size-overflow / CWE-131 TAMAMLANDI — changelog 2026-07-30.)
 
 ## Açık kullanıcı kararları
 
@@ -29,10 +29,9 @@ kapalı. RED-önce + yerel kapılar (suite/thesis/corpus) şart.
 ## Backlog (öncelik sırası)
 
 ```
-1. alloc-size-overflow kuralı (CWE-131)         ← sıradaki
-2. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
-3. CWE-191 integer underflow ('-' operatörü)
-4. CWE-775/404 fd/kaynak sızıntısı genellemesi
+1. CWE-191 integer underflow ('-' operatörü)     ← sıradaki
+2. CWE-775/404 fd/kaynak sızıntısı genellemesi
+3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
 5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
 6. tinyusb untrusted-length makbuzu → changelog'a resmi kayıt (ölçüldü, temiz)
 ```

@@ -1,5 +1,37 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — alloc-size-overflow rule (CWE-131), the binfont hunt's answer
+
+The LVGL binfont hunt named a scope gap; this is the rule. An untrusted
+length wraps an UNSIGNED allocation-size computation before the
+allocator sees it: `lv_malloc(sizeof(uint32_t) * (loca_count + 1))` with
+loca_count from a font file — at 0xFFFFFFFF the `+ 1` wraps to 0 in
+uint32, lv_malloc(0) hands back a tiny buffer, the fill loop overflows
+the heap. Every existing rule missed it by design (IntOverflow is
+signed-only, sign-conversion needs a cast and EXCLUDES allocator args,
+bounds is fixed-extent) — the nlohmann lesson one level over.
+
+The rule fires only when an unsigned `*`/`+` (a) feeds an allocator's
+size argument, (b) has an operand of declared untrusted provenance, and
+(c) provably reaches past its unsigned result type's max (a finite
+interval witness). A bound on the length narrows the interval and
+silences on its edge; an ordinary unsigned parameter with no declared
+source stays silent (provenance opt-in). It INVERTS sign-conversion's
+allocator exclusion — the allocator sink is precisely this rule's
+target — so the two partition the allocator-size space cleanly; the
+shared `isAllocatorCall` predicate (lifted to engine/AllocFunctions.h)
+keeps them in lockstep. v1 scope: sub-64-bit result types, where the
+int64 interval can witness the wrap; 64-bit size_t multiply needs the
+operand-corner proof and is deferred (documented, not dropped).
+
+RED/GREEN proven on the loca_count shape (pre-rule Clean -> reports at
+the `+ 1`). 7 tests (trophy out-param, return-value multiply, the bound
+that silences, provenance/non-allocator/signed negatives, custom
+wrapper). Off by default. Suite 794 -> 801, thesis clean_fp=0, corpus
+unchanged. The LVGL sites are now upstream candidates pending the
+duplicate/CVE search and SECURITY.md channel (PLAN.md section 6) — NOT
+yet filed.
+
 ## 2026-07-30 — FINDING 2: the negative-name veto failed open
 
 AR.3 gate 2 vetoes a recovered assert whose NAME announces the pointer

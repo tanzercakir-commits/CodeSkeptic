@@ -262,6 +262,13 @@ const MsgEntry kMessages[] = {
      "olasi negatif uzunluk: guvenilmeyen isaretli '{0}' deger negatif "
      "olabilir; '{1}' donusumu onu devasa bir degere cevirir - donusumden "
      "once negatiflik kontrolu yapin"},
+    // AllocSizeOverflow
+    {"possible allocation-size overflow: an untrusted length can wrap "
+     "this unsigned '{0}' size computation to a small value, under-sizing "
+     "the buffer - bound the length before computing the size",
+     "olasi tahsis-boyutu tasmasi: guvenilmeyen bir uzunluk bu isaretsiz "
+     "'{0}' boyut hesabini kucuk bir degere sarabilir ve tamponu kucuk "
+     "yapar - boyutu hesaplamadan once uzunlugu sinirlayin"},
 };
 
 void substitute(std::string& text, const std::string& placeholder,

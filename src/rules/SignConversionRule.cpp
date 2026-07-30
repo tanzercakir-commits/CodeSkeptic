@@ -64,9 +64,7 @@ struct ConvSite {
     std::string dstType;
 };
 
-// A call to a heap allocator whose size argument, over-large, is met by
-// a NULL return — the intrinsic C family plus any --alloc-functions
-// wrapper. The conversion that feeds such an argument is DELIBERATELY
+// A conversion feeding a heap allocator's size argument is DELIBERATELY
 // out of this rule's scope: a negative-turned-huge allocation request
 // is caught by the allocator's own contract (calloc even proves the
 // nmemb*size overflow) and, when the result is used unchecked, it is
@@ -75,19 +73,8 @@ struct ConvSite {
 // idiom silent — the thesis corpus's array_from_int.c, ground-truth
 // clean. The rule's own territory is the NON-allocator use nlohmann
 // showed: a length stored/returned/used for access with no NULL net.
-bool isAllocatorCallee(const CallExpr* call) {
-    const FunctionDecl* fd = call->getDirectCallee();
-    if (!fd || !fd->getIdentifier()) return false;
-    const std::string n = fd->getName().str();
-    static const std::set<std::string> kIntrinsic = {
-        "malloc",  "calloc",       "realloc",    "reallocarray",
-        "alloca",  "aligned_alloc", "valloc",    "pvalloc",
-        "memalign",
-    };
-    if (kIntrinsic.count(n)) return true;
-    const auto& extra = codeskeptic::allocFunctionNames();
-    return !extra.empty() && extra.count(n);
-}
+// The allocator predicate is shared (engine/AllocFunctions.h) with
+// AllocSizeOverflowRule, which owns the opposite half.
 
 std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
@@ -102,7 +89,7 @@ std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
         // parents before children, so recording the argument subtree on
         // the way DOWN covers every nested conversion.
         bool VisitCallExpr(CallExpr* call) {
-            if (!isAllocatorCallee(call)) return true;
+            if (!codeskeptic::isAllocatorCall(call)) return true;
             for (const Expr* arg : call->arguments()) {
                 std::function<void(const Stmt*)> mark = [&](const Stmt* s) {
                     if (!s) return;

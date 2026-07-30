@@ -82,6 +82,7 @@ enum class MsgId {
     MultipleSourcePaths,        // {0} = kept path, {1} = rejected extra
     BoundsCopyUntrustedLen,     // {0} = copy size range, {1} = dest capacity bytes
     SignConversionUntrusted,    // {0} = signed source type, {1} = unsigned target type
+    AllocSizeOverflow,          // {0} = the unsigned result type name
 
 };
 

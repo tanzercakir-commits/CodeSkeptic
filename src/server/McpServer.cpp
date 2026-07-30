@@ -5,6 +5,7 @@
 #include "rules/DivByZeroRule.h"
 #include "rules/IntOverflowRule.h"
 #include "rules/SignConversionRule.h"
+#include "rules/AllocSizeOverflowRule.h"
 #include "rules/BoundsRule.h"
 #include "rules/AssumptionRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
@@ -171,6 +172,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     analyzer.addRule<codeskeptic::DivByZeroRule>();
     analyzer.addRule<codeskeptic::IntOverflowRule>();
     analyzer.addRule<codeskeptic::SignConversionRule>();
+    analyzer.addRule<codeskeptic::AllocSizeOverflowRule>();
     analyzer.addRule<codeskeptic::BoundsRule>();
     analyzer.addRule<codeskeptic::AssumptionRule>();
     analyzer.addRule<codeskeptic::NullDerefRule>();
