@@ -21,9 +21,9 @@ kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
 
 ## Açık kullanıcı kararları
 
-1. **LVGL binfont açıklaması** — kural landing + duplikat/CVE taraması
-   SONRASI karar; kanal SECURITY.md (halka açık tracker değil). Şimdi
-   HİÇBİR ŞEY bildirilmez.
+1. **LVGL binfont açıklaması** — KAPANDI (2026-07-30): duplikat/CVE yok
+   ama Gate B düştü (LVGL'de threat-model/SECURITY.md yok, font=güvenilir).
+   Rapor edilmedi; PLAN §6 ledger'da kayıtlı.
 2. **zlib "core clean" trophy** — kullanıcı GEREK YOK dedi (kapalı).
 3. **TF PR #123994** — hâlâ açık; takipte, aksiyon yok.
 
@@ -34,7 +34,6 @@ kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
 2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
 3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
 5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
-6. tinyusb untrusted-length makbuzu → changelog'a resmi kayıt (ölçüldü, temiz)
 ```
 
 ## Not — dosya disiplini (2026-07-30 kararı)

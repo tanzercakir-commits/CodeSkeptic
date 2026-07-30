@@ -1,5 +1,20 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — tinyusb untrusted-length receipt (out-param model), re-measured clean
+
+The sign-conversion round's out-param seeding (a declared untrusted
+source taints integer out-params, not just returns) was a real behaviour
+change; the untrusted-length.md receipt (tinyusb, "scanned clean with
+and without the flag on plausible sources") predated it and was flagged
+as not-re-measured. Now measured: full tinyusb src (77 .c files) under
+the alloc-size binary, three modes — assert-recovery off, flag off, flag
+on (--untrusted-int-sources read_u16,packet_len,tud_cdc_read,tu_u16) —
+ALL 0 findings, 0 resource/sign/alloc-size. The out-param model
+introduced no false positives on the device stack; the receipt holds
+under the new engine. Honest note: the survey cited 24 TUs, this run
+saw 77 .c (the fallback per-extension DB compiles a wider set); either
+way, clean.
+
 ## 2026-07-30 — CI: doc-hygiene guard automates the working agreement
 
 scripts/check_docs_sync.sh, wired into the required build-and-test lane,

@@ -141,7 +141,7 @@ dataflow ile bulundu") · 1 issue = 1 kusur · mütevazı fix önerisi.
 |---|---|---|
 | TFLite rfft2d/irfft2d leak (#123387/#123994) | 4/4 | raporlandı; PR açık |
 | zlib untgz strcpy/strdup (1.3.1) | 4'te düştü (HEAD'de kod silinmiş) | rapor yok |
-| LVGL binfont alloc-size (aday) | A/1,4 ✓ · A/3 duplikat taraması BEKLİYOR | kural + arama sonrası karar |
+| LVGL binfont alloc-size | A: ✓ (mekanizma+HEAD+dup-yok) · B: ✗ | HOLD — LVGL'de threat-model/SECURITY.md yok, font'lar güvenilir sayılıyor; özel kanal yok. Rapor edilmedi (kural için kanıt olarak kalır). |
 
 ## 7. Yol haritası — tamamlanan (özet; detay changelog'da)
 
