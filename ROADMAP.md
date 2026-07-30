@@ -37,7 +37,7 @@ deterministic, trace-backed verdicts an agent can act on.
 An external reviewer's assessment was verified point by point and
 turned into a phased plan with tests, guards and definition-of-done
 per phase — the working plan is committed at
-[docs/PLAN-v0.4.md](docs/PLAN-v0.4.md) (in Turkish; phases summarized):
+[docs/PLAN.md](docs/PLAN.md) (in Turkish; phases summarized):
 
 - **Phase 0 — first five minutes:** README re-architecture (quickstart
   up top, honest-limits and use-alongside sections, deep content

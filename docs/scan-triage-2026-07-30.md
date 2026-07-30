@@ -71,7 +71,7 @@ Cluster classification (44 null-deref, 2 div-by-zero, 1 leak):
 ## Disposition
 
 - zlib: the two real contrib findings were run through the upstream
-  criteria (docs/upstream-criteria.md) and KILLED at gate A/4 — current
+  criteria (docs/PLAN.md (§6)) and KILLED at gate A/4 — current
   zlib HEAD has deleted contrib/untgz entirely, so there is no code to
   report against. Core-clean remains a trophy-table candidate.
 - LVGL: no per-finding follow-up; the class-level answer is
