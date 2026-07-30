@@ -33,7 +33,7 @@ Exit 1 = bulgu, 0 = temiz, 2 = analiz edilemedi.
 
 ## 3. CWE kapsam haritası
 
-**Aktif taranan (12) — kural eşleşmesi:**
+**Aktif taranan (15) — kural eşleşmesi:**
 
 | CWE | Zafiyet | Kural | Juliet floor? |
 |---|---|---|:--:|
@@ -43,11 +43,14 @@ Exit 1 = bulgu, 0 = temiz, 2 = analiz edilemedi.
 | 787 | sınır-dışı yazma | BoundsRule | |
 | 120 | klasik buffer overflow | BoundsRule | |
 | 401 | bellek sızıntısı | MemoryLeakRule | ✓ |
+| 404 | kaynak sızıntısı (FILE*/DIR*) | MemoryLeakRule (resource-leak) | |
 | 415 | double-free | MemoryLeakRule | ✓ |
 | 416 | use-after-free | MemoryLeakRule | ✓ |
 | 457/824 | başlatılmamış pointer | UninitPointerRule | |
 | 190 | integer overflow | IntOverflowRule | ✓ |
 | 195 | signed→unsigned dönüşüm | SignConversionRule | |
+| 131 | hatalı buffer-boyutu hesabı | AllocSizeOverflowRule | |
+| 191 | integer underflow (signed `-`) | IntOverflowRule | |
 | 369 | sıfıra bölme | DivByZeroRule | ✓ |
 
 Meta kurallar (CWE-bağımsız): AssumptionRule · ContractRule · PolicyRule.
@@ -57,15 +60,14 @@ Meta kurallar (CWE-bağımsız): AssumptionRule · ContractRule · PolicyRule.
 
 | CWE | Zafiyet | Durum |
 |---|---|---|
-| 131 | hatalı buffer-boyutu hesabı | **SIRADAKİ** — alloc-size-overflow kuralı (§4) |
-| 191 | integer underflow | aday — IntOverflowRule'a `-` genişlemesi |
-| 775/404 | fd / kaynak sızıntısı | aday — MemoryLeak genellemesi |
+| 775 | file descriptor sızıntısı (int fd: open/socket) | ertelendi — integer-kaynak modeli ister (CWE-404 FILE*/DIR* aktif) |
+| 131-64bit | 64-bit size_t çarpım sarması | ertelendi — operand-köşe ispatı (alloc-size v1 sub-64) |
 
 **Bilinçli kapsam-DIŞI:** enjeksiyon ailesi (CWE-89 SQLi, 79 XSS, 78
 cmd-inj, 22 path-traversal, 352 CSRF) — kaynak→sink taint izleme farklı
 motor ister; precision-first hedefi değil.
 
-## 4. Sıradaki kural spec'i — alloc-size-overflow (CWE-131)
+## 4. Kural spec'i — alloc-size-overflow (CWE-131, UYGULANDI 2026-07-30)
 
 **Kaynak:** LVGL binfont avı (2026-07-30). Güvenilmez uzunluk
 `lv_malloc(sizeof(T) * (n + 1))` boyutunu sarabilir → küçük tampon →
@@ -96,8 +98,9 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 
 **Bağlayıcı kurallar:**
 - `main`'e ASLA doğrudan iş yapılmaz. Her şey `phase-*` dalında.
-- `main` GitHub ruleset ile kilitli (Restrict updates yok, ama Block
-  force + Restrict deletions + status-check). Merge günü kullanıcı açar.
+- `main` GitHub ruleset ile korunuyor: DOĞRUDAN push reddedilir
+  (deneyip gördük). Dal 6/6 yeşil → "MERGE-READY" bildir → kullanıcı
+  kilidi açar → ff. Ben asla tek başıma main'i ilerletemem.
 - Yanıtlar **Türkçe**, teknik jargon parantez içinde, plan/şema/tree ile.
 - Her zaman dürüst; max efor gerekiyorsa önceden söyle; model düştüğünü
   içeriden teyit EDEMEM — kullanıcının ekranı asıl sinyaldir.

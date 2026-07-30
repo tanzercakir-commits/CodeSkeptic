@@ -71,6 +71,23 @@ bool isStdNothrowT(const CXXRecordDecl* rd) {
     return false;
 }
 
+// A stdlib RESOURCE acquisition returning an owned handle that a matching
+// close must release (CWE-404). fopen-family return FILE*, opendir a
+// DIR* — both pointers, so the pointer-ownership machinery tracks them
+// unchanged; the release side (fclose/closedir) is added to the free
+// recognition. Not the raw-fd openers (open/socket/accept): those return
+// an int, which the pointer-based leak domain cannot track — CWE-775
+// strict is deferred to an integer-resource model (documented).
+bool isResourceAcquireName(llvm::StringRef n) {
+    return n == "fopen" || n == "freopen" || n == "fdopen" ||
+           n == "tmpfile" || n == "opendir" || n == "fdopendir";
+}
+
+// The matching releases for the resources above.
+bool isResourceReleaseName(llvm::StringRef n) {
+    return n == "fclose" || n == "closedir";
+}
+
 bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
@@ -103,6 +120,14 @@ bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
         if (name == "malloc" || name == "calloc" ||
             name == "strdup" || name == "realloc")
             return true;
+        // Built-in RESOURCE acquisitions (CWE-404/775): a FILE*/DIR*
+        // that leaves the function un-closed is a resource leak, tracked
+        // by the same ownership machinery as heap memory (a FILE* is a
+        // pointer). Recognised out of the box so no --alloc-functions
+        // config is needed for the ubiquitous fopen/opendir case. The
+        // report site classifies these as "resource-leak" by the
+        // acquiring name (isResourceAcquireName).
+        if (isResourceAcquireName(name)) return true;
         // Project wrappers registered via --alloc-functions
         // (git__malloc, zmalloc, ...) — without them the whole
         // leak/double-free/UAF domain is blind in wrapper-heavy
@@ -471,7 +496,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         const FunctionDecl* callee = call->getDirectCallee();
         const llvm::StringRef name = calleeName(callee);
         const bool isFreeByName =
-            name == "free" ||
+            name == "free" || isResourceReleaseName(name) ||
             (!name.empty() &&
              codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
@@ -1039,11 +1064,25 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 diag.file = sm.getFilename(endLoc).str();
                 diag.line = line;
                 diag.column = sm.getSpellingColumnNumber(endLoc);
+                // Classify by the ACQUIRING name (robust — a FILE*
+                // typedef's record name varies by libc). A resource
+                // handle left un-closed is CWE-404, not a heap leak.
                 diag.rule_id = "memory-leak";
+                codeskeptic::MsgId leakMsg =
+                    codeskeptic::MsgId::LeakEndOfFunction;
+                if (const Expr* init = var->getInit()) {
+                    const Expr* e = init->IgnoreParenImpCasts();
+                    if (const auto* c = dyn_cast<CallExpr>(e))
+                        if (isResourceAcquireName(
+                                calleeName(c->getDirectCallee()))) {
+                            diag.rule_id = "resource-leak";
+                            leakMsg = codeskeptic::MsgId::
+                                ResourceLeakEndOfFunction;
+                        }
+                }
                 diag.function = funcDecl->getQualifiedNameAsString();
-                diag.message = codeskeptic::msg(
-                    codeskeptic::MsgId::LeakEndOfFunction,
-                    var->getNameAsString());
+                diag.message =
+                    codeskeptic::msg(leakMsg, var->getNameAsString());
                 results.push_back(diag);
                 analysis.registerNoteTarget(results.size() - 1, var);
             }

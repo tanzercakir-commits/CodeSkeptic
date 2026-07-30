@@ -14,9 +14,10 @@ Uçuşta: phase-triage-close + phase-binfont-hunt (doc-only, CI'da)
 
 ## Sıradaki iş (kod)
 
-**CWE-775/404 fd/kaynak sızıntısı** — MemoryLeakRule genellemesi
-(open/fopen/socket → close/fclose eşleşmesi). (CWE-131 ve CWE-191
-TAMAMLANDI — changelog 2026-07-30.)
+**Üç hedef CWE TAMAMLANDI** (131 alloc-size · 191 underflow · 404
+resource-leak — changelog 2026-07-30). Sıradaki: aşağıdaki backlog'dan
+kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
+(interprocedural sink + 64-bit köşe ispatı) veya FINDING 3 kalıntısı.
 
 ## Açık kullanıcı kararları
 
@@ -29,8 +30,9 @@ TAMAMLANDI — changelog 2026-07-30.)
 ## Backlog (öncelik sırası)
 
 ```
-1. CWE-775/404 fd/kaynak sızıntısı genellemesi   ← sıradaki (3. CWE)
-2. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
+1. CWE-775 strict (int fd: open/socket) — integer-kaynak modeli
+2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
+3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
 5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
 6. tinyusb untrusted-length makbuzu → changelog'a resmi kayıt (ölçüldü, temiz)
 ```

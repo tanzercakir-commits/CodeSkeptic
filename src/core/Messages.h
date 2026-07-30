@@ -16,6 +16,7 @@ enum class MsgId {
     UninitPtrDeref,       // {0} = variable name
     LeakReassign,         // {0} = variable name
     LeakEndOfFunction,    // {0} = variable name
+    ResourceLeakEndOfFunction,  // {0} = the leaked resource variable name
     DoubleFree,           // {0} = variable name
     UseAfterFree,         // {0} = variable name
     DivByZeroLiteral,

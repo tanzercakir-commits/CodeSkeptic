@@ -1617,3 +1617,90 @@ TEST(MemoryLeakRuleExTest, MutatedFlagCopy_NotFolded) {
     )");
     ASSERT_EQ(results.size(), 1u);
 }
+
+// --- CWE-404/775: resource leak (2026-07-30). fopen-family / opendir
+// return an owned handle that a matching close must release. Recognised
+// built-in (no --alloc-functions config), tracked by the same
+// pointer-ownership machinery as heap memory, reported as "resource-leak"
+// (classified by the acquiring name, robust across libc FILE typedefs).
+// Raw-fd openers (open/socket) return an int the pointer domain cannot
+// track — CWE-775 strict deferred to an integer-resource model.
+
+TEST(MemoryLeakRuleExTest, FopenNotClosed_ResourceLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        typedef struct FILE FILE;
+        extern FILE* fopen(const char*, const char*);
+        extern int fclose(FILE*);
+        int f(const char* p) {
+            FILE* fp = fopen(p, "r");
+            if (!fp) return 1;
+            return 0;                 /* fp leaks: never fclosed */
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "resource-leak");
+}
+
+TEST(MemoryLeakRuleExTest, FopenClosed_Clean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        typedef struct FILE FILE;
+        extern FILE* fopen(const char*, const char*);
+        extern int fclose(FILE*);
+        int f(const char* p) {
+            FILE* fp = fopen(p, "r");
+            if (!fp) return 1;
+            fclose(fp);
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(MemoryLeakRuleExTest, OpendirNotClosed_ResourceLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        typedef struct DIR DIR;
+        extern DIR* opendir(const char*);
+        extern int closedir(DIR*);
+        int f(const char* p) {
+            DIR* d = opendir(p);
+            if (!d) return 1;
+            return 0;                 /* d leaks: never closedir'd */
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "resource-leak");
+}
+
+TEST(MemoryLeakRuleExTest, FopenReturned_Clean) {
+    // Ownership escapes via return — the caller closes it. Same
+    // escape logic that keeps returned malloc clean.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        typedef struct FILE FILE;
+        extern FILE* fopen(const char*, const char*);
+        FILE* open_it(const char* p) {
+            FILE* fp = fopen(p, "r");
+            return fp;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(MemoryLeakRuleExTest, HeapLeakStillMemoryLeak_NotResource) {
+    // Regression: a plain malloc leak keeps rule_id "memory-leak" — the
+    // resource classification must not bleed onto heap allocations.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern void* malloc(unsigned long);
+        int f(void) {
+            int* p = (int*)malloc(64);
+            if (!p) return 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}

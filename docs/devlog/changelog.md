@@ -1,5 +1,27 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — CWE-404: resource leak (fopen/opendir), built-in
+
+A FILE*/DIR* left un-closed is a resource leak, and a FILE* is a
+pointer — so the leak rule's ownership machinery already tracked it the
+moment `--alloc-functions fopen --free-functions fclose` was set. This
+makes the common resource pairs BUILT-IN (fopen/freopen/fdopen/tmpfile
+acquire, opendir/fdopendir; fclose/closedir release) so the CWE-404
+case is caught out of the box, no config. The report classifies by the
+ACQUIRING name — robust across libc FILE typedefs — as a distinct
+`resource-leak` finding, so a leaked handle is not mislabelled a heap
+`memory-leak` (CWE-401). Ownership escape (return, struct store) rides
+the same logic that keeps returned malloc clean, so a FILE* handed back
+to the caller is silent.
+
+Raw-fd openers (open/openat/socket/accept) return an int the
+pointer-based leak domain cannot track; CWE-775 strict is deferred to
+an integer-resource model (documented, not silently dropped). RED/GREEN
+proven; 5 tests (fopen leak, fopen closed, opendir leak, returned-escape
+clean, heap-still-memory-leak regression). Suite 806 -> 811, thesis
+clean_fp=0, corpus unchanged (cjson 54, tinyxml2 9, zero new resource
+findings — real code closes its files).
+
 ## 2026-07-30 — CWE-191: signed subtraction underflow, folded into IntOverflowRule
 
 The roadmap parked `-` as "CWE-191, out of scope." It turned out to be
