@@ -120,7 +120,7 @@ codeskeptic src/ --build-path build --report-paths $PWD/src --html report.html
 
 ![A finding's dataflow trace](docs/img/trace.png)
 
-Next steps: the full [usage reference](docs/usage.md) ·
+Next steps: [your first scan](docs/first-scan.md) · the full [usage reference](docs/usage.md) ·
 [evaluate it on *your* code in about an hour](docs/evaluate.md) ·
 [CI, editor & agent integrations](docs/integrations.md).
 

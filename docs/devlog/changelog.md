@@ -1,5 +1,17 @@
 # CodeSkeptic — Changelog
 
+## 2026-07-30 — docs: first-scan triage guide (adoption)
+
+New docs/first-scan.md, the adoption-critical guide missing until now:
+what a first run on a mature codebase surfaces and the exact lever for
+each family — baseline first; assert-family -> --assert-macros/
+--negative-assert-macros; custom abort -> --fatal-asserts;
+accessor-nullability -> contracts/baseline; wrapper-blind leak domain
+-> --alloc-functions; opt-in provenance -> --untrusted-int-sources. The
+framing is precision, not suppression: every lever states a fact the
+analyzer couldn't see, so the surviving findings stay trustworthy.
+Linked from README "Next steps" (budget held at 298/300).
+
 ## 2026-07-30 — tinyusb untrusted-length receipt (out-param model), re-measured clean
 
 The sign-conversion round's out-param seeding (a declared untrusted
