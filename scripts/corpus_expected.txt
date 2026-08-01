@@ -24,8 +24,18 @@
 # one past a 9-element array. The bounds rule proves i in [9,+inf] on loop
 # exit and flags the definite OOB. Pin raised to track the correct level.
 #
+# 2026-08-01 (drift correction, no rule change): cjson pin 53 -> 54. The
+# pin had not moved since the bounds rule set it (895c813); every
+# changelog measurement since 2026-07-30 reported 54, and a re-run on the
+# 5dae941 binary confirms 54. The 10%+2 tolerance had been absorbing the
+# gap, so CI stayed green while the pin sat one below the true level —
+# the failure mode this file's own doctrine ("a drop = silent finding
+# loss") cannot see, because a real -1 would land exactly on the stale
+# pin and read as unchanged. Re-centred BEFORE touching the bounds rule,
+# so that work is measured against the true baseline.
+#
 # project finding-count
-cjson 53
+cjson 54
 tinyxml2 9
 # abseil runs only with CORPUS_DEEP=1 (weekly cron; tag 20260526.0).
 # 4 = post-v2b level; 5 was post-dedup; 12 was the post-FP-hunt level
