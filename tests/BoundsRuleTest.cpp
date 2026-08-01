@@ -862,3 +862,107 @@ TEST(BoundsRuleTest, TwoHopParamIndex_BoundedClean) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// --- Struct hack / flexible array member (2026-08-01, the libarchive
+// v3.8.9 FP) ---
+//
+// A struct whose LAST member is a `[1]`/`[0]` array, allocated with
+// `malloc(sizeof(S) + n)` and written past the declared one element, is
+// the pre-C99 flexible-array idiom — legal, ubiquitous, and NOT an
+// overflow. The declared extent is not the real extent, so the honest
+// answer is "unknown", and this rule's doctrine says unknown stays
+// silent. The discriminator is the BASE: reached through a pointer the
+// object's real size is unknowable from the type; on a direct object it
+// is exactly the declared size and the warning is right.
+
+TEST(BoundsRuleTest, StructHackTailArray_PointerBase_Clean) {
+    // The idiom: last member char[1], object from malloc(sizeof+extra).
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { int a; char name[1]; };
+        void f(struct S* p, const char* in) { strcpy(p->name, in); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, StructHackTailUnion_PointerBase_Clean) {
+    // libarchive's exact shape: the tail is a UNION of [1] arrays. The
+    // array is not the union's last field (w follows m), so a naive
+    // "is this the last member" test misses it — union members all sit
+    // at offset 0, so tail-ness belongs to the union field itself.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S {
+            int fd;
+            union { char m[1]; int w[1]; } filename;
+        };
+        void f(struct S* p, const char* in) { strcpy(p->filename.m, in); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(BoundsRuleTest, ZeroLengthTailArray_PointerBase_Clean) {
+    // The GNU `[0]` spelling of the same idiom.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { int a; char name[0]; };
+        void f(struct S* p, const char* in) { strcpy(p->name, in); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Positive controls — the exemption must be narrow. Each of these keeps
+// firing, and each fails for a different reason than the others.
+
+TEST(BoundsRuleTest, MiddleMemberArray_PointerBase_StillWarns) {
+    // Not the tail: a following member fixes this array's extent at 1,
+    // so writing past it corrupts `a`. Still a real overflow.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { char name[1]; int a; };
+        void f(struct S* p, const char* in) { strcpy(p->name, in); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, TailArrayDirectObject_StillWarns) {
+    // Direct object, not a pointer: sizeof(S) IS the allocation, so the
+    // declared 1 element is the real extent. No struct hack possible.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { int a; char name[1]; };
+        void f(const char* in) { struct S s; strcpy(s.name, in); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, RealFixedTailArray_PointerBase_StillWarns) {
+    // A genuinely sized tail array (char[32]) is a fixed buffer that
+    // happens to sit last — not the struct-hack idiom, which is
+    // recognisable precisely by its degenerate [0]/[1] extent.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { int a; char name[32]; };
+        void f(struct S* p, const char* in) { strcpy(p->name, in); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(BoundsRuleTest, C99FlexibleArrayMember_Clean) {
+    // The real C99 spelling `char name[]` is an IncompleteArrayType, so
+    // it never had a constant extent to report. Pinned here so the
+    // struct-hack work cannot accidentally turn it INTO a finding.
+    BoundsRule rule;
+    auto results = runRule(rule, R"(
+        extern char* strcpy(char*, const char*);
+        struct S { int a; char name[]; };
+        void f(struct S* p, const char* in) { strcpy(p->name, in); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}

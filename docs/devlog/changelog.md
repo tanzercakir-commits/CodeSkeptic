@@ -1,5 +1,51 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-01 — bounds: struct-hack / flexible-array tail exemption (BULGU 1)
+
+The second fix out of the libarchive v3.8.9 evaluation — the one its
+receipt named first.
+
+The unbounded-copy arm (CWE-120) read a struct member's declared
+`char name[1]` as a one-byte destination and reported
+`strcpy(p->name, src)` as a possible overflow. That is the pre-C99
+flexible-array idiom: the object comes from `malloc(sizeof(S) + n)`, so
+the declared extent is not the object's extent. libarchive sizes it
+deliberately — `calloc(1, sizeof(*mine) + wcslen(wfilename) *
+MB_LEN_MAX)` in archive_read_open_filename.c — and the copy fits by
+construction. The type says nothing about capacity there, and an
+unknown extent is precisely what this analyzer keeps silent by
+doctrine; reporting it was the doctrine breaking, not merely noise.
+
+isFlexibleTailMember() exempts a member on three conditions, each
+necessary:
+
+  * DEGENERATE extent — `[0]` or `[1]` only. A real `char name[32]` is
+    a fixed buffer that happens to sit last, and keeps warning.
+  * TAIL position in every record it nests in. A middle member is
+    pinned by the field that follows it, so its extent is real. Unions
+    are exempt from the position test and from nothing else: their
+    members all sit at offset 0, so tail-ness belongs to the union
+    FIELD in its enclosing struct. That is libarchive's shape — the
+    array is not even the union's last member, so a naive last-field
+    test would have missed the very case that prompted this.
+  * a POINTER base. Through `p->` the allocation decides the size, not
+    the type; on a direct object `sizeof(S)` IS the allocation, the
+    declared extent is exact, and the warning stands.
+
+The real C99 `char name[]` needed no work — an IncompleteArrayType
+never carried a constant extent — and a pinned probe now proves this
+change cannot turn it INTO a finding.
+
+RED-first, with positive controls outnumbering the exemption 4 to 3:
+StructHackTailArray / StructHackTailUnion / ZeroLengthTailArray report
+against the pre-fix binary and go silent after; MiddleMemberArray,
+TailArrayDirectObject, RealFixedTailArray and C99FlexibleArrayMember
+pass before AND after, each failing the exemption for a different
+reason. Suite 815 -> 822, thesis clean_fp=0 with recall floors held,
+corpus unmoved (cjson 54 / tinyxml2 9 — the gate silenced nothing
+there), self-scan clean. bounds carries CWE-125/787/120 and has no
+Juliet floor; only the CWE-120 arm narrows.
+
 ## 2026-08-01 — sign-conversion: non-size unsigned typedef sink gate (BULGU 2)
 
 Fix drawn from the first foreign-machine evaluation.

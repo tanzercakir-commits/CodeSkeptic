@@ -123,6 +123,64 @@ std::vector<StrCopyCall> collectStrCopyCalls(const FunctionDecl* fn) {
 // right-sized and its extent is symbolic anyway, but a `malloc(CONST)`
 // heap block would false-positive on the "programmer sized it
 // correctly" case far more often than a stack/struct array.
+// Is `f` the final field declared in `rd`?
+bool isLastFieldOf(const FieldDecl* f, const RecordDecl* rd) {
+    const FieldDecl* last = nullptr;
+    for (const auto* fd : rd->fields()) last = fd;
+    return last == f;
+}
+
+// The struct-hack / flexible-array-member tail (2026-08-01, the
+// libarchive v3.8.9 false positive).
+//
+// `struct S { ...; char name[1]; }` allocated as
+// `malloc(sizeof(S) + n)` and written past the declared element is the
+// pre-C99 spelling of a flexible array member — legal and everywhere in
+// C. The declared extent is then NOT the object's extent, so the type
+// says nothing about capacity and the honest answer is "unknown", which
+// this analyzer keeps silent by doctrine.
+//
+// Three conditions, all necessary, deliberately narrow:
+//   * a DEGENERATE extent — `[0]` or `[1]`. A real `char name[32]` is a
+//     fixed buffer that merely happens to sit last; only the degenerate
+//     spelling identifies the idiom.
+//   * TAIL position in every record the member is nested in. A middle
+//     member is pinned by the field that follows it, so its extent is
+//     real. Union members are exempt from the position test and only
+//     from it: they all sit at offset 0, so tail-ness is a property of
+//     the union FIELD in its enclosing struct (libarchive's shape —
+//     `union { char m[1]; wchar_t w[1]; }` where the array is not the
+//     union's last field).
+//   * a POINTER base. Reached through `p->`, the object's real size is
+//     unknowable from the type — the allocation decides it. On a direct
+//     object, `sizeof(S)` IS the allocation and the declared extent is
+//     exact, so the warning stays.
+//
+// The real C99 `char name[]` needs no handling here: an
+// IncompleteArrayType never had a constant extent to report.
+bool isFlexibleTailMember(const MemberExpr* mem, ASTContext& ctx) {
+    const auto* field = dyn_cast<FieldDecl>(mem->getMemberDecl());
+    if (!field) return false;
+    const auto* arr = ctx.getAsConstantArrayType(field->getType());
+    if (!arr || arr->getSize().ugt(1)) return false;  // degenerate only
+
+    bool pointerBase = false;
+    for (const MemberExpr* cur = mem; cur;) {
+        const auto* f = dyn_cast<FieldDecl>(cur->getMemberDecl());
+        if (!f) return false;
+        const RecordDecl* rd = f->getParent();
+        if (!rd) return false;
+        if (!rd->isUnion() && !isLastFieldOf(f, rd)) return false;
+
+        if (cur->isArrow()) pointerBase = true;
+        const Expr* base = cur->getBase()->IgnoreParenImpCasts();
+        if (const auto* deref = dyn_cast<UnaryOperator>(base))
+            if (deref->getOpcode() == UO_Deref) pointerBase = true;
+        cur = dyn_cast<MemberExpr>(base);
+    }
+    return pointerBase;
+}
+
 bool destIsFixedArray(const Expr* e, ASTContext& ctx) {
     if (!e) return false;
     e = e->IgnoreParenImpCasts();
@@ -132,7 +190,9 @@ bool destIsFixedArray(const Expr* e, ASTContext& ctx) {
     }
     if (const auto* mem = dyn_cast<MemberExpr>(e)) {
         const auto* field = dyn_cast<FieldDecl>(mem->getMemberDecl());
-        return field && ctx.getAsConstantArrayType(field->getType()) != nullptr;
+        if (!field || !ctx.getAsConstantArrayType(field->getType()))
+            return false;
+        return !isFlexibleTailMember(mem, ctx);
     }
     return false;
 }
