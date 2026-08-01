@@ -103,6 +103,19 @@ PYEOF
                  "(expected $expected ±$tol, measured $count)"
             return 1
         fi
+        if [ "$count" -ne "$expected" ]; then
+            # Inside the band but not ON the pin. This is exactly how the
+            # cjson pin sat at 53 from 895c813 while every measurement
+            # read 54: the tolerance absorbed the gap, nothing went red,
+            # and the drift stayed invisible. A pin one below the true
+            # level is worse than a merely wrong number — a real -1 then
+            # lands on it and reads as "unchanged". Loud but not fatal:
+            # re-centring is a deliberate act that belongs in a commit
+            # explaining why the level moved.
+            echo "[$dir] PIN_DRIFT expected=$expected measured=$count" \
+                 "(within ±$tol, not a failure) — re-centre the pin in" \
+                 "scripts/corpus_expected.txt or explain the gap"
+        fi
         echo "[$dir] finding count within expected range ($expected ±$tol)"
     else
         echo "[$dir] NOTE: no expected count recorded" \

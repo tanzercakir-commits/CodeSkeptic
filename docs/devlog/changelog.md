@@ -1,5 +1,54 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-01 — guards: the record can no longer drift from reality
+
+Two silent drifts surfaced by accident in one session, both of the same
+shape — a document asserting a fact that had stopped being true, with
+nothing able to notice. TODO's state block read `main = 3ae3ecb` for
+five commits while listing two long-since-merged branches as in flight.
+The cjson pin read 53 from 895c813 onward while every measurement read
+54, the 10%+2 tolerance quietly absorbing the gap. Neither was being
+looked for; both were found because someone opened the file for an
+unrelated reason.
+
+The existing guard could not have caught either: checks 1-5 verify
+presence and name/version consistency — things derivable from the tree
+itself — never whether a stated fact still matches the world.
+
+Check 6 closes the first. The two facts in TODO's state block (the main
+commit the work sits on; the phase branches actually in flight) are
+derivable, so they are GENERATED into a marked region and verified
+against git, not remembered. `--fix` regenerates them. The pairing is
+deliberate: a guard alone catches forgetting but does not undo it, and a
+generator alone drifts whenever nobody runs it. Enforced on phase*
+branches, where the refresh belongs — on main the block records the
+round that just merged and has nothing left to prove. Everything else
+in TODO (priorities, open user decisions) is judgment and is never
+touched; generating that would be fabricating a record rather than
+keeping one.
+
+Writing the check taught it something. The first draft defined "in
+flight" as any phase-* branch present on the remote — which would have
+listed phase-docs-combined and phase-housekeeping, both long merged and
+merely undeleted, manufacturing exactly the false record the check
+exists to kill. In flight now means UNMERGED (not an ancestor of
+origin/main).
+
+The pin drift gets a different instrument, because prose-parsing a
+changelog for the last measured number is fragile and the information
+already exists where it is produced. run_corpus.sh now prints
+`PIN_DRIFT expected=N measured=M` whenever the two differ inside the
+tolerance band. Loud, not fatal: legitimate movement should be
+re-centred deliberately in a commit that says why, and a pin one below
+the true level is worse than a wrong number — a real -1 lands on it and
+reads as "unchanged".
+
+Negative-tested, both: stale base, a merged branch listed as in flight,
+and a deleted marker block each turn the guard red (exit 1), the
+regenerated block is green; the pin line appears at 53-vs-54 and is
+absent when the pin is on the measurement. No src/ change — suite,
+thesis, corpus and self-scan unaffected and re-run clean.
+
 ## 2026-08-01 — bounds: struct-hack / flexible-array tail exemption (BULGU 1)
 
 The second fix out of the libarchive v3.8.9 evaluation — the one its

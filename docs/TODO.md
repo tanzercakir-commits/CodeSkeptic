@@ -6,10 +6,18 @@
 
 ## Şu anki durum
 
+Aşağıdaki blok ÜRETİLİR — elle düzenleme. Tazele:
+`scripts/check_docs_sync.sh --fix`. CI guard #6 phase* dallarında bunu
+git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
+
+<!-- cs:state-begin -->
 ```
-main = def46ac  (libarchive turu: BULGU 1 + BULGU 2 inmiş; kilitli)
-Uçuşta: yok
+base   = bc50462
+uçuşta = phase-state-guard
 ```
+<!-- cs:state-end -->
+
+Serbest not (insanda kalır): kilit kullanıcıda.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
