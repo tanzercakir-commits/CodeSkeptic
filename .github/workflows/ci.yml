@@ -23,6 +23,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # Full history: the doc guard's changelog-freshness (3) and
+        # state-block (6) checks both need a merge-base with main. The
+        # default depth-1 checkout has none, so BOTH silently skipped —
+        # a green lane running an unexecuted guard, from c8ca617 until
+        # 2026-08-01. The guard now FAILS rather than notes when it
+        # cannot resolve a base under CI; this line is what keeps it
+        # resolvable.
+        with:
+          fetch-depth: 0
 
       - name: Doc-hygiene guard (canonical files, no scatter, changelog fresh)
         run: bash scripts/check_docs_sync.sh

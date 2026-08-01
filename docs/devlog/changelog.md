@@ -49,6 +49,29 @@ regenerated block is green; the pin line appears at 53-vs-54 and is
 absent when the pin is on the measurement. No src/ change — suite,
 thesis, corpus and self-scan unaffected and re-run clean.
 
+And then CI produced the sharpest finding of the round, by being read
+instead of trusted. The lane was green, so check 6 looked delivered;
+the log said otherwise:
+
+    note: changelog-freshness check skipped (no shared base)
+    note: state-block check skipped (git could not resolve a base)
+
+actions/checkout defaults to depth 1. With no history there is no
+merge-base with main, so check 3 has been skipping since it was written
+(c8ca617) and check 6 would have shipped stubbed out — a guard that had
+never once executed in the place it exists to guard, reporting success
+the whole time. This is the same defect as the two it was written to
+catch, one level up: a green signal that asserts something untrue, and
+nothing able to notice.
+
+Fixed on both sides. The lane now checks out with fetch-depth: 0 so a
+base exists. More importantly the guard no longer treats an
+unresolvable base as a soft skip when GITHUB_ACTIONS is set — under CI
+that condition is a broken guard, not a benign one, and it now fails.
+Local shallow clones keep the soft skip. Negative-tested by cloning
+--depth 1 and running the guard both with and without GITHUB_ACTIONS:
+exit 1 under CI, green and skipping without it.
+
 ## 2026-08-01 — bounds: struct-hack / flexible-array tail exemption (BULGU 1)
 
 The second fix out of the libarchive v3.8.9 evaluation — the one its

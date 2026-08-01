@@ -78,8 +78,17 @@ if [ -n "$base" ] && git merge-base "$base" HEAD >/dev/null 2>&1; then
         echo "      Every code change logs its rationale in the changelog."
         fail=1
     fi
+elif [ -n "${GITHUB_ACTIONS:-}" ]; then
+    # In CI a base is always obtainable, so failing to find one means the
+    # checkout is shallow and checks 3 and 6 are about to no-op. That is
+    # how they ran from c8ca617 to 2026-08-01: lane green, guard never
+    # executed. A guard that cannot check must say so loudly, not pass.
+    echo "FAIL: no shared base with main, so the changelog-freshness and"
+    echo "      state-block checks cannot run. Under CI that is a broken"
+    echo "      guard, not a soft skip — check out with fetch-depth: 0."
+    fail=1
 else
-    echo "note: changelog-freshness check skipped (no shared base)"
+    echo "note: changelog-freshness check skipped (no shared base — local shallow clone)"
 fi
 
 # --fix: regenerate the derivable block and stop. Everything else in
@@ -123,6 +132,9 @@ if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
             echo "      Refresh it: scripts/check_docs_sync.sh --fix"
             fail=1
         fi
+    elif [ -n "${GITHUB_ACTIONS:-}" ]; then
+        echo "FAIL: state-block check could not resolve a base under CI."
+        fail=1
     else
         echo "note: state-block check skipped (git could not resolve a base)"
     fi
