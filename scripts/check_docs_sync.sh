@@ -120,6 +120,9 @@ fi
 cur_ref="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
 is_phase=0
 case "$cur_ref" in phase-*) is_phase=1 ;; esac
+if [ "$is_phase" = 0 ]; then
+    echo "state-block check n/a on '$cur_ref' (enforced on phase* branches)"
+fi
 if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
     if ! grep -q 'cs:state-begin' docs/TODO.md; then
         echo "FAIL: docs/TODO.md has no <!-- cs:state-begin --> block to verify."
@@ -131,6 +134,11 @@ if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
             echo "  actual:";   printf '%s\n' "$want" | sed 's/^/    /'
             echo "      Refresh it: scripts/check_docs_sync.sh --fix"
             fail=1
+        else
+            # Affirm on success too. A silent pass cannot be told apart
+            # from a check that never ran — the exact way this guard was
+            # able to report success from a shallow checkout for days.
+            echo "state-block verified: $(printf '%s' "$want" | tr '\n' ' ')"
         fi
     elif [ -n "${GITHUB_ACTIONS:-}" ]; then
         echo "FAIL: state-block check could not resolve a base under CI."

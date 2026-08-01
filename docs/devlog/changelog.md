@@ -72,6 +72,14 @@ Local shallow clones keep the soft skip. Negative-tested by cloning
 --depth 1 and running the guard both with and without GITHUB_ACTIONS:
 exit 1 under CI, green and skipping without it.
 
+One silent path was still left after that, and the same standard
+applies to it: on success check 6 printed nothing, so a pass could not
+be distinguished in the log from a check that never ran — which is
+exactly how this guard reported success from a shallow checkout for
+days. It now affirms what it did (`state-block verified: base = …`) and
+says so explicitly when it does not apply (`n/a on 'main'`). A green
+lane should never be the only evidence that a check happened.
+
 ## 2026-08-01 — bounds: struct-hack / flexible-array tail exemption (BULGU 1)
 
 The second fix out of the libarchive v3.8.9 evaluation — the one its
