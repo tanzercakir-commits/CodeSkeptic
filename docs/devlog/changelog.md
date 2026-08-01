@@ -1,5 +1,54 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-01 — corpus: name the surface the pinned count belongs to
+
+The libarchive round ended by asking "132/132 of what?" and answering it
+with a measurement. The same question had never been put to our own
+corpus, where the CI log had been printing the answer's premise all
+along: cjson's pinned 54 comes from a run that also skips 41
+translation units it cannot compile.
+
+Measured and classified rather than assumed, on both axes. Coverage:
+enumerated 76, broken 41, analysed 35; all 41 broken sit under
+tests/unity/ — the vendored framework's own suite, its expectdata
+samples and runner generators, none of which the corpus build compiles
+— and zero outside tests/, so no part of cjson proper is silently
+absent. That half matched the expectation.
+
+The other half did not, and is the honest headline: of the 54 findings,
+only 4 are in the cJSON library itself (cJSON.c 3, cJSON_Utils.c 1).
+47 sit in cjson's OWN test suite (misc_tests.c 18, cjson_add.c 10,
+minify_tests.c 5, …) and 3 in Unity's tutorial ProductionCode.c — the
+deliberate off-by-one. So the pin is ~87% a tripwire over test code:
+real C, deliberately unguarded idioms, exactly where a null-deref FP
+family would first surface — legitimate for a regression tripwire, but
+a reader of "cjson 54" would naturally assume the analyzer found 54
+things in cJSON, and it found 4. A cjson movement should be read
+accordingly: far more likely a test-idiom family than a library-scan
+change. An expectation that is never checked is just a belief — this
+one was half right.
+
+run_corpus.sh now prints CORPUS_COVERAGE per project (enumerated,
+broken, analysed), so the surface is readable from any run instead of
+requiring an investigation: cjson enumerated=76 broken=41 analysed=35,
+tinyxml2 enumerated=3 broken=0 analysed=3.
+
+Also restores the executable bit on check_docs_sync.sh and
+run_corpus.sh, dropped when they were edited over a UNC path from
+Windows. Harmless in practice — every caller says `bash scripts/...`,
+in all three workflows — but their own `Usage: scripts/run_corpus.sh`
+headers had stopped being true, and a header that lies is the same
+defect as a pin that lies.
+
+Footnote worth keeping: check 6's first live run failed this very
+branch, and correctly. main had moved to 138b222 and the branch opened
+without anyone re-running --fix, so the block still read
+`base = bc50462 / uçuşta = phase-state-guard`. Ten seconds, red. That
+is the same staleness that previously sat unnoticed for five commits,
+and the guard caught its own author with it on the first attempt —
+which is the only kind of evidence that a mechanism built against
+forgetting actually works.
+
 ## 2026-08-01 — guards: the record can no longer drift from reality
 
 Two silent drifts surfaced by accident in one session, both of the same

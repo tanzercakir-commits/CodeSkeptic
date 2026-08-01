@@ -34,6 +34,24 @@
 # pin and read as unchanged. Re-centred BEFORE touching the bounds rule,
 # so that work is measured against the true baseline.
 #
+# 2026-08-01 (surface named, no count change): what does cjson's 54
+# actually count? Measured on both axes.
+#   Coverage: enumerated 76 TUs, broken 41, analysed 35. All 41 broken
+#   are under tests/unity/ (the vendored framework's own suite,
+#   expectdata samples, runner generators — nothing the corpus build
+#   compiles). ZERO broken outside tests/; no part of cjson proper is
+#   silently missing.
+#   The 54 findings: 4 in the cJSON library itself (cJSON.c 3,
+#   cJSON_Utils.c 1), 47 in cjson's OWN test suite (misc_tests.c 18,
+#   cjson_add.c 10, minify_tests.c 5, ...), 3 in Unity's tutorial
+#   ProductionCode.c (the deliberate off-by-one). So this pin is ~87%
+#   a tripwire over TEST code — real C, deliberately unguarded idioms,
+#   exactly where a null-deref FP family would first show — and ~7%
+#   over the library. Read a cjson movement accordingly: it is far more
+#   likely a test-idiom family than a library-scan change.
+# Each run prints CORPUS_COVERAGE (enumerated/broken/analysed) so the
+# coverage half stays answerable from the log.
+#
 # project finding-count
 cjson 54
 tinyxml2 9

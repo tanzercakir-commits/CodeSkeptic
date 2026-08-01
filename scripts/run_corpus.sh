@@ -90,6 +90,19 @@ PYEOF
         "out-$dir.txt" || true)
     echo "CORPUS_RESULT $dir findings=$count"
 
+    # Name the surface the count belongs to. A pinned number says nothing
+    # about how much was analysed to reach it: cjson's 54 sat next to 41
+    # translation units that never compiled, and nobody had asked which
+    # ones. Printed every run, so "N of what?" is answerable from the log
+    # instead of requiring an investigation (the libarchive lesson).
+    local seen broke
+    seen=$(grep -oE 'Analysis starting\.\.\. \([0-9]+ files' "out-$dir.txt" \
+           | grep -oE '[0-9]+' || true)
+    broke=$(grep -oE '[0-9]+ translation unit\(s\) failed to COMPILE' \
+            "out-$dir.txt" | grep -oE '^[0-9]+' || true)
+    echo "CORPUS_COVERAGE $dir enumerated=${seen:-?} broken=${broke:-0}" \
+         "analysed=$(( ${seen:-0} - ${broke:-0} ))"
+
     # Compare against the pinned expectation (if any). Tolerance 10%+2:
     # versions are pinned, a large deviation is a semantic regression.
     local expected
