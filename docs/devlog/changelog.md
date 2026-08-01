@@ -46,6 +46,23 @@ corpus unmoved (cjson 54 / tinyxml2 9 — the gate silenced nothing
 there), self-scan clean. bounds carries CWE-125/787/120 and has no
 Juliet floor; only the CWE-120 arm narrows.
 
+Post-merge confirmation (def46ac binary, libarchive v3.8.9, same
+target/command as the BULGU 2 receipt): untrusted 14 -> 13, baseline
+12 -> 11, and the entire delta is one line — the
+archive_read_open_filename.c:222 struct-hack FP — with nothing added;
+null-deref 11 and int-overflow 2 unmoved. The pre-registered prediction
+(13, that single line, no collateral) is what this measured. Surface
+named, since these receipts carry two denominators: the directory walk
+enumerates 487 .c (132 library + 355 test); the 355 test files have no
+compile command (tests disabled) and are skipped; the 610 "processing"
+lines are not files — 123 library files hold two compile-DB entries
+each (shared + static). Of the 132 library TUs, 123 come from the DB
+and 9 are platform files absent from the Linux build (4 ACL backends —
+the Linux one included, libacl being unavailable on the rig — and 5
+Windows-only), analysed with fallback flags and effectively empty
+behind their guards. "132/132, broken=0" is true of the library scope;
+the load-bearing surface is 123.
+
 ## 2026-08-01 — sign-conversion: non-size unsigned typedef sink gate (BULGU 2)
 
 Fix drawn from the first foreign-machine evaluation.

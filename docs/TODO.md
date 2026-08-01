@@ -7,10 +7,19 @@
 ## Şu anki durum
 
 ```
-main = 3ae3ecb  (FINDING 2 dahil; kilitli)
-Uçuşta: phase-triage-close + phase-binfont-hunt (doc-only, CI'da)
-        → bu doc-konsolidasyon dalı ikisinin superset'i olacak
+main = def46ac  (libarchive turu: BULGU 1 + BULGU 2 inmiş; kilitli)
+Uçuşta: yok
 ```
+
+## libarchive değerlendirmesi — KAPANDI (2026-08-01)
+
+Üç precision notu, üçü de kapatıldı: BULGU 2 (sign-conversion non-size
+sink kapısı) ve BULGU 1 (bounds struct-hack/FAM kuyruk muafiyeti) kod
+olarak indi ve ikisi de **önceden yazılmış tahmine karşı** ölçüldü —
+19→14 ve 14→13, ikisinde de delta'nın tamamı niyet edilen sınıf,
+kolateral sıfır. BULGU 3 kod değil önkoşul; backlog #1'e işlendi.
+Yan ürün: corpus pin'i 53→54 merkeze alındı (895c813'ten beri
+sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş (kod)
 
@@ -31,6 +40,13 @@ kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
 
 ```
 1. CWE-775 strict (int fd: open/socket) — integer-kaynak modeli
+   > BULGU 3 (libarchive, 2026-08-01): artık tahmin değil ÖNKOŞUL.
+   > Dosya açan bir kütüphanede resource-leak 0 verdi; sebebi ölçüldü —
+   > 43 ham fd açıcı (open 28 · openat 8 · dup 4 · mkstemp 3) karşısında
+   > pointer tabanlı domain'in gördüğü fopen/opendir/tmpfile toplam 3.
+   > CWE-404'ün idiyomatik POSIX C'de karşılık bulması buna bağlı; o
+   > zamana dek "resource leak" kapsamı FILE*/DIR* ile sınırlı
+   > anlatılmalı. Makbuz: changelog 2026-08-01 (BULGU 1 kaydı).
 2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
 3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
 5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
