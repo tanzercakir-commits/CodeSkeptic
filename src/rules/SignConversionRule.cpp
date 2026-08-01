@@ -76,6 +76,31 @@ struct ConvSite {
 // The allocator predicate is shared (engine/AllocFunctions.h) with
 // AllocSizeOverflowRule, which owns the opposite half.
 
+// The rule's claim is "a negative value reinterpreted as a huge LENGTH".
+// Some unsigned typedefs are NOT lengths — mode_t (permission bits),
+// dev_t (a device id), uid_t/gid_t (identities). An untrusted signed
+// value converting into one of these is a real conversion but not THIS
+// rule's story, and the "negative length" message misframes it
+// (libarchive v3.8.9 eval, BULGU 2: file modes/rdevs set from archive
+// headers). This is a DENYLIST, not an allowlist, on purpose: a
+// fail-closed "only size_t-family fires" gate would also silence the
+// uintN_t lengths read straight off the wire — the rule's flagship case.
+// So raw builtins, size_t, and the exact-width unsigned types all keep
+// firing; only these named identity/permission typedefs are exempt. The
+// whole typedef chain is walked because glibc spells dev_t as __dev_t.
+bool isNonSizeUnsignedSink(QualType dst) {
+    static const std::set<std::string> kNonSize = {
+        "mode_t",   "dev_t",   "uid_t",   "gid_t",   "ino_t",   "nlink_t",
+        "__mode_t", "__dev_t", "__uid_t", "__gid_t", "__ino_t", "__nlink_t",
+    };
+    for (QualType t = dst;;) {
+        const auto* tt = t->getAs<TypedefType>();
+        if (!tt) return false;
+        if (kNonSize.count(tt->getDecl()->getName().str())) return true;
+        t = tt->getDecl()->getUnderlyingType();
+    }
+}
+
 std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
     struct V : RecursiveASTVisitor<V> {
         std::vector<ConvSite> sites;
@@ -110,6 +135,7 @@ std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
                 return;
             if (!src->isIntegerType() || !src->isSignedIntegerType())
                 return;
+            if (isNonSizeUnsignedSink(dst)) return;  // not a length sink
             sites.push_back({cast, operand, src.getAsString(),
                              dst.getAsString()});
         }

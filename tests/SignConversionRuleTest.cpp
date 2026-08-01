@@ -211,6 +211,66 @@ TEST(SignConversionRuleTest, SignedNarrowing_NotThisRulesQuestion) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+// --- The sink-type gate (libarchive v3.8.9 eval, BULGU 2). The rule's
+// whole claim is "a negative value reinterpreted as a huge LENGTH".
+// A non-size unsigned typedef — mode_t (permission bits), dev_t (a
+// device id) — is unsigned but is NOT a length; converting an untrusted
+// signed value there is not this rule's story, and the "negative length"
+// message misframes it. libarchive set file modes/rdevs from archive
+// headers and drew exactly this false positive. The gate is a denylist
+// of POSIX identity/permission typedefs (fail-open, deliberately narrow:
+// a fail-CLOSED allowlist would also silence uint32_t/uint16_t lengths
+// read off the wire — the rule's flagship case). ---
+TEST(SignConversionRuleTest, ModeTSink_NotALength_Silent) {
+    SourceScope scope({"read_header_field"});
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int mode_t;
+        extern int read_header_field();
+        extern int chmod(const char*, mode_t);
+        void apply(const char* path) {
+            int raw = read_header_field();
+            mode_t m = (mode_t)raw;
+            chmod(path, m);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(SignConversionRuleTest, DevTSink_NotALength_Silent) {
+    SourceScope scope({"read_header_field"});
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long dev_t;
+        extern int read_header_field();
+        void f(dev_t* out) {
+            int raw = read_header_field();
+            *out = (dev_t)raw;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// --- Positive control: the gate must NOT over-silence. A genuine size_t
+// typedef sink (the length case) still reports — proving the fix is a
+// targeted denylist, not a blanket "any typedef is exempt". ---
+TEST(SignConversionRuleTest, SizeTTypedefSink_StillReports) {
+    SourceScope scope({"read_header_field"});
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned long size_t;
+        extern void* memcpy(void*, const void*, size_t);
+        extern int read_header_field();
+        void f(char* dst, const char* src) {
+            int raw = read_header_field();
+            size_t len = (size_t)raw;
+            memcpy(dst, src, len);
+        }
+    )");
+    ASSERT_GE(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "sign-conversion");
+}
+
 // --- C out-param spelling (`&x`), the scanf-shaped C twin of the
 // trophy: a listed source filling through a pointer. ---
 TEST(SignConversionRuleTest, PointerOutParam_CShape_Reports) {

@@ -1,5 +1,38 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-01 — sign-conversion: non-size unsigned typedef sink gate (BULGU 2)
+
+Fix drawn from the first foreign-machine evaluation.
+
+libarchive v3.8.9 measurement receipt (independent WSL host, no repo
+files written): 132/132 TU parsed, broken=0, ~22s. Finding ladder held
+its shape across the config axis — baseline 12 -> --untrusted-int-sources
+19 -> --no-assert-recovery 12 — i.e. the untrusted rules are the only
+thing the flag turns on, and assert-recovery accounts for exactly the
+baseline delta. Three precision notes came back (BULGU 1 bounds
+struct-hack FP, BULGU 2 below, BULGU 3 CWE-775 int-fd precondition).
+
+BULGU 2 fixed here: the sign-conversion rule (CWE-195, opt-in) reported
+an untrusted signed value converting into a mode_t / dev_t as a "possible
+negative length". Those types are unsigned but are NOT lengths —
+permission bits, a device id — so the message misframed a conversion
+that is not this rule's story (libarchive sets file modes/rdevs from
+archive headers). Added isNonSizeUnsignedSink(): a conversion whose
+destination typedef chain names a POSIX identity/permission type
+(mode_t, dev_t, uid_t, gid_t, ino_t, nlink_t + the glibc __ spellings)
+is exempt. Deliberately a DENYLIST, not an allowlist: a fail-closed
+"only size_t-family fires" gate would also silence the uintN_t lengths
+read straight off the wire — the rule's flagship case — so raw builtins,
+size_t and the exact-width unsigned types all keep firing. RED-first:
+ModeTSink / DevTSink probes reported against the pre-fix binary and go
+silent after; SizeTTypedefSink positive-control proves the gate is
+targeted, not a blanket typedef exemption. Full suite 814/814, thesis
+clean_fp=0 recall floors held, self-scan clean. Corpus (cjson 54 /
+tinyxml2 9) is invariant by construction — it runs without
+--untrusted-int-sources, so sign-conversion emits nothing there — and CI
+confirms empirically. The rule is off-by-default and not Juliet-floored;
+this only narrows it.
+
 ## 2026-07-30 — docs: README rule table synced + two consistency guards
 
 An external review flagged the gap the doc-hygiene guard had left open:
