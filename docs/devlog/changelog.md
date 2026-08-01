@@ -33,6 +33,20 @@ tinyxml2 9) is invariant by construction — it runs without
 confirms empirically. The rule is off-by-default and not Juliet-floored;
 this only narrows it.
 
+Post-merge confirmation (5dae941 binary, libarchive v3.8.9, same
+target/command): 19 -> 14, the full delta the intended class —
+sign-conversion 5 -> 0 at exactly tar.c:1348 (mode_t) +
+1852/1854/3085/3087 (dev_t), zero collateral, no new findings. This
+measures the gate's targeting, not the flagship-preserved claim
+(libarchive had no size_t/uint32_t sink to begin with — that claim
+rests on the RED tests).
+
+Scope notes, for the record: 2 of the 11 baseline null-derefs were
+sampled, 9 remain untriaged; and the lzma/bz2/openssl/acl-xattr filter
+layers were outside the scan (missing dev headers on the rig: lzma.h,
+bzlib.h, openssl/evp.h, sys/acl.h, attr/xattr.h), so "clean" here means
+within-scope, not absolute.
+
 ## 2026-07-30 — docs: README rule table synced + two consistency guards
 
 An external review flagged the gap the doc-hygiene guard had left open:
