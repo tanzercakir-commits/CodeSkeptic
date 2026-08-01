@@ -34,6 +34,16 @@
 # pin and read as unchanged. Re-centred BEFORE touching the bounds rule,
 # so that work is measured against the true baseline.
 #
+# 2026-08-01 (surface named, no count change): cjson's 54 comes from a
+# run that also skips 41 uncompilable translation units — measured and
+# classified, all 41 under tests/unity/ (the vendored Unity framework:
+# its own test suite, expectdata samples and runner generators, none of
+# which the corpus build compiles). ZERO outside tests/. So 54 is the
+# count over cjson's own source plus the Unity tutorial examples that
+# do compile — the ProductionCode.c off-by-one the +3 came from lives
+# there — and no part of cjson proper is silently missing from it. Each
+# run now prints CORPUS_COVERAGE so this stays answerable from the log.
+#
 # project finding-count
 cjson 54
 tinyxml2 9

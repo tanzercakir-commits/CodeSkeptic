@@ -1,5 +1,35 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-01 — corpus: name the surface the pinned count belongs to
+
+The libarchive round ended by asking "132/132 of what?" and answering it
+with a measurement. The same question had never been put to our own
+corpus, where the CI log had been printing the answer's premise all
+along: cjson's pinned 54 comes from a run that also skips 41
+translation units it cannot compile.
+
+Measured and classified rather than assumed: all 41 sit under
+tests/unity/ — the vendored Unity framework's own suite, its expectdata
+samples and runner generators, none of which the corpus build compiles.
+Zero outside tests/. So the pin is intact and means what it was taken
+to mean: 54 over cjson's own source plus the Unity tutorial examples
+that do compile (where the ProductionCode.c off-by-one behind the +3
+lives), with no part of cjson proper silently absent. The expectation
+was exactly this — which is why it was worth measuring, since an
+expectation that is never checked is just a belief.
+
+run_corpus.sh now prints CORPUS_COVERAGE per project (enumerated,
+broken, analysed), so the surface is readable from any run instead of
+requiring an investigation: cjson enumerated=76 broken=41 analysed=35,
+tinyxml2 enumerated=3 broken=0 analysed=3.
+
+Also restores the executable bit on check_docs_sync.sh and
+run_corpus.sh, dropped when they were edited over a UNC path from
+Windows. Harmless in practice — every caller says `bash scripts/...`,
+in all three workflows — but their own `Usage: scripts/run_corpus.sh`
+headers had stopped being true, and a header that lies is the same
+defect as a pin that lies.
+
 ## 2026-08-01 — guards: the record can no longer drift from reality
 
 Two silent drifts surfaced by accident in one session, both of the same
