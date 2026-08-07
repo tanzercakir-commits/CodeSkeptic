@@ -40,14 +40,14 @@ curl -sL https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/down
 **Docker** — nothing installed at all:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.7 src/ --sarif out.sarif  # :latest floats
+docker run --rm -v "$PWD:/work" ghcr.io/tanzercakir-commits/codeskeptic:v0.4.8 src/ --sarif out.sarif  # :latest floats
 ```
 
 **CI** — the [packaged action](action.yml), report-only by default:
 
 ```yaml
 # Pinning the action pins the analyzer binary too (same tag).
-- uses: tanzercakir-commits/CodeSkeptic@v0.4.7
+- uses: tanzercakir-commits/CodeSkeptic@v0.4.8
   with: { path: src/, build-path: build }
 ```
 
@@ -62,10 +62,10 @@ code resolves real headers, as with any compiler:
 ```powershell
 curl.exe -sLO https://github.com/tanzercakir-commits/CodeSkeptic/releases/latest/download/codeskeptic-windows-x86_64.zip
 Expand-Archive codeskeptic-windows-x86_64.zip -DestinationPath .
-.\codeskeptic-v0.4.7-windows-x86_64\bin\codeskeptic.exe path\to\source --build-path path\to\build
+.\codeskeptic-v0.4.8-windows-x86_64\bin\codeskeptic.exe path\to\source --build-path path\to\build
 ```
 
-WSL2/Docker remain as Linux-view paths (`docker run ... :v0.4.7`, or
+WSL2/Docker remain as Linux-view paths (`docker run ... :v0.4.8`, or
 the Linux tarball inside WSL). One honest caveat there — CodeSkeptic
 analyzes the program the compiler sees: the Linux preprocessor view,
 so `#ifdef _WIN32` branches are invisible; MSVC-targeted code wants
@@ -127,11 +127,11 @@ Next steps: [your first scan](docs/first-scan.md) · the full [usage reference](
 ## Proven on real code
 
 Synthetic benchmarks reward pattern coverage; real codebases punish
-every false positive. Each project below was built with its own build
-system, analyzed from its compilation database, and every surviving
-finding was triaged by hand. All numbers are from one analyzer build
-(2026-07-12); "initial" is what the same scan reported the first time
-the project was tried, before the FP families it exposed were fixed.
+every false positive. Each project was built with its own build system
+and analyzed from its compilation database. Historical campaign values
+stay dated; current fail-closed receipts live in the [canonical replay
+ledger](docs/benchmarks.md#current-engine-real-world-replay-ledger).
+"Initial" means the first scan, before its exposed FP families were fixed.
 
 | Project | Scope | Initial → now | Hand-verified real bugs |
 |---------|-------|--------------:|------------------------|
@@ -145,10 +145,10 @@ the project was tried, before the FP families it exposed were fixed.
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
 | [libexpat](https://github.com/libexpat/libexpat) | 2.6.4, full lib | **0** | clean — the untrusted-length bounds arm fired no FP on a hardened XML parser |
 
-The two merged shadPS4 fixes are the canonical
-looks-right-reads-wrong bugs this project exists to catch: a null
-check with `&&` where it needed `||`, so the guard fell through and
-dereferenced the very pointer it had just checked
+Accepted upstream fixes include the two shadPS4 bugs below and the TFLite FFT
+work-buffer leak ([TensorFlow #123994](https://github.com/tensorflow/tensorflow/pull/123994)), whose reduced error path stays pinned as a regression test. The
+shadPS4 bugs are canonical looks-right-reads-wrong examples: a null check with
+`&&` where it needed `||`, so the guard fell through and dereferenced the pointer
 ([#4703](https://github.com/shadps4-emu/shadPS4/pull/4703)), and an
 `ENOMEM` path that fell through without a `return`, dereferencing the
 null `FILE*` on the next line

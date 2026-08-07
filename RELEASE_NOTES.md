@@ -1,71 +1,89 @@
-# CodeSkeptic v0.4.7 — two engine slices: untrusted lengths reach the bounds rule, zeroness flows through wrapper chains
+# CodeSkeptic v0.4.8 — fail-closed verdict integrity
 
-The first engine-capability release since the v0.4.3 false-positive
-round (v0.4.4–v0.4.6 were trust-chain, platform and correctness-of-
-delivery work). Two long-deferred slices land, both recall moves with
-the precision story pinned in CI.
+v0.4.8 makes one promise precise across every interface: a clean result is
+published only when CodeSkeptic produced a complete, trustworthy verdict.
+Findings and analyzer failure are no longer two spellings of the same
+non-zero exit, and integrations can no longer turn missing analysis into a
+green “0 findings” result.
 
-## Untrusted length -> possible buffer overflow (CWE-120)
+## One verdict contract
 
-The engine's declared untrusted-integer sources — the `atoi`/`strtol`
-family, `scanf`-filled outputs, and your project's own
-`--untrusted-int-sources` functions (wire lengths, packet fields) —
-now feed the sized-copy check. When a `memcpy`/`memmove`/`memset`/
-`strncpy` length *derives* from such a source and its proven finite
-range can exceed the destination's capacity, that is reported as a
-possible buffer overflow. Reachability is by construction: the source
-contract says external input picks the value.
+CLI, MCP and report writers now consume the same `AnalysisResult` evidence:
+translation units attempted, analyzed and broken; incomplete dataflow
+functions; whole-program summary freshness/load failures; and artifact I/O.
 
-The proof doctrine is unchanged on both sides of the line:
+- **Exit 0 — complete and clean.** Every requested unit and analysis
+  obligation completed, every requested artifact was written, and no finding
+  survived filtering.
+- **Exit 1 — complete with findings.** The verdict is trustworthy and the
+  reported findings are the result.
+- **Exit 2 — verdict unavailable.** Broken or skipped requested units,
+  incomplete dataflow, a stale/missing requested summary, report-write
+  failure, or no enabled detection rule cannot masquerade as clean.
 
-- a guard (`if (len <= sizeof(buf))`) narrows the range on its own
-  edge and silences the warning;
-- an unknown length (no declared source) never reports — provenance
-  is opt-in, never guessed, so ordinary size parameters stay silent;
-- a width-bounded `%2d` keeps its narrowed range and warns only
-  against a destination it can actually exceed.
+`--accept-partial-coverage` remains an explicit corpus-maintenance escape
+hatch. It does not erase attempted/analyzed/broken evidence and never permits
+unreliable error-recovery ASTs to be analyzed.
 
-`strncpy` also joins the definite arm: it pads to exactly `n` bytes,
-so a constant `n` past the capacity is a definite overflow (CWE-787),
-same as `memcpy`.
+Dataflow coverage now distinguishes a real iteration limit from a function
+whose CFG cannot be built. Dependent templates without concrete control flow
+are deferred to their concrete instantiations instead of being mislabeled as
+non-convergent. The worklist keeps one pending entry per block and determines
+completion from remaining work, closing duplicate-scheduling and exact-budget
+false failures.
 
-## Zeroness through wrapper chains (div-by-zero recall)
+## Every output tells the same truth
 
-`int id(int x) { return x; }` used to erase what the analyzer knew
-about `x`: `r = id(d); 100 / r` lost `d`'s possibly-zero state at the
-call boundary. Function summaries now carry a zero-passthrough claim —
-"the result is zero only if argument #k is zero" — harvested when
-every return path is either proven never-zero or returns an unmodified
-parameter. Consumption flows the argument's state through the call
-(`r = id(d)` behaves exactly like `r = d`), chains compose across
-hops, and guards on the result refine as usual.
+- JSON and SARIF carry status, completeness, exit-code and coverage evidence.
+- HTML cannot display “Clean!” when the verdict is incomplete or absent.
+- Failed JSON, SARIF, HTML and baseline writes make the verdict unavailable.
+- MCP `analyze` returns status/completeness/coverage evidence and uses tool
+  error only for unavailable verdicts; ordinary findings remain a successful
+  tool call.
+- MCP rejects unknown or wrongly typed arguments instead of ignoring them.
 
-Width discipline guards both directions: any narrowing conversion in
-the chain blocks the claim, because a truncated nonzero can become
-zero — which would otherwise fabricate a warning or, worse, silently
-suppress a real one.
+## Strict configuration and honest identity
 
-## The honest numbers
+Configuration is whitespace-aware and fail-loud. Unknown CLI flags, missing
+values, invalid severity/language/line scopes, malformed config lines and
+unknown keys now return exit 2. This also fixes shipped idiom profiles whose
+documented `key = value` form previously retained whitespace in the key.
+`--help` remains successful even beside an invalid project configuration.
 
-- libgit2 v1.9.0 (201 files): **34 findings — identical** to the
-  documented v0.4.3 core; the new arms produced zero new reports on
-  real C.
-- rtp2httpd: **0**, Catch2 deep corpus: **0**.
-- NIST Juliet: every gated floor holds (CWE369/190/476/415/416 at
-  sampled rprecision 1.000; CWE401 0.714 ≥ its 0.68 floor). The
-  CWE369 sampled hitrate did NOT move (0.108): Juliet's remaining
-  misses there are function-pointer and multi-hop-parameter shapes,
-  not identity wrappers — the passthrough gain lives in real-world
-  wrapper code and in the 22 new pinned tests, and we report it that
-  way rather than claiming a benchmark bump.
-- 717 unit tests (Linux; the Windows lane runs the same suite minus
-  one Linux-only case), thesis gate 0 FP / 9-of-9 in scope.
+An exact `v0.4.8` tag reports `0.4.8`. Any other checkout reports the next
+development identity with its source commit (and `.dirty` when applicable),
+so a post-release build cannot claim to be the old binary. The dependency-free
+`--capabilities --json` surface publishes version, rules, outputs, modes and
+the verdict contract for wrappers and agents.
 
-## Summary file format v4
+## GitHub Action hardening
 
-Persisted cross-run summaries gain the zero-passthrough column;
-v1–v3 files load unchanged (the claim defaults to absent).
+The composite Action validates gate, SARIF-upload, output-path and version
+inputs before download or analysis. User values cross into shell through
+environment variables. `extra-args` supports shell-style quoting and
+environment expansion as data, but never evaluates command substitution,
+globbing or shell syntax; malformed quoting fails with exit 2. Report-only
+keeps findings green by design, but an unavailable verdict is always red.
 
-No platform or packaging changes — the v0.4.5 native Windows zip, the
-v0.4.6 macOS SDK resolution and fail-loud exit policy, and the
-checksum-verified GitHub Action all carry forward unchanged.
+## Verification receipts
+
+- The Windows suite passed **847/847** in both parallel and serial modes;
+  packaged-zip rehearsal and relocation smoke passed.
+- The Action argument parser passed **5/5** tests on Windows and Linux.
+- The thesis gate held at **0 false positives on nine clean programs** and
+  **9/9 addressable in-scope bugs caught**. Pinned cJSON/tinyxml2 counts held.
+- The fail-closed real-world replay completed libgit2 v1.9.0 at **167/167
+  translation units, 34 findings, exit 1**, and rtp2httpd
+  `a7a1e568d46ee3176f8a3e94e0f88f131ebd444e` at **38/38, 6 findings,
+  exit 1**. rtp2httpd triage partitions those six into four actionable
+  findings and two context false positives. The canonical executable ledger
+  is `scripts/realworld_expected.txt`; method and immutable receipt are in
+  `docs/benchmarks.md`.
+- The TFLite FFT work-buffer leak preserved by
+  `MemoryLeakRuleExTest.TFLite_123387_Rfft2dWorkBufferLeak_Reports` was fixed
+  upstream: TensorFlow issue #123387 closed with merged PR #123994, commit
+  `68a7e5821cbb2beb76eeebbbbdffda85a418b254`.
+
+No detection rule was removed and no quality floor was relaxed. Automation
+that previously treated every non-zero result as “findings” should now branch
+on 0/1/2 explicitly; that incompatibility is the safety fix.
