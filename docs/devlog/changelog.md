@@ -1,5 +1,58 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-07 — v0.4.8 truth sync: one verdict, one replay ledger
+
+Verdict-integrity PR #119 merged to `main` as squash commit `dd089708` after
+all required Linux, Windows, documentation, Juliet and package-relocation
+checks passed. The merge used the user's explicitly approved one-time
+administrator bypass; this work did not modify the repository ruleset. The
+truth-sync change was then rebased onto that exact `main` commit, whose Git
+tree matches the reviewed PR head `4db8205` byte for byte.
+
+Prepared the v0.4.8 release identity and rewrote the release notes around the
+contract the candidate actually ships: exit 0 is complete+clean, exit 1 is
+complete+findings, and exit 2 is verdict unavailable across CLI, reports, MCP
+and the Action. README, evaluation instructions and Action examples now pin
+v0.4.8 together.
+
+The current libgit2/rtp2httpd replay no longer has expected revisions, TU
+surfaces and result counts copied into workflow shell. The executable source of
+truth is `scripts/realworld_expected.txt`; `realworld.yml` validates it, fetches
+both projects by full commit SHA and consumes its expectations. The human
+ledger in `docs/benchmarks.md` binds those rows to analyzer tree `d47d114`,
+workflow run 31199842703, evidence ref
+`refs/ci-logs/d47d11422542551e2f4f7b571e07d6d917c32885/realworld` and evidence
+commit `2d03342268a523c33bafa22ddb3c97d5834be4d4`.
+`check_realworld_ledger.py` is also part of the required docs-sync gate: it
+rejects missing/duplicate projects, non-SHA inputs, exit-2 pseudo-results,
+result/exit contradictions and incomplete or dishonest triage partitions.
+Six Python regressions pin those rejection paths plus the canonical success.
+
+The final Windows rehearsal exposed a release-path bug before tagging: Clang's
+native `C:\llvm\...` resource path was passed into a quoted C++ definition
+without normalization, so sequences such as `\l` and `\c` corrupted the baked
+development fallback. A new configured-resource regression first failed with
+an empty path. CMake now emits portable forward slashes; the same regression
+passes and the path-escape compiler warnings are gone.
+
+Local truth-sync gates: CMake identified the untagged dirty checkout as
+`0.4.9-dev+gaa403171dd86.dirty`; all **848/848** Windows tests passed both
+parallel and serial; the canonical ledger and its six validator regressions
+passed locally. The parent PR's Action argument tests were already green at
+5/5. README and the remaining docs-sync guards passed. A final build with the
+release override made both `--version` and `--capabilities --json` report
+`0.4.8`, then produced the 14 MB
+`codeskeptic-v0.4.8-windows-x86_64.zip`. Its extracted tree carried
+`lib/clang/20/include/stddef.h`. With `C:\llvm` hidden, the packaged executable
+reproduced three demo findings with exit 1, while a missing input produced the
+required verdict-unavailable marker and exit 2.
+
+Upstream truth was stale too. TensorFlow issue #123387 is closed and PR #123994
+merged on 2026-08-07 as
+`68a7e5821cbb2beb76eeebbbbdffda85a418b254`; PLAN/TODO, README proof and the
+pinned regression-test comment now say so. No analyzer behavior or quality
+floor changed in this truth-sync slice.
+
 ## 2026-08-07 — verdict integrity: zero findings is no longer enough
 
 CLI, MCP and report artifacts now share one `AnalysisResult` contract.

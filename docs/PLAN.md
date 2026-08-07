@@ -139,7 +139,7 @@ dataflow ile bulundu") · 1 issue = 1 kusur · mütevazı fix önerisi.
 **Ledger:**
 | Aday | Gate A | Sonuç |
 |---|---|---|
-| TFLite rfft2d/irfft2d leak (#123387/#123994) | 4/4 | raporlandı; PR açık |
+| TFLite rfft2d/irfft2d leak (#123387/#123994) | 4/4 | DÜZELTİLDİ — PR #123994 merge (`68a7e5821cbb2beb76eeebbbbdffda85a418b254`), issue kapandı (2026-08-07) |
 | zlib untgz strcpy/strdup (1.3.1) | 4'te düştü (HEAD'de kod silinmiş) | rapor yok |
 | LVGL binfont alloc-size | A: ✓ (mekanizma+HEAD+dup-yok) · B: ✗ | HOLD — LVGL'de threat-model/SECURITY.md yok, font'lar güvenilir sayılıyor; özel kanal yok. Rapor edilmedi (kural için kanıt olarak kalır). |
 

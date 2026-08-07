@@ -73,6 +73,10 @@ and rtp2httpd revisions, derives an explicit source list from each real
 `compile_commands.json`, and treats exit 2 or any TU/count drift as a
 failure. Results and tail logs are mirrored to
 `refs/ci-logs/<commit>/realworld` for independent readback.
+The exact revisions and expected verdicts come from the single executable
+ledger, [`scripts/realworld_expected.txt`](../scripts/realworld_expected.txt);
+the current immutable receipt and replay command contract are recorded in
+[benchmarks.md](benchmarks.md#current-engine-real-world-replay-ledger).
 
 ## What the guards mean
 
