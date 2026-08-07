@@ -3,8 +3,9 @@ name: Real-world scan
 # On-demand re-validation of the README's real-world scan table on the
 # current engine. Triggered by pushing to the `realworld-scan` branch
 # (the dev sandbox cannot use workflow_dispatch — git protocol only).
-# Each project is built with its own build system at a PINNED version,
-# analyzed from its real compilation database with its idiom profile,
+# Each project is built with its own build system at a PINNED revision,
+# analyzed only across the translation units in its real compilation
+# database with its idiom profile,
 # and the resulting counts + reports are published to
 # refs/ci-logs/<sha>/realworld for git-protocol readback.
 #
@@ -51,8 +52,15 @@ jobs:
           cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DBUILD_TESTS=OFF -DBUILD_CLI=OFF >/dev/null
           cd ..
+          cmake --build libgit2-1.9.0/build
+          root=$(realpath libgit2-1.9.0/src)
+          jq -r --arg root "$root/" \
+            '.[] | .file | select(startswith($root))' \
+            libgit2-1.9.0/build/compile_commands.json \
+            | sort -u > libgit2.files
+          test -s libgit2.files
           code=0
-          ./build/src/codeskeptic libgit2-1.9.0/src \
+          ./build/src/codeskeptic --files libgit2.files \
             --build-path libgit2-1.9.0/build \
             --alloc-functions git__malloc,git__calloc,git__realloc,git__strdup \
             --free-functions git__free \
@@ -60,23 +68,38 @@ jobs:
             2>&1 | tee libgit2-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' libgit2-scan.log || true)
           echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n" >> results.txt
+          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n exit=$code" >> results.txt
+          test "$code" -eq 1
+          test "$n" -eq 34
 
-      - name: Scan rtp2httpd (pinned, no profile needed)
+      - name: Scan rtp2httpd (pinned e49df993, no profile needed)
         run: |
           set -o pipefail
-          git clone --quiet --depth 1 https://github.com/stackia/rtp2httpd
-          cd rtp2httpd
-          # autotools project; a bear-style DB via compile flags is
-          # overkill — the fallback per-extension DB parses plain C99.
-          cd ..
+          git init -q rtp2httpd
+          git -C rtp2httpd remote add origin https://github.com/stackia/rtp2httpd
+          git -C rtp2httpd fetch -q --depth 1 origin \
+            e49df993ca2629bb116a29a87ce2afff24d97ef7
+          git -C rtp2httpd checkout -q --detach FETCH_HEAD
+          cmake -S rtp2httpd -B rtp2httpd/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-20 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake --build rtp2httpd/build
+          root=$(realpath rtp2httpd/src)
+          jq -r --arg root "$root/" \
+            '.[] | .file | select(startswith($root))' \
+            rtp2httpd/build/compile_commands.json \
+            | sort -u > rtp2httpd.files
+          test -s rtp2httpd.files
           code=0
-          ./build/src/codeskeptic rtp2httpd/src \
+          ./build/src/codeskeptic --files rtp2httpd.files \
+            --build-path rtp2httpd/build \
             --report-paths "$PWD/rtp2httpd/src" \
             2>&1 | tee rtp2httpd-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log || true)
           echo "REALWORLD_RESULT project=rtp2httpd findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=rtp2httpd findings=$n" >> results.txt
+          echo "REALWORLD_RESULT project=rtp2httpd rev=e49df993 findings=$n exit=$code" >> results.txt
+          test "$code" -eq 0
+          test "$n" -eq 0
 
       - name: Deep corpus (abseil) for good measure
         run: |
