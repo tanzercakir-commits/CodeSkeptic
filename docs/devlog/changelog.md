@@ -28,16 +28,24 @@ rejects missing/duplicate projects, non-SHA inputs, exit-2 pseudo-results,
 result/exit contradictions and incomplete or dishonest triage partitions.
 Six Python regressions pin those rejection paths plus the canonical success.
 
-Local truth-sync gates: CMake identified the dirty phase checkout as
-`0.4.9-dev+g4db820502bd8.dirty`; all **847/847** Windows tests passed both
-parallel and serial; the canonical ledger and an incomplete-partition negative
-case passed locally. Six Python ledger regressions are wired into the required
-Linux gate; the parent PR's Action argument tests were already green at 5/5.
-README and the remaining docs-sync guards passed. The Windows package rehearsal
-produced a 14 MB dev zip; its extracted tree carried
-`lib/clang/20/include/stddef.h` and the packaged executable reproduced the
-three demo findings with exit 1. The parent PR's green Windows lane remains the
-stronger relocation receipt because it additionally hides the build LLVM.
+The final Windows rehearsal exposed a release-path bug before tagging: Clang's
+native `C:\llvm\...` resource path was passed into a quoted C++ definition
+without normalization, so sequences such as `\l` and `\c` corrupted the baked
+development fallback. A new configured-resource regression first failed with
+an empty path. CMake now emits portable forward slashes; the same regression
+passes and the path-escape compiler warnings are gone.
+
+Local truth-sync gates: CMake identified the untagged dirty checkout as
+`0.4.9-dev+gaa403171dd86.dirty`; all **848/848** Windows tests passed both
+parallel and serial; the canonical ledger and its six validator regressions
+passed locally. The parent PR's Action argument tests were already green at
+5/5. README and the remaining docs-sync guards passed. A final build with the
+release override made both `--version` and `--capabilities --json` report
+`0.4.8`, then produced the 14 MB
+`codeskeptic-v0.4.8-windows-x86_64.zip`. Its extracted tree carried
+`lib/clang/20/include/stddef.h`. With `C:\llvm` hidden, the packaged executable
+reproduced three demo findings with exit 1, while a missing input produced the
+required verdict-unavailable marker and exit 2.
 
 Upstream truth was stale too. TensorFlow issue #123387 is closed and PR #123994
 merged on 2026-08-07 as

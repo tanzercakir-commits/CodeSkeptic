@@ -86,10 +86,16 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 if(CLANG_RESOURCE_DIR)
+    # clang.exe prints a native Windows path. Passing backslashes through a
+    # quoted /D value turns sequences such as `\l` and `\c` into malformed
+    # C++ escapes, so the compiled-in development fallback silently points
+    # nowhere. CMake-style forward slashes are valid on every supported OS.
+    file(TO_CMAKE_PATH "${CLANG_RESOURCE_DIR}"
+         CLANG_RESOURCE_DIR_FOR_DEFINE)
     target_compile_definitions(codeskeptic_core PRIVATE
-        CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR}"
+        CLANG_RESOURCE_DIR="${CLANG_RESOURCE_DIR_FOR_DEFINE}"
     )
-    message(STATUS "Clang resource dir: ${CLANG_RESOURCE_DIR}")
+    message(STATUS "Clang resource dir: ${CLANG_RESOURCE_DIR_FOR_DEFINE}")
 endif()
 
 # macOS SDK sysroot (for string.h, stdlib.h, etc.)

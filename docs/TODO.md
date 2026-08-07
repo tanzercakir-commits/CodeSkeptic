@@ -40,9 +40,10 @@ koru. Ardından Faz 1 capability tier sözleşmesine geç.
 
 ## Açık kullanıcı kararları
 
-Yok. PR #119 için gereken tek seferlik yönetici bypass'ı açıkça onaylandı ve
-merge tamamlandı. TensorFlow PR #123994 merge edildi, issue #123387 kapandı;
-PLAN §6 ledger'ı ve changelog buna göre düzeltildi.
+`phase-truth-sync-v048` dalını origin'e push edip draft PR açmak için çalışma
+kuralı 12 kapsamındaki açık onay bekleniyor. PR #119 için gereken tek seferlik
+yönetici bypass'ı onaylandı ve merge tamamlandı. TensorFlow PR #123994 merge
+edildi, issue #123387 kapandı; PLAN §6 ledger'ı ve changelog düzeltildi.
 
 ## Backlog (öncelik sırası)
 

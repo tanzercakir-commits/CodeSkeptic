@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 using codeskeptic::resolveResourceDir;
+using codeskeptic::resourceDir;
 namespace fs = std::filesystem;
 
 namespace {
@@ -91,4 +92,11 @@ TEST(ResourceDirTest, BakedIsLastResortOnlyIfItExists) {
 
 TEST(ResourceDirTest, AllMissingYieldsEmpty) {
     EXPECT_EQ(resolveResourceDir("", "", ""), "");
+}
+
+TEST(ResourceDirTest, ConfiguredResourceDirCarriesIntrinsicHeaders) {
+    const fs::path configured = resourceDir();
+    EXPECT_FALSE(configured.empty());
+    EXPECT_TRUE(fs::exists(configured / "include" / "stddef.h"))
+        << "configured resource dir: " << configured.string();
 }

@@ -54,7 +54,9 @@ An exact `v0.4.8` tag reports `0.4.8`. Any other checkout reports the next
 development identity with its source commit (and `.dirty` when applicable),
 so a post-release build cannot claim to be the old binary. The dependency-free
 `--capabilities --json` surface publishes version, rules, outputs, modes and
-the verdict contract for wrappers and agents.
+the verdict contract for wrappers and agents. Windows builds also normalize
+the native Clang resource path before compiling it in, so the development
+fallback cannot be corrupted by C++ backslash escapes.
 
 ## GitHub Action hardening
 
@@ -67,8 +69,10 @@ keeps findings green by design, but an unavailable verdict is always red.
 
 ## Verification receipts
 
-- The Windows suite passed **847/847** in both parallel and serial modes;
-  packaged-zip rehearsal and relocation smoke passed.
+- The Windows suite passed **848/848** in both parallel and serial modes. A
+  dedicated regression proves the configured Clang resource directory carries
+  intrinsic headers; packaged-zip rehearsal and relocation smoke passed with
+  the build LLVM hidden.
 - The Action argument parser passed **5/5** tests on Windows and Linux.
 - The thesis gate held at **0 false positives on nine clean programs** and
   **9/9 addressable in-scope bugs caught**. Pinned cJSON/tinyxml2 counts held.
