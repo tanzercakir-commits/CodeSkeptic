@@ -215,7 +215,14 @@ DataflowResult<Analysis> runDataflow(
     unsigned latticeHeight = 4;
     if constexpr (detail::HasLatticeHeight<Analysis>::value)
         latticeHeight = analysis.latticeHeight();
-    const unsigned maxIterations = numBlocks * (latticeHeight + 2);
+    const unsigned widenAfter = latticeHeight + 2;
+    // Widening cannot help if the global fuse expires at the exact visit
+    // count that merely makes a block eligible for it. Reserve enough
+    // post-threshold passes for the first widened snapshot, the
+    // join-with-history pass, and propagation through the SCC.
+    constexpr unsigned kWideningStabilizationVisits = 4;
+    const unsigned maxIterations =
+        numBlocks * (widenAfter + kWideningStabilizationVisits);
 
     auto& blockExitState = result.blockExitStates;
 
@@ -408,7 +415,6 @@ DataflowResult<Analysis> runDataflow(
     // previous was added).
     std::vector<unsigned> visitCounts(numBlocks, 0);
     std::map<unsigned, State> widenMemory;
-    const unsigned widenAfter = latticeHeight + 2;
 
     while (!worklist.empty() && iterations < maxIterations) {
         ++iterations;
