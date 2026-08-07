@@ -12,9 +12,11 @@
 #include <clang/AST/Stmt.h>
 #include <clang/Analysis/CFG.h>
 
+#include <map>
 #include <queue>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 namespace codeskeptic {
 
@@ -373,7 +375,20 @@ DataflowResult<Analysis> runDataflow(
     // severity: e.g. on the first visit of a do-while body, before the
     // back-edge state exists, we might claim "definitely null".
     std::queue<const clang::CFGBlock*> worklist;
-    worklist.push(&cfg->getEntry());
+    // A block may have several predecessors that change before it gets
+    // its next turn. Keep at most one pending entry per block: processing
+    // duplicate queue entries cannot add information, but it consumes the
+    // convergence safety budget and used to make large fan-in CFGs report
+    // a false iteration-cap failure.
+    std::vector<bool> queued(numBlocks, false);
+    auto enqueue = [&](const clang::CFGBlock* block) {
+        if (!block) return;
+        const unsigned id = block->getBlockID();
+        if (queued[id]) return;
+        queued[id] = true;
+        worklist.push(block);
+    };
+    enqueue(&cfg->getEntry());
     unsigned iterations = 0;
 
     // Convergence widening. The guarded-disjunct domain is not a clean
@@ -399,6 +414,7 @@ DataflowResult<Analysis> runDataflow(
         ++iterations;
         const clang::CFGBlock* block = worklist.front();
         worklist.pop();
+        queued[block->getBlockID()] = false;
 
         bool hasPreds = false;
         State entryState = computeEntryState(block, hasPreds,
@@ -452,12 +468,15 @@ DataflowResult<Analysis> runDataflow(
             for (auto succIt = block->succ_begin();
                  succIt != block->succ_end(); ++succIt) {
                 const clang::CFGBlock* succ = succIt->getReachableBlock();
-                if (succ) worklist.push(succ);
+                enqueue(succ);
             }
         }
     }
 
-    result.converged = (iterations < maxIterations);
+    // Equality with the safety limit is not itself a failure: the last
+    // allowed visit may have drained the queue. What matters is whether
+    // unprocessed work remains.
+    result.converged = worklist.empty();
     result.exitBlockID = cfg->getExit().getBlockID();
 
     // --- Phase 2: reporting pass ---
