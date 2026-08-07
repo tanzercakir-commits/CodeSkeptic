@@ -42,22 +42,48 @@ inputs:
     required: false
     default: ""
   extra-args:
-    description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $PWD/src)"
+    description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $GITHUB_WORKSPACE/src)"
     required: false
     default: ""
 
 outputs:
   exit-code:
-    description: "Raw analyzer exit code (0 clean, 1 findings)"
+    description: "Raw analyzer exit code (0 clean, 1 findings, 2 verdict unavailable)"
     value: ${{ steps.analyze.outputs.exit-code }}
 
 runs:
   using: "composite"
   steps:
+    - name: Validate action inputs
+      shell: bash
+      env:
+        INPUT_GATE: ${{ inputs.gate }}
+        INPUT_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+        INPUT_SARIF_PATH: ${{ inputs.sarif }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$INPUT_GATE" in
+          report-only|error) ;;
+          *) echo "::error::gate must be 'report-only' or 'error'"; exit 2 ;;
+        esac
+        case "$INPUT_UPLOAD_SARIF" in
+          true|false) ;;
+          *) echo "::error::upload-sarif must be 'true' or 'false'"; exit 2 ;;
+        esac
+        test -n "$INPUT_SARIF_PATH" || {
+          echo "::error::sarif output path must not be empty"; exit 2; }
+        case "$INPUT_VERSION" in
+          ""|latest|v[0-9]*) ;;
+          *) echo "::error::version must be 'latest' or a v* release tag"; exit 2 ;;
+        esac
+
     - name: Download CodeSkeptic release
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
       run: |
         set -euo pipefail
         # Unique per invocation: a workflow may run this action twice
@@ -71,9 +97,9 @@ runs:
         # with the v0.4.5 binary, so pinning the action really pins
         # the analyzer. Only an explicit "latest" (or a non-tag ref:
         # branch names, the self-test's local `uses: ./`) floats.
-        VERSION="${{ inputs.version }}"
+        VERSION="$INPUT_VERSION"
         if [ -z "$VERSION" ]; then
-          VERSION="${{ github.action_ref }}"
+          VERSION="$ACTION_REF"
           case "$VERSION" in
             v[0-9]*) : ;;         # release tag -> pin to it
             *) VERSION="latest" ;; # branch/sha/empty -> newest release
@@ -98,14 +124,29 @@ runs:
     - name: Analyze
       id: analyze
       shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_BUILD_PATH: ${{ inputs.build-path }}
+        INPUT_SARIF_PATH: ${{ inputs.sarif }}
+        INPUT_GATE: ${{ inputs.gate }}
+        INPUT_EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         set -uo pipefail
-        args=( "${{ inputs.path }}" --sarif "${{ inputs.sarif }}" )
-        if [ -n "${{ inputs.build-path }}" ]; then
-          args+=( --build-path "${{ inputs.build-path }}" )
+        args=( "$INPUT_PATH" --sarif "$INPUT_SARIF_PATH" )
+        if [ -n "$INPUT_BUILD_PATH" ]; then
+          args+=( --build-path "$INPUT_BUILD_PATH" )
         fi
-        # extra-args is intentionally word-split
-        extra=( ${{ inputs.extra-args }} )
+        # Shell-style quoting plus environment-variable expansion, still
+        # strictly data-only: no eval, command substitution, or globbing.
+        parsed_args=$(mktemp "$RUNNER_TEMP/codeskeptic-args-XXXXXX")
+        trap 'rm -f "$parsed_args"' EXIT
+        if ! python3 "$GITHUB_ACTION_PATH/scripts/action_args.py" \
+             "$INPUT_EXTRA_ARGS" > "$parsed_args"; then
+          exit 2
+        fi
+        mapfile -d '' -t extra < "$parsed_args"
+        rm -f "$parsed_args"
+        trap - EXIT
         code=0
         codeskeptic "${args[@]}" "${extra[@]}" || code=$?
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
@@ -113,7 +154,7 @@ runs:
           echo "::error::codeskeptic failed (exit $code)"; exit "$code"
         fi
         if [ "$code" -eq 1 ]; then
-          if [ "${{ inputs.gate }}" = "error" ]; then
+          if [ "$INPUT_GATE" = "error" ]; then
             echo "::error::CodeSkeptic reported findings (gate: error)"; exit 1
           fi
           echo "::notice::CodeSkeptic reported findings (gate: report-only — job stays green)"

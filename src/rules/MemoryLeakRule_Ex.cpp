@@ -1007,8 +1007,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         std::move(aliasGroups), results);
     auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
-        codeskeptic::CoverageReport::instance().recordNonConvergence(
-            funcDecl->getQualifiedNameAsString());
+        codeskeptic::CoverageReport::instance().recordDataflowFailure(
+            funcDecl->getQualifiedNameAsString(), dfResult.failure);
 
     // Exit block leak check
     auto exitIt = dfResult.blockExitStates.find(dfResult.exitBlockID);

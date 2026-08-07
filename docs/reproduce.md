@@ -67,6 +67,13 @@ finding by its dataflow trace. `docs/evaluate.md` turns that into a
 one-hour protocol for *your* codebase — which is the measurement that
 should actually convince you.
 
+The CI-sized replay is `.github/workflows/realworld.yml`, triggered by
+moving the dedicated `realworld-scan` branch. It builds pinned libgit2
+and rtp2httpd revisions, derives an explicit source list from each real
+`compile_commands.json`, and treats exit 2 or any TU/count drift as a
+failure. Results and tail logs are mirrored to
+`refs/ci-logs/<commit>/realworld` for independent readback.
+
 ## What the guards mean
 
 CI enforces all of this on every code PR: Juliet floors

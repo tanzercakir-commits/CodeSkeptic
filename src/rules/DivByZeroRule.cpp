@@ -1034,8 +1034,8 @@ void analyzeFunction(const FunctionDecl* funcDecl,
     }
     auto df = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!df.converged)
-        codeskeptic::CoverageReport::instance().recordNonConvergence(
-            funcDecl->getQualifiedNameAsString());
+        codeskeptic::CoverageReport::instance().recordDataflowFailure(
+            funcDecl->getQualifiedNameAsString(), df.failure);
     analysis.attachTraces();
 }
 

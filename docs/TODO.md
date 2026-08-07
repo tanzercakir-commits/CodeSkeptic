@@ -17,7 +17,8 @@ uçuşta = phase-corpus-surface
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): kilit kullanıcıda.
+Serbest not (insanda kalır): verdict-integrity Faz 0 PR #119'da; son bağımsız
+denetim düzeltmeleri ve kapı kanıtı tamamlanınca merge kilidi kullanıcıda.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 

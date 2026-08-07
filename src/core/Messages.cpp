@@ -206,10 +206,10 @@ const MsgEntry kMessages[] = {
      "dizi sinirlari disinda erisim: ispatlanan indeks araligi {0}, dizi "
      "siniri [0, {1}) disinda"},
     // CoverageIncomplete
-    {"[CodeSkeptic] analysis coverage: {0} function(s) hit the iteration cap "
-     "and were not fully analyzed; their findings may be incomplete:",
-     "[CodeSkeptic] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
-     "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
+    {"[CodeSkeptic] analysis coverage: dataflow could not complete for {0} "
+     "function(s); their findings may be incomplete:",
+     "[CodeSkeptic] analiz kapsami: {0} fonksiyon icin veri akisi "
+     "tamamlanamadi; bu fonksiyonlardaki bulgular eksik olabilir:"},
     // BrokenTuSkipped
     {"[CodeSkeptic] {0} translation unit(s) failed to COMPILE and were "
      "skipped - findings from an error-recovery AST are unreliable. Fix "
@@ -277,6 +277,11 @@ const MsgEntry kMessages[] = {
      "olasi tahsis-boyutu tasmasi: guvenilmeyen bir uzunluk bu isaretsiz "
      "'{0}' boyut hesabini kucuk bir degere sarabilir ve tamponu kucuk "
      "yapar - boyutu hesaplamadan once uzunlugu sinirlayin"},
+    // VerdictUnavailable
+    {"[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was "
+     "incomplete or an artifact could not be written (exit 2).",
+     "[CodeSkeptic] KARAR URETILEMEDI: istenen analiz kaniti eksik kaldi "
+     "veya bir cikti yazilamadi (cikis 2)."},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
