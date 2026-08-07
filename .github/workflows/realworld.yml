@@ -59,6 +59,7 @@ jobs:
             libgit2-1.9.0/build/compile_commands.json \
             | sort -u > libgit2.files
           test -s libgit2.files
+          tus=$(wc -l < libgit2.files)
           code=0
           ./build/src/codeskeptic --files libgit2.files \
             --build-path libgit2-1.9.0/build \
@@ -67,8 +68,9 @@ jobs:
             --report-paths "$PWD/libgit2-1.9.0/src" \
             2>&1 | tee libgit2-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' libgit2-scan.log || true)
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 findings=$n exit=$code" >> results.txt
+          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 tus=$tus findings=$n exit=$code"
+          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 tus=$tus findings=$n exit=$code" >> results.txt
+          test "$tus" -eq 167
           test "$code" -eq 1
           test "$n" -eq 34
 
@@ -92,16 +94,18 @@ jobs:
             rtp2httpd/build/compile_commands.json \
             | sort -u > rtp2httpd.files
           test -s rtp2httpd.files
+          tus=$(wc -l < rtp2httpd.files)
           code=0
           ./build/src/codeskeptic --files rtp2httpd.files \
             --build-path rtp2httpd/build \
             --report-paths "$PWD/rtp2httpd/src" \
             2>&1 | tee rtp2httpd-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log || true)
-          echo "REALWORLD_RESULT project=rtp2httpd findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 findings=$n exit=$code" >> results.txt
-          test "$code" -eq 0
-          test "$n" -eq 0
+          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 tus=$tus findings=$n exit=$code"
+          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 tus=$tus findings=$n exit=$code" >> results.txt
+          test "$tus" -eq 38
+          test "$code" -eq 1
+          test "$n" -eq 6
 
       - name: Deep corpus (abseil) for good measure
         run: |

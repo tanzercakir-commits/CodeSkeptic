@@ -47,6 +47,23 @@ through environment variables rather than interpolated into shell source;
 `extra-args` is split as data without evaluating command substitutions. An
 invalid gate can no longer fall through to a green report-only run.
 
+The first real-world replay proved why the verdict distinction matters. The
+old lane swallowed analyzer exit 2, counted only emitted diagnostics and
+reported success even though 16 libgit2 TUs and 3 rtp2httpd TUs had failed to
+compile. The lane now builds both projects, analyzes only the translation units
+in their real compilation databases, and pins both that surface and the result:
+libgit2 v1.9.0 is complete at 167 TUs / 34 findings; rtp2httpd at the recorded
+campaign revision `a7a1e568` is complete at 38 TUs / 6 findings. Any unavailable
+verdict, surface drift or count drift is red.
+
+The rtp2httpd zero in the historical table belonged to the 2026-07 engine, not
+the current rule set. Re-triage of the six current findings found four
+actionable reports across three roots (unchecked allocation, two verbosity
+range sites and negative RTSP Content-Length arithmetic) and two context FPs
+(the required-argument getopt contract and a cast followed by a bounding
+check). README now shows the historical and current measurements separately
+instead of letting a stale zero look contemporary.
+
 ## 2026-08-01 — corpus: name the surface the pinned count belongs to
 
 The libarchive round ended by asking "132/132 of what?" and answering it
