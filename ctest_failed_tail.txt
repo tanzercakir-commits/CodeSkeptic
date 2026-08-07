@@ -1,0 +1,339 @@
+PolicyRuleTest.MachineProposedActivation_IsWarning ......................   Passed    0.02 sec
+        Start 675: SidecarTest.ParseText_EntriesAndIssues
+675/841 Test #675: SidecarTest.ParseText_EntriesAndIssues ..................................   Passed    0.02 sec
+        Start 676: SidecarTest.RequiresFromSidecar_CallSiteViolation
+676/841 Test #676: SidecarTest.RequiresFromSidecar_CallSiteViolation .......................   Passed    0.02 sec
+        Start 677: SidecarTest.EnsuresFromSidecar_ViolationPointsAtCskFile
+677/841 Test #677: SidecarTest.EnsuresFromSidecar_ViolationPointsAtCskFile .................   Passed    0.02 sec
+        Start 678: SidecarTest.ArityAnchor_Binds
+678/841 Test #678: SidecarTest.ArityAnchor_Binds ...........................................   Passed    0.02 sec
+        Start 679: SidecarTest.MalformedLines_AreContractSyntaxErrors
+679/841 Test #679: SidecarTest.MalformedLines_AreContractSyntaxErrors ......................   Passed    0.02 sec
+        Start 680: SidecarTest.NoSidecarFile_NoEffect
+680/841 Test #680: SidecarTest.NoSidecarFile_NoEffect ......................................   Passed    0.02 sec
+        Start 681: GuardContractTest.AssertGuard_NullLiteral_IsError
+681/841 Test #681: GuardContractTest.AssertGuard_NullLiteral_IsError .......................   Passed    0.02 sec
+        Start 682: GuardContractTest.CheckMacroShape_IdentityWrapper_IsError
+682/841 Test #682: GuardContractTest.CheckMacroShape_IdentityWrapper_IsError ...............   Passed    0.02 sec
+        Start 683: GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque
+683/841 Test #683: GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque ........   Passed    0.02 sec
+        Start 684: GuardContractTest.CheckMacroShape_VariableConjunct_StillBails
+684/841 Test #684: GuardContractTest.CheckMacroShape_VariableConjunct_StillBails ...........   Passed    0.02 sec
+        Start 685: GuardContractTest.TransitiveNoreturn_BodyNeverReturns_IsError
+685/841 Test #685: GuardContractTest.TransitiveNoreturn_BodyNeverReturns_IsError ...........   Passed    0.02 sec
+        Start 686: GuardContractTest.TransitiveNoreturn_BodyReturns_NotAGuard
+686/841 Test #686: GuardContractTest.TransitiveNoreturn_BodyReturns_NotAGuard ..............   Passed    0.02 sec
+        Start 687: GuardContractTest.SameLine_DifferentCallees_BothReported
+687/841 Test #687: GuardContractTest.SameLine_DifferentCallees_BothReported ................   Passed    0.02 sec
+        Start 688: GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning
+688/841 Test #688: GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning .........   Passed    0.02 sec
+        Start 689: GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract
+689/841 Test #689: GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract ........   Passed    0.02 sec
+        Start 690: GuardContractTest.WorkThenReturnGuard_NotAContract
+690/841 Test #690: GuardContractTest.WorkThenReturnGuard_NotAContract ......................   Passed    0.02 sec
+        Start 691: GuardContractTest.DefinitelyNullVariable_Reported
+691/841 Test #691: GuardContractTest.DefinitelyNullVariable_Reported .......................   Passed    0.02 sec
+        Start 692: GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly
+692/841 Test #692: GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly ..................   Passed    0.02 sec
+        Start 693: GuardContractTest.CompoundGuard_SkippedInV1
+693/841 Test #693: GuardContractTest.CompoundGuard_SkippedInV1 .............................   Passed    0.02 sec
+        Start 694: GuardContractTest.GuardAfterWork_NotAnEntryGuard
+694/841 Test #694: GuardContractTest.GuardAfterWork_NotAnEntryGuard ........................   Passed    0.02 sec
+        Start 695: GuardContractTest.DeclaredContractOwnsTheParam_NoDoubleReport
+695/841 Test #695: GuardContractTest.DeclaredContractOwnsTheParam_NoDoubleReport ...........   Passed    0.02 sec
+        Start 696: GuardContractTest.CallerWithNoPointerLocals_StillChecked
+696/841 Test #696: GuardContractTest.CallerWithNoPointerLocals_StillChecked ................   Passed    0.02 sec
+        Start 697: BestCaseTest.GotoFailCleanup_Clean
+697/841 Test #697: BestCaseTest.GotoFailCleanup_Clean ......................................   Passed    0.03 sec
+        Start 698: BestCaseTest.TernaryGuardDivision_Clean
+698/841 Test #698: BestCaseTest.TernaryGuardDivision_Clean .................................   Passed    0.02 sec
+        Start 699: BestCaseTest.TernaryGuardNullDeref_Clean
+699/841 Test #699: BestCaseTest.TernaryGuardNullDeref_Clean ................................   Passed    0.02 sec
+        Start 700: BestCaseTest.BreakEdgeGuard_Clean
+700/841 Test #700: BestCaseTest.BreakEdgeGuard_Clean .......................................   Passed    0.02 sec
+        Start 701: BestCaseTest.ContinueGuard_Clean
+701/841 Test #701: BestCaseTest.ContinueGuard_Clean ........................................   Passed    0.02 sec
+        Start 702: BestCaseTest.CommaOperatorOrdering_Clean
+702/841 Test #702: BestCaseTest.CommaOperatorOrdering_Clean ................................   Passed    0.02 sec
+        Start 703: WorstCaseTest.DeepNesting_OnePathInits
+703/841 Test #703: WorstCaseTest.DeepNesting_OnePathInits ..................................   Passed    0.02 sec
+        Start 704: WorstCaseTest.WideProductLattice_AllLeaksFound
+704/841 Test #704: WorstCaseTest.WideProductLattice_AllLeaksFound ..........................   Passed    0.02 sec
+        Start 705: WorstCaseTest.LongElseIfChain_OneArmZero
+705/841 Test #705: WorstCaseTest.LongElseIfChain_OneArmZero ................................   Passed    0.02 sec
+        Start 706: WorstCaseTest.NestedLoopConditionalFree
+706/841 Test #706: WorstCaseTest.NestedLoopConditionalFree .................................   Passed    0.02 sec
+        Start 707: WorstCaseTest.NestedLoopConditionalFree_MutatedConds
+707/841 Test #707: WorstCaseTest.NestedLoopConditionalFree_MutatedConds ....................   Passed    0.02 sec
+        Start 708: WorstCaseTest.DoWhileFirstIteration_UninitDeref
+708/841 Test #708: WorstCaseTest.DoWhileFirstIteration_UninitDeref .........................   Passed    0.02 sec
+        Start 709: WorstCaseTest.GotoBackwardLoop
+709/841 Test #709: WorstCaseTest.GotoBackwardLoop ..........................................   Passed    0.02 sec
+        Start 710: WorstCaseTest.SwitchWithoutDefault_MaybeUninit
+710/841 Test #710: WorstCaseTest.SwitchWithoutDefault_MaybeUninit ..........................   Passed    0.03 sec
+        Start 711: TraceTest.UseAfterFree_HasAllocAndFreeNotes
+711/841 Test #711: TraceTest.UseAfterFree_HasAllocAndFreeNotes .............................   Passed    0.03 sec
+        Start 712: TraceTest.ExitLeak_HasAllocNote
+712/841 Test #712: TraceTest.ExitLeak_HasAllocNote .........................................   Passed    0.02 sec
+        Start 713: TraceTest.NullDeref_HasAssignedNullNote
+713/841 Test #713: TraceTest.NullDeref_HasAssignedNullNote .................................   Passed    0.02 sec
+        Start 714: TraceTest.DivByZero_HasAssignedZeroNote
+714/841 Test #714: TraceTest.DivByZero_HasAssignedZeroNote .................................   Passed    0.02 sec
+        Start 715: TraceTest.UninitPtr_HasDeclaredNote
+715/841 Test #715: TraceTest.UninitPtr_HasDeclaredNote .....................................   Passed    0.02 sec
+        Start 716: FunctionFilterTest.EmptyFilter_AnalyzesAll
+716/841 Test #716: FunctionFilterTest.EmptyFilter_AnalyzesAll ..............................   Passed    0.02 sec
+        Start 717: FunctionFilterTest.FilterSelectsSingleFunction
+717/841 Test #717: FunctionFilterTest.FilterSelectsSingleFunction ..........................   Passed    0.02 sec
+        Start 718: FunctionFilterTest.FilterWithUnknownName_AnalyzesNothing
+718/841 Test #718: FunctionFilterTest.FilterWithUnknownName_AnalyzesNothing ................   Passed    0.02 sec
+        Start 719: FunctionFilterTest.QualifiedNameMatchesMethod
+719/841 Test #719: FunctionFilterTest.QualifiedNameMatchesMethod ...........................   Passed    0.02 sec
+        Start 720: LineFilterTest.EmptyRanges_AnalyzesAll
+720/841 Test #720: LineFilterTest.EmptyRanges_AnalyzesAll ..................................   Passed    0.02 sec
+        Start 721: LineFilterTest.RangeSelectsSecondFunction
+721/841 Test #721: LineFilterTest.RangeSelectsSecondFunction ...............................   Passed    0.02 sec
+        Start 722: LineFilterTest.SingleLineOnSignature_Overlaps
+722/841 Test #722: LineFilterTest.SingleLineOnSignature_Overlaps ...........................   Passed    0.02 sec
+        Start 723: LineFilterTest.RangeBetweenFunctions_Nothing
+723/841 Test #723: LineFilterTest.RangeBetweenFunctions_Nothing ............................   Passed    0.02 sec
+        Start 724: ReportPathsTest.CommaListSplitsAndTrims
+724/841 Test #724: ReportPathsTest.CommaListSplitsAndTrims .................................   Passed    0.02 sec
+        Start 725: ReportPathsTest.InteriorSpacesPreserved
+725/841 Test #725: ReportPathsTest.InteriorSpacesPreserved .................................   Passed    0.02 sec
+        Start 726: ReportPathsTest.EmptyTokensDropped
+726/841 Test #726: ReportPathsTest.EmptyTokensDropped ......................................   Passed    0.02 sec
+        Start 727: ReportPathsTest.DefaultIsEmpty_NoFiltering
+727/841 Test #727: ReportPathsTest.DefaultIsEmpty_NoFiltering ..............................   Passed    0.02 sec
+        Start 728: ReportPathsTest.CliFlagParsed
+728/841 Test #728: ReportPathsTest.CliFlagParsed ...........................................   Passed    0.02 sec
+        Start 729: BrokenTuTest.BrokenTuIsSkippedAndRecorded
+729/841 Test #729: BrokenTuTest.BrokenTuIsSkippedAndRecorded ...............................   Passed    0.02 sec
+        Start 730: BrokenTuTest.AnalyzeBrokenTUsOverride
+730/841 Test #730: BrokenTuTest.AnalyzeBrokenTUsOverride ...................................   Passed    0.03 sec
+        Start 731: BrokenTuTest.CleanTuStillAnalyzed
+731/841 Test #731: BrokenTuTest.CleanTuStillAnalyzed .......................................   Passed    0.02 sec
+        Start 732: BrokenTuTest.ConfigFlagParsed
+732/841 Test #732: BrokenTuTest.ConfigFlagParsed ...........................................   Passed    0.02 sec
+        Start 733: McpServerTest.Initialize
+733/841 Test #733: McpServerTest.Initialize ................................................   Passed    0.02 sec
+        Start 734: McpServerTest.NotificationGetsNoResponse
+734/841 Test #734: McpServerTest.NotificationGetsNoResponse ................................   Passed    0.02 sec
+        Start 735: McpServerTest.Ping
+735/841 Test #735: McpServerTest.Ping ......................................................   Passed    0.02 sec
+        Start 736: McpServerTest.ToolsListContainsAnalyze
+736/841 Test #736: McpServerTest.ToolsListContainsAnalyze ..................................   Passed    0.02 sec
+        Start 737: McpServerTest.UnknownMethod_Error
+737/841 Test #737: McpServerTest.UnknownMethod_Error .......................................   Passed    0.02 sec
+        Start 738: McpServerTest.ParseError
+738/841 Test #738: McpServerTest.ParseError ................................................   Passed    0.02 sec
+        Start 739: McpServerTest.AnalyzeCallReturnsFindingsWithTrace
+739/841 Test #739: McpServerTest.AnalyzeCallReturnsFindingsWithTrace .......................   Passed    0.02 sec
+        Start 740: McpServerTest.AnalyzeWithFunctionScope
+740/841 Test #740: McpServerTest.AnalyzeWithFunctionScope ..................................   Passed    0.03 sec
+        Start 741: McpServerTest.FilterStateResetAfterScopedAnalyze
+741/841 Test #741: McpServerTest.FilterStateResetAfterScopedAnalyze ........................   Passed    0.02 sec
+        Start 742: McpServerTest.WarmCache_SecondCallHits
+742/841 Test #742: McpServerTest.WarmCache_SecondCallHits ..................................   Passed    0.03 sec
+        Start 743: McpServerTest.WarmCache_InvalidatedOnChange
+743/841 Test #743: McpServerTest.WarmCache_InvalidatedOnChange .............................   Passed    0.03 sec
+        Start 744: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
+744/841 Test #744: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge ...................   Passed    0.03 sec
+        Start 745: McpServerTest.ToolsListMentionsSummaries
+745/841 Test #745: McpServerTest.ToolsListMentionsSummaries ................................   Passed    0.02 sec
+        Start 746: McpServerTest.AnalyzeMissingPath_Error
+746/841 Test #746: McpServerTest.AnalyzeMissingPath_Error ..................................   Passed    0.02 sec
+        Start 747: McpServerTest.AnalyzeRejectsUnknownOrWrongTypedFields
+747/841 Test #747: McpServerTest.AnalyzeRejectsUnknownOrWrongTypedFields ...................   Passed    0.02 sec
+        Start 748: McpServerTest.BrokenTuReturnsFailedVerdictAndCoverage
+748/841 Test #748: McpServerTest.BrokenTuReturnsFailedVerdictAndCoverage ...................   Passed    0.03 sec
+        Start 749: McpServerTest.MissingSummaryReturnsIncompleteEvidence
+749/841 Test #749: McpServerTest.MissingSummaryReturnsIncompleteEvidence ...................   Passed    0.02 sec
+        Start 750: McpServerTest.UnknownTool_Error
+750/841 Test #750: McpServerTest.UnknownTool_Error .........................................   Passed    0.02 sec
+        Start 751: McpServerTest.ToolsListContainsIdiomParams
+751/841 Test #751: McpServerTest.ToolsListContainsIdiomParams ..............................   Passed    0.02 sec
+        Start 752: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
+752/841 Test #752: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall ...........   Passed    0.03 sec
+        Start 753: McpServerTest.AllocFunctions_ExtendLeakTracking
+753/841 Test #753: McpServerTest.AllocFunctions_ExtendLeakTracking .........................   Passed    0.03 sec
+        Start 754: InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning
+754/841 Test #754: InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning ................   Passed    0.03 sec
+        Start 755: InterprocNullTest.MaybeNullReturn_Guarded_Clean
+755/841 Test #755: InterprocNullTest.MaybeNullReturn_Guarded_Clean .........................   Passed    0.03 sec
+        Start 756: InterprocNullTest.NeverNullChain_Clean
+756/841 Test #756: InterprocNullTest.NeverNullChain_Clean ..................................   Passed    0.02 sec
+        Start 757: InterprocNullTest.MaybeNullChain_TwoLevels_Warning
+757/841 Test #757: InterprocNullTest.MaybeNullChain_TwoLevels_Warning ......................   Passed    0.02 sec
+        Start 758: InterprocNullTest.RecursiveReturn_StaysUnknown_Silent
+758/841 Test #758: InterprocNullTest.RecursiveReturn_StaysUnknown_Silent ...................   Passed    0.02 sec
+        Start 759: InterprocNullTest.VariableReturn_Unknown_Silent
+759/841 Test #759: InterprocNullTest.VariableReturn_Unknown_Silent .........................   Passed    0.02 sec
+        Start 760: InterprocLeakTest.FreeWrapper_DoubleFree_Error
+760/841 Test #760: InterprocLeakTest.FreeWrapper_DoubleFree_Error ..........................   Passed    0.02 sec
+        Start 761: InterprocLeakTest.GuardedFreeWrapper_StillFrees
+761/841 Test #761: InterprocLeakTest.GuardedFreeWrapper_StillFrees .........................   Passed    0.02 sec
+        Start 762: InterprocLeakTest.FreeWrapperChain_TwoLevels
+762/841 Test #762: InterprocLeakTest.FreeWrapperChain_TwoLevels ............................   Passed    0.02 sec
+        Start 763: InterprocLeakTest.ReadOnlyCallee_LeakVisible
+763/841 Test #763: InterprocLeakTest.ReadOnlyCallee_LeakVisible ............................   Passed    0.02 sec
+        Start 764: InterprocLeakTest.StoringCallee_NoLeakReport
+764/841 Test #764: InterprocLeakTest.StoringCallee_NoLeakReport ............................   Passed    0.02 sec
+        Start 765: InterprocLeakTest.AliasingCallee_NowFrees_DoubleFree
+765/841 Test #765: InterprocLeakTest.AliasingCallee_NowFrees_DoubleFree ....................   Passed    0.02 sec
+        Start 766: InterprocLeakTest.ExternalCallee_StillEscapes
+766/841 Test #766: InterprocLeakTest.ExternalCallee_StillEscapes ...........................   Passed    0.02 sec
+        Start 767: InterprocLeakTest.MutualRecursionParam_Conservative_Silent
+767/841 Test #767: InterprocLeakTest.MutualRecursionParam_Conservative_Silent ..............   Passed    0.02 sec
+        Start 768: InterprocLeakTest.DeleteWrapper_UAF
+768/841 Test #768: InterprocLeakTest.DeleteWrapper_UAF .....................................   Passed    0.02 sec
+        Start 769: InterprocAliasTest.CursorLoopWalk_RealCJSONDeleteShape
+769/841 Test #769: InterprocAliasTest.CursorLoopWalk_RealCJSONDeleteShape ..................   Passed    0.03 sec
+        Start 770: InterprocAliasTest.AliasChain_TwoHops_Frees
+770/841 Test #770: InterprocAliasTest.AliasChain_TwoHops_Frees .............................   Passed    0.02 sec
+        Start 771: InterprocAliasTest.TaintedAlias_ImpureSource_Conservative
+771/841 Test #771: InterprocAliasTest.TaintedAlias_ImpureSource_Conservative ...............   Passed    0.02 sec
+        Start 772: InterprocAliasTest.MultiParamAlias_Conservative
+772/841 Test #772: InterprocAliasTest.MultiParamAlias_Conservative .........................   Passed    0.02 sec
+        Start 773: InterprocAliasTest.AliasStoredToGlobal_Stores
+773/841 Test #773: InterprocAliasTest.AliasStoredToGlobal_Stores ...........................   Passed    0.02 sec
+        Start 774: InterprocAliasTest.AliasReturned_Stores
+774/841 Test #774: InterprocAliasTest.AliasReturned_Stores .................................   Passed    0.02 sec
+        Start 775: InterprocAliasTest.AddressTakenAlias_Conservative
+775/841 Test #775: InterprocAliasTest.AddressTakenAlias_Conservative .......................   Passed    0.03 sec
+        Start 776: InterprocAliasTest.ReadOnlyThroughAlias_LeakVisible
+776/841 Test #776: InterprocAliasTest.ReadOnlyThroughAlias_LeakVisible .....................   Passed    0.02 sec
+        Start 777: CrossTUTest.MaybeNullReturn_AcrossTU_Warning
+777/841 Test #777: CrossTUTest.MaybeNullReturn_AcrossTU_Warning ............................   Passed    0.03 sec
+        Start 778: CrossTUTest.FreeWrapper_AcrossTU_DoubleFree
+778/841 Test #778: CrossTUTest.FreeWrapper_AcrossTU_DoubleFree .............................   Passed    0.03 sec
+        Start 779: CrossTUTest.ReadsOnlyCallee_AcrossTU_LeakVisible
+779/841 Test #779: CrossTUTest.ReadsOnlyCallee_AcrossTU_LeakVisible ........................   Passed    0.03 sec
+        Start 780: CrossTUTest.StaticCallee_NotShared
+780/841 Test #780: CrossTUTest.StaticCallee_NotShared ......................................   Passed    0.03 sec
+        Start 781: CrossTUTest.WithoutHarvest_StaysConservative
+781/841 Test #781: CrossTUTest.WithoutHarvest_StaysConservative ............................   Passed    0.02 sec
+        Start 782: ReturnFlowTest.InitNullThenSet_NeverNull_Silent
+782/841 Test #782: ReturnFlowTest.InitNullThenSet_NeverNull_Silent .........................   Passed    0.02 sec
+        Start 783: ReturnFlowTest.MaybeNullVarFlow_Warning
+783/841 Test #783: ReturnFlowTest.MaybeNullVarFlow_Warning .................................   Passed    0.02 sec
+        Start 784: ReturnFlowTest.GuardedFallthrough_NeverNull_Silent
+784/841 Test #784: ReturnFlowTest.GuardedFallthrough_NeverNull_Silent ......................   Passed    0.02 sec
+        Start 785: ReturnFlowTest.DefiniteNullVar_Warning
+785/841 Test #785: ReturnFlowTest.DefiniteNullVar_Warning ..................................   Passed    0.02 sec
+        Start 786: ReturnFlowTest.ParamPassthrough_StaysUnknown_Silent
+786/841 Test #786: ReturnFlowTest.ParamPassthrough_StaysUnknown_Silent .....................   Passed    0.02 sec
+        Start 787: ReturnFlowTest.ChainThroughVariable_Warning
+787/841 Test #787: ReturnFlowTest.ChainThroughVariable_Warning .............................   Passed    0.02 sec
+        Start 788: ReturnFlowTest.JulietBadSourceShape_ParamReassignedNull_Warning
+788/841 Test #788: ReturnFlowTest.JulietBadSourceShape_ParamReassignedNull_Warning .........   Passed    0.02 sec
+        Start 789: ReturnFlowTest.CrossTU_VarFlowMaybeNull_Warning
+789/841 Test #789: ReturnFlowTest.CrossTU_VarFlowMaybeNull_Warning .........................   Passed    0.03 sec
+        Start 790: SummaryPersistTest.FileFormat_RoundTripDeterministic
+790/841 Test #790: SummaryPersistTest.FileFormat_RoundTripDeterministic ....................   Passed    0.02 sec
+        Start 791: SummaryPersistTest.OldV1File_AcceptedZeronessUnknown
+791/841 Test #791: SummaryPersistTest.OldV1File_AcceptedZeronessUnknown ....................   Passed    0.02 sec
+        Start 792: SummaryPersistTest.ConflictingLoad_MergesConservative
+792/841 Test #792: SummaryPersistTest.ConflictingLoad_MergesConservative ...................   Passed    0.02 sec
+        Start 793: SummaryPersistTest.CorruptFile_RejectedWhole
+793/841 Test #793: SummaryPersistTest.CorruptFile_RejectedWhole ............................   Passed    0.03 sec
+        Start 794: SummaryPersistTest.MissingFile_ReturnsFalse
+794/841 Test #794: SummaryPersistTest.MissingFile_ReturnsFalse .............................   Passed    0.03 sec
+        Start 795: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding
+795/841 Test #795: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding .............   Passed    0.03 sec
+        Start 796: SummaryPersistTest.StaleSummary_WarnsButStillWorks
+796/841 Test #796: SummaryPersistTest.StaleSummary_WarnsButStillWorks ......................   Passed    0.03 sec
+        Start 797: SummaryPersistTest.V4File_ZeroFromParamParses
+797/841 Test #797: SummaryPersistTest.V4File_ZeroFromParamParses ...........................   Passed    0.02 sec
+        Start 798: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected
+798/841 Test #798: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected ............   Passed    0.02 sec
+        Start 799: SummaryPersistTest.V3File_NullCondStillParses
+799/841 Test #799: SummaryPersistTest.V3File_NullCondStillParses ...........................   Passed    0.02 sec
+        Start 800: SummaryPersistTest.V5File_NullFromParamParses
+800/841 Test #800: SummaryPersistTest.V5File_NullFromParamParses ...........................   Passed    0.02 sec
+        Start 801: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected
+801/841 Test #801: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected ............   Passed    0.02 sec
+        Start 802: SummaryPersistTest.V4File_ZeroFromParamStillParses
+802/841 Test #802: SummaryPersistTest.V4File_ZeroFromParamStillParses ......................   Passed    0.02 sec
+        Start 803: InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning
+803/841 Test #803: InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning .................   Passed    0.02 sec
+        Start 804: InterprocZeroTest.JulietShape_VarFlowSource_Warning
+804/841 Test #804: InterprocZeroTest.JulietShape_VarFlowSource_Warning .....................   Passed    0.02 sec
+        Start 805: InterprocZeroTest.GuardedUse_Silent
+805/841 Test #805: InterprocZeroTest.GuardedUse_Silent .....................................   Passed    0.02 sec
+        Start 806: InterprocZeroTest.FlowKilledZero_NeverZero_Silent
+806/841 Test #806: InterprocZeroTest.FlowKilledZero_NeverZero_Silent .......................   Passed    0.02 sec
+        Start 807: InterprocZeroTest.DirectCallDivisor_DocumentedSilent
+807/841 Test #807: InterprocZeroTest.DirectCallDivisor_DocumentedSilent ....................   Passed    0.02 sec
+        Start 808: InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero
+808/841 Test #808: InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero .................   Passed    0.02 sec
+        Start 809: InterprocZeroTest.CrossTU_ZeronessTravels
+809/841 Test #809: InterprocZeroTest.CrossTU_ZeronessTravels ...............................   Passed    0.03 sec
+        Start 810: ConditionedNullTest.SwitchDefault_MaskedArg_Clean
+810/841 Test #810: ConditionedNullTest.SwitchDefault_MaskedArg_Clean .......................   Passed    0.02 sec
+        Start 811: ConditionedNullTest.SwitchDefault_InlineArg_Clean
+811/841 Test #811: ConditionedNullTest.SwitchDefault_InlineArg_Clean .......................   Passed    0.02 sec
+        Start 812: ConditionedNullTest.SwitchDefault_UnprovableArg_WarningStays
+812/841 Test #812: ConditionedNullTest.SwitchDefault_UnprovableArg_WarningStays ............   Passed    0.02 sec
+        Start 813: ConditionedNullTest.SwitchDefault_OutOfRangeArg_WarningStays
+813/841 Test #813: ConditionedNullTest.SwitchDefault_OutOfRangeArg_WarningStays ............   Passed    0.02 sec
+        Start 814: ConditionedNullTest.NonContiguousCases_WarningStays
+814/841 Test #814: ConditionedNullTest.NonContiguousCases_WarningStays .....................   Passed    0.02 sec
+        Start 815: ConditionedNullTest.CaseFallsThroughToDefault_WarningStays
+815/841 Test #815: ConditionedNullTest.CaseFallsThroughToDefault_WarningStays ..............   Passed    0.02 sec
+        Start 816: ConditionedNullTest.IfGuard_ProvableArg_Clean
+816/841 Test #816: ConditionedNullTest.IfGuard_ProvableArg_Clean ...........................   Passed    0.02 sec
+        Start 817: ConditionedNullTest.MutatedParam_WarningStays
+817/841 Test #817: ConditionedNullTest.MutatedParam_WarningStays ...........................   Passed    0.02 sec
+        Start 818: ConditionedNullTest.ArgReassignedLocal_WarningStays
+818/841 Test #818: ConditionedNullTest.ArgReassignedLocal_WarningStays .....................   Passed    0.02 sec
+        Start 819: ConditionedNullTest.CrossTU_ConditionTravels
+819/841 Test #819: ConditionedNullTest.CrossTU_ConditionTravels ............................   Passed    0.02 sec
+        Start 820: ConditionedNullTest.V3FileRoundtrip
+820/841 Test #820: ConditionedNullTest.V3FileRoundtrip .....................................   Passed    0.02 sec
+        Start 821: MacSdkPathTest.EnvSdkrootWinsVerbatim
+821/841 Test #821: MacSdkPathTest.EnvSdkrootWinsVerbatim ...................................   Passed    0.02 sec
+        Start 822: MacSdkPathTest.EnvHonoredEvenWhenMissing
+822/841 Test #822: MacSdkPathTest.EnvHonoredEvenWhenMissing ................................   Passed    0.02 sec
+        Start 823: MacSdkPathTest.XcrunUsedWhenItExists
+823/841 Test #823: MacSdkPathTest.XcrunUsedWhenItExists ....................................   Passed    0.02 sec
+        Start 824: MacSdkPathTest.MissingXcrunFallsThroughToBaked
+824/841 Test #824: MacSdkPathTest.MissingXcrunFallsThroughToBaked ..........................   Passed    0.02 sec
+        Start 825: MacSdkPathTest.BakedOnlyIfItExists
+825/841 Test #825: MacSdkPathTest.BakedOnlyIfItExists ......................................   Passed    0.02 sec
+        Start 826: MacSdkPathTest.AllMissingYieldsEmpty
+826/841 Test #826: MacSdkPathTest.AllMissingYieldsEmpty ....................................   Passed    0.02 sec
+        Start 827: ExitPolicyTest.CleanRunIsZero
+827/841 Test #827: ExitPolicyTest.CleanRunIsZero ...........................................   Passed    0.02 sec
+        Start 828: ExitPolicyTest.FindingsAreOne
+828/841 Test #828: ExitPolicyTest.FindingsAreOne ...........................................   Passed    0.02 sec
+        Start 829: ExitPolicyTest.AllBrokenIsTwo
+829/841 Test #829: ExitPolicyTest.AllBrokenIsTwo ...........................................   Passed    0.02 sec
+        Start 830: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict
+830/841 Test #830: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict ...................   Passed    0.02 sec
+        Start 831: ExitPolicyTest.ForcedAnalysisKeepsOldBehavior
+831/841 Test #831: ExitPolicyTest.ForcedAnalysisKeepsOldBehavior ...........................   Passed    0.02 sec
+        Start 832: ExitPolicyTest.NoInputsIsTwo
+832/841 Test #832: ExitPolicyTest.NoInputsIsTwo ............................................   Passed    0.02 sec
+        Start 833: ResourceDirTest.OverrideWinsWhenItExists
+833/841 Test #833: ResourceDirTest.OverrideWinsWhenItExists ................................   Passed    0.02 sec
+        Start 834: ResourceDirTest.MissingOverrideFallsThrough
+834/841 Test #834: ResourceDirTest.MissingOverrideFallsThrough .............................   Passed    0.02 sec
+        Start 835: ResourceDirTest.ExeRelativeLayoutIsFound
+835/841 Test #835: ResourceDirTest.ExeRelativeLayoutIsFound ................................   Passed    0.02 sec
+        Start 836: ResourceDirTest.HighestVersionWins
+836/841 Test #836: ResourceDirTest.HighestVersionWins ......................................   Passed    0.02 sec
+        Start 837: ResourceDirTest.VersionDirWithoutHeadersIsSkipped
+837/841 Test #837: ResourceDirTest.VersionDirWithoutHeadersIsSkipped .......................   Passed    0.02 sec
+        Start 838: ResourceDirTest.ExeRelativeBeatsBaked
+838/841 Test #838: ResourceDirTest.ExeRelativeBeatsBaked ...................................   Passed    0.02 sec
+        Start 839: ResourceDirTest.BakedIsLastResortOnlyIfItExists
+839/841 Test #839: ResourceDirTest.BakedIsLastResortOnlyIfItExists .........................   Passed    0.02 sec
+        Start 840: ResourceDirTest.AllMissingYieldsEmpty
+840/841 Test #840: ResourceDirTest.AllMissingYieldsEmpty ...................................   Passed    0.02 sec
+        Start 841: ReviewDiffFlow
+841/841 Test #841: ReviewDiffFlow ..........................................................   Passed    1.57 sec
+
+100% tests passed, 0 tests failed out of 841
+
+Total Test time (real) =  22.23 sec
