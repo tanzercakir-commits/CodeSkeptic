@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 138b222
-uçuşta = phase-corpus-surface
+base   = 96e4257
+uçuşta = phase-verdict-integrity-validation
 ```
 <!-- cs:state-end -->
 
