@@ -102,11 +102,41 @@ TEST(HtmlReporterTest, Trace_EmbedsSourceContext) {
 
 TEST(HtmlReporterTest, EmptyReport_ShowsClean) {
     std::string out = ::testing::TempDir() + "report_empty.html";
+    AnalysisResult result;
+    HtmlReporter reporter(out);
+    reporter.report({}, &result);
+
+    std::string html = readWhole(out);
+    EXPECT_NE(html.find("Clean! No issues found."), std::string::npos);
+}
+
+TEST(HtmlReporterTest, MissingVerdictNeverClaimsClean) {
+    std::string out = ::testing::TempDir() + "report_no_verdict.html";
     HtmlReporter reporter(out);
     reporter.report({});
 
     std::string html = readWhole(out);
-    EXPECT_NE(html.find("Clean! No issues found."), std::string::npos);
+    EXPECT_NE(html.find("Verdict: not-recorded"), std::string::npos);
+    EXPECT_NE(html.find("Exit code: not-recorded"), std::string::npos);
+    EXPECT_EQ(html.find("Clean! No issues found."), std::string::npos);
+}
+
+TEST(HtmlReporterTest, IncompleteEmptyReportNeverClaimsClean) {
+    std::string out = ::testing::TempDir() + "report_incomplete.html";
+    AnalysisResult result;
+    result.attempted_tus = 2;
+    result.analyzed_tus = 1;
+    result.broken_tus = 1;
+    result.incomplete_functions = 3;
+
+    HtmlReporter reporter(out);
+    reporter.report({}, &result);
+
+    std::string html = readWhole(out);
+    EXPECT_NE(html.find("Verdict: incomplete"), std::string::npos);
+    EXPECT_NE(html.find("Exit code: 2"), std::string::npos);
+    EXPECT_NE(html.find("TUs: 1 / 2 analyzed"), std::string::npos);
+    EXPECT_EQ(html.find("Clean! No issues found."), std::string::npos);
 }
 
 TEST(HtmlReporterTest, MissingSourceFile_NoContextButNoCrash) {

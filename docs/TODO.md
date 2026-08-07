@@ -12,12 +12,13 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 138b222
-uçuşta = phase-corpus-surface
+base   = 96e4257
+uçuşta = phase-verdict-integrity-validation
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): kilit kullanıcıda.
+Serbest not (insanda kalır): verdict-integrity Faz 0 PR #119'da; son bağımsız
+denetim düzeltmeleri ve kapı kanıtı tamamlanınca merge kilidi kullanıcıda.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 

@@ -1,10 +1,41 @@
 #include "TestHelper.h"
+#include "engine/CoverageReport.h"
 #include "rules/NullDerefRule.h"
 
 #include <gtest/gtest.h>
 
 using namespace codeskeptic;
 using namespace codeskeptic::testing;
+
+TEST(NullDerefRuleTest, DependentTemplatePatternDefersToInstantiation) {
+    auto& coverage = CoverageReport::instance();
+    coverage.clear();
+
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct Range {
+            int* begin();
+            int* end();
+        };
+
+        template <typename T>
+        void inspect(T& range) {
+            int* p = nullptr;
+            for (auto& value : range) (void)value;
+            int value = *p;
+        }
+
+        void instantiate(Range& range) { inspect(range); }
+    )");
+
+    EXPECT_EQ(results.size(), 1u);
+    if (!results.empty()) {
+        EXPECT_EQ(results[0].rule_id, "null-deref");
+        EXPECT_EQ(results[0].function, "inspect");
+    }
+    EXPECT_EQ(coverage.incompleteCount(), 0u);
+    coverage.clear();
+}
 
 // --- Definite null dereference ---
 

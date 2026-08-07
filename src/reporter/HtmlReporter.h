@@ -15,7 +15,8 @@ class HtmlReporter : public Reporter {
 public:
     explicit HtmlReporter(const std::string& output_path);
 
-    void report(const DiagnosticList& diagnostics) override;
+    bool report(const DiagnosticList& diagnostics,
+                const AnalysisResult* result = nullptr) override;
     std::string format() const override;
 
 private:

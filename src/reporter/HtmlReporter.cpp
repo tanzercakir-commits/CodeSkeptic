@@ -153,11 +153,12 @@ namespace codeskeptic {
 HtmlReporter::HtmlReporter(const std::string& output_path)
     : output_path_(output_path) {}
 
-void HtmlReporter::report(const DiagnosticList& diagnostics) {
+bool HtmlReporter::report(const DiagnosticList& diagnostics,
+                          const AnalysisResult* result) {
     std::ofstream file(output_path_);
     if (!file.is_open()) {
         std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
-        return;
+        return false;
     }
 
     // Summary counts
@@ -180,6 +181,19 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
          << "<title>CodeSkeptic Report</title>\n"
          << "<style>" << kStyle << "</style>\n</head>\n<body>\n"
          << "<div class=\"wrap\">\n<header>\n<h1>CodeSkeptic Report</h1>\n"
+         << "<p class=\"sub\">Verdict: "
+         << (result ? result->statusName() : "not-recorded") << "</p>\n"
+         << "<p class=\"sub\">Exit code: "
+         << (result ? std::to_string(result->exitCode()) : "not-recorded")
+         << "</p>\n";
+    if (result) {
+        file << "<p class=\"sub\">TUs: " << result->analyzed_tus << " / "
+             << result->attempted_tus << " analyzed &middot; "
+             << result->broken_tus << " broken &middot; "
+             << result->incomplete_functions
+             << " incomplete function(s)</p>\n";
+    }
+    file
          << "<p class=\"sub\"><span id=\"shown\">" << diagnostics.size()
          << "</span> / " << diagnostics.size()
          << " finding(s) &middot; generated " << stamp << "</p>\n"
@@ -208,7 +222,12 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
             "file, function or message&hellip;\">\n<main>\n";
 
     if (diagnostics.empty()) {
-        file << "<p class=\"empty\">Clean! No issues found.</p>\n";
+        if (result && result->complete()) {
+            file << "<p class=\"empty\">Clean! No issues found.</p>\n";
+        } else {
+            file << "<p class=\"empty\">Verdict unavailable &mdash; no "
+                    "clean result was produced.</p>\n";
+        }
     }
 
     LineCache cache;
@@ -256,6 +275,12 @@ void HtmlReporter::report(const DiagnosticList& diagnostics) {
     file << "</main>\n<footer>CodeSkeptic &middot; self-contained report "
             "&mdash; works offline</footer>\n</div>\n"
          << "<script>" << kScript << "</script>\n</body>\n</html>\n";
+    file.flush();
+    if (!file.good()) {
+        std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
+        return false;
+    }
+    return true;
 }
 
 std::string HtmlReporter::format() const {

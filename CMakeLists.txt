@@ -1,6 +1,54 @@
 cmake_minimum_required(VERSION 3.20)
 project(CodeSkeptic VERSION 0.4.7 LANGUAGES C CXX)
 
+# Release identity is evidence. A build from an exact v<project-version> tag
+# carries the release version; every other checkout is visibly a development
+# build and includes its source commit when git is available. This prevents
+# months of post-release main changes from still claiming to be the old binary.
+set(CODESKEPTIC_VERSION_OVERRIDE "" CACHE STRING
+    "Explicit version identity for source archives/reproducible packagers")
+if(CODESKEPTIC_VERSION_OVERRIDE)
+    set(CODESKEPTIC_VERSION_STRING "${CODESKEPTIC_VERSION_OVERRIDE}")
+else()
+    execute_process(
+        COMMAND git describe --tags --exact-match HEAD
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        RESULT_VARIABLE CODESKEPTIC_TAG_RESULT
+        OUTPUT_VARIABLE CODESKEPTIC_EXACT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(CODESKEPTIC_TAG_RESULT EQUAL 0 AND
+       CODESKEPTIC_EXACT_TAG STREQUAL "v${PROJECT_VERSION}")
+        set(CODESKEPTIC_VERSION_STRING "${PROJECT_VERSION}")
+    else()
+        math(EXPR CODESKEPTIC_NEXT_PATCH "${PROJECT_VERSION_PATCH} + 1")
+        set(CODESKEPTIC_VERSION_STRING
+            "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${CODESKEPTIC_NEXT_PATCH}-dev")
+        execute_process(
+            COMMAND git rev-parse --short=12 HEAD
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            RESULT_VARIABLE CODESKEPTIC_SHA_RESULT
+            OUTPUT_VARIABLE CODESKEPTIC_GIT_SHA
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(CODESKEPTIC_SHA_RESULT EQUAL 0)
+            string(APPEND CODESKEPTIC_VERSION_STRING "+g${CODESKEPTIC_GIT_SHA}")
+            execute_process(
+                COMMAND git diff --quiet --ignore-submodules HEAD
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+                RESULT_VARIABLE CODESKEPTIC_DIRTY_RESULT
+                ERROR_QUIET
+            )
+            if(NOT CODESKEPTIC_DIRTY_RESULT EQUAL 0)
+                string(APPEND CODESKEPTIC_VERSION_STRING ".dirty")
+            endif()
+        endif()
+    endif()
+endif()
+message(STATUS "CodeSkeptic identity: ${CODESKEPTIC_VERSION_STRING}")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

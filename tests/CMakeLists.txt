@@ -12,6 +12,11 @@ FetchContent_MakeAvailable(googletest)
 add_executable(codeskeptic_tests
     TestHelper.cpp
     DiagnosticTest.cpp
+    AnalysisResultTest.cpp
+    CapabilitiesTest.cpp
+    ConfigTest.cpp
+    VerdictIntegrityTest.cpp
+    JsonReporterTest.cpp
     UninitPointerRuleExTest.cpp
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
@@ -68,6 +73,10 @@ gtest_discover_tests(codeskeptic_tests)
 # POSIX. The 620 C++ unit tests above are the portable floor; this
 # flow stays pinned by the Linux/macOS lanes.
 if(NOT WIN32)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME ActionArgsParser
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/ActionArgsTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)

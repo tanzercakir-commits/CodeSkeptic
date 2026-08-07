@@ -137,9 +137,9 @@ the project was tried, before the FP families it exposed were fixed.
 |---------|-------|--------------:|------------------------|
 | [systemd](https://github.com/systemd/systemd) | 494 files (basic/core/shared) | 414 → **53** | 3 deliberate leak-shaped idioms, documented |
 | [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 reported upstream — 2 merged ([#4702](https://github.com/shadps4-emu/shadPS4/pull/4702), [#4703](https://github.com/shadps4-emu/shadPS4/pull/4703))** |
-| [libgit2](https://github.com/libgit2/libgit2) | v1.9.0, 201 files | 149 → **34** | **11 confirmed OOM-path leaks** (one issue class, report drafted); re-validated in CI on every `realworld-scan` run |
+| [libgit2](https://github.com/libgit2/libgit2) | v1.9.0, 201-file historical scan; 167 built Linux TUs in CI | 149 → **34** | **11 confirmed OOM-path leaks** (one issue class, report drafted); re-validated in CI on every `realworld-scan` run |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | full build | 511 → **25** | triage in progress |
-| [rtp2httpd](https://github.com/stackia/rtp2httpd) | 39 files | 12 → **0** | **1 NULL-contract bug reported** (upstream has since moved); the v0.4.3 FP round closed every remaining family, CI-verified |
+| [rtp2httpd](https://github.com/stackia/rtp2httpd) | 39-file historical scan; pinned `a7a1e568`, 38 built Linux TUs in CI | 12 → **0** (2026-07 engine); **6 current** | Historical NULL-contract report; current triage: **4 actionable findings across 3 root causes, 2 context FPs** |
 | [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **0** | clean (with `--fatal-asserts SwAssert` declaring F´'s assert handler) |
 | [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
@@ -156,6 +156,18 @@ null `FILE*` on the next line
 bugs, found from a compilation database, accepted by the people who
 own the code. How these numbers are kept honest — idiom configuration
 and the FP-family process — is in [docs/benchmarks.md](docs/benchmarks.md#reading-the-real-world-scan-numbers).
+
+The 2026-08-07 fail-closed replay deliberately keeps the historical
+`initial → now` measurements separate from the current engine. It scans
+only translation units present in each real compilation database and
+requires a complete verdict. libgit2 reproduced 34 findings across all
+167 built Linux TUs. The pinned rtp2httpd campaign now reports six across
+38/38 TUs: four actionable findings (an unchecked allocation, two sites
+of one verbosity-range bug, and unsafe negative `Content-Length`
+arithmetic) plus two context false positives (a required `getopt`
+argument contract and a cast followed by a safe range check). The CI
+guard pins both the TU surface and these counts, so skipped files cannot
+masquerade as an improvement.
 
 ## What it won't catch
 

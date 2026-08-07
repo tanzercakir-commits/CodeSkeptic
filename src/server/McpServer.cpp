@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
 
 #ifdef _WIN32
@@ -75,6 +76,7 @@ json::Value handleInitialize(const json::Value& id) {
 json::Value handleToolsList(const json::Value& id) {
     json::Object analyzeSchema{
         {"type", "object"},
+        {"additionalProperties", false},
         {"properties", json::Object{
             {"path", json::Object{
                 {"type", "string"},
@@ -143,8 +145,27 @@ json::Value handleToolsList(const json::Value& id) {
 
 json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     if (!args) return makeError(id, -32602, "missing arguments");
+
+    static const std::set<std::string> allowedFields = {
+        "path", "build_path", "functions", "lines", "summaries",
+        "fatal_asserts", "alloc_functions", "free_functions"
+    };
+    for (const auto& field : *args) {
+        const std::string name = field.first.str();
+        if (!allowedFields.count(name))
+            return makeError(id, -32602, "unknown analyze field: " + name);
+    }
+
+    for (const auto& name : allowedFields) {
+        if (args->get(name) && !args->getString(name))
+            return makeError(id, -32602,
+                             "field must be a string: " + name);
+    }
+
     auto path = args->getString("path");
     if (!path) return makeError(id, -32602, "missing required field: path");
+    if (path->empty())
+        return makeError(id, -32602, "field must not be empty: path");
 
     codeskeptic::Config config;
     config.setSourcePath(path->str());
@@ -152,8 +173,11 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.setBuildPath(buildPath->str());
     if (auto functions = args->getString("functions"))
         config.addFunctions(functions->str());
-    if (auto lines = args->getString("lines"))
-        config.addLines(lines->str());
+    if (auto lines = args->getString("lines")) {
+        if (!config.addLines(lines->str()))
+            return makeError(id, -32602,
+                             "invalid lines scope; expected e.g. 10-40,55");
+    }
     if (auto summaries = args->getString("summaries"))
         config.setSummaryIn(summaries->str());
     if (auto fatalAsserts = args->getString("fatal_asserts"))
@@ -178,7 +202,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     analyzer.addRule<codeskeptic::NullDerefRule>();
     analyzer.addRule<codeskeptic::ContractRule>();
     analyzer.addRule<codeskeptic::PolicyRule>();
-    analyzer.run();
+    const codeskeptic::AnalysisResult result = analyzer.run();
 
     json::Array findings;
     for (const auto& diag : analyzer.diagnostics()) {
@@ -203,14 +227,29 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     }
 
     json::Object payload{
+        {"status", result.statusName()},
+        {"complete", result.complete()},
+        {"exit_code", static_cast<int64_t>(result.exitCode())},
+        {"coverage", json::Object{
+            {"attempted_tus", static_cast<int64_t>(result.attempted_tus)},
+            {"analyzed_tus", static_cast<int64_t>(result.analyzed_tus)},
+            {"broken_tus", static_cast<int64_t>(result.broken_tus)},
+            {"incomplete_functions",
+             static_cast<int64_t>(result.incomplete_functions)},
+        }},
+        {"evidence", json::Object{
+            {"tool_failed", result.tool_failed},
+            {"summary_load_failed", result.summary_load_failed},
+            {"summary_stale", result.summary_stale},
+        }},
         {"count", static_cast<int64_t>(findings.size())},
         {"findings", std::move(findings)},
     };
 
-    // MCP tool result: JSON as text content (agents parse it directly);
-    // findings do not mean isError — the analysis SUCCEEDED, the result
-    // is the findings
+    // Findings are a successful tool result. isError is reserved for a
+    // missing trustworthy verdict (coverage/evidence/I/O failure).
     return makeResponse(id, json::Object{
+        {"isError", result.exitCode() > 1},
         {"content", json::Array{json::Object{
             {"type", "text"},
             {"text", serialize(json::Value(std::move(payload)))},
