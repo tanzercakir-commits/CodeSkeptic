@@ -29,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate real-world replay ledger
+        run: python3 scripts/check_realworld_ledger.py
+
       - name: Install LLVM 20 and build tools
         run: |
           sudo apt-get update
@@ -42,47 +45,57 @@ jobs:
             -DCODESKEPTIC_BUILD_TESTS=OFF
           cmake --build build
 
-      - name: Scan libgit2 (pinned v1.9.0, idiom profile)
+      - name: Scan libgit2 (ledger-pinned revision, idiom profile)
         run: |
-          set -o pipefail
-          curl -sL --retry 3 \
-            https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.0.tar.gz \
-            | tar xz
-          cd libgit2-1.9.0
-          cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          set -euo pipefail
+          mapfile -t ledger < <(awk '!/^#/ && $1 == "libgit2" { print }' \
+            scripts/realworld_expected.txt)
+          test "${#ledger[@]}" -eq 1
+          read -r _ revision label expected_tus expected_findings expected_exit _ _ \
+            <<< "${ledger[0]}"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          git init -q libgit2
+          git -C libgit2 remote add origin https://github.com/libgit2/libgit2
+          git -C libgit2 fetch -q --depth 1 origin "$revision"
+          git -C libgit2 checkout -q --detach FETCH_HEAD
+          cmake -S libgit2 -B libgit2/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DBUILD_TESTS=OFF -DBUILD_CLI=OFF >/dev/null
-          cd ..
-          cmake --build libgit2-1.9.0/build
-          root=$(realpath libgit2-1.9.0/src)
+          cmake --build libgit2/build
+          root=$(realpath libgit2/src)
           jq -r --arg root "$root/" \
             '.[] | .file | select(startswith($root))' \
-            libgit2-1.9.0/build/compile_commands.json \
+            libgit2/build/compile_commands.json \
             | sort -u > libgit2.files
           test -s libgit2.files
           tus=$(wc -l < libgit2.files)
           code=0
           ./build/src/codeskeptic --files libgit2.files \
-            --build-path libgit2-1.9.0/build \
+            --build-path libgit2/build \
             --alloc-functions git__malloc,git__calloc,git__realloc,git__strdup \
             --free-functions git__free \
-            --report-paths "$PWD/libgit2-1.9.0/src" \
+            --report-paths "$PWD/libgit2/src" \
             2>&1 | tee libgit2-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' libgit2-scan.log || true)
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 tus=$tus findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=libgit2 v=1.9.0 tus=$tus findings=$n exit=$code" >> results.txt
-          test "$tus" -eq 167
-          test "$code" -eq 1
-          test "$n" -eq 34
+          echo "REALWORLD_RESULT project=libgit2 revision=$revision label=$label tus=$tus findings=$n exit=$code"
+          echo "REALWORLD_RESULT project=libgit2 revision=$revision label=$label tus=$tus findings=$n exit=$code" >> results.txt
+          test "$tus" -eq "$expected_tus"
+          test "$code" -eq "$expected_exit"
+          test "$n" -eq "$expected_findings"
 
-      - name: Scan rtp2httpd (pinned a7a1e568, no profile needed)
+      - name: Scan rtp2httpd (ledger-pinned revision, no profile needed)
         run: |
-          set -o pipefail
+          set -euo pipefail
+          mapfile -t ledger < <(awk '!/^#/ && $1 == "rtp2httpd" { print }' \
+            scripts/realworld_expected.txt)
+          test "${#ledger[@]}" -eq 1
+          read -r _ revision label expected_tus expected_findings expected_exit _ _ \
+            <<< "${ledger[0]}"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || exit 2
           # The 2026-07-22 campaign scanned then-current HEAD; this is
           # the last upstream commit preceding that recorded run.
           git init -q rtp2httpd
           git -C rtp2httpd remote add origin https://github.com/stackia/rtp2httpd
-          git -C rtp2httpd fetch -q --depth 1 origin \
-            a7a1e568d46ee3176f8a3e94e0f88f131ebd444e
+          git -C rtp2httpd fetch -q --depth 1 origin "$revision"
           git -C rtp2httpd checkout -q --detach FETCH_HEAD
           cmake -S rtp2httpd -B rtp2httpd/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-20 \
@@ -101,11 +114,11 @@ jobs:
             --report-paths "$PWD/rtp2httpd/src" \
             2>&1 | tee rtp2httpd-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log || true)
-          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 tus=$tus findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 tus=$tus findings=$n exit=$code" >> results.txt
-          test "$tus" -eq 38
-          test "$code" -eq 1
-          test "$n" -eq 6
+          echo "REALWORLD_RESULT project=rtp2httpd revision=$revision label=$label tus=$tus findings=$n exit=$code"
+          echo "REALWORLD_RESULT project=rtp2httpd revision=$revision label=$label tus=$tus findings=$n exit=$code" >> results.txt
+          test "$tus" -eq "$expected_tus"
+          test "$code" -eq "$expected_exit"
+          test "$n" -eq "$expected_findings"
 
       - name: Deep corpus (abseil) for good measure
         run: |
