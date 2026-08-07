@@ -127,8 +127,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         collectIntVars(fn), codeskeptic::paramSeeds(paramMap, fn));
     auto df = codeskeptic::runDataflow(fn, ctx, analysis);
     if (!df.converged)
-        codeskeptic::CoverageReport::instance().recordNonConvergence(
-            fn->getQualifiedNameAsString());
+        codeskeptic::CoverageReport::instance().recordDataflowFailure(
+            fn->getQualifiedNameAsString(), df.failure);
 
     const SourceManager& sm = ctx.getSourceManager();
     std::set<unsigned> reportedLines;

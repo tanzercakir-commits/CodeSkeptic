@@ -1510,8 +1510,8 @@ public:
         }
         auto df = codeskeptic::runDataflow(func, *result.Context, analysis);
         if (!df.converged)
-            codeskeptic::CoverageReport::instance().recordNonConvergence(
-                func->getQualifiedNameAsString());
+            codeskeptic::CoverageReport::instance().recordDataflowFailure(
+                func->getQualifiedNameAsString(), df.failure);
         analysis.attachTraces();
     }
 

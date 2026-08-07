@@ -99,8 +99,17 @@ codeskeptic <source_path> [options]
   --lang <en|tr>         Diagnostic message language (default: en)
 ```
 
-Exit code is `1` when findings are reported, `0` when clean — suitable
-for CI gates.
+The verdict contract is stable: `0` means a complete clean analysis,
+`1` means a complete analysis with findings, and `2` means no trustworthy
+verdict was produced (invalid input/config, incomplete coverage/evidence,
+or an output artifact could not be written). Report-only integrations may
+relax `1`; they must never turn `2` green.
+
+Machine-readable capability discovery does not start an analysis:
+
+```bash
+codeskeptic --capabilities --json
+```
 
 **Environment:** `CODESKEPTIC_RESOURCE_DIR` overrides the Clang
 resource directory (intrinsic headers). Normally unnecessary — release
@@ -110,7 +119,9 @@ Set it only when analyzing with a resource dir in a non-standard place.
 
 ## Configuration file
 
-Options can also be set in a `.codeskeptic.conf` file (`key=value` lines:
+Options can also be set in a `.codeskeptic.conf` file (`key=value` lines;
+whitespace around `=` is accepted, while unknown keys and invalid values
+fail with exit `2`):
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
@@ -198,9 +209,12 @@ weaker claim, so a wrong strong claim cannot enter through the file.
 
 | Code | Meaning |
 |---|---|
-| 0 | Analysis ran; no findings. |
-| 1 | Analysis ran; findings were reported (also: usage errors). |
-| 2 | **Nothing was analyzed** — every attempted translation unit failed to compile (missing headers/SDK, wrong flags). Never treat this as clean: fix the include paths (macOS: `SDKROOT` / `xcrun`), pass `--build-path` with your `compile_commands.json`, or force with `--analyze-broken-tus`. |
+| 0 | Complete analysis; no findings (or baseline recorded successfully). |
+| 1 | Complete analysis; findings were reported. |
+| 2 | **Verdict unavailable** — invalid CLI/config, no inputs, skipped TUs, incomplete dataflow/summary evidence, or artifact I/O failure. |
 
-A partially broken run (some TUs compiled, some skipped) keeps the
-findings-based exit code and prints an honest per-TU coverage warning.
+A partially broken run fails closed with `2`. A deliberately scoped adoption
+harness may pass `--accept-partial-coverage` to restore a findings-based exit
+over the analyzed subset; attempted/analyzed/broken counts and warnings remain
+visible. This is different from `--analyze-broken-tus`, which runs rules over
+Clang's error-recovery AST and accepts that additional reliability risk.
