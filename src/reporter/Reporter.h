@@ -2,6 +2,7 @@
 #define CODESKEPTIC_REPORTER_H
 
 #include "core/Diagnostic.h"
+#include "core/AnalysisResult.h"
 
 #include <string>
 
@@ -11,7 +12,10 @@ class Reporter {
 public:
     virtual ~Reporter() = default;
 
-    virtual void report(const DiagnosticList& diagnostics) = 0;
+    // False means the requested artifact was not fully written. Report I/O is
+    // part of the verdict: a missing SARIF/JSON file must fail CI loudly.
+    virtual bool report(const DiagnosticList& diagnostics,
+                        const AnalysisResult* result = nullptr) = 0;
     virtual std::string format() const = 0;
 };
 

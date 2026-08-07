@@ -30,15 +30,26 @@ namespace codeskeptic {
 JsonReporter::JsonReporter(const std::string& output_path)
     : output_path_(output_path) {}
 
-void JsonReporter::report(const DiagnosticList& diagnostics) {
+bool JsonReporter::report(const DiagnosticList& diagnostics,
+                          const AnalysisResult* result) {
     std::ofstream file(output_path_);
     if (!file.is_open()) {
         std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
-        return;
+        return false;
     }
 
     file << "{\n";
     file << "  \"tool\": \"CodeSkeptic\",\n";
+    if (result) {
+        file << "  \"status\": \"" << result->statusName() << "\",\n";
+        file << "  \"complete\": " << (result->complete() ? "true" : "false")
+             << ",\n";
+        file << "  \"coverage\": { \"attempted_tus\": "
+             << result->attempted_tus << ", \"analyzed_tus\": "
+             << result->analyzed_tus << ", \"broken_tus\": "
+             << result->broken_tus << ", \"incomplete_functions\": "
+             << result->incomplete_functions << " },\n";
+    }
     file << "  \"total\": " << diagnostics.size() << ",\n";
     file << "  \"diagnostics\": [";
 
@@ -70,6 +81,12 @@ void JsonReporter::report(const DiagnosticList& diagnostics) {
 
     file << "\n  ]\n";
     file << "}\n";
+    file.flush();
+    if (!file.good()) {
+        std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
+        return false;
+    }
+    return true;
 }
 
 std::string JsonReporter::format() const {

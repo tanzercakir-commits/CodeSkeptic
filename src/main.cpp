@@ -1,5 +1,5 @@
 #include "analyzer/StaticAnalyzer.h"
-#include "core/ExitPolicy.h"
+#include "core/Capabilities.h"
 #include "config/Config.h"
 #include "core/Messages.h"
 #include "engine/SummaryDiff.h"
@@ -32,12 +32,46 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    bool capabilities = false;
+    bool capabilities_json = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--capabilities") == 0)
+            capabilities = true;
+        else if (std::strcmp(argv[i], "--json") == 0)
+            capabilities_json = true;
+    }
+    if (capabilities) {
+        for (int i = 1; i < argc; ++i) {
+            if (std::strcmp(argv[i], "--capabilities") != 0 &&
+                std::strcmp(argv[i], "--json") != 0) {
+                std::cerr << "[CodeSkeptic] --capabilities accepts only "
+                             "the optional --json flag\n";
+                return 2;
+            }
+        }
+        codeskeptic::writeCapabilities(std::cout, capabilities_json);
+        return 0;
+    }
+
+    // Help must work even when the current directory contains a malformed
+    // project config; discovery/control flow does not depend on analysis input.
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--help") == 0) {
+            codeskeptic::Config help_config;
+            if (!help_config.parseArgs(argc, argv)) return 2;
+            return help_config.helpRequested() ? 0 : 2;
+        }
+    }
+
     codeskeptic::Config config;
-    config.loadFromFile(".codeskeptic.conf");
+    if (!config.loadFromFile(".codeskeptic.conf")) {
+        return 2;
+    }
 
     if (!config.parseArgs(argc, argv)) {
-        return 1;
+        return 2;
     }
+    if (config.helpRequested()) return 0;
 
     codeskeptic::setLang(codeskeptic::parseLang(config.lang()));
 
@@ -59,7 +93,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    const bool analyze_broken = config.analyzeBrokenTUs();
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
 
     analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
@@ -74,13 +107,10 @@ int main(int argc, char* argv[]) {
     analyzer.addRule<codeskeptic::ContractRule>();
     analyzer.addRule<codeskeptic::PolicyRule>();
 
-    int findings = analyzer.run();
-
-    const int exit_code = codeskeptic::analysisExitCode(
-        findings, analyzer.totalTUs(), analyzer.brokenTUCount(),
-        analyze_broken);
+    const codeskeptic::AnalysisResult result = analyzer.run();
+    const int exit_code = result.exitCode();
     if (exit_code == 2)
-        std::cerr << codeskeptic::msg(codeskeptic::MsgId::NothingAnalyzed)
+        std::cerr << codeskeptic::msg(codeskeptic::MsgId::VerdictUnavailable)
                   << "\n";
     return exit_code;
 }

@@ -1,5 +1,52 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-07 — verdict integrity: zero findings is no longer enough
+
+CLI, MCP and report artifacts now share one `AnalysisResult` contract.
+The result records attempted/analyzed/broken translation units, incomplete
+dataflow functions, summary freshness/load failures and artifact I/O. Exit
+codes are deliberately narrow: 0 is complete+clean, 1 is complete+findings,
+and 2 means a trustworthy verdict was not produced. Partial broken-TU
+coverage, a stale or missing requested summary, a failed ClangTool run, and
+failed JSON/SARIF/HTML/baseline writes can therefore never look clean.
+The existing corpus harness explicitly opts into `--accept-partial-coverage`
+for its intentionally broad tree pins; ordinary CLI, MCP and Action use stays
+fail-closed. The override preserves the attempted/analyzed/broken evidence and
+does not analyze unreliable error-recovery ASTs.
+
+Dataflow coverage now distinguishes an iteration limit from a concrete
+function whose CFG could not be built. A dependent function-template pattern
+that has no concrete control flow is deferred to the AST's concrete
+instantiations instead of being mislabeled as an iteration-cap failure; those
+instantiations are still analyzed normally. The worklist also keeps only one
+pending entry per CFG block and derives convergence from whether work remains,
+so duplicate fan-in scheduling and an exactly-drained iteration budget cannot
+manufacture an incomplete verdict.
+
+MCP's `analyze` result publishes `status`, `complete`, `exit_code`, coverage
+and evidence fields, and sets `isError` only when the verdict is unavailable;
+ordinary findings remain a successful tool call. Unknown or wrongly typed MCP
+arguments are rejected instead of ignored.
+
+Configuration is now strict and whitespace-aware. This also fixes the shipped
+idiom profiles: their documented `key = value` form previously retained the
+space in the key and silently ignored every setting. Unknown CLI flags,
+missing option values, invalid severity/language/line scopes, malformed config
+lines and unknown config keys now fail loudly. `--help` is successful control
+flow and remains available even beside a broken project config.
+
+Development builds no longer claim the last release's identity. An exact
+`v<project-version>` tag reports the final version; other checkouts report the
+next patch as `-dev+g<commit>` (and `.dirty` when applicable). A dependency-free
+`--capabilities --json` surface publishes version, rules, outputs, modes and the
+verdict contract for wrappers and AI agents.
+
+The composite GitHub Action validates `gate`, `upload-sarif`, output path and
+version inputs before downloading or analyzing. User-provided values are passed
+through environment variables rather than interpolated into shell source;
+`extra-args` is split as data without evaluating command substitutions. An
+invalid gate can no longer fall through to a green report-only run.
+
 ## 2026-08-01 — corpus: name the surface the pinned count belongs to
 
 The libarchive round ended by asking "132/132 of what?" and answering it

@@ -12,17 +12,26 @@
 #include <clang/AST/Stmt.h>
 #include <clang/Analysis/CFG.h>
 
+#include <map>
 #include <queue>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 namespace codeskeptic {
+
+enum class DataflowFailure {
+    None,
+    CfgUnavailable,
+    IterationLimit,
+};
 
 template <typename Analysis>
 struct DataflowResult {
     using State = typename Analysis::State;
     std::unordered_map<unsigned, State> blockExitStates;
     bool converged = false;
+    DataflowFailure failure = DataflowFailure::None;
     unsigned exitBlockID = 0;
 };
 
@@ -171,12 +180,29 @@ DataflowResult<Analysis> runDataflow(
     using State = typename Analysis::State;
     DataflowResult<Analysis> result;
 
-    if (!func || !func->hasBody()) return result;
+    if (!func || !func->hasBody()) {
+        result.failure = DataflowFailure::CfgUnavailable;
+        return result;
+    }
 
     // CFG comes from the shared cache (built once per function; build
     // options — including setAllAlwaysAdd — live in CfgCache)
     clang::CFG* cfg = CfgCache::instance().get(func, ctx);
-    if (!cfg) return result;
+    if (!cfg) {
+        // A dependent function-template pattern has no concrete control
+        // flow yet, and Clang's CFG builder rejects many such bodies
+        // (notably dependent range-for loops). MatchFinder visits each
+        // concrete instantiation separately; those are the executable
+        // analysis units and get their own CFG/dataflow pass. Deferring
+        // only the rejected dependent pattern is therefore not a coverage
+        // gap. A CFG failure for any concrete function remains fail-closed.
+        if (func->isDependentContext() &&
+            !func->isTemplateInstantiation())
+            result.converged = true;
+        else
+            result.failure = DataflowFailure::CfgUnavailable;
+        return result;
+    }
 
     // Vanished-assert guards (AR.3). Built lazily per function and
     // empty for every function that contains no compiled-out assert —
@@ -373,7 +399,20 @@ DataflowResult<Analysis> runDataflow(
     // severity: e.g. on the first visit of a do-while body, before the
     // back-edge state exists, we might claim "definitely null".
     std::queue<const clang::CFGBlock*> worklist;
-    worklist.push(&cfg->getEntry());
+    // A block may have several predecessors that change before it gets
+    // its next turn. Keep at most one pending entry per block: processing
+    // duplicate queue entries cannot add information, but it consumes the
+    // convergence safety budget and used to make large fan-in CFGs report
+    // a false iteration-cap failure.
+    std::vector<bool> queued(numBlocks, false);
+    auto enqueue = [&](const clang::CFGBlock* block) {
+        if (!block) return;
+        const unsigned id = block->getBlockID();
+        if (queued[id]) return;
+        queued[id] = true;
+        worklist.push(block);
+    };
+    enqueue(&cfg->getEntry());
     unsigned iterations = 0;
 
     // Convergence widening. The guarded-disjunct domain is not a clean
@@ -399,6 +438,7 @@ DataflowResult<Analysis> runDataflow(
         ++iterations;
         const clang::CFGBlock* block = worklist.front();
         worklist.pop();
+        queued[block->getBlockID()] = false;
 
         bool hasPreds = false;
         State entryState = computeEntryState(block, hasPreds,
@@ -452,12 +492,17 @@ DataflowResult<Analysis> runDataflow(
             for (auto succIt = block->succ_begin();
                  succIt != block->succ_end(); ++succIt) {
                 const clang::CFGBlock* succ = succIt->getReachableBlock();
-                if (succ) worklist.push(succ);
+                enqueue(succ);
             }
         }
     }
 
-    result.converged = (iterations < maxIterations);
+    // Equality with the safety limit is not itself a failure: the last
+    // allowed visit may have drained the queue. What matters is whether
+    // unprocessed work remains.
+    result.converged = worklist.empty();
+    result.failure = result.converged ? DataflowFailure::None
+                                      : DataflowFailure::IterationLimit;
     result.exitBlockID = cfg->getExit().getBlockID();
 
     // --- Phase 2: reporting pass ---

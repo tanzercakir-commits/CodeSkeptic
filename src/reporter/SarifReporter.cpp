@@ -68,11 +68,12 @@ namespace codeskeptic {
 SarifReporter::SarifReporter(const std::string& output_path)
     : output_path_(output_path) {}
 
-void SarifReporter::report(const DiagnosticList& diagnostics) {
+bool SarifReporter::report(const DiagnosticList& diagnostics,
+                           const AnalysisResult* result) {
     std::ofstream file(output_path_);
     if (!file.is_open()) {
         std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
-        return;
+        return false;
     }
 
     std::set<std::string> ruleIds;
@@ -102,6 +103,17 @@ void SarifReporter::report(const DiagnosticList& diagnostics) {
     file << (ruleIds.empty() ? "]" : "\n          ]") << "\n";
     file << "        }\n";
     file << "      },\n";
+    if (result) {
+        file << "      \"invocations\": [ { \"executionSuccessful\": "
+             << (result->complete() ? "true" : "false")
+             << ", \"properties\": { \"codeskeptic/status\": \""
+             << result->statusName() << "\", \"codeskeptic/attemptedTUs\": "
+             << result->attempted_tus
+             << ", \"codeskeptic/analyzedTUs\": " << result->analyzed_tus
+             << ", \"codeskeptic/brokenTUs\": " << result->broken_tus
+             << ", \"codeskeptic/incompleteFunctions\": "
+             << result->incomplete_functions << " } } ],\n";
+    }
     file << "      \"results\": [";
 
     for (size_t i = 0; i < diagnostics.size(); ++i) {
@@ -159,6 +171,12 @@ void SarifReporter::report(const DiagnosticList& diagnostics) {
     file << "    }\n";
     file << "  ]\n";
     file << "}\n";
+    file.flush();
+    if (!file.good()) {
+        std::cerr << msg(MsgId::OutputFileOpenError, output_path_) << "\n";
+        return false;
+    }
+    return true;
 }
 
 std::string SarifReporter::format() const {
