@@ -31,6 +31,7 @@ public:
     void enableGlobalHarvest(bool enabled) { harvest_global_ = enabled; }
 
     size_t ruleCount() const;
+    size_t enabledRuleCount() const;
     std::vector<std::string> ruleIds() const;
 
 private:

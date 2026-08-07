@@ -8,10 +8,14 @@ using namespace codeskeptic;
 
 namespace {
 
-std::string reportToString(const DiagnosticList& diags) {
-    std::string path = ::testing::TempDir() + "sarif_test_output.sarif";
+std::string reportToString(const DiagnosticList& diags,
+                           const AnalysisResult* result = nullptr) {
+    const auto* test =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string path = ::testing::TempDir() + test->test_suite_name() + "_" +
+                       test->name() + ".sarif";
     SarifReporter reporter(path);
-    reporter.report(diags);
+    EXPECT_TRUE(reporter.report(diags, result));
 
     std::ifstream file(path);
     std::stringstream ss;
@@ -69,6 +73,22 @@ TEST(SarifReporterTest, EmptyDiagnostics_ValidSkeleton) {
 
     EXPECT_NE(out.find("\"results\": []"), std::string::npos);
     EXPECT_NE(out.find("\"rules\": []"), std::string::npos);
+}
+
+TEST(SarifReporterTest, InvocationPublishesCompleteVerdictContract) {
+    AnalysisResult result;
+    result.attempted_tus = 2;
+    result.analyzed_tus = 1;
+    result.broken_tus = 1;
+
+    std::string out = reportToString({}, &result);
+
+    EXPECT_NE(out.find("\"executionSuccessful\": false"),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/status\": \"incomplete\""),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/exitCode\": 2"),
+              std::string::npos);
 }
 
 TEST(SarifReporterTest, MessageEscaping) {

@@ -16,6 +16,7 @@ public:
 
     bool loadFromFile(const std::string& path);
     bool parseArgs(int argc, char* argv[]);
+    bool helpRequested() const { return help_requested_; }
 
     const std::string& sourcePath() const { return source_path_; }
     const std::vector<std::string>& sourceFiles() const {
@@ -46,6 +47,10 @@ public:
     // with an honest coverage note — error recovery eats declarations
     // and rules would report confidently about code that isn't there).
     bool analyzeBrokenTUs() const { return analyze_broken_tus_; }
+    // Explicit adoption escape hatch: preserve coverage counts/warnings but
+    // allow a verdict over the successfully analyzed subset. Default is
+    // fail-closed; integrations must opt in deliberately.
+    bool acceptPartialCoverage() const { return accept_partial_coverage_; }
     // --assumptions: opt-in intent-debt report of inferred, undeclared
     // preconditions (AssumptionRule). Off by default — it is high-volume
     // by nature and must not perturb the normal finding stream.
@@ -73,7 +78,7 @@ public:
 
     // Programmatic scope settings (the MCP server uses these directly)
     void addFunctions(const std::string& list);
-    void addLines(const std::string& list);
+    bool addLines(const std::string& list);
 
     // Fatal-assert handlers (--fatal-asserts): user-declared noreturn
     // functions; the engine kills dataflow paths at calls to them.
@@ -148,7 +153,7 @@ public:
     const std::string& summaryDiffGate() const { return summary_diff_gate_; }
 
 private:
-    Severity parseSeverity(const std::string& str) const;
+    bool parseSeverity(const std::string& str, Severity& severity) const;
     void addNamesTo(std::set<std::string>& target, const std::string& list);
 
     std::string source_path_;
@@ -176,9 +181,11 @@ private:
     bool serve_ = false;
     bool whole_program_ = false;
     bool analyze_broken_tus_ = false;
+    bool accept_partial_coverage_ = false;
     bool assert_recovery_ = true;
     bool assumptions_ = false;
     bool warm_cache_ = false;
+    bool help_requested_ = false;
     std::string summary_in_path_;
     std::string summary_out_path_;
     std::string summary_diff_old_;

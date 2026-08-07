@@ -145,8 +145,10 @@ sees custom assert handlers and allocator wrappers the same way the
 CLI flags do. Idiom registrations are per-call: nothing leaks into the
 next request of the long-lived server process.
 
-Exit code is `1` when findings are reported, `0` when clean — suitable
-for CI gates.
+The MCP payload exposes the same verdict contract as the CLI: `0` means a
+complete clean run, `1` means complete with findings, and `2` means the
+requested evidence was not sufficient for a trustworthy verdict. Findings are
+a successful tool response; only verdict-unavailable sets `isError`.
 
 ## Editor & code-scanning integration (via SARIF)
 
@@ -211,3 +213,8 @@ should use.)
 
 For a shareable, tool-free view of the same findings, use `--html` —
 one self-contained file with filters and source-context traces.
+
+The packaged composite Action accepts `extra-args` with shell-style quoting.
+Environment references such as `$GITHUB_WORKSPACE/src` are expanded, while
+command substitutions and glob patterns remain literal data and are never
+executed by a shell.

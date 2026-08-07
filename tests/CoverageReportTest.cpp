@@ -35,6 +35,14 @@ TEST(CoverageReportTest, DedupsSameFunction) {
     EXPECT_EQ(cov.incompleteCount(), 1u);
 }
 
+TEST(CoverageReportTest, RecordsConcreteCfgFailurePrecisely) {
+    auto& cov = CoverageReport::instance();
+    cov.clear();
+    cov.recordCfgUnavailable("f");
+    ASSERT_EQ(cov.incompleteCount(), 1u);
+    EXPECT_EQ(cov.entries()[0].gap, CoverageGap::CfgUnavailable);
+}
+
 TEST(CoverageReportTest, KeepsDistinctFunctionsInOrder) {
     auto& cov = CoverageReport::instance();
     cov.clear();
