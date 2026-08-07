@@ -1,0 +1,60 @@
+[CodeSkeptic] Analysis starting... (46 files, 11 rules)
+[1/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/ConsoleReporter.cpp.
+[2/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/SarifReporter.cpp.
+[3/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/JsonReporter.cpp.
+[4/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/HtmlReporter.cpp.
+[5/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/ContractRule.cpp.
+[6/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/BoundsRule.cpp.
+[7/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/AssumptionRule.cpp.
+[8/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/DivByZeroRule.cpp.
+[9/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/MemoryLeakRule_Ex.cpp.
+[10/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/AllocSizeOverflowRule.cpp.
+[11/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/UninitPointerRule_Ex.cpp.
+[12/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/IntOverflowRule.cpp.
+[13/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/SignConversionRule.cpp.
+[14/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/PolicyRule.cpp.
+[15/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/NullDerefRule.cpp.
+[16/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/server/McpServer.cpp.
+[17/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/ResourceDir.cpp.
+[18/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp:218:13: warning: braces around scalar initializer [-Wbraced-scalar-init]
+  218 |             {"-fparse-all-comments"},
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[19/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/SuppressionFilter.cpp.
+[20/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/StaticAnalyzer.cpp.
+[21/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/Baseline.cpp.
+[22/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/config/Config.cpp.
+[23/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/main.cpp.
+[24/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/Messages.cpp.
+[25/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/FunctionFilter.cpp.
+[26/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/Capabilities.cpp.
+[27/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/GuardContracts.cpp.
+[28/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/Sidecar.cpp.
+[29/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/ContractParser.cpp.
+[30/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/ContractInfo.cpp.
+[31/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/Policy.cpp.
+[32/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/RuleEngine.cpp.
+[33/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/Interval.cpp.
+[34/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AssertGuards.cpp.
+[35/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ExtentMap.cpp.
+[36/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/FunctionSummary.cpp.
+[37/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/CoverageReport.cpp.
+[38/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/PathFacts.cpp.
+[39/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ImmutableFlags.cpp.
+[40/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/IntervalEval.cpp.
+[41/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ParamIntervals.cpp.
+[42/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/FatalCalls.cpp.
+[43/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/CfgCache.cpp.
+[44/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/SummaryDiff.cpp.
+[45/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AllocFunctions.cpp.
+[46/46] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AssumptionMode.cpp.
+[CodeSkeptic] analysis coverage: 6 function(s) hit the iteration cap and were not fully analyzed; their findings may be incomplete:
+  - codeskeptic::applyMemberStmtFacts
+  - codeskeptic::applyStmtFacts
+  - codeskeptic::applyStmtFactsOps
+  - codeskeptic::refineGuardedFactsWith
+  - codeskeptic::refineGuardedFactsOps
+  - codeskeptic::eraseMemberFactsAtCall
+[CodeSkeptic] 1 finding(s) suppressed by source comments
+[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).
