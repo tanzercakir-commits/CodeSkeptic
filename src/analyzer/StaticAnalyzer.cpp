@@ -121,20 +121,26 @@ StaticAnalyzer::~StaticAnalyzer() {
     CoverageReport::instance().clear();
 }
 
-int StaticAnalyzer::run() {
+AnalysisResult StaticAnalyzer::run() {
     diagnostics_.clear();
+    AnalysisResult result;
+    result.attempted_tus = source_mgr_->fileCount();
+    result.analyze_broken_tus = config_.analyzeBrokenTUs();
+    result.accept_partial_coverage = config_.acceptPartialCoverage();
 
     if (source_mgr_->fileCount() == 0) {
         // Analyzing nothing must not look like a clean pass: a mistyped
         // path or a relative-path file list would otherwise print
         // "Clean!" with exit 0.
         std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
-        return 2;
+        result.no_inputs = true;
+        return result;
     }
 
     if (engine_.ruleCount() == 0) {
         std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
-        return 0;
+        result.no_rules = true;
+        return result;
     }
 
     for (const auto& rule_id : engine_.ruleIds()) {
@@ -173,6 +179,7 @@ int StaticAnalyzer::run() {
                     auto srcTime =
                         std::filesystem::last_write_time(file, fec);
                     if (!fec && srcTime > summaryTime) {
+                        result.summary_stale = true;
                         std::cerr << msg(MsgId::SummaryStaleWarning,
                                          config_.summaryIn(), file) << "\n";
                         break;
@@ -180,6 +187,7 @@ int StaticAnalyzer::run() {
                 }
             }
         } else {
+            result.summary_load_failed = true;
             std::cerr << msg(MsgId::SummaryLoadError, config_.summaryIn())
                       << "\n";
         }
@@ -211,7 +219,9 @@ int StaticAnalyzer::run() {
     SourceManager::clearBrokenTUs();
     SourceManager::setAttemptedTUCount(source_mgr_->fileCount());
 
-    source_mgr_->processAll([this](clang::ASTContext& ctx) {
+    const int analysis_result = source_mgr_->processAll(
+        [this, &result](clang::ASTContext& ctx) {
+        ++result.analyzed_tus;
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
@@ -224,12 +234,20 @@ int StaticAnalyzer::run() {
         for (const auto& file : SourceManager::brokenTUs())
             std::cerr << "  - " << file << "\n";
     }
+    result.broken_tus = SourceManager::brokenTUs().size();
+    // ClangTool returns non-zero for ordinary compile diagnostics as well as
+    // driver failures. Broken TUs are already accounted explicitly; only an
+    // unaccounted failure is a separate hard tool failure.
+    if (analysis_result != 0 &&
+        result.analyzed_tus + result.broken_tus < result.attempted_tus)
+        result.tool_failed = true;
 
     // Coverage: surface the functions the dataflow could not drive to a
     // fixpoint (iteration cap). "No warning" in these is NOT "proven
     // safe" — one honest summary, deduplicated across all rules, instead
     // of six scattered per-rule stderr lines.
     const auto& coverage = CoverageReport::instance();
+    result.incomplete_functions = coverage.incompleteCount();
     if (coverage.incompleteCount() > 0) {
         std::cerr << msg(MsgId::CoverageIncomplete,
                          std::to_string(coverage.incompleteCount())) << "\n";
@@ -244,6 +262,7 @@ int StaticAnalyzer::run() {
                              std::to_string(registry.globalSize()),
                              config_.summaryOut()) << "\n";
         } else {
+            result.summary_save_failed = true;
             std::cerr << msg(MsgId::SummarySaveError, config_.summaryOut())
                       << "\n";
         }
@@ -303,16 +322,24 @@ int StaticAnalyzer::run() {
             std::cerr << msg(MsgId::BaselineWritten,
                              std::to_string(diagnostics_.size()),
                              config_.writeBaselinePath()) << "\n";
-            return 0;
+            result.findings = diagnostics_.size();
+            result.baseline_recorded = true;
+            return result;
         }
+        result.findings = diagnostics_.size();
+        result.baseline_write_failed = true;
         std::cerr << msg(MsgId::OutputFileOpenError,
                          config_.writeBaselinePath()) << "\n";
-        return 0;
+        return result;
     }
 
     if (!config_.baselinePath().empty()) {
         Baseline baseline;
-        baseline.load(config_.baselinePath());
+        if (!baseline.load(config_.baselinePath())) {
+            result.baseline_load_failed = true;
+            std::cerr << msg(MsgId::OutputFileOpenError,
+                             config_.baselinePath()) << "\n";
+        }
         size_t matched = baseline.filter(diagnostics_);
         if (matched > 0) {
             std::cerr << msg(MsgId::BaselineFiltered,
@@ -335,9 +362,11 @@ int StaticAnalyzer::run() {
         std::unique(diagnostics_.begin(), diagnostics_.end()),
         diagnostics_.end());
 
-    reporter_->report(diagnostics_);
+    result.findings = diagnostics_.size();
+    if (!reporter_->report(diagnostics_, &result))
+        result.report_write_failed = true;
 
-    return static_cast<int>(diagnostics_.size());
+    return result;
 }
 
 } // namespace codeskeptic

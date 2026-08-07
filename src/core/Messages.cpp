@@ -277,6 +277,11 @@ const MsgEntry kMessages[] = {
      "olasi tahsis-boyutu tasmasi: guvenilmeyen bir uzunluk bu isaretsiz "
      "'{0}' boyut hesabini kucuk bir degere sarabilir ve tamponu kucuk "
      "yapar - boyutu hesaplamadan once uzunlugu sinirlayin"},
+    // VerdictUnavailable
+    {"[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was "
+     "incomplete or an artifact could not be written (exit 2).",
+     "[CodeSkeptic] KARAR URETILEMEDI: istenen analiz kaniti eksik kaldi "
+     "veya bir cikti yazilamadi (cikis 2)."},
 };
 
 void substitute(std::string& text, const std::string& placeholder,
