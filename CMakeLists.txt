@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(CodeSkeptic VERSION 0.4.7 LANGUAGES C CXX)
+project(CodeSkeptic VERSION 0.4.8 LANGUAGES C CXX)
 
 # Release identity is evidence. A build from an exact v<project-version> tag
 # carries the release version; every other checkout is visibly a development

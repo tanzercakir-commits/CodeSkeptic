@@ -123,6 +123,34 @@ improvement is locked by a ratcheted floor in
 0.03 → 0.095, CWE-401 precision 0.66 → 0.68) — the guard file's
 comments carry each move's rationale.
 
+## Current-engine real-world replay ledger
+
+The canonical executable expectations live in
+[`scripts/realworld_expected.txt`](../scripts/realworld_expected.txt).
+The real-world workflow reads that file for project revisions, translation-unit
+surfaces, finding counts and exit codes; those values are not duplicated in
+workflow shell. A deliberate semantic change therefore updates one ledger in
+the same reviewed change, while an unexplained surface/count/verdict drift is
+red.
+
+The current receipt was measured on 2026-08-07 UTC with analyzer tree
+[`d47d11422542551e2f4f7b571e07d6d917c32885`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/d47d11422542551e2f4f7b571e07d6d917c32885)
+in [workflow run 31199842703](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31199842703).
+CI mirrored `results.txt` and bounded tail logs to
+`refs/ci-logs/d47d11422542551e2f4f7b571e07d6d917c32885/realworld`; its immutable
+evidence commit is
+[`2d03342268a523c33bafa22ddb3c97d5834be4d4`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/2d03342268a523c33bafa22ddb3c97d5834be4d4).
+
+| Project | Exact input revision | Built TU verdict | Findings | Completed triage claim |
+|---|---|---:|---:|---|
+| libgit2 (`v1.9.0`) | `338e6fb681369ff0537719095e22ce9dc602dbf0` | 167/167, exit 1 | 34 | 11 confirmed OOM-path leaks; no full 34-finding partition claimed here |
+| rtp2httpd | `a7a1e568d46ee3176f8a3e94e0f88f131ebd444e` | 38/38, exit 1 | 6 | 4 actionable findings + 2 context false positives |
+
+Exit 1 is material evidence here: under the fail-closed contract it means a
+complete verdict with findings, whereas any broken requested TU or unavailable
+analysis would be exit 2. Historical table numbers remain historical and are
+never substituted for this current-engine replay.
+
 ## Reading the real-world scan numbers
 
 The [real-world scan table in the README](../README.md#proven-on-real-code)

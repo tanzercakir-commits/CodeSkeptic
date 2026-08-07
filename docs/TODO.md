@@ -12,13 +12,15 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 96e4257
-uçuşta = phase-verdict-integrity-validation
+base   = dd08970
+uçuşta = phase-truth-sync-v048 phase-verdict-integrity-validation
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): verdict-integrity Faz 0 PR #119'da; son bağımsız
-denetim düzeltmeleri ve kapı kanıtı tamamlanınca merge kilidi kullanıcıda.
+Serbest not (insanda kalır): verdict-integrity Faz 0, tüm kapıları yeşilken
+kullanıcının açıkça onayladığı tek seferlik yönetici squash merge'iyle PR
+#119'dan `main`e alındı (`dd08970`). v0.4.8 truth-sync doğrulanmış yeni `main`
+tabanına taşındı; yayın gerçeği ve replay ledger'ı bu dalda hazırlanıyor.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -30,20 +32,19 @@ kolateral sıfır. BULGU 3 kod değil önkoşul; backlog #1'e işlendi.
 Yan ürün: corpus pin'i 53→54 merkeze alındı (895c813'ten beri
 sürükleniyordu, toleransın içinde sessizce).
 
-## Sıradaki iş (kod)
+## Sıradaki iş
 
-**Üç hedef CWE TAMAMLANDI** (131 alloc-size · 191 underflow · 404
-resource-leak — changelog 2026-07-30). Sıradaki: aşağıdaki backlog'dan
-kullanıcı seçer. En doğal aday sign-conversion/alloc-size v2
-(interprocedural sink + 64-bit köşe ispatı) veya FINDING 3 kalıntısı.
+Bağlayıcı ürün programı sırası: Faz 0 truth-sync dalını CI kanıtıyla kapat;
+TensorFlow/ölçüm ledger'ı/v0.4.8 yayın gerçeğini ve paket taşıma smoke'unu
+koru. Ardından Faz 1 capability tier sözleşmesine geç.
 
 ## Açık kullanıcı kararları
 
-1. **LVGL binfont açıklaması** — KAPANDI (2026-07-30): duplikat/CVE yok
-   ama Gate B düştü (LVGL'de threat-model/SECURITY.md yok, font=güvenilir).
-   Rapor edilmedi; PLAN §6 ledger'da kayıtlı.
-2. **zlib "core clean" trophy** — kullanıcı GEREK YOK dedi (kapalı).
-3. **TF PR #123994** — hâlâ açık; takipte, aksiyon yok.
+Yok; `phase-truth-sync-v048` draft PR #120 olarak açıldı ve güncel-HEAD CI
+kanıtını bekliyor. Merge-ready olduğunda çalışma kuralı 12 gereği ayrıca açık
+merge onayı istenecek. PR #119'un tek seferlik yönetici bypass'ı tamamlandı;
+TensorFlow PR #123994 merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı
+güncellendi.
 
 ## Backlog (öncelik sırası)
 

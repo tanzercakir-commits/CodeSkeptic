@@ -77,6 +77,9 @@ if(NOT WIN32)
     add_test(NAME ActionArgsParser
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/ActionArgsTest.py)
+    add_test(NAME RealworldLedgerValidator
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/RealworldLedgerTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)
