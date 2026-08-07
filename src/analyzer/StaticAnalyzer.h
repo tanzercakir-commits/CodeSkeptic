@@ -2,6 +2,7 @@
 #define CODESKEPTIC_STATIC_ANALYZER_H
 
 #include "config/Config.h"
+#include "core/AnalysisResult.h"
 #include "core/Diagnostic.h"
 #include "engine/RuleEngine.h"
 #include "reporter/Reporter.h"
@@ -30,7 +31,7 @@ public:
         engine_.addRule<T>(std::forward<Args>(args)...);
     }
 
-    int run();
+    AnalysisResult run();
 
     const DiagnosticList& diagnostics() const { return diagnostics_; }
     const Config& config() const { return config_; }

@@ -7,17 +7,15 @@
 
 namespace codeskeptic {
 
-void ConsoleReporter::report(const DiagnosticList& diagnostics) {
+bool ConsoleReporter::report(const DiagnosticList& diagnostics,
+                             const AnalysisResult* result) {
     if (diagnostics.empty()) {
         // Suppressed when NOTHING was actually analyzed (every TU
         // broken): printing "Clean!" a line above the exit-2 failure
         // message would be a contradiction (v0.4.5 fail-loud policy).
-        const std::size_t total = SourceManager::attemptedTUCount();
-        const std::size_t broken = SourceManager::brokenTUs().size();
-        if (!(total > 0 && broken >= total &&
-              !SourceManager::analyzeBrokenTUs()))
+        if (!result || result->complete())
             std::cerr << msg(MsgId::CleanNoIssues) << "\n";
-        return;
+        return true;
     }
 
     std::cerr << msg(MsgId::FindingsCount,
@@ -35,6 +33,7 @@ void ConsoleReporter::report(const DiagnosticList& diagnostics) {
     }
 
     std::cerr << "----------------------------------------\n";
+    return true;
 }
 
 std::string ConsoleReporter::format() const {
