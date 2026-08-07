@@ -72,13 +72,15 @@ jobs:
           test "$code" -eq 1
           test "$n" -eq 34
 
-      - name: Scan rtp2httpd (pinned e49df993, no profile needed)
+      - name: Scan rtp2httpd (pinned a7a1e568, no profile needed)
         run: |
           set -o pipefail
+          # The 2026-07-22 campaign scanned then-current HEAD; this is
+          # the last upstream commit preceding that recorded run.
           git init -q rtp2httpd
           git -C rtp2httpd remote add origin https://github.com/stackia/rtp2httpd
           git -C rtp2httpd fetch -q --depth 1 origin \
-            e49df993ca2629bb116a29a87ce2afff24d97ef7
+            a7a1e568d46ee3176f8a3e94e0f88f131ebd444e
           git -C rtp2httpd checkout -q --detach FETCH_HEAD
           cmake -S rtp2httpd -B rtp2httpd/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-20 \
@@ -97,7 +99,7 @@ jobs:
             2>&1 | tee rtp2httpd-scan.log || code=$?
           n=$(grep -cE '\.(c|h):[0-9]+:[0-9]+ \[(warning|error)\]' rtp2httpd-scan.log || true)
           echo "REALWORLD_RESULT project=rtp2httpd findings=$n exit=$code"
-          echo "REALWORLD_RESULT project=rtp2httpd rev=e49df993 findings=$n exit=$code" >> results.txt
+          echo "REALWORLD_RESULT project=rtp2httpd rev=a7a1e568 findings=$n exit=$code" >> results.txt
           test "$code" -eq 0
           test "$n" -eq 0
 
