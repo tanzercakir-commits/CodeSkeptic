@@ -1,5 +1,6 @@
 add_library(codeskeptic_core STATIC
     core/Messages.cpp
+    core/Capabilities.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
     source_manager/ResourceDir.cpp
@@ -75,7 +76,7 @@ target_include_directories(codeskeptic_core SYSTEM
 target_compile_definitions(codeskeptic_core
     PUBLIC ${LLVM_DEFINITIONS}
     # Single source of truth for the version: project(VERSION ...) above
-    PUBLIC CODESKEPTIC_VERSION="${PROJECT_VERSION}"
+    PUBLIC CODESKEPTIC_VERSION="${CODESKEPTIC_VERSION_STRING}"
 )
 
 # Clang resource dir (for intrinsic headers such as stddef.h, stdarg.h)

@@ -12,6 +12,10 @@ FetchContent_MakeAvailable(googletest)
 add_executable(codeskeptic_tests
     TestHelper.cpp
     DiagnosticTest.cpp
+    AnalysisResultTest.cpp
+    CapabilitiesTest.cpp
+    ConfigTest.cpp
+    VerdictIntegrityTest.cpp
     UninitPointerRuleExTest.cpp
     MemoryLeakRuleExTest.cpp
     DivByZeroRuleTest.cpp
