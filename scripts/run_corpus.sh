@@ -72,7 +72,11 @@ PYEOF
         "$CS_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
             > "out-$dir.txt" 2>&1
     else
-        "$CS_BIN" "$dir" --build-path "build-$dir" > "out-$dir.txt" 2>&1
+        # The scan-mode pins deliberately include the source tree's own
+        # non-build test fixtures. Their skipped TUs are measured below and
+        # accepted explicitly; the analyzer's default remains fail-closed.
+        "$CS_BIN" "$dir" --build-path "build-$dir" \
+            --accept-partial-coverage > "out-$dir.txt" 2>&1
     fi
     local code=$?
     set -e

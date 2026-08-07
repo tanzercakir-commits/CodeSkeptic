@@ -84,16 +84,15 @@ TEST(ExitPolicyTest, AllBrokenIsTwo) {
     EXPECT_EQ(analysisExitCode(0, 3, 3, false), 2);
 }
 
-TEST(ExitPolicyTest, PartialBreakageKeepsFindingsSemantics) {
-    EXPECT_EQ(analysisExitCode(0, 3, 2, false), 0);
-    EXPECT_EQ(analysisExitCode(1, 3, 2, false), 1);
+TEST(ExitPolicyTest, PartialBreakageHasNoTrustworthyVerdict) {
+    EXPECT_EQ(analysisExitCode(0, 3, 2, false), 2);
+    EXPECT_EQ(analysisExitCode(1, 3, 2, false), 2);
 }
 
 TEST(ExitPolicyTest, ForcedAnalysisKeepsOldBehavior) {
     EXPECT_EQ(analysisExitCode(0, 3, 3, true), 0);
 }
 
-TEST(ExitPolicyTest, NoInputsIsZeroNotTwo) {
-    // An empty run (no files matched) is not "analysis failed".
-    EXPECT_EQ(analysisExitCode(0, 0, 0, false), 0);
+TEST(ExitPolicyTest, NoInputsIsTwo) {
+    EXPECT_EQ(analysisExitCode(0, 0, 0, false), 2);
 }

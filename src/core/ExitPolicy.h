@@ -9,17 +9,13 @@ namespace codeskeptic {
 // external hardware evaluation's P1):
 //   0 — analysis ran, no findings
 //   1 — analysis ran, findings reported
-//   2 — NOTHING was analyzed: every attempted translation unit failed
-//       to compile (and --analyze-broken-tus was not given). The old
-//       behavior — "Clean! No issues found." + exit 0 — is the worst
-//       possible failure mode for an analyzer in CI: a green tick with
-//       zero coverage. Partial breakage keeps the honest per-TU
-//       warning and the findings-based code: some coverage is not NO
-//       coverage, and corpus/real-world flows depend on that.
+//   2 — no trustworthy verdict: no inputs or any requested translation
+//       unit was skipped (unless --analyze-broken-tus explicitly accepts
+//       error-recovery ASTs). Partial coverage is evidence, not a verdict.
 inline int analysisExitCode(int findings, std::size_t total_tus,
                             std::size_t broken_tus,
                             bool analyze_broken_tus) {
-    if (total_tus > 0 && broken_tus >= total_tus && !analyze_broken_tus)
+    if (total_tus == 0 || (broken_tus > 0 && !analyze_broken_tus))
         return 2;
     return findings > 0 ? 1 : 0;
 }
