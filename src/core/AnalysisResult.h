@@ -1,0 +1,94 @@
+#ifndef CODESKEPTIC_ANALYSIS_RESULT_H
+#define CODESKEPTIC_ANALYSIS_RESULT_H
+
+#include <cstddef>
+
+namespace codeskeptic {
+
+// One verdict contract for every frontend (CLI, MCP, integrations).
+// Findings and analysis integrity are deliberately separate: zero findings
+// is only a clean verdict when the requested evidence was produced.
+enum class AnalysisStatus {
+    Clean,
+    Findings,
+    Recorded,
+    Incomplete,
+    Failed,
+};
+
+struct AnalysisResult {
+    std::size_t attempted_tus = 0;
+    std::size_t analyzed_tus = 0;
+    std::size_t broken_tus = 0;
+    std::size_t incomplete_functions = 0;
+    std::size_t findings = 0;
+
+    bool analyze_broken_tus = false;
+    bool accept_partial_coverage = false;
+    bool no_inputs = false;
+    bool no_rules = false;
+    bool tool_failed = false;
+    bool summary_load_failed = false;
+    bool summary_stale = false;
+    bool summary_save_failed = false;
+    bool baseline_load_failed = false;
+    bool baseline_write_failed = false;
+    bool baseline_recorded = false;
+    bool report_write_failed = false;
+
+    bool hasHardFailure() const {
+        const bool nothing_analyzed =
+            attempted_tus > 0 && analyzed_tus == 0 && !analyze_broken_tus;
+        return no_inputs || no_rules || tool_failed || nothing_analyzed ||
+               summary_save_failed || baseline_load_failed ||
+               baseline_write_failed || report_write_failed;
+    }
+
+    bool hasIncompleteEvidence() const {
+        const bool partial_tu_coverage =
+            broken_tus > 0 && !analyze_broken_tus &&
+            !accept_partial_coverage;
+        const bool unaccounted_tus =
+            analyzed_tus + broken_tus < attempted_tus;
+        return partial_tu_coverage || unaccounted_tus ||
+               incomplete_functions > 0 ||
+               summary_load_failed || summary_stale;
+    }
+
+    bool complete() const {
+        return !hasHardFailure() && !hasIncompleteEvidence();
+    }
+
+    AnalysisStatus status() const {
+        if (hasHardFailure()) return AnalysisStatus::Failed;
+        if (hasIncompleteEvidence()) return AnalysisStatus::Incomplete;
+        if (baseline_recorded) return AnalysisStatus::Recorded;
+        return findings > 0 ? AnalysisStatus::Findings
+                            : AnalysisStatus::Clean;
+    }
+
+    // Stable process contract:
+    //   0 complete + clean (or successful baseline recording)
+    //   1 complete + findings
+    //   2 no trustworthy verdict (input, coverage, evidence, or I/O failure)
+    int exitCode() const {
+        if (!complete()) return 2;
+        if (baseline_recorded) return 0;
+        return findings > 0 ? 1 : 0;
+    }
+
+    const char* statusName() const {
+        switch (status()) {
+            case AnalysisStatus::Clean: return "clean";
+            case AnalysisStatus::Findings: return "findings";
+            case AnalysisStatus::Recorded: return "recorded";
+            case AnalysisStatus::Incomplete: return "incomplete";
+            case AnalysisStatus::Failed: return "failed";
+        }
+        return "failed";
+    }
+};
+
+} // namespace codeskeptic
+
+#endif // CODESKEPTIC_ANALYSIS_RESULT_H

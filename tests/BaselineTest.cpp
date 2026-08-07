@@ -225,5 +225,7 @@ TEST(FilesUxTest, ZeroAnalyzableFiles_IsAnError) {
     codeskeptic::Config config;
     config.setSourcePath("/nonexistent/definitely/missing.c");
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
-    EXPECT_EQ(analyzer.run(), 2);
+    const auto result = analyzer.run();
+    EXPECT_EQ(result.exitCode(), 2);
+    EXPECT_EQ(result.status(), codeskeptic::AnalysisStatus::Failed);
 }

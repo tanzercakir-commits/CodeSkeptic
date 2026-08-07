@@ -67,6 +67,7 @@ DivSite findDiv(const FunctionDecl* fn) {
 
 struct Result {
     bool found = false;
+    bool converged = false;
     Interval divisor;
 };
 
@@ -93,7 +94,8 @@ public:
         DivSite site = findDiv(v.fn);
         if (!site.op) return;
         codeskeptic::IntervalAnalysis analysis(intVars(v.fn, ctx));
-        codeskeptic::runDataflow(v.fn, ctx, analysis);
+        auto dataflow = codeskeptic::runDataflow(v.fn, ctx, analysis);
+        out_.converged = dataflow.converged;
         out_.divisor = analysis.intervalAt(site.op, site.divisor);
         out_.found = true;
     }
@@ -118,6 +120,7 @@ Interval divisorInterval(const std::string& code) {
     clang::tooling::runToolOnCode(std::make_unique<Action>(out), code,
                                   "interval_test.c");
     EXPECT_TRUE(out.found);
+    EXPECT_TRUE(out.converged);
     return out.divisor;
 }
 

@@ -10,12 +10,12 @@
 // coverage summary instead of six scattered per-rule stderr lines
 // (every rule re-reported the same non-converged function).
 //
-// v0 tracks a single gap kind — non-convergence — because that is the
-// one incompleteness signal the engine already produces. Opaque
-// external calls and unsupported constructs are later gap kinds; the
-// enum leaves room. Cleared per analysis run (StaticAnalyzer ctor/dtor),
-// exactly like the other global engine state, so a long-lived process
-// (the MCP server) never leaks one run's gaps into the next.
+// The report distinguishes a concrete function whose CFG could not be
+// built from a CFG that hit its fixpoint safety limit. Opaque external
+// calls and unsupported constructs are later gap kinds. Cleared per
+// analysis run (StaticAnalyzer ctor/dtor), exactly like the other global
+// engine state, so a long-lived process (the MCP server) never leaks one
+// run's gaps into the next.
 
 #include <cstddef>
 #include <set>
@@ -24,8 +24,11 @@
 
 namespace codeskeptic {
 
+enum class DataflowFailure;
+
 enum class CoverageGap {
     NonConvergence,   // dataflow hit the iteration cap; findings incomplete
+    CfgUnavailable,   // concrete function had no buildable CFG
 };
 
 struct CoverageEntry {
@@ -42,6 +45,9 @@ public:
     // belongs to the function, not the rule — so only the first report
     // per function is kept.
     void recordNonConvergence(const std::string& function);
+    void recordCfgUnavailable(const std::string& function);
+    void recordDataflowFailure(const std::string& function,
+                               DataflowFailure failure);
 
     const std::vector<CoverageEntry>& entries() const { return entries_; }
     // Number of distinct functions with any coverage gap.
