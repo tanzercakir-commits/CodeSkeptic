@@ -40,11 +40,11 @@ koru. Ardından Faz 1 capability tier sözleşmesine geç.
 
 ## Açık kullanıcı kararları
 
-Yok; `phase-truth-sync-v048` draft PR #120 olarak açıldı ve güncel-HEAD CI
-kanıtını bekliyor. Merge-ready olduğunda çalışma kuralı 12 gereği ayrıca açık
-merge onayı istenecek. PR #119'un tek seferlik yönetici bypass'ı tamamlandı;
-TensorFlow PR #123994 merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı
-güncellendi.
+Draft PR #120'yi ready-for-review durumuna geçirmek ve sonrasında merge etmek
+çalışma kuralı 12 onay kilidinde. Güncel CI makbuzları PR açıklamasında tutulur;
+bu TODO geçici run durumlarını kopyalamaz. PR #119'un tek seferlik yönetici
+bypass'ı tamamlandı; TensorFlow PR #123994 merge edildi, issue #123387 kapandı
+ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
