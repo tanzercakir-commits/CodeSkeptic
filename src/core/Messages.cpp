@@ -206,10 +206,10 @@ const MsgEntry kMessages[] = {
      "dizi sinirlari disinda erisim: ispatlanan indeks araligi {0}, dizi "
      "siniri [0, {1}) disinda"},
     // CoverageIncomplete
-    {"[CodeSkeptic] analysis coverage: {0} function(s) hit the iteration cap "
-     "and were not fully analyzed; their findings may be incomplete:",
-     "[CodeSkeptic] analiz kapsami: {0} fonksiyon iterasyon tavanina takildi "
-     "ve tam analiz edilemedi; bu fonksiyonlardaki bulgular eksik olabilir:"},
+    {"[CodeSkeptic] analysis coverage: dataflow could not complete for {0} "
+     "function(s); their findings may be incomplete:",
+     "[CodeSkeptic] analiz kapsami: {0} fonksiyon icin veri akisi "
+     "tamamlanamadi; bu fonksiyonlardaki bulgular eksik olabilir:"},
     // BrokenTuSkipped
     {"[CodeSkeptic] {0} translation unit(s) failed to COMPILE and were "
      "skipped - findings from an error-recovery AST are unreliable. Fix "

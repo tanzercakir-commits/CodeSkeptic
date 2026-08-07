@@ -20,11 +20,18 @@
 
 namespace codeskeptic {
 
+enum class DataflowFailure {
+    None,
+    CfgUnavailable,
+    IterationLimit,
+};
+
 template <typename Analysis>
 struct DataflowResult {
     using State = typename Analysis::State;
     std::unordered_map<unsigned, State> blockExitStates;
     bool converged = false;
+    DataflowFailure failure = DataflowFailure::None;
     unsigned exitBlockID = 0;
 };
 
@@ -173,12 +180,29 @@ DataflowResult<Analysis> runDataflow(
     using State = typename Analysis::State;
     DataflowResult<Analysis> result;
 
-    if (!func || !func->hasBody()) return result;
+    if (!func || !func->hasBody()) {
+        result.failure = DataflowFailure::CfgUnavailable;
+        return result;
+    }
 
     // CFG comes from the shared cache (built once per function; build
     // options — including setAllAlwaysAdd — live in CfgCache)
     clang::CFG* cfg = CfgCache::instance().get(func, ctx);
-    if (!cfg) return result;
+    if (!cfg) {
+        // A dependent function-template pattern has no concrete control
+        // flow yet, and Clang's CFG builder rejects many such bodies
+        // (notably dependent range-for loops). MatchFinder visits each
+        // concrete instantiation separately; those are the executable
+        // analysis units and get their own CFG/dataflow pass. Deferring
+        // only the rejected dependent pattern is therefore not a coverage
+        // gap. A CFG failure for any concrete function remains fail-closed.
+        if (func->isDependentContext() &&
+            !func->isTemplateInstantiation())
+            result.converged = true;
+        else
+            result.failure = DataflowFailure::CfgUnavailable;
+        return result;
+    }
 
     // Vanished-assert guards (AR.3). Built lazily per function and
     // empty for every function that contains no compiled-out assert —
@@ -215,14 +239,7 @@ DataflowResult<Analysis> runDataflow(
     unsigned latticeHeight = 4;
     if constexpr (detail::HasLatticeHeight<Analysis>::value)
         latticeHeight = analysis.latticeHeight();
-    const unsigned widenAfter = latticeHeight + 2;
-    // Widening cannot help if the global fuse expires at the exact visit
-    // count that merely makes a block eligible for it. Reserve enough
-    // post-threshold passes for the first widened snapshot, the
-    // join-with-history pass, and propagation through the SCC.
-    constexpr unsigned kWideningStabilizationVisits = 4;
-    const unsigned maxIterations =
-        numBlocks * (widenAfter + kWideningStabilizationVisits);
+    const unsigned maxIterations = numBlocks * (latticeHeight + 2);
 
     auto& blockExitState = result.blockExitStates;
 
@@ -415,6 +432,7 @@ DataflowResult<Analysis> runDataflow(
     // previous was added).
     std::vector<unsigned> visitCounts(numBlocks, 0);
     std::map<unsigned, State> widenMemory;
+    const unsigned widenAfter = latticeHeight + 2;
 
     while (!worklist.empty() && iterations < maxIterations) {
         ++iterations;
@@ -483,6 +501,8 @@ DataflowResult<Analysis> runDataflow(
     // allowed visit may have drained the queue. What matters is whether
     // unprocessed work remains.
     result.converged = worklist.empty();
+    result.failure = result.converged ? DataflowFailure::None
+                                      : DataflowFailure::IterationLimit;
     result.exitBlockID = cfg->getExit().getBlockID();
 
     // --- Phase 2: reporting pass ---

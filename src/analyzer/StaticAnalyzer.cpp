@@ -242,17 +242,22 @@ AnalysisResult StaticAnalyzer::run() {
         result.analyzed_tus + result.broken_tus < result.attempted_tus)
         result.tool_failed = true;
 
-    // Coverage: surface the functions the dataflow could not drive to a
-    // fixpoint (iteration cap). "No warning" in these is NOT "proven
-    // safe" — one honest summary, deduplicated across all rules, instead
-    // of six scattered per-rule stderr lines.
+    // Coverage: surface concrete functions whose CFG could not be built or
+    // whose dataflow could not reach a fixpoint. "No warning" in these is
+    // NOT "proven safe" — one honest summary, deduplicated across rules.
     const auto& coverage = CoverageReport::instance();
     result.incomplete_functions = coverage.incompleteCount();
     if (coverage.incompleteCount() > 0) {
         std::cerr << msg(MsgId::CoverageIncomplete,
                          std::to_string(coverage.incompleteCount())) << "\n";
-        for (const auto& entry : coverage.entries())
-            std::cerr << "  - " << entry.function << "\n";
+        for (const auto& entry : coverage.entries()) {
+            const char* reason =
+                entry.gap == CoverageGap::CfgUnavailable
+                    ? "CFG unavailable"
+                    : "iteration limit";
+            std::cerr << "  - " << entry.function << " (" << reason
+                      << ")\n";
+        }
     }
 
     if (!config_.summaryOut().empty()) {

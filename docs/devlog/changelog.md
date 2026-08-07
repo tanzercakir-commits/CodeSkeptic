@@ -14,6 +14,15 @@ for its intentionally broad tree pins; ordinary CLI, MCP and Action use stays
 fail-closed. The override preserves the attempted/analyzed/broken evidence and
 does not analyze unreliable error-recovery ASTs.
 
+Dataflow coverage now distinguishes an iteration limit from a concrete
+function whose CFG could not be built. A dependent function-template pattern
+that has no concrete control flow is deferred to the AST's concrete
+instantiations instead of being mislabeled as an iteration-cap failure; those
+instantiations are still analyzed normally. The worklist also keeps only one
+pending entry per CFG block and derives convergence from whether work remains,
+so duplicate fan-in scheduling and an exactly-drained iteration budget cannot
+manufacture an incomplete verdict.
+
 MCP's `analyze` result publishes `status`, `complete`, `exit_code`, coverage
 and evidence fields, and sets `isError` only when the verdict is unavailable;
 ordinary findings remain a successful tool call. Unknown or wrongly typed MCP
