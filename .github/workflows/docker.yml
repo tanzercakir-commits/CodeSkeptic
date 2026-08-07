@@ -1,5 +1,7 @@
 name: Docker
 
+# Validation-only trigger for draft PR #119 (no production behavior change).
+
 # phase* pushes and PRs touching the image: build + smoke only (the
 # gate). Tag pushes additionally publish to ghcr.io as <version> and
 # latest. The smoke is the same contract as the release tarball's:

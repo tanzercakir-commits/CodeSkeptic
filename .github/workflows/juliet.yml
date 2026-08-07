@@ -1,5 +1,7 @@
 name: Juliet benchmark
 
+# Validation-only trigger for draft PR #119 (no production behavior change).
+
 # Juliet score guard: runs on EVERY PR that touches analysis code
 # (suite is cached, ~3.5 min) and dropping below the juliet_expected.txt
 # baselines turns the job red (JULIET_GUARD_FAIL). Docs-only PRs are

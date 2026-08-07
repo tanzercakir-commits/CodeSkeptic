@@ -1,5 +1,7 @@
 name: Action self-test
 
+# Validation-only trigger for draft PR #119 (no production behavior change).
+
 # After a successful Release run, the packaged action (action.yml) is
 # exercised end to end against this repo's own docs/demo.c: download
 # the fresh release binary, analyze, produce SARIF, and verify that
