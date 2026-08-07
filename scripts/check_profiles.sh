@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-KNOWN_KEYS='source_path|build_path|output_format|json_output|sarif_output|html_output|min_severity|lang|baseline|function|fatal_asserts|alloc_functions|free_functions|owning_pointers|untrusted_int_sources|report_paths|policy|summary_diff_gate|analyze_broken_tus|enable_rule|disable_rule'
+KNOWN_KEYS='source_path|build_path|output_format|json_output|sarif_output|html_output|min_severity|lang|baseline|function|fatal_asserts|alloc_functions|free_functions|owning_pointers|untrusted_int_sources|report_paths|policy|summary_diff_gate|analyze_broken_tus|accept_partial_coverage|enable_rule|disable_rule'
 
 fail=0
 shopt -s nullglob

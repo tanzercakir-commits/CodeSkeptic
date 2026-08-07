@@ -2,8 +2,64 @@
 
 #include "core/Messages.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <set>
+#include <stdexcept>
+
+namespace {
+
+std::string trim(const std::string& value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+bool parseBool(const std::string& value, bool& out) {
+    if (value == "true" || value == "1") {
+        out = true;
+        return true;
+    }
+    if (value == "false" || value == "0") {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+bool isOutputFormat(const std::string& value) {
+    return value == "console" || value == "json" ||
+           value == "sarif" || value == "html";
+}
+
+const std::set<std::string>& singleValueOptions() {
+    static const std::set<std::string> options = {
+        "--source", "--build-path", "--json", "--sarif", "--html",
+        "--severity", "--disable-rule", "--lang", "--baseline",
+        "--function", "--fatal-asserts", "--assert-macros",
+        "--negative-assert-macros", "--alloc-functions",
+        "--free-functions", "--untrusted-int-sources",
+        "--owning-pointers", "--report-paths", "--policy", "--gate",
+        "--lines", "--summary-in", "--summary-out", "--files",
+        "--write-baseline"
+    };
+    return options;
+}
+
+bool looksLikeOption(const char* value) {
+    return value && value[0] == '-' && value[1] == '-';
+}
+
+void configError(const std::string& path, std::size_t line,
+                 const std::string& message) {
+    std::cerr << "[CodeSkeptic] invalid config " << path << ":" << line
+              << ": " << message << "\n";
+}
+
+} // anonymous namespace
 
 namespace codeskeptic {
 
@@ -15,22 +71,55 @@ Config::Config()
 
 bool Config::loadFromFile(const std::string& path) {
     std::ifstream file(path);
-    if (!file.is_open()) return false;
+    // The default project config is optional. Once the file exists, every
+    // non-comment line is a contract and is validated strictly.
+    if (!file.is_open()) {
+        std::error_code ec;
+        if (std::filesystem::exists(path, ec) && !ec) {
+            std::cerr << "[CodeSkeptic] cannot read config: " << path << "\n";
+            return false;
+        }
+        return true;
+    }
 
     std::string line;
+    std::size_t lineNumber = 0;
+    bool ok = true;
     while (std::getline(file, line)) {
+        ++lineNumber;
+        line = trim(line);
         if (line.empty() || line[0] == '#') continue;
 
         auto pos = line.find('=');
-        if (pos == std::string::npos) continue;
+        if (pos == std::string::npos) {
+            configError(path, lineNumber, "expected key=value");
+            ok = false;
+            continue;
+        }
 
-        std::string key = line.substr(0, pos);
-        std::string value = line.substr(pos + 1);
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        if (key.empty()) {
+            configError(path, lineNumber, "empty key");
+            ok = false;
+            continue;
+        }
 
         if (key == "source_path")        source_path_ = value;
         else if (key == "build_path")    build_path_ = value;
-        else if (key == "output_format") output_format_ = value;
-        else if (key == "json_output")   json_output_path_ = value;
+        else if (key == "output_format") {
+            if (!isOutputFormat(value)) {
+                configError(path, lineNumber,
+                            "output_format expects console/json/sarif/html");
+                ok = false;
+            } else {
+                output_format_ = value;
+            }
+        }
+        else if (key == "json_output") {
+            output_format_ = "json";
+            json_output_path_ = value;
+        }
         else if (key == "sarif_output") {
             output_format_ = "sarif";
             sarif_output_path_ = value;
@@ -39,34 +128,96 @@ bool Config::loadFromFile(const std::string& path) {
             output_format_ = "html";
             html_output_path_ = value;
         }
-        else if (key == "min_severity")  min_severity_ = parseSeverity(value);
-        else if (key == "lang")          lang_ = value;
+        else if (key == "min_severity") {
+            Severity parsed;
+            if (!parseSeverity(value, parsed)) {
+                configError(path, lineNumber,
+                            "min_severity expects info/warning/error");
+                ok = false;
+            } else {
+                min_severity_ = parsed;
+            }
+        }
+        else if (key == "lang") {
+            if (value != "en" && value != "tr") {
+                configError(path, lineNumber, "lang expects en or tr");
+                ok = false;
+            } else {
+                lang_ = value;
+            }
+        }
         else if (key == "baseline")      baseline_path_ = value;
         else if (key == "function")      addFunctions(value);
         else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "assert_macros") addAssertMacros(value);
         else if (key == "negative_assert_macros") addNegativeAssertMacros(value);
-        else if (key == "assert_recovery")
-            assert_recovery_ = (value == "true" || value == "1");
+        else if (key == "assert_recovery") {
+            if (!parseBool(value, assert_recovery_)) {
+                configError(path, lineNumber,
+                            "assert_recovery expects true/false/1/0");
+                ok = false;
+            }
+        }
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
         else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
         else if (key == "untrusted_int_sources") addNamesTo(untrusted_int_sources_, value);
         else if (key == "report_paths")    addReportPaths(value);
         else if (key == "policy")          addNamesTo(policies_, value);
-        else if (key == "summary_diff_gate") summary_diff_gate_ = value;
-        else if (key == "analyze_broken_tus")
-            analyze_broken_tus_ = (value == "true" || value == "1");
+        else if (key == "summary_diff_gate") {
+            if (value != "error" && value != "warn") {
+                configError(path, lineNumber,
+                            "summary_diff_gate expects error or warn");
+                ok = false;
+            } else {
+                summary_diff_gate_ = value;
+            }
+        }
+        else if (key == "analyze_broken_tus") {
+            if (!parseBool(value, analyze_broken_tus_)) {
+                configError(path, lineNumber,
+                            "analyze_broken_tus expects true/false/1/0");
+                ok = false;
+            }
+        }
+        else if (key == "accept_partial_coverage") {
+            if (!parseBool(value, accept_partial_coverage_)) {
+                configError(path, lineNumber,
+                            "accept_partial_coverage expects true/false/1/0");
+                ok = false;
+            }
+        }
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
+        else {
+            configError(path, lineNumber, "unknown key '" + key + "'");
+            ok = false;
+        }
     }
 
-    return true;
+    if (file.bad()) {
+        std::cerr << "[CodeSkeptic] failed while reading config: " << path
+                  << "\n";
+        ok = false;
+    }
+    return ok;
 }
 
 bool Config::parseArgs(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
+
+        if (singleValueOptions().count(arg) &&
+            (i + 1 >= argc || looksLikeOption(argv[i + 1]))) {
+            std::cerr << "[CodeSkeptic] missing value for " << arg << "\n";
+            return false;
+        }
+        if (arg == "--summary-diff" &&
+            (i + 2 >= argc || looksLikeOption(argv[i + 1]) ||
+             looksLikeOption(argv[i + 2]))) {
+            std::cerr << "[CodeSkeptic] --summary-diff expects two files\n";
+            return false;
+        }
 
         if (arg == "--source" && i + 1 < argc) {
             source_path_ = argv[++i];
@@ -82,11 +233,21 @@ bool Config::parseArgs(int argc, char* argv[]) {
             output_format_ = "html";
             html_output_path_ = argv[++i];
         } else if (arg == "--severity" && i + 1 < argc) {
-            min_severity_ = parseSeverity(argv[++i]);
+            const std::string value = argv[++i];
+            if (!parseSeverity(value, min_severity_)) {
+                std::cerr << "[CodeSkeptic] --severity expects "
+                             "info/warning/error, got: " << value << "\n";
+                return false;
+            }
         } else if (arg == "--disable-rule" && i + 1 < argc) {
             disabled_rules_.insert(argv[++i]);
         } else if (arg == "--lang" && i + 1 < argc) {
             lang_ = argv[++i];
+            if (lang_ != "en" && lang_ != "tr") {
+                std::cerr << "[CodeSkeptic] --lang expects en or tr, got: "
+                          << lang_ << "\n";
+                return false;
+            }
         } else if (arg == "--baseline" && i + 1 < argc) {
             baseline_path_ = argv[++i];
         } else if (arg == "--function" && i + 1 < argc) {
@@ -121,13 +282,21 @@ bool Config::parseArgs(int argc, char* argv[]) {
                 return false;
             }
         } else if (arg == "--lines" && i + 1 < argc) {
-            addLines(argv[++i]);
+            const std::string value = argv[++i];
+            if (!addLines(value)) {
+                std::cerr << "[CodeSkeptic] --lines expects positive line "
+                             "numbers/ranges (e.g. 10-40,55), got: "
+                          << value << "\n";
+                return false;
+            }
         } else if (arg == "--serve") {
             serve_ = true;
         } else if (arg == "--whole-program") {
             whole_program_ = true;
         } else if (arg == "--analyze-broken-tus") {
             analyze_broken_tus_ = true;
+        } else if (arg == "--accept-partial-coverage") {
+            accept_partial_coverage_ = true;
         } else if (arg == "--assumptions") {
             assumptions_ = true;
         } else if (arg == "--summary-in" && i + 1 < argc) {
@@ -158,7 +327,7 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--write-baseline" && i + 1 < argc) {
             write_baseline_path_ = argv[++i];
         } else if (arg == "--help") {
-            std::cerr << "Usage: codeskeptic [options] [source_path]\n"
+            std::cout << "Usage: codeskeptic [options] [source_path]\n"
                       << "\n"
                       << "Options:\n"
                       << "  --source <path>        Directory/file to analyze\n"
@@ -223,6 +392,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --serve                Run as an MCP server (JSON-RPC on stdio)\n"
                       << "  --whole-program        Two-pass mode: collect function summaries\n"
                       << "                         across all files first, then analyze\n"
+                      << "  --accept-partial-coverage  Allow a verdict over successfully\n"
+                      << "                         analyzed TUs while still reporting skips\n"
                       << "  --summary-out <file>   Save harvested cross-file function\n"
                       << "                         summaries to a file after analysis\n"
                       << "  --summary-in <file>    Load function summaries saved earlier;\n"
@@ -235,7 +406,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --lang <en|tr>         Diagnostic message language (default: en)\n"
                       << "  --version              Print version and exit\n"
                       << "  --help                 Show this message\n";
-            return false;
+            help_requested_ = true;
+            return true;
         } else if (arg[0] != '-' && source_path_.empty()) {
             source_path_ = arg;
         } else if (arg[0] != '-') {
@@ -246,9 +418,27 @@ bool Config::parseArgs(int argc, char* argv[]) {
             std::cerr << msg(MsgId::MultipleSourcePaths, source_path_, arg)
                       << "\n";
             return false;
+        } else {
+            if (singleValueOptions().count(arg) || arg == "--summary-diff")
+                std::cerr << "[CodeSkeptic] missing value for " << arg << "\n";
+            else
+                std::cerr << "[CodeSkeptic] unknown option: " << arg << "\n";
+            return false;
         }
     }
 
+    if (output_format_ == "json" && json_output_path_.empty()) {
+        std::cerr << "[CodeSkeptic] json output requires a file path\n";
+        return false;
+    }
+    if (output_format_ == "sarif" && sarif_output_path_.empty()) {
+        std::cerr << "[CodeSkeptic] sarif output requires a file path\n";
+        return false;
+    }
+    if (output_format_ == "html" && html_output_path_.empty()) {
+        std::cerr << "[CodeSkeptic] html output requires a file path\n";
+        return false;
+    }
     return true;
 }
 
@@ -327,24 +517,51 @@ void Config::addNamesTo(std::set<std::string>& target,
     }
 }
 
-void Config::addLines(const std::string& list) {
-    // "12-40,55" -> {12,40}, {55,55}. Invalid tokens are silently skipped.
+bool Config::addLines(const std::string& list) {
+    // "12-40,55" -> {12,40}, {55,55}. Invalid scope is a caller error:
+    // silently dropping it would expand a targeted analysis to all functions.
     std::string token;
-    auto flush = [this](const std::string& t) {
-        if (t.empty()) return;
+    bool ok = true;
+    auto flush = [this, &ok](const std::string& t) {
+        if (t.empty()) {
+            ok = false;
+            return;
+        }
         auto dash = t.find('-');
         unsigned from = 0, to = 0;
         try {
+            std::size_t used = 0;
             if (dash == std::string::npos) {
-                from = to = static_cast<unsigned>(std::stoul(t));
+                const auto parsed = std::stoul(t, &used);
+                if (used != t.size()) throw std::invalid_argument("line");
+                if (parsed > std::numeric_limits<unsigned>::max())
+                    throw std::out_of_range("line");
+                from = to = static_cast<unsigned>(parsed);
             } else {
-                from = static_cast<unsigned>(std::stoul(t.substr(0, dash)));
-                to = static_cast<unsigned>(std::stoul(t.substr(dash + 1)));
+                if (dash == 0 || dash + 1 >= t.size() ||
+                    t.find('-', dash + 1) != std::string::npos)
+                    throw std::invalid_argument("range");
+                const std::string first = t.substr(0, dash);
+                const std::string last = t.substr(dash + 1);
+                const auto parsedFrom = std::stoul(first, &used);
+                if (used != first.size()) throw std::invalid_argument("line");
+                if (parsedFrom > std::numeric_limits<unsigned>::max())
+                    throw std::out_of_range("line");
+                from = static_cast<unsigned>(parsedFrom);
+                const auto parsedTo = std::stoul(last, &used);
+                if (used != last.size()) throw std::invalid_argument("line");
+                if (parsedTo > std::numeric_limits<unsigned>::max())
+                    throw std::out_of_range("line");
+                to = static_cast<unsigned>(parsedTo);
             }
         } catch (...) {
+            ok = false;
             return;
         }
-        if (from == 0 || to < from) return;
+        if (from == 0 || to < from) {
+            ok = false;
+            return;
+        }
         lines_.emplace_back(from, to);
     };
     for (size_t i = 0; i <= list.size(); ++i) {
@@ -356,12 +573,23 @@ void Config::addLines(const std::string& list) {
             token += c;
         }
     }
+    return ok;
 }
 
-Severity Config::parseSeverity(const std::string& str) const {
-    if (str == "warning") return Severity::Warning;
-    if (str == "error")   return Severity::Error;
-    return Severity::Info;
+bool Config::parseSeverity(const std::string& str, Severity& severity) const {
+    if (str == "info") {
+        severity = Severity::Info;
+        return true;
+    }
+    if (str == "warning") {
+        severity = Severity::Warning;
+        return true;
+    }
+    if (str == "error") {
+        severity = Severity::Error;
+        return true;
+    }
+    return false;
 }
 
 } // namespace codeskeptic

@@ -242,6 +242,60 @@ TEST(McpServerTest, AnalyzeMissingPath_Error) {
     EXPECT_NE(response.find("-32602"), std::string::npos);
 }
 
+TEST(McpServerTest, AnalyzeRejectsUnknownOrWrongTypedFields) {
+    auto response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":60,"method":"tools/call",)"
+        R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
+        R"("severtiy":"error"}}})");
+    EXPECT_NE(response.find("unknown analyze field"), std::string::npos);
+
+    response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":61,"method":"tools/call",)"
+        R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
+        R"("functions":7}}})");
+    EXPECT_NE(response.find("field must be a string"), std::string::npos);
+
+    response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":62,"method":"tools/call",)"
+        R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
+        R"("lines":"10-x"}}})");
+    EXPECT_NE(response.find("invalid lines scope"), std::string::npos);
+}
+
+TEST(McpServerTest, BrokenTuReturnsFailedVerdictAndCoverage) {
+    auto path = writeTempSource(
+        "mcp_broken_verdict.cpp",
+        "#include \"definitely_missing_codeskeptic_header.h\"\n"
+        "int f() { return 0; }\n");
+    auto response = handleMcpMessage(analyzeRequest(63, path));
+
+    EXPECT_NE(response.find("\\\"status\\\":\\\"failed\\\""),
+              std::string::npos);
+    EXPECT_NE(response.find("\\\"complete\\\":false"), std::string::npos);
+    EXPECT_NE(response.find("\\\"attempted_tus\\\":1"), std::string::npos);
+    EXPECT_NE(response.find("\\\"analyzed_tus\\\":0"), std::string::npos);
+    EXPECT_NE(response.find("\\\"broken_tus\\\":1"), std::string::npos);
+    EXPECT_NE(response.find("\"isError\":true"), std::string::npos);
+}
+
+TEST(McpServerTest, MissingSummaryReturnsIncompleteEvidence) {
+    auto path = writeTempSource("mcp_missing_summary.cpp",
+                                "int f() { return 0; }\n");
+    const auto missing = std::filesystem::path(::testing::TempDir()) /
+                         "definitely_missing_summary.csk";
+    std::string request =
+        std::string(R"({"jsonrpc":"2.0","id":64,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","summaries":")" + missing.generic_string() + R"("}}})";
+    auto response = handleMcpMessage(request);
+
+    EXPECT_NE(response.find("\\\"status\\\":\\\"incomplete\\\""),
+              std::string::npos);
+    EXPECT_NE(response.find("\\\"summary_load_failed\\\":true"),
+              std::string::npos);
+    EXPECT_NE(response.find("\"isError\":true"), std::string::npos);
+}
+
 TEST(McpServerTest, UnknownTool_Error) {
     auto response = handleMcpMessage(
         R"({"jsonrpc":"2.0","id":8,"method":"tools/call",)"
