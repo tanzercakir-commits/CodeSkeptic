@@ -149,9 +149,18 @@ AnalysisResult StaticAnalyzer::run() {
         }
     }
 
+    // Registered-but-disabled is still "no analysis". Without this
+    // post-configuration check, disabling every rule produced a false
+    // clean verdict because runAll simply had nothing to execute.
+    if (engine_.enabledRuleCount() == 0) {
+        std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
+        result.no_rules = true;
+        return result;
+    }
+
     std::cerr << msg(MsgId::AnalysisStarting,
                      std::to_string(source_mgr_->fileCount()),
-                     std::to_string(engine_.ruleCount())) << "\n";
+                     std::to_string(engine_.enabledRuleCount())) << "\n";
 
     // Load saved summaries (Cross-TU v2): a previous run's harvest is
     // merged into the store — a single file is analyzed with

@@ -42,7 +42,7 @@ inputs:
     required: false
     default: ""
   extra-args:
-    description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $PWD/src)"
+    description: "Extra CLI arguments (e.g. --alloc-functions my_malloc --report-paths $GITHUB_WORKSPACE/src)"
     required: false
     default: ""
 
@@ -136,8 +136,17 @@ runs:
         if [ -n "$INPUT_BUILD_PATH" ]; then
           args+=( --build-path "$INPUT_BUILD_PATH" )
         fi
-        # Intentional simple word splitting, without evaluating shell syntax.
-        read -r -a extra <<< "$INPUT_EXTRA_ARGS"
+        # Shell-style quoting plus environment-variable expansion, still
+        # strictly data-only: no eval, command substitution, or globbing.
+        parsed_args=$(mktemp "$RUNNER_TEMP/codeskeptic-args-XXXXXX")
+        trap 'rm -f "$parsed_args"' EXIT
+        if ! python3 "$GITHUB_ACTION_PATH/scripts/action_args.py" \
+             "$INPUT_EXTRA_ARGS" > "$parsed_args"; then
+          exit 2
+        fi
+        mapfile -d '' -t extra < "$parsed_args"
+        rm -f "$parsed_args"
+        trap - EXIT
         code=0
         codeskeptic "${args[@]}" "${extra[@]}" || code=$?
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"

@@ -47,6 +47,14 @@ through environment variables rather than interpolated into shell source;
 `extra-args` is split as data without evaluating command substitutions. An
 invalid gate can no longer fall through to a green report-only run.
 
+The final integrity audit closed four ways integrations could still overstate
+their result. Action `extra-args` now preserves quoted paths and expands
+environment variables such as `$GITHUB_WORKSPACE` without executing shell
+syntax. Disabling every registered rule is verdict-unavailable rather than
+clean. JSON and SARIF publish the same exit-code evidence as CLI/MCP, while an
+incomplete empty HTML report can no longer display the contradictory “Clean!”
+banner.
+
 The first real-world replay proved why the verdict distinction matters. The
 old lane swallowed analyzer exit 2, counted only emitted diagnostics and
 reported success even though 16 libgit2 TUs and 3 rtp2httpd TUs had failed to

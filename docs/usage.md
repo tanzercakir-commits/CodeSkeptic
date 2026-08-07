@@ -105,6 +105,11 @@ verdict was produced (invalid input/config, incomplete coverage/evidence,
 or an output artifact could not be written). Report-only integrations may
 relax `1`; they must never turn `2` green.
 
+JSON, SARIF and HTML artifacts carry that same status and exit code together
+with translation-unit/dataflow coverage. An empty HTML findings list says
+“Clean” only when the evidence is complete; an unavailable verdict stays
+visibly unavailable.
+
 Machine-readable capability discovery does not start an analysis:
 
 ```bash

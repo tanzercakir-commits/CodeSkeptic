@@ -74,3 +74,13 @@ TEST(VerdictIntegrityTest, RequestedMissingBaselineIsExitTwo) {
     EXPECT_TRUE(result.baseline_load_failed);
     EXPECT_EQ(result.exitCode(), 2);
 }
+
+TEST(VerdictIntegrityTest, AllRegisteredRulesDisabledIsExitTwo) {
+    const auto source = writeCleanSource("verdict_no_enabled_rules.cpp");
+    auto result = runWithOneRule(configFor(
+        {"codeskeptic", source, "--disable-rule", "div-by-zero"}));
+
+    EXPECT_TRUE(result.no_rules);
+    EXPECT_EQ(result.status(), AnalysisStatus::Failed);
+    EXPECT_EQ(result.exitCode(), 2);
+}

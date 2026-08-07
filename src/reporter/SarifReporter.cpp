@@ -107,7 +107,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
         file << "      \"invocations\": [ { \"executionSuccessful\": "
              << (result->complete() ? "true" : "false")
              << ", \"properties\": { \"codeskeptic/status\": \""
-             << result->statusName() << "\", \"codeskeptic/attemptedTUs\": "
+             << result->statusName() << "\", \"codeskeptic/exitCode\": "
+             << result->exitCode()
+             << ", \"codeskeptic/attemptedTUs\": "
              << result->attempted_tus
              << ", \"codeskeptic/analyzedTUs\": " << result->analyzed_tus
              << ", \"codeskeptic/brokenTUs\": " << result->broken_tus

@@ -54,6 +54,14 @@ size_t RuleEngine::ruleCount() const {
     return rules_.size();
 }
 
+size_t RuleEngine::enabledRuleCount() const {
+    size_t count = 0;
+    for (const auto& rule : rules_) {
+        if (rule->isEnabled()) ++count;
+    }
+    return count;
+}
+
 std::vector<std::string> RuleEngine::ruleIds() const {
     std::vector<std::string> ids;
     ids.reserve(rules_.size());

@@ -183,6 +183,17 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
          << "<div class=\"wrap\">\n<header>\n<h1>CodeSkeptic Report</h1>\n"
          << "<p class=\"sub\">Verdict: "
          << (result ? result->statusName() : "not-recorded") << "</p>\n"
+         << "<p class=\"sub\">Exit code: "
+         << (result ? std::to_string(result->exitCode()) : "not-recorded")
+         << "</p>\n";
+    if (result) {
+        file << "<p class=\"sub\">TUs: " << result->analyzed_tus << " / "
+             << result->attempted_tus << " analyzed &middot; "
+             << result->broken_tus << " broken &middot; "
+             << result->incomplete_functions
+             << " incomplete function(s)</p>\n";
+    }
+    file
          << "<p class=\"sub\"><span id=\"shown\">" << diagnostics.size()
          << "</span> / " << diagnostics.size()
          << " finding(s) &middot; generated " << stamp << "</p>\n"
@@ -211,7 +222,12 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
             "file, function or message&hellip;\">\n<main>\n";
 
     if (diagnostics.empty()) {
-        file << "<p class=\"empty\">Clean! No issues found.</p>\n";
+        if (result && result->complete()) {
+            file << "<p class=\"empty\">Clean! No issues found.</p>\n";
+        } else {
+            file << "<p class=\"empty\">Verdict unavailable &mdash; no "
+                    "clean result was produced.</p>\n";
+        }
     }
 
     LineCache cache;
