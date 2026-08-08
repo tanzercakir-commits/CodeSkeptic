@@ -197,7 +197,7 @@ bool edgeInfeasibleByFlags(const Stmt* leafCond, bool edgeIsTrue,
     if (const auto* call = dyn_cast<CallExpr>(stripped)) {
         const auto& reg = SummaryRegistry::instance();
         if (!reg.stable()) return false;
-        if (const auto* summary = reg.lookup(call->getDirectCallee())) {
+        if (const auto* summary = reg.lookup(call)) {
             using RZ = SummaryRegistry::ReturnZeroness;
             if (summary->returnZeroness == RZ::AlwaysZero)
                 return edgeIsTrue;   // condition certainly false

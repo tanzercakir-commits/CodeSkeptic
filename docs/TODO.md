@@ -42,25 +42,29 @@ kolateral sıfır. BULGU 3 kod değil önkoşul; backlog #1'e işlendi.
 Yan ürün: corpus pin'i 53→54 merkeze alındı (895c813'ten beri
 sürükleniyordu, toleransın içinde sessizce).
 
-## Sıradaki iş
+## Next work
 
-Bağlayıcı ürün programında Faz 4 interprocedural motor v2'nin ilk beş dilimi
-RED→GREEN tamamlandı: exact pointer return-alias (v7), parametre precondition/
-postcondition (v8), bağımsız side-effect/ownership ilişkileri (v9), callee-first
-call-graph SCC sabit noktası ve alan-duyarlı yazma etkileri (v10).
+The first six slices of Phase 4 interprocedural engine v2 are locally
+RED-to-GREEN complete: exact pointer return identity (v7), parameter
+pre/postconditions (v8), independent access/ownership relations (v9), the
+callee-first call-graph SCC fixed point, field-sensitive writes (v10), and
+controlled local function-pointer targets.
 
-Alan-duyarlılığı; pointer ve record-reference parametrelerinde kesin tek-atlamalı
-may-write kümelerini, sibling-field korunmasını, `(*p).field`, temiz alias,
-alan adresi/reference'i, dönüş aliası, whole-object yazımı, const/non-const üye
-metodu, doğrudan zincir, cross-TU kalıcılık, muhafazakâr merge ve summary-diff
-yönlerini kapsıyor. v1-v9 dosyaları muhafazakâr okunuyor; bozuk v10 genişliği,
-vektör uzunluğu ve alan kodlaması toptan reddediliyor. Tam Windows kapısı
-956/956; exact korpus cJSON 54 (76 attempted / 35 analyzed / 41 açıkça kabul
-edilmiş broken) ve tinyxml2 9 (3/3), Faz 4.4'e göre bulgu-site deltası sıfır.
+The controlled resolver accepts only automatic local raw function pointers
+whose initializer and every assignment produce a closed target set. Clean
+aliases, conditional choices, direct/C targets, persisted cross-TU target
+summaries, and every existing summary relation compose. Unknown sources,
+address or mutable-reference escape, by-reference capture, inline-assembly
+output, volatile/non-local storage, pointer parameters, member pointers, and
+global/table dispatch remain conservative.
 
-Sıradaki dilim kontrollü function-pointer hedef çözümü; ardından kütüphane
-model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak; tam suite,
-doküman senkronu ve gerçek korpus kapıları geçmeden dilim kapanmayacak.
+The exact local gates are 971/971 tests, thesis `clean_fp=0` with
+`bug_caught=9/15`, a clean 47/47-TU self-scan, cJSON 54 findings
+(76 attempted / 35 analyzed / 41 explicitly accepted broken), and tinyxml2 9
+findings (3/3). Corpus diagnostic-site deltas versus Phase 4.5 are zero.
+
+The next slice is library model files. Every relation still requires a RED
+receipt, the full suite, documentation sync, and an exact real-corpus audit.
 
 ## Açık kullanıcı kararları
 

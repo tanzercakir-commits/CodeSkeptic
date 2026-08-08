@@ -25,6 +25,18 @@
 
 using namespace clang;
 
+namespace codeskeptic {
+void mergeConservative(
+    SummaryRegistry::FunctionSummary& into,
+    const SummaryRegistry::FunctionSummary& from);
+void mergeTargetSummaries(
+    SummaryRegistry::FunctionSummary& into,
+    const SummaryRegistry::FunctionSummary& from);
+} // namespace codeskeptic
+
+using codeskeptic::mergeConservative;
+using codeskeptic::mergeTargetSummaries;
+
 namespace {
 
 constexpr unsigned kMinimumSccSweeps = 16;
@@ -40,6 +52,226 @@ using ParamPostcondition = codeskeptic::SummaryRegistry::ParamPostcondition;
 using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
+using FunctionTargetSet = std::set<const FunctionDecl*>;
+using IndirectTargetMap =
+    std::map<const CallExpr*, std::vector<const FunctionDecl*>>;
+
+const IndirectTargetMap* activeIndirectTargets = nullptr;
+
+const VarDecl* targetVarRef(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
+        return dyn_cast<VarDecl>(ref->getDecl());
+    return nullptr;
+}
+
+bool containsTargetVar(const Expr* expr, const VarDecl* variable) {
+    if (!expr || !variable) return false;
+    struct Finder : RecursiveASTVisitor<Finder> {
+        const VarDecl* variable = nullptr;
+        bool found = false;
+        bool VisitDeclRefExpr(DeclRefExpr* reference) {
+            if (reference->getDecl() == variable) {
+                found = true;
+                return false;
+            }
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    };
+    Finder finder;
+    finder.variable = variable;
+    finder.TraverseStmt(const_cast<Expr*>(expr));
+    return finder.found;
+}
+
+bool isFunctionPointerType(QualType type) {
+    return !type.isNull() && type->isPointerType() &&
+           type->getPointeeType()->isFunctionType();
+}
+
+// Closed, flow-insensitive target sets for automatic local function
+// pointers. Every visible initializer/assignment contributes a target.
+// Any unknown source or rebinding exposure rejects the whole set.
+class LocalFunctionPointerResolver {
+public:
+    explicit LocalFunctionPointerResolver(const FunctionDecl* function)
+        : function_(function) {}
+
+    std::optional<FunctionTargetSet> resolve(const Expr* expr) {
+        if (!expr) return std::nullopt;
+        expr = expr->IgnoreParenImpCasts();
+
+        if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+            if (const auto* function =
+                    dyn_cast<FunctionDecl>(ref->getDecl())) {
+                return FunctionTargetSet{function->getCanonicalDecl()};
+            }
+            if (const auto* variable = dyn_cast<VarDecl>(ref->getDecl()))
+                return resolveVariable(variable);
+            return std::nullopt;
+        }
+        if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_AddrOf ||
+                unary->getOpcode() == UO_Deref)
+                return resolve(unary->getSubExpr());
+            return std::nullopt;
+        }
+        if (const auto* choice = dyn_cast<ConditionalOperator>(expr)) {
+            auto yes = resolve(choice->getTrueExpr());
+            auto no = resolve(choice->getFalseExpr());
+            if (!yes || !no) return std::nullopt;
+            yes->insert(no->begin(), no->end());
+            return yes;
+        }
+        if (const auto* choice = dyn_cast<ChooseExpr>(expr))
+            return resolve(choice->getChosenSubExpr());
+        return std::nullopt;
+    }
+
+private:
+    struct MutationCollector : RecursiveASTVisitor<MutationCollector> {
+        const VarDecl* variable = nullptr;
+        std::vector<const Expr*> assignments;
+        bool unsafe = false;
+
+        bool VisitBinaryOperator(BinaryOperator* assignment) {
+            if (assignment->getOpcode() == BO_Assign &&
+                containsTargetVar(assignment->getLHS(), variable))
+                assignments.push_back(assignment->getRHS());
+            return true;
+        }
+
+        bool VisitUnaryOperator(UnaryOperator* unary) {
+            if (unary->getOpcode() == UO_AddrOf &&
+                containsTargetVar(unary->getSubExpr(), variable))
+                unsafe = true;
+            return true;
+        }
+
+        bool VisitGCCAsmStmt(GCCAsmStmt* statement) {
+            for (unsigned i = 0; i < statement->getNumOutputs(); ++i) {
+                if (containsTargetVar(statement->getOutputExpr(i), variable)) {
+                    unsafe = true;
+                    break;
+                }
+            }
+            return true;
+        }
+
+        bool VisitMSAsmStmt(MSAsmStmt*) {
+            unsafe = true;
+            return true;
+        }
+
+        bool VisitVarDecl(VarDecl* alias) {
+            if (!alias->hasInit() || !alias->getType()->isReferenceType())
+                return true;
+            if (alias->getType().getNonReferenceType().isConstQualified())
+                return true;
+            if (containsTargetVar(alias->getInit(), variable)) unsafe = true;
+            return true;
+        }
+
+        bool VisitCallExpr(CallExpr* call) {
+            codeskeptic::forEachNonConstRefArg(
+                call, [&](const Expr* argument) {
+                    if (containsTargetVar(argument, variable)) unsafe = true;
+                });
+            return true;
+        }
+
+        bool TraverseLambdaExpr(LambdaExpr* lambda) {
+            auto init = lambda->capture_init_begin();
+            for (const LambdaCapture& capture : lambda->captures()) {
+                const Expr* captureInit = *init++;
+                if (capture.getCaptureKind() != LCK_ByRef) continue;
+                if ((capture.capturesVariable() &&
+                     capture.getCapturedVar() == variable) ||
+                    containsTargetVar(captureInit, variable))
+                    unsafe = true;
+            }
+            return true;
+        }
+    };
+
+    std::optional<FunctionTargetSet> resolveVariable(
+            const VarDecl* variable) {
+        auto cached = cache_.find(variable);
+        if (cached != cache_.end()) return cached->second;
+        if (!resolving_.insert(variable).second) return std::nullopt;
+
+        std::optional<FunctionTargetSet> result;
+        const bool controlled =
+            variable->getDeclContext() == function_ &&
+            variable->getStorageDuration() == SD_Automatic &&
+            isFunctionPointerType(variable->getType()) &&
+            !variable->getType().isVolatileQualified() &&
+            variable->hasInit();
+        if (controlled) {
+            MutationCollector mutations;
+            mutations.variable = variable;
+            mutations.TraverseStmt(
+                const_cast<Stmt*>(function_->getBody()));
+            if (!mutations.unsafe) {
+                FunctionTargetSet targets;
+                std::vector<const Expr*> sources{variable->getInit()};
+                sources.insert(sources.end(), mutations.assignments.begin(),
+                               mutations.assignments.end());
+                bool exact = true;
+                for (const Expr* source : sources) {
+                    auto resolved = resolve(source);
+                    if (!resolved || resolved->empty()) {
+                        exact = false;
+                        break;
+                    }
+                    targets.insert(resolved->begin(), resolved->end());
+                }
+                if (exact && !targets.empty()) result = std::move(targets);
+            }
+        }
+
+        resolving_.erase(variable);
+        cache_[variable] = result;
+        return result;
+    }
+
+    const FunctionDecl* function_;
+    std::map<const VarDecl*, std::optional<FunctionTargetSet>> cache_;
+    std::set<const VarDecl*> resolving_;
+};
+
+struct ControlledIndirectCallCollector
+    : RecursiveASTVisitor<ControlledIndirectCallCollector> {
+    explicit ControlledIndirectCallCollector(const FunctionDecl* function)
+        : resolver(function) {}
+
+    bool VisitCallExpr(CallExpr* call) {
+        if (call->getDirectCallee()) return true;
+        auto targets = resolver.resolve(call->getCallee());
+        if (!targets || targets->empty()) return true;
+        (*output)[call] = {targets->begin(), targets->end()};
+        return true;
+    }
+
+    bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+
+    LocalFunctionPointerResolver resolver;
+    IndirectTargetMap* output = nullptr;
+};
+
+IndirectTargetMap buildIndirectTargetMap(
+        const std::vector<const FunctionDecl*>& functions) {
+    IndirectTargetMap out;
+    for (const FunctionDecl* function : functions) {
+        ControlledIndirectCallCollector collector(function);
+        collector.output = &out;
+        collector.TraverseStmt(
+            const_cast<Stmt*>(function->getBody()));
+    }
+    return out;
+}
 
 // --- Return nullness ---
 
@@ -54,6 +286,29 @@ const FunctionSummary* lookupPrev(const SummaryTable& previous,
     auto it = previous.find(callee->getCanonicalDecl());
     if (it != previous.end()) return &it->second;
     return codeskeptic::SummaryRegistry::instance().lookupGlobal(callee);
+}
+
+std::optional<FunctionSummary> lookupPrev(
+        const SummaryTable& previous, const CallExpr* call) {
+    if (!call) return std::nullopt;
+    if (const FunctionDecl* direct = call->getDirectCallee()) {
+        if (const FunctionSummary* summary = lookupPrev(previous, direct))
+            return *summary;
+        return std::nullopt;
+    }
+    if (!activeIndirectTargets) return std::nullopt;
+    auto found = activeIndirectTargets->find(call);
+    if (found == activeIndirectTargets->end() || found->second.empty())
+        return std::nullopt;
+
+    std::optional<FunctionSummary> combined;
+    for (const FunctionDecl* target : found->second) {
+        const FunctionSummary* summary = lookupPrev(previous, target);
+        if (!summary) return std::nullopt;
+        if (!combined) combined = *summary;
+        else mergeTargetSummaries(*combined, *summary);
+    }
+    return combined;
 }
 
 // Value-level "bad value" state. The two domains share one shape: in
@@ -92,8 +347,7 @@ VState vstateOf(const Expr* expr, const SummaryTable& previous) {
     }
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        if (const auto* summary =
-                lookupPrev(previous, call->getDirectCallee())) {
+        if (const auto summary = lookupPrev(previous, call)) {
             if (summary->returnNullness == ReturnNullness::NeverNull)
                 return VState::NonBad;
             if (summary->returnNullness == ReturnNullness::MaybeNull)
@@ -127,8 +381,7 @@ VState zstateOf(const Expr* expr, const SummaryTable& previous) {
     }
 
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        if (const auto* summary =
-                lookupPrev(previous, call->getDirectCallee())) {
+        if (const auto summary = lookupPrev(previous, call)) {
             if (summary->returnZeroness == ReturnZeroness::AlwaysZero)
                 return VState::Bad;
             if (summary->returnZeroness == ReturnZeroness::NeverZero)
@@ -508,8 +761,7 @@ private:
                 call, [&](const Expr*) { hasNonConstRefArg = true; });
             if (hasNonConstRefArg) return -1;
 
-            const auto* summary =
-                lookupPrev(previous_, call->getDirectCallee());
+            const auto summary = lookupPrev(previous_, call);
             if (!summary || summary->returnAliasParam < 0) return -1;
 
             unsigned argOffset = 0;
@@ -626,8 +878,7 @@ public:
                 unary->getOpcode() == UO_AddrOf)
                 kill(exprAsVar(unary->getSubExpr()), out);
         } else if (const auto* call = dyn_cast<CallExpr>(stmt)) {
-            const FunctionSummary* summary =
-                lookupPrev(previous_, call->getDirectCallee());
+            const auto summary = lookupPrev(previous_, call);
             unsigned argOffset = 0;
             if (isa<CXXOperatorCallExpr>(call)) {
                 const auto* method = dyn_cast_or_null<CXXMethodDecl>(
@@ -682,8 +933,7 @@ private:
                                      : it->second;
         }
         if (const auto* call = dyn_cast<CallExpr>(expr)) {
-            const FunctionSummary* summary =
-                lookupPrev(previous_, call->getDirectCallee());
+            const auto summary = lookupPrev(previous_, call);
             if (!summary) return OwnershipState::Unknown;
             if (summary->returnAliasParam >= 0) {
                 unsigned argOffset = 0;
@@ -822,7 +1072,7 @@ PtrRes resolveNullReturn(const Expr* e, const FunctionDecl* func,
         return PtrRes::Passthrough;
     }
     if (const auto* call = dyn_cast<CallExpr>(e)) {
-        const auto* summary = lookupPrev(previous, call->getDirectCallee());
+        const auto summary = lookupPrev(previous, call);
         if (!summary) return PtrRes::Blocked;
         if (summary->returnNullness == ReturnNullness::NeverNull)
             return PtrRes::NonNull;
@@ -924,7 +1174,7 @@ PtRes resolveZeroReturn(const Expr* e, const FunctionDecl* func,
         return PtRes::Passthrough;
     }
     if (const auto* call = dyn_cast<CallExpr>(e)) {
-        const auto* summary = lookupPrev(previous, call->getDirectCallee());
+        const auto summary = lookupPrev(previous, call);
         if (!summary) return PtRes::Blocked;
         if (summary->returnZeroness == ReturnZeroness::NeverZero)
             return PtRes::NonZero;
@@ -1497,7 +1747,7 @@ public:
     bool VisitCallExpr(CallExpr* call) {
         const FunctionDecl* callee = call->getDirectCallee();
         bool isFreeByName = calleeIdentifier(callee) == "free";
-        const FunctionSummary* summary = lookupPrev(previous_, callee);
+        const auto summary = lookupPrev(previous_, call);
 
         for (unsigned i = 0; i < call->getNumArgs(); ++i) {
             const Expr* arg = call->getArg(i);
@@ -1720,8 +1970,7 @@ public:
     }
 
     bool VisitCallExpr(CallExpr* call) {
-        const FunctionSummary* summary =
-            lookupPrev(previous_, call->getDirectCallee());
+        const auto summary = lookupPrev(previous_, call);
         const unsigned offset = callParamOffset(call);
         for (unsigned argIndex = offset; argIndex < call->getNumArgs();
              ++argIndex) {
@@ -1759,7 +2008,7 @@ public:
                 case ParamAccess::None: break;
                 case ParamAccess::Unknown: relation.unknownAccess = true; break;
             }
-            composeFieldWrites(relation, summary, paramIndex);
+            composeFieldWrites(relation, &*summary, paramIndex);
             switch (summary->paramOwnership(paramIndex)) {
                 case ParamOwnership::Consumed:
                     relation.consumes = true;
@@ -2289,8 +2538,7 @@ public:
             return out;
         }
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
-            const FunctionSummary* summary =
-                lookupPrev(previous_, call->getDirectCallee());
+            const auto summary = lookupPrev(previous_, call);
             unsigned argOffset = 0;
             if (isa<CXXOperatorCallExpr>(call)) {
                 const auto* method = dyn_cast_or_null<CXXMethodDecl>(
@@ -2373,8 +2621,7 @@ private:
             return yes == no ? yes : ParamPostcondition::Unknown;
         }
         if (const auto* call = dyn_cast<CallExpr>(expr)) {
-            const FunctionSummary* summary =
-                lookupPrev(previous_, call->getDirectCallee());
+            const auto summary = lookupPrev(previous_, call);
             if (summary) {
                 if (summary->returnNullness == ReturnNullness::NeverNull)
                     return ParamPostcondition::NonNull;
@@ -2495,13 +2742,21 @@ using CallEdges = std::map<FunctionNode, std::vector<FunctionNode>>;
 
 struct DirectCallCollector : RecursiveASTVisitor<DirectCallCollector> {
     const std::set<FunctionNode>* known = nullptr;
+    const IndirectTargetMap* indirectTargets = nullptr;
     std::set<FunctionNode> callees;
 
     bool VisitCallExpr(CallExpr* call) {
-        const FunctionDecl* callee = call->getDirectCallee();
-        if (!callee) return true;
-        const FunctionNode key = callee->getCanonicalDecl();
-        if (known->count(key)) callees.insert(key);
+        if (const FunctionDecl* callee = call->getDirectCallee()) {
+            const FunctionNode key = callee->getCanonicalDecl();
+            if (known->count(key)) callees.insert(key);
+            return true;
+        }
+        auto found = indirectTargets->find(call);
+        if (found == indirectTargets->end()) return true;
+        for (const FunctionDecl* target : found->second) {
+            const FunctionNode key = target->getCanonicalDecl();
+            if (known->count(key)) callees.insert(key);
+        }
         return true;
     }
 
@@ -2517,7 +2772,8 @@ struct FunctionCallGraph {
 };
 
 FunctionCallGraph buildCallGraph(
-        const std::vector<const FunctionDecl*>& functions) {
+        const std::vector<const FunctionDecl*>& functions,
+        const IndirectTargetMap& indirectTargets) {
     FunctionCallGraph graph;
     std::set<FunctionNode> known;
     for (const FunctionDecl* func : functions) {
@@ -2529,6 +2785,7 @@ FunctionCallGraph buildCallGraph(
     for (FunctionNode key : graph.order) {
         DirectCallCollector collector;
         collector.known = &known;
+        collector.indirectTargets = &indirectTargets;
         collector.TraverseStmt(const_cast<Stmt*>(
             graph.definitions.at(key)->getBody()));
         graph.edges[key] = {collector.callees.begin(),
@@ -2659,15 +2916,20 @@ SummaryRegistry& SummaryRegistry::instance() {
 
 void SummaryRegistry::clear() {
     summaries_.clear();
+    callSummaries_.clear();
     stable_ = false;
 }
 
 void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
     stable_ = false;
     summaries_.clear();
+    callSummaries_.clear();
 
     FunctionCollector collector;
     collector.TraverseDecl(ctx.getTranslationUnitDecl());
+    IndirectTargetMap indirectTargets =
+        buildIndirectTargetMap(collector.functions);
+    activeIndirectTargets = &indirectTargets;
 
     // Solve the direct-call graph component-by-component. Tarjan emits
     // callee SCCs before callers, so an acyclic wrapper is evaluated once
@@ -2675,7 +2937,8 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
     // Recursive SCCs start from conservative summaries and iterate
     // synchronously to a fixed point; a guard fallback keeps the first
     // conservative round if a future relation ever oscillates.
-    FunctionCallGraph graph = buildCallGraph(collector.functions);
+    FunctionCallGraph graph = buildCallGraph(collector.functions,
+                                             indirectTargets);
     auto components = SccFinder(graph.edges).run(graph.order);
     SummaryTable current;
 
@@ -2725,6 +2988,22 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             current[node] = std::move(summary);
     }
     summaries_ = std::move(current);
+    for (const auto& [call, targets] : indirectTargets) {
+        std::optional<FunctionSummary> combined;
+        bool complete = true;
+        for (const FunctionDecl* target : targets) {
+            const FunctionSummary* summary = lookup(target);
+            if (!summary) {
+                complete = false;
+                break;
+            }
+            if (!combined) combined = *summary;
+            else mergeTargetSummaries(*combined, *summary);
+        }
+        if (complete && combined)
+            callSummaries_[call] = std::move(*combined);
+    }
+    activeIndirectTargets = nullptr;
     stable_ = true;  // consumers may now fold on these (see stable())
 }
 
@@ -2736,12 +3015,23 @@ SummaryRegistry::lookup(const clang::FunctionDecl* func) const {
     return lookupGlobal(func);
 }
 
+const SummaryRegistry::FunctionSummary*
+SummaryRegistry::lookup(const clang::CallExpr* call) const {
+    if (!call) return nullptr;
+    if (const FunctionDecl* direct = call->getDirectCallee())
+        return lookup(direct);
+    auto found = callSummaries_.find(call);
+    return found == callSummaries_.end() ? nullptr : &found->second;
+}
+
 namespace {
 
 std::string globalKey(const FunctionDecl* func) {
     return func->getQualifiedNameAsString() + "/" +
            std::to_string(func->getNumParams());
 }
+
+} // anonymous namespace
 
 // Different summaries landing on the same key (C++ overloads) merge
 // conservatively: a mismatched field falls to the weak claim — a false
@@ -2835,6 +3125,84 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
                 into.paramPostconditions[i] = PPost::Unknown;
     }
 }
+
+void mergeTargetSummaries(
+        SummaryRegistry::FunctionSummary& into,
+        const SummaryRegistry::FunctionSummary& from) {
+    using RN = SummaryRegistry::ReturnNullness;
+    using RZ = SummaryRegistry::ReturnZeroness;
+    using PA = SummaryRegistry::ParamAccess;
+    const SummaryRegistry::FunctionSummary left = into;
+
+    mergeConservative(into, from);
+
+    auto joinNullness = [](RN lhs, RN rhs) {
+        if (lhs == RN::Unknown || rhs == RN::Unknown)
+            return RN::Unknown;
+        if (lhs == rhs) return lhs;
+        return RN::MaybeNull;
+    };
+    into.returnNullness =
+        joinNullness(left.returnNullness, from.returnNullness);
+    into.nullCondParam = -1;
+    into.nullCondRange = codeskeptic::Interval::top();
+    if (into.returnNullness == RN::MaybeNull) {
+        const SummaryRegistry::FunctionSummary* conditioned = nullptr;
+        if (left.returnNullness == RN::MaybeNull &&
+            from.returnNullness == RN::NeverNull)
+            conditioned = &left;
+        else if (left.returnNullness == RN::NeverNull &&
+                 from.returnNullness == RN::MaybeNull)
+            conditioned = &from;
+        else if (left.returnNullness == RN::MaybeNull &&
+                 from.returnNullness == RN::MaybeNull &&
+                 left.nullCondParam == from.nullCondParam &&
+                 left.nullCondRange == from.nullCondRange)
+            conditioned = &left;
+        if (conditioned) {
+            into.nullCondParam = conditioned->nullCondParam;
+            into.nullCondRange = conditioned->nullCondRange;
+        }
+    }
+
+    auto joinZeroness = [](RZ lhs, RZ rhs) {
+        if (lhs == RZ::Unknown || rhs == RZ::Unknown)
+            return RZ::Unknown;
+        if (lhs == rhs) return lhs;
+        return RZ::MaybeZero;
+    };
+    into.returnZeroness =
+        joinZeroness(left.returnZeroness, from.returnZeroness);
+
+    auto joinAccess = [](PA lhs, PA rhs) {
+        if (lhs == PA::Unknown || rhs == PA::Unknown)
+            return PA::Unknown;
+        auto bits = [](PA value) {
+            switch (value) {
+                case PA::None: return 0u;
+                case PA::Reads: return 1u;
+                case PA::Writes: return 2u;
+                case PA::ReadsWrites: return 3u;
+                case PA::Unknown: break;
+            }
+            return 3u;
+        };
+        switch (bits(lhs) | bits(rhs)) {
+            case 0: return PA::None;
+            case 1: return PA::Reads;
+            case 2: return PA::Writes;
+            default: return PA::ReadsWrites;
+        }
+    };
+    if (left.paramAccesses.size() == from.paramAccesses.size()) {
+        into.paramAccesses.resize(left.paramAccesses.size());
+        for (size_t i = 0; i < left.paramAccesses.size(); ++i)
+            into.paramAccesses[i] =
+                joinAccess(left.paramAccesses[i], from.paramAccesses[i]);
+    }
+}
+
+namespace {
 
 // --- Disk format ---
 //

@@ -83,8 +83,7 @@ bool isAllocExpr(const Expr* expr, ASTContext& /*ctx*/) {
     if (codeskeptic::isOwnedAllocationExpr(expr)) return true;
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         const auto* summary =
-            codeskeptic::SummaryRegistry::instance().lookup(
-                call->getDirectCallee());
+            codeskeptic::SummaryRegistry::instance().lookup(call);
         return summary &&
                summary->returnOwnership ==
                    codeskeptic::SummaryRegistry::ReturnOwnership::Owned;
@@ -453,7 +452,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             (!name.empty() &&
              codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
-            codeskeptic::SummaryRegistry::instance().lookup(callee);
+            codeskeptic::SummaryRegistry::instance().lookup(call);
         using PO = codeskeptic::SummaryRegistry::ParamOwnership;
         unsigned argOffset = 0;
         if (isa<CXXOperatorCallExpr>(call)) {

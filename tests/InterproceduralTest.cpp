@@ -2508,3 +2508,366 @@ TEST(CallGraphSccTest, NullableFactPropagatesInsideRecursiveComponent) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "null-deref");
 }
+
+TEST(FunctionPointerSummaryTest,
+     ResolvesBoundedLocalTargetsAndRejectsAddressEscape) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("function_pointer_summary.cpp", R"(
+        struct config { int left; int right; };
+        using Touch = void (*)(config*);
+        char* make_owned();
+        char* identity(char*);
+        void fill(char*&);
+        void consume(char*);
+        void touch_left(config*);
+        void touch_right(config*);
+        void rebind(Touch*);
+        void rebind_ref(Touch&);
+        Touch get_touch();
+
+        char* via_owned() {
+            auto fn = &make_owned;
+            return fn();
+        }
+        char* via_alias(char* value) {
+            auto fn = &identity;
+            auto alias = fn;
+            return alias(value);
+        }
+        void via_fill(char*& out) {
+            auto fn = &fill;
+            fn(out);
+        }
+        void via_consume(char* value) {
+            auto fn = &consume;
+            fn(value);
+        }
+        void via_choice(config* value, bool pick) {
+            Touch fn = pick ? &touch_left : &touch_right;
+            fn(value);
+        }
+        void via_reassign(config* value, bool pick) {
+            Touch fn = &touch_left;
+            if (pick) fn = &touch_right;
+            fn(value);
+        }
+        void via_escape(config* value) {
+            Touch fn = &touch_left;
+            rebind(&fn);
+            fn(value);
+        }
+        void via_ref_escape(config* value) {
+            Touch fn = &touch_left;
+            rebind_ref(fn);
+            fn(value);
+        }
+        void via_unknown_source(config* value) {
+            Touch fn = &touch_left;
+            fn = get_touch();
+            fn(value);
+        }
+        void via_lambda_capture(config* value) {
+            Touch fn = &touch_left;
+            auto change = [&fn]() { fn = &touch_right; };
+            change();
+            fn(value);
+        }
+        void via_conditional_ref(config* value, bool pick) {
+            Touch fn = &touch_left;
+            Touch other = &touch_right;
+            Touch& alias = pick ? fn : other;
+            alias = &touch_right;
+            fn(value);
+        }
+        void via_asm_output(config* value) {
+            Touch fn = &touch_left;
+            asm volatile("" : "+r"(fn));
+            fn(value);
+        }
+        void via_parameter(config* value, Touch fn) { fn(value); }
+
+        char* make_owned() { return new char; }
+        char* identity(char* value) { return value; }
+        void fill(char*& out) { out = new char; }
+        void consume(char* value) { delete value; }
+        void touch_left(config* value) { value->left = 1; }
+        void touch_right(config* value) { value->right = 1; }
+    )");
+    auto summaryPath = ::testing::TempDir() +
+                       "function_pointer_summary.csk";
+
+    Config config;
+    config.setSourcePath(source);
+    config.setSummaryOut(summaryPath);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.run();
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["via_owned/0"].returnOwnership,
+              SummaryRegistry::ReturnOwnership::Owned);
+    EXPECT_EQ(parsed["via_alias/1"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["via_fill/1"].paramPostcondition(0),
+              SummaryRegistry::ParamPostcondition::NonNull);
+    EXPECT_EQ(parsed["via_consume/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Consumed);
+    EXPECT_EQ(parsed["via_consume/1"].paramEffect(0),
+              SummaryRegistry::ParamEffect::Frees);
+    for (const char* name : {"via_choice/2", "via_reassign/2"}) {
+        const auto* writes = parsed[name].exactParamFieldWrites(0);
+        ASSERT_NE(writes, nullptr) << name;
+        EXPECT_EQ(writes->fields,
+                  std::set<std::string>({"left", "right"})) << name;
+        EXPECT_EQ(parsed[name].paramAccess(0),
+                  SummaryRegistry::ParamAccess::Writes) << name;
+    }
+    EXPECT_EQ(parsed["via_escape/1"].exactParamFieldWrites(0), nullptr);
+    for (const char* name : {
+             "via_ref_escape/1", "via_unknown_source/1",
+             "via_lambda_capture/1", "via_conditional_ref/2",
+             "via_asm_output/1", "via_parameter/2"})
+        EXPECT_EQ(parsed[name].exactParamFieldWrites(0), nullptr) << name;
+}
+
+TEST(FunctionPointerSummaryTest, IndirectMaybeNullReturnWarns) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* maybe(int flag) {
+            if (flag) return nullptr;
+            return new int(1);
+        }
+        int use(int flag) {
+            int* (*find)(int) = &maybe;
+            int* value = find(flag);
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(FunctionPointerSummaryTest, IndirectOwnedReturnRemainsALeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        int* allocate() { return new int(1); }
+        void use() {
+            int* (*factory)() = &allocate;
+            int* value = factory();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(FunctionPointerSummaryTest, IndirectZeroReturnWarns) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int zero() { return 0; }
+        int use() {
+            int (*produce)() = &zero;
+            int divisor = produce();
+            return 10 / divisor;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+}
+TEST(FunctionPointerSummaryTest, IndirectSiblingWritePreservesCorrelation) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct config { int has_source; int other; };
+        void touch_other(config* value) { value->other = 1; }
+        int use(int flag) {
+            config value;
+            value.has_source = flag;
+            char* pointer = nullptr;
+            if (value.has_source) {
+                pointer = new char;
+                if (!pointer) return -1;
+            }
+            auto touch = &touch_other;
+            touch(&value);
+            if (value.has_source) *pointer = 1;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(FunctionPointerSummaryTest, IndirectNullPostconditionReports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        void clear(int*& output) { output = nullptr; }
+        int use() {
+            int* value = new int(1);
+            auto reset = &clear;
+            reset(value);
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(FunctionPointerSummaryTest, IndirectPreconditionViolationReports) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        [[noreturn]] void die();
+        void require(int* value) {
+            if (!value) die();
+            *value = 1;
+        }
+        void use() {
+            auto invoke = &require;
+            invoke(nullptr);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract")
+        << results[0].message;
+}
+
+TEST(FunctionPointerSummaryTest, IndirectBorrowKeepsCallerOwnership) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void inspect(int* value) { (void)*value; }
+        void use() {
+            int* value = new int(1);
+            auto invoke = &inspect;
+            invoke(value);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+TEST(FunctionPointerSummaryTest, MixedTargetsPreserveMaybeNull) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int storage;
+        int* safe(int) { return &storage; }
+        int* maybe(int flag) {
+            if (flag) return nullptr;
+            return &storage;
+        }
+        int use(bool pick, int flag) {
+            using Find = int* (*)(int);
+            Find find = pick ? &safe : &maybe;
+            int* value = find(flag);
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(FunctionPointerSummaryTest, MixedTargetsPreserveMaybeZero) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        int zero(int) { return 0; }
+        int one(int) { return 1; }
+        int use(bool pick, int input) {
+            using Produce = int (*)(int);
+            Produce produce = pick ? &zero : &one;
+            int divisor = produce(input);
+            return 10 / divisor;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+}
+
+TEST(FunctionPointerSummaryTest, IndirectZeroPassthroughPreservesArgument) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        extern int scanf(const char*, ...);
+        int identity(int value) { return value; }
+        int use() {
+            int divisor;
+            if (scanf("%d", &divisor) != 1) return 0;
+            int (*apply)(int) = &identity;
+            int result = apply(divisor);
+            return 10 / result;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "div-by-zero");
+}
+
+TEST(FunctionPointerSummaryTest, IndirectNullPassthroughPreservesArgument) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* identity(int* value) { return value; }
+        int use() {
+            int* (*apply)(int*) = &identity;
+            int* result = apply(nullptr);
+            return *result;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(FunctionPointerSummaryTest, IndirectConstantReturnPrunesDeadBranch) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int always_false() { return 0; }
+        int use() {
+            int* value = nullptr;
+            int (*flag)() = &always_false;
+            if (flag()) return *value;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(FunctionPointerSummaryTest, CrossTUTargetUsesPersistedSummary) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int* maybe(int flag) {
+            if (flag) return nullptr;
+            return new int(1);
+        }
+    )", R"(
+        int* maybe(int);
+        int use(int flag) {
+            int* (*find)(int) = &maybe;
+            int* value = find(flag);
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(FunctionPointerSummaryTest, CTargetSetComposesFieldWrites) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("function_pointer_targets.c", R"(
+        struct config { int left; int right; };
+        void touch_left(struct config* value) { value->left = 1; }
+        void touch_right(struct config* value) { value->right = 1; }
+        void dispatch(struct config* value, int pick) {
+            void (*touch)(struct config*) =
+                pick ? touch_left : touch_right;
+            touch(value);
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() +
+                       "function_pointer_targets_c.csk";
+
+    Config config;
+    config.setSourcePath(source);
+    config.setSummaryOut(summaryPath);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.run();
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    const auto* writes = parsed["dispatch/2"].exactParamFieldWrites(0);
+    ASSERT_NE(writes, nullptr);
+    EXPECT_EQ(writes->fields,
+              std::set<std::string>({"left", "right"}));
+}

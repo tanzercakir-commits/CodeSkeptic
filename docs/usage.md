@@ -233,6 +233,16 @@ compatible with v1-v9 files; version-specific field counts, codes,
 identifiers, and parameter-vector lengths are strict, so a newer column
 under an older header or a truncated vector is rejected rather than guessed.
 
+Summary consumption also covers a bounded local dispatch case without a
+format change: an automatic local raw function pointer whose initializer and
+every assignment resolve to visible function addresses has its target
+summaries joined at each call. Clean local aliases and conditional choices are
+included. Unknown sources, address/reference escape, by-reference capture,
+inline-assembly output, non-local storage, function-pointer parameters, member
+pointers, and global/table dispatch remain unresolved and therefore
+conservative. A loaded cross-file summary may supply a resolved target's
+facts, but target-set resolution itself remains local to the caller TU.
+
 ## Exit codes
 
 | Code | Meaning |

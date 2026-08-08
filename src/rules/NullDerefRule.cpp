@@ -263,8 +263,7 @@ NullState evaluateNullness(const Expr* expr) {
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         using RN = codeskeptic::SummaryRegistry::ReturnNullness;
         const auto* summary =
-            codeskeptic::SummaryRegistry::instance().lookup(
-                call->getDirectCallee());
+            codeskeptic::SummaryRegistry::instance().lookup(call);
         if (summary) {
             if (summary->returnNullness == RN::NeverNull)
                 return NullState::NonNull;
@@ -474,6 +473,37 @@ unsigned callParamArgOffset(const CallExpr* call,
     if (!isa_and_nonnull<CXXOperatorCallExpr>(call)) return 0;
     const auto* method = dyn_cast_or_null<CXXMethodDecl>(callee);
     return method && !method->isStatic() ? 1u : 0u;
+}
+
+const FunctionProtoType* callPrototype(const CallExpr* call,
+                                       const FunctionDecl* callee) {
+    if (callee) return callee->getType()->getAs<FunctionProtoType>();
+    if (!call || !call->getCallee()) return nullptr;
+    QualType type = call->getCallee()->getType();
+    if (const auto* pointer = type->getAs<PointerType>())
+        type = pointer->getPointeeType();
+    return type->getAs<FunctionProtoType>();
+}
+
+unsigned callParamCount(const CallExpr* call,
+                        const FunctionDecl* callee) {
+    if (callee) return callee->getNumParams();
+    const auto* prototype = callPrototype(call, callee);
+    return prototype ? prototype->getNumParams() : 0;
+}
+
+QualType callParamType(const CallExpr* call,
+                       const FunctionDecl* callee,
+                       unsigned paramIndex) {
+    if (callee) {
+        return paramIndex < callee->getNumParams()
+                   ? callee->getParamDecl(paramIndex)->getType()
+                   : QualType{};
+    }
+    const auto* prototype = callPrototype(call, callee);
+    return prototype && paramIndex < prototype->getNumParams()
+               ? prototype->getParamType(paramIndex)
+               : QualType{};
 }
 
 // libc functions that UNCONDITIONALLY dereference a pointer argument — a
@@ -714,14 +744,15 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         const auto* call = result.getNodeAs<CallExpr>("call");
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
-        if (!callee) continue;
         if (const auto* summary =
-                codeskeptic::SummaryRegistry::instance().lookup(callee)) {
-            for (unsigned i = 0; i < callee->getNumParams(); ++i)
+                codeskeptic::SummaryRegistry::instance().lookup(call)) {
+            for (unsigned i = 0;
+                 i < callParamCount(call, callee); ++i)
                 if (summary->paramPrecondition(i) !=
                     codeskeptic::SummaryRegistry::ParamPrecondition::None)
                     return true;
         }
+        if (!callee) continue;
         auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) {
             // Guard-as-contract (#89): a body-visible callee whose own
@@ -882,7 +913,7 @@ public:
             if (const auto* bases = codeskeptic::activeMemberFactBases()) {
                 const FunctionDecl* callee = call->getDirectCallee();
                 const auto* summary =
-                    codeskeptic::SummaryRegistry::instance().lookup(callee);
+                    codeskeptic::SummaryRegistry::instance().lookup(call);
                 const unsigned offset = callParamArgOffset(call, callee);
                 for (unsigned argIndex = 0;
                      argIndex < call->getNumArgs(); ++argIndex) {
@@ -891,11 +922,11 @@ public:
                     const VarDecl* base =
                         codeskeptic::addrOfBaseVar(arg);
                     bool directReference = false;
-                    if (!base && callee && argIndex >= offset) {
+                    if (!base && argIndex >= offset) {
                         const unsigned paramIndex = argIndex - offset;
-                        if (paramIndex < callee->getNumParams()) {
-                            QualType type =
-                                callee->getParamDecl(paramIndex)->getType();
+                        QualType type =
+                            callParamType(call, callee, paramIndex);
+                        if (!type.isNull()) {
                             if (type->isReferenceType()) {
                                 QualType referred =
                                     type.getNonReferenceType();
@@ -932,10 +963,10 @@ public:
 
                     const codeskeptic::SummaryRegistry::FieldWriteSet*
                         exact = nullptr;
-                    if (wholeObject && callee && summary &&
+                    if (wholeObject && summary &&
                         argIndex >= offset) {
                         const unsigned paramIndex = argIndex - offset;
-                        if (paramIndex < callee->getNumParams())
+                        if (paramIndex < callParamCount(call, callee))
                             exact = summary->exactParamFieldWrites(paramIndex);
                     }
                     bool memberChanged = false;
@@ -1092,16 +1123,16 @@ public:
             // a T*& binds directly to `p`, while a T** must be `&p`.
             const FunctionDecl* callee = call->getDirectCallee();
             const auto* summary =
-                codeskeptic::SummaryRegistry::instance().lookup(callee);
+                codeskeptic::SummaryRegistry::instance().lookup(call);
             const unsigned argOffset = callParamArgOffset(call, callee);
-            if (callee && summary) {
+            if (summary) {
                 using Post =
                     codeskeptic::SummaryRegistry::ParamPostcondition;
-                for (unsigned i = 0; i < callee->getNumParams(); ++i) {
+                for (unsigned i = 0;
+                     i < callParamCount(call, callee); ++i) {
                     const unsigned argIndex = i + argOffset;
                     if (argIndex >= call->getNumArgs()) break;
-                    const ParmVarDecl* param = callee->getParamDecl(i);
-                    const QualType type = param->getType();
+                    const QualType type = callParamType(call, callee, i);
                     const bool refToPointer =
                         type->isLValueReferenceType() &&
                         type.getNonReferenceType()->isPointerType();
@@ -1249,37 +1280,63 @@ public:
                              const FunctionDecl* callee,
                              const State& before, ASTContext& ctx,
                              const std::set<unsigned>& declaredParams) {
-        auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
-        if (inserted) {
-            cacheIt->second = codeskeptic::inferGuardRequires(callee, ctx);
-            if (cacheIt->second.empty()) {
-                const auto* summary =
-                    codeskeptic::SummaryRegistry::instance().lookup(callee);
-                if (summary) {
-                    using Pre =
-                        codeskeptic::SummaryRegistry::ParamPrecondition;
-                    for (unsigned i = 0; i < callee->getNumParams(); ++i) {
-                        Pre pre = summary->paramPrecondition(i);
-                        if (pre == Pre::None) continue;
-                        cacheIt->second.push_back({
-                            i, pre == Pre::NonNullCrash
-                                   ? codeskeptic::GuardConsequence::Crash
-                                   : codeskeptic::GuardConsequence::Rejected,
-                            0});
+        std::vector<codeskeptic::GuardRequire> guards;
+        if (callee) {
+            auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
+            if (inserted) {
+                cacheIt->second =
+                    codeskeptic::inferGuardRequires(callee, ctx);
+                if (cacheIt->second.empty()) {
+                    const auto* summary =
+                        codeskeptic::SummaryRegistry::instance().lookup(call);
+                    if (summary) {
+                        using Pre =
+                            codeskeptic::SummaryRegistry::ParamPrecondition;
+                        for (unsigned i = 0;
+                             i < callParamCount(call, callee); ++i) {
+                            Pre pre = summary->paramPrecondition(i);
+                            if (pre == Pre::None) continue;
+                            cacheIt->second.push_back({
+                                i, pre == Pre::NonNullCrash
+                                       ? codeskeptic::GuardConsequence::Crash
+                                       : codeskeptic::GuardConsequence::Rejected,
+                                0});
+                        }
                     }
                 }
             }
+            guards = cacheIt->second;
+        } else {
+            const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(call);
+            if (summary) {
+                using Pre =
+                    codeskeptic::SummaryRegistry::ParamPrecondition;
+                for (unsigned i = 0;
+                     i < callParamCount(call, callee); ++i) {
+                    Pre pre = summary->paramPrecondition(i);
+                    if (pre == Pre::None) continue;
+                    guards.push_back({
+                        i, pre == Pre::NonNullCrash
+                               ? codeskeptic::GuardConsequence::Crash
+                               : codeskeptic::GuardConsequence::Rejected,
+                        0});
+                }
+            }
         }
-        if (cacheIt->second.empty()) return;
+        if (guards.empty()) return;
 
         NullVarState flat;
         bool flatComputed = false;
         const unsigned argOffset = callParamArgOffset(call, callee);
-        for (const auto& g : cacheIt->second) {
-            if (declaredParams.count(g.paramIndex)) continue;
-            const unsigned argIndex = g.paramIndex + argOffset;
+        const std::string calleeName =
+            callee ? callee->getNameAsString()
+                   : "resolved function-pointer target set";
+        for (const auto& guard : guards) {
+            if (declaredParams.count(guard.paramIndex)) continue;
+            const unsigned argIndex = guard.paramIndex + argOffset;
             if (argIndex >= call->getNumArgs() ||
-                g.paramIndex >= callee->getNumParams())
+                guard.paramIndex >= callParamCount(call, callee))
                 continue;
             const Expr* arg = call->getArg(argIndex);
 
@@ -1291,25 +1348,29 @@ public:
                                                           mergeNullVals);
                         flatComputed = true;
                     }
-                    auto f = flat.find(var);
-                    definite = f != flat.end() &&
-                               f->second.st == NullState::Null;
+                    auto found = flat.find(var);
+                    definite = found != flat.end() &&
+                               found->second.st == NullState::Null;
                 }
             }
-            if (!definite) continue;  // v1: definite violations only
+            if (!definite) continue;
 
             const SourceManager& sm = ctx.getSourceManager();
             SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
             const unsigned line = sm.getSpellingLineNumber(loc);
-            const std::string paramName =
-                callee->getParamDecl(g.paramIndex)->getNameAsString();
+            std::string paramName =
+                "argument #" + std::to_string(guard.paramIndex + 1);
+            if (callee && guard.paramIndex < callee->getNumParams()) {
+                const std::string declared =
+                    callee->getParamDecl(guard.paramIndex)->getNameAsString();
+                if (!declared.empty()) paramName = declared;
+            }
             const bool crash =
-                g.consequence == codeskeptic::GuardConsequence::Crash;
-            // Callee name is part of the key: two same-line calls to
-            // DIFFERENT guarded callees are two violations, not one.
+                guard.consequence ==
+                codeskeptic::GuardConsequence::Crash;
             const std::string text =
                 (crash ? "guard-crash:" : "guard-reject:") +
-                callee->getNameAsString() + ":" + paramName;
+                calleeName + ":" + paramName;
             if (!reportedContracts_.emplace(line, text).second) continue;
 
             codeskeptic::Diagnostic diag;
@@ -1319,17 +1380,17 @@ public:
             diag.rule_id = "contract";
             diag.severity = crash ? codeskeptic::Severity::Error
                                   : codeskeptic::Severity::Warning;
-            if (g.guardLine == 0) {
+            if (guard.guardLine == 0) {
                 diag.message = codeskeptic::msg(
                     crash ? codeskeptic::MsgId::ContractSummaryGuardCrash
                           : codeskeptic::MsgId::ContractSummaryGuardRejected,
-                    paramName, callee->getNameAsString());
+                    paramName, calleeName);
             } else {
                 diag.message = codeskeptic::msg(
                     crash ? codeskeptic::MsgId::ContractGuardCrash
                           : codeskeptic::MsgId::ContractGuardRejected,
-                    paramName, callee->getNameAsString(),
-                    std::to_string(g.guardLine));
+                    paramName, calleeName,
+                    std::to_string(guard.guardLine));
             }
             diag.function = funcName_;
             results_.push_back(std::move(diag));
@@ -1337,11 +1398,14 @@ public:
                 noteTargets_.emplace_back(results_.size() - 1, var);
         }
     }
-
     void checkCallContracts(const CallExpr* call, const State& before,
+
                             ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
-        if (!callee) return;
+        if (!callee) {
+            checkGuardContracts(call, nullptr, before, ctx, {});
+            return;
+        }
 
         auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         std::vector<codeskeptic::RequiresInfo> enforced;

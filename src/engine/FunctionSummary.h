@@ -10,6 +10,7 @@
 
 namespace clang {
 class ASTContext;
+class CallExpr;
 class FunctionDecl;
 }
 
@@ -25,7 +26,8 @@ namespace codeskeptic {
 //
 // Visible bodies are solved TU-locally; externally linked summaries can
 // be harvested, persisted, and loaded for cross-TU callers. Clean local
-// aliases and direct calls compose. Opaque/indirect calls, ambiguous
+// aliases, direct calls, and controlled local function-pointer target sets
+// compose. Unresolved indirect calls, ambiguous
 // aliases, captures, and conflicting paths degrade only the affected
 // relations to their conservative value.
 //
@@ -182,6 +184,11 @@ public:
     // tried first, then the cross-TU store (external linkage only).
     const FunctionSummary* lookup(const clang::FunctionDecl* func) const;
 
+    // Direct calls use their declaration; controlled indirect calls use
+    // the conservative merge of their exact local function-pointer target
+    // set. Returns nullptr when target resolution was not provably closed.
+    const FunctionSummary* lookup(const clang::CallExpr* call) const;
+
     // --- Cross-TU layer (Horizon 2: whole-program mode) ---
     //
     // Key: qualified name + "/" + parameter count. Only EXTERNALLY
@@ -239,6 +246,7 @@ public:
 private:
     std::map<const clang::FunctionDecl*, FunctionSummary> summaries_;
     std::map<std::string, FunctionSummary> globalStore_;
+    std::map<const clang::CallExpr*, FunctionSummary> callSummaries_;
     bool stable_ = false;
 };
 

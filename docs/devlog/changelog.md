@@ -1,5 +1,55 @@
 # CodeSkeptic — Changelog
 
+
+## 2026-08-08 ? Phase 4.6 controlled function-pointer targets
+
+Interprocedural v2 now resolves a deliberately bounded indirect-call class:
+automatic local raw function-pointer variables whose initializer and every
+visible assignment form a closed set of function addresses. Clean local
+pointer aliases and conditional target choices join into a flow-insensitive
+may-target union. Each resolved target becomes a call-graph edge, so
+callee-first SCC solving and cross-TU persisted summaries compose through the
+indirect call.
+
+Target summaries are joined relation by relation. Nullness and zeroness keep
+their may-value information, pointee access unions read/write bits, exact field
+writes union their may-write sets, and identity, ownership, pre/postcondition,
+and legacy effect claims retain strength only when every target agrees. The
+call consumers now cover null/zero returns and passthrough, return ownership,
+borrow/consume effects, field-sensitive invalidation, output postconditions,
+non-null guard preconditions, and constant-return branch pruning.
+
+The resolver fails closed for any unknown source, address exposure, mutable
+reference rebinding, by-reference lambda capture, volatile or non-local
+storage, function-pointer parameter, GNU inline-assembly output, or any MS
+inline assembly. Member-function pointers and global/table dispatch remain
+unresolved. The feature is call-target summary composition only; it does not
+claim native pointer, heap, ownership, lifetime, or alias-verification parity.
+
+RED receipts first showed absent summary composition and downstream null,
+zero, leak, precondition, postcondition, field, and mixed-target behavior. A
+later soundness audit added two more RED cases: GNU asm could mutate the target
+without invalidating the set, and an indirect zero-passthrough relation was not
+consumed because its prototype width was unavailable. Both now pass via
+fail-closed asm handling and width-checked callee-expression prototypes. The
+focused function-pointer matrix is 15/15, and the affected interprocedural
+matrix is 120/120.
+
+The exact Windows binary passed 971/971 tests. The frozen thesis gate remains
+`clean_fp=0`, `bug_caught=9/15`, and `total_findings=11`. The self-scan is
+complete and clean across 47/47 translation units with zero broken TU. The
+historical corpus lane remains cJSON 54 findings (76 attempted, 35 analyzed,
+41 explicitly accepted broken fixtures) and tinyxml2 9 findings (3/3); the
+diagnostic-site multisets have zero additions and zero removals versus Phase
+4.5.
+
+Contract-first shadow audit after the workflow was adopted considered
+`MutationCollector::VisitGCCAsmStmt`,
+`MutationCollector::VisitMSAsmStmt`, `unwrapZeroPassthrough`, and
+`NullDerefAnalysis::checkGuardContracts`. All four depend on Clang AST
+pointers, function-pointer target identity, alias/mutation channels, or
+dataflow state that the current contract verifier cannot prove. Counts:
+proposals 0, eligible 0, rejected 0, unsupported 4. No proposal exposed an
 ## 2026-08-08 — Phase 4.5 field-sensitive effect summaries
 
 Interprocedural v2 now records the exact set of one-hop record fields that

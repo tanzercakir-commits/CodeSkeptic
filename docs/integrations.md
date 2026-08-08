@@ -121,9 +121,11 @@ Both analyzer runs receive identical settings (arguments after `--` are
 forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
 `--summary-in .codeskeptic-summaries` to review with whole-project
 knowledge, …); a delta between two differently-configured runs would
-not be a delta. Known limits, stated rather than hidden: a header-only
-change analyzes no TU (it is listed in the coverage section), and
-deleted files' base-only findings are not counted as fixed.
+not be a delta. Loaded summaries also compose through a controlled automatic
+local function-pointer target when that target set is closed. Unresolved
+indirect dispatch remains conservative. Known limits are stated rather than
+hidden: a header-only change analyzes no TU (it is listed in the coverage
+section), and deleted files' base-only findings are not counted as fixed.
 
 A minimal GitHub Actions gate:
 
