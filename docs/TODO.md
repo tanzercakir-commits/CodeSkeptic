@@ -48,8 +48,8 @@ Phase 4 is merged through PR #131. Its exact squash commit is
 `6aad09c8030ebdf14b4bef2eeb6596f25f650e17`; the squash tree matches the
 fully gated Phase 4 head, and the local and remote `main` branches agree.
 
-Phase 5 is active on `phase-fd-resource-model` and remains split into
-measurable RED-to-GREEN slices:
+Phase 5 is locally complete on `phase-fd-resource-model` and remains split
+into measurable RED-to-GREEN slices pending its PR gates and merge:
 
 1. **Direct POSIX descriptor lifecycle — locally complete.** A separate
    integer-resource rule covers global `open`/`openat`/`socket`/`dup`/
@@ -79,9 +79,18 @@ measurable RED-to-GREEN slices:
    summary/model/contract 129/129, direct and CTest 1010/1010, exact CLI
    smoke 2 report-only findings, thesis `clean_fp=0` / `bug_caught=9/15`,
    clean 48/48-TU self-scan, cJSON 54, and tinyxml2 9.
-3. Run the pinned libarchive validation, manually triage every new finding,
-   and close Phase 5 only at measured precision of at least 0.90 with no
-   regression in the existing local, thesis, self-scan, or corpus gates.
+3. **Pinned libarchive validation and promotion — locally complete.** The
+   exact 132-file library surface (123 compile-DB files plus nine controlled
+   fallbacks, 255 analysis executions) is complete with zero broken TUs and
+   zero incomplete functions. Manual triage classified all 12 initial
+   descriptor reports as false and exposed non-local transfer plus negative
+   snapshot gaps. RED was 3/39; GREEN is 42/42. The final clean run has zero
+   descriptor findings, while three independent load-bearing close mutations
+   produce exactly 3 TP / 0 FP: precision 1.000 and mutation recall 3/3.
+   `resource-leak` is now supported, quality-gated, and blocking. Final local
+   gates are focused 45/45, direct and CTest 1019/1019, thesis
+   `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan, cJSON 54,
+   and tinyxml2 9.
 
 The first slice's contract-first shadow audit found no eligible function: its
 40 new or materially changed source functions depend on enum lattice
@@ -100,6 +109,16 @@ the planned wrapper/model gap; precision review removed an ordinary-integer
 Borrowed overclaim. Candidate contracts: none. No `cs: ai` proposal became
 accepted intent.
 
+The third slice's shadow audit considered 15 new or materially changed
+production functions. Every candidate depends on Clang AST/CFG identity,
+container/lattice state, class members, or resource-ownership lifetime beyond
+the current referee, so dogfood was not applicable. Counts: proposals 0,
+eligible 0, rejected 0, unsupported 15. No proposal exposed a problem; the
+independent libarchive scan exposed the non-local transfer and negative
+snapshot assumptions, and both are closed. Candidate contracts: none. No
+`cs: ai` proposal became accepted intent, and native memory semantics remain
+deferred to executable A7 fixtures.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
@@ -111,15 +130,9 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 ## Backlog (öncelik sırası)
 
 ```
-1. CWE-775 strict — Phase 5 aktif. Doğrudan POSIX integer-resource domain'i
-   wrapper/custom model ile birlikte tamamlandı; libarchive triaj/precision
-   kapısı açık.
-   > BULGU 3 (libarchive, 2026-08-01): 43 ham fd açıcı ölçüldü
-   > (open 28 · openat 8 · dup 4 · mkstemp 3). Pointer domain yalnızca
-   > fopen/opendir/tmpfile toplam 3 kaynağı görüyordu; Phase 5 çıkış ölçümü
-   > bu önkoşulu tam analiz ve manuel triajla kapatacak.
-2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
-3. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
+1. alloc-size v2: 64-bit size_t multiplication corner proof
+2. sign-conversion v2: interprocedural sink (the nlohmann harm was in a
+   different function)
 ```
 
 ## Not — dosya disiplini (2026-07-30 kararı)

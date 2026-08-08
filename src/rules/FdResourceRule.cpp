@@ -53,9 +53,15 @@ struct Binding {
 struct State {
     std::map<Origin, ResourceLife> resources;
     std::map<const VarDecl*, Binding> bindings;
+    std::set<const VarDecl*> definitelyNegative;
+    std::map<const VarDecl*, const VarDecl*> valueCopies;
+    std::map<Origin, std::set<const VarDecl*>> negativeWitnesses;
 
     bool operator==(const State& other) const {
-        return resources == other.resources && bindings == other.bindings;
+        return resources == other.resources && bindings == other.bindings &&
+               definitelyNegative == other.definitelyNegative &&
+               valueCopies == other.valueCopies &&
+               negativeWitnesses == other.negativeWitnesses;
     }
     bool operator!=(const State& other) const { return !(*this == other); }
 };
@@ -94,11 +100,15 @@ State mergeStates(const State& a, const State& b) {
         auto bi = b.bindings.find(var);
         if (ai == a.bindings.end()) {
             Binding merged = bi->second;
-            merged.opaque = true;
+            for (Origin origin : merged.origins)
+                if (resourceLife(a, origin) != ResourceLife::None)
+                    merged.opaque = true;
             out.bindings.emplace(var, std::move(merged));
         } else if (bi == b.bindings.end()) {
             Binding merged = ai->second;
-            merged.opaque = true;
+            for (Origin origin : merged.origins)
+                if (resourceLife(b, origin) != ResourceLife::None)
+                    merged.opaque = true;
             out.bindings.emplace(var, std::move(merged));
         } else {
             Binding merged = ai->second;
@@ -107,6 +117,41 @@ State mergeStates(const State& a, const State& b) {
             merged.opaque = ai->second.opaque || bi->second.opaque;
             out.bindings.emplace(var, std::move(merged));
         }
+    }
+
+    for (const VarDecl* var : a.definitelyNegative)
+        if (b.definitelyNegative.count(var) != 0)
+            out.definitelyNegative.insert(var);
+
+    for (const auto& [target, source] : a.valueCopies) {
+        auto it = b.valueCopies.find(target);
+        if (it != b.valueCopies.end() && it->second == source)
+            out.valueCopies.emplace(target, source);
+    }
+
+    for (Origin origin : origins) {
+        const ResourceLife aLife = resourceLife(a, origin);
+        const ResourceLife bLife = resourceLife(b, origin);
+        const auto ai = a.negativeWitnesses.find(origin);
+        const auto bi = b.negativeWitnesses.find(origin);
+        if (aLife == ResourceLife::None) {
+            if (bLife != ResourceLife::None &&
+                bi != b.negativeWitnesses.end())
+                out.negativeWitnesses.emplace(origin, bi->second);
+            continue;
+        }
+        if (bLife == ResourceLife::None) {
+            if (ai != a.negativeWitnesses.end())
+                out.negativeWitnesses.emplace(origin, ai->second);
+            continue;
+        }
+        if (ai == a.negativeWitnesses.end() ||
+            bi == b.negativeWitnesses.end())
+            continue;
+        std::set<const VarDecl*> common;
+        for (const VarDecl* var : ai->second)
+            if (bi->second.count(var) != 0) common.insert(var);
+        out.negativeWitnesses.emplace(origin, std::move(common));
     }
     return out;
 }
@@ -155,8 +200,64 @@ const VarDecl* asVar(const Expr* expr) {
 }
 
 bool isTrackableLocal(const VarDecl* var) {
-    return var && var->hasLocalStorage() && !isa<ParmVarDecl>(var) &&
+    return var && (var->hasLocalStorage() || isa<ParmVarDecl>(var)) &&
            var->getType()->isIntegerType();
+}
+
+void forgetValue(const VarDecl* var, State& state) {
+    if (!var) return;
+    state.definitelyNegative.erase(var);
+    state.valueCopies.erase(var);
+    for (auto it = state.valueCopies.begin(); it != state.valueCopies.end();) {
+        if (it->second == var)
+            it = state.valueCopies.erase(it);
+        else
+            ++it;
+    }
+    for (auto& [origin, witnesses] : state.negativeWitnesses) {
+        (void)origin;
+        witnesses.erase(var);
+    }
+}
+
+void rememberValueCopy(const VarDecl* target, const VarDecl* source,
+                       State& state) {
+    const bool negative = source &&
+        state.definitelyNegative.count(source) != 0;
+    forgetValue(target, state);
+    if (source && source != target)
+        state.valueCopies[target] = source;
+    if (negative) state.definitelyNegative.insert(target);
+}
+
+void markNegativeEquivalents(const VarDecl* var, State& state) {
+    if (!var) return;
+    std::set<const VarDecl*> equivalent{var};
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& [target, source] : state.valueCopies) {
+            if (equivalent.count(target) == 0 &&
+                equivalent.count(source) == 0)
+                continue;
+            changed |= equivalent.insert(target).second;
+            changed |= equivalent.insert(source).second;
+        }
+    }
+    state.definitelyNegative.insert(equivalent.begin(), equivalent.end());
+}
+
+void rememberNegativeWitnesses(Origin origin, const VarDecl* target,
+                               State& state) {
+    std::set<const VarDecl*> witnesses = state.definitelyNegative;
+    witnesses.erase(target);
+    auto [it, inserted] =
+        state.negativeWitnesses.emplace(origin, witnesses);
+    if (inserted) return;
+    std::set<const VarDecl*> common;
+    for (const VarDecl* var : it->second)
+        if (witnesses.count(var) != 0) common.insert(var);
+    it->second = std::move(common);
 }
 
 Binding bindingFor(const Expr* expr, const State& state) {
@@ -289,9 +390,50 @@ std::optional<FailureEdge> failureEdge(const Expr* condition) {
     return std::nullopt;
 }
 
+struct EqualityEdge {
+    const VarDecl* first = nullptr;
+    const VarDecl* second = nullptr;
+    bool trueBranch = false;
+};
+
+std::optional<EqualityEdge> equalityEdge(const Expr* condition) {
+    if (!condition) return std::nullopt;
+    condition = condition->IgnoreParenImpCasts();
+    if (const auto* unary = dyn_cast<UnaryOperator>(condition)) {
+        if (unary->getOpcode() != UO_LNot) return std::nullopt;
+        auto nested = equalityEdge(unary->getSubExpr());
+        if (nested) nested->trueBranch = !nested->trueBranch;
+        return nested;
+    }
+
+    const auto* comparison = dyn_cast<BinaryOperator>(condition);
+    if (!comparison) return std::nullopt;
+    const BinaryOperatorKind op = comparison->getOpcode();
+    if (op != BO_EQ && op != BO_NE) return std::nullopt;
+    const VarDecl* first = asVar(comparison->getLHS());
+    const VarDecl* second = asVar(comparison->getRHS());
+    if (!first || !second) return std::nullopt;
+    return EqualityEdge{first, second, op == BO_EQ};
+}
+
+void discardImpossibleEquality(const VarDecl* resourceVar,
+                               const VarDecl* negativeVar,
+                               State& state) {
+    auto binding = state.bindings.find(resourceVar);
+    if (binding == state.bindings.end()) return;
+    for (Origin origin : binding->second.origins) {
+        const auto witnesses = state.negativeWitnesses.find(origin);
+        if (state.definitelyNegative.count(negativeVar) != 0 ||
+            (witnesses != state.negativeWitnesses.end() &&
+             witnesses->second.count(negativeVar) != 0))
+            state.resources[origin] = ResourceLife::None;
+    }
+}
+
 struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     std::vector<Origin> origins;
     std::map<Origin, std::string> names;
+    unsigned integerVariables = 0;
 
     bool VisitCallExpr(CallExpr* call) {
         if (isAcquisitionCall(call)) origins.push_back(call);
@@ -299,6 +441,7 @@ struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     }
 
     bool VisitVarDecl(VarDecl* var) {
+        if (isFdIntegerType(var->getType())) ++integerVariables;
         if (!var->hasInit()) return true;
         if (Origin origin = acquisition(var->getInit()))
             names.emplace(origin, var->getNameAsString());
@@ -321,12 +464,15 @@ class FdAnalysis {
 public:
     using State = ::State;
 
-    FdAnalysis(std::vector<Origin> origins) : origins_(std::move(origins)) {}
+    FdAnalysis(std::vector<Origin> origins, unsigned integerVariables)
+        : origins_(std::move(origins)),
+          integerVariables_(integerVariables) {}
 
     State initialState() const { return {}; }
 
     unsigned latticeHeight() const {
-        return static_cast<unsigned>(origins_.size()) * 4 + 16;
+        return static_cast<unsigned>(origins_.size()) * 8 +
+               integerVariables_ * 4 + 32;
     }
 
     State merge(const State& a, const State& b) const {
@@ -343,14 +489,20 @@ public:
             for (const Decl* decl : declaration->decls()) {
                 const auto* var = dyn_cast<VarDecl>(decl);
                 if (!isTrackableLocal(var) || !var->hasInit()) continue;
-                if (Origin origin = acquisition(var->getInit())) {
+                const Expr* init = var->getInit();
+                if (Origin origin = acquisition(init)) {
+                    rememberNegativeWitnesses(origin, var, out);
+                    forgetValue(var, out);
                     out.resources[origin] = ResourceLife::Open;
                     out.bindings[var] = Binding{{origin}, false};
-                } else if (const VarDecl* source = asVar(var->getInit())) {
-                    auto it = out.bindings.find(source);
-                    out.bindings[var] = it == out.bindings.end()
-                                            ? Binding{{}, true}
-                                            : it->second;
+                } else {
+                    const Binding binding = bindingFor(init, out);
+                    const VarDecl* source = asVar(init);
+                    rememberValueCopy(var, source, out);
+                    if (const auto constant = integerConstant(init);
+                        constant && *constant < 0)
+                        out.definitelyNegative.insert(var);
+                    out.bindings[var] = binding;
                 }
             }
             return out;
@@ -358,19 +510,27 @@ public:
 
         if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
             if (assignment->getOpcode() != BO_Assign) return out;
+            const Expr* rhs = assignment->getRHS();
             const VarDecl* target = asVar(assignment->getLHS());
             if (isTrackableLocal(target)) {
-                if (Origin origin = acquisition(assignment->getRHS())) {
+                if (Origin origin = acquisition(rhs)) {
+                    rememberNegativeWitnesses(origin, target, out);
+                    forgetValue(target, out);
                     out.resources[origin] = ResourceLife::Open;
                     out.bindings[target] = Binding{{origin}, false};
                 } else {
-                    out.bindings[target] = bindingFor(
-                        assignment->getRHS(), out);
+                    const Binding binding = bindingFor(rhs, out);
+                    const VarDecl* source = asVar(rhs);
+                    rememberValueCopy(target, source, out);
+                    if (const auto constant = integerConstant(rhs);
+                        constant && *constant < 0)
+                        out.definitelyNegative.insert(target);
+                    out.bindings[target] = binding;
                 }
-            } else if (target && !target->hasLocalStorage()) {
-                escape(bindingFor(assignment->getRHS(), out), out);
-            } else if (!target) {
-                escape(bindingFor(assignment->getRHS(), out), out);
+            } else if (Origin origin = acquisition(rhs)) {
+                out.resources[origin] = ResourceLife::Escaped;
+            } else {
+                escape(bindingFor(rhs, out), out);
             }
             return out;
         }
@@ -405,16 +565,27 @@ public:
     void refineOnEdge(const Stmt* condition, bool isTrueBranch,
                       State& state, ASTContext&) const {
         const auto* expr = dyn_cast_or_null<Expr>(condition);
-        auto failure = failureEdge(expr);
-        if (!failure || failure->trueBranch != isTrueBranch) return;
-        auto binding = state.bindings.find(failure->var);
-        if (binding == state.bindings.end()) return;
-        for (Origin origin : binding->second.origins)
-            state.resources[origin] = ResourceLife::None;
+        if (auto failure = failureEdge(expr);
+            failure && failure->trueBranch == isTrueBranch) {
+            markNegativeEquivalents(failure->var, state);
+            auto binding = state.bindings.find(failure->var);
+            if (binding != state.bindings.end())
+                for (Origin origin : binding->second.origins)
+                    state.resources[origin] = ResourceLife::None;
+        }
+
+        if (auto equality = equalityEdge(expr);
+            equality && equality->trueBranch == isTrueBranch) {
+            discardImpossibleEquality(
+                equality->first, equality->second, state);
+            discardImpossibleEquality(
+                equality->second, equality->first, state);
+        }
     }
 
 private:
     std::vector<Origin> origins_;
+    unsigned integerVariables_;
 };
 
 void reportLeaks(const FunctionDecl* function,
@@ -454,7 +625,9 @@ void analyzeFunction(const FunctionDecl* function,
     inventory.TraverseStmt(const_cast<Stmt*>(function->getBody()));
     if (inventory.origins.empty()) return;
 
-    FdAnalysis analysis(inventory.origins);
+    FdAnalysis analysis(
+        inventory.origins,
+        inventory.integerVariables + function->getNumParams());
     auto dataflow = codeskeptic::runDataflow(function, context, analysis);
     if (!dataflow.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(

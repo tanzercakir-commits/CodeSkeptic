@@ -1,5 +1,86 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 5.3 pinned libarchive validation and promotion
+
+Phase 5 closed against the pinned libarchive v3.8.9 tag object
+`f1f785cc218bb05876c54680f10d3d4e54575ea2`, peeled commit
+`27cbc7827172698143e440801fc0ba39ccb4f1f5`. The exact library surface is
+132 C files: 123 have compile-database entries and nine platform files use
+the controlled fallback, producing 255 analysis executions in whole-program
+mode. Both the clean and mutation runs are complete with zero broken
+translation units and zero incomplete functions.
+
+The first clean scan produced 47 findings: 17 `memory-leak`, 18
+`null-deref`, and 12 `resource-leak`. Every descriptor finding was manually
+triaged against the source and was false: one caller-owned negative-input
+replacement, two output stores, four struct/member ownership stores, one
+streaming parser state store, one saved-directory transfer, two writer-state
+stores, and one registered-close-callback store. This exposed two concrete
+analysis assumptions: non-local stores were not treated as responsibility
+transfer, and the path-correlated relation between an incoming negative
+descriptor snapshot and its successful replacement was not retained.
+
+RED was recorded before implementation: exactly three of 39 focused tests
+failed for member transfer, output-parameter transfer, and the negative
+snapshot cleanup. The dataflow now marks direct and wrapped non-local
+acquisition stores as escaped responsibility, tracks reassigned integer
+parameters without claiming ownership of the incoming value, and preserves
+only path-common negative witnesses. Reassignment invalidates stale copies
+and witnesses; conditional or equality cleanup without proof still reports.
+The final focused matrix is 42/42, including wrapper/member transfer and a
+reassigned-snapshot precision control.
+
+The final clean scan with binary SHA-256
+`5f59aa44c94b68e3d6b8d96f3974baac48b87b907a49bb4c2b6affced2c37aaa`
+contains 35 findings: the unchanged 17 `memory-leak` and 18 `null-deref`
+findings, with zero `resource-leak`. It completed in 36.39 seconds at
+102292 KiB peak RSS. The clean checkout has no tracked source changes.
+
+A separate worktree at the same peeled commit contains exactly three
+load-bearing close mutations: the replacement descriptor cleanup in
+`archive_read_disk_entry_from_file`, the write-disk fixup-loop cleanup, and
+the internal descriptor cleanup in `set_fflags_platform`. The scan contains
+38 findings: the same 17 memory and 18 null findings plus exactly three
+blocking `resource-leak` findings at the seeded sites, with no extra
+descriptor report. It completed in 32.66 seconds at 103404 KiB peak RSS.
+Measured descriptor precision is 3 / (3 + 0) = 1.000 and mutation recall is
+3/3, above the Phase 5 precision gate of 0.90.
+
+`resource-leak` is therefore promoted to supported, quality-gated, and
+blocking in the central registry. README and the capability contract now
+cover both `FILE*`/`DIR*` and POSIX `open`/`openat`/`socket`/`dup`/`mkstemp`
+descriptors, including visible wrappers and reviewed v10 models. The
+capability JSON publishes the promoted tier. CLI smoke reports one blocking
+descriptor finding with exit 1 for the leaking fixture and stays clean with
+exit 0 for its closed twin.
+
+Final local gates are focused capability/descriptor 45/45, direct suite
+1019/1019, CTest 1019/1019, frozen thesis `clean_fp=0` and
+`bug_caught=9/15` with 11 total findings, clean 48/48-TU self-scan, cJSON 54
+findings (76 attempted, 35 analyzed, 41 explicitly accepted broken
+fixtures), and tinyxml2 9 findings (3/3 analyzed). The exact Phase 5.3 file
+set is `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
+`src/core/RuleCapabilities.def`, `tests/CapabilitiesTest.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `README.md`, `docs/capabilities.md`,
+`docs/TODO.md`, and this changelog; `PLAN.md` remains unchanged.
+
+Contract-first shadow audit considered 15 new or materially changed
+production functions: `State::operator==`, `mergeStates`,
+`isTrackableLocal`, `forgetValue`, `rememberValueCopy`,
+`markNegativeEquivalents`, `rememberNegativeWitnesses`, `equalityEdge`,
+`discardImpossibleEquality`, `ResourceInventory::VisitVarDecl`, the
+`FdAnalysis` constructor, `FdAnalysis::latticeHeight`,
+`FdAnalysis::transfer`, `FdAnalysis::refineOnEdge`, and `analyzeFunction`.
+Dogfood was not applicable because every candidate depends on Clang AST/CFG
+identity, container/lattice state, class members, or resource-ownership
+lifetime beyond the current deterministic contract referee. Counts:
+proposals 0, eligible 0, rejected 0, unsupported 15. No proposal exposed an
+implementation or assumption problem; the independent libarchive scan
+exposed the two problems above and both are closed. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent. No native pointer, heap, alias, ownership, or lifetime verification
+semantics were added; those claims remain deferred to executable A7 fixtures.
+
 ## 2026-08-08 — Phase 5.2 descriptor wrappers and explicit models
 
 Phase 5 now propagates POSIX descriptor ownership through visible wrappers

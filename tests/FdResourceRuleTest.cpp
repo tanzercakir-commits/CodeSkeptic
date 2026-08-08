@@ -440,3 +440,101 @@ TEST(FdResourceRuleTest, ConflictingModelsDegradeToUnknown) {
     )");
     EXPECT_TRUE(results.empty());
 }
+
+TEST(FdResourceRuleTest, MemberStoreTransfersDescriptorOwnership) {
+    auto results = runFdRule(R"(
+        struct Holder { int fd; };
+        void f(Holder* holder, const char* p) {
+            holder->fd = open(p, 0);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, WrappedMemberStoreTransfersDescriptorOwnership) {
+    auto results = runFdRule(R"(
+        struct Holder { int fd; };
+        int acquire(const char* p) { return open(p, 0); }
+        void f(Holder* holder, const char* p) {
+            holder->fd = acquire(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, OutParameterStoreTransfersDescriptorOwnership) {
+    auto results = runFdRule(R"(
+        void f(int* output, const char* p) {
+            *output = open(p, 0);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, NegativeInputSnapshotProvesReplacementClose) {
+    auto results = runFdRule(R"(
+        void f(int fd, const char* p) {
+            int initial_fd = fd;
+            if (fd < 0)
+                fd = open(p, 0);
+            if (initial_fd != fd)
+                close(fd);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(FdResourceRuleTest, ReassignedParameterWithoutCloseStillReports) {
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(int fd, const char* p) {
+            if (fd < 0)
+                fd = open(p, 0);
+        }
+    )"));
+}
+
+TEST(FdResourceRuleTest, UnknownSnapshotDoesNotProveReplacementClose) {
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(int initial_fd, const char* p) {
+            int fd = open(p, 0);
+            if (initial_fd != fd)
+                close(fd);
+        }
+    )"));
+}
+
+TEST(FdResourceRuleTest, ReassignedSnapshotDoesNotProveReplacementClose) {
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(int fd, const char* p) {
+            int initial_fd = fd;
+            if (fd < 0)
+                fd = open(p, 0);
+            initial_fd = fd;
+            if (initial_fd != fd)
+                close(fd);
+        }
+    )"));
+}
+
+TEST(FdResourceRuleTest, ConditionalReplacementCloseStillReports) {
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(int fd, const char* p, int release) {
+            if (fd < 0)
+                fd = open(p, 0);
+            if (release)
+                close(fd);
+        }
+    )"));
+}
+
+TEST(FdResourceRuleTest, EqualityCleanupMissesSuccessfulReplacement) {
+    expectSingleResourceLeak(runFdRule(R"(
+        void f(int fd, const char* p) {
+            int initial_fd = fd;
+            if (fd < 0)
+                fd = open(p, 0);
+            if (initial_fd == fd)
+                close(fd);
+        }
+    )"));
+}
