@@ -1,5 +1,24 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — v0.4.8 release smoke contract repair
+
+The first v0.4.8 tag run (`31231137919`) proved that the macOS build, all
+851 tests, tag/version check and relocatable package were sound, but its final
+negative smoke assertion had drifted behind the fail-closed verdict contract.
+With `SDKROOT=/nonexistent/sdk`, the packaged CLI correctly returned exit 2
+and printed `VERDICT UNAVAILABLE`; the workflow still searched for the retired
+`ANALYSIS FAILED` phrase and therefore failed after the product checks passed.
+The Linux lane, including its two clean-container relocation smokes, passed.
+Windows likewise passed build, all tests, version, package, relocation and
+draft-upload checks; publish was correctly skipped because macOS was red.
+
+A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
+The release workflow now requires both exit 2 and the canonical
+`VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is
+registered in CTest on Linux/macOS, so future wording drift fails before the
+release smoke rather than invalidating an otherwise correct tag candidate.
+No product behavior, analysis threshold or quality gate was weakened.
+
 ## 2026-08-07 — v0.4.8 truth sync: one verdict, one replay ledger
 
 Verdict-integrity PR #119 merged to `main` as squash commit `dd089708` after
