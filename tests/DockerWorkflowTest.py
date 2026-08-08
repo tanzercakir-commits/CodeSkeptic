@@ -13,6 +13,16 @@ DOCKERFILE = ROOT / "Dockerfile"
 
 
 class DockerWorkflowTest(unittest.TestCase):
+    def test_release_rebuild_uses_current_recipe_with_exact_tag_source(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertGreaterEqual(workflow.count("uses: actions/checkout@v4"), 2)
+        self.assertIn("Checkout workflow source", workflow)
+        self.assertIn("Checkout exact release source", workflow)
+        self.assertIn("path: release-source", workflow)
+        self.assertIn('context="release-source"', workflow)
+        self.assertIn('-f Dockerfile', workflow)
+
     def test_release_build_is_pinned_to_triggering_source_and_tag(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         dockerfile = DOCKERFILE.read_text(encoding="utf-8")
