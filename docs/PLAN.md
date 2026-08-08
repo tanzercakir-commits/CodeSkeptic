@@ -99,8 +99,13 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 **Bağlayıcı kurallar:**
 - `main`'e ASLA doğrudan iş yapılmaz. Her şey `phase-*` dalında.
 - `main` GitHub ruleset ile korunuyor: DOĞRUDAN push reddedilir
-  (deneyip gördük). Dal 6/6 yeşil → "MERGE-READY" bildir → kullanıcı
-  kilidi açar → ff. Ben asla tek başıma main'i ilerletemem.
+  (deneyip gördük). Dalın zorunlu kapıları yeşil olmadan merge edilmez;
+  ruleset kalite kapısıdır ve gevşetilmez.
+- **Sürekli yürütme yetkisi (2026-08-08):** kullanıcı, ürün programı
+  tamamlanana kadar push, draft/ready PR, merge, release/tag ve gerekli
+  upstream işlemleri için yeniden onay bekleme şartını kaldırdı. Her dış
+  etkiden önce hedef ref/SHA, CI ve kapsam yine doğrulanır; bu yetki kalite
+  kapılarını atlama veya `main`e doğrudan çalışma izni değildir.
 - Yanıtlar **Türkçe**, teknik jargon parantez içinde, plan/şema/tree ile.
 - Her zaman dürüst; max efor gerekiyorsa önceden söyle; model düştüğünü
   içeriden teyit EDEMEM — kullanıcının ekranı asıl sinyaldir.
@@ -139,7 +144,7 @@ dataflow ile bulundu") · 1 issue = 1 kusur · mütevazı fix önerisi.
 **Ledger:**
 | Aday | Gate A | Sonuç |
 |---|---|---|
-| TFLite rfft2d/irfft2d leak (#123387/#123994) | 4/4 | raporlandı; PR açık |
+| TFLite rfft2d/irfft2d leak (#123387/#123994) | 4/4 | DÜZELTİLDİ — PR #123994 merge (`68a7e5821cbb2beb76eeebbbbdffda85a418b254`), issue kapandı (2026-08-07) |
 | zlib untgz strcpy/strdup (1.3.1) | 4'te düştü (HEAD'de kod silinmiş) | rapor yok |
 | LVGL binfont alloc-size | A: ✓ (mekanizma+HEAD+dup-yok) · B: ✗ | HOLD — LVGL'de threat-model/SECURITY.md yok, font'lar güvenilir sayılıyor; özel kanal yok. Rapor edilmedi (kural için kanıt olarak kalır). |
 

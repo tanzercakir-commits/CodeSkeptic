@@ -5,6 +5,7 @@
 #   2. no scattered per-feature PLAN-*.md briefs (fold into PLAN.md);
 #   3. a src/ change ships with a changelog entry (progress is logged).
 #   6. TODO's state block agrees with git (generated, not remembered).
+#   7. the executable real-world replay ledger is internally consistent.
 # Runs in the required build-and-test lane, so a miss blocks merge.
 #
 # --fix regenerates what is derivable (check 6) instead of only
@@ -180,6 +181,13 @@ if [ -n "$ver" ]; then
             fail=1
         fi
     done
+fi
+
+# 7. A measurement ledger is a contract, not prose. Reject duplicate/missing
+# projects, non-SHA inputs, unavailable verdicts, and dishonest triage sums
+# before realworld.yml consumes the values.
+if ! python3 scripts/check_realworld_ledger.py; then
+    fail=1
 fi
 
 [ "$fail" -eq 0 ] && echo "ok: docs in sync (canonical files, no scatter, changelog fresh, rules listed, versions pinned)"
