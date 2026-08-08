@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 44695b1
-uçuşta = phase-measurement-lab
+base   = be577ab
+uçuşta = phase-precision-debt
 ```
 <!-- cs:state-end -->
 
