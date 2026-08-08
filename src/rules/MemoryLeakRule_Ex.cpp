@@ -15,6 +15,8 @@
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
 #include <clang/AST/ExprCXX.h>
+#include <clang/AST/ParentMapContext.h>
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/Stmt.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
@@ -58,19 +60,6 @@ llvm::StringRef calleeName(const FunctionDecl* callee) {
     return {};
 }
 
-// `std::nothrow_t` — the placement tag of the ONE standard placement
-// form (`new (std::nothrow) T`) that still returns owned heap. Matched
-// by name + an enclosing `std` namespace so libc++'s inline-versioned
-// `std::__1::nothrow_t` counts too.
-bool isStdNothrowT(const CXXRecordDecl* rd) {
-    if (!rd || rd->getName() != "nothrow_t") return false;
-    for (const DeclContext* dc = rd->getDeclContext(); dc;
-         dc = dc->getParent())
-        if (const auto* ns = dyn_cast<NamespaceDecl>(dc))
-            if (ns->getName() == "std") return true;
-    return false;
-}
-
 // A stdlib RESOURCE acquisition returning an owned handle that a matching
 // close must release (CWE-404). fopen-family return FILE*, opendir a
 // DIR* — both pointers, so the pointer-ownership machinery tracks them
@@ -88,56 +77,20 @@ bool isResourceReleaseName(llvm::StringRef n) {
     return n == "fclose" || n == "closedir";
 }
 
-bool isAllocExpr(const Expr* expr, ASTContext& ctx) {
+bool isAllocExpr(const Expr* expr, ASTContext& /*ctx*/) {
     if (!expr) return false;
     expr = expr->IgnoreParenImpCasts();
-    // Placement new that does NOT return individually-owned heap:
-    //   - a POINTER placement arg designates caller-provided raw
-    //     storage (`new (&m_slots[i]) Slot()`, the NASA fprime
-    //     AtomicQueue loop) — allocates nothing;
-    //   - an ALLOCATOR/ARENA OBJECT arg (`new (ctx.ast_context()) T`,
-    //     Carbon's node allocation; `new (arena) T`) draws from
-    //     storage the arena owns and frees en masse — never a block
-    //     the caller must `delete` per-object.
-    // The ONE standard placement tag that still heap-allocates is
-    // `std::nothrow`; it (and scalar/enum tags like `std::align_val_t`)
-    // must stay tracked. So: pointer arg or a NON-nothrow class/record
-    // arg ⟹ not a tracked allocation; anything else ⟹ tracked.
-    if (const auto* newExpr = dyn_cast<CXXNewExpr>(expr)) {
-        for (unsigned i = 0; i < newExpr->getNumPlacementArgs(); ++i) {
-            QualType t = newExpr->getPlacementArg(i)->getType();
-            if (t->isPointerType()) return false;
-            QualType u = t.getNonReferenceType().getUnqualifiedType();
-            if (const auto* rd = u->getAsCXXRecordDecl())
-                if (!isStdNothrowT(rd)) return false;
-        }
-        return true;
-    }
-    if (const auto* cast = dyn_cast<CastExpr>(expr))
-        return isAllocExpr(cast->getSubExpr(), ctx);
+    if (codeskeptic::isOwnedAllocationExpr(expr)) return true;
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
-        auto name = calleeName(call->getDirectCallee());
-        if (name == "malloc" || name == "calloc" ||
-            name == "strdup" || name == "realloc")
-            return true;
-        // Built-in RESOURCE acquisitions (CWE-404/775): a FILE*/DIR*
-        // that leaves the function un-closed is a resource leak, tracked
-        // by the same ownership machinery as heap memory (a FILE* is a
-        // pointer). Recognised out of the box so no --alloc-functions
-        // config is needed for the ubiquitous fopen/opendir case. The
-        // report site classifies these as "resource-leak" by the
-        // acquiring name (isResourceAcquireName).
-        if (isResourceAcquireName(name)) return true;
-        // Project wrappers registered via --alloc-functions
-        // (git__malloc, zmalloc, ...) — without them the whole
-        // leak/double-free/UAF domain is blind in wrapper-heavy
-        // codebases.
-        return !name.empty() &&
-               codeskeptic::allocFunctionNames().count(name.str()) != 0;
+        const auto* summary =
+            codeskeptic::SummaryRegistry::instance().lookup(
+                call->getDirectCallee());
+        return summary &&
+               summary->returnOwnership ==
+                   codeskeptic::SummaryRegistry::ReturnOwnership::Owned;
     }
     return false;
 }
-
 const VarDecl* asVar(const Expr* expr) {
     if (!expr) return nullptr;
     // Explicit casts included: `(void*)copy` handed to a callback
@@ -501,7 +454,13 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
              codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
             codeskeptic::SummaryRegistry::instance().lookup(callee);
-        using PE = codeskeptic::SummaryRegistry::ParamEffect;
+        using PO = codeskeptic::SummaryRegistry::ParamOwnership;
+        unsigned argOffset = 0;
+        if (isa<CXXOperatorCallExpr>(call)) {
+            const auto* method =
+                dyn_cast_or_null<CXXMethodDecl>(call->getDirectCallee());
+            if (method && !method->isStatic()) argOffset = 1;
+        }
 
         // &var is always Escapes (the callee may reassign/free it).
         std::map<const VarDecl*, VarCallEffect> byVar;
@@ -556,12 +515,15 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
                 byVar[var].frees = true;
                 continue;
             }
-            PE effect = summary ? summary->paramEffect(i) : PE::Opaque;
-            switch (effect) {
-                case PE::Stores:
-                case PE::Opaque:    byVar[var].escapes = true; break;
-                case PE::Frees:     byVar[var].frees = true; break;
-                case PE::ReadsOnly: byVar[var]; break;  // become visible, no effect
+            PO ownership =
+                summary && i >= argOffset
+                    ? summary->paramOwnership(i - argOffset)
+                    : PO::Unknown;
+            switch (ownership) {
+                case PO::Transferred:
+                case PO::Unknown:  byVar[var].escapes = true; break;
+                case PO::Consumed: byVar[var].frees = true; break;
+                case PO::Borrowed: byVar[var]; break;  // leak stays visible
             }
         }
         for (const auto& [var, e] : byVar) {
@@ -989,10 +951,74 @@ private:
 
 // --- Function-level analysis ---
 
+void reportDiscardedOwnedResults(const FunctionDecl* funcDecl,
+                                 ASTContext& ctx,
+                                 codeskeptic::DiagnosticList& results) {
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const FunctionDecl* func;
+        ASTContext* ctx;
+        codeskeptic::DiagnosticList* results;
+        std::set<unsigned> reportedLocations;
+
+        bool VisitExpr(Expr* expr) {
+            const Expr* core = expr->IgnoreParenCasts();
+            if (!isAllocExpr(core, *ctx) || !isDiscarded(expr)) return true;
+            const SourceManager& sm = ctx->getSourceManager();
+            SourceLocation loc = sm.getExpansionLoc(core->getBeginLoc());
+            if (!loc.isValid() || sm.isInSystemHeader(loc)) return true;
+            const unsigned raw = loc.getRawEncoding();
+            if (!reportedLocations.insert(raw).second) return true;
+
+            const auto* call = dyn_cast<CallExpr>(core);
+            const bool resource =
+                call && isResourceAcquireName(
+                            calleeName(call->getDirectCallee()));
+            codeskeptic::Diagnostic diag;
+            diag.severity = codeskeptic::Severity::Warning;
+            diag.file = sm.getFilename(loc).str();
+            diag.line = sm.getSpellingLineNumber(loc);
+            diag.column = sm.getSpellingColumnNumber(loc);
+            diag.rule_id = resource ? "resource-leak" : "memory-leak";
+            diag.function = func->getQualifiedNameAsString();
+            diag.message = codeskeptic::msg(
+                codeskeptic::MsgId::OwnedResultDiscarded);
+            results->push_back(std::move(diag));
+            return true;
+        }
+
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+
+        bool isDiscarded(const Expr* expr) const {
+            DynTypedNode node = DynTypedNode::create(*expr);
+            auto parents = ctx->getParents(node);
+            if (parents.empty()) return false;
+            const Stmt* parent = parents[0].get<Stmt>();
+            if (!parent) return false;
+            if (isa<CompoundStmt>(parent)) return true;
+            if (const auto* branch = dyn_cast<IfStmt>(parent))
+                return branch->getThen() == expr ||
+                       branch->getElse() == expr;
+            if (const auto* loop = dyn_cast<WhileStmt>(parent))
+                return loop->getBody() == expr;
+            if (const auto* loop = dyn_cast<DoStmt>(parent))
+                return loop->getBody() == expr;
+            if (const auto* loop = dyn_cast<ForStmt>(parent))
+                return loop->getBody() == expr;
+            return false;
+        }
+    } visitor;
+    visitor.func = funcDecl;
+    visitor.ctx = &ctx;
+    visitor.results = &results;
+    visitor.TraverseStmt(const_cast<Stmt*>(funcDecl->getBody()));
+}
+
 void analyzeFunction(const FunctionDecl* funcDecl,
                      ASTContext& ctx,
                      codeskeptic::DiagnosticList& results) {
     if (!funcDecl->hasBody()) return;
+
+    reportDiscardedOwnedResults(funcDecl, ctx, results);
 
     auto trackedVars = collectTrackedVars(funcDecl, ctx);
     if (trackedVars.empty()) return;

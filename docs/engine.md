@@ -48,7 +48,7 @@ freed" path is infeasible). Function-call conditions are never keyed
 and the disjunct budget degrades gracefully to the classic merged
 analysis.
 
-## Interprocedural analysis (v1)
+## Interprocedural analysis (v2)
 
 Functions with visible bodies are summarized before rules run — return
 nullness (a `find()`-style function that can return null makes
@@ -58,8 +58,41 @@ division by the assigned result a warning — the classic
 `data = badSource(); 100 / data` split across functions or files) and
 parameter effects (free-wrappers count as frees, so double-free/
 use-after-free through wrappers is caught; read-only helpers no longer
-hide leaks behind them). Recursion-safe fixpoint; external and aliasing
-callees stay conservative.
+hide leaks behind them). Visible direct calls form a call graph whose
+strongly connected components are solved callee-first. Acyclic wrappers are
+evaluated once after their dependencies; recursive components iterate
+synchronously from conservative summaries to a fixed point. External,
+indirect and aliasing callees stay conservative.
+
+The v2 schema also records exact pointer return identity: a relation is
+published only when every reachable return aliases the same pointer
+parameter's entry object. Local copies and direct call chains preserve it;
+mixed sources, mutation and exposed write channels lose it conservatively.
+This identity relation is independent from null correspondence.
+
+Parameter contracts now cross translation-unit boundaries too. Leading
+assert/abort and complain-then-return guards become exact non-null entry
+preconditions with their crash/reject consequence preserved. On normal
+return, direct `T**` and `T*&` output slots carry an exact Null/NonNull
+postcondition only when every reachable path agrees; partial writes,
+conflicting paths, rebinding and untracked aliases fall back to Unknown.
+Callers consume both relations, including direct chains and `operator()`
+calls.
+
+Side effects and ownership are separate summary axes. For every pointer-like
+parameter, the access relation records no access, read, write, or read+write;
+the ownership relation records borrowed, consumed, transferred, or unknown.
+Direct dereference/member/subscript uses, clean local aliases, direct call
+chains and non-static `operator()` calls compose through the SCC solver. Fresh
+heap/resource returns and their wrapper chains are Owned; parameter/global
+aliases are Borrowed; mixed, opaque, capture, and conflicting flows remain
+Unknown. MemoryLeak consumes the ownership relations, and ContractRule now
+verifies `owns`, `borrows`, and `returns owned` against the same facts.
+
+Summary format v9 persists the access (`O/R/W/B/U`), parameter ownership
+(`B/C/T/U`), and return ownership (`B/O/U`) fields alongside the v8
+pre/postcondition vectors. Readers still accept v1-v8 files; old parameter
+effects are conservatively upgraded for ownership behavior.
 
 Summaries are deterministic and serializable (`--summary-out` /
 `--summary-in`), which is what makes the

@@ -6,6 +6,7 @@
 
 namespace clang {
 class CallExpr;
+class Expr;
 }
 
 namespace codeskeptic {
@@ -30,6 +31,15 @@ const std::set<std::string>& allocFunctionNames();
 // alloc-size-overflow rules so their opposite treatments of an
 // allocator size argument stay in lockstep.
 bool isAllocatorCall(const clang::CallExpr* call);
+
+// True when a call returns an individually-owned pointer/resource. Unlike
+// isAllocatorCall(), this excludes stack alloca and includes strdup plus
+// FILE*/DIR* acquisition APIs used by the pointer resource domain.
+bool isOwnedPointerReturnCall(const clang::CallExpr* call);
+
+// Exact expression-level ownership source, including heap new while
+// excluding caller-storage and arena placement-new forms.
+bool isOwnedAllocationExpr(const clang::Expr* expr);
 
 void setFreeFunctionNames(std::set<std::string> names);
 const std::set<std::string>& freeFunctionNames();

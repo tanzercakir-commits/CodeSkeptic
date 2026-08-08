@@ -350,7 +350,7 @@ TEST(InterprocAliasTest, AliasStoredToGlobal_Stores) {
     ASSERT_EQ(results.size(), 0);
 }
 
-TEST(InterprocAliasTest, AliasReturned_Stores) {
+TEST(InterprocAliasTest, AliasReturnedBorrowed_LeakVisible) {
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         int* identity(int* p) {
@@ -363,7 +363,8 @@ TEST(InterprocAliasTest, AliasReturned_Stores) {
             (void)r;
         }
     )");
-    ASSERT_EQ(results.size(), 0);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
 TEST(InterprocAliasTest, AddressTakenAlias_Conservative) {
@@ -809,10 +810,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\n"
-              "alpha/1\tN\tR\tU\t-\t-\t-\n"
-              "beta/2\tM\tOF\tM\t-\t-\t-\n"
-              "gamma/0\tU\t-\tN\t-\t-\t-\n");
+              "codeskeptic-summaries v9\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\tUU\tUC\tU\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\t-\t-\tU\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -830,7 +831,8 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v9\n"
+              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -852,7 +854,8 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nfoo/1\tU\tO\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v9\n"
+              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -895,7 +898,8 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nkeep/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v9\n"
+              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1427,7 +1431,7 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
 
 // --- v6 persistence: exact always-zero return ---
 
-TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
+TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV9) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v6\n"
@@ -1442,7 +1446,9 @@ TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
     ASSERT_TRUE(registry.loadGlobal(p));
     auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
     ASSERT_TRUE(registry.saveGlobal(out));
-    EXPECT_EQ(readWholeFile(out), content);
+    EXPECT_EQ(readWholeFile(out),
+              "codeskeptic-summaries v9\n"
+              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\n");
 }
 
 TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
@@ -1466,4 +1472,836 @@ TEST(SummaryPersistTest, V4File_ZeroFromParamStillParses) {
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
     EXPECT_EQ(parsed["id/1"].zeroFromParam, 0);
+}
+
+// ===================================================================
+// Interprocedural v2: exact pointer return-alias relation.
+//
+// A strong claim is emitted only when every reachable return denotes
+// the same pointer parameter's entry object. Local copies and chains of
+// exact summaries preserve identity; mixed sources, pointer arithmetic,
+// mutation, and exposed write channels deliberately lose it. The
+// relation is persisted independently from null-passthrough.
+// ===================================================================
+
+TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("return_alias_summary.cpp", R"(
+        int g;
+        int* direct(int* p) { return p; }
+        int* local_copy(int* p) {
+            int* q = p;
+            return q;
+        }
+        int* chain(int* p) { return local_copy(p); }
+        int* same_on_both_paths(int* p, int c) {
+            if (c) return p;
+            return p;
+        }
+        int* mixed(int* p, int* q, int c) {
+            if (c) return p;
+            return q;
+        }
+        int* altered(int* p) { return p + 1; }
+        int* alternate(int* p, int c) {
+            if (c) return p;
+            return &g;
+        }
+        void replace(int*& p);
+        int* reassigned_global(int* p) {
+            p = &g;
+            return p;
+        }
+        int* reassigned_param(int* p, int* q) {
+            p = q;
+            return p;
+        }
+        int* path_merge(int* p, int* q, int c) {
+            int* r = p;
+            if (c) r = q;
+            return r;
+        }
+        int* ref_escape(int* p) {
+            replace(p);
+            return p;
+        }
+        int* address_exposed(int* p) {
+            int* q = p;
+            int** out = &q;
+            (void)out;
+            return q;
+        }
+        int* conditional_same(int* p, int c) {
+            return c ? p : p;
+        }
+        struct IdentityOp {
+            int* operator()(int* p) { return p; }
+        };
+        int* operator_chain(int* p) {
+            IdentityOp identity;
+            return identity(p);
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "return_alias_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\tOU\tBU\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\tOOU\tBBU\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\tOU\tBU\tB\n"),
+              std::string::npos);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["reassigned_global/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["reassigned_param/2"].returnAliasParam, 1);
+    EXPECT_EQ(parsed["path_merge/3"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["ref_escape/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["address_exposed/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["conditional_same/2"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["operator_chain/1"].returnAliasParam, 0);
+}
+
+TEST(ReturnAliasSummaryTest, V7FileUpgradesToV9Exactly) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v7\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n"
+        "plain/1\tU\tR\tU\t-\t-\t-\t-\n";
+    auto input = writePersistFile("sum_v7_return_alias.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["identity/1"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["plain/1"].returnAliasParam, -1);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v7_return_alias_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output),
+              "codeskeptic-summaries v9\n"
+              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tU\tT\tU\n"
+              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
+}
+
+TEST(ReturnAliasSummaryTest, V6FileWithV7ColumnIsRejected) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "sum_v6_with_return_alias.txt",
+        "codeskeptic-summaries v6\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(input, parsed));
+}
+
+// ===================================================================
+// Interprocedural v2: parameter precondition/postcondition summaries.
+// The caller sees declarations only; summaries are the proof channel.
+// ===================================================================
+
+TEST(ParamContractSummaryTest, CrossTUNonNullPreconditionViolationReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        [[noreturn]] void die();
+        void consume(int* p) {
+            if (!p) die();
+            *p = 1;
+        }
+    )", R"(
+        void consume(int*);
+        void caller() { consume(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, HarvestsPreAndPostconditionsExactly) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("param_contract_summary.cpp", R"(
+        [[noreturn]] void die();
+        void complain();
+        int storage;
+        void consume(int* p) {
+            if (!p) die();
+            *p = 1;
+        }
+        void reject(int* p) {
+            if (!p) { complain(); return; }
+            *p = 1;
+        }
+        void bind(int** out) { *out = &storage; }
+        void maybe_bind(int** out, int c) {
+            if (c) *out = &storage;
+        }
+        void alias_overwrite(int** out) {
+            *out = &storage;
+            int** alias = out;
+            *alias = nullptr;
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "param_contract_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\tW\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+              std::string::npos);
+}
+
+TEST(ParamContractSummaryTest, V9FileRoundTripsAndValidatesVectors) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v9\n"
+        "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\n"
+        "consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\n";
+    auto input = writePersistFile("sum_v9_param_contracts.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["bind/1"].paramPostcondition(0),
+              SummaryRegistry::ParamPostcondition::NonNull);
+    EXPECT_EQ(parsed["consume/1"].paramPrecondition(0),
+              SummaryRegistry::ParamPrecondition::NonNullCrash);
+    EXPECT_EQ(parsed["bind/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Writes);
+    EXPECT_EQ(parsed["bind/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Borrowed);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v9_param_contracts_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output), content);
+
+    auto badLength = writePersistFile(
+        "sum_v9_bad_param_length.txt",
+        "codeskeptic-summaries v9\n"
+        "bad/2\tU\tRO\tU\t-\t-\t-\t-\tO\tUU\tUU\tBU\tU\n");
+    auto badCode = writePersistFile(
+        "sum_v9_bad_param_code.txt",
+        "codeskeptic-summaries v9\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tX\tU\tW\tB\tU\n");
+    auto badAccess = writePersistFile(
+        "sum_v9_bad_access_code.txt",
+        "codeskeptic-summaries v9\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tX\tB\tU\n");
+    auto badOwnership = writePersistFile(
+        "sum_v9_bad_ownership_code.txt",
+        "codeskeptic-summaries v9\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tX\tU\n");
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badLength, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badCode, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badAccess, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badOwnership, parsed));
+}
+
+TEST(ParamContractSummaryTest, V8FileUpgradesToV9WithUnknownOwnership) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v8\n"
+        "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\n";
+    auto input = writePersistFile("sum_v8_ownership_upgrade.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["bind/1"].returnOwnership,
+              SummaryRegistry::ReturnOwnership::Unknown);
+    EXPECT_EQ(parsed["bind/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Unknown);
+    EXPECT_EQ(parsed["bind/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Borrowed);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v8_ownership_upgrade_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output),
+              "codeskeptic-summaries v9\n"
+              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tU\tB\tU\n");
+}
+TEST(ParamContractSummaryTest, V8HeaderRejectsV9Columns) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "sum_v8_with_ownership.txt",
+        "codeskeptic-summaries v8\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tC\tN\tW\tB\tU\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(input, parsed));
+}
+
+TEST(ParamContractSummaryTest, CrossTUDefiniteNonNullOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind(int** out) { *out = &storage; }
+    )", R"(
+        void bind(int**);
+        int caller() {
+            int* p = nullptr;
+            bind(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUReferenceOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind_ref(int*& out) { out = &storage; }
+    )", R"(
+        void bind_ref(int*&);
+        int caller() {
+            int* p = nullptr;
+            bind_ref(p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUChainedOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind(int** out) { *out = &storage; }
+        void bind_chain(int** out) { bind(out); }
+    )", R"(
+        void bind_chain(int**);
+        int caller() {
+            int* p = nullptr;
+            bind_chain(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUOperatorOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        struct Binder {
+            void operator()(int*& out) { out = &storage; }
+        };
+    )", R"(
+        struct Binder { void operator()(int*&); };
+        int caller(Binder& bind) {
+            int* p = nullptr;
+            bind(p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, OperatorCallForwardsOutPostcondition) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        struct Binder {
+            void operator()(int** out) { *out = &storage; }
+        };
+        void bind_operator(int** out) {
+            Binder binder;
+            binder(out);
+        }
+    )", R"(
+        void bind_operator(int**);
+        int caller() {
+            int* p = nullptr;
+            bind_operator(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTURejectedPreconditionWarns) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void complain();
+        void consume(int* p) {
+            if (!p) { complain(); return; }
+            *p = 1;
+        }
+    )", R"(
+        void consume(int*);
+        void caller() { consume(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ParamContractSummaryTest, CrossTUDefiniteNullOutPostconditionReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void clear(int** out) { *out = nullptr; }
+    )", R"(
+        int storage;
+        void clear(int**);
+        int caller() {
+            int* p = &storage;
+            clear(&p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, CrossTUReferenceNullPostconditionReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void clear_ref(int*& out) { out = nullptr; }
+    )", R"(
+        int storage;
+        void clear_ref(int*&);
+        int caller() {
+            int* p = &storage;
+            clear_ref(p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, PartialOutWriteStaysUnknown) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void maybe_bind(int** out, bool write) {
+            if (write) *out = &storage;
+        }
+    )", R"(
+        void maybe_bind(int**, bool);
+        int caller(bool write) {
+            int* p = nullptr;
+            maybe_bind(&p, write);
+            return *p;
+        }
+    )");
+    // Unknown is deliberately silent: no exact guarantee was proven.
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, LocalPointerToPointerRebindDoesNotEscape) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void rebind_local(int*** slot) { *slot = nullptr; }
+        void leave_slot(int** out) { rebind_local(&out); }
+    )", R"(
+        int storage;
+        void leave_slot(int**);
+        int caller() {
+            int* p = &storage;
+            leave_slot(&p);
+            return *p;
+        }
+    )");
+    // `&out` exposes only the callee's local T** parameter variable;
+    // rebinding it cannot change the caller's `p` slot.
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// ===================================================================
+// Interprocedural v2: pointee side effects and ownership transfer.
+// Access and ownership are independent relations: returning an alias
+// borrows the input, while returning a fresh allocation creates a new
+// owned result. Both relations must survive cross-TU persistence.
+// ===================================================================
+
+TEST(OwnershipSummaryTest, HarvestsAccessOwnershipAndOwnedReturns) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("ownership_summary.cpp", R"(
+        void free(void*);
+        int* saved;
+        int read_value(int* p) { return *p; }
+        void write_value(int* p) { *p = 1; }
+        int read_write(int* p) {
+            int value = *p;
+            *p = value + 1;
+            return value;
+        }
+        void untouched(int* p) { (void)p; }
+        int read_chain(int* p) { return read_value(p); }
+        void write_chain(int* p) { write_value(p); }
+        void consume(int* p) { free(p); }
+        void transfer(int* p) { saved = p; }
+        void consume_then_transfer(int* p) { free(p); saved = p; }
+        void external(int*);
+        void pass_unknown(int* p) { external(p); }
+        void write_ref(int*& p) { p = nullptr; }
+        struct Writer { void operator()(int* p) { *p = 2; } };
+        void write_operator(int* p) { Writer writer; writer(p); }
+        int* borrow(int* p) { return p; }
+        int* make_owned() { return new int(7); }
+        int* make_owned_chain() { return make_owned(); }
+        int ownership_global;
+        int* make_owned_or_null(bool choose) {
+            if (choose) return new int(9);
+            return nullptr;
+        }
+        int* make_mixed_ownership(bool choose) {
+            if (choose) return new int(11);
+            return &ownership_global;
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "ownership_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<MemoryLeakRule_Ex>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("read_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("write_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("read_write/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tB\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("untouched/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("read_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("write_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("consume/1\tU\tF\tU\t-\t-\t-\t-\tO\tU\tO\tC\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("transfer/1\tU\tS\tU\t-\t-\t-\t-\tO\tU\tO\tT\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("borrow/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("make_owned/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("make_owned_chain/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\n"),
+              std::string::npos);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["make_owned_or_null/1"].returnOwnership,
+              SummaryRegistry::ReturnOwnership::Owned);
+    EXPECT_EQ(parsed["make_mixed_ownership/1"].returnOwnership,
+              SummaryRegistry::ReturnOwnership::Unknown);
+    EXPECT_EQ(parsed["consume_then_transfer/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Unknown);
+    EXPECT_EQ(parsed["pass_unknown/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Unknown);
+    EXPECT_EQ(parsed["pass_unknown/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Unknown);
+    EXPECT_EQ(parsed["write_ref/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Writes);
+    EXPECT_EQ(parsed["write_ref/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Unknown);
+    EXPECT_EQ(parsed["write_operator/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Writes);
+    EXPECT_EQ(parsed["write_operator/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Borrowed);
+}
+
+TEST(OwnershipSummaryTest, CrossTUOwnedReturnWrapperLeakVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* make_buffer() { return malloc(16); }
+    )", R"(
+        void* make_buffer();
+        void caller() {
+            void* p = make_buffer();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(OwnershipSummaryTest, CrossTUDiscardedOwnedResultIsLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* make_buffer() { return malloc(16); }
+    )", R"(
+        void* make_buffer();
+        void caller() { (void)make_buffer(); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+    EXPECT_NE(results[0].message.find("discarded"), std::string::npos);
+}
+
+TEST(OwnershipSummaryTest, CrossTUDiscardedBorrowedResultIsClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int* borrow(int* p) { return p; }
+    )", R"(
+        int* borrow(int*);
+        int storage;
+        void caller() { (void)borrow(&storage); }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(OwnershipSummaryTest, CrossTUBorrowedReturnDoesNotHideLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int* identity(int* p) { return p; }
+    )", R"(
+        int* identity(int*);
+        void caller() {
+            int* p = new int(7);
+            int* alias = identity(p);
+            (void)alias;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(OwnershipSummaryTest, AliasWrapperPreservesOwnedArgument) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* identity(void* p) { return p; }
+        void* make_buffer() { return identity(malloc(16)); }
+    )", R"(
+        void* make_buffer();
+        void caller() {
+            void* p = make_buffer();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+TEST(OwnershipSummaryTest, BorrowedCallKeepsOwnedReturn) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* identity(void* p) { return p; }
+        void* make_buffer() {
+            void* p = malloc(16);
+            (void)identity(p);
+            return p;
+        }
+    )", R"(
+        void* make_buffer();
+        void caller() {
+            void* p = make_buffer();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReturnOwnershipSummaryTest, CrossTUPlacementReturnIsNotOwned) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        struct Slot { int value; };
+        void* operator new(__SIZE_TYPE__, void*) noexcept;
+        Slot* construct(void* storage) {
+            return new (storage) Slot();
+        }
+    )", R"(
+        struct Slot;
+        Slot* construct(void*);
+        void caller(void* storage) {
+            Slot* slot = construct(storage);
+            (void)slot;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ReturnOwnershipSummaryTest, CrossTUOwnedReturnMakesCallerResponsible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        char* make_buffer() {
+            return static_cast<char*>(malloc(32));
+        }
+    )", R"(
+        char* make_buffer();
+        void caller() {
+            char* buffer = make_buffer();
+            (void)buffer;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CallGraphSccTest, DeepAcyclicChainExceedsLegacySweepCap) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* level0() { return malloc(16); }
+        void* level1() { return level0(); }
+        void* level2() { return level1(); }
+        void* level3() { return level2(); }
+        void* level4() { return level3(); }
+        void* level5() { return level4(); }
+        void* level6() { return level5(); }
+        void* level7() { return level6(); }
+    )", R"(
+        void* level7();
+        void caller() {
+            void* p = level7();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CallGraphSccTest, DeepNullChainIsIndependentOfSourceOrder) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* level6();
+        int* level5();
+        int* level4();
+        int* level3();
+        int* level2();
+        int* level1();
+        int* level0();
+        int* level7() { return level6(); }
+        int* level6() { return level5(); }
+        int* level5() { return level4(); }
+        int* level4() { return level3(); }
+        int* level3() { return level2(); }
+        int* level2() { return level1(); }
+        int* level1() { return level0(); }
+        int* level0() { return nullptr; }
+        int caller() {
+            int* value = level7();
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(CallGraphSccTest, DeepBorrowChainKeepsCallerLeakVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void use0(int* p) { (void)*p; }
+        void use1(int* p) { use0(p); }
+        void use2(int* p) { use1(p); }
+        void use3(int* p) { use2(p); }
+        void use4(int* p) { use3(p); }
+        void use5(int* p) { use4(p); }
+        void use6(int* p) { use5(p); }
+        void use7(int* p) { use6(p); }
+        void caller() {
+            int* p = new int(7);
+            use7(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CallGraphSccTest, DeepAccessChainReachesFixedPoint) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("scc_access_chain.cpp", R"(
+        void write0(int* p) { *p = 1; }
+        void write1(int* p) { write0(p); }
+        void write2(int* p) { write1(p); }
+        void write3(int* p) { write2(p); }
+        void write4(int* p) { write3(p); }
+        void write5(int* p) { write4(p); }
+        void write6(int* p) { write5(p); }
+        void write7(int* p) { write6(p); }
+    )");
+    auto summaryPath = ::testing::TempDir() + "scc_access_chain.csk";
+
+    Config config;
+    config.setSourcePath(source);
+    config.setSummaryOut(summaryPath);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<MemoryLeakRule_Ex>();
+    analyzer.run();
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["write7/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Writes);
+    EXPECT_EQ(parsed["write7/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Borrowed);
+}
+
+TEST(CallGraphSccTest, NullableFactPropagatesInsideRecursiveComponent) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int value;
+        int* odd(int);
+        int* even(int n) {
+            if (n <= 0) return &value;
+            return odd(n - 1);
+        }
+        int* odd(int n) {
+            if (n <= 0) return nullptr;
+            return even(n - 1);
+        }
+        int use(int n) {
+            int* p = even(n);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
 }

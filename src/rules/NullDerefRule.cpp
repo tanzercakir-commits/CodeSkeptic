@@ -469,6 +469,13 @@ const VarDecl* addrOfPtrVar(const Expr* e) {
     return nullptr;
 }
 
+unsigned callParamArgOffset(const CallExpr* call,
+                            const FunctionDecl* callee) {
+    if (!isa_and_nonnull<CXXOperatorCallExpr>(call)) return 0;
+    const auto* method = dyn_cast_or_null<CXXMethodDecl>(callee);
+    return method && !method->isStatic() ? 1u : 0u;
+}
+
 // libc functions that UNCONDITIONALLY dereference a pointer argument — a
 // NULL there is definite UB, with NO length parameter that could be 0 to
 // excuse it. Passing a Null/MaybeNull pointer to one of these is a
@@ -708,6 +715,13 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
         if (!callee) continue;
+        if (const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(callee)) {
+            for (unsigned i = 0; i < callee->getNumParams(); ++i)
+                if (summary->paramPrecondition(i) !=
+                    codeskeptic::SummaryRegistry::ParamPrecondition::None)
+                    return true;
+        }
         auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) {
             // Guard-as-contract (#89): a body-visible callee whose own
@@ -945,6 +959,48 @@ public:
                     changed = true;
                 }
             });
+
+            // Exact output summaries refine the conservative reference
+            // invalidation above. Only keyable caller slots are updated:
+            // a T*& binds directly to `p`, while a T** must be `&p`.
+            const FunctionDecl* callee = call->getDirectCallee();
+            const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(callee);
+            const unsigned argOffset = callParamArgOffset(call, callee);
+            if (callee && summary) {
+                using Post =
+                    codeskeptic::SummaryRegistry::ParamPostcondition;
+                for (unsigned i = 0; i < callee->getNumParams(); ++i) {
+                    const unsigned argIndex = i + argOffset;
+                    if (argIndex >= call->getNumArgs()) break;
+                    const ParmVarDecl* param = callee->getParamDecl(i);
+                    const QualType type = param->getType();
+                    const bool refToPointer =
+                        type->isLValueReferenceType() &&
+                        type.getNonReferenceType()->isPointerType();
+                    const bool pointerToPointer =
+                        type->isPointerType() &&
+                        type->getPointeeType()->isPointerType();
+                    const VarDecl* var = nullptr;
+                    if (refToPointer)
+                        var = asVar(call->getArg(argIndex));
+                    else if (pointerToPointer)
+                        var = addrOfPtrVar(call->getArg(argIndex));
+                    if (!var) continue;
+
+                    const Post post = summary->paramPostcondition(i);
+                    if (post == Post::Unknown) continue;
+                    const NullState value = post == Post::NonNull
+                                                ? NullState::NonNull
+                                                : NullState::Null;
+                    for (auto& d : out) {
+                        auto it = d.vars.find(var);
+                        if (it == d.vars.end()) continue;
+                        it->second = value;
+                        changed = true;
+                    }
+                }
+            }
             return changed ? out : in;
         }
 
@@ -1067,18 +1123,38 @@ public:
                              const State& before, ASTContext& ctx,
                              const std::set<unsigned>& declaredParams) {
         auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
-        if (inserted)
+        if (inserted) {
             cacheIt->second = codeskeptic::inferGuardRequires(callee, ctx);
+            if (cacheIt->second.empty()) {
+                const auto* summary =
+                    codeskeptic::SummaryRegistry::instance().lookup(callee);
+                if (summary) {
+                    using Pre =
+                        codeskeptic::SummaryRegistry::ParamPrecondition;
+                    for (unsigned i = 0; i < callee->getNumParams(); ++i) {
+                        Pre pre = summary->paramPrecondition(i);
+                        if (pre == Pre::None) continue;
+                        cacheIt->second.push_back({
+                            i, pre == Pre::NonNullCrash
+                                   ? codeskeptic::GuardConsequence::Crash
+                                   : codeskeptic::GuardConsequence::Rejected,
+                            0});
+                    }
+                }
+            }
+        }
         if (cacheIt->second.empty()) return;
 
         NullVarState flat;
         bool flatComputed = false;
+        const unsigned argOffset = callParamArgOffset(call, callee);
         for (const auto& g : cacheIt->second) {
             if (declaredParams.count(g.paramIndex)) continue;
-            if (g.paramIndex >= call->getNumArgs() ||
+            const unsigned argIndex = g.paramIndex + argOffset;
+            if (argIndex >= call->getNumArgs() ||
                 g.paramIndex >= callee->getNumParams())
                 continue;
-            const Expr* arg = call->getArg(g.paramIndex);
+            const Expr* arg = call->getArg(argIndex);
 
             bool definite = codeskeptic::isNullPointerArg(arg);
             if (!definite) {
@@ -1116,11 +1192,18 @@ public:
             diag.rule_id = "contract";
             diag.severity = crash ? codeskeptic::Severity::Error
                                   : codeskeptic::Severity::Warning;
-            diag.message = codeskeptic::msg(
-                crash ? codeskeptic::MsgId::ContractGuardCrash
-                      : codeskeptic::MsgId::ContractGuardRejected,
-                paramName, callee->getNameAsString(),
-                std::to_string(g.guardLine));
+            if (g.guardLine == 0) {
+                diag.message = codeskeptic::msg(
+                    crash ? codeskeptic::MsgId::ContractSummaryGuardCrash
+                          : codeskeptic::MsgId::ContractSummaryGuardRejected,
+                    paramName, callee->getNameAsString());
+            } else {
+                diag.message = codeskeptic::msg(
+                    crash ? codeskeptic::MsgId::ContractGuardCrash
+                          : codeskeptic::MsgId::ContractGuardRejected,
+                    paramName, callee->getNameAsString(),
+                    std::to_string(g.guardLine));
+            }
             diag.function = funcName_;
             results_.push_back(std::move(diag));
             if (const VarDecl* var = asVar(arg))
@@ -1149,18 +1232,22 @@ public:
 
         NullVarState flat =
             codeskeptic::flattenGuarded(before, mergeNullVals);
+        const unsigned argOffset = callParamArgOffset(call, callee);
 
         for (const auto& info : req.enforced) {
             if (info.kind == codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;  // DivByZero owns the zero domain
-            if (info.paramIndex >= call->getNumArgs()) continue;
-            const Expr* arg = call->getArg(info.paramIndex);
+            const unsigned argIndex = info.paramIndex + argOffset;
+            if (argIndex >= call->getNumArgs()) continue;
+            const Expr* arg = call->getArg(argIndex);
 
             if (info.kind ==
                 codeskeptic::RequiresInfo::Kind::NonNullUnlessCond) {
-                if (info.condParamIndex >= call->getNumArgs()) continue;
+                const unsigned condArgIndex =
+                    info.condParamIndex + argOffset;
+                if (condArgIndex >= call->getNumArgs()) continue;
                 auto lit = codeskeptic::intLiteralArg(
-                    call->getArg(info.condParamIndex));
+                    call->getArg(condArgIndex));
                 if (!lit) continue;  // non-literal escape: conservative
                 if (codeskeptic::evalCmp(*lit, info.condOp,
                                         info.condLiteral))

@@ -16,6 +16,7 @@ enum class MsgId {
     UninitPtrDeref,       // {0} = variable name
     LeakReassign,         // {0} = variable name
     LeakEndOfFunction,    // {0} = variable name
+    OwnedResultDiscarded,
     ResourceLeakEndOfFunction,  // {0} = the leaked resource variable name
     DoubleFree,           // {0} = variable name
     UseAfterFree,         // {0} = variable name
@@ -65,6 +66,8 @@ enum class MsgId {
     ContractViolated,           // {0} = clause text
     ContractGuardCrash,         // {0} = param, {1} = callee, {2} = guard line
     ContractGuardRejected,      // {0} = param, {1} = callee, {2} = guard line
+    ContractSummaryGuardCrash,  // {0} = param, {1} = callee
+    ContractSummaryGuardRejected, // {0} = param, {1} = callee
     ContractSyntaxError,        // {0} = offending line text
     ContractUnsupported,        // {0} = clause text (outside v1 subset)
     ContractUnverified,         // {0} = clause text (engine cannot prove yet)
