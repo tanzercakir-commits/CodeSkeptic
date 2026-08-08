@@ -1,5 +1,8 @@
 #include "engine/FunctionSummary.h"
 
+#include "contracts/GuardContracts.h"
+#include "engine/AllocFunctions.h"
+#include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
 
@@ -15,6 +18,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -27,7 +31,12 @@ constexpr unsigned kMaxSweeps = 5;
 
 using ReturnNullness = codeskeptic::SummaryRegistry::ReturnNullness;
 using ReturnZeroness = codeskeptic::SummaryRegistry::ReturnZeroness;
+using ReturnOwnership = codeskeptic::SummaryRegistry::ReturnOwnership;
 using ParamEffect = codeskeptic::SummaryRegistry::ParamEffect;
+using ParamAccess = codeskeptic::SummaryRegistry::ParamAccess;
+using ParamOwnership = codeskeptic::SummaryRegistry::ParamOwnership;
+using ParamPrecondition = codeskeptic::SummaryRegistry::ParamPrecondition;
+using ParamPostcondition = codeskeptic::SummaryRegistry::ParamPostcondition;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
@@ -369,7 +378,374 @@ AggregateFlags computeReturnFlow(const FunctionDecl* func, ASTContext& ctx,
     return aggregateFlags(analysis.contributions);
 }
 
+// --- Exact pointer return-alias relation (interprocedural v2) ---
+//
+// The lattice is deliberately tiny: -1 means "not proven"; otherwise
+// the value is the index of the pointer parameter whose ENTRY object the
+// variable denotes. A merge keeps a relation only on exact agreement.
+// This is stricter than nullFromParam: returning either p or &global
+// preserves null correspondence with p, but not object identity.
+class ReturnAliasAnalysis {
+public:
+    using State = std::map<const VarDecl*, int>;
 
+    ReturnAliasAnalysis(const FunctionDecl* func,
+                        std::vector<const VarDecl*> trackedVars,
+                        const SummaryTable& previous)
+        : previous_(previous) {
+        for (const auto* var : trackedVars) initState_[var] = -1;
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const auto* param = func->getParamDecl(i);
+            if (param->getType()->isPointerType())
+                initState_[param] = static_cast<int>(i);
+        }
+    }
+
+    State initialState() const { return initState_; }
+
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(initState_.size()) * 2 + 1;
+    }
+
+    State merge(const State& a, const State& b) const {
+        State result = a;
+        for (const auto& [var, source] : b) {
+            auto it = result.find(var);
+            if (it == result.end())
+                result[var] = source;
+            else if (it->second != source)
+                it->second = -1;
+        }
+        return result;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& /*ctx*/) const {
+        State out = in;
+
+        if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+            for (const auto* decl : declStmt->decls()) {
+                const auto* vd = dyn_cast<VarDecl>(decl);
+                auto it = vd ? out.find(vd) : out.end();
+                if (it != out.end())
+                    it->second = vd->hasInit()
+                                     ? originOf(vd->getInit(), out)
+                                     : -1;
+            }
+        } else if (const auto* binOp = dyn_cast<BinaryOperator>(stmt)) {
+            if (binOp->isAssignmentOp()) {
+                const VarDecl* var = exprAsVar(binOp->getLHS());
+                auto it = var ? out.find(var) : out.end();
+                if (it != out.end())
+                    it->second = binOp->getOpcode() == BO_Assign
+                                     ? originOf(binOp->getRHS(), in)
+                                     : -1;
+            }
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->isIncrementDecrementOp())
+                kill(exprAsVar(unary->getSubExpr()), out);
+        }
+
+        // Address-taking and non-const reference arguments expose a
+        // write channel. Scan the current CFG element because these
+        // expressions can be nested in an initializer or assignment.
+        struct EscapeVisitor : RecursiveASTVisitor<EscapeVisitor> {
+            State* state;
+            static void killExpr(const Expr* expr, State& state) {
+                const VarDecl* var = exprAsVar(expr);
+                auto it = var ? state.find(var) : state.end();
+                if (it != state.end()) it->second = -1;
+            }
+            bool VisitUnaryOperator(UnaryOperator* unary) {
+                if (unary->getOpcode() == UO_AddrOf)
+                    killExpr(unary->getSubExpr(), *state);
+                return true;
+            }
+            bool VisitCallExpr(CallExpr* call) {
+                codeskeptic::forEachNonConstRefArg(
+                    call, [&](const Expr* arg) { killExpr(arg, *state); });
+                return true;
+            }
+            bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+        } visitor;
+        visitor.state = &out;
+        visitor.TraverseStmt(const_cast<Stmt*>(stmt));
+        return out;
+    }
+
+    void refineOnEdge(const Stmt*, bool, State&, ASTContext&) const {}
+
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State&, ASTContext&) {
+        const auto* ret = dyn_cast<ReturnStmt>(stmt);
+        if (!ret || !ret->getRetValue()) return;
+        contributions.push_back(originOf(ret->getRetValue(), before));
+    }
+
+    std::vector<int> contributions;
+
+private:
+    int originOf(const Expr* expr, const State& state) const {
+        if (!expr) return -1;
+        expr = expr->IgnoreParens();
+        if (!expr->getType()->isPointerType()) return -1;
+
+        if (const auto* cast = dyn_cast<CastExpr>(expr)) {
+            if (isa<CXXDynamicCastExpr>(cast)) return -1;
+            const Expr* sub = cast->getSubExpr();
+            return sub->getType()->isPointerType()
+                       ? originOf(sub, state)
+                       : -1;
+        }
+        if (const VarDecl* var = exprAsVar(expr)) {
+            auto it = state.find(var);
+            return it == state.end() ? -1 : it->second;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(expr)) {
+            bool hasNonConstRefArg = false;
+            codeskeptic::forEachNonConstRefArg(
+                call, [&](const Expr*) { hasNonConstRefArg = true; });
+            if (hasNonConstRefArg) return -1;
+
+            const auto* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            if (!summary || summary->returnAliasParam < 0) return -1;
+
+            unsigned argOffset = 0;
+            if (isa<CXXOperatorCallExpr>(call)) {
+                const auto* method =
+                    dyn_cast_or_null<CXXMethodDecl>(call->getDirectCallee());
+                if (method && !method->isStatic()) argOffset = 1;
+            }
+            unsigned argIndex =
+                static_cast<unsigned>(summary->returnAliasParam) + argOffset;
+            if (argIndex >= call->getNumArgs()) return -1;
+            return originOf(call->getArg(argIndex), state);
+        }
+        if (const auto* cond = dyn_cast<ConditionalOperator>(expr)) {
+            int lhs = originOf(cond->getTrueExpr(), state);
+            int rhs = originOf(cond->getFalseExpr(), state);
+            return lhs >= 0 && lhs == rhs ? lhs : -1;
+        }
+        return -1;
+    }
+
+    static void kill(const VarDecl* var, State& state) {
+        auto it = var ? state.find(var) : state.end();
+        if (it != state.end()) it->second = -1;
+    }
+
+    const SummaryTable& previous_;
+    State initState_;
+};
+
+int computeReturnAliasParam(const FunctionDecl* func, ASTContext& ctx,
+                            const SummaryTable& previous) {
+    if (!func->getReturnType()->isPointerType()) return -1;
+    ReturnAliasAnalysis analysis(
+        func,
+        collectTypedVars(func, [](QualType t) { return t->isPointerType(); }),
+        previous);
+    codeskeptic::runDataflow(func, ctx, analysis);
+    if (analysis.contributions.empty()) return -1;
+    int source = analysis.contributions.front();
+    if (source < 0) return -1;
+    for (int contribution : analysis.contributions)
+        if (contribution != source) return -1;
+    return source;
+}
+
+// --- Exact pointer return ownership (interprocedural v2) ---
+//
+// The claim is conditional on a non-null result: allocator/new results are
+// Owned, aliases of caller/global storage are Borrowed, and a null return is
+// neutral. Mixed or unmodelled non-null paths collapse to Unknown.
+enum class OwnershipState { Unknown, Owned, Borrowed, Null };
+
+OwnershipState mergeOwnership(OwnershipState lhs, OwnershipState rhs) {
+    if (lhs == rhs) return lhs;
+    if (lhs == OwnershipState::Null) return rhs;
+    if (rhs == OwnershipState::Null) return lhs;
+    return OwnershipState::Unknown;
+}
+
+class ReturnOwnershipAnalysis {
+public:
+    using State = std::map<const VarDecl*, OwnershipState>;
+
+    ReturnOwnershipAnalysis(const FunctionDecl* func,
+                            std::vector<const VarDecl*> trackedVars,
+                            const SummaryTable& previous)
+        : previous_(previous) {
+        for (const auto* var : trackedVars)
+            initState_[var] = isa<ParmVarDecl>(var)
+                                  ? OwnershipState::Borrowed
+                                  : OwnershipState::Unknown;
+    }
+
+    State initialState() const { return initState_; }
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(initState_.size()) * 4 + 1;
+    }
+    State merge(const State& lhs, const State& rhs) const {
+        State out = lhs;
+        for (const auto& [var, value] : rhs) {
+            auto it = out.find(var);
+            if (it == out.end())
+                out[var] = value;
+            else
+                it->second = mergeOwnership(it->second, value);
+        }
+        return out;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& /*ctx*/) const {
+        State out = in;
+        if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+            for (const auto* decl : declStmt->decls()) {
+                const auto* var = dyn_cast<VarDecl>(decl);
+                auto it = var ? out.find(var) : out.end();
+                if (it != out.end())
+                    it->second = var->hasInit()
+                                     ? ownershipOf(var->getInit(), in)
+                                     : OwnershipState::Unknown;
+            }
+        } else if (const auto* assign = dyn_cast<BinaryOperator>(stmt)) {
+            if (assign->isAssignmentOp()) {
+                const VarDecl* var = exprAsVar(assign->getLHS());
+                auto it = var ? out.find(var) : out.end();
+                if (it != out.end())
+                    it->second = assign->getOpcode() == BO_Assign
+                                     ? ownershipOf(assign->getRHS(), in)
+                                     : OwnershipState::Unknown;
+            }
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->isIncrementDecrementOp() ||
+                unary->getOpcode() == UO_AddrOf)
+                kill(exprAsVar(unary->getSubExpr()), out);
+        } else if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            unsigned argOffset = 0;
+            if (isa<CXXOperatorCallExpr>(call)) {
+                const auto* method = dyn_cast_or_null<CXXMethodDecl>(
+                    call->getDirectCallee());
+                if (method && !method->isStatic()) argOffset = 1;
+            }
+            for (unsigned argIndex = argOffset;
+                 argIndex < call->getNumArgs(); ++argIndex) {
+                const VarDecl* var = exprAsVar(call->getArg(argIndex));
+                auto it = var ? out.find(var) : out.end();
+                if (it == out.end()) continue;
+                const unsigned paramIndex = argIndex - argOffset;
+                if (!summary ||
+                    summary->paramOwnership(paramIndex) !=
+                        ParamOwnership::Borrowed)
+                    it->second = OwnershipState::Unknown;
+            }
+        }
+        return out;
+    }
+
+    void refineOnEdge(const Stmt*, bool, State&, ASTContext&) const {}
+
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State&, ASTContext&) {
+        const auto* ret = dyn_cast<ReturnStmt>(stmt);
+        if (ret && ret->getRetValue())
+            contributions.push_back(ownershipOf(ret->getRetValue(), before));
+    }
+
+    std::vector<OwnershipState> contributions;
+
+private:
+    OwnershipState ownershipOf(const Expr* expr, const State& state) const {
+        if (!expr) return OwnershipState::Unknown;
+        if (codeskeptic::isOwnedAllocationExpr(expr))
+            return OwnershipState::Owned;
+        expr = expr->IgnoreParenCasts();
+        if (isa<CXXNullPtrLiteralExpr>(expr) || isa<GNUNullExpr>(expr))
+            return OwnershipState::Null;
+        if (const auto* literal = dyn_cast<IntegerLiteral>(expr))
+            return literal->getValue() == 0 ? OwnershipState::Null
+                                            : OwnershipState::Unknown;
+        if (isa<StringLiteral>(expr) || isa<CXXThisExpr>(expr))
+            return OwnershipState::Borrowed;
+        if (const auto* unary = dyn_cast<UnaryOperator>(expr))
+            if (unary->getOpcode() == UO_AddrOf)
+                return OwnershipState::Borrowed;
+        if (const VarDecl* var = exprAsVar(expr)) {
+            auto it = state.find(var);
+            return it == state.end() ? OwnershipState::Borrowed
+                                     : it->second;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(expr)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            if (!summary) return OwnershipState::Unknown;
+            if (summary->returnAliasParam >= 0) {
+                unsigned argOffset = 0;
+                if (isa<CXXOperatorCallExpr>(call)) {
+                    const auto* method = dyn_cast_or_null<CXXMethodDecl>(
+                        call->getDirectCallee());
+                    if (method && !method->isStatic()) argOffset = 1;
+                }
+                const unsigned argIndex =
+                    static_cast<unsigned>(summary->returnAliasParam) +
+                    argOffset;
+                if (argIndex < call->getNumArgs())
+                    return ownershipOf(call->getArg(argIndex), state);
+            }
+            if (summary->returnOwnership == ReturnOwnership::Owned)
+                return OwnershipState::Owned;
+            if (summary->returnOwnership == ReturnOwnership::Borrowed)
+                return OwnershipState::Borrowed;
+            return OwnershipState::Unknown;
+        }
+        if (const auto* conditional = dyn_cast<ConditionalOperator>(expr))
+            return mergeOwnership(
+                ownershipOf(conditional->getTrueExpr(), state),
+                ownershipOf(conditional->getFalseExpr(), state));
+        return OwnershipState::Unknown;
+    }
+
+    static void kill(const VarDecl* var, State& state) {
+        auto it = var ? state.find(var) : state.end();
+        if (it != state.end()) it->second = OwnershipState::Unknown;
+    }
+
+    const SummaryTable& previous_;
+    State initState_;
+};
+
+ReturnOwnership computeReturnOwnership(const FunctionDecl* func,
+                                       ASTContext& ctx,
+                                       const SummaryTable& previous) {
+    if (!func->getReturnType()->isPointerType())
+        return ReturnOwnership::Unknown;
+    ReturnOwnershipAnalysis analysis(
+        func,
+        collectTypedVars(func, [](QualType type) {
+            return type->isPointerType();
+        }),
+        previous);
+    auto result = codeskeptic::runDataflow(func, ctx, analysis);
+    if (!result.converged || analysis.contributions.empty())
+        return ReturnOwnership::Unknown;
+    OwnershipState aggregate = OwnershipState::Null;
+    for (OwnershipState contribution : analysis.contributions) {
+        if (contribution == OwnershipState::Unknown)
+            return ReturnOwnership::Unknown;
+        aggregate = mergeOwnership(aggregate, contribution);
+        if (aggregate == OwnershipState::Unknown)
+            return ReturnOwnership::Unknown;
+    }
+    if (aggregate == OwnershipState::Owned) return ReturnOwnership::Owned;
+    if (aggregate == OwnershipState::Borrowed)
+        return ReturnOwnership::Borrowed;
+    return ReturnOwnership::Unknown;
+}
 // --- Zero-passthrough harvest (the zeroness-through-summaries slice) ---
 //
 // Parameters whose entry value survives the whole function: never the
@@ -964,6 +1340,12 @@ bool isPlainLocal(const ValueDecl* d) {
     return var && !isa<ParmVarDecl>(var) && var->hasLocalStorage();
 }
 
+bool isPointerCarrier(QualType type) {
+    return type->isPointerType() ||
+           (type->isLValueReferenceType() &&
+            type.getNonReferenceType()->isPointerType());
+}
+
 // Pass A: copy graph + taint seeds
 class AliasCollector : public RecursiveASTVisitor<AliasCollector> {
 public:
@@ -1036,7 +1418,7 @@ AliasInfo computeAliases(const FunctionDecl* func,
     // parameter that REACHES a dirty local enters taintedReach.
     std::map<const VarDecl*, std::set<const ParmVarDecl*>> origins;
     for (const auto* p : func->parameters()) {
-        if (!p->getType()->isPointerType()) continue;
+        if (!isPointerCarrier(p->getType())) continue;
         std::set<const ValueDecl*> frontier{p};
         std::set<const ValueDecl*> visited{p};
         while (!frontier.empty()) {
@@ -1067,7 +1449,7 @@ AliasInfo computeAliases(const FunctionDecl* func,
         }
     }
     for (const auto* p : func->parameters())
-        if (p->getType()->isPointerType()) info.family[p].insert(p);
+        if (isPointerCarrier(p->getType())) info.family[p].insert(p);
 
     return info;
 }
@@ -1233,6 +1615,633 @@ std::vector<ParamEffect> computeParamEffects(const FunctionDecl* func,
     return effects;
 }
 
+// --- Independent pointee access and ownership-transfer relations ---
+
+struct ParamRelationFlags {
+    bool reads = false;
+    bool writes = false;
+    bool consumes = false;
+    bool transfers = false;
+    bool unknownAccess = false;
+    bool unknownOwnership = false;
+};
+
+enum class DirectAccess { None, Read, Write, ReadWrite };
+
+DirectAccess classifyDirectAccess(const Expr* expr, ASTContext& ctx) {
+    if (!expr) return DirectAccess::Read;
+    DynTypedNode node = DynTypedNode::create(*expr);
+    const Stmt* child = expr;
+    for (unsigned depth = 0; depth < 12; ++depth) {
+        auto parents = ctx.getParents(node);
+        if (parents.empty()) break;
+        const Stmt* parent = parents[0].get<Stmt>();
+        if (!parent) break;
+
+        if (const auto* unary = dyn_cast<UnaryOperator>(parent)) {
+            if (unary->getOpcode() == UO_AddrOf) return DirectAccess::None;
+            if (unary->isIncrementDecrementOp())
+                return DirectAccess::ReadWrite;
+        }
+        if (isa<UnaryExprOrTypeTraitExpr>(parent))
+            return DirectAccess::None;
+        if (const auto* assign = dyn_cast<BinaryOperator>(parent)) {
+            const auto* childExpr = dyn_cast<Expr>(child);
+            if (assign->isAssignmentOp() && childExpr &&
+                assign->getLHS()->IgnoreParenImpCasts() ==
+                    childExpr->IgnoreParenImpCasts()) {
+                return assign->getOpcode() == BO_Assign
+                           ? DirectAccess::Write
+                           : DirectAccess::ReadWrite;
+            }
+        }
+
+        // Keep walking through lvalue wrappers until the expression's
+        // actual use site is reached (`(*p).field = ...`, `p[i].x++`).
+        if (isa<ParenExpr>(parent) || isa<CastExpr>(parent) ||
+            isa<MemberExpr>(parent) || isa<ArraySubscriptExpr>(parent)) {
+            child = parent;
+            node = DynTypedNode::create(*parent);
+            continue;
+        }
+        break;
+    }
+    return DirectAccess::Read;
+}
+
+unsigned callParamOffset(const CallExpr* call) {
+    if (!isa_and_nonnull<CXXOperatorCallExpr>(call)) return 0;
+    const auto* method =
+        dyn_cast_or_null<CXXMethodDecl>(call->getDirectCallee());
+    return method && !method->isStatic() ? 1u : 0u;
+}
+
+bool isReleaseCall(const CallExpr* call) {
+    const llvm::StringRef name = calleeIdentifier(call->getDirectCallee());
+    if (name == "free" || name == "fclose" || name == "closedir")
+        return true;
+    return !name.empty() &&
+           codeskeptic::freeFunctionNames().count(name.str()) != 0;
+}
+
+class ParamRelationVisitor
+    : public RecursiveASTVisitor<ParamRelationVisitor> {
+public:
+    ParamRelationVisitor(const FunctionDecl* func, ASTContext& ctx,
+                         const SummaryTable& previous,
+                         const AliasInfo& aliases,
+                         std::map<const ParmVarDecl*, ParamRelationFlags>& flags)
+        : ctx_(ctx), previous_(previous), aliases_(aliases), flags_(flags) {
+        for (const auto* param : func->parameters())
+            if (isPointerCarrier(param->getType())) flags_[param];
+    }
+
+    bool VisitCXXDeleteExpr(CXXDeleteExpr* deletion) {
+        if (const auto* param = resolve(deletion->getArgument()))
+            flags_[param].consumes = true;
+        return true;
+    }
+
+    bool VisitCallExpr(CallExpr* call) {
+        const FunctionSummary* summary =
+            lookupPrev(previous_, call->getDirectCallee());
+        const unsigned offset = callParamOffset(call);
+        for (unsigned argIndex = offset; argIndex < call->getNumArgs();
+             ++argIndex) {
+            const Expr* arg = call->getArg(argIndex);
+            const auto* param = resolve(arg);
+            if (!param) {
+                for (auto& [candidate, relation] : flags_) {
+                    if (!containsAnyRef(arg, aliases_.family.at(candidate)))
+                        continue;
+                    relation.unknownAccess = true;
+                    relation.unknownOwnership = true;
+                }
+                continue;
+            }
+            ParamRelationFlags& relation = flags_[param];
+            const unsigned paramIndex = argIndex - offset;
+            if (isReleaseCall(call) && paramIndex == 0) {
+                relation.consumes = true;
+                continue;
+            }
+            if (!summary) {
+                relation.unknownAccess = true;
+                relation.unknownOwnership = true;
+                continue;
+            }
+            switch (summary->paramAccess(paramIndex)) {
+                case ParamAccess::Reads: relation.reads = true; break;
+                case ParamAccess::Writes: relation.writes = true; break;
+                case ParamAccess::ReadsWrites:
+                    relation.reads = true;
+                    relation.writes = true;
+                    break;
+                case ParamAccess::None: break;
+                case ParamAccess::Unknown: relation.unknownAccess = true; break;
+            }
+            switch (summary->paramOwnership(paramIndex)) {
+                case ParamOwnership::Consumed:
+                    relation.consumes = true;
+                    break;
+                case ParamOwnership::Transferred:
+                    relation.transfers = true;
+                    break;
+                case ParamOwnership::Borrowed:
+                    break;
+                case ParamOwnership::Unknown:
+                    relation.unknownOwnership = true;
+                    break;
+            }
+        }
+        return true;
+    }
+
+    bool VisitUnaryOperator(UnaryOperator* unary) {
+        if (unary->getOpcode() == UO_Deref) {
+            if (const auto* param = resolve(unary->getSubExpr()))
+                recordAccess(param, classifyDirectAccess(unary, ctx_));
+        } else if (unary->getOpcode() == UO_AddrOf) {
+            const ValueDecl* value = asVarOrParam(unary->getSubExpr());
+            if (const auto* param = dyn_cast_or_null<ParmVarDecl>(value))
+                if (flags_.count(param))
+                    flags_[param].unknownOwnership = true;
+        }
+        return true;
+    }
+
+    bool VisitMemberExpr(MemberExpr* member) {
+        if (!member->isArrow()) return true;
+        if (const auto* param = resolve(member->getBase()))
+            recordAccess(param, classifyDirectAccess(member, ctx_));
+        return true;
+    }
+
+    bool VisitArraySubscriptExpr(ArraySubscriptExpr* subscript) {
+        if (const auto* param = resolve(subscript->getBase()))
+            recordAccess(param, classifyDirectAccess(subscript, ctx_));
+        return true;
+    }
+
+    bool VisitBinaryOperator(BinaryOperator* assign) {
+        if (assign->getOpcode() != BO_Assign) return true;
+        const ValueDecl* lhsValue = asVarOrParam(assign->getLHS());
+        if (const auto* lhsParam =
+                dyn_cast_or_null<ParmVarDecl>(lhsValue)) {
+            if (lhsParam->getType()->isLValueReferenceType() &&
+                lhsParam->getType().getNonReferenceType()->isPointerType() &&
+                flags_.count(lhsParam)) {
+                flags_[lhsParam].writes = true;
+                flags_[lhsParam].unknownOwnership = true;
+            }
+        }
+        const auto* param = resolve(assign->getRHS());
+        if (!param) return true;
+        const ValueDecl* lhs = lhsValue;
+        const bool localCopy =
+            lhs && (isa<ParmVarDecl>(lhs) || isPlainLocal(lhs));
+        if (!localCopy) flags_[param].transfers = true;
+        return true;
+    }
+
+    bool VisitVarDecl(VarDecl* var) {
+        if (isa<ParmVarDecl>(var) || !var->hasInit() ||
+            var->hasLocalStorage())
+            return true;
+        if (const auto* param = resolve(var->getInit()))
+            flags_[param].transfers = true;
+        return true;
+    }
+
+    bool TraverseLambdaExpr(LambdaExpr* lambda) {
+        for (auto& [param, relation] : flags_) {
+            if (!containsAnyRef(lambda, aliases_.family.at(param))) continue;
+            relation.unknownAccess = true;
+            relation.unknownOwnership = true;
+        }
+        return true;
+    }
+
+private:
+    const ParmVarDecl* resolve(const Expr* expr) const {
+        const ValueDecl* decl = asVarOrParam(expr);
+        if (!decl) return nullptr;
+        if (const auto* param = dyn_cast<ParmVarDecl>(decl))
+            return flags_.count(param) ? param : nullptr;
+        auto it = aliases_.cleanAlias.find(cast<VarDecl>(decl));
+        return it == aliases_.cleanAlias.end() ? nullptr : it->second;
+    }
+
+    void recordAccess(const ParmVarDecl* param, DirectAccess access) {
+        ParamRelationFlags& relation = flags_[param];
+        if (access == DirectAccess::Read || access == DirectAccess::ReadWrite)
+            relation.reads = true;
+        if (access == DirectAccess::Write || access == DirectAccess::ReadWrite)
+            relation.writes = true;
+    }
+
+    ASTContext& ctx_;
+    const SummaryTable& previous_;
+    const AliasInfo& aliases_;
+    std::map<const ParmVarDecl*, ParamRelationFlags>& flags_;
+};
+
+struct ParamRelations {
+    std::vector<ParamAccess> accesses;
+    std::vector<ParamOwnership> ownerships;
+};
+
+ParamRelations computeParamRelations(const FunctionDecl* func,
+                                     ASTContext& ctx,
+                                     const SummaryTable& previous) {
+    AliasCollector collector;
+    collector.TraverseStmt(func->getBody());
+    AliasInfo aliases = computeAliases(func, collector);
+    std::map<const ParmVarDecl*, ParamRelationFlags> flags;
+    ParamRelationVisitor visitor(func, ctx, previous, aliases, flags);
+    visitor.TraverseStmt(func->getBody());
+
+    for (const auto* param : aliases.taintedReach) {
+        auto it = flags.find(param);
+        if (it == flags.end()) continue;
+        it->second.unknownAccess = true;
+        it->second.unknownOwnership = true;
+    }
+
+    ParamRelations out;
+    out.accesses.reserve(func->getNumParams());
+    out.ownerships.reserve(func->getNumParams());
+    for (const auto* param : func->parameters()) {
+        if (!isPointerCarrier(param->getType())) {
+            out.accesses.push_back(ParamAccess::Unknown);
+            out.ownerships.push_back(ParamOwnership::Unknown);
+            continue;
+        }
+        const ParamRelationFlags& relation = flags[param];
+        if (relation.unknownAccess)
+            out.accesses.push_back(ParamAccess::Unknown);
+        else if (relation.reads && relation.writes)
+            out.accesses.push_back(ParamAccess::ReadsWrites);
+        else if (relation.reads)
+            out.accesses.push_back(ParamAccess::Reads);
+        else if (relation.writes)
+            out.accesses.push_back(ParamAccess::Writes);
+        else
+            out.accesses.push_back(ParamAccess::None);
+
+        if (relation.unknownOwnership ||
+            (relation.consumes && relation.transfers))
+            out.ownerships.push_back(ParamOwnership::Unknown);
+        else if (relation.transfers)
+            out.ownerships.push_back(ParamOwnership::Transferred);
+        else if (relation.consumes)
+            out.ownerships.push_back(ParamOwnership::Consumed);
+        else
+            out.ownerships.push_back(ParamOwnership::Borrowed);
+    }
+    return out;
+}
+
+// --- Parameter preconditions and postconditions (interprocedural v2) ---
+
+std::vector<ParamPrecondition> computeParamPreconditions(
+        const FunctionDecl* func, ASTContext& ctx) {
+    std::vector<ParamPrecondition> out(
+        func->getNumParams(), ParamPrecondition::None);
+    for (const auto& guard : codeskeptic::inferGuardRequires(func, ctx)) {
+        if (guard.paramIndex >= out.size()) continue;
+        const ParamPrecondition inferred =
+            guard.consequence == codeskeptic::GuardConsequence::Crash
+                ? ParamPrecondition::NonNullCrash
+                : ParamPrecondition::NonNullRejected;
+        // Several equivalent leading guards can mention one parameter.
+        // Preserve the more severe observable consequence independent of
+        // AST visitation order.
+        if (out[guard.paramIndex] == ParamPrecondition::None ||
+            inferred == ParamPrecondition::NonNullCrash)
+            out[guard.paramIndex] = inferred;
+    }
+    return out;
+}
+
+bool isRefToPointer(const ParmVarDecl* param) {
+    if (!param) return false;
+    QualType type = param->getType();
+    return type->isLValueReferenceType() &&
+           type.getNonReferenceType()->isPointerType();
+}
+
+bool isPointerToPointer(const ParmVarDecl* param) {
+    if (!param) return false;
+    QualType type = param->getType();
+    return type->isPointerType() && type->getPointeeType()->isPointerType();
+}
+
+struct ParamPostState {
+    std::vector<ParamPostcondition> values;
+    // For T** parameters, a direct store through `*p` still targets the
+    // caller only while p denotes its entry value. T*& references cannot
+    // be rebound, so their bit stays true.
+    std::vector<bool> entryTargets;
+
+    bool operator==(const ParamPostState& other) const {
+        return values == other.values && entryTargets == other.entryTargets;
+    }
+    bool operator!=(const ParamPostState& other) const {
+        return !(*this == other);
+    }
+};
+
+class ParamPostAnalysis {
+public:
+    using State = ParamPostState;
+
+    ParamPostAnalysis(const FunctionDecl* func,
+                      const SummaryTable& previous)
+        : previous_(previous) {
+        init_.values.assign(func->getNumParams(),
+                            ParamPostcondition::Unknown);
+        init_.entryTargets.assign(func->getNumParams(), false);
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const ParmVarDecl* param = func->getParamDecl(i);
+            if (isRefToPointer(param) || isPointerToPointer(param)) {
+                outputIndexes_[param] = i;
+                init_.entryTargets[i] = true;
+            }
+        }
+    }
+
+    State initialState() const { return init_; }
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(init_.values.size()) * 3 + 2;
+    }
+    void widen(State& state) const {
+        std::fill(state.values.begin(), state.values.end(),
+                  ParamPostcondition::Unknown);
+        std::fill(state.entryTargets.begin(), state.entryTargets.end(), false);
+    }
+    State merge(const State& a, const State& b) const {
+        State out = a;
+        for (size_t i = 0; i < out.values.size(); ++i) {
+            if (out.values[i] != b.values[i])
+                out.values[i] = ParamPostcondition::Unknown;
+            out.entryTargets[i] =
+                out.entryTargets[i] && b.entryTargets[i];
+        }
+        return out;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& /*ctx*/) const {
+        State out = in;
+        if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
+            if (bin->getOpcode() == BO_Assign) {
+                if (auto index = outputTarget(bin->getLHS(), in)) {
+                    out.values[*index] = valueOf(bin->getRHS(), in);
+                    return out;
+                }
+                // Rebinding a T** parameter changes what subsequent
+                // `*p = ...` stores denote; no caller guarantee may be
+                // learned after that point.
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(bin->getLHS()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end() &&
+                        isPointerToPointer(param))
+                        out.entryTargets[found->second] = false;
+                }
+            } else if (bin->isCompoundAssignmentOp()) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(bin->getLHS()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            return out;
+        }
+        if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->isIncrementDecrementOp()) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(unary->getSubExpr()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            if (unary->getOpcode() == UO_AddrOf) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(unary->getSubExpr()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            return out;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            unsigned argOffset = 0;
+            if (isa<CXXOperatorCallExpr>(call)) {
+                const auto* method = dyn_cast_or_null<CXXMethodDecl>(
+                    call->getDirectCallee());
+                if (method && !method->isStatic()) argOffset = 1;
+            }
+            for (unsigned argIndex = argOffset;
+                 argIndex < call->getNumArgs(); ++argIndex) {
+                auto target = forwardedOutput(call->getArg(argIndex), in);
+                if (!target) continue;
+                const unsigned paramIndex = argIndex - argOffset;
+                out.values[*target] = summary
+                    ? summary->paramPostcondition(paramIndex)
+                    : ParamPostcondition::Unknown;
+            }
+        }
+        return out;
+    }
+
+private:
+    std::optional<unsigned> outputTarget(const Expr* expr,
+                                         const State& state) const {
+        if (!expr) return std::nullopt;
+        expr = expr->IgnoreParenImpCasts();
+        if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+            const auto* param = dyn_cast<ParmVarDecl>(ref->getDecl());
+            auto found = outputIndexes_.find(param);
+            if (found != outputIndexes_.end() && isRefToPointer(param))
+                return found->second;
+            return std::nullopt;
+        }
+        const auto* unary = dyn_cast<UnaryOperator>(expr);
+        if (!unary || unary->getOpcode() != UO_Deref)
+            return std::nullopt;
+        const auto* param = dyn_cast_or_null<ParmVarDecl>(
+            asVarOrParam(unary->getSubExpr()));
+        auto found = outputIndexes_.find(param);
+        if (found == outputIndexes_.end() || !isPointerToPointer(param) ||
+            !state.entryTargets[found->second])
+            return std::nullopt;
+        return found->second;
+    }
+
+    std::optional<unsigned> forwardedOutput(const Expr* expr,
+                                            const State& state) const {
+        if (!expr) return std::nullopt;
+        expr = expr->IgnoreParenImpCasts();
+        if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_AddrOf) {
+                const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                    asVarOrParam(unary->getSubExpr()));
+                auto found = outputIndexes_.find(param);
+                // `&ref` addresses the caller's pointer slot, but `&out`
+                // for a by-value T** parameter addresses only this
+                // function's local parameter variable. Rebinding that
+                // local T** must not become a postcondition on `*out`.
+                if (found != outputIndexes_.end() &&
+                    isRefToPointer(param))
+                    return found->second;
+            }
+        }
+        const auto* param = dyn_cast_or_null<ParmVarDecl>(
+            asVarOrParam(expr));
+        auto found = outputIndexes_.find(param);
+        if (found == outputIndexes_.end() ||
+            !state.entryTargets[found->second])
+            return std::nullopt;
+        return found->second;
+    }
+
+    ParamPostcondition valueOf(const Expr* expr,
+                               const State& state) const {
+        if (!expr) return ParamPostcondition::Unknown;
+        expr = expr->IgnoreParenCasts();
+        if (const auto target = outputTarget(expr, state))
+            return state.values[*target];
+        if (const auto* cond = dyn_cast<ConditionalOperator>(expr)) {
+            ParamPostcondition yes = valueOf(cond->getTrueExpr(), state);
+            ParamPostcondition no = valueOf(cond->getFalseExpr(), state);
+            return yes == no ? yes : ParamPostcondition::Unknown;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(expr)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            if (summary) {
+                if (summary->returnNullness == ReturnNullness::NeverNull)
+                    return ParamPostcondition::NonNull;
+                if (summary->returnNullness == ReturnNullness::MaybeNull)
+                    return ParamPostcondition::Unknown;
+                if (summary->nullFromParam >= 0 &&
+                    static_cast<unsigned>(summary->nullFromParam) <
+                        call->getNumArgs())
+                    return valueOf(call->getArg(summary->nullFromParam),
+                                   state);
+            }
+            return ParamPostcondition::Unknown;
+        }
+        switch (vstateOf(expr, previous_)) {
+            case VState::Bad: return ParamPostcondition::Null;
+            case VState::NonBad: return ParamPostcondition::NonNull;
+            case VState::MaybeBad:
+            case VState::Unknown: break;
+        }
+        return ParamPostcondition::Unknown;
+    }
+
+    const SummaryTable& previous_;
+    State init_;
+    std::map<const ParmVarDecl*, unsigned> outputIndexes_;
+};
+
+// A strong output guarantee is emitted only while every use of the output
+// slot stays in the dataflow's exact vocabulary: direct `*out = value`,
+// direct `ref = value`, or forwarding to another summarized callee. Copying
+// the slot into another local/member (or capturing it in a lambda) creates an
+// alias whose later writes are outside that vocabulary, so the affected
+// parameter is forced back to Unknown.
+class OutputAliasCollector
+    : public RecursiveASTVisitor<OutputAliasCollector> {
+public:
+    explicit OutputAliasCollector(const FunctionDecl* func)
+        : unsafe(func->getNumParams(), false) {
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const ParmVarDecl* param = func->getParamDecl(i);
+            if (isRefToPointer(param) || isPointerToPointer(param))
+                outputIndexes_[param] = i;
+        }
+    }
+
+    bool VisitVarDecl(VarDecl* var) {
+        if (!isa<ParmVarDecl>(var) && var->hasInit())
+            markRefs(var->getInit());
+        return true;
+    }
+
+    bool VisitBinaryOperator(BinaryOperator* bin) {
+        if (bin->isAssignmentOp()) markRefs(bin->getRHS());
+        return true;
+    }
+
+    bool TraverseLambdaExpr(LambdaExpr* lambda) {
+        if (lambda) markRefs(lambda->getBody());
+        return true;
+    }
+
+    std::vector<bool> unsafe;
+
+private:
+    void markRefs(const Stmt* root) {
+        if (!root) return;
+        struct Finder : RecursiveASTVisitor<Finder> {
+            const std::map<const ParmVarDecl*, unsigned>* indexes = nullptr;
+            std::vector<bool>* unsafe = nullptr;
+            bool VisitDeclRefExpr(DeclRefExpr* ref) {
+                const auto* param = dyn_cast<ParmVarDecl>(ref->getDecl());
+                auto found = indexes->find(param);
+                if (found != indexes->end())
+                    (*unsafe)[found->second] = true;
+                return true;
+            }
+        } finder;
+        finder.indexes = &outputIndexes_;
+        finder.unsafe = &unsafe;
+        finder.TraverseStmt(const_cast<Stmt*>(root));
+    }
+
+    std::map<const ParmVarDecl*, unsigned> outputIndexes_;
+};
+
+std::vector<ParamPostcondition> computeParamPostconditions(
+        const FunctionDecl* func, ASTContext& ctx,
+        const SummaryTable& previous) {
+    std::vector<ParamPostcondition> unknown(
+        func->getNumParams(), ParamPostcondition::Unknown);
+    OutputAliasCollector aliasCollector(func);
+    aliasCollector.TraverseStmt(func->getBody());
+    ParamPostAnalysis analysis(func, previous);
+    auto result = codeskeptic::runDataflow(func, ctx, analysis);
+    if (!result.converged) return unknown;
+    auto exit = result.blockExitStates.find(result.exitBlockID);
+    if (exit == result.blockExitStates.end()) return unknown;
+    std::vector<ParamPostcondition> values = exit->second.values;
+    for (size_t i = 0; i < values.size(); ++i)
+        if (aliasCollector.unsafe[i])
+            values[i] = ParamPostcondition::Unknown;
+    return values;
+}
+
 // --- Collect the functions with bodies in the TU ---
 
 struct FunctionCollector : RecursiveASTVisitor<FunctionCollector> {
@@ -1279,7 +2288,19 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
                 func, ctx, current, &summary.nullFromParam);
             summary.returnZeroness = computeReturnZeroness(
                 func, ctx, current, &summary.zeroFromParam);
+            summary.returnOwnership =
+                computeReturnOwnership(func, ctx, current);
             summary.params = computeParamEffects(func, current);
+            ParamRelations relations =
+                computeParamRelations(func, ctx, current);
+            summary.paramAccesses = std::move(relations.accesses);
+            summary.paramOwnerships = std::move(relations.ownerships);
+            summary.paramPreconditions =
+                computeParamPreconditions(func, ctx);
+            summary.paramPostconditions =
+                computeParamPostconditions(func, ctx, current);
+            summary.returnAliasParam =
+                computeReturnAliasParam(func, ctx, current);
 
             // #69b: try to strengthen a plain MaybeNull into the
             // value-conditioned form (null only if param outside R).
@@ -1300,11 +2321,17 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             if (prev == current.end() ||
                 prev->second.returnNullness != summary.returnNullness ||
                 prev->second.returnZeroness != summary.returnZeroness ||
+                prev->second.returnOwnership != summary.returnOwnership ||
                 prev->second.zeroFromParam != summary.zeroFromParam ||
                 prev->second.nullFromParam != summary.nullFromParam ||
+                prev->second.returnAliasParam != summary.returnAliasParam ||
                 prev->second.nullCondParam != summary.nullCondParam ||
                 prev->second.nullCondRange != summary.nullCondRange ||
-                prev->second.params != summary.params) {
+                prev->second.params != summary.params ||
+                prev->second.paramAccesses != summary.paramAccesses ||
+                prev->second.paramOwnerships != summary.paramOwnerships ||
+                prev->second.paramPreconditions != summary.paramPreconditions ||
+                prev->second.paramPostconditions != summary.paramPostconditions) {
                 changed = true;
             }
         }
@@ -1337,7 +2364,12 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
                        const SummaryRegistry::FunctionSummary& from) {
     using RN = SummaryRegistry::ReturnNullness;
     using RZ = SummaryRegistry::ReturnZeroness;
+    using RO = SummaryRegistry::ReturnOwnership;
     using PE = SummaryRegistry::ParamEffect;
+    using PA = SummaryRegistry::ParamAccess;
+    using PO = SummaryRegistry::ParamOwnership;
+    using PPre = SummaryRegistry::ParamPrecondition;
+    using PPost = SummaryRegistry::ParamPostcondition;
     if (into.returnNullness != from.returnNullness)
         into.returnNullness = RN::Unknown;
     // A conditioned claim survives a merge only when BOTH sides carry
@@ -1354,6 +2386,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     }
     if (into.returnZeroness != from.returnZeroness)
         into.returnZeroness = RZ::Unknown;
+    if (into.returnOwnership != from.returnOwnership)
+        into.returnOwnership = RO::Unknown;
     // The passthrough claims survive a merge only on exact agreement,
     // and only in their defined homes (the Unknown side of each axis).
     if (into.zeroFromParam != from.zeroFromParam ||
@@ -1362,12 +2396,45 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     if (into.nullFromParam != from.nullFromParam ||
         into.returnNullness != RN::Unknown)
         into.nullFromParam = -1;
+    if (into.returnAliasParam != from.returnAliasParam)
+        into.returnAliasParam = -1;
     if (into.params.size() != from.params.size()) {
         into.params.clear();  // paramEffect() defaults to Opaque
-        return;
+    } else {
+        for (size_t i = 0; i < into.params.size(); ++i)
+            if (into.params[i] != from.params[i])
+                into.params[i] = PE::Opaque;
     }
-    for (size_t i = 0; i < into.params.size(); ++i)
-        if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
+    if (into.paramAccesses.size() != from.paramAccesses.size()) {
+        into.paramAccesses.clear();
+    } else {
+        for (size_t i = 0; i < into.paramAccesses.size(); ++i)
+            if (into.paramAccesses[i] != from.paramAccesses[i])
+                into.paramAccesses[i] = PA::Unknown;
+    }
+    if (into.paramOwnerships.size() != from.paramOwnerships.size()) {
+        into.paramOwnerships.clear();
+    } else {
+        for (size_t i = 0; i < into.paramOwnerships.size(); ++i)
+            if (into.paramOwnerships[i] != from.paramOwnerships[i])
+                into.paramOwnerships[i] = PO::Unknown;
+    }
+    if (into.paramPreconditions.size() !=
+        from.paramPreconditions.size()) {
+        into.paramPreconditions.clear();
+    } else {
+        for (size_t i = 0; i < into.paramPreconditions.size(); ++i)
+            if (into.paramPreconditions[i] != from.paramPreconditions[i])
+                into.paramPreconditions[i] = PPre::None;
+    }
+    if (into.paramPostconditions.size() !=
+        from.paramPostconditions.size()) {
+        into.paramPostconditions.clear();
+    } else {
+        for (size_t i = 0; i < into.paramPostconditions.size(); ++i)
+            if (into.paramPostconditions[i] != from.paramPostconditions[i])
+                into.paramPostconditions[i] = PPost::Unknown;
+    }
 }
 
 // --- Disk format ---
@@ -1376,7 +2443,10 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/Z/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v6";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v9";
+constexpr const char* kSummaryFileHeaderV8 = "codeskeptic-summaries v8";
+constexpr const char* kSummaryFileHeaderV7 = "codeskeptic-summaries v7";
+constexpr const char* kSummaryFileHeaderV6 = "codeskeptic-summaries v6";
 constexpr const char* kSummaryFileHeaderV5 = "codeskeptic-summaries v5";
 constexpr const char* kSummaryFileHeaderV4 = "codeskeptic-summaries v4";
 constexpr const char* kSummaryFileHeaderV3 = "codeskeptic-summaries v3";
@@ -1421,6 +2491,23 @@ bool rzFromChar(char c, ReturnZeroness& out) {
     return false;
 }
 
+char roToChar(ReturnOwnership value) {
+    switch (value) {
+        case ReturnOwnership::Owned: return 'O';
+        case ReturnOwnership::Borrowed: return 'B';
+        case ReturnOwnership::Unknown: break;
+    }
+    return 'U';
+}
+
+bool roFromChar(char c, ReturnOwnership& out) {
+    switch (c) {
+        case 'U': out = ReturnOwnership::Unknown; return true;
+        case 'O': out = ReturnOwnership::Owned; return true;
+        case 'B': out = ReturnOwnership::Borrowed; return true;
+    }
+    return false;
+}
 char peToChar(ParamEffect v) {
     switch (v) {
         case ParamEffect::ReadsOnly: return 'R';
@@ -1439,6 +2526,92 @@ bool peFromChar(char c, ParamEffect& out) {
         case 'S': out = ParamEffect::Stores;    return true;
     }
     return false;
+}
+
+char preToChar(ParamPrecondition value) {
+    switch (value) {
+        case ParamPrecondition::NonNullCrash: return 'C';
+        case ParamPrecondition::NonNullRejected: return 'R';
+        case ParamPrecondition::None: break;
+    }
+    return 'O';
+}
+
+bool preFromChar(char c, ParamPrecondition& out) {
+    switch (c) {
+        case 'O': out = ParamPrecondition::None; return true;
+        case 'C': out = ParamPrecondition::NonNullCrash; return true;
+        case 'R': out = ParamPrecondition::NonNullRejected; return true;
+    }
+    return false;
+}
+
+char postToChar(ParamPostcondition value) {
+    switch (value) {
+        case ParamPostcondition::Null: return '0';
+        case ParamPostcondition::NonNull: return 'N';
+        case ParamPostcondition::Unknown: break;
+    }
+    return 'U';
+}
+
+bool postFromChar(char c, ParamPostcondition& out) {
+    switch (c) {
+        case 'U': out = ParamPostcondition::Unknown; return true;
+        case '0': out = ParamPostcondition::Null; return true;
+        case 'N': out = ParamPostcondition::NonNull; return true;
+    }
+    return false;
+}
+
+char accessToChar(ParamAccess value) {
+    switch (value) {
+        case ParamAccess::None: return 'O';
+        case ParamAccess::Reads: return 'R';
+        case ParamAccess::Writes: return 'W';
+        case ParamAccess::ReadsWrites: return 'B';
+        case ParamAccess::Unknown: break;
+    }
+    return 'U';
+}
+
+bool accessFromChar(char c, ParamAccess& out) {
+    switch (c) {
+        case 'U': out = ParamAccess::Unknown; return true;
+        case 'O': out = ParamAccess::None; return true;
+        case 'R': out = ParamAccess::Reads; return true;
+        case 'W': out = ParamAccess::Writes; return true;
+        case 'B': out = ParamAccess::ReadsWrites; return true;
+    }
+    return false;
+}
+
+char ownershipToChar(ParamOwnership value) {
+    switch (value) {
+        case ParamOwnership::Borrowed: return 'B';
+        case ParamOwnership::Consumed: return 'C';
+        case ParamOwnership::Transferred: return 'T';
+        case ParamOwnership::Unknown: break;
+    }
+    return 'U';
+}
+
+bool ownershipFromChar(char c, ParamOwnership& out) {
+    switch (c) {
+        case 'U': out = ParamOwnership::Unknown; return true;
+        case 'B': out = ParamOwnership::Borrowed; return true;
+        case 'C': out = ParamOwnership::Consumed; return true;
+        case 'T': out = ParamOwnership::Transferred; return true;
+    }
+    return false;
+}
+
+template <typename Value, typename ToChar>
+void writeParamVector(std::ostream& out, size_t count, ToChar toChar,
+                      const std::vector<Value>& values, Value fallback) {
+    if (count == 0) { out << '-'; return; }
+    for (size_t i = 0; i < count; ++i)
+        out << toChar(i < values.size() ? values[i] : fallback);
 }
 
 } // anonymous namespace
@@ -1497,6 +2670,38 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
         out << '\t';
         if (summary.nullFromParam < 0) out << '-';
         else out << summary.nullFromParam;
+        // v7 column: exact pointer return-alias param, "-" when absent.
+        out << '\t';
+        if (summary.returnAliasParam < 0) out << '-';
+        else out << summary.returnAliasParam;
+        // v8 columns: inferred non-null preconditions and exact pointer
+        // out-parameter postconditions.
+        out << '\t';
+        writeParamVector(out, summary.params.size(), preToChar,
+                         summary.paramPreconditions, ParamPrecondition::None);
+        out << '\t';
+        writeParamVector(out, summary.params.size(), postToChar,
+                         summary.paramPostconditions,
+                         ParamPostcondition::Unknown);
+        // v9 columns: pointee access, parameter ownership, and exact
+        // ownership of every non-null pointer return.
+        out << '\t';
+        if (summary.params.empty()) {
+            out << '-';
+        } else {
+            for (size_t i = 0; i < summary.params.size(); ++i)
+                out << accessToChar(summary.paramAccess(
+                    static_cast<unsigned>(i)));
+        }
+        out << '\t';
+        if (summary.params.empty()) {
+            out << '-';
+        } else {
+            for (size_t i = 0; i < summary.params.size(); ++i)
+                out << ownershipToChar(summary.paramOwnership(
+                    static_cast<unsigned>(i)));
+        }
+        out << '\t' << roToChar(summary.returnOwnership);
         out << '\n';
     }
     return out.good();
@@ -1511,7 +2716,10 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 6;
+    if (line == kSummaryFileHeader) version = 9;
+    else if (line == kSummaryFileHeaderV8) version = 8;
+    else if (line == kSummaryFileHeaderV7) version = 7;
+    else if (line == kSummaryFileHeaderV6) version = 6;
     else if (line == kSummaryFileHeaderV5) version = 5;
     else if (line == kSummaryFileHeaderV4) version = 4;
     else if (line == kSummaryFileHeaderV3) version = 3;
@@ -1521,7 +2729,9 @@ bool SummaryRegistry::parseSummaryFile(
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
     const size_t maxFields =
-        (version >= 5) ? 7 : (version == 4) ? 6 : (version == 3) ? 5 : 4;
+        (version >= 9) ? 13 : (version >= 8) ? 10
+                           : (version >= 7) ? 8 : (version >= 5) ? 7
+                       : (version == 4) ? 6 : (version == 3) ? 5 : 4;
 
     // Parse fully first, then hand over: a corrupt file is rejected
     // without leaving partial state behind
@@ -1541,6 +2751,8 @@ bool SummaryRegistry::parseSummaryFile(
         // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null
         // cond); v4: 6 (zero-passthrough param)
         if (fields.size() < 3 || fields.size() > maxFields) return false;
+        if (version == 9 && fields.size() != 13) return false;
+        if (version == 8 && fields.size() != 10) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
@@ -1609,7 +2821,7 @@ bool SummaryRegistry::parseSummaryFile(
                 return false;
             summary.zeroFromParam = static_cast<int>(idx);
         }
-        if (fields.size() == 7 && fields[6] != "-") {
+        if (fields.size() >= 7 && fields[6] != "-") {
             const std::string& nf = fields[6];
             errno = 0;
             char* end = nullptr;
@@ -1620,6 +2832,16 @@ bool SummaryRegistry::parseSummaryFile(
                 return false;
             summary.nullFromParam = static_cast<int>(idx);
         }
+        if (fields.size() >= 8 && fields[7] != "-") {
+            const std::string& alias = fields[7];
+            errno = 0;
+            char* end = nullptr;
+            long long idx = std::strtoll(alias.c_str(), &end, 10);
+            if (errno != 0 || end != alias.c_str() + alias.size() ||
+                idx < 0)
+                return false;
+            summary.returnAliasParam = static_cast<int>(idx);
+        }
         if (pe != "-") {
             summary.params.reserve(pe.size());
             for (char c : pe) {
@@ -1627,6 +2849,59 @@ bool SummaryRegistry::parseSummaryFile(
                 if (!peFromChar(c, effect)) return false;
                 summary.params.push_back(effect);
             }
+        }
+        if (version >= 8) {
+            const std::string& pre = fields[8];
+            const std::string& post = fields[9];
+            const size_t paramCount = summary.params.size();
+            if ((pre == "-") != (paramCount == 0) ||
+                (post == "-") != (paramCount == 0))
+                return false;
+            if (paramCount != 0) {
+                if (pre.size() != paramCount || post.size() != paramCount)
+                    return false;
+                summary.paramPreconditions.reserve(paramCount);
+                summary.paramPostconditions.reserve(paramCount);
+                for (char c : pre) {
+                    ParamPrecondition value;
+                    if (!preFromChar(c, value)) return false;
+                    summary.paramPreconditions.push_back(value);
+                }
+                for (char c : post) {
+                    ParamPostcondition value;
+                    if (!postFromChar(c, value)) return false;
+                    summary.paramPostconditions.push_back(value);
+                }
+            }
+        }
+        if (version >= 9) {
+            const std::string& access = fields[10];
+            const std::string& ownership = fields[11];
+            const std::string& returnOwnership = fields[12];
+            const size_t paramCount = summary.params.size();
+            if ((access == "-") != (paramCount == 0) ||
+                (ownership == "-") != (paramCount == 0))
+                return false;
+            if (paramCount != 0) {
+                if (access.size() != paramCount ||
+                    ownership.size() != paramCount)
+                    return false;
+                summary.paramAccesses.reserve(paramCount);
+                summary.paramOwnerships.reserve(paramCount);
+                for (char c : access) {
+                    ParamAccess value;
+                    if (!accessFromChar(c, value)) return false;
+                    summary.paramAccesses.push_back(value);
+                }
+                for (char c : ownership) {
+                    ParamOwnership value;
+                    if (!ownershipFromChar(c, value)) return false;
+                    summary.paramOwnerships.push_back(value);
+                }
+            }
+            if (returnOwnership.size() != 1 ||
+                !roFromChar(returnOwnership[0], summary.returnOwnership))
+                return false;
         }
         auto [it, inserted] = parsed.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);

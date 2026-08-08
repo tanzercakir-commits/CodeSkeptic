@@ -48,12 +48,36 @@ public:
     // `data = 0; return data;` source lives in another function/file).
     // The mirror of null: same mini-flow, with the zero domain.
     enum class ReturnZeroness { Unknown, AlwaysZero, NeverZero, MaybeZero };
+    enum class ReturnOwnership { Unknown, Owned, Borrowed };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
+    enum class ParamAccess { Unknown, None, Reads, Writes, ReadsWrites };
+    enum class ParamOwnership {
+        Unknown, Borrowed, Consumed, Transferred
+    };
+    enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
+    enum class ParamPostcondition { Unknown, Null, NonNull };
 
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
+        ReturnOwnership returnOwnership = ReturnOwnership::Unknown;
         std::vector<ParamEffect> params;
+
+        // Independent interprocedural-v2 relations. ParamAccess describes
+        // reads/writes through the pointer, while ParamOwnership describes
+        // what happens to responsibility for the pointed-to allocation.
+        // Keeping these axes separate avoids treating `return p` as an
+        // ownership transfer merely because the pointer value escapes.
+        std::vector<ParamAccess> paramAccesses;
+        std::vector<ParamOwnership> paramOwnerships;
+
+        // Entry requirements inferred from the callee's own leading
+        // guard, and exact normal-return effects on pointer out-params.
+        // The vectors are indexed like params. Missing entries (legacy
+        // summary files and conservative overload merges) mean no
+        // precondition / unknown postcondition.
+        std::vector<ParamPrecondition> paramPreconditions;
+        std::vector<ParamPostcondition> paramPostconditions;
 
         // Zero-passthrough (the zeroness-through-summaries slice): when
         // returnZeroness is Unknown ONLY because some paths return
@@ -76,6 +100,14 @@ public:
         // null-correspondence). -1 = no claim.
         int nullFromParam = -1;
 
+        // Exact pointer return-alias relation (interprocedural v2):
+        // every reachable return denotes pointer parameter
+        // #returnAliasParam's entry object. Unlike nullFromParam this
+        // describes identity, not merely null correspondence, and is
+        // therefore valid independently of returnNullness. -1 = no
+        // proven exact relation.
+        int returnAliasParam = -1;
+
         // Value-conditioned null return (#69b). When returnNullness is
         // MaybeNull AND the harvest PROVED that every null-returning
         // path is guarded by "parameter #nullCondParam outside
@@ -94,6 +126,36 @@ public:
         ParamEffect paramEffect(unsigned index) const {
             if (index >= params.size()) return ParamEffect::Opaque;
             return params[index];
+        }
+
+        ParamAccess paramAccess(unsigned index) const {
+            if (index >= paramAccesses.size()) return ParamAccess::Unknown;
+            return paramAccesses[index];
+        }
+
+        ParamOwnership paramOwnership(unsigned index) const {
+            if (index < paramOwnerships.size()) return paramOwnerships[index];
+            // v1-v8 compatibility: preserve the old caller behavior when
+            // a persisted summary predates the independent ownership axis.
+            switch (paramEffect(index)) {
+                case ParamEffect::ReadsOnly: return ParamOwnership::Borrowed;
+                case ParamEffect::Frees: return ParamOwnership::Consumed;
+                case ParamEffect::Stores: return ParamOwnership::Transferred;
+                case ParamEffect::Opaque: break;
+            }
+            return ParamOwnership::Unknown;
+        }
+
+        ParamPrecondition paramPrecondition(unsigned index) const {
+            if (index >= paramPreconditions.size())
+                return ParamPrecondition::None;
+            return paramPreconditions[index];
+        }
+
+        ParamPostcondition paramPostcondition(unsigned index) const {
+            if (index >= paramPostconditions.size())
+                return ParamPostcondition::Unknown;
+            return paramPostconditions[index];
         }
     };
 

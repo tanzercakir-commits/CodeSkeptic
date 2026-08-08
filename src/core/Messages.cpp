@@ -22,6 +22,9 @@ const MsgEntry kMessages[] = {
     // LeakEndOfFunction
     {"Memory leak: allocation stored in '{0}' may not be freed",
      "Bellek sizintisi: {0} icin ayrilan bellek serbest birakilmamis olabilir"},
+    // OwnedResultDiscarded
+    {"Owned result is discarded without being released",
+     "Sahip olunan sonuc serbest birakilmadan atiliyor"},
     // ResourceLeakEndOfFunction
     {"Resource leak: handle stored in '{0}' may not be closed",
      "Kaynak sizintisi: {0} icin acilan tanitici (handle) kapatilmamis olabilir"},
@@ -169,6 +172,16 @@ const MsgEntry kMessages[] = {
      "'{0}' icin null arguman: {1} fonksiyonunun kendi giris guard'i "
      "(satir {2}) bu cagriyi her zaman reddedecek - cagri isini asla "
      "yapamaz"},
+    // ContractSummaryGuardCrash
+    {"null argument for '{0}' violates {1}'s persisted non-null entry "
+     "precondition; this call can crash",
+     "'{0}' icin null arguman, {1} fonksiyonunun kalici non-null giris "
+     "onkosulunu ihlal ediyor; bu cagri cokebilir"},
+    // ContractSummaryGuardRejected
+    {"null argument for '{0}' violates {1}'s persisted non-null entry "
+     "precondition; the callee will refuse this call",
+     "'{0}' icin null arguman, {1} fonksiyonunun kalici non-null giris "
+     "onkosulunu ihlal ediyor; fonksiyon bu cagriyi reddedecek"},
     // ContractSyntaxError
     {"invalid contract syntax: '{0}'",
      "gecersiz sozlesme sozdizimi: '{0}'"},

@@ -22,6 +22,36 @@ TEST(MemoryLeakRuleExTest, SimpleLeak) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
+TEST(MemoryLeakRuleExTest, DiscardedOwnedResultIsLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() { (void)new int(42); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+    EXPECT_NE(results[0].message.find("discarded"), std::string::npos);
+}
+
+TEST(MemoryLeakRuleExTest, DiscardedResourceResultUsesResourceRule) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct FILE;
+        FILE* fopen(const char*, const char*);
+        void f() { (void)fopen("data.txt", "r"); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "resource-leak");
+    EXPECT_NE(results[0].message.find("discarded"), std::string::npos);
+}
+
+TEST(MemoryLeakRuleExTest, ImmediatelyDeletedTemporaryIsClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() { delete new int(42); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(MemoryLeakRuleExTest, CorrectUsage_NewDelete) {
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
