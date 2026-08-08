@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -20,12 +21,33 @@ def macos_smoke_step() -> str:
     return workflow[start:end]
 
 
+def job(name: str) -> str:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    start_marker = f"  {name}:\n"
+    start = workflow.index(start_marker)
+    next_job = re.search(
+        r"(?m)^  [A-Za-z0-9_-]+:\s*$",
+        workflow[start + len(start_marker):],
+    )
+    if next_job is None:
+        return workflow[start:]
+    end = start + len(start_marker) + next_job.start()
+    return workflow[start:end]
+
+
 class ReleaseWorkflowTest(unittest.TestCase):
     def test_unavailable_analysis_uses_canonical_verdict(self) -> None:
         smoke = macos_smoke_step()
         self.assertIn('test "$code2" -eq 2', smoke)
         self.assertIn('grep -q "VERDICT UNAVAILABLE"', smoke)
         self.assertNotIn("ANALYSIS FAILED", smoke)
+
+    def test_draft_release_is_created_once_before_parallel_jobs(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(workflow.count("gh release create"), 1)
+        self.assertIn("gh release create", job("prepare"))
+        for platform in ("linux", "macos", "windows"):
+            self.assertIn("    needs: prepare", job(platform))
 
 
 if __name__ == "__main__":

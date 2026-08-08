@@ -11,6 +11,12 @@ and printed `VERDICT UNAVAILABLE`; the workflow still searched for the retired
 The Linux lane, including its two clean-container relocation smokes, passed.
 Windows likewise passed build, all tests, version, package, relocation and
 draft-upload checks; publish was correctly skipped because macOS was red.
+The parallel Linux/Windows upload steps also exposed a second release-only
+race: each could create a draft, leaving two v0.4.8 drafts (one carried all
+four uploaded aliases; the other was empty). A serial `prepare` job now owns
+the single draft before any platform starts, while the three platform jobs
+only upload to it. The workflow contract pins one create command and all three
+dependency edges, preventing incomplete or orphaned release state on retries.
 
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
