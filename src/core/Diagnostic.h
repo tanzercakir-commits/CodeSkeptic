@@ -37,6 +37,10 @@ struct Diagnostic {
     std::string message;
     std::string function;          // function the finding occurs in
     std::vector<TraceNote> notes;  // function and notes excluded from ordering
+    // csf1 semantic identity, assigned after path canonicalization and before
+    // reporting. Excluded from ordering/equality so presentation metadata
+    // cannot change finding deduplication.
+    std::string fingerprint;
 
     std::string severityToString() const {
         switch (severity) {

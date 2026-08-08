@@ -92,6 +92,8 @@ TEST(McpServerTest, AnalyzeCallReturnsFindingsWithTrace) {
               std::string::npos);
     EXPECT_NE(response.find("\\\"blocks_verdict\\\":true"),
               std::string::npos);
+    EXPECT_NE(response.find("\\\"fingerprint\\\":\\\"csf1-"),
+              std::string::npos);
     EXPECT_NE(response.find("\\\"blocking_count\\\":1"),
               std::string::npos);
     EXPECT_NE(response.find("\\\"report_only_count\\\":0"),

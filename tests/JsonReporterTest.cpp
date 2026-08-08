@@ -73,4 +73,6 @@ TEST(JsonReporterTest, PublishesPerFindingCapabilityMetadata) {
               std::string::npos);
     EXPECT_NE(json.find("\"blocks_verdict\": false"),
               std::string::npos);
+    EXPECT_NE(json.find("\"fingerprint\": \"csf1-"),
+              std::string::npos);
 }

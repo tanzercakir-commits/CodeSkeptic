@@ -1,6 +1,7 @@
 #include "reporter/JsonReporter.h"
 
 #include "core/Capabilities.h"
+#include "core/FindingFingerprint.h"
 #include "core/Messages.h"
 
 #include <fstream>
@@ -82,6 +83,9 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
 
     for (size_t i = 0; i < diagnostics.size(); ++i) {
         const auto& diag = diagnostics[i];
+        const std::string fingerprint = diag.fingerprint.empty()
+            ? findingFingerprint(diag)
+            : diag.fingerprint;
         if (i > 0) file << ",";
         file << "\n    {\n";
         file << "      \"severity\": \"" << diag.severityToString() << "\",\n";
@@ -95,6 +99,8 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         file << "      \"blocks_verdict\": "
              << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
              << ",\n";
+        file << "      \"fingerprint\": \""
+             << escapeJson(fingerprint) << "\",\n";
         file << "      \"file\": \"" << escapeJson(diag.file) << "\",\n";
         file << "      \"line\": " << diag.line << ",\n";
         file << "      \"column\": " << diag.column << ",\n";

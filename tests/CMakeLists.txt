@@ -14,6 +14,7 @@ add_executable(codeskeptic_tests
     DiagnosticTest.cpp
     AnalysisResultTest.cpp
     CapabilitiesTest.cpp
+    FindingFingerprintTest.cpp
     ConfigTest.cpp
     VerdictIntegrityTest.cpp
     JsonReporterTest.cpp
@@ -90,6 +91,12 @@ if(NOT WIN32)
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/CapabilitiesCliTest.py
                      $<TARGET_FILE:codeskeptic>)
+    add_test(NAME MeasurementLabContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/MeasurementLabTest.py)
+    add_test(NAME MeasurementWorkflowContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/MeasurementWorkflowTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)
