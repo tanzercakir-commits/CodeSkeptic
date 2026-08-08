@@ -24,8 +24,8 @@ prune impossible leak paths. The disk format is v6, older v1-v5 files remain
 accepted, and v5 rejects the new encoding rather than misreading it.
 
 The authoritative Juliet run
-[`31250527466`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31250527466)
-on analyzer tree `f1775290493c98fa60e1823272204745fa572181` kept all 80
+[`31252090247`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252090247)
+on analyzer tree `125a915a458e108b631d48b1dfdd92cd49089c6b` kept all 80
 memory-leak TPs while cutting rule-matched FPs from 32 to 13:
 precision **0.714 → 0.860**, recall 0.193 and case F1 0.315. The 0.85
 product threshold is now the pinned CI floor; `memory-leak` is promoted to
@@ -35,19 +35,19 @@ supported, quality-gated and blocking. The independently unmeasured
 Adding the shared support TU also exposed exact constant-return helper truth:
 double-free reached 101 TP / 0 FP (recall 0.253), use-after-free 212 / 0
 (0.531), and integer-overflow 23 / 0 (0.057); all gains have ratcheted floors.
-The immutable Juliet evidence commit is `3565549f2bb23b3ad0e6822357a452fedafed346`.
+The immutable Juliet evidence commit is `20626193c6e29d3b00721cad117d2ff6f4b53ad5`.
 
 The pinned rtp2httpd replay
-[`31250560567`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31250560567)
+[`31252131673`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252131673)
 analyzed 38/38 TUs, exit 1, and reported exactly four findings: the same four
 actionable findings from the completed triage and zero context false
-positives. libgit2 stayed 34 across 167/167 TUs. The run failed only on the
-deliberately stale six-finding ledger, proving the semantic delta before the
-pin moved; immutable evidence is `3017c34c72e09074d5beb112b19daa5aa3b4cdf7`.
+positives. libgit2 stayed 34 across 167/167 TUs, the canonical ledger matched,
+and the run passed. Immutable evidence is `f8e39ce49c40893859f6079f57c423df1b654166`.
 
-Local verification passed all 875 tests both through CTest and in one process;
-the thesis gate stayed `clean_fp=0`, `bug_caught=9/15`, and profile plus
-real-world-ledger integrity checks passed.
+Local verification passed all 875 tests both through CTest and in one process,
+the dogfood scan was clean across 47/47 TUs, and corpus pins stayed cJSON 54 /
+tinyxml2 9. The thesis gate stayed `clean_fp=0`, `bug_caught=9/15`; profile,
+capability, documentation and real-world-ledger integrity checks passed.
 
 ## 2026-08-08 — Phase 2 measurement laboratory
 

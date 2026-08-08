@@ -163,7 +163,8 @@ Notes on reading these numbers honestly:
   its 13 rule-matched FPs stay visible even though it cleared the 0.85
   Phase 3 product gate.
 
-Results are from the 2026-08-08 Phase 3 run `31250527466` (400 files/CWE).
+Results are from the 2026-08-08 Phase 3 run
+[`31252090247`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252090247) (400 files/CWE).
 Every improvement is locked by a ratcheted floor in
 `scripts/juliet_expected.txt`: CWE-401 precision 0.85, CWE-415 recall 0.24,
 CWE-416 recall 0.50, CWE-190 recall 0.050, and the unchanged CWE-369
@@ -180,12 +181,12 @@ the same reviewed change, while an unexplained surface/count/verdict drift is
 red.
 
 The current receipt was measured on 2026-08-08 UTC with analyzer tree
-[`f1775290493c98fa60e1823272204745fa572181`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/f1775290493c98fa60e1823272204745fa572181)
-in [workflow run 31250560567](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31250560567).
+[`125a915a458e108b631d48b1dfdd92cd49089c6b`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/125a915a458e108b631d48b1dfdd92cd49089c6b)
+in [workflow run 31252131673](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252131673).
 CI mirrored `results.txt` and bounded tail logs to
-`refs/ci-logs/f1775290493c98fa60e1823272204745fa572181/realworld`; its immutable
+`refs/ci-logs/125a915a458e108b631d48b1dfdd92cd49089c6b/realworld`; its immutable
 evidence commit is
-[`3017c34c72e09074d5beb112b19daa5aa3b4cdf7`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/3017c34c72e09074d5beb112b19daa5aa3b4cdf7).
+[`f8e39ce49c40893859f6079f57c423df1b654166`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/f8e39ce49c40893859f6079f57c423df1b654166).
 
 | Project | Exact input revision | Built TU verdict | Findings | Completed triage claim |
 |---|---|---:|---:|---|
