@@ -1,5 +1,54 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 3 precision-debt implementation
+
+Phase 3 replaces two rtp2httpd context false positives with explicit
+proof inputs and narrow engine reasoning. Recovered assertions now accept an
+honestly resolved one-hop member subject such as `DEBUGASSERT(data->conn)`,
+preserve its field identity, and refine only the asserted base. The
+`parse_bind_cmd` precondition is carried by a revision-pinned sidecar contract
+pack whose `getopt_long` required-argument invariant is documented and copied
+into the exact real-world replay; it is not a baseline or suppression.
+
+The sign-conversion rule recognizes the rtp2httpd post-cast capacity idiom
+only when one dedicated unsigned local is consumed exclusively under a direct
+independent-variable upper bound. Disjunctions, arithmetic bounds, positive-
+only checks, else/outside uses and later uses remain reportable. Bidirectional
+regression tests pin those limits.
+
+Memory-leak ownership now constructs transitive local pointer/reference alias
+components before filtering them to tracked owners, covering Juliet shadow and
+`T*&` variants without hiding the no-free control. Cross-TU summaries add an
+exact `AlwaysZero` state so support helpers such as `globalReturnsFalse()` can
+prune impossible leak paths. The disk format is v6, older v1-v5 files remain
+accepted, and v5 rejects the new encoding rather than misreading it.
+
+The authoritative Juliet run
+[`31250527466`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31250527466)
+on analyzer tree `f1775290493c98fa60e1823272204745fa572181` kept all 80
+memory-leak TPs while cutting rule-matched FPs from 32 to 13:
+precision **0.714 → 0.860**, recall 0.193 and case F1 0.315. The 0.85
+product threshold is now the pinned CI floor; `memory-leak` is promoted to
+supported, quality-gated and blocking. The independently unmeasured
+`resource-leak` finding remains experimental/report-only.
+
+Adding the shared support TU also exposed exact constant-return helper truth:
+double-free reached 101 TP / 0 FP (recall 0.253), use-after-free 212 / 0
+(0.531), and integer-overflow 23 / 0 (0.057); all gains have ratcheted floors.
+The immutable Juliet evidence commit is `3565549f2bb23b3ad0e6822357a452fedafed346`.
+
+The pinned rtp2httpd replay
+[`31250560567`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31250560567)
+analyzed 38/38 TUs, exit 1, and reported exactly four findings: the same four
+actionable findings from the completed triage and zero context false
+positives. libgit2 stayed 34 across 167/167 TUs. The run failed only on the
+deliberately stale six-finding ledger, proving the semantic delta before the
+pin moved; immutable evidence is `3017c34c72e09074d5beb112b19daa5aa3b4cdf7`.
+
+Local verification passed all 875 tests both through CTest and in one process;
+the thesis gate stayed `clean_fp=0`, `bug_caught=9/15`, and profile plus
+real-world-ledger integrity checks passed.
+
 ## 2026-08-08 — Phase 2 measurement laboratory
 
 Every pull request now receives an exact base-to-head measurement rather than

@@ -139,7 +139,7 @@ ledger](docs/benchmarks.md#current-engine-real-world-replay-ledger).
 | [shadPS4](https://github.com/shadps4-emu/shadPS4) | 377 files | 209 → **22** | **3 reported upstream — 2 merged ([#4702](https://github.com/shadps4-emu/shadPS4/pull/4702), [#4703](https://github.com/shadps4-emu/shadPS4/pull/4703))** |
 | [libgit2](https://github.com/libgit2/libgit2) | v1.9.0, 201-file historical scan; 167 built Linux TUs in CI | 149 → **34** | **11 confirmed OOM-path leaks** (one issue class, report drafted); re-validated in CI on every `realworld-scan` run |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | full build | 511 → **25** | triage in progress |
-| [rtp2httpd](https://github.com/stackia/rtp2httpd) | 39-file historical scan; pinned `a7a1e568`, 38 built Linux TUs in CI | 12 → **0** (2026-07 engine); **6 current** | Historical NULL-contract report; current triage: **4 actionable findings across 3 root causes, 2 context FPs** |
+| [rtp2httpd](https://github.com/stackia/rtp2httpd) | 39-file historical scan; pinned `a7a1e568`, 38 built Linux TUs in CI | 12 → **0** (2026-07 engine); **4 current** | Historical NULL-contract report; current triage: **4 actionable findings across 3 root causes, 0 context FPs** |
 | [NASA fprime](https://github.com/nasa/fprime) | 216 files | 10 → **0** | clean (with `--fatal-asserts SwAssert` declaring F´'s assert handler) |
 | [abseil-cpp](https://github.com/abseil/abseil-cpp) | LTS tag | 12 → **4** | — |
 | [Catch2](https://github.com/catchorg/Catch2) | full build | **0** | clean |
@@ -157,17 +157,17 @@ bugs, found from a compilation database, accepted by the people who
 own the code. How these numbers are kept honest — idiom configuration
 and the FP-family process — is in [docs/benchmarks.md](docs/benchmarks.md#reading-the-real-world-scan-numbers).
 
-The 2026-08-07 fail-closed replay deliberately keeps the historical
+The 2026-08-08 fail-closed replay deliberately keeps the historical
 `initial → now` measurements separate from the current engine. It scans
 only translation units present in each real compilation database and
 requires a complete verdict. libgit2 reproduced 34 findings across all
-167 built Linux TUs. The pinned rtp2httpd campaign now reports six across
-38/38 TUs: four actionable findings (an unchecked allocation, two sites
-of one verbosity-range bug, and unsafe negative `Content-Length`
-arithmetic) plus two context false positives (a required `getopt`
-argument contract and a cast followed by a safe range check). The CI
-guard pins both the TU surface and these counts, so skipped files cannot
-masquerade as an improvement.
+167 built Linux TUs. The pinned rtp2httpd campaign now reports four across
+38/38 TUs, all actionable: an unchecked allocation, two sites of one
+verbosity-range bug, and unsafe negative `Content-Length` arithmetic.
+The former required-`getopt`-argument and safe-post-cast-range context FPs
+are retired by a revision-pinned sidecar contract and a narrow guarded-use
+proof. The CI guard pins both the TU surface and these counts, so skipped
+files cannot masquerade as an improvement.
 
 ## What it won't catch
 
@@ -178,13 +178,13 @@ Read its silence accordingly:
   design; bugs that need reasoning the engine doesn't have (deep
   aliasing, concurrency, arbitrary arithmetic) are not reported.
 - **Recall is bounded and measured.** On Juliet, recall ranges from
-  0.496 (use-after-free) down to 0.052 (integer overflow) — and every
+  0.531 (use-after-free) down to 0.057 (integer overflow) — and every
   missed case is *classified*: by-design silences (float division,
   opaque `rand()`) vs addressable gaps, so the denominator is honest.
   Numbers and why: [docs/benchmarks.md](docs/benchmarks.md).
-- **`memory-leak` is experimental/report-only** (Juliet precision 0.714
-  vs 1.000 for supported rules) and the standing Phase 3 improvement
-  target — evaluate it separately ([how](docs/evaluate.md)).
+- **`memory-leak` is supported/blocking** after Phase 3 raised Juliet
+  precision from 0.714 to **0.860** (80 TP / 13 FP), clearing the 0.85
+  product gate; its remaining noise is still tracked separately ([how](docs/evaluate.md)).
 - **A compiled-out assert is believed, not checked.** Under `NDEBUG` the
   condition never runs, but CodeSkeptic recovers it from the preprocessor
   and trusts it — `--no-assert-recovery` reports the shipped build instead.
@@ -210,7 +210,7 @@ others are weakest: gating *new* changes (human or AI-generated).
 | Rule | ID | Tier | Verdict | Detects |
 |------|----|------|---------|---------|
 | Uninitialized pointer | `uninit-ptr` | experimental | report-only | Dereference of a pointer that may be unassigned on some path (CFG dataflow) |
-| Memory leak | `memory-leak` | experimental | report-only | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
+| Memory leak | `memory-leak` | supported | blocking | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
 | Double free | `double-free` | supported | blocking | Freeing a pointer already in freed state (shares the memory-leak dataflow) |
 | Use after free | `use-after-free` | supported | blocking | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
 | Resource leak | `resource-leak` | experimental | report-only | A `FILE*`/`DIR*` from `fopen`/`freopen`/`fdopen`/`tmpfile`/`opendir` lost without a matching `fclose`/`closedir` (CWE-404) — built-in, classified apart from heap `memory-leak` |
@@ -232,12 +232,12 @@ interfaces and explicit non-goals; analysis machinery is in
 
 Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 
-- **Mature code (NIST Juliet 1.3):** rule precision **1.000** on all five
-  supported rules (experimental memory-leak: 0.714); recall 0.496 / 0.347 / 0.242 /
-  0.193 / 0.108 / 0.052 by CWE — lower bounds with a classified
-  denominator (floating-point variants and opaque sources are
-  by-design silences, not gaps), every improvement locked by a
-  ratcheted CI floor.
+- **Mature code (NIST Juliet 1.3):** five supported rules have precision
+  **1.000** and supported `memory-leak` has **0.860**; recall is 0.531 /
+  0.347 / 0.253 / 0.193 / 0.108 / 0.057 by CWE — lower bounds with a
+  classified denominator (floating-point variants and opaque sources are
+  by-design silences, not gaps), every improvement locked by a ratcheted
+  CI floor.
 - **First-draft code (the mission axis):** a frozen 24-program corpus
   written by rule-blind generators gates every PR
   (`tests/thesis_corpus/`): **zero false positives across 9

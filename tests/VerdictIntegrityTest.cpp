@@ -113,7 +113,7 @@ TEST(VerdictIntegrityTest, AllRegisteredRulesDisabledIsExitTwo) {
 TEST(VerdictIntegrityTest, ExperimentalFindingIsVisibleButDoesNotBlock) {
     const auto source = writeCleanSource("verdict_experimental.cpp");
     StaticAnalyzer analyzer(configFor({"codeskeptic", source}));
-    analyzer.addRule<FixedFindingRule>("memory-leak");
+    analyzer.addRule<FixedFindingRule>("bounds");
 
     const auto result = analyzer.run();
 

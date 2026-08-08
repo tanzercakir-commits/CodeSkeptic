@@ -51,7 +51,7 @@ stay silent until their source/contract/policy signal exists.
 | Rule | ID | Tier | Default | Quality gate | Verdict |
 |---|---|---|:---:|:---:|---|
 | Uninitialized pointer | `uninit-ptr` | experimental | on | no | report-only |
-| Memory leak | `memory-leak` | experimental | on | no | report-only |
+| Memory leak | `memory-leak` | supported | on | yes | blocking |
 | Double free | `double-free` | supported | on | yes | blocking |
 | Use after free | `use-after-free` | supported | on | yes | blocking |
 | Resource leak (`FILE*`/`DIR*`) | `resource-leak` | experimental | on | no | report-only |
@@ -66,11 +66,12 @@ stay silent until their source/contract/policy signal exists.
 | Policy enforcement | `policy` | experimental | on | no | report-only |
 
 The supported evidence is the pinned Juliet precision gate: double-free
-1.000 (97 TP / 0 FP), use-after-free 1.000 (198 / 0), div-by-zero 1.000
-(43 / 0), null-deref 1.000 (140 / 0), and int-overflow 1.000 (21 / 0).
-`memory-leak` remains experimental at 0.714 precision until Phase 3 reaches
-at least 0.85. Families without an independent precision sample remain
-experimental even when other clean-corpus tests cover them.
+1.000 (101 TP / 0 FP), use-after-free 1.000 (212 / 0), div-by-zero 1.000
+(43 / 0), null-deref 1.000 (140 / 0), and int-overflow 1.000 (23 / 0).
+Phase 3 promoted `memory-leak` after it reached 0.860 precision (80 TP /
+13 FP), above its 0.85 product gate. Families without an independent
+precision sample — including `resource-leak`, despite sharing the same
+engine pass — remain experimental.
 
 The four heap/resource finding IDs share the `memory-leak` engine pass.
 `--disable-rule memory-leak` disables that pass; their verdict tiers are
