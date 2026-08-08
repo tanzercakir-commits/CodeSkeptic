@@ -83,10 +83,14 @@
 // verified to FAIL on the pre-fix binary.
 //
 // Deliberately out of scope for v1 (each is a separate, pinned step):
-// integer `!= 0` asserts (the div-by-zero twin), field and array
-// subjects (`p->q`, `a[i]`), asserts nested inside another macro
-// expansion, and the MCP warm-AST path (which has no preprocessor
+// integer `!= 0` asserts (the div-by-zero twin), nested member and
+// array subjects (`p->q->r`, `a[i]`), asserts nested inside another
+// macro expansion, and the MCP warm-AST path (which has no preprocessor
 // hook — see SourceManager::processAllOnWorker).
+
+// One-hop `p->q` subjects are supported: they prove the base pointer
+// non-null and retain the resolved field identity for future
+// field-sensitive domains.
 
 #include <set>
 #include <string>
@@ -97,6 +101,7 @@ namespace clang {
 class ASTContext;
 class CompilerInstance;
 class FunctionDecl;
+class FieldDecl;
 class SourceManager;
 class Stmt;
 class VarDecl;
@@ -104,11 +109,15 @@ class VarDecl;
 
 namespace codeskeptic {
 
-// A recovered guard: "this variable is non-null from here on".
+// A recovered guard: "this variable is non-null from here on". A
+// one-hop member assertion also keeps the resolved field identity; the
+// current null domain consumes the entailed base-pointer fact, while
+// field-sensitive domains can consume the narrower subject later.
 struct AssertGuard {
     enum class Kind { NonNull };
     Kind kind = Kind::NonNull;
     const clang::VarDecl* var = nullptr;
+    const clang::FieldDecl* field = nullptr;
 };
 
 // --- Configuration ---

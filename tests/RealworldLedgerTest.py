@@ -15,7 +15,7 @@ VALIDATOR = ROOT / "scripts" / "check_realworld_ledger.py"
 CANONICAL = ROOT / "scripts" / "realworld_expected.txt"
 
 LIBGIT2 = "libgit2 338e6fb681369ff0537719095e22ce9dc602dbf0 v1.9.0 167 34 1 - -"
-RTP = "rtp2httpd a7a1e568d46ee3176f8a3e94e0f88f131ebd444e a7a1e568 38 6 1 4 2"
+RTP = "rtp2httpd a7a1e568d46ee3176f8a3e94e0f88f131ebd444e a7a1e568 38 4 1 4 0"
 
 
 def run_ledger(text: str) -> subprocess.CompletedProcess[str]:
@@ -68,7 +68,7 @@ class RealworldLedgerTest(unittest.TestCase):
 
         wrong_sum = run_ledger(f"{LIBGIT2}\n{RTP.rsplit(' ', 2)[0]} 3 2\n")
         self.assertEqual(wrong_sum.returncode, 1)
-        self.assertIn("triage_total=5 findings=6", wrong_sum.stderr)
+        self.assertIn("triage_total=5 findings=4", wrong_sum.stderr)
 
 
 if __name__ == "__main__":

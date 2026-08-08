@@ -80,12 +80,12 @@ FP-hunting material).
 
 | CWE | Target rule | Rule precision | Recall | Case F1 |
 |-----|-------------|---------------:|-------:|--------:|
-| CWE-416 Use After Free | `use-after-free` | **1.000** (198 TP / 0 FP) | 0.496 | **0.663** |
+| CWE-416 Use After Free | `use-after-free` | **1.000** (212 TP / 0 FP) | 0.531 | **0.694** |
 | CWE-476 NULL Pointer Dereference | `null-deref` | **1.000** (140 TP / 0 FP) | 0.347 | **0.516** |
-| CWE-415 Double Free | `double-free` | **1.000** (97 TP / 0 FP) | 0.242 | 0.390 |
-| CWE-401 Memory Leak | `memory-leak` | 0.714 (case-level) | 0.193 | 0.306 |
+| CWE-415 Double Free | `double-free` | **1.000** (101 TP / 0 FP) | 0.253 | 0.403 |
+| CWE-401 Memory Leak | `memory-leak` | **0.860** (80 TP / 13 FP) | 0.193 | 0.315 |
 | CWE-369 Divide by Zero | `div-by-zero` | **1.000** (43 TP / 0 FP) | 0.108 | 0.195 |
-| CWE-190 Integer Overflow | `int-overflow` | **1.000** (21 TP / 0 FP*) | 0.052 | 0.100 |
+| CWE-190 Integer Overflow | `int-overflow` | **1.000** (23 TP / 0 FP*) | 0.057 | 0.108 |
 
 <sub>* The CWE-190 rand-source family reaches the sink through a
 bit-shuffle macro the interval evaluator cannot fold — a documented
@@ -130,6 +130,13 @@ CWE-416 good function may genuinely leak, so a `memory-leak` finding
 there is counted against us while possibly being correct. The
 rule-matched columns are the sound metric.
 
+Phase 3 (2026-08-08) analyzes the shared Juliet support TU without adding it
+to the scored denominator. Exact constant-return helpers now prune impossible
+paths across files; transitive shadow/reference aliases carry ownership to the
+real free. Memory-leak rule-matched FPs fell 32 → 13 with all 80 TPs retained
+(precision 0.714 → 0.860). The same support truth exposed four double-free /
+use-after-free TPs and two integer-overflow TPs that were previously hidden.
+
 Beyond precision/hit-rate, the harness reports **case-level F1** (each
 file is a case: a matched finding in a `bad` function is a case-TP, in
 a `good` function a case-FP, a silent bad file an FN) and a second
@@ -142,9 +149,9 @@ any code PR that drops below them fails CI.
 
 Notes on reading these numbers honestly:
 
-- **Zero false positives on four of five rules** reflects the design
-  choice that unknown values stay silent — the analyzer only speaks
-  when the dataflow proves something.
+- **Five rules have zero sampled false positives; `memory-leak` has 13.**
+  Unknown values still stay silent: the analyzer speaks only when the
+  dataflow proves something.
 - **Hit rates are lower bounds.** Many Juliet defects flow through
   source/sink call chains and class variants; intraprocedural analysis
   plus v1 summaries catches the local and wrapper-based portion.
@@ -152,16 +159,16 @@ Notes on reading these numbers honestly:
   floating-point division (defined behavior in IEEE 754 — deliberately
   not reported) or opaque sources (`rand()`, sockets) that an honest
   analyzer cannot call zero.
-- **`memory-leak` is the one noisy rule** (also the bulk of the
-  cross-rule noise on other CWEs' files) and is the current
-  improvement target.
+- **`memory-leak` remains the lowest-precision supported rule** at 0.860;
+  its 13 rule-matched FPs stay visible even though it cleared the 0.85
+  Phase 3 product gate.
 
-Results are from the 2026-07-22 run (v0.4.1, 400 files/CWE); grep
-`JULIET_RESULT` in the workflow logs for current numbers. Every
-improvement is locked by a ratcheted floor in
-`scripts/juliet_expected.txt` (CWE-190 recall 0.005 → 0.040, CWE-369
-0.03 → 0.095, CWE-401 precision 0.66 → 0.68) — the guard file's
-comments carry each move's rationale.
+Results are from the 2026-08-08 Phase 3 run
+[`31252090247`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252090247) (400 files/CWE).
+Every improvement is locked by a ratcheted floor in
+`scripts/juliet_expected.txt`: CWE-401 precision 0.85, CWE-415 recall 0.24,
+CWE-416 recall 0.50, CWE-190 recall 0.050, and the unchanged CWE-369
+recall 0.095. The guard file comments carry each move's rationale.
 
 ## Current-engine real-world replay ledger
 
@@ -173,18 +180,18 @@ workflow shell. A deliberate semantic change therefore updates one ledger in
 the same reviewed change, while an unexplained surface/count/verdict drift is
 red.
 
-The current receipt was measured on 2026-08-07 UTC with analyzer tree
-[`d47d11422542551e2f4f7b571e07d6d917c32885`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/d47d11422542551e2f4f7b571e07d6d917c32885)
-in [workflow run 31199842703](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31199842703).
+The current receipt was measured on 2026-08-08 UTC with analyzer tree
+[`125a915a458e108b631d48b1dfdd92cd49089c6b`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/125a915a458e108b631d48b1dfdd92cd49089c6b)
+in [workflow run 31252131673](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31252131673).
 CI mirrored `results.txt` and bounded tail logs to
-`refs/ci-logs/d47d11422542551e2f4f7b571e07d6d917c32885/realworld`; its immutable
+`refs/ci-logs/125a915a458e108b631d48b1dfdd92cd49089c6b/realworld`; its immutable
 evidence commit is
-[`2d03342268a523c33bafa22ddb3c97d5834be4d4`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/2d03342268a523c33bafa22ddb3c97d5834be4d4).
+[`f8e39ce49c40893859f6079f57c423df1b654166`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/f8e39ce49c40893859f6079f57c423df1b654166).
 
 | Project | Exact input revision | Built TU verdict | Findings | Completed triage claim |
 |---|---|---:|---:|---|
 | libgit2 (`v1.9.0`) | `338e6fb681369ff0537719095e22ce9dc602dbf0` | 167/167, exit 1 | 34 | 11 confirmed OOM-path leaks; no full 34-finding partition claimed here |
-| rtp2httpd | `a7a1e568d46ee3176f8a3e94e0f88f131ebd444e` | 38/38, exit 1 | 6 | 4 actionable findings + 2 context false positives |
+| rtp2httpd | `a7a1e568d46ee3176f8a3e94e0f88f131ebd444e` | 38/38, exit 1 | 4 | 4 actionable findings + 0 context false positives |
 
 Exit 1 is material evidence here: under the fail-closed contract it means a
 complete verdict with findings, whereas any broken requested TU or unavailable

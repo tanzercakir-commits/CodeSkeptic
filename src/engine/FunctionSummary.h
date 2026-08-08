@@ -47,7 +47,7 @@ public:
     // see across functions (the divisor is flagged even when the
     // `data = 0; return data;` source lives in another function/file).
     // The mirror of null: same mini-flow, with the zero domain.
-    enum class ReturnZeroness { Unknown, NeverZero, MaybeZero };
+    enum class ReturnZeroness { Unknown, AlwaysZero, NeverZero, MaybeZero };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
 
     struct FunctionSummary {

@@ -22,6 +22,7 @@ const char* rnName(RN v) {
 
 const char* rzName(RZ v) {
     switch (v) {
+        case RZ::AlwaysZero: return "AlwaysZero";
         case RZ::NeverZero: return "NeverZero";
         case RZ::MaybeZero: return "MaybeZero";
         case RZ::Unknown:   break;
@@ -43,7 +44,9 @@ const char* peName(PE v) {
 // caller side. Their loss/change is a weakening — callers leaning on
 // the claim must be re-examined.
 bool rnStrong(RN v) { return v == RN::NeverNull; }
-bool rzStrong(RZ v) { return v == RZ::NeverZero; }
+bool rzStrong(RZ v) {
+    return v == RZ::AlwaysZero || v == RZ::NeverZero;
+}
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
 
 struct FieldVerdict {

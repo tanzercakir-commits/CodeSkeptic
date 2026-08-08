@@ -58,6 +58,15 @@ if [ ! -d "$TESTCASES" ]; then
     SUPPORT="$(dirname "$alt")/testcasesupport"
 fi
 
+# Native Windows executables do not understand MSYS paths embedded inside
+# compile_commands.json ("/c/..." is otherwise read as "C:\\c\\...").
+# Keep the harness locally reproducible under Git Bash while leaving Linux CI
+# paths unchanged.
+if command -v cygpath >/dev/null 2>&1; then
+    TESTCASES="$(cygpath -m "$TESTCASES")"
+    SUPPORT="$(cygpath -m "$SUPPORT")"
+fi
+
 # Rule -> CWE mapping
 CWES=(
     "CWE476_NULL_Pointer_Dereference"
@@ -116,10 +125,19 @@ run_cwe() { # <cwe-name>
     count=$(wc -l < "$list")
     [ "$count" -gt 0 ] || { echo "[juliet] $cwe: no eligible files"; return 0; }
 
-    # Generate compile_commands.json: with support includes for each file
+    # Score only testcase files, but analyze the shared support TU too.
+    # io.c defines globalReturnsFalse/True used by variants 11/12; without
+    # it the whole-program pass cannot prove those branch outcomes.
+    local analysis="analysis_$cwe.txt"
+    cp "$list" "$analysis"
+    if [ -f "$SUPPORT/io.c" ]; then
+        printf '%s\n' "$SUPPORT/io.c" >> "$analysis"
+    fi
+
+    # Generate compile_commands.json for every analyzed TU.
     local build="build_$cwe"
     mkdir -p "$build"
-    python3 - "$list" "$SUPPORT" "$build/compile_commands.json" << 'PYEOF'
+    python3 - "$analysis" "$SUPPORT" "$build/compile_commands.json" << 'PYEOF'
 import json, sys
 files, support, out = sys.argv[1], sys.argv[2], sys.argv[3]
 entries = []
@@ -138,10 +156,12 @@ PYEOF
     echo ""
     echo "[juliet] $cwe: scanning $count files..."
     set +e
-    # --files: only the selected (filtered + limited) files are analyzed
-    # --whole-program: flow variants (61/63/64...) split source/sink
-    # across a/b files — invisible without cross-TU summaries
-    "$CS_BIN" --files "$list" --build-path "$build" --whole-program \
+    # --files includes support/io.c for cross-TU flag summaries; the
+    # evaluator still receives "$list", so support code never changes the
+    # file denominator or testcase TP/FP accounting.
+    # --whole-program: flow variants (11/61/63/64...) split source/sink
+    # across files — invisible without cross-TU summaries.
+    "$CS_BIN" --files "$analysis" --build-path "$build" --whole-program \
         --json "findings_$cwe.json" > /dev/null 2> "log_$cwe.txt"
     local code=$?
     set -e

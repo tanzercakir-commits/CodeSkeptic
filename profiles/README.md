@@ -23,6 +23,12 @@ Every profile is format-checked in CI (`scripts/check_profiles.sh`):
 keys must be ones `Config` actually parses — a silently-ignored key in
 a shipped example would be worse than none.
 
+Verified third-party preconditions live under `profiles/contracts/` as
+sidecar contract packs. Copy the matching `.csk` next to the upstream
+source before analysis; each pack names the pinned revision and the
+concrete invariant that justifies the contract. These are explicit proof
+inputs, not baselines or diagnostic suppressions.
+
 | Profile | Project | What it declares |
 |---------|---------|------------------|
 | `libgit2.conf` | libgit2 | `git__*` allocator family |
@@ -32,3 +38,7 @@ a shipped example would be worse than none.
 | `carbon.conf` | carbon-lang | `CHECK`'s non-returning fail handler |
 | `redis.conf` | Redis | `zmalloc` family (idiom round 2 in progress) |
 | `systemd.conf` | systemd | mostly engine-native (cleanup attributes) — see comments |
+
+| Contract pack | Project | Verified invariant |
+|---------------|---------|--------------------|
+| `contracts/rtp2httpd/configuration.c.csk` | rtp2httpd `a7a1e568` | `getopt_long` required `-l` argument makes `parse_bind_cmd(arg)` non-null |

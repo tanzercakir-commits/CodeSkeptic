@@ -44,7 +44,7 @@ struct RecoveryScope {
 // builds on, because an unchecked malloc deref is the finding we are
 // asking the assert to retire.
 const char* kPrelude = R"(
-    typedef unsigned long size_t;
+    typedef __SIZE_TYPE__ size_t;
     extern void* malloc(size_t);
 )";
 
@@ -383,11 +383,10 @@ TEST(AssertRecoveryTest, Gate3_VarVersusVar_StillWarns) {
     EXPECT_GE(results.size(), 1u);
 }
 
-// GATE 3. A member subject is v1 out-of-scope. `->` is not in the
-// token whitelist, so the record is rejected outright — and crucially
-// the rejection is TOTAL: it must not silently degrade into a claim
-// about the base pointer `s`.
-TEST(AssertRecoveryTest, Gate3_MemberSubject_StillWarns) {
+// One-hop member assertions prove their base pointer non-null. The
+// resolved field identity is retained so field-sensitive domains can
+// consume the full subject later.
+TEST(AssertRecoveryTest, MemberSubject_RecoversBaseNonNull) {
     NullDerefRule rule;
     auto results = runRule(rule, src(R"(
         #define assert(e) ((void)0)
@@ -395,6 +394,36 @@ TEST(AssertRecoveryTest, Gate3_MemberSubject_StillWarns) {
         int f(void) {
             struct S* s = (struct S*)malloc(8);
             assert(s->q);
+            return *s->q;
+        }
+    )"));
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(AssertRecoveryTest, MemberSubject_DoesNotBlessAnotherBase) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(e)
+        struct S { int* q; };
+        int f(void) {
+            struct S* guarded = (struct S*)malloc(sizeof(struct S));
+            struct S* other = (struct S*)malloc(sizeof(struct S));
+            DEBUGASSERT(guarded->q);
+            return *other->q;
+        }
+    )"));
+    EXPECT_GE(results.size(), 1u);
+}
+
+TEST(AssertRecoveryTest, MemberSubject_BaseReassignmentStalesGuard) {
+    NullDerefRule rule;
+    auto results = runRule(rule, src(R"(
+        #define DEBUGASSERT(e)
+        struct S { int* q; };
+        int f(void) {
+            struct S* s = (struct S*)malloc(sizeof(struct S));
+            DEBUGASSERT(s->q);
+            s = (struct S*)malloc(sizeof(struct S));
             return *s->q;
         }
     )"));

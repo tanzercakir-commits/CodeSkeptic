@@ -161,6 +161,114 @@ std::vector<ConvSite> collectConvSites(const FunctionDecl* fn) {
     return v.sites;
 }
 
+bool subtreeContains(const Stmt* root, const Stmt* needle) {
+    if (!root) return false;
+    if (root == needle) return true;
+    for (const Stmt* child : root->children())
+        if (subtreeContains(child, needle)) return true;
+    return false;
+}
+
+const VarDecl* directVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    const auto* ref =
+        dyn_cast<DeclRefExpr>(expr->IgnoreParenImpCasts());
+    return ref ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+}
+
+// A post-cast bound must be a distinct integer variable (remaining buffer
+// length, packet size, ...). Constants and arithmetic expressions are
+// intentionally excluded: either can admit wrapped negatives without a
+// separately proven range.
+bool independentIntegerBound(const Expr* expr, const VarDecl* converted) {
+    const VarDecl* bound = directVar(expr);
+    return bound && bound != converted &&
+           bound->getType()->isIntegerType();
+}
+
+bool hasIndependentUpperBound(const Expr* cond, const VarDecl* converted) {
+    if (!cond) return false;
+    const Expr* stripped = cond->IgnoreParenImpCasts();
+    if (const auto* bin = dyn_cast<BinaryOperator>(stripped)) {
+        // A true conjunction entails both operands; a disjunction does
+        // not entail either one and must never suppress the finding.
+        if (bin->getOpcode() == BO_LAnd)
+            return hasIndependentUpperBound(bin->getLHS(), converted) ||
+                   hasIndependentUpperBound(bin->getRHS(), converted);
+        const VarDecl* lhs = directVar(bin->getLHS());
+        const VarDecl* rhs = directVar(bin->getRHS());
+        if ((bin->getOpcode() == BO_LE || bin->getOpcode() == BO_LT) &&
+            lhs == converted &&
+            independentIntegerBound(bin->getRHS(), converted))
+            return true;
+        if ((bin->getOpcode() == BO_GE || bin->getOpcode() == BO_GT) &&
+            rhs == converted &&
+            independentIntegerBound(bin->getLHS(), converted))
+            return true;
+    }
+    return false;
+}
+
+// Precision proof for the rtp2httpd body-skip idiom. The conversion must
+// initialize a dedicated unsigned local; every read of that local must
+// occur either in a qualifying range condition or in its true branch.
+// A later/outside/else use keeps the finding.
+bool allPostCastUsesRangeGuarded(const FunctionDecl* fn,
+                                const ConvSite& site) {
+    struct DestinationVisitor : RecursiveASTVisitor<DestinationVisitor> {
+        const Expr* cast = nullptr;
+        std::set<const VarDecl*> matches;
+        bool VisitVarDecl(VarDecl* vd) {
+            if (vd->hasInit() && vd->getType()->isUnsignedIntegerType() &&
+                subtreeContains(vd->getInit(), cast))
+                matches.insert(vd);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } destination;
+    destination.cast = site.cast;
+    destination.TraverseStmt(const_cast<Stmt*>(fn->getBody()));
+    if (destination.matches.size() != 1) return false;
+    const VarDecl* converted = *destination.matches.begin();
+
+    struct UseVisitor : RecursiveASTVisitor<UseVisitor> {
+        const VarDecl* converted = nullptr;
+        std::vector<const DeclRefExpr*> uses;
+        std::vector<const IfStmt*> guards;
+        bool VisitDeclRefExpr(DeclRefExpr* ref) {
+            if (ref->getDecl() == converted) uses.push_back(ref);
+            return true;
+        }
+        bool VisitIfStmt(IfStmt* stmt) {
+            if (hasIndependentUpperBound(stmt->getCond(), converted))
+                guards.push_back(stmt);
+            return true;
+        }
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } use;
+    use.converted = converted;
+    use.TraverseStmt(const_cast<Stmt*>(fn->getBody()));
+    if (use.uses.empty() || use.guards.empty()) return false;
+
+    bool consumedInTrueBranch = false;
+    for (const DeclRefExpr* ref : use.uses) {
+        bool covered = false;
+        for (const IfStmt* guard : use.guards) {
+            if (subtreeContains(guard->getCond(), ref)) {
+                covered = true;
+                break;
+            }
+            if (subtreeContains(guard->getThen(), ref)) {
+                covered = true;
+                consumedInTrueBranch = true;
+                break;
+            }
+        }
+        if (!covered) return false;
+    }
+    return consumedInTrueBranch;
+}
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const codeskeptic::ParamIntervalMap& paramMap,
                      codeskeptic::DiagnosticList& results) {
@@ -211,6 +319,11 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             codeskeptic::evalInterval(site.operand, *st, &ctx);
         if (iv.isEmpty() || iv.isTop() || iv.loIsInf()) continue;
         if (iv.lo() >= 0) continue;
+
+        // A wrapped value that is used only behind an independent
+        // post-cast capacity check cannot reach the sink on the bad
+        // path. Any use outside that true branch remains reportable.
+        if (allPostCastUsesRangeGuarded(fn, site)) continue;
 
         SourceLocation loc = sm.getExpansionLoc(site.cast->getBeginLoc());
         unsigned line = sm.getSpellingLineNumber(loc);
