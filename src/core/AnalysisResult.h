@@ -1,6 +1,7 @@
 #ifndef CODESKEPTIC_ANALYSIS_RESULT_H
 #define CODESKEPTIC_ANALYSIS_RESULT_H
 
+#include <algorithm>
 #include <cstddef>
 
 namespace codeskeptic {
@@ -11,6 +12,7 @@ namespace codeskeptic {
 enum class AnalysisStatus {
     Clean,
     Findings,
+    ReportOnly,
     Recorded,
     Incomplete,
     Failed,
@@ -21,7 +23,12 @@ struct AnalysisResult {
     std::size_t analyzed_tus = 0;
     std::size_t broken_tus = 0;
     std::size_t incomplete_functions = 0;
+    // `findings` is the complete visible result set. Experimental families
+    // remain measurable but are report-only; only the remainder gates the
+    // process verdict. Existing callers that set only `findings` retain the
+    // historical all-findings-block behavior.
     std::size_t findings = 0;
+    std::size_t report_only_findings = 0;
 
     bool analyze_broken_tus = false;
     bool accept_partial_coverage = false;
@@ -59,28 +66,34 @@ struct AnalysisResult {
         return !hasHardFailure() && !hasIncompleteEvidence();
     }
 
+    std::size_t blockingFindings() const {
+        return findings - std::min(findings, report_only_findings);
+    }
+
     AnalysisStatus status() const {
         if (hasHardFailure()) return AnalysisStatus::Failed;
         if (hasIncompleteEvidence()) return AnalysisStatus::Incomplete;
         if (baseline_recorded) return AnalysisStatus::Recorded;
-        return findings > 0 ? AnalysisStatus::Findings
+        if (blockingFindings() > 0) return AnalysisStatus::Findings;
+        return findings > 0 ? AnalysisStatus::ReportOnly
                             : AnalysisStatus::Clean;
     }
 
     // Stable process contract:
-    //   0 complete + clean (or successful baseline recording)
-    //   1 complete + findings
+    //   0 complete + no blocking findings (clean, report-only, or baseline)
+    //   1 complete + supported findings
     //   2 no trustworthy verdict (input, coverage, evidence, or I/O failure)
     int exitCode() const {
         if (!complete()) return 2;
         if (baseline_recorded) return 0;
-        return findings > 0 ? 1 : 0;
+        return blockingFindings() > 0 ? 1 : 0;
     }
 
     const char* statusName() const {
         switch (status()) {
             case AnalysisStatus::Clean: return "clean";
             case AnalysisStatus::Findings: return "findings";
+            case AnalysisStatus::ReportOnly: return "report-only";
             case AnalysisStatus::Recorded: return "recorded";
             case AnalysisStatus::Incomplete: return "incomplete";
             case AnalysisStatus::Failed: return "failed";

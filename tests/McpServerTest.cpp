@@ -88,6 +88,14 @@ TEST(McpServerTest, AnalyzeCallReturnsFindingsWithTrace) {
     EXPECT_NE(response.find("freed here"), std::string::npos);
     // The inner JSON travels in the text field with escaped quotes: \"count\":
     EXPECT_NE(response.find("\\\"count\\\":"), std::string::npos);
+    EXPECT_NE(response.find("\\\"capability_tier\\\":\\\"supported\\\""),
+              std::string::npos);
+    EXPECT_NE(response.find("\\\"blocks_verdict\\\":true"),
+              std::string::npos);
+    EXPECT_NE(response.find("\\\"blocking_count\\\":1"),
+              std::string::npos);
+    EXPECT_NE(response.find("\\\"report_only_count\\\":0"),
+              std::string::npos);
 }
 
 TEST(McpServerTest, AnalyzeWithFunctionScope) {

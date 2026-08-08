@@ -1,17 +1,42 @@
 #include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
+#include "core/Rule.h"
 #include "rules/DivByZeroRule.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace fs = std::filesystem;
 using namespace codeskeptic;
 
 namespace {
+
+class FixedFindingRule : public Rule {
+public:
+    explicit FixedFindingRule(std::string finding_id)
+        : finding_id_(std::move(finding_id)) {}
+
+    std::string id() const override { return finding_id_; }
+    std::string description() const override { return "fixed test finding"; }
+    void check(clang::ASTContext&, DiagnosticList& results) override {
+        Diagnostic diagnostic;
+        diagnostic.severity = Severity::Warning;
+        diagnostic.file = "fixed.cpp";
+        diagnostic.line = 1;
+        diagnostic.column = 1;
+        diagnostic.rule_id = finding_id_;
+        diagnostic.message = "fixed test finding";
+        results.push_back(std::move(diagnostic));
+    }
+
+private:
+    std::string finding_id_;
+};
 
 std::string writeCleanSource(const char* name) {
     const fs::path path = fs::path(::testing::TempDir()) / name;
@@ -83,4 +108,33 @@ TEST(VerdictIntegrityTest, AllRegisteredRulesDisabledIsExitTwo) {
     EXPECT_TRUE(result.no_rules);
     EXPECT_EQ(result.status(), AnalysisStatus::Failed);
     EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(VerdictIntegrityTest, ExperimentalFindingIsVisibleButDoesNotBlock) {
+    const auto source = writeCleanSource("verdict_experimental.cpp");
+    StaticAnalyzer analyzer(configFor({"codeskeptic", source}));
+    analyzer.addRule<FixedFindingRule>("memory-leak");
+
+    const auto result = analyzer.run();
+
+    EXPECT_EQ(analyzer.diagnostics().size(), 1u);
+    EXPECT_EQ(result.findings, 1u);
+    EXPECT_EQ(result.report_only_findings, 1u);
+    EXPECT_EQ(result.blockingFindings(), 0u);
+    EXPECT_EQ(result.status(), AnalysisStatus::ReportOnly);
+    EXPECT_EQ(result.exitCode(), 0);
+}
+
+TEST(VerdictIntegrityTest, SupportedFindingStillBlocks) {
+    const auto source = writeCleanSource("verdict_supported.cpp");
+    StaticAnalyzer analyzer(configFor({"codeskeptic", source}));
+    analyzer.addRule<FixedFindingRule>("null-deref");
+
+    const auto result = analyzer.run();
+
+    EXPECT_EQ(result.findings, 1u);
+    EXPECT_EQ(result.report_only_findings, 0u);
+    EXPECT_EQ(result.blockingFindings(), 1u);
+    EXPECT_EQ(result.status(), AnalysisStatus::Findings);
+    EXPECT_EQ(result.exitCode(), 1);
 }

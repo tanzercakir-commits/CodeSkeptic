@@ -216,6 +216,18 @@ assert_grep "assumed non-null" review.md
 assert_grep "deref_param" review.md
 assert_grep "New findings (1 info)" review.md   # severity-true label
 assert_not_grep "1 warning" review.md           # info is NOT mislabeled
+assert_grep "experimental, report-only" review.md
+
+# Experimental means non-blocking as a product invariant: --strict may
+# promote supported warnings, but it cannot silently promote an experimental
+# capability.
+code=0
+bash "$SCRIPT_DIR/review_diff.sh" "$CS_BIN" "$WARN_SHA" --out review.md \
+    --strict > "$TMP/stdout.txt" 2> "$TMP/stderr.txt" || code=$?
+[ "$code" -eq 0 ] || fail "assumption review (--strict): expected exit 0, got $code"
+assert_grep "gate=pass" "$TMP/stdout.txt"
+assert_grep "never gate, including under --strict" review.md
+
 
 # ...and --no-assumptions turns the delta off.
 code=0

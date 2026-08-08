@@ -1,5 +1,45 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 1 product-scope contract
+
+The capability surface is now a versioned runtime contract instead of a flat
+list. `--capabilities --json` schema v2 classifies languages, frontends,
+outputs, modes, all fourteen public finding families, and five explicit v1
+non-goals as `supported`, `experimental`, or `out-of-scope`. The single
+rule registry records default activation, quality-gate status, verdict
+behavior and evidence. The v1 name-enumeration arrays, including `rules`,
+remain available under their original keys; richer rule objects are additive
+under `rule_capabilities`. Supported rules are exactly the five
+Juliet-measured
+families at 1.000 precision: double-free, use-after-free, div-by-zero,
+null-deref and int-overflow. Memory-leak stays experimental at 0.714 until
+the Phase 3 >=0.85 gate; every family without an independent precision
+sample is likewise labeled experimental rather than promoted on breadth.
+
+The tier is enforced, not merely documented. Experimental findings remain in
+console, JSON, SARIF, HTML and MCP output but are report-only; only supported
+findings contribute exit 1. Reports publish total, blocking and report-only
+counts plus per-finding tier/blocking metadata. Exit 2 remains fail-closed for
+incomplete evidence. Unknown future diagnostic IDs conservatively block until
+classified, while the internal `contract-syntax` diagnostic inherits the
+experimental contract tier. README, usage/integration docs, PLAN and the new
+capability reference use the same semantics. A CI sync guard parses the
+runtime registry and rejects any rule ID/tier/verdict drift in both public
+tables, and it enforces supported/default/quality/blocking plus
+experimental/report-only invariants. Injection/taint, race detection,
+automatic fixes, an IDE product and a cloud dashboard are explicit non-goals;
+CWE count is explicitly not a success metric.
+
+CI exit-1 smokes now plant supported use-after-free/null-deref witnesses rather
+than experimental memory-leak/bounds-only witnesses. The canonical real-world
+ledger needs no pin relaxation: the stored libgit2 replay contains supported
+null-deref findings alongside its experimental leaks, and rtp2httpd contains
+two supported null-deref findings alongside four experimental sign-conversion
+findings, so both complete scans still honestly exit 1.
+The thesis runner also emits native compile-database paths under MSYS and
+normalizes CRLF manifests, making its pinned precision/recall gate reproducible
+from Git Bash as well as Linux CI.
+
 ## 2026-08-08 — v0.4.8 release smoke contract repair
 
 The first v0.4.8 tag run (`31231137919`) proved that the macOS build, all

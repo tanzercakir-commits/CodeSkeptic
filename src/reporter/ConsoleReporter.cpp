@@ -20,6 +20,12 @@ bool ConsoleReporter::report(const DiagnosticList& diagnostics,
 
     std::cerr << msg(MsgId::FindingsCount,
                      std::to_string(diagnostics.size())) << "\n";
+    if (result && result->report_only_findings > 0) {
+        std::cerr << "[CodeSkeptic] Verdict gate: "
+                  << result->blockingFindings() << " blocking, "
+                  << result->report_only_findings
+                  << " experimental report-only finding(s).\n";
+    }
     std::cerr << "----------------------------------------\n";
 
     for (const auto& diag : diagnostics) {

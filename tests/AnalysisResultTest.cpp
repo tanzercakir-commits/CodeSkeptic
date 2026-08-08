@@ -18,6 +18,24 @@ TEST(AnalysisResultTest, CompleteCleanAndFindingsHaveStableExitCodes) {
     EXPECT_EQ(clean.exitCode(), 1);
 }
 
+TEST(AnalysisResultTest, ExperimentalFindingsAreVisibleButReportOnly) {
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.findings = 3;
+    result.report_only_findings = 3;
+
+    EXPECT_TRUE(result.complete());
+    EXPECT_EQ(result.blockingFindings(), 0u);
+    EXPECT_EQ(result.status(), AnalysisStatus::ReportOnly);
+    EXPECT_STREQ(result.statusName(), "report-only");
+    EXPECT_EQ(result.exitCode(), 0);
+
+    result.report_only_findings = 2;
+    EXPECT_EQ(result.blockingFindings(), 1u);
+    EXPECT_EQ(result.status(), AnalysisStatus::Findings);
+    EXPECT_EQ(result.exitCode(), 1);
+}
+
 TEST(AnalysisResultTest, PartialCoverageCannotProduceCleanVerdict) {
     AnalysisResult result;
     result.attempted_tus = 3;
