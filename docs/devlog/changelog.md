@@ -55,6 +55,18 @@ context. This preserves exact source identity and also lets recipe-only release
 repairs rebuild older tags. A regression requires the two checkouts and their
 separate recipe/context roles.
 
+PR #124 merged that repair as `a4fc98f6`. The single guarded republish
+(`31236205846`) then passed both checkouts, built `0.4.8`, packaged
+`codeskeptic-v0.4.8-linux-x86_64.tar.gz`, found the expected three demo
+findings and published both `v0.4.8` and `latest` at
+`sha256:039b10d81dbceb6cd8d16c93c4e640b84febc55e02365b0537e78652f90e9f56`.
+The remaining registry repair is intentionally narrower than a tag-name
+delete: a one-shot Actions step requires exactly one matching package version,
+digest `sha256:03b346e66f1b292a5c2a1ddd1b5cb9190d21899077b6d646eee115f320d6197c`,
+and exactly the sole tag `v0.4.9`; any ambiguity fails without deleting. It
+also re-lists the package and requires both the digest and tag to be absent.
+The step is removed after its deletion receipt is recorded.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is

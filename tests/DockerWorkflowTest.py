@@ -13,6 +13,33 @@ DOCKERFILE = ROOT / "Dockerfile"
 
 
 class DockerWorkflowTest(unittest.TestCase):
+    def test_one_time_legacy_cleanup_is_exact_and_fail_closed(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("Remove exact legacy v0.4.9 package version", workflow)
+        self.assertIn("LEGACY_TAG: v0.4.9", workflow)
+        self.assertIn(
+            "LEGACY_DIGEST: sha256:03b346e66f1b292a5c2a1ddd1b5cb9190d21899077b6d646eee115f320d6197c",
+            workflow,
+        )
+        self.assertIn(
+            "CURRENT_DIGEST: sha256:039b10d81dbceb6cd8d16c93c4e640b84febc55e02365b0537e78652f90e9f56",
+            workflow,
+        )
+        self.assertIn("current_before", workflow)
+        self.assertIn("current_after", workflow)
+        self.assertIn(
+            "if: github.event_name == 'workflow_dispatch' && "
+            "inputs.release_tag == 'v0.4.8'",
+            workflow,
+        )
+        self.assertIn(".metadata.container.tags | length", workflow)
+        self.assertEqual(workflow.count("-eq 1"), 4)
+        self.assertIn('test "$tag_count" -eq 1', workflow)
+        self.assertIn('test "$digest" = "$LEGACY_DIGEST"', workflow)
+        self.assertIn("gh api --method DELETE", workflow)
+        self.assertIn('test "$remaining" -eq 0', workflow)
+
     def test_release_rebuild_uses_current_recipe_with_exact_tag_source(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
 
