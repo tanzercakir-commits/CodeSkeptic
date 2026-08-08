@@ -1,0 +1,9 @@
+install=success
+configure=success
+build=success
+test=failure
+test-single=skipped
+smoke=skipped
+selfscan=skipped
+corpus=skipped
+thesis=skipped
