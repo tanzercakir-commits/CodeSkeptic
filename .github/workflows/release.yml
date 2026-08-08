@@ -13,7 +13,28 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create the single shared draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if draft=$(gh release view "$GITHUB_REF_NAME" \
+              --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$draft" = "true" || {
+              echo "::error::$GITHUB_REF_NAME is already published; refusing to overwrite it"
+              exit 1
+            }
+            echo "Reusing existing draft for $GITHUB_REF_NAME"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft \
+              --title "CodeSkeptic $GITHUB_REF_NAME" \
+              --notes "Draft — assets uploading."
+          fi
+
   linux:
+    needs: prepare
     runs-on: ubuntu-22.04   # older glibc -> wider binary compatibility
     steps:
       - uses: actions/checkout@v4
@@ -91,9 +112,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --draft \
-            --title "CodeSkeptic $GITHUB_REF_NAME" \
-            --notes "Draft — assets uploading." 2>/dev/null || true
           cp dist/codeskeptic-*-linux-*.tar.gz codeskeptic-linux-x86_64.tar.gz
           gh release upload "$GITHUB_REF_NAME" \
             dist/codeskeptic-*-linux-*.tar.gz \
@@ -119,6 +137,7 @@ jobs:
             "HEAD:refs/status/${{ github.sha }}/release-linux/${{ job.status }}"
 
   macos:
+    needs: prepare
     runs-on: macos-14   # arm64
     steps:
       - uses: actions/checkout@v4
@@ -170,15 +189,12 @@ jobs:
           code2=0; out2=$(SDKROOT=/nonexistent/sdk ./bin/codeskeptic "$GITHUB_WORKSPACE/docs/demo.c" 2>&1) || code2=$?
           echo "SDKROOT-invalid exit_code=$code2" | tee -a /tmp/smoke.log
           test "$code2" -eq 2
-          echo "$out2" | grep -q "ANALYSIS FAILED"
+          echo "$out2" | grep -q "VERDICT UNAVAILABLE"
 
       - name: Upload to draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --draft \
-            --title "CodeSkeptic $GITHUB_REF_NAME" \
-            --notes "Draft — assets uploading." 2>/dev/null || true
           cp dist/codeskeptic-*-darwin-*.tar.gz codeskeptic-darwin-arm64.tar.gz
           gh release upload "$GITHUB_REF_NAME" \
             dist/codeskeptic-*-darwin-*.tar.gz \
@@ -204,6 +220,7 @@ jobs:
             "HEAD:refs/status/${{ github.sha }}/release-macos/${{ job.status }}"
 
   windows:
+    needs: prepare
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -276,7 +293,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$env:GITHUB_REF_NAME" --draft --title "CodeSkeptic $env:GITHUB_REF_NAME" --notes "Draft - assets uploading." 2>$null
           $zip = Get-ChildItem dist\codeskeptic-*-windows-*.zip | Select-Object -First 1
           Copy-Item $zip.FullName codeskeptic-windows-x86_64.zip
           gh release upload "$env:GITHUB_REF_NAME" $zip.FullName codeskeptic-windows-x86_64.zip --clobber
