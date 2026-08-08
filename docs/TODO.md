@@ -47,11 +47,14 @@ sürükleniyordu, toleransın içinde sessizce).
 Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. İlk dilim olan
 exact pointer return-alias ilişkisi RED→GREEN tamamlandı; flow-sensitive yerel
 kopyalar, doğrudan/operator çağrı zincirleri, muhafazakâr merge, summary-diff
-ve v1-v6 uyumlu v7 kalıcılık testlerle kilitlendi. Sıradaki dilim parametre
-precondition/postcondition özetleri; ardından yan etkiler ve ownership
-transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
-function-pointer çözümü ve kütüphane model dosyaları gelecek. Her ilişki önce
-RED testle kanıtlanacak; gerçek korpusta kontrolsüz bulgu artışı olmayacak.
+ve v1-v6 uyumlu v7 kalıcılık testlerle kilitlendi. Parametre precondition/
+postcondition dilimi de RED→GREEN tamamlandı: cross-TU crash/reject non-null
+girişleri, kesin `T**`/`T*&` Null/NonNull çıkışları, zincir/operator bileşimi,
+muhafazakâr alias/path merge, v1-v7 uyumlu v8 kalıcılık ve summary-diff yönleri
+kilitlendi. Sıradaki dilim yan etkiler ve ownership transferi; ardından call-
+graph SCC sabit noktası, alan duyarlılığı, kontrollü function-pointer çözümü
+ve kütüphane model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak;
+gerçek korpusta kontrolsüz bulgu artışı olmayacak.
 
 ## Açık kullanıcı kararları
 

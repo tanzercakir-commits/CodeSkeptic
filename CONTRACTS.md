@@ -17,8 +17,10 @@ what it was supposed to do. Contracts close that gap:
 
 The key architectural insight: **a contract is a declared function
 summary.** The engine already INFERS summaries (return nullness,
-zeroness, parameter effects) and already diffs them as contracts
-(`--summary-diff`, WEAKENED = CI gate). Contracts replace "inferred
+zeroness, parameter effects, exact return identity, inferred non-null
+parameter preconditions and exact pointer-output postconditions) and already
+diffs them as contracts (`--summary-diff`, WEAKENED = CI gate). Contracts
+replace "inferred
 vs inferred" with "declared vs inferred": the declaration pins the
 intent, the dataflow engine checks the pin.
 

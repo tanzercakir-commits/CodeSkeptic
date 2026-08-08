@@ -49,11 +49,21 @@ public:
     // The mirror of null: same mini-flow, with the zero domain.
     enum class ReturnZeroness { Unknown, AlwaysZero, NeverZero, MaybeZero };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
+    enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
+    enum class ParamPostcondition { Unknown, Null, NonNull };
 
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
         std::vector<ParamEffect> params;
+
+        // Entry requirements inferred from the callee's own leading
+        // guard, and exact normal-return effects on pointer out-params.
+        // The vectors are indexed like params. Missing entries (legacy
+        // summary files and conservative overload merges) mean no
+        // precondition / unknown postcondition.
+        std::vector<ParamPrecondition> paramPreconditions;
+        std::vector<ParamPostcondition> paramPostconditions;
 
         // Zero-passthrough (the zeroness-through-summaries slice): when
         // returnZeroness is Unknown ONLY because some paths return
@@ -102,6 +112,18 @@ public:
         ParamEffect paramEffect(unsigned index) const {
             if (index >= params.size()) return ParamEffect::Opaque;
             return params[index];
+        }
+
+        ParamPrecondition paramPrecondition(unsigned index) const {
+            if (index >= paramPreconditions.size())
+                return ParamPrecondition::None;
+            return paramPreconditions[index];
+        }
+
+        ParamPostcondition paramPostcondition(unsigned index) const {
+            if (index >= paramPostconditions.size())
+                return ParamPostcondition::Unknown;
+            return paramPostconditions[index];
         }
     };
 

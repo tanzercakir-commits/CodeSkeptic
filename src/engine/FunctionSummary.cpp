@@ -1,5 +1,6 @@
 #include "engine/FunctionSummary.h"
 
+#include "contracts/GuardContracts.h"
 #include "engine/CallRefArgs.h"
 #include "engine/ConditionWalk.h"
 #include "engine/DataflowEngine.h"
@@ -16,6 +17,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -29,6 +31,8 @@ constexpr unsigned kMaxSweeps = 5;
 using ReturnNullness = codeskeptic::SummaryRegistry::ReturnNullness;
 using ReturnZeroness = codeskeptic::SummaryRegistry::ReturnZeroness;
 using ParamEffect = codeskeptic::SummaryRegistry::ParamEffect;
+using ParamPrecondition = codeskeptic::SummaryRegistry::ParamPrecondition;
+using ParamPostcondition = codeskeptic::SummaryRegistry::ParamPostcondition;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
@@ -1410,6 +1414,346 @@ std::vector<ParamEffect> computeParamEffects(const FunctionDecl* func,
     return effects;
 }
 
+// --- Parameter preconditions and postconditions (interprocedural v2) ---
+
+std::vector<ParamPrecondition> computeParamPreconditions(
+        const FunctionDecl* func, ASTContext& ctx) {
+    std::vector<ParamPrecondition> out(
+        func->getNumParams(), ParamPrecondition::None);
+    for (const auto& guard : codeskeptic::inferGuardRequires(func, ctx)) {
+        if (guard.paramIndex >= out.size()) continue;
+        const ParamPrecondition inferred =
+            guard.consequence == codeskeptic::GuardConsequence::Crash
+                ? ParamPrecondition::NonNullCrash
+                : ParamPrecondition::NonNullRejected;
+        // Several equivalent leading guards can mention one parameter.
+        // Preserve the more severe observable consequence independent of
+        // AST visitation order.
+        if (out[guard.paramIndex] == ParamPrecondition::None ||
+            inferred == ParamPrecondition::NonNullCrash)
+            out[guard.paramIndex] = inferred;
+    }
+    return out;
+}
+
+bool isRefToPointer(const ParmVarDecl* param) {
+    if (!param) return false;
+    QualType type = param->getType();
+    return type->isLValueReferenceType() &&
+           type.getNonReferenceType()->isPointerType();
+}
+
+bool isPointerToPointer(const ParmVarDecl* param) {
+    if (!param) return false;
+    QualType type = param->getType();
+    return type->isPointerType() && type->getPointeeType()->isPointerType();
+}
+
+struct ParamPostState {
+    std::vector<ParamPostcondition> values;
+    // For T** parameters, a direct store through `*p` still targets the
+    // caller only while p denotes its entry value. T*& references cannot
+    // be rebound, so their bit stays true.
+    std::vector<bool> entryTargets;
+
+    bool operator==(const ParamPostState& other) const {
+        return values == other.values && entryTargets == other.entryTargets;
+    }
+    bool operator!=(const ParamPostState& other) const {
+        return !(*this == other);
+    }
+};
+
+class ParamPostAnalysis {
+public:
+    using State = ParamPostState;
+
+    ParamPostAnalysis(const FunctionDecl* func,
+                      const SummaryTable& previous)
+        : previous_(previous) {
+        init_.values.assign(func->getNumParams(),
+                            ParamPostcondition::Unknown);
+        init_.entryTargets.assign(func->getNumParams(), false);
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const ParmVarDecl* param = func->getParamDecl(i);
+            if (isRefToPointer(param) || isPointerToPointer(param)) {
+                outputIndexes_[param] = i;
+                init_.entryTargets[i] = true;
+            }
+        }
+    }
+
+    State initialState() const { return init_; }
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(init_.values.size()) * 3 + 2;
+    }
+    void widen(State& state) const {
+        std::fill(state.values.begin(), state.values.end(),
+                  ParamPostcondition::Unknown);
+        std::fill(state.entryTargets.begin(), state.entryTargets.end(), false);
+    }
+    State merge(const State& a, const State& b) const {
+        State out = a;
+        for (size_t i = 0; i < out.values.size(); ++i) {
+            if (out.values[i] != b.values[i])
+                out.values[i] = ParamPostcondition::Unknown;
+            out.entryTargets[i] =
+                out.entryTargets[i] && b.entryTargets[i];
+        }
+        return out;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext& /*ctx*/) const {
+        State out = in;
+        if (const auto* bin = dyn_cast<BinaryOperator>(stmt)) {
+            if (bin->getOpcode() == BO_Assign) {
+                if (auto index = outputTarget(bin->getLHS(), in)) {
+                    out.values[*index] = valueOf(bin->getRHS(), in);
+                    return out;
+                }
+                // Rebinding a T** parameter changes what subsequent
+                // `*p = ...` stores denote; no caller guarantee may be
+                // learned after that point.
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(bin->getLHS()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end() &&
+                        isPointerToPointer(param))
+                        out.entryTargets[found->second] = false;
+                }
+            } else if (bin->isCompoundAssignmentOp()) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(bin->getLHS()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            return out;
+        }
+        if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->isIncrementDecrementOp()) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(unary->getSubExpr()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            if (unary->getOpcode() == UO_AddrOf) {
+                if (const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                        asVarOrParam(unary->getSubExpr()))) {
+                    auto found = outputIndexes_.find(param);
+                    if (found != outputIndexes_.end()) {
+                        out.values[found->second] =
+                            ParamPostcondition::Unknown;
+                        if (isPointerToPointer(param))
+                            out.entryTargets[found->second] = false;
+                    }
+                }
+            }
+            return out;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            unsigned argOffset = 0;
+            if (isa<CXXOperatorCallExpr>(call)) {
+                const auto* method = dyn_cast_or_null<CXXMethodDecl>(
+                    call->getDirectCallee());
+                if (method && !method->isStatic()) argOffset = 1;
+            }
+            for (unsigned argIndex = argOffset;
+                 argIndex < call->getNumArgs(); ++argIndex) {
+                auto target = forwardedOutput(call->getArg(argIndex), in);
+                if (!target) continue;
+                const unsigned paramIndex = argIndex - argOffset;
+                out.values[*target] = summary
+                    ? summary->paramPostcondition(paramIndex)
+                    : ParamPostcondition::Unknown;
+            }
+        }
+        return out;
+    }
+
+private:
+    std::optional<unsigned> outputTarget(const Expr* expr,
+                                         const State& state) const {
+        if (!expr) return std::nullopt;
+        expr = expr->IgnoreParenImpCasts();
+        if (const auto* ref = dyn_cast<DeclRefExpr>(expr)) {
+            const auto* param = dyn_cast<ParmVarDecl>(ref->getDecl());
+            auto found = outputIndexes_.find(param);
+            if (found != outputIndexes_.end() && isRefToPointer(param))
+                return found->second;
+            return std::nullopt;
+        }
+        const auto* unary = dyn_cast<UnaryOperator>(expr);
+        if (!unary || unary->getOpcode() != UO_Deref)
+            return std::nullopt;
+        const auto* param = dyn_cast_or_null<ParmVarDecl>(
+            asVarOrParam(unary->getSubExpr()));
+        auto found = outputIndexes_.find(param);
+        if (found == outputIndexes_.end() || !isPointerToPointer(param) ||
+            !state.entryTargets[found->second])
+            return std::nullopt;
+        return found->second;
+    }
+
+    std::optional<unsigned> forwardedOutput(const Expr* expr,
+                                            const State& state) const {
+        if (!expr) return std::nullopt;
+        expr = expr->IgnoreParenImpCasts();
+        if (const auto* unary = dyn_cast<UnaryOperator>(expr)) {
+            if (unary->getOpcode() == UO_AddrOf) {
+                const auto* param = dyn_cast_or_null<ParmVarDecl>(
+                    asVarOrParam(unary->getSubExpr()));
+                auto found = outputIndexes_.find(param);
+                // `&ref` addresses the caller's pointer slot, but `&out`
+                // for a by-value T** parameter addresses only this
+                // function's local parameter variable. Rebinding that
+                // local T** must not become a postcondition on `*out`.
+                if (found != outputIndexes_.end() &&
+                    isRefToPointer(param))
+                    return found->second;
+            }
+        }
+        const auto* param = dyn_cast_or_null<ParmVarDecl>(
+            asVarOrParam(expr));
+        auto found = outputIndexes_.find(param);
+        if (found == outputIndexes_.end() ||
+            !state.entryTargets[found->second])
+            return std::nullopt;
+        return found->second;
+    }
+
+    ParamPostcondition valueOf(const Expr* expr,
+                               const State& state) const {
+        if (!expr) return ParamPostcondition::Unknown;
+        expr = expr->IgnoreParenCasts();
+        if (const auto target = outputTarget(expr, state))
+            return state.values[*target];
+        if (const auto* cond = dyn_cast<ConditionalOperator>(expr)) {
+            ParamPostcondition yes = valueOf(cond->getTrueExpr(), state);
+            ParamPostcondition no = valueOf(cond->getFalseExpr(), state);
+            return yes == no ? yes : ParamPostcondition::Unknown;
+        }
+        if (const auto* call = dyn_cast<CallExpr>(expr)) {
+            const FunctionSummary* summary =
+                lookupPrev(previous_, call->getDirectCallee());
+            if (summary) {
+                if (summary->returnNullness == ReturnNullness::NeverNull)
+                    return ParamPostcondition::NonNull;
+                if (summary->returnNullness == ReturnNullness::MaybeNull)
+                    return ParamPostcondition::Unknown;
+                if (summary->nullFromParam >= 0 &&
+                    static_cast<unsigned>(summary->nullFromParam) <
+                        call->getNumArgs())
+                    return valueOf(call->getArg(summary->nullFromParam),
+                                   state);
+            }
+            return ParamPostcondition::Unknown;
+        }
+        switch (vstateOf(expr, previous_)) {
+            case VState::Bad: return ParamPostcondition::Null;
+            case VState::NonBad: return ParamPostcondition::NonNull;
+            case VState::MaybeBad:
+            case VState::Unknown: break;
+        }
+        return ParamPostcondition::Unknown;
+    }
+
+    const SummaryTable& previous_;
+    State init_;
+    std::map<const ParmVarDecl*, unsigned> outputIndexes_;
+};
+
+// A strong output guarantee is emitted only while every use of the output
+// slot stays in the dataflow's exact vocabulary: direct `*out = value`,
+// direct `ref = value`, or forwarding to another summarized callee. Copying
+// the slot into another local/member (or capturing it in a lambda) creates an
+// alias whose later writes are outside that vocabulary, so the affected
+// parameter is forced back to Unknown.
+class OutputAliasCollector
+    : public RecursiveASTVisitor<OutputAliasCollector> {
+public:
+    explicit OutputAliasCollector(const FunctionDecl* func)
+        : unsafe(func->getNumParams(), false) {
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const ParmVarDecl* param = func->getParamDecl(i);
+            if (isRefToPointer(param) || isPointerToPointer(param))
+                outputIndexes_[param] = i;
+        }
+    }
+
+    bool VisitVarDecl(VarDecl* var) {
+        if (!isa<ParmVarDecl>(var) && var->hasInit())
+            markRefs(var->getInit());
+        return true;
+    }
+
+    bool VisitBinaryOperator(BinaryOperator* bin) {
+        if (bin->isAssignmentOp()) markRefs(bin->getRHS());
+        return true;
+    }
+
+    bool TraverseLambdaExpr(LambdaExpr* lambda) {
+        if (lambda) markRefs(lambda->getBody());
+        return true;
+    }
+
+    std::vector<bool> unsafe;
+
+private:
+    void markRefs(const Stmt* root) {
+        if (!root) return;
+        struct Finder : RecursiveASTVisitor<Finder> {
+            const std::map<const ParmVarDecl*, unsigned>* indexes = nullptr;
+            std::vector<bool>* unsafe = nullptr;
+            bool VisitDeclRefExpr(DeclRefExpr* ref) {
+                const auto* param = dyn_cast<ParmVarDecl>(ref->getDecl());
+                auto found = indexes->find(param);
+                if (found != indexes->end())
+                    (*unsafe)[found->second] = true;
+                return true;
+            }
+        } finder;
+        finder.indexes = &outputIndexes_;
+        finder.unsafe = &unsafe;
+        finder.TraverseStmt(const_cast<Stmt*>(root));
+    }
+
+    std::map<const ParmVarDecl*, unsigned> outputIndexes_;
+};
+
+std::vector<ParamPostcondition> computeParamPostconditions(
+        const FunctionDecl* func, ASTContext& ctx,
+        const SummaryTable& previous) {
+    std::vector<ParamPostcondition> unknown(
+        func->getNumParams(), ParamPostcondition::Unknown);
+    OutputAliasCollector aliasCollector(func);
+    aliasCollector.TraverseStmt(func->getBody());
+    ParamPostAnalysis analysis(func, previous);
+    auto result = codeskeptic::runDataflow(func, ctx, analysis);
+    if (!result.converged) return unknown;
+    auto exit = result.blockExitStates.find(result.exitBlockID);
+    if (exit == result.blockExitStates.end()) return unknown;
+    std::vector<ParamPostcondition> values = exit->second.values;
+    for (size_t i = 0; i < values.size(); ++i)
+        if (aliasCollector.unsafe[i])
+            values[i] = ParamPostcondition::Unknown;
+    return values;
+}
+
 // --- Collect the functions with bodies in the TU ---
 
 struct FunctionCollector : RecursiveASTVisitor<FunctionCollector> {
@@ -1457,6 +1801,10 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
             summary.returnZeroness = computeReturnZeroness(
                 func, ctx, current, &summary.zeroFromParam);
             summary.params = computeParamEffects(func, current);
+            summary.paramPreconditions =
+                computeParamPreconditions(func, ctx);
+            summary.paramPostconditions =
+                computeParamPostconditions(func, ctx, current);
             summary.returnAliasParam =
                 computeReturnAliasParam(func, ctx, current);
 
@@ -1484,7 +1832,9 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
                 prev->second.returnAliasParam != summary.returnAliasParam ||
                 prev->second.nullCondParam != summary.nullCondParam ||
                 prev->second.nullCondRange != summary.nullCondRange ||
-                prev->second.params != summary.params) {
+                prev->second.params != summary.params ||
+                prev->second.paramPreconditions != summary.paramPreconditions ||
+                prev->second.paramPostconditions != summary.paramPostconditions) {
                 changed = true;
             }
         }
@@ -1518,6 +1868,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     using RN = SummaryRegistry::ReturnNullness;
     using RZ = SummaryRegistry::ReturnZeroness;
     using PE = SummaryRegistry::ParamEffect;
+    using PPre = SummaryRegistry::ParamPrecondition;
+    using PPost = SummaryRegistry::ParamPostcondition;
     if (into.returnNullness != from.returnNullness)
         into.returnNullness = RN::Unknown;
     // A conditioned claim survives a merge only when BOTH sides carry
@@ -1546,10 +1898,27 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
         into.returnAliasParam = -1;
     if (into.params.size() != from.params.size()) {
         into.params.clear();  // paramEffect() defaults to Opaque
-        return;
+    } else {
+        for (size_t i = 0; i < into.params.size(); ++i)
+            if (into.params[i] != from.params[i])
+                into.params[i] = PE::Opaque;
     }
-    for (size_t i = 0; i < into.params.size(); ++i)
-        if (into.params[i] != from.params[i]) into.params[i] = PE::Opaque;
+    if (into.paramPreconditions.size() !=
+        from.paramPreconditions.size()) {
+        into.paramPreconditions.clear();
+    } else {
+        for (size_t i = 0; i < into.paramPreconditions.size(); ++i)
+            if (into.paramPreconditions[i] != from.paramPreconditions[i])
+                into.paramPreconditions[i] = PPre::None;
+    }
+    if (into.paramPostconditions.size() !=
+        from.paramPostconditions.size()) {
+        into.paramPostconditions.clear();
+    } else {
+        for (size_t i = 0; i < into.paramPostconditions.size(); ++i)
+            if (into.paramPostconditions[i] != from.paramPostconditions[i])
+                into.paramPostconditions[i] = PPost::Unknown;
+    }
 }
 
 // --- Disk format ---
@@ -1558,7 +1927,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/Z/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v7";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v8";
+constexpr const char* kSummaryFileHeaderV7 = "codeskeptic-summaries v7";
 constexpr const char* kSummaryFileHeaderV6 = "codeskeptic-summaries v6";
 constexpr const char* kSummaryFileHeaderV5 = "codeskeptic-summaries v5";
 constexpr const char* kSummaryFileHeaderV4 = "codeskeptic-summaries v4";
@@ -1624,6 +1994,50 @@ bool peFromChar(char c, ParamEffect& out) {
     return false;
 }
 
+char preToChar(ParamPrecondition value) {
+    switch (value) {
+        case ParamPrecondition::NonNullCrash: return 'C';
+        case ParamPrecondition::NonNullRejected: return 'R';
+        case ParamPrecondition::None: break;
+    }
+    return 'O';
+}
+
+bool preFromChar(char c, ParamPrecondition& out) {
+    switch (c) {
+        case 'O': out = ParamPrecondition::None; return true;
+        case 'C': out = ParamPrecondition::NonNullCrash; return true;
+        case 'R': out = ParamPrecondition::NonNullRejected; return true;
+    }
+    return false;
+}
+
+char postToChar(ParamPostcondition value) {
+    switch (value) {
+        case ParamPostcondition::Null: return '0';
+        case ParamPostcondition::NonNull: return 'N';
+        case ParamPostcondition::Unknown: break;
+    }
+    return 'U';
+}
+
+bool postFromChar(char c, ParamPostcondition& out) {
+    switch (c) {
+        case 'U': out = ParamPostcondition::Unknown; return true;
+        case '0': out = ParamPostcondition::Null; return true;
+        case 'N': out = ParamPostcondition::NonNull; return true;
+    }
+    return false;
+}
+
+template <typename Value, typename ToChar>
+void writeParamVector(std::ostream& out, size_t count, ToChar toChar,
+                      const std::vector<Value>& values, Value fallback) {
+    if (count == 0) { out << '-'; return; }
+    for (size_t i = 0; i < count; ++i)
+        out << toChar(i < values.size() ? values[i] : fallback);
+}
+
 } // anonymous namespace
 
 void SummaryRegistry::harvestGlobal() {
@@ -1684,6 +2098,15 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
         out << '\t';
         if (summary.returnAliasParam < 0) out << '-';
         else out << summary.returnAliasParam;
+        // v8 columns: inferred non-null preconditions and exact pointer
+        // out-parameter postconditions.
+        out << '\t';
+        writeParamVector(out, summary.params.size(), preToChar,
+                         summary.paramPreconditions, ParamPrecondition::None);
+        out << '\t';
+        writeParamVector(out, summary.params.size(), postToChar,
+                         summary.paramPostconditions,
+                         ParamPostcondition::Unknown);
         out << '\n';
     }
     return out.good();
@@ -1698,7 +2121,8 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 7;
+    if (line == kSummaryFileHeader) version = 8;
+    else if (line == kSummaryFileHeaderV7) version = 7;
     else if (line == kSummaryFileHeaderV6) version = 6;
     else if (line == kSummaryFileHeaderV5) version = 5;
     else if (line == kSummaryFileHeaderV4) version = 4;
@@ -1709,7 +2133,7 @@ bool SummaryRegistry::parseSummaryFile(
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
     const size_t maxFields =
-        (version >= 7) ? 8 : (version >= 5) ? 7
+        (version >= 8) ? 10 : (version >= 7) ? 8 : (version >= 5) ? 7
                        : (version == 4) ? 6 : (version == 3) ? 5 : 4;
 
     // Parse fully first, then hand over: a corrupt file is rejected
@@ -1730,6 +2154,7 @@ bool SummaryRegistry::parseSummaryFile(
         // v1: 3 fields (no zeroness -> Unknown); v2: 4; v3: 5 (null
         // cond); v4: 6 (zero-passthrough param)
         if (fields.size() < 3 || fields.size() > maxFields) return false;
+        if (version == 8 && fields.size() != 10) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
@@ -1809,7 +2234,7 @@ bool SummaryRegistry::parseSummaryFile(
                 return false;
             summary.nullFromParam = static_cast<int>(idx);
         }
-        if (fields.size() == 8 && fields[7] != "-") {
+        if (fields.size() >= 8 && fields[7] != "-") {
             const std::string& alias = fields[7];
             errno = 0;
             char* end = nullptr;
@@ -1825,6 +2250,30 @@ bool SummaryRegistry::parseSummaryFile(
                 ParamEffect effect;
                 if (!peFromChar(c, effect)) return false;
                 summary.params.push_back(effect);
+            }
+        }
+        if (version >= 8) {
+            const std::string& pre = fields[8];
+            const std::string& post = fields[9];
+            const size_t paramCount = summary.params.size();
+            if ((pre == "-") != (paramCount == 0) ||
+                (post == "-") != (paramCount == 0))
+                return false;
+            if (paramCount != 0) {
+                if (pre.size() != paramCount || post.size() != paramCount)
+                    return false;
+                summary.paramPreconditions.reserve(paramCount);
+                summary.paramPostconditions.reserve(paramCount);
+                for (char c : pre) {
+                    ParamPrecondition value;
+                    if (!preFromChar(c, value)) return false;
+                    summary.paramPreconditions.push_back(value);
+                }
+                for (char c : post) {
+                    ParamPostcondition value;
+                    if (!postFromChar(c, value)) return false;
+                    summary.paramPostconditions.push_back(value);
+                }
             }
         }
         auto [it, inserted] = parsed.emplace(key, summary);

@@ -14,6 +14,8 @@ using namespace codeskeptic;
 using RN = SummaryRegistry::ReturnNullness;
 using RZ = SummaryRegistry::ReturnZeroness;
 using PE = SummaryRegistry::ParamEffect;
+using PPre = SummaryRegistry::ParamPrecondition;
+using PPost = SummaryRegistry::ParamPostcondition;
 
 namespace {
 
@@ -118,6 +120,60 @@ TEST(SummaryDiffTest, ReturnAliasSourceChangeIsWeakened) {
     EXPECT_NE(result.changes[0].detail.find(
                   "returnAliasParam: param#0 -> param#1"),
               std::string::npos);
+}
+
+TEST(SummaryDiffTest, AddedParameterPreconditionIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    auto newSum = oldSum;
+    newSum.paramPreconditions = {PPre::NonNullCrash};
+    SummaryMap oldMap{{"consume/1", oldSum}};
+    SummaryMap newMap{{"consume/1", newSum}};
+
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.precondition: None -> NonNullCrash"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, SaferParameterPreconditionIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramPreconditions = {PPre::NonNullCrash};
+    auto newSum = oldSum;
+    newSum.paramPreconditions = {PPre::NonNullRejected};
+    SummaryMap oldMap{{"consume/1", oldSum}};
+    SummaryMap newMap{{"consume/1", newSum}};
+
+    auto result = diffSummaries(oldMap, newMap);
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+}
+
+TEST(SummaryDiffTest, ParameterPostconditionLossOrChangeIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramPostconditions = {PPost::NonNull};
+    auto lostSum = oldSum;
+    lostSum.paramPostconditions = {PPost::Unknown};
+    auto changedSum = oldSum;
+    changedSum.paramPostconditions = {PPost::Null};
+
+    auto lost = diffSummaries({{"bind/1", oldSum}},
+                              {{"bind/1", lostSum}});
+    auto changed = diffSummaries({{"bind/1", oldSum}},
+                                 {{"bind/1", changedSum}});
+    EXPECT_EQ(lost.weakened, 1u);
+    EXPECT_EQ(changed.weakened, 1u);
+}
+
+TEST(SummaryDiffTest, ParameterPostconditionGainIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    auto newSum = oldSum;
+    newSum.paramPostconditions = {PPost::NonNull};
+
+    auto result = diffSummaries({{"bind/1", oldSum}},
+                                {{"bind/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
 }
 
 TEST(SummaryDiffTest, DirectionlessDrift_Changed) {

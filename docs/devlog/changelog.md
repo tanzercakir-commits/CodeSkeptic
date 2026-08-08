@@ -1,5 +1,38 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 4.2 parameter precondition/postcondition summaries
+
+Interprocedural v2 now persists and consumes two parameter relations across
+translation-unit boundaries. A callee's exact leading non-null guard becomes
+an entry precondition while preserving its observable consequence: an
+assert/abort violation is an error, and a complain-then-return rejection is a
+warning. Exact normal-return Null/NonNull effects are harvested for direct
+`T**` and `T*&` output slots. Every reachable path must agree; partial writes,
+conflicting values, pointer rebinding, copied/member aliases, lambda capture
+and opaque forwarding degrade to Unknown.
+
+The relations compose through direct calls, non-static `operator()` calls and
+the existing bounded summary sweep. NullDeref applies exact output effects
+after conservative out-parameter invalidation, so a proven NonNull result
+cleans the next dereference and a proven Null result produces the existing
+definite error. Body-less callers also wake for persisted preconditions.
+
+Summary format v8 adds fixed-width precondition (`O/C/R`) and postcondition
+(`U/0/N`) vectors. Readers retain v1-v7 compatibility; v8 row width, vector
+lengths and codes are strict, and an older header carrying v8 columns is
+rejected wholesale. Conservative key collisions keep either relation only on
+exact agreement. Summary diff uses caller compatibility for preconditions
+(new obligation or reject-to-crash is WEAKENED) and guarantee strength for
+postconditions (loss/change is WEAKENED, gain is STRENGTHENED).
+
+RED was captured before implementation: the cross-TU guard test returned zero
+diagnostics instead of one, and the Phase 4.1 executable still emitted v7
+summaries with no parameter-relation fields for the same fixture. After
+implementation, all focused inference, persistence, cross-TU,
+chain/operator, alias/path and summary-diff tests passed; the full Windows
+suite is 899/899. The pinned local corpus stayed exactly at cJSON 54 and
+tinyxml2 9, with no finding-count rise.
+
 ## 2026-08-08 — Phase 4.1 exact pointer return-alias summaries
 
 Interprocedural v2 now harvests an independent, strong relation stating that

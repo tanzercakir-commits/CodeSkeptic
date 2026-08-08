@@ -67,7 +67,15 @@ parameter's entry object. Local copies and direct call chains preserve it;
 mixed sources, mutation and exposed write channels lose it conservatively.
 This identity relation is independent from null correspondence and is
 currently the proof input for the remaining ownership/side-effect v2 slices.
-Summary format v7 persists it while remaining able to read v1-v6 files.
+
+Parameter contracts now cross translation-unit boundaries too. Leading
+assert/abort and complain-then-return guards become exact non-null entry
+preconditions with their crash/reject consequence preserved. On normal
+return, direct `T**` and `T*&` output slots carry an exact Null/NonNull
+postcondition only when every reachable path agrees; partial writes,
+conflicting paths, rebinding and untracked aliases fall back to Unknown.
+Callers consume both relations, including direct chains and `operator()`
+calls. Summary format v8 persists these vectors and still reads v1-v7 files.
 
 Summaries are deterministic and serializable (`--summary-out` /
 `--summary-in`), which is what makes the
