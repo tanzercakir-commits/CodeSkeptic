@@ -2871,3 +2871,169 @@ TEST(FunctionPointerSummaryTest, CTargetSetComposesFieldWrites) {
     EXPECT_EQ(writes->fields,
               std::set<std::string>({"left", "right"}));
 }
+
+TEST(LibraryModelFileTest, LoadsStrictV10ForDirectAndControlledIndirectCalls) {
+    GlobalStoreGuard guard;
+    auto model = writePersistFile("library_model_v10.csk",
+        "codeskeptic-summaries v10\n"
+        "vendor_find/1\tM\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tO\t?\n"
+        "vendor_require/1\tU\tO\tU\t-\t-\t-\t-\tC\tU\tU\tU\tU\t?\n"
+        "vendor_zero/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n");
+    auto source = writePersistFile("library_model_user.cpp", R"(
+        int* vendor_find(int);
+        void vendor_require(int*);
+        int vendor_zero();
+
+        int direct_use(int key) {
+            int* value = vendor_find(key);
+            int divisor = vendor_zero();
+            vendor_require(nullptr);
+            return *value + 100 / divisor;
+        }
+
+        int indirect_use(int key) {
+            auto find = &vendor_find;
+            auto require = &vendor_require;
+            auto zero = &vendor_zero;
+            int* value = find(key);
+            int divisor = zero();
+            require(nullptr);
+            return *value + 100 / divisor;
+        }
+    )");
+    std::filesystem::last_write_time(
+        source, std::filesystem::last_write_time(model) +
+                    std::chrono::hours(1));
+    auto configPath = writePersistFile("library_model.conf",
+                                       "model_file = " + model + "\n");
+
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(configPath));
+    config.setSourcePath(source);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.addRule<MemoryLeakRule_Ex>();
+    analyzer.addRule<DivByZeroRule>();
+    auto result = analyzer.run();
+
+    std::map<std::string, std::size_t> counts;
+    for (const auto& diagnostic : analyzer.diagnostics())
+        ++counts[diagnostic.rule_id];
+    EXPECT_FALSE(result.summary_stale);
+    EXPECT_EQ(counts["null-deref"], 2u);
+    EXPECT_EQ(counts["memory-leak"], 2u);
+    EXPECT_EQ(counts["div-by-zero"], 2u);
+    EXPECT_EQ(counts["contract"], 2u);
+    EXPECT_EQ(analyzer.diagnostics().size(), 8u);
+}
+
+TEST(LibraryModelFileTest, MalformedModelFailsClosed) {
+    GlobalStoreGuard guard;
+    auto model = writePersistFile("library_model_bad.csk",
+        "codeskeptic-summaries v10\n"
+        "broken/1\tdefinitely-not-a-summary\n");
+    auto source = writePersistFile("library_model_bad_user.cpp",
+                                   "int use() { return 0; }\n");
+    auto configPath = writePersistFile("library_model_bad.conf",
+                                       "model_file = " + model + "\n");
+
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(configPath));
+    config.setSourcePath(source);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    auto result = analyzer.run();
+
+    EXPECT_TRUE(result.summary_load_failed);
+    EXPECT_EQ(result.exitCode(), 2);
+    EXPECT_TRUE(analyzer.diagnostics().empty());
+}
+
+TEST(LibraryModelFileTest, MissingModelFailsClosed) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("library_model_missing_user.cpp",
+                                   "int use() { return 0; }\n");
+    auto missing = ::testing::TempDir() +
+                   "library_model_absent_phase47.csk";
+    auto configPath = writePersistFile("library_model_missing.conf",
+                                       "model_file = " + missing + "\n");
+
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(configPath));
+    config.setSourcePath(source);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    auto result = analyzer.run();
+
+    EXPECT_TRUE(result.summary_load_failed);
+    EXPECT_EQ(result.exitCode(), 2);
+    EXPECT_TRUE(analyzer.diagnostics().empty());
+}
+
+TEST(LibraryModelFileTest, MultipleFilesMergeConflictsConservatively) {
+    GlobalStoreGuard guard;
+    auto strong = writePersistFile("library_model_strong.csk",
+        "codeskeptic-summaries v10\n"
+        "vendor_find/1\tN\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tO\t?\n");
+    auto weak = writePersistFile("library_model_weak.csk",
+        "codeskeptic-summaries v10\n"
+        "vendor_find/1\tM\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\t?\n");
+    auto source = writePersistFile("library_model_merge_user.cpp", R"(
+        int* vendor_find(int);
+        int use(int key) {
+            int* value = vendor_find(key);
+            return *value;
+        }
+    )");
+    auto configPath = writePersistFile(
+        "library_model_merge.conf",
+        "model_file = " + strong + "\nmodel_file = " + weak + "\n");
+
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(configPath));
+    config.setSourcePath(source);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.addRule<MemoryLeakRule_Ex>();
+    auto result = analyzer.run();
+
+    EXPECT_FALSE(result.summary_load_failed);
+    EXPECT_EQ(result.exitCode(), 0);
+    EXPECT_TRUE(analyzer.diagnostics().empty());
+}
+
+TEST(LibraryModelFileTest, ModelAndHarvestedSummaryMergeConservatively) {
+    GlobalStoreGuard guard;
+    auto model = writePersistFile("library_model_with_harvest.csk",
+        "codeskeptic-summaries v10\n"
+        "vendor_find/1\tN\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tO\t?\n");
+    auto harvested = writePersistFile("library_harvested_summary.csk",
+        "codeskeptic-summaries v10\n"
+        "vendor_find/1\tM\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\t?\n");
+    auto source = writePersistFile("library_harvested_user.cpp", R"(
+        int* vendor_find(int);
+        int use(int key) {
+            int* value = vendor_find(key);
+            return *value;
+        }
+    )");
+    std::filesystem::last_write_time(
+        harvested, std::filesystem::last_write_time(source) +
+                       std::chrono::hours(1));
+    auto configPath = writePersistFile("library_model_with_harvest.conf",
+                                       "model_file = " + model + "\n");
+
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(configPath));
+    config.setSummaryIn(harvested);
+    config.setSourcePath(source);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.addRule<MemoryLeakRule_Ex>();
+    auto result = analyzer.run();
+
+    EXPECT_FALSE(result.summary_load_failed);
+    EXPECT_FALSE(result.summary_stale);
+    EXPECT_EQ(result.exitCode(), 0);
+    EXPECT_TRUE(analyzer.diagnostics().empty());
+}

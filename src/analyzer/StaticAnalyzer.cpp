@@ -177,6 +177,25 @@ AnalysisResult StaticAnalyzer::run() {
                      std::to_string(source_mgr_->fileCount()),
                      std::to_string(engine_.enabledRuleCount())) << "\n";
 
+    // Opt-in library models are declarative specifications in the existing
+    // strict summary format. Load them before harvested summaries so every
+    // source of knowledge shares the same conservative merge operation.
+    // Unlike --summary-in, models do not represent a source snapshot and
+    // therefore have no freshness relationship to analyzed files.
+    if (!config_.modelFiles().empty()) {
+        auto& registry = SummaryRegistry::instance();
+        for (const auto& path : config_.modelFiles()) {
+            if (registry.loadGlobal(path)) {
+                std::cerr << msg(MsgId::SummariesLoaded,
+                                 std::to_string(registry.globalSize()),
+                                 path) << "\n";
+            } else {
+                result.summary_load_failed = true;
+                std::cerr << msg(MsgId::SummaryLoadError, path) << "\n";
+            }
+        }
+    }
+
     // Load saved summaries (Cross-TU v2): a previous run's harvest is
     // merged into the store — a single file is analyzed with
     // whole-project knowledge. A load failure does NOT stop the

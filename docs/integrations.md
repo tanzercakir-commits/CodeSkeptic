@@ -47,6 +47,35 @@ before letting it break CI. The default stays `error` — and an
 unreadable summary file is exit `2` regardless: a gate that cannot
 read its input never looks green.
 
+## Opt-in library models in CI
+
+A repository can version reviewed declarations for body-less platform or
+vendor functions and load them on every analysis:
+
+```bash
+codeskeptic src/ --model-file models/platform.csk \
+    --model-file models/vendor.csk
+```
+
+The flag is repeatable and is forwarded normally when placed after `--` in
+the diff/review scripts. Model files use the same deterministic strict schema
+as `--summary-out`, so `--summary-diff old.csk new.csk` can review their
+semantic drift. Key collisions across models, harvested summaries, and the
+current run merge conservatively; ordering is not an override mechanism.
+
+Treat model changes like source changes. A strong declaration is a reviewed
+assumption and can remove a finding; it is not proof that the library
+implementation satisfies the row. CI should pin the files in the repository,
+show their semantic diff, and require human review before accepting generated
+or AI-proposed changes. CodeSkeptic never promotes a proposal into a model or
+accepted contract automatically.
+
+A missing or malformed requested model sets the ordinary
+`summary_load_failed` evidence bit and exits `2`, even if the remaining
+analysis produced diagnostics. Model files have no source timestamp check
+because they are declarations rather than harvested snapshots. There are no
+built-in models or implicit library-name semantics.
+
 ## Repository PR measurement
 
 CodeSkeptic's own `measurement.yml` is the product-quality companion to the

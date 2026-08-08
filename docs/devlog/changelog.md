@@ -1,7 +1,62 @@
 # CodeSkeptic — Changelog
 
 
-## 2026-08-08 ? Phase 4.6 controlled function-pointer targets
+## 2026-08-08 — Phase 4.7 opt-in library model files
+
+Body-less platform and vendor functions can now participate in the existing
+interprocedural analysis through repeatable `--model-file <file>` CLI
+arguments or `model_file = <file>` configuration entries. A model is the
+existing strict summary file, loaded before `--summary-in`; this slice adds
+no grammar, file format, accepted relation, built-in model, or implicit
+library-name semantics.
+
+Every model and harvested summary enters the same global registry. Duplicate
+keys merge through the existing conservative relation-by-relation join, so
+file order cannot override a disagreement with a stronger claim. Models are
+declarative specifications rather than source snapshots and deliberately skip
+the source-freshness check. Missing, unreadable, empty-path, or malformed
+inputs fail closed through the existing `summary_load_failed` evidence and
+exit 2; strict parsing remains atomic, so a rejected file contributes no
+partial rows.
+
+The RED receipt was four failures: the CLI/config surface rejected the new
+repeatable option and three end-to-end model cases could not load. GREEN pins
+direct and controlled local function-pointer consumption of model-provided
+nullness, zeroness, return ownership, and non-null entry preconditions. The
+fixture reports exactly two findings on each of those four relations.
+Additional negatives cover empty/missing paths, malformed v10, a model older
+than the analyzed source without a stale warning, conflicting model files,
+and a model/harvested-summary collision degrading to Unknown. The focused
+config, persistence, function-pointer, and model matrix is 42/42.
+
+Both the direct single-process binary and CTest passed 977/977 tests. The
+frozen thesis gate remains `clean_fp=0`, `bug_caught=9/15`, and
+`total_findings=11`. The self-scan is clean with complete evidence across
+47/47 translation units, zero broken TUs, and zero incomplete functions. The
+historical corpus lane remains cJSON 54 findings (76 attempted, 35 analyzed,
+41 explicitly accepted broken fixtures) and tinyxml2 9 findings (3/3); exact
+diagnostic-site multisets have zero additions and zero removals versus Phase
+4.6. The documentation sync gate is green.
+
+Models are documented as reviewed, trusted assumptions that can suppress a
+finding when wrong, not verifier-produced proof. They must be versioned and
+human-reviewed; CodeSkeptic does not promote generated or AI-proposed text
+into a model or accepted contract automatically. Native pointer, heap, alias,
+ownership, and lifetime verification remain outside this slice and await the
+upstream A7 executable semantics.
+
+Contract-first shadow audit considered `Config::loadFromFile`,
+`Config::parseArgs`, `Config::modelFiles`, and `StaticAnalyzer::run`.
+Dogfood was not applicable: all four new or materially changed functions
+depend on `std::string`/`std::vector`, reference lifetime, filesystem
+streams, registry state, or analyzer/AST lifecycle semantics the current
+verifier cannot express and check. Counts: proposals 0, eligible 0, rejected
+0, unsupported 4. No proposal exposed an
+implementation or assumption problem; the independent RED tests exposed only
+the planned feature gap. Candidate contracts requiring later human review:
+none. No `cs: ai` proposal became accepted intent.
+
+## 2026-08-08 — Phase 4.6 controlled function-pointer targets
 
 Interprocedural v2 now resolves a deliberately bounded indirect-call class:
 automatic local raw function-pointer variables whose initializer and every
@@ -50,6 +105,10 @@ Contract-first shadow audit after the workflow was adopted considered
 pointers, function-pointer target identity, alias/mutation channels, or
 dataflow state that the current contract verifier cannot prove. Counts:
 proposals 0, eligible 0, rejected 0, unsupported 4. No proposal exposed an
+implementation or assumption problem; the independent soundness REDs exposed
+two implementation gaps and both were closed. Candidate contracts requiring
+later human review: none. No `cs: ai` proposal became accepted intent.
+
 ## 2026-08-08 — Phase 4.5 field-sensitive effect summaries
 
 Interprocedural v2 now records the exact set of one-hop record fields that

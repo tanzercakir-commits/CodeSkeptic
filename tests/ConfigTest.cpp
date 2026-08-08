@@ -85,3 +85,29 @@ TEST(ConfigTest, PartialCoverageAcceptanceIsExplicit) {
                       {"codeskeptic", "--accept-partial-coverage", "x.cpp"}));
     EXPECT_TRUE(config.acceptPartialCoverage());
 }
+
+TEST(ConfigTest, ModelFileOptionsAreRepeatableAndLayered) {
+    const auto path = writeConfig(
+        "codeskeptic_models.conf",
+        "model_file = platform.csk\n"
+        "model_file = project.csk\n");
+    Config layered;
+    EXPECT_TRUE(layered.loadFromFile(path));
+    EXPECT_TRUE(parse(layered, {"codeskeptic",
+                                "--model-file", "vendor-base.csk",
+                                "--model-file", "vendor-extra.csk",
+                                "input.cpp"}));
+    EXPECT_EQ(layered.modelFiles(),
+              std::vector<std::string>({"platform.csk", "project.csk",
+                                        "vendor-base.csk",
+                                        "vendor-extra.csk"}));
+
+    Config empty;
+    const auto emptyPath = writeConfig("codeskeptic_empty_model.conf",
+                                       "model_file =\n");
+    EXPECT_FALSE(empty.loadFromFile(emptyPath));
+    EXPECT_TRUE(empty.modelFiles().empty());
+
+    Config missing;
+    EXPECT_FALSE(parse(missing, {"codeskeptic", "--model-file"}));
+}

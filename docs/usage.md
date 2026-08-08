@@ -96,6 +96,9 @@ codeskeptic <source_path> [options]
   --summary-in <file>    Load summaries saved earlier (incremental
                          whole-program: single-file analysis with
                          whole-project knowledge)
+  --model-file <file>    Load an opt-in library model in the strict
+                         summary schema (repeatable; malformed or
+                         missing files make the verdict unavailable)
   --lang <en|tr>         Diagnostic message language (default: en)
   --capabilities [--json] Print the tiered product scope and exit
 ```
@@ -142,7 +145,7 @@ fail with exit `2`):
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
-`alloc_functions`, `free_functions`).
+`alloc_functions`, `free_functions`, and repeatable `model_file` entries.
 
 Project idioms are configuration, not code: allocator wrappers, fatal
 assert handlers and owning smart pointers belong in the project's conf
@@ -218,9 +221,40 @@ The MCP `analyze` tool accepts the same file via its optional
 `summaries` argument, so agent loops get cross-file knowledge too
 (see [integrations.md](integrations.md#mcp-server-agent-integration)).
 
-Stale or malformed summary files are rejected whole (analysis continues
-without them, conservatively); conflicting entries merge toward the
-weaker claim, so a wrong strong claim cannot enter through the file.
+Third-party functions without visible bodies can be modeled explicitly:
+
+```bash
+codeskeptic src/ --model-file models/platform.csk \
+    --model-file models/vendor.csk
+```
+
+The equivalent configuration is repeatable:
+
+```ini
+model_file = models/platform.csk
+model_file = models/vendor.csk
+```
+
+Model files use exactly the strict summary format emitted by
+`--summary-out`; there is no second grammar. They load in declaration order
+before `--summary-in`, and key collisions merge toward Unknown rather than
+letting the last file win. Missing or malformed model files still allow
+diagnostics to run, but the final verdict is exit `2`. Models are
+declarative specifications, so no source-freshness warning applies.
+
+A model is reviewed, trusted input. A wrong `NeverNull`, `NeverZero`, or
+borrowed-ownership claim can suppress a real finding; keep model files in
+version control and review their semantic diff. CodeSkeptic provides no
+built-in library models and makes no native heap, alias, ownership, or
+lifetime-verification claim from these declarations. See
+[the engine model contract](engine.md#interprocedural-analysis-v2) for a v10
+row example and scope.
+
+Malformed harvested summary files are rejected whole (analysis continues
+without them, conservatively); conflicting entries merge toward the weaker
+claim. A `--summary-in` snapshot may also report stale when analyzed source
+is newer; model files deliberately do not.
+
 The current v10 format includes exact pointer return-alias identity, inferred
 non-null parameter preconditions (crash versus rejected-call consequence),
 exact Null/NonNull normal-return effects for `T**`/`T*&` output slots,

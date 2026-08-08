@@ -126,6 +126,33 @@ version-specific widths, vector lengths, codes, and identifiers remain
 strict.
 
 Summaries are deterministic and serializable (`--summary-out` /
-`--summary-in`), which is what makes the
+`--summary-in`). The identical strict file schema can be supplied as an
+opt-in library model with repeatable `--model-file` arguments. Models load
+before harvested summaries and every duplicate key is merged with the same
+conservative relation-by-relation join. Missing or malformed models make the
+verdict unavailable (exit 2); a rejected file contributes no partial rows.
+
+Unlike `--summary-in`, a model is a declarative specification rather than a
+snapshot of analyzed source, so source timestamps do not make it stale. It is
+also trusted user input, not inferred proof: an incorrect strong relation can
+hide a real finding. Model changes therefore require human review and should
+be kept in version control. CodeSkeptic ships no default models and does not
+infer native pointer, heap, alias, ownership, or lifetime semantics from a
+library name.
+
+The canonical encoding is the output of `--summary-out`: a version header
+followed by tab-separated `qualified-name/arity` rows. For example, this v10
+model says that `vendor_find(int)` may return null and returns owned memory;
+all other relations stay conservative:
+
+```text
+codeskeptic-summaries v10
+vendor_find/1	M	O	U	-	-	-	-	O	U	U	U	O	?
+```
+
+Using the canonical serializer as a template avoids guessing version-specific
+column widths. Strict parsing and conservative merging make these files
+machine-checkable, but do not turn their claims into verifier-proven facts.
+Serialization is what makes the
 [semantic regression gate](integrations.md#semantic-regression-gate-summary-diff)
 and incremental whole-program analysis possible.
