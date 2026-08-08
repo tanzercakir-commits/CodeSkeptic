@@ -40,7 +40,17 @@ Local Phase 2 receipts used the Windows analyzer against all three corpora:
 71/71 analyzed TUs with zero broken TUs, and every emitted fingerprint matched
 the independent oracle. Five schema/delta tests, two workflow-contract tests,
 the Juliet classifier self-test, workflow YAML parsing and the focused 50-test
-reporter/fingerprint/verdict set passed before the full suite.
+reporter/fingerprint/verdict set passed before the full suite. The final MSVC
+binary then passed all 860 tests both parallel and serial. The canonical thesis
+gate stayed at zero clean false positives, 9/15 caught defective cases and 11
+findings; pinned cJSON/tinyxml2 corpus counts stayed at 54/9 with no crash.
+
+The first draft-PR push also exercised the new Juliet dashboard fail-closed:
+all six score and miss rows were correct, but the parser treated the human
+completion sentence containing the words `JULIET_RESULT lines` as a seventh
+machine row and rejected it. Machine-row patterns are now start-anchored, with
+a regression containing that exact prose line. No score, miss classification,
+floor or artifact requirement changed.
 
 ## 2026-08-08 — Phase 1 product-scope contract
 

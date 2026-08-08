@@ -10,8 +10,8 @@ import sys
 from pathlib import Path
 
 
-RESULT = re.compile(r"JULIET_RESULT\s+(\S+)\s+(.*)$")
-MISSES = re.compile(r"JULIET_MISS_CLASS\s+(\S+)\s+(.*)$")
+RESULT = re.compile(r"^JULIET_RESULT\s+(\S+)\s+(.*)$")
+MISSES = re.compile(r"^JULIET_MISS_CLASS\s+(\S+)\s+(.*)$")
 KEY_VALUE = re.compile(r"([a-z0-9_]+)=([^\s]+)")
 RULES = {
     "CWE476_NULL_Pointer_Dereference": "null-deref",

@@ -137,6 +137,7 @@ class MeasurementLabTest(unittest.TestCase):
                 f"addressable={misses['addressable']} model_gap={misses['model_gap']} "
                 f"out_of_scope={misses['out_of_scope']}"
             )
+        lines.append("[juliet] OK — see the JULIET_RESULT lines for a summary")
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "juliet.txt"
             output.write_text("\n".join(lines), encoding="utf-8")
