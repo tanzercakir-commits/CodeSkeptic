@@ -23,6 +23,12 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published release tag to rebuild (for example v0.4.8)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -39,12 +45,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # workflow_run otherwise checks out a possibly newer default branch.
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
 
       - name: Build image
         id: build
         env:
-          RELEASE_TAG: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
         run: |
           set -o pipefail
           args=()
@@ -77,12 +83,18 @@ jobs:
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docker"
 
       - name: Publish exact release identity to ghcr.io
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+        if: >-
+          (github.event_name == 'workflow_run' &&
+           github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           IMAGE: ghcr.io/${{ github.repository_owner }}/codeskeptic
-          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || inputs.release_tag }}
         run: |
+          draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)
+          test "$draft" = "false"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           IMG="$IMAGE"
           VER=$(docker run --rm codeskeptic:test --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)

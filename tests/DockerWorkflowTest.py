@@ -27,6 +27,12 @@ class DockerWorkflowTest(unittest.TestCase):
         self.assertIn('docker push "$IMG:$RELEASE_TAG"', workflow)
         self.assertNotIn("[docker-publish]", workflow)
 
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("release_tag:", workflow)
+        self.assertIn("inputs.release_tag", workflow)
+        self.assertIn('gh release view "$RELEASE_TAG" --json isDraft', workflow)
+        self.assertIn('test "$draft" = "false"', workflow)
+
         self.assertIn('ARG CODESKEPTIC_VERSION_OVERRIDE=""', dockerfile)
         self.assertIn(
             '-DCODESKEPTIC_VERSION_OVERRIDE="$CODESKEPTIC_VERSION_OVERRIDE"',
