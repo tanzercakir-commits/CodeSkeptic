@@ -119,6 +119,8 @@ VState zstateOf(const Expr* expr, const SummaryTable& previous) {
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         if (const auto* summary =
                 lookupPrev(previous, call->getDirectCallee())) {
+            if (summary->returnZeroness == ReturnZeroness::AlwaysZero)
+                return VState::Bad;
             if (summary->returnZeroness == ReturnZeroness::NeverZero)
                 return VState::NonBad;
             if (summary->returnZeroness == ReturnZeroness::MaybeZero)
@@ -292,6 +294,7 @@ private:
 struct AggregateFlags {
     bool empty = true;
     bool sawBad = false;
+    bool allBad = true;
     bool allNonBad = true;
 };
 
@@ -300,6 +303,7 @@ AggregateFlags aggregateFlags(const std::vector<VState>& contribs) {
     flags.empty = contribs.empty();
     for (VState v : contribs) {
         if (v == VState::Bad || v == VState::MaybeBad) flags.sawBad = true;
+        if (v != VState::Bad) flags.allBad = false;
         if (v != VState::NonBad) flags.allNonBad = false;
     }
     return flags;
@@ -591,6 +595,7 @@ ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
             return t->isIntegerType() && !t->isBooleanType();
         });
     if (flags.empty) return ReturnZeroness::Unknown;
+    if (flags.allBad) return ReturnZeroness::AlwaysZero;
     if (flags.sawBad) return ReturnZeroness::MaybeZero;
     if (flags.allNonBad) return ReturnZeroness::NeverZero;
 
@@ -1369,9 +1374,10 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 //
 // v2: key<TAB>return-null<TAB>params<TAB>return-zero
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
-// Returns: U/N/M; params are a char string of O/R/F/S, empty vector "-".
+// Returns: U/Z/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v5";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v6";
+constexpr const char* kSummaryFileHeaderV5 = "codeskeptic-summaries v5";
 constexpr const char* kSummaryFileHeaderV4 = "codeskeptic-summaries v4";
 constexpr const char* kSummaryFileHeaderV3 = "codeskeptic-summaries v3";
 constexpr const char* kSummaryFileHeaderV2 = "codeskeptic-summaries v2";
@@ -1397,8 +1403,9 @@ bool rnFromChar(char c, ReturnNullness& out) {
 
 char rzToChar(ReturnZeroness v) {
     switch (v) {
-        case ReturnZeroness::NeverZero: return 'N';
-        case ReturnZeroness::MaybeZero: return 'M';
+        case ReturnZeroness::AlwaysZero: return 'Z';
+        case ReturnZeroness::NeverZero:  return 'N';
+        case ReturnZeroness::MaybeZero:  return 'M';
         case ReturnZeroness::Unknown:   break;
     }
     return 'U';
@@ -1406,8 +1413,9 @@ char rzToChar(ReturnZeroness v) {
 
 bool rzFromChar(char c, ReturnZeroness& out) {
     switch (c) {
-        case 'U': out = ReturnZeroness::Unknown;   return true;
-        case 'N': out = ReturnZeroness::NeverZero; return true;
+        case 'U': out = ReturnZeroness::Unknown;    return true;
+        case 'Z': out = ReturnZeroness::AlwaysZero; return true;
+        case 'N': out = ReturnZeroness::NeverZero;  return true;
         case 'M': out = ReturnZeroness::MaybeZero; return true;
     }
     return false;
@@ -1503,7 +1511,8 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 5;
+    if (line == kSummaryFileHeader) version = 6;
+    else if (line == kSummaryFileHeaderV5) version = 5;
     else if (line == kSummaryFileHeaderV4) version = 4;
     else if (line == kSummaryFileHeaderV3) version = 3;
     else if (line == kSummaryFileHeaderV2) version = 2;
@@ -1541,6 +1550,7 @@ bool SummaryRegistry::parseSummaryFile(
         if (!rnFromChar(rn[0], summary.returnNullness)) return false;
         if (fields.size() >= 4) {
             if (fields[3].size() != 1 ||
+                (fields[3][0] == 'Z' && version < 6) ||
                 !rzFromChar(fields[3][0], summary.returnZeroness))
                 return false;
         }

@@ -164,7 +164,6 @@ bool edgeInfeasibleByFlags(const Stmt* leafCond, bool edgeIsTrue,
     const auto* expr = dyn_cast_or_null<Expr>(leafCond);
     if (!expr) return false;
     const ImmutableFlagMap& flags = ImmutableFlagCache::instance().get(ctx);
-    if (flags.empty()) return false;
 
     auto flagValue = [&](const Expr* e) -> std::optional<int64_t> {
         if (const auto* vd = refTo(e)) {
@@ -200,6 +199,8 @@ bool edgeInfeasibleByFlags(const Stmt* leafCond, bool edgeIsTrue,
         if (!reg.stable()) return false;
         if (const auto* summary = reg.lookup(call->getDirectCallee())) {
             using RZ = SummaryRegistry::ReturnZeroness;
+            if (summary->returnZeroness == RZ::AlwaysZero)
+                return edgeIsTrue;   // condition certainly false
             if (summary->returnZeroness == RZ::NeverZero)
                 return !edgeIsTrue;  // condition certainly true
         }
