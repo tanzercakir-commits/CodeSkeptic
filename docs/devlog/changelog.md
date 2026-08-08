@@ -25,6 +25,22 @@ reported `fatal: not a git repository`. `GH_REPO` is now bound to
 `github.repository`, and the release-workflow contract requires that binding;
 the same command can create the draft without an unnecessary checkout.
 
+The next exact-main tag run (`31233391177`) then passed prepare, macOS,
+Linux, Windows and publish; the public v0.4.8 release and all six archive
+aliases were valid. Action self-test, real WSL2 smoke and housekeeping also
+passed. The green downstream Docker run (`31233885015`) nevertheless exposed
+an identity error in its publish log: it built the default-branch checkout,
+whose honest development identity was `0.4.9-dev`, stripped that suffix and
+pushed the image as future tag `v0.4.9` instead of release tag `v0.4.8`.
+
+Release-triggered Docker now checks out the Release run's exact `head_sha`,
+passes its `head_branch` tag through an explicit CMake version override, and
+refuses to publish unless the image-reported version equals that tag. Phase
+branch pushes remain build+smoke-only; the old commit-message publish escape
+hatch was removed because it had no trustworthy release identity. A new
+`DockerWorkflowContract` regression pins the source SHA, override, equality
+check and pushed tag. No analyzer or image payload behavior changed.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is

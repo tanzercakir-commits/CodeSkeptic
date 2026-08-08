@@ -12,16 +12,16 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 625c245
-uçuşta = phase-truth-sync-v048 phase-v048-release-prepare-context phase-v048-release-smoke-fix phase-verdict-integrity-validation
+base   = 530e8f2
+uçuşta = phase-v048-docker-release-identity
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): Faz 0 verdict-integrity ve truth-sync dilimleri
-PR #119 (`dd08970`) ve PR #120 (`38e29e2`) ile `main`e alındı. İlk v0.4.8
-tag koşusu ürün/paket kontrollerini geçti; macOS negative-smoke adımı doğru
-`VERDICT UNAVAILABLE` çıktısında eski metni aradığı için release-contract
-hotfix'i hazırlanıyor.
+Serbest not (insanda kalır): Faz 0 analyzer/release zinciri v0.4.8 olarak
+`530e8f2` commitinden yayımlandı; üç platform, Action ve WSL2 kapıları yeşil.
+Docker image/smoke doğru olmasına rağmen workflow-run varsayılan dal kimliğini
+`v0.4.9` diye yayınladı. Exact release SHA/tag binding hotfix'i hazırlanıyor;
+yanlış GHCR etiketi doğru `v0.4.8` republish sonrasında kaldırılacak.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -35,10 +35,10 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: v0.4.8 release-smoke sözleşme düzeltmesini
-CI kanıtıyla birleştir, etiketi doğrulanmış `main`e taşı ve üç platformlu
-yayını tamamla. Ardından Faz 0'ı kapatıp Faz 1 capability tier sözleşmesine
-geç.
+Bağlayıcı ürün programı sırası: Docker release kimliğini exact tag'e bağla,
+CI ile birleştir, v0.4.8 image'ını yeniden yayınla ve yanlış v0.4.9 paket
+versiyonunu kaldır. Nihai makbuzla Faz 0'ı kapatıp Faz 1 capability tier
+sözleşmesine geç.
 
 ## Açık kullanıcı kararları
 
