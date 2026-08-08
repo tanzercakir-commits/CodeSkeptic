@@ -1,5 +1,6 @@
 #include "reporter/HtmlReporter.h"
 
+#include "core/FindingFingerprint.h"
 #include "core/Messages.h"
 
 #include <ctime>
@@ -104,7 +105,7 @@ border-radius:6px;padding:2px 8px;color:#fff}
 .badge.info{background:var(--info)}
 .rule{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
 .loc{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
-.fn{color:var(--muted);font-size:13px}
+.fn,.fp{color:var(--muted);font-size:13px}.fp{font-family:ui-monospace,Menlo,Consolas,monospace}
 .msg{margin:8px 0 0;font-size:15px}
 details{margin-top:10px}summary{cursor:pointer;color:var(--muted);font-size:14px}
 .step{margin:10px 0 0;font-size:14px}
@@ -236,11 +237,16 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
     LineCache cache;
     for (const auto& d : diagnostics) {
         const std::string sev = d.severityToString();
+        const std::string fingerprint = d.fingerprint.empty()
+            ? findingFingerprint(d)
+            : d.fingerprint;
         std::string haystack = toLower(d.file + " " + d.function + " " +
-                                       d.message + " " + d.rule_id);
+                                       d.message + " " + d.rule_id + " " +
+                                       fingerprint);
 
         file << "<article class=\"finding\" data-sev=\"" << sev
              << "\" data-rule=\"" << escapeHtml(d.rule_id)
+             << "\" data-fingerprint=\"" << escapeHtml(fingerprint)
              << "\" data-text=\"" << escapeHtml(haystack) << "\">\n"
              << "<div class=\"head\"><span class=\"badge " << sev << "\">"
              << sev << "</span><span class=\"rule\">" << escapeHtml(d.rule_id)
@@ -249,6 +255,8 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
         if (!d.function.empty())
             file << "<span class=\"fn\">in " << escapeHtml(d.function)
                  << "()</span>";
+        file << "<span class=\"fp\">" << escapeHtml(fingerprint)
+             << "</span>";
         file << "</div>\n<p class=\"msg\">" << escapeHtml(d.message)
              << "</p>\n";
 

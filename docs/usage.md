@@ -112,6 +112,16 @@ with translation-unit/dataflow coverage. An empty HTML findings list says
 “Clean” only when the evidence is complete; an unavailable verdict stays
 visibly unavailable.
 
+Every finding also carries the same stable semantic fingerprint. JSON and MCP
+use the `fingerprint` field, SARIF uses
+`partialFingerprints["codeskeptic/v1"]`, and HTML displays the value and stores
+it in `data-fingerprint`. The current `csf1-<16 lowercase hex digits>` schema
+tracks a rule at a normalized source statement across checkout roots, harmless
+line shifts, formatting-only edits, severity changes and message rewrites. It
+is a site identity, not a cryptographic digest; consumers must retain counts
+when identical sites occur more than once. The exact schema and PR comparison
+contract are documented in [benchmarks.md](benchmarks.md#pr-measurement-laboratory).
+
 Machine-readable capability discovery does not start an analysis:
 
 ```bash

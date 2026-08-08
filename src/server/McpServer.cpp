@@ -2,6 +2,7 @@
 
 #include "analyzer/StaticAnalyzer.h"
 #include "core/Capabilities.h"
+#include "core/FindingFingerprint.h"
 #include "config/Config.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/IntOverflowRule.h"
@@ -207,6 +208,9 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 
     json::Array findings;
     for (const auto& diag : analyzer.diagnostics()) {
+        const std::string fingerprint = diag.fingerprint.empty()
+            ? codeskeptic::findingFingerprint(diag)
+            : diag.fingerprint;
         const codeskeptic::RuleCapability* capability =
             codeskeptic::findRuleCapability(diag.rule_id);
         json::Array notes;
@@ -230,6 +234,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
                  : "unclassified"},
             {"blocks_verdict",
              codeskeptic::findingBlocksVerdict(diag.rule_id)},
+            {"fingerprint", fingerprint},
             {"message", diag.message},
             {"trace", std::move(notes)},
         });

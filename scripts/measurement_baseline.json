@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "reference": {
+    "analyzer_tree": "7decb6b09ac2ee3c09a03bb37eebf17df71e97d5",
+    "workflow_run": 31242561307,
+    "sample_limit_per_cwe": 400,
+    "measured_at_utc": "2026-08-08T05:56:22Z"
+  },
+  "juliet": {
+    "CWE476_NULL_Pointer_Dereference": {
+      "rule": "null-deref",
+      "files": 400,
+      "rtp": 140,
+      "rfp": 0,
+      "precision": 1.0,
+      "recall": 0.347,
+      "case_f1": 0.516,
+      "misses": {"total": 261, "addressable": 67, "model_gap": 194, "out_of_scope": 0}
+    },
+    "CWE401_Memory_Leak": {
+      "rule": "memory-leak",
+      "files": 399,
+      "rtp": 80,
+      "rfp": 32,
+      "precision": 0.714,
+      "recall": 0.193,
+      "case_f1": 0.306,
+      "misses": {"total": 322, "addressable": 119, "model_gap": 203, "out_of_scope": 0}
+    },
+    "CWE415_Double_Free": {
+      "rule": "double-free",
+      "files": 400,
+      "rtp": 97,
+      "rfp": 0,
+      "precision": 1.0,
+      "recall": 0.242,
+      "case_f1": 0.390,
+      "misses": {"total": 303, "addressable": 92, "model_gap": 211, "out_of_scope": 0}
+    },
+    "CWE416_Use_After_Free": {
+      "rule": "use-after-free",
+      "files": 399,
+      "rtp": 198,
+      "rfp": 0,
+      "precision": 1.0,
+      "recall": 0.496,
+      "case_f1": 0.663,
+      "misses": {"total": 201, "addressable": 96, "model_gap": 105, "out_of_scope": 0}
+    },
+    "CWE369_Divide_by_Zero": {
+      "rule": "div-by-zero",
+      "files": 399,
+      "rtp": 43,
+      "rfp": 0,
+      "precision": 1.0,
+      "recall": 0.108,
+      "case_f1": 0.195,
+      "misses": {"total": 356, "addressable": 36, "model_gap": 81, "out_of_scope": 239}
+    },
+    "CWE190_Integer_Overflow": {
+      "rule": "int-overflow",
+      "files": 401,
+      "rtp": 21,
+      "rfp": 0,
+      "precision": 1.0,
+      "recall": 0.052,
+      "case_f1": 0.100,
+      "misses": {"total": 380, "addressable": 82, "model_gap": 119, "out_of_scope": 179}
+    }
+  }
+}

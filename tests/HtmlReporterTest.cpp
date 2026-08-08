@@ -137,6 +137,19 @@ TEST(HtmlReporterTest, ReportOnlyVerdictPublishesTierCounts) {
     EXPECT_NE(html.find("report-only: 2"), std::string::npos);
 }
 
+TEST(HtmlReporterTest, FindingPublishesSemanticFingerprint) {
+    std::string out = ::testing::TempDir() + "fingerprint.html";
+    Diagnostic diagnostic{Severity::Warning, "sample.cpp", 1, 1,
+                          "memory-leak", "leak"};
+
+    HtmlReporter reporter(out);
+    reporter.report({diagnostic});
+
+    std::string html = readWhole(out);
+    EXPECT_NE(html.find("data-fingerprint=\"csf1-"), std::string::npos);
+    EXPECT_NE(html.find("<span class=\"fp\">csf1-"), std::string::npos);
+}
+
 TEST(HtmlReporterTest, IncompleteEmptyReportNeverClaimsClean) {
     std::string out = ::testing::TempDir() + "report_incomplete.html";
     AnalysisResult result;

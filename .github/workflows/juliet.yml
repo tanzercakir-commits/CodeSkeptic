@@ -20,6 +20,8 @@ on:
       - "scripts/run_juliet.sh"
       - "scripts/juliet_eval.py"
       - "scripts/juliet_expected.txt"
+      - "scripts/measurement_baseline.json"
+      - "scripts/render_quality_dashboard.py"
       - "src/**"
       - "tests/**"
       - "CMakeLists.txt"
@@ -32,6 +34,8 @@ on:
       - "scripts/run_juliet.sh"
       - "scripts/juliet_eval.py"
       - "scripts/juliet_expected.txt"
+      - "scripts/measurement_baseline.json"
+      - "scripts/render_quality_dashboard.py"
       - "src/**"
       - "tests/**"
       - "CMakeLists.txt"
@@ -60,7 +64,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
-            clang-20 ninja-build unzip
+            clang-20 ninja-build unzip time
 
       - name: Configure and build
         run: |
@@ -89,8 +93,9 @@ jobs:
           else
             LIMIT="${{ github.event.inputs.limit || '400' }}"
           fi
-          bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work \
-            "$LIMIT" | tee juliet-output.txt
+          /usr/bin/time -v -o juliet-time.txt \
+            bash scripts/run_juliet.sh ./build/src/codeskeptic juliet-work \
+              "$LIMIT" | tee juliet-output.txt
 
       - name: Deep corpus (abseil) — weekly only
         # Real modern C++ FP net (CORPUS_DEEP gates the ~2.5 min abseil
@@ -99,15 +104,29 @@ jobs:
         if: github.event_name == 'schedule'
         run: CORPUS_DEEP=1 bash scripts/run_corpus.sh ./build/src/codeskeptic corpus-work
 
-      - name: Summary
+      - name: Render rule quality dashboard
         if: always()
         run: |
-          {
-            echo "## Juliet results"
-            echo '```'
-            grep "JULIET_RESULT" juliet-output.txt || echo "(no results)"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/render_quality_dashboard.py \
+            --juliet-output juliet-output.txt \
+            --baseline scripts/measurement_baseline.json \
+            --time-output juliet-time.txt \
+            --json-output juliet-dashboard.json \
+            --markdown-output juliet-dashboard.md
+          cat juliet-dashboard.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload quality dashboard receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: juliet-quality-${{ github.sha }}
+          path: |
+            juliet-output.txt
+            juliet-time.txt
+            juliet-dashboard.json
+            juliet-dashboard.md
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Publish full output to refs/ci-logs/*
         # Always (not just on failure): the FN classification and FP
@@ -119,7 +138,8 @@ jobs:
           git config user.name "ci-logs"
           git config user.email "ci-logs@localhost"
           git checkout --detach -q
-          git add -f juliet-output.tail.txt
+          git add -f juliet-output.tail.txt juliet-time.txt \
+            juliet-dashboard.json juliet-dashboard.md
           git commit -qm "juliet output @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/juliet"
 
