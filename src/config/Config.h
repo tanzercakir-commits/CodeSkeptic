@@ -63,6 +63,12 @@ public:
     // its own but with project knowledge.
     const std::string& summaryIn() const { return summary_in_path_; }
     const std::string& summaryOut() const { return summary_out_path_; }
+    // Opt-in library models use the same strict summary schema but are
+    // declarative inputs, not source harvests. Repeatable paths are loaded
+    // in order and merged conservatively without freshness checks.
+    const std::vector<std::string>& modelFiles() const {
+        return model_files_;
+    }
     // --summary-diff <old> <new>: contract-diff report instead of analysis
     const std::string& summaryDiffOld() const { return summary_diff_old_; }
     const std::string& summaryDiffNew() const { return summary_diff_new_; }
@@ -188,6 +194,7 @@ private:
     bool help_requested_ = false;
     std::string summary_in_path_;
     std::string summary_out_path_;
+    std::vector<std::string> model_files_;
     std::string summary_diff_old_;
     std::string summary_diff_new_;
     Severity min_severity_;

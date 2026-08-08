@@ -263,8 +263,7 @@ NullState evaluateNullness(const Expr* expr) {
     if (const auto* call = dyn_cast<CallExpr>(expr)) {
         using RN = codeskeptic::SummaryRegistry::ReturnNullness;
         const auto* summary =
-            codeskeptic::SummaryRegistry::instance().lookup(
-                call->getDirectCallee());
+            codeskeptic::SummaryRegistry::instance().lookup(call);
         if (summary) {
             if (summary->returnNullness == RN::NeverNull)
                 return NullState::NonNull;
@@ -467,6 +466,44 @@ const VarDecl* addrOfPtrVar(const Expr* e) {
         if (const auto* vd = dyn_cast<VarDecl>(ref->getDecl()))
             if (vd->getType()->isPointerType()) return vd;
     return nullptr;
+}
+
+unsigned callParamArgOffset(const CallExpr* call,
+                            const FunctionDecl* callee) {
+    if (!isa_and_nonnull<CXXOperatorCallExpr>(call)) return 0;
+    const auto* method = dyn_cast_or_null<CXXMethodDecl>(callee);
+    return method && !method->isStatic() ? 1u : 0u;
+}
+
+const FunctionProtoType* callPrototype(const CallExpr* call,
+                                       const FunctionDecl* callee) {
+    if (callee) return callee->getType()->getAs<FunctionProtoType>();
+    if (!call || !call->getCallee()) return nullptr;
+    QualType type = call->getCallee()->getType();
+    if (const auto* pointer = type->getAs<PointerType>())
+        type = pointer->getPointeeType();
+    return type->getAs<FunctionProtoType>();
+}
+
+unsigned callParamCount(const CallExpr* call,
+                        const FunctionDecl* callee) {
+    if (callee) return callee->getNumParams();
+    const auto* prototype = callPrototype(call, callee);
+    return prototype ? prototype->getNumParams() : 0;
+}
+
+QualType callParamType(const CallExpr* call,
+                       const FunctionDecl* callee,
+                       unsigned paramIndex) {
+    if (callee) {
+        return paramIndex < callee->getNumParams()
+                   ? callee->getParamDecl(paramIndex)->getType()
+                   : QualType{};
+    }
+    const auto* prototype = callPrototype(call, callee);
+    return prototype && paramIndex < prototype->getNumParams()
+               ? prototype->getParamType(paramIndex)
+               : QualType{};
 }
 
 // libc functions that UNCONDITIONALLY dereference a pointer argument — a
@@ -707,6 +744,14 @@ bool hasNonNullContractCalls(const FunctionDecl* funcDecl, ASTContext& ctx) {
         const auto* call = result.getNodeAs<CallExpr>("call");
         if (!call) continue;
         const FunctionDecl* callee = call->getDirectCallee();
+        if (const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(call)) {
+            for (unsigned i = 0;
+                 i < callParamCount(call, callee); ++i)
+                if (summary->paramPrecondition(i) !=
+                    codeskeptic::SummaryRegistry::ParamPrecondition::None)
+                    return true;
+        }
         if (!callee) continue;
         auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         if (parsed.clauses.empty()) {
@@ -844,7 +889,7 @@ public:
         // truth. Domain logic below then reads the fact-current state.
         State in = inRaw;
         codeskeptic::applyStmtFactsOps(in, stmt, stampable_, ptrFacts_,
-                                      ops());
+                                      ops(), false);
         // #70: an assignment to a guard variable stales every
         // implication keyed on it — the exact mirror of the fact
         // erasure applyStmtFacts just performed.
@@ -866,14 +911,141 @@ public:
         }
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             if (const auto* bases = codeskeptic::activeMemberFactBases()) {
-                for (const Expr* arg : call->arguments()) {
-                    const VarDecl* base = codeskeptic::addrOfBaseVar(arg);
+                const FunctionDecl* callee = call->getDirectCallee();
+                const auto* summary =
+                    codeskeptic::SummaryRegistry::instance().lookup(call);
+                const unsigned offset = callParamArgOffset(call, callee);
+                for (unsigned argIndex = 0;
+                     argIndex < call->getNumArgs(); ++argIndex) {
+                    const Expr* arg = call->getArg(argIndex);
+                    const Expr* stripped = arg->IgnoreParenCasts();
+                    const VarDecl* base =
+                        codeskeptic::addrOfBaseVar(arg);
+                    bool directReference = false;
+                    if (!base && argIndex >= offset) {
+                        const unsigned paramIndex = argIndex - offset;
+                        QualType type =
+                            callParamType(call, callee, paramIndex);
+                        if (!type.isNull()) {
+                            if (type->isReferenceType()) {
+                                QualType referred =
+                                    type.getNonReferenceType();
+                                if (!referred.isConstQualified() &&
+                                    referred->isRecordType()) {
+                                    const Expr* value =
+                                        stripped->IgnoreParenImpCasts();
+                                    if (const auto* ref =
+                                            dyn_cast<DeclRefExpr>(value)) {
+                                        base = dyn_cast<VarDecl>(
+                                            ref->getDecl());
+                                        directReference = base != nullptr;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (!base || !bases->count(base)) continue;
-                    for (auto& d : in)
-                        for (auto& [var, val] : d.vars)
+
+                    // Field precision is valid only for `&whole_object`.
+                    // Passing `&c.field` exposes that field itself, so the
+                    // legacy all-facts invalidation remains conservative.
+                    bool wholeObject = directReference;
+                    if (const auto* address =
+                            dyn_cast<UnaryOperator>(stripped)) {
+                        if (address->getOpcode() == UO_AddrOf) {
+                            const Expr* target = address->getSubExpr()
+                                ->IgnoreParenImpCasts();
+                            if (const auto* ref =
+                                    dyn_cast<DeclRefExpr>(target))
+                                wholeObject = ref->getDecl() == base;
+                        }
+                    }
+
+                    const codeskeptic::SummaryRegistry::FieldWriteSet*
+                        exact = nullptr;
+                    if (wholeObject && summary &&
+                        argIndex >= offset) {
+                        const unsigned paramIndex = argIndex - offset;
+                        if (paramIndex < callParamCount(call, callee))
+                            exact = summary->exactParamFieldWrites(paramIndex);
+                    }
+                    bool memberChanged = false;
+                    for (auto& d : in) {
+                        for (auto it = d.facts.begin();
+                             it != d.facts.end();) {
+                            const bool matches =
+                                it->first.var == base && it->first.field &&
+                                (!exact || exact->fields.count(
+                                    it->first.field->getNameAsString()));
+                            if (matches) {
+                                it = d.facts.erase(it);
+                                memberChanged = true;
+                            } else {
+                                ++it;
+                            }
+                        }
+                        for (auto& [var, val] : d.vars) {
                             if (val.fact && val.fact->var == base &&
-                                val.fact->field)
+                                val.fact->field &&
+                                (!exact || exact->fields.count(
+                                    val.fact->field->getNameAsString()))) {
                                 val.fact.reset();
+                                memberChanged = true;
+                            }
+                        }
+                    }
+                    if (memberChanged)
+                        codeskeptic::normalizeGuardedOps(in, ops());
+                }
+                if (const auto* memberCall =
+                        dyn_cast<CXXMemberCallExpr>(call)) {
+                    const CXXMethodDecl* method =
+                        memberCall->getMethodDecl();
+                    const Expr* object =
+                        memberCall->getImplicitObjectArgument();
+                    if (method && object) {
+                        object = object->IgnoreParenImpCasts();
+                        const auto* ref =
+                            dyn_cast<DeclRefExpr>(object);
+                        const auto* base = ref
+                            ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+                        if (base && bases->count(base)) {
+                            const auto affectedByMethod =
+                                [method](const ValueDecl* field) {
+                                    const auto* member =
+                                        dyn_cast_or_null<FieldDecl>(field);
+                                    return !method->isConst() ||
+                                           (member && member->isMutable());
+                                };
+                            bool memberChanged = false;
+                            for (auto& d : in) {
+                                for (auto it = d.facts.begin();
+                                     it != d.facts.end();) {
+                                    const bool matches =
+                                        it->first.var == base &&
+                                        it->first.field &&
+                                        affectedByMethod(it->first.field);
+                                    if (matches) {
+                                        it = d.facts.erase(it);
+                                        memberChanged = true;
+                                    } else {
+                                        ++it;
+                                    }
+                                }
+                                for (auto& [var, val] : d.vars) {
+                                    if (val.fact &&
+                                        val.fact->var == base &&
+                                        val.fact->field &&
+                                        affectedByMethod(val.fact->field)) {
+                                        val.fact.reset();
+                                        memberChanged = true;
+                                    }
+                                }
+                            }
+                            if (memberChanged)
+                                codeskeptic::normalizeGuardedOps(in, ops());
+                        }
+                    }
                 }
             }
         }
@@ -945,6 +1117,48 @@ public:
                     changed = true;
                 }
             });
+
+            // Exact output summaries refine the conservative reference
+            // invalidation above. Only keyable caller slots are updated:
+            // a T*& binds directly to `p`, while a T** must be `&p`.
+            const FunctionDecl* callee = call->getDirectCallee();
+            const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(call);
+            const unsigned argOffset = callParamArgOffset(call, callee);
+            if (summary) {
+                using Post =
+                    codeskeptic::SummaryRegistry::ParamPostcondition;
+                for (unsigned i = 0;
+                     i < callParamCount(call, callee); ++i) {
+                    const unsigned argIndex = i + argOffset;
+                    if (argIndex >= call->getNumArgs()) break;
+                    const QualType type = callParamType(call, callee, i);
+                    const bool refToPointer =
+                        type->isLValueReferenceType() &&
+                        type.getNonReferenceType()->isPointerType();
+                    const bool pointerToPointer =
+                        type->isPointerType() &&
+                        type->getPointeeType()->isPointerType();
+                    const VarDecl* var = nullptr;
+                    if (refToPointer)
+                        var = asVar(call->getArg(argIndex));
+                    else if (pointerToPointer)
+                        var = addrOfPtrVar(call->getArg(argIndex));
+                    if (!var) continue;
+
+                    const Post post = summary->paramPostcondition(i);
+                    if (post == Post::Unknown) continue;
+                    const NullState value = post == Post::NonNull
+                                                ? NullState::NonNull
+                                                : NullState::Null;
+                    for (auto& d : out) {
+                        auto it = d.vars.find(var);
+                        if (it == d.vars.end()) continue;
+                        it->second = value;
+                        changed = true;
+                    }
+                }
+            }
             return changed ? out : in;
         }
 
@@ -1066,19 +1280,65 @@ public:
                              const FunctionDecl* callee,
                              const State& before, ASTContext& ctx,
                              const std::set<unsigned>& declaredParams) {
-        auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
-        if (inserted)
-            cacheIt->second = codeskeptic::inferGuardRequires(callee, ctx);
-        if (cacheIt->second.empty()) return;
+        std::vector<codeskeptic::GuardRequire> guards;
+        if (callee) {
+            auto [cacheIt, inserted] = guardCache_.try_emplace(callee);
+            if (inserted) {
+                cacheIt->second =
+                    codeskeptic::inferGuardRequires(callee, ctx);
+                if (cacheIt->second.empty()) {
+                    const auto* summary =
+                        codeskeptic::SummaryRegistry::instance().lookup(call);
+                    if (summary) {
+                        using Pre =
+                            codeskeptic::SummaryRegistry::ParamPrecondition;
+                        for (unsigned i = 0;
+                             i < callParamCount(call, callee); ++i) {
+                            Pre pre = summary->paramPrecondition(i);
+                            if (pre == Pre::None) continue;
+                            cacheIt->second.push_back({
+                                i, pre == Pre::NonNullCrash
+                                       ? codeskeptic::GuardConsequence::Crash
+                                       : codeskeptic::GuardConsequence::Rejected,
+                                0});
+                        }
+                    }
+                }
+            }
+            guards = cacheIt->second;
+        } else {
+            const auto* summary =
+                codeskeptic::SummaryRegistry::instance().lookup(call);
+            if (summary) {
+                using Pre =
+                    codeskeptic::SummaryRegistry::ParamPrecondition;
+                for (unsigned i = 0;
+                     i < callParamCount(call, callee); ++i) {
+                    Pre pre = summary->paramPrecondition(i);
+                    if (pre == Pre::None) continue;
+                    guards.push_back({
+                        i, pre == Pre::NonNullCrash
+                               ? codeskeptic::GuardConsequence::Crash
+                               : codeskeptic::GuardConsequence::Rejected,
+                        0});
+                }
+            }
+        }
+        if (guards.empty()) return;
 
         NullVarState flat;
         bool flatComputed = false;
-        for (const auto& g : cacheIt->second) {
-            if (declaredParams.count(g.paramIndex)) continue;
-            if (g.paramIndex >= call->getNumArgs() ||
-                g.paramIndex >= callee->getNumParams())
+        const unsigned argOffset = callParamArgOffset(call, callee);
+        const std::string calleeName =
+            callee ? callee->getNameAsString()
+                   : "resolved function-pointer target set";
+        for (const auto& guard : guards) {
+            if (declaredParams.count(guard.paramIndex)) continue;
+            const unsigned argIndex = guard.paramIndex + argOffset;
+            if (argIndex >= call->getNumArgs() ||
+                guard.paramIndex >= callParamCount(call, callee))
                 continue;
-            const Expr* arg = call->getArg(g.paramIndex);
+            const Expr* arg = call->getArg(argIndex);
 
             bool definite = codeskeptic::isNullPointerArg(arg);
             if (!definite) {
@@ -1088,25 +1348,29 @@ public:
                                                           mergeNullVals);
                         flatComputed = true;
                     }
-                    auto f = flat.find(var);
-                    definite = f != flat.end() &&
-                               f->second.st == NullState::Null;
+                    auto found = flat.find(var);
+                    definite = found != flat.end() &&
+                               found->second.st == NullState::Null;
                 }
             }
-            if (!definite) continue;  // v1: definite violations only
+            if (!definite) continue;
 
             const SourceManager& sm = ctx.getSourceManager();
             SourceLocation loc = sm.getExpansionLoc(call->getBeginLoc());
             const unsigned line = sm.getSpellingLineNumber(loc);
-            const std::string paramName =
-                callee->getParamDecl(g.paramIndex)->getNameAsString();
+            std::string paramName =
+                "argument #" + std::to_string(guard.paramIndex + 1);
+            if (callee && guard.paramIndex < callee->getNumParams()) {
+                const std::string declared =
+                    callee->getParamDecl(guard.paramIndex)->getNameAsString();
+                if (!declared.empty()) paramName = declared;
+            }
             const bool crash =
-                g.consequence == codeskeptic::GuardConsequence::Crash;
-            // Callee name is part of the key: two same-line calls to
-            // DIFFERENT guarded callees are two violations, not one.
+                guard.consequence ==
+                codeskeptic::GuardConsequence::Crash;
             const std::string text =
                 (crash ? "guard-crash:" : "guard-reject:") +
-                callee->getNameAsString() + ":" + paramName;
+                calleeName + ":" + paramName;
             if (!reportedContracts_.emplace(line, text).second) continue;
 
             codeskeptic::Diagnostic diag;
@@ -1116,22 +1380,32 @@ public:
             diag.rule_id = "contract";
             diag.severity = crash ? codeskeptic::Severity::Error
                                   : codeskeptic::Severity::Warning;
-            diag.message = codeskeptic::msg(
-                crash ? codeskeptic::MsgId::ContractGuardCrash
-                      : codeskeptic::MsgId::ContractGuardRejected,
-                paramName, callee->getNameAsString(),
-                std::to_string(g.guardLine));
+            if (guard.guardLine == 0) {
+                diag.message = codeskeptic::msg(
+                    crash ? codeskeptic::MsgId::ContractSummaryGuardCrash
+                          : codeskeptic::MsgId::ContractSummaryGuardRejected,
+                    paramName, calleeName);
+            } else {
+                diag.message = codeskeptic::msg(
+                    crash ? codeskeptic::MsgId::ContractGuardCrash
+                          : codeskeptic::MsgId::ContractGuardRejected,
+                    paramName, calleeName,
+                    std::to_string(guard.guardLine));
+            }
             diag.function = funcName_;
             results_.push_back(std::move(diag));
             if (const VarDecl* var = asVar(arg))
                 noteTargets_.emplace_back(results_.size() - 1, var);
         }
     }
-
     void checkCallContracts(const CallExpr* call, const State& before,
+
                             ASTContext& ctx) {
         const FunctionDecl* callee = call->getDirectCallee();
-        if (!callee) return;
+        if (!callee) {
+            checkGuardContracts(call, nullptr, before, ctx, {});
+            return;
+        }
 
         auto parsed = codeskeptic::allContractClausesForDecl(callee, ctx);
         std::vector<codeskeptic::RequiresInfo> enforced;
@@ -1149,18 +1423,22 @@ public:
 
         NullVarState flat =
             codeskeptic::flattenGuarded(before, mergeNullVals);
+        const unsigned argOffset = callParamArgOffset(call, callee);
 
         for (const auto& info : req.enforced) {
             if (info.kind == codeskeptic::RequiresInfo::Kind::NonZeroParam)
                 continue;  // DivByZero owns the zero domain
-            if (info.paramIndex >= call->getNumArgs()) continue;
-            const Expr* arg = call->getArg(info.paramIndex);
+            const unsigned argIndex = info.paramIndex + argOffset;
+            if (argIndex >= call->getNumArgs()) continue;
+            const Expr* arg = call->getArg(argIndex);
 
             if (info.kind ==
                 codeskeptic::RequiresInfo::Kind::NonNullUnlessCond) {
-                if (info.condParamIndex >= call->getNumArgs()) continue;
+                const unsigned condArgIndex =
+                    info.condParamIndex + argOffset;
+                if (condArgIndex >= call->getNumArgs()) continue;
                 auto lit = codeskeptic::intLiteralArg(
-                    call->getArg(info.condParamIndex));
+                    call->getArg(condArgIndex));
                 if (!lit) continue;  // non-literal escape: conservative
                 if (codeskeptic::evalCmp(*lit, info.condOp,
                                         info.condLiteral))

@@ -13,7 +13,12 @@
 using namespace codeskeptic;
 using RN = SummaryRegistry::ReturnNullness;
 using RZ = SummaryRegistry::ReturnZeroness;
+using RO = SummaryRegistry::ReturnOwnership;
 using PE = SummaryRegistry::ParamEffect;
+using PA = SummaryRegistry::ParamAccess;
+using PO = SummaryRegistry::ParamOwnership;
+using PPre = SummaryRegistry::ParamPrecondition;
+using PPost = SummaryRegistry::ParamPostcondition;
 
 namespace {
 
@@ -25,11 +30,13 @@ std::string writeFile(const std::string& name, const std::string& body) {
 }
 
 SummaryRegistry::FunctionSummary makeSum(RN rn, RZ rz,
-                                         std::vector<PE> params = {}) {
+                                         std::vector<PE> params = {},
+                                         int returnAliasParam = -1) {
     SummaryRegistry::FunctionSummary s;
     s.returnNullness = rn;
     s.returnZeroness = rz;
     s.params = std::move(params);
+    s.returnAliasParam = returnAliasParam;
     return s;
 }
 
@@ -75,6 +82,149 @@ TEST(SummaryDiffTest, AlwaysZeroClaimGained_Strengthened) {
     ASSERT_EQ(result.strengthened, 1u);
     EXPECT_NE(result.changes[0].detail.find("AlwaysZero"),
               std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasClaimLostIsWeakened) {
+    SummaryMap oldMap{
+        {"identity/1",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    SummaryMap newMap{
+        {"identity/1", makeSum(RN::Unknown, RZ::Unknown)}};
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: param#0 -> none"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasClaimGainedIsStrengthened) {
+    SummaryMap oldMap{
+        {"identity/1", makeSum(RN::Unknown, RZ::Unknown)}};
+    SummaryMap newMap{
+        {"identity/1",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    auto result = diffSummaries(oldMap, newMap);
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: none -> param#0"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasSourceChangeIsWeakened) {
+    SummaryMap oldMap{
+        {"choose/2",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    SummaryMap newMap{
+        {"choose/2",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/1)}};
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: param#0 -> param#1"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnOwnershipLossOrChangeIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown);
+    oldSum.returnOwnership = RO::Owned;
+    auto lostSum = oldSum;
+    lostSum.returnOwnership = RO::Unknown;
+    auto changedSum = oldSum;
+    changedSum.returnOwnership = RO::Borrowed;
+
+    EXPECT_EQ(diffSummaries({{"make/0", oldSum}},
+                            {{"make/0", lostSum}}).weakened,
+              1u);
+    EXPECT_EQ(diffSummaries({{"make/0", oldSum}},
+                            {{"make/0", changedSum}}).weakened,
+              1u);
+}
+
+TEST(SummaryDiffTest, ParamAccessAndOwnershipGainsAreStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramAccesses = {PA::Unknown};
+    oldSum.paramOwnerships = {PO::Unknown};
+    auto newSum = oldSum;
+    newSum.paramAccesses = {PA::Writes};
+    newSum.paramOwnerships = {PO::Consumed};
+
+    auto result = diffSummaries({{"consume/1", oldSum}},
+                                {{"consume/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+    EXPECT_NE(result.changes[0].detail.find("param#0.access"),
+              std::string::npos);
+    EXPECT_NE(result.changes[0].detail.find("param#0.ownership"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ParamOwnershipChangeRequiresCallerRecheck) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramOwnerships = {PO::Borrowed};
+    auto newSum = oldSum;
+    newSum.paramOwnerships = {PO::Transferred};
+
+    auto result = diffSummaries({{"keep/1", oldSum}},
+                                {{"keep/1", newSum}});
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.ownership: Borrowed -> Transferred"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, AddedParameterPreconditionIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    auto newSum = oldSum;
+    newSum.paramPreconditions = {PPre::NonNullCrash};
+    SummaryMap oldMap{{"consume/1", oldSum}};
+    SummaryMap newMap{{"consume/1", newSum}};
+
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.precondition: None -> NonNullCrash"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, SaferParameterPreconditionIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramPreconditions = {PPre::NonNullCrash};
+    auto newSum = oldSum;
+    newSum.paramPreconditions = {PPre::NonNullRejected};
+    SummaryMap oldMap{{"consume/1", oldSum}};
+    SummaryMap newMap{{"consume/1", newSum}};
+
+    auto result = diffSummaries(oldMap, newMap);
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+}
+
+TEST(SummaryDiffTest, ParameterPostconditionLossOrChangeIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramPostconditions = {PPost::NonNull};
+    auto lostSum = oldSum;
+    lostSum.paramPostconditions = {PPost::Unknown};
+    auto changedSum = oldSum;
+    changedSum.paramPostconditions = {PPost::Null};
+
+    auto lost = diffSummaries({{"bind/1", oldSum}},
+                              {{"bind/1", lostSum}});
+    auto changed = diffSummaries({{"bind/1", oldSum}},
+                                 {{"bind/1", changedSum}});
+    EXPECT_EQ(lost.weakened, 1u);
+    EXPECT_EQ(changed.weakened, 1u);
+}
+
+TEST(SummaryDiffTest, ParameterPostconditionGainIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    auto newSum = oldSum;
+    newSum.paramPostconditions = {PPost::NonNull};
+
+    auto result = diffSummaries({{"bind/1", oldSum}},
+                                {{"bind/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
 }
 
 TEST(SummaryDiffTest, DirectionlessDrift_Changed) {
@@ -154,4 +304,56 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     std::ostringstream out2;
     EXPECT_EQ(reportSummaryDiff("/no/such.txt", newPathWeak, out2,
                                 /*gateWeakened=*/false), 2);
+}
+
+TEST(SummaryDiffTest, AddedPossibleFieldWriteIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet oldFields;
+    oldFields.known = true;
+    oldFields.fields = {"other"};
+    oldSum.paramFieldWrites = {oldFields};
+
+    auto newSum = oldSum;
+    newSum.paramFieldWrites[0].fields.insert("guard");
+    auto result = diffSummaries({{"touch/1", oldSum}},
+                                {{"touch/1", newSum}});
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.fieldWrites: {other} -> {guard,other}"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, RemovedPossibleFieldWriteIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet fields;
+    fields.known = true;
+    fields.fields = {"guard", "other"};
+    oldSum.paramFieldWrites = {fields};
+
+    auto newSum = oldSum;
+    newSum.paramFieldWrites[0].fields.erase("guard");
+    auto result = diffSummaries({{"touch/1", oldSum}},
+                                {{"touch/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+}
+
+TEST(SummaryDiffTest, ExactFieldWritesLostIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet exact;
+    exact.known = true;
+    oldSum.paramFieldWrites = {exact};
+    auto unknownSum = oldSum;
+    unknownSum.paramFieldWrites = {SummaryRegistry::FieldWriteSet{}};
+
+    auto lost = diffSummaries({{"inspect/1", oldSum}},
+                              {{"inspect/1", unknownSum}});
+    ASSERT_EQ(lost.weakened, 1u);
+    EXPECT_NE(lost.changes[0].detail.find(
+                  "param#0.fieldWrites: {} -> unknown"),
+              std::string::npos);
+
+    auto gained = diffSummaries({{"inspect/1", unknownSum}},
+                                {{"inspect/1", oldSum}});
+    ASSERT_EQ(gained.strengthened, 1u);
 }

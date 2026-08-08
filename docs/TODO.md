@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = be577ab
-uçuşta = phase-precision-debt
+base   = e75bcab
+uçuşta = phase-interprocedural-v2
 ```
 <!-- cs:state-end -->
 
@@ -42,15 +42,31 @@ kolateral sıfır. BULGU 3 kod değil önkoşul; backlog #1'e işlendi.
 Yan ürün: corpus pin'i 53→54 merkeze alındı (895c813'ten beri
 sürükleniyordu, toleransın içinde sessizce).
 
-## Sıradaki iş
+## Next work
 
-Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. Return-alias
-ilişkileri, parametre precondition/postcondition özetleri, yan etkiler ve
-ownership transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
-function-pointer çözümü ve kütüphane model dosyaları küçük dilimler halinde
-eklenecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
-bulgu artışı olmayacak.
+All seven Phase 4 interprocedural-engine-v2 slices are locally RED-to-GREEN
+complete: exact pointer return identity (v7), parameter pre/postconditions
+(v8), independent access/ownership relations (v9), the callee-first
+call-graph SCC fixed point, field-sensitive writes (v10), controlled local
+function-pointer targets, and opt-in library model files.
 
+Library models reuse the strict summary schema through repeatable
+`--model-file` / `model_file` inputs. They load before harvested summaries,
+merge conflicts conservatively, skip snapshot-freshness checks, and make the
+verdict unavailable on missing or malformed input. They are reviewed trusted
+assumptions, not verifier proof; there are no built-in models, new grammar, or
+native pointer/heap/alias/ownership/lifetime semantics in this slice.
+
+The exact local gates are 977/977 tests through both CTest and the direct
+single-process binary, thesis `clean_fp=0` with `bug_caught=9/15`, a clean
+47/47-TU self-scan, cJSON 54 findings (76 attempted / 35 analyzed / 41
+explicitly accepted broken), and tinyxml2 9 findings (3/3). Corpus diagnostic-
+site deltas versus Phase 4.6 are exactly zero additions and zero removals.
+
+PR #131 remains the Phase 4 integration boundary. After its exact pushed
+commit satisfies every required check, merge Phase 4 and begin Phase 5's
+general dataflow-engine work from the canonical PLAN without reopening the
+completed Phase 4 slices.
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili

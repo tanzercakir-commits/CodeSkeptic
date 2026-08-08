@@ -26,11 +26,18 @@ SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
 
 `WEAKENED` means a strong claim callers may rely on was lost — a
 function that could never return null now can, a callee that used to
-be read-only now stores its argument. The exit code is `1` in that
-case, so the diff doubles as a CI gate: *this change silently altered
-function contracts; the callers deserve a look*. Gained claims report
-as `STRENGTHENED` (informational), directionless drifts as `CHANGED`,
-and signature changes appear as `REMOVED`+`ADDED` (the key includes
+be read-only now stores its argument. Losing or changing an exact pointee
+access, parameter-ownership, return-ownership, return-alias, or output
+postcondition claim is also a weakening. Adding a possible field write,
+replacing an exact field set with unknown, or changing to an incomparable
+set is likewise WEAKENED; removing possible writes is STRENGTHENED.
+Preconditions use the caller-compatibility direction: adding a new non-null obligation, or changing
+rejection into crash, is WEAKENED; removing/softening it is STRENGTHENED. The
+exit code is `1` for a weakening,
+so the diff doubles as a CI gate: *this change silently altered function
+contracts; the callers deserve a look*. Other gained claims report as
+`STRENGTHENED` (informational), directionless drifts as `CHANGED`, and
+signature changes appear as `REMOVED`+`ADDED` (the key includes
 arity — an arity change breaks callers anyway).
 
 The gate is configurable for adoption: `--gate warn` (or
@@ -39,6 +46,35 @@ report but exits `0`, so a project can watch its contract drift
 before letting it break CI. The default stays `error` — and an
 unreadable summary file is exit `2` regardless: a gate that cannot
 read its input never looks green.
+
+## Opt-in library models in CI
+
+A repository can version reviewed declarations for body-less platform or
+vendor functions and load them on every analysis:
+
+```bash
+codeskeptic src/ --model-file models/platform.csk \
+    --model-file models/vendor.csk
+```
+
+The flag is repeatable and is forwarded normally when placed after `--` in
+the diff/review scripts. Model files use the same deterministic strict schema
+as `--summary-out`, so `--summary-diff old.csk new.csk` can review their
+semantic drift. Key collisions across models, harvested summaries, and the
+current run merge conservatively; ordering is not an override mechanism.
+
+Treat model changes like source changes. A strong declaration is a reviewed
+assumption and can remove a finding; it is not proof that the library
+implementation satisfies the row. CI should pin the files in the repository,
+show their semantic diff, and require human review before accepting generated
+or AI-proposed changes. CodeSkeptic never promotes a proposal into a model or
+accepted contract automatically.
+
+A missing or malformed requested model sets the ordinary
+`summary_load_failed` evidence bit and exits `2`, even if the remaining
+analysis produced diagnostics. Model files have no source timestamp check
+because they are declarations rather than harvested snapshots. There are no
+built-in models or implicit library-name semantics.
 
 ## Repository PR measurement
 
@@ -114,9 +150,11 @@ Both analyzer runs receive identical settings (arguments after `--` are
 forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
 `--summary-in .codeskeptic-summaries` to review with whole-project
 knowledge, …); a delta between two differently-configured runs would
-not be a delta. Known limits, stated rather than hidden: a header-only
-change analyzes no TU (it is listed in the coverage section), and
-deleted files' base-only findings are not counted as fixed.
+not be a delta. Loaded summaries also compose through a controlled automatic
+local function-pointer target when that target set is closed. Unresolved
+indirect dispatch remains conservative. Known limits are stated rather than
+hidden: a header-only change analyzes no TU (it is listed in the coverage
+section), and deleted files' base-only findings are not counted as fixed.
 
 A minimal GitHub Actions gate:
 
