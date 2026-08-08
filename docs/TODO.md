@@ -12,16 +12,18 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 530e8f2
-uçuşta = phase-v048-docker-release-identity
+base   = a14b5fb
+uçuşta = phase-v048-docker-republish-context
 ```
 <!-- cs:state-end -->
 
 Serbest not (insanda kalır): Faz 0 analyzer/release zinciri v0.4.8 olarak
 `530e8f2` commitinden yayımlandı; üç platform, Action ve WSL2 kapıları yeşil.
-Docker image/smoke doğru olmasına rağmen workflow-run varsayılan dal kimliğini
-`v0.4.9` diye yayınladı. Exact release SHA/tag binding hotfix'i hazırlanıyor;
-yanlış GHCR etiketi doğru `v0.4.8` republish sonrasında kaldırılacak.
+Exact release SHA/tag binding PR #123 ile indi. İlk korumalı republish, eski
+etiketin Dockerfile'ının yeni version arg'ını aktarmadığını yakalayıp registry
+push'undan önce kırmızı oldu; güncel güvenilir tarif + immutable tag kaynak
+bağlamı düzeltmesi hazırlanıyor. Doğru `v0.4.8` republish sonrasında yanlış
+GHCR `v0.4.9` paket versiyonu kaldırılacak.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
