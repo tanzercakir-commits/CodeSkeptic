@@ -42,10 +42,19 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      # Keep the workflow revision's Dockerfile as the trusted build recipe.
+      # Historical release tags may predate recipe-only fixes (for example the
+      # explicit version build argument), so the immutable tag is checked out
+      # separately and used only as the image's source context.
+      - name: Checkout workflow source
+        uses: actions/checkout@v4
+
+      - name: Checkout exact release source
+        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
         with:
-          # workflow_run otherwise checks out a possibly newer default branch.
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          path: release-source
 
       - name: Build image
         id: build
@@ -54,17 +63,23 @@ jobs:
         run: |
           set -o pipefail
           args=()
+          context="."
           if [ -n "$RELEASE_TAG" ]; then
             [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
             args+=(--build-arg "CODESKEPTIC_VERSION_OVERRIDE=${RELEASE_TAG#v}")
+            context="release-source"
           fi
-          docker build "${args[@]}" -t codeskeptic:test . 2>&1 | tee /tmp/docker_build.log
+          docker build "${args[@]}" -f "$PWD/Dockerfile" -t codeskeptic:test "$context" 2>&1 | tee /tmp/docker_build.log
 
       - name: Smoke (fresh image, demo.c, exit 1 + findings)
         id: smoke
         run: |
+          docs="$PWD/docs"
+          if [ -d "$PWD/release-source/docs" ]; then
+            docs="$PWD/release-source/docs"
+          fi
           code=0
-          out=$(docker run --rm -v "$PWD/docs:/work:ro" codeskeptic:test demo.c 2>&1) || code=$?
+          out=$(docker run --rm -v "$docs:/work:ro" codeskeptic:test demo.c 2>&1) || code=$?
           echo "$out" | tee /tmp/docker_smoke.log
           echo "exit_code=$code" >> /tmp/docker_smoke.log
           test "$code" -eq 1

@@ -44,6 +44,17 @@ arbitrary phase commit. A new `DockerWorkflowContract` regression pins the
 source SHA, override, public-release check and pushed tag. No analyzer or image
 payload behavior changed.
 
+The first guarded manual republish (`31235061132`) checked out `v0.4.8`, built
+the image and passed the fresh-image analysis smoke, then stopped before either
+registry push. Its log showed why: the immutable v0.4.8 source contains the
+CMake override but its historical Dockerfile predates the `ARG` that forwards
+that override, so the image honestly reported `0.4.9-dev`; the tag-equality
+gate rejected it. Release rebuilds now keep the workflow revision's Dockerfile
+as the trusted recipe while using the immutable release checkout as the build
+context. This preserves exact source identity and also lets recipe-only release
+repairs rebuild older tags. A regression requires the two checkouts and their
+separate recipe/context roles.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is
