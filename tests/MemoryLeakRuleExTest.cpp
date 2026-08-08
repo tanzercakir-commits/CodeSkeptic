@@ -1036,6 +1036,59 @@ TEST(AliasEscapeTest, FreedThroughAlias_NoLeak) {
     ASSERT_EQ(results.size(), 0);
 }
 
+TEST(AliasEscapeTest, FreedThroughTransitiveShadowAlias_NoLeak) {
+    // Juliet variant 31: the allocation travels through two local aliases,
+    // and the second shadows the original name. The inner free releases it.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* data = (int*)malloc(16);
+            int* dataCopy = data;
+            {
+                int* data = dataCopy;
+                free(data);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
+TEST(AliasEscapeTest, TransitiveShadowAliasWithoutFree_LeakStaysVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        void f() {
+            int* data = (int*)malloc(16);
+            int* dataCopy = data;
+            {
+                int* data = dataCopy;
+                (void)data;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AliasEscapeTest, FreedThroughLocalReferenceAlias_NoLeak) {
+    // Juliet variant 33: a local T*& aliases the owning pointer, then a
+    // shadow local is freed through that reference.
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            char* data = new char;
+            char*& dataRef = data;
+            {
+                char* data = dataRef;
+                delete data;
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 0);
+}
+
 TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
     // DOCUMENTED accepted FN of the exit-time alias-free check:
     // reusing the alias variable for a SECOND allocation and freeing

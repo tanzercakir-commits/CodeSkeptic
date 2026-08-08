@@ -120,6 +120,8 @@ ZeroState evaluateAssignedValue(const Expr* expr) {
         using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
         if (const auto* summary = codeskeptic::SummaryRegistry::instance()
                                       .lookup(call->getDirectCallee())) {
+            if (summary->returnZeroness == RZ::AlwaysZero)
+                return ZeroState::MaybeZero;
             if (summary->returnZeroness == RZ::NeverZero)
                 return ZeroState::NonZero;
             if (summary->returnZeroness == RZ::MaybeZero)

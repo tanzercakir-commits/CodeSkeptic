@@ -515,6 +515,28 @@ TEST(CrossTUTest, ReadsOnlyCallee_AcrossTU_LeakVisible) {
     EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
+TEST(CrossTUTest, AlwaysZeroReturnPrunesFalseHelperGuard) {
+    // Juliet variant 11: the helper body lives in testcasesupport/io.c.
+    // Whole-program summaries carry the exact zero result so the caller's
+    // else/free path is recognized as the only feasible one.
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int globalReturnsFalse(void) { return 0; }
+    )", R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int globalReturnsFalse(void);
+        void goodB2G(void) {
+            int* data = (int*)malloc(16);
+            if (globalReturnsFalse()) {
+            } else {
+                free(data);
+            }
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
 TEST(CrossTUTest, StaticCallee_NotShared) {
     // The static (file-local) make in the callee TU and the caller TU's
     // extern declaration are DIFFERENT functions — the summary MUST NOT
@@ -787,7 +809,7 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v5\n"
+              "codeskeptic-summaries v6\n"
               "alpha/1\tN\tR\tU\t-\t-\t-\n"
               "beta/2\tM\tOF\tM\t-\t-\t-\n"
               "gamma/0\tU\t-\tN\t-\t-\t-\n");
@@ -808,7 +830,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v5\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v6\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -830,7 +852,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v5\nfoo/1\tU\tO\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v6\nfoo/1\tU\tO\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -873,7 +895,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v5\nkeep/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v6\nkeep/1\tN\tR\tU\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1399,6 +1421,36 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
         "codeskeptic-summaries v5\n"
         "bad/1\tN\tR\tU\t-\t-\t0\n";
     auto p = writePersistFile("sum_v5_nf_bad.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(p, parsed));
+}
+
+// --- v6 persistence: exact always-zero return ---
+
+TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v6\n"
+        "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\n";
+    auto p = writePersistFile("sum_v6_always_zero.txt", content);
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
+    EXPECT_EQ(parsed["globalReturnsFalse/0"].returnZeroness,
+              SummaryRegistry::ReturnZeroness::AlwaysZero);
+
+    SummaryRegistry& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(p));
+    auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(out));
+    EXPECT_EQ(readWholeFile(out), content);
+}
+
+TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
+    GlobalStoreGuard guard;
+    auto p = writePersistFile(
+        "sum_v5_reject_always_zero.txt",
+        "codeskeptic-summaries v5\n"
+        "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\n");
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     EXPECT_FALSE(SummaryRegistry::parseSummaryFile(p, parsed));
 }

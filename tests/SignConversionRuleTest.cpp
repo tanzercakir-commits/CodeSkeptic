@@ -160,6 +160,83 @@ TEST(SignConversionRuleTest, NegativityGuard_Silent) {
     EXPECT_EQ(results.size(), 0u);
 }
 
+TEST(SignConversionRuleTest, SafePostCastRangeUse_Silent) {
+    // rtp2httpd keepalive body-skip shape: a wrapped negative fails the
+    // upper-bound test and the converted value never reaches the sink.
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        void consume(unsigned long);
+        void f(const char* text, unsigned long available) {
+            unsigned long length = (unsigned long)atoi(text);
+            if (length > 0 && length <= available) {
+                consume(length);
+            }
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(SignConversionRuleTest, PostCastRangeDoesNotCoverLaterUse_Reports) {
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        void consume(unsigned long);
+        void f(const char* text, unsigned long available) {
+            unsigned long length = (unsigned long)atoi(text);
+            if (length > 0 && length <= available) consume(length);
+            consume(length);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "sign-conversion");
+}
+
+TEST(SignConversionRuleTest, PositiveOnlyPostCastGuard_Reports) {
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        void consume(unsigned long);
+        void f(const char* text) {
+            unsigned long length = (unsigned long)atoi(text);
+            if (length > 0) consume(length);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(SignConversionRuleTest, DisjunctivePostCastGuard_Reports) {
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        void consume(unsigned long);
+        void f(const char* text, unsigned long available, int bypass) {
+            unsigned long length = (unsigned long)atoi(text);
+            if (length <= available || bypass) {
+                consume(length);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "sign-conversion");
+}
+
+TEST(SignConversionRuleTest, ArithmeticPostCastBound_Reports) {
+    SignConversionRule rule;
+    auto results = runRule(rule, R"(
+        extern int atoi(const char*);
+        void consume(unsigned long);
+        void f(const char* text, unsigned long available,
+               unsigned long slack) {
+            unsigned long length = (unsigned long)atoi(text);
+            if (length <= available + slack) {
+                consume(length);
+            }
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "sign-conversion");
+}
 // --- Unsigned source: no sign to convert, not a site. ---
 TEST(SignConversionRuleTest, UnsignedSource_Silent) {
     SourceScope scope({"read_len"});
@@ -258,7 +335,7 @@ TEST(SignConversionRuleTest, SizeTTypedefSink_StillReports) {
     SourceScope scope({"read_header_field"});
     SignConversionRule rule;
     auto results = runRule(rule, R"(
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* memcpy(void*, const void*, size_t);
         extern int read_header_field();
         void f(char* dst, const char* src) {
