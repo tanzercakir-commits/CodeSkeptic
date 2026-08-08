@@ -9,6 +9,8 @@ With `SDKROOT=/nonexistent/sdk`, the packaged CLI correctly returned exit 2
 and printed `VERDICT UNAVAILABLE`; the workflow still searched for the retired
 `ANALYSIS FAILED` phrase and therefore failed after the product checks passed.
 The Linux lane, including its two clean-container relocation smokes, passed.
+Windows likewise passed build, all tests, version, package, relocation and
+draft-upload checks; publish was correctly skipped because macOS was red.
 
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
