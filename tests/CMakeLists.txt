@@ -83,6 +83,9 @@ if(NOT WIN32)
     add_test(NAME ReleaseWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/ReleaseWorkflowTest.py)
+    add_test(NAME DockerWorkflowContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/DockerWorkflowTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)

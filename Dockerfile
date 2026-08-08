@@ -7,6 +7,7 @@
 # analyzing code needs the target's own headers, exactly like a
 # compiler. Mount your project at /work (the default workdir).
 FROM ubuntu:24.04 AS build
+ARG CODESKEPTIC_VERSION_OVERRIDE=""
 RUN apt-get update && apt-get install -y --no-install-recommends \
         llvm-20-dev libclang-20-dev clang-20 libzstd-dev zlib1g-dev \
         cmake ninja-build g++ ca-certificates \
@@ -16,6 +17,7 @@ RUN cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
         -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc" \
         -DCODESKEPTIC_BUILD_TESTS=OFF \
+        -DCODESKEPTIC_VERSION_OVERRIDE="$CODESKEPTIC_VERSION_OVERRIDE" \
     && cmake --build /build \
     && bash /src/scripts/package_release.sh /build/src/codeskeptic /dist clang-20
 

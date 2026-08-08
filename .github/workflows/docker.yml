@@ -1,8 +1,9 @@
 name: Docker
 
 # phase* pushes and PRs touching the image: build + smoke only (the
-# gate). Tag pushes additionally publish to ghcr.io as <version> and
-# latest. The smoke is the same contract as the release tarball's:
+# gate). A successful Release workflow additionally publishes to
+# ghcr.io as its exact tag and latest. The smoke is the same contract
+# as the release tarball's:
 # analyze docs/demo.c in the fresh image -> exactly exit 1, findings
 # present.
 on:
@@ -22,6 +23,12 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published release tag to rebuild (for example v0.4.8)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -36,12 +43,22 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # workflow_run otherwise checks out a possibly newer default branch.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
 
       - name: Build image
         id: build
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
         run: |
           set -o pipefail
-          docker build -t codeskeptic:test . 2>&1 | tee /tmp/docker_build.log
+          args=()
+          if [ -n "$RELEASE_TAG" ]; then
+            [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            args+=(--build-arg "CODESKEPTIC_VERSION_OVERRIDE=${RELEASE_TAG#v}")
+          fi
+          docker build "${args[@]}" -t codeskeptic:test . 2>&1 | tee /tmp/docker_build.log
 
       - name: Smoke (fresh image, demo.c, exit 1 + findings)
         id: smoke
@@ -65,28 +82,26 @@ jobs:
           git commit -qm "ci diagnostics: docker @ ${{ github.sha }}" || true
           git push --force origin "HEAD:refs/ci-logs/${{ github.sha }}/docker"
 
-      - name: Publish to ghcr.io (releases; manual republish lane)
-        # The [docker-publish] escape hatch exists for exactly one
-        # failure mode: the Release chain is green but THIS publish
-        # step lost a coin toss with ghcr (v0.4.3: build+smoke green,
-        # push failed with no diagnostics possible). Pushing a phase*
-        # branch whose head commit message contains [docker-publish]
-        # re-runs build+smoke and publishes the freshly smoked image —
-        # no full release re-tag needed.
+      - name: Publish exact release identity to ghcr.io
         if: >-
           (github.event_name == 'workflow_run' &&
            github.event.workflow_run.conclusion == 'success') ||
-          (github.event_name == 'push' &&
-           contains(github.event.head_commit.message, '[docker-publish]'))
+          github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/codeskeptic
+          RELEASE_TAG: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || inputs.release_tag }}
         run: |
-          echo "${{ github.token }}" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          IMG=ghcr.io/${{ github.repository_owner }}/codeskeptic
+          draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)
+          test "$draft" = "false"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          IMG="$IMAGE"
           VER=$(docker run --rm codeskeptic:test --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          docker tag codeskeptic:test "$IMG:v$VER"
+          test "$RELEASE_TAG" = "v$VER"
+          docker tag codeskeptic:test "$IMG:$RELEASE_TAG"
           docker tag codeskeptic:test "$IMG:latest"
-          docker push "$IMG:v$VER"
+          docker push "$IMG:$RELEASE_TAG"
           docker push "$IMG:latest"
 
       - name: Mirror job status to refs/status/*
