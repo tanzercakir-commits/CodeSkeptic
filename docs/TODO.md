@@ -65,10 +65,20 @@ measurable RED-to-GREEN slices:
    Gates: focused 21/21, direct and CTest 998/998, exact CLI smoke,
    thesis `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan,
    cJSON 54 and tinyxml2 9.
-2. **Next:** inspect the existing summary/model axes, then declare the exact
-   second-slice file set before adding wrapper propagation and explicit
-   custom resource models. Reuse the strict model grammar; do not create a
-   second grammar or implicit ownership authority.
+2. **Wrapper propagation and explicit models — locally complete.** The
+   existing v10 return/parameter ownership axes are the only declaration
+   channel. Visible integer wrapper chains now compose locally and across TUs
+   through the existing SCC solver; bodyless acquire/consume/transfer APIs
+   require an explicit reviewed v10 model. Conditional/conflicting effects
+   degrade to `Unknown`, and `Unknown`/`Borrowed` never suppress a leak.
+   The exact file set stayed `src/engine/FunctionSummary.cpp`,
+   `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
+   `docs/engine.md`, `docs/usage.md`, this TODO, and
+   `docs/devlog/changelog.md`; no header/API, configuration, grammar,
+   ContractRule, or default model changed. Gates: RED 5/29, focused 33/33,
+   summary/model/contract 129/129, direct and CTest 1010/1010, exact CLI
+   smoke 2 report-only findings, thesis `clean_fp=0` / `bug_caught=9/15`,
+   clean 48/48-TU self-scan, cJSON 54, and tinyxml2 9.
 3. Run the pinned libarchive validation, manually triage every new finding,
    and close Phase 5 only at measured precision of at least 0.90 with no
    regression in the existing local, thesis, self-scan, or corpus gates.
@@ -80,6 +90,15 @@ analyzer lifetime beyond the current contract referee. Counts are proposals
 0, eligible 0, rejected 0, unsupported 40; no `cs: ai` proposal became
 accepted intent. The independent RED suite found the planned feature gap and
 the namespace/method precision assumption; both are closed.
+
+The second slice's shadow audit likewise found no eligible function among 46
+new or materially changed C++ functions. They depend on Clang type/AST/CFG
+identity, enum/resource lattices, containers, summary-registry state,
+filesystem streams, or analyzer lifetime beyond the current referee. Counts:
+proposals 0, eligible 0, rejected 0, unsupported 46. The independent RED found
+the planned wrapper/model gap; precision review removed an ordinary-integer
+Borrowed overclaim. Candidate contracts: none. No `cs: ai` proposal became
+accepted intent.
 
 ## Açık kullanıcı kararları
 
@@ -93,7 +112,8 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ```
 1. CWE-775 strict — Phase 5 aktif. Doğrudan POSIX integer-resource domain'i
-   tamamlandı; wrapper/custom model ve libarchive triaj/precision kapısı açık.
+   wrapper/custom model ile birlikte tamamlandı; libarchive triaj/precision
+   kapısı açık.
    > BULGU 3 (libarchive, 2026-08-01): 43 ham fd açıcı ölçüldü
    > (open 28 · openat 8 · dup 4 · mkstemp 3). Pointer domain yalnızca
    > fopen/opendir/tmpfile toplam 3 kaynağı görüyordu; Phase 5 çıkış ölçümü

@@ -102,6 +102,23 @@ aliases are Borrowed; mixed, opaque, capture, and conflicting flows remain
 Unknown. MemoryLeak consumes the ownership relations, and ContractRule now
 verifies `owns`, `borrows`, and `returns owned` against the same facts.
 
+Phase 5 reuses these v10 ownership columns for POSIX integer descriptors;
+it does not add a second summary grammar. An integer return is `Owned` only
+when every non-`-1` return path comes from global `open`, `openat`, `socket`,
+`dup`, or `mkstemp`, from a visible wrapper with the same proven relation,
+or from an explicit loaded model. An integer parameter is `Consumed` or
+`Transferred` only when every normal exit agrees that it reaches `close` or
+non-local storage, respectively. Wrapper chains compose through the existing
+SCC solver and persist across TUs. Conditional, conflicting, ambiguous aliases,
+opaque calls, or unresolved effects stay `Unknown`; `Unknown` and `Borrowed`
+never discharge the caller's descriptor responsibility. `shutdown` remains
+a borrow because it does not release the descriptor.
+
+Bodyless/custom descriptor APIs require a reviewed v10 model. Such a row is
+trusted declaration input, not inferred proof, and duplicate rows still merge
+toward Unknown. This descriptor reuse neither changes the contract grammar
+nor claims native pointer, heap, alias, ownership, or lifetime parity.
+
 Record pointers and record references carry an additional field-write
 relation: the exact set of one-hop fields that may be written through that
 parameter. Arrow/dot stores, `(*p).field`, clean pointer aliases, field

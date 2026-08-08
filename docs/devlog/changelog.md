@@ -1,5 +1,60 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 5.2 descriptor wrappers and explicit models
+
+Phase 5 now propagates POSIX descriptor ownership through visible wrappers
+and the existing strict v10 model channel. The shared SCC summary solver
+infers `Owned` for non-boolean integer returns only when every non-`-1`
+return path originates at global `open`, `openat`, `socket`, `dup`, or
+`mkstemp`, or at a wrapper with the same proven relation. It infers
+`Consumed` or `Transferred` for integer parameters only when every normal
+exit agrees that the descriptor reaches `close` or non-local storage.
+Conditional, conflicting, opaque, and ambiguous flows remain `Unknown`;
+ordinary integer returns do not acquire a borrowed-resource claim.
+
+`FdResourceRule` consumes those same relations for local, cross-TU, and
+controlled summary calls. `Owned` results become acquisition origins;
+`Consumed` closes an exact origin and `Transferred` escapes it. `Borrowed`
+and `Unknown` never suppress a leak. Exact global POSIX primitives retain
+their built-in meaning, so `shutdown` still borrows and same-named namespace
+functions or methods gain no implicit authority. Bodyless vendor APIs can
+opt in through reviewed v10 `--model-file` rows for acquire, consume, or
+transfer. Duplicate model/harvest rows use the existing conservative join;
+a disagreement falls to `Unknown` instead of allowing the last file to win.
+No header/API, configuration, grammar, ContractRule, default model, or native
+pointer/heap/alias/lifetime claim was added.
+
+RED was recorded before implementation: 5 of 29 focused cases failed exactly
+on acquisition chains, `-1`-neutral acquisition wrappers, consuming wrappers,
+transfer wrappers, and explicit model acquire/consume. GREEN plus precision
+review expanded the matrix to 33/33 with consumer chains, conditional
+consume/transfer negatives, cross-TU acquire/consume, explicit model transfer,
+Borrowed/Unknown non-suppression, and conflicting-model degradation. The
+summary/model/contract regression selection passed 129/129. The exact Windows
+binary and CTest both passed 1010/1010.
+
+The production CLI smoke emitted exactly two experimental/report-only
+`resource-leak` diagnostics for the deliberately leaking visible and modeled
+wrappers, while wrapper/model close and transfer twins stayed clean; exit was
+0. The frozen thesis receipt remains `clean_fp=0`, `bug_caught=9/15`, and
+`total_findings=11`. Self-scan is clean and complete across 48/48 translation
+units with zero broken TUs and zero incomplete functions. Corpus pins remain
+cJSON 54 findings (76 enumerated, 41 explicitly accepted broken, 35 analyzed)
+and tinyxml2 9 findings (3/3 analyzed).
+
+Contract-first shadow audit considered 46 new or materially changed C++
+functions: 35 summary-domain functions/methods including `summarizeFunction`,
+eight FD-rule functions/methods, and three explicit test helpers. Dogfood was
+not applicable because every candidate depends on Clang `QualType`/AST/CFG
+identity, enum lattice relations, containers, call-summary registry state,
+filesystem streams, or analyzer lifetime beyond the current deterministic
+contract referee. Counts: proposals 0, eligible 0, rejected 0, unsupported
+46. No proposal exposed an implementation or assumption problem; the
+independent RED suite exposed the planned feature gap, and precision review
+removed a potential ordinary-integer Borrowed overclaim. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent.
+
 ## 2026-08-08 — Phase 5.1 direct POSIX descriptor lifecycle
 
 CWE-775 now has a separate integer-resource dataflow rule instead of being

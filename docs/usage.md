@@ -250,6 +250,24 @@ lifetime-verification claim from these declarations. See
 [the engine model contract](engine.md#interprocedural-analysis-v2) for a v10
 row example and scope.
 
+A bodyless integer-descriptor API uses the same v10 rows. For example, this
+reviewed model declares an owned descriptor result, a definite consumer, and
+a definite transfer:
+
+```text
+codeskeptic-summaries v10
+vendor_fd_open/0	U	-	U	-	-	-	-	-	-	-	-	O	-
+vendor_fd_close/1	U	O	U	-	-	-	-	O	U	U	C	U	?
+vendor_fd_keep/1	U	O	U	-	-	-	-	O	U	U	T	U	?
+```
+
+The corresponding declarations must return or accept a non-boolean integer.
+`Owned` makes the caller responsible on every non-`-1` result; `Consumed` and
+`Transferred` discharge that responsibility. `Borrowed`, `Unknown`, malformed,
+or conflicting rows never suppress a descriptor leak. These are trusted model
+claims, not facts inferred from the vendor function's name, and CodeSkeptic
+ships no default descriptor model.
+
 Malformed harvested summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the weaker
 claim. A `--summary-in` snapshot may also report stale when analyzed source

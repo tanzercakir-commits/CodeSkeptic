@@ -4,6 +4,7 @@
 #include "core/Messages.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
+#include "engine/FunctionSummary.h"
 
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
@@ -124,11 +125,26 @@ bool isAcquireName(llvm::StringRef name) {
            name == "dup" || name == "mkstemp";
 }
 
+bool isFdIntegerType(QualType type) {
+    return !type.isNull() && type->isIntegerType() &&
+           !type->isBooleanType();
+}
+
+bool isAcquisitionCall(const CallExpr* call) {
+    if (!call || !isFdIntegerType(call->getType())) return false;
+    if (isAcquireName(calleeName(call))) return true;
+    const auto* summary =
+        codeskeptic::SummaryRegistry::instance().lookup(call);
+    return summary &&
+           summary->returnOwnership ==
+               codeskeptic::SummaryRegistry::ReturnOwnership::Owned;
+}
+
 Origin acquisition(const Expr* expr) {
     if (!expr) return nullptr;
     expr = expr->IgnoreParenImpCasts();
     const auto* call = dyn_cast<CallExpr>(expr);
-    return call && isAcquireName(calleeName(call)) ? call : nullptr;
+    return isAcquisitionCall(call) ? call : nullptr;
 }
 
 const VarDecl* asVar(const Expr* expr) {
@@ -164,6 +180,53 @@ void release(const Binding& binding, State& state) {
         return;
     }
     state.resources[*binding.origins.begin()] = ResourceLife::Closed;
+}
+
+unsigned fdCallParamOffset(const CallExpr* call) {
+    if (!isa_and_nonnull<CXXOperatorCallExpr>(call)) return 0;
+    const auto* method =
+        dyn_cast_or_null<CXXMethodDecl>(call->getDirectCallee());
+    return method && !method->isStatic() ? 1u : 0u;
+}
+
+void applyOwnershipToExpr(
+        const Expr* expr,
+        codeskeptic::SummaryRegistry::ParamOwnership ownership,
+        State& state) {
+    using ParamOwnership =
+        codeskeptic::SummaryRegistry::ParamOwnership;
+    if (ownership == ParamOwnership::Borrowed ||
+        ownership == ParamOwnership::Unknown)
+        return;
+    if (Origin origin = acquisition(expr)) {
+        state.resources[origin] =
+            ownership == ParamOwnership::Consumed
+                ? ResourceLife::Closed : ResourceLife::Escaped;
+        return;
+    }
+    const Binding binding = bindingFor(expr, state);
+    if (ownership == ParamOwnership::Consumed)
+        release(binding, state);
+    else
+        escape(binding, state);
+}
+
+void applyModeledCallEffects(const CallExpr* call, State& state) {
+    const llvm::StringRef direct = calleeName(call);
+    if (isAcquireName(direct) || direct == "close" ||
+        direct == "shutdown")
+        return;
+    const auto* summary =
+        codeskeptic::SummaryRegistry::instance().lookup(call);
+    if (!summary) return;
+    const unsigned offset = fdCallParamOffset(call);
+    for (unsigned argIndex = offset;
+         argIndex < call->getNumArgs(); ++argIndex) {
+        const Expr* arg = call->getArg(argIndex);
+        if (!isFdIntegerType(arg->getType())) continue;
+        applyOwnershipToExpr(
+            arg, summary->paramOwnership(argIndex - offset), state);
+    }
 }
 
 struct FailureEdge {
@@ -231,7 +294,7 @@ struct ResourceInventory : RecursiveASTVisitor<ResourceInventory> {
     std::map<Origin, std::string> names;
 
     bool VisitCallExpr(CallExpr* call) {
-        if (isAcquireName(calleeName(call))) origins.push_back(call);
+        if (isAcquisitionCall(call)) origins.push_back(call);
         return true;
     }
 
@@ -324,13 +387,14 @@ public:
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             const llvm::StringRef name = calleeName(call);
             if (name == "close" && call->getNumArgs() >= 1) {
-                if (Origin origin = acquisition(call->getArg(0))) {
-                    out.resources[origin] = ResourceLife::Closed;
-                } else {
-                    release(bindingFor(call->getArg(0), out), out);
-                }
-            } else if (isAcquireName(name)) {
-                out.resources[call] = ResourceLife::Open;
+                applyOwnershipToExpr(
+                    call->getArg(0),
+                    codeskeptic::SummaryRegistry::ParamOwnership::Consumed,
+                    out);
+            } else {
+                applyModeledCallEffects(call, out);
+                if (isAcquisitionCall(call))
+                    out.resources[call] = ResourceLife::Open;
             }
             // shutdown intentionally has no ownership effect: POSIX still
             // requires close() to release the descriptor itself.
