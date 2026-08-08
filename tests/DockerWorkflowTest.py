@@ -34,7 +34,9 @@ class DockerWorkflowTest(unittest.TestCase):
             workflow,
         )
         self.assertIn(".metadata.container.tags | length", workflow)
-        self.assertEqual(workflow.count("-eq 1"), 4)
+        for name in ("current_before", "matches", "current_after"):
+            with self.subTest(singleton=name):
+                self.assertIn(f'<<<"${name}")" -eq 1', workflow)
         self.assertIn('test "$tag_count" -eq 1', workflow)
         self.assertIn('test "$digest" = "$LEGACY_DIGEST"', workflow)
         self.assertIn("gh api --method DELETE", workflow)
