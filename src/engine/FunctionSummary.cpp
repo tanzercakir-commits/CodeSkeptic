@@ -2388,6 +2388,468 @@ ParamRelations computeParamRelations(const FunctionDecl* func,
     return out;
 }
 
+// --- POSIX integer-resource ownership summaries ---
+//
+// Phase 5 reuses the persisted v10 ownership axes for file descriptors.
+// This is deliberately narrower than native memory ownership: only exact
+// global POSIX primitives, visible wrappers, and reviewed loaded models can
+// create a strong relation.
+
+bool isFdIntegerType(QualType type) {
+    return !type.isNull() && type->isIntegerType() &&
+           !type->isBooleanType();
+}
+
+llvm::StringRef globalFdCalleeName(const FunctionDecl* callee) {
+    if (!callee || isa<CXXMethodDecl>(callee)) return {};
+    const IdentifierInfo* id = callee->getIdentifier();
+    if (!id) return {};
+    if (callee->getQualifiedNameAsString() != id->getName().str()) return {};
+    return id->getName();
+}
+
+bool isFdAcquireName(llvm::StringRef name) {
+    return name == "open" || name == "openat" || name == "socket" ||
+           name == "dup" || name == "mkstemp";
+}
+
+bool isKnownFdPrimitive(llvm::StringRef name) {
+    return isFdAcquireName(name) || name == "close" || name == "shutdown";
+}
+
+bool isMinusOneFdFailure(const Expr* expr) {
+    if (!expr) return false;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* unary = dyn_cast<UnaryOperator>(expr);
+    if (!unary || unary->getOpcode() != UO_Minus) return false;
+    const auto* literal = dyn_cast<IntegerLiteral>(
+        unary->getSubExpr()->IgnoreParenImpCasts());
+    return literal && literal->getValue() == 1;
+}
+
+bool isFdAcquisitionExpr(const Expr* expr,
+                         const SummaryTable& previous) {
+    if (!expr) return false;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* call = dyn_cast<CallExpr>(expr);
+    if (!call || !isFdIntegerType(call->getType())) return false;
+    if (isFdAcquireName(globalFdCalleeName(call->getDirectCallee())))
+        return true;
+    const auto summary = lookupPrev(previous, call);
+    return summary &&
+           summary->returnOwnership == ReturnOwnership::Owned;
+}
+
+enum class FdReturnState { Unknown, Owned, Borrowed, Failure };
+
+FdReturnState mergeFdReturnState(FdReturnState lhs,
+                                 FdReturnState rhs) {
+    if (lhs == rhs) return lhs;
+    if (lhs == FdReturnState::Failure) return rhs;
+    if (rhs == FdReturnState::Failure) return lhs;
+    return FdReturnState::Unknown;
+}
+
+class FdReturnOwnershipAnalysis {
+public:
+    using State = std::map<const VarDecl*, FdReturnState>;
+
+    FdReturnOwnershipAnalysis(std::vector<const VarDecl*> trackedVars,
+                              const SummaryTable& previous)
+        : previous_(previous) {
+        for (const VarDecl* var : trackedVars)
+            initial_[var] = isa<ParmVarDecl>(var)
+                                ? FdReturnState::Borrowed
+                                : FdReturnState::Unknown;
+    }
+
+    State initialState() const { return initial_; }
+
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(initial_.size()) * 4 + 4;
+    }
+
+    State merge(const State& lhs, const State& rhs) const {
+        State out = lhs;
+        for (const auto& [var, value] : rhs) {
+            auto it = out.find(var);
+            if (it == out.end())
+                out[var] = value;
+            else
+                it->second = mergeFdReturnState(it->second, value);
+        }
+        return out;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext&) const {
+        State out = in;
+        if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
+            for (const Decl* decl : declaration->decls()) {
+                const auto* var = dyn_cast<VarDecl>(decl);
+                auto it = var ? out.find(var) : out.end();
+                if (it == out.end()) continue;
+                it->second = var->hasInit()
+                                 ? ownershipOf(var->getInit(), in)
+                                 : FdReturnState::Unknown;
+            }
+        } else if (const auto* assignment =
+                       dyn_cast<BinaryOperator>(stmt)) {
+            if (assignment->isAssignmentOp()) {
+                const auto* var = dyn_cast_or_null<VarDecl>(
+                    asVarOrParam(assignment->getLHS()));
+                auto it = var ? out.find(var) : out.end();
+                if (it != out.end())
+                    it->second = assignment->getOpcode() == BO_Assign
+                                     ? ownershipOf(assignment->getRHS(), in)
+                                     : FdReturnState::Unknown;
+            }
+        } else if (const auto* unary = dyn_cast<UnaryOperator>(stmt)) {
+            if (unary->isIncrementDecrementOp() ||
+                unary->getOpcode() == UO_AddrOf)
+                kill(asVarOrParam(unary->getSubExpr()), out);
+        } else if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            applyCallEffects(call, out);
+        }
+        return out;
+    }
+
+    void refineOnEdge(const Stmt*, bool, State&, ASTContext&) const {}
+
+    void onStatement(const Stmt* stmt, const State& before,
+                     const State&, ASTContext&) {
+        const auto* ret = dyn_cast<ReturnStmt>(stmt);
+        if (ret && ret->getRetValue())
+            contributions.push_back(
+                ownershipOf(ret->getRetValue(), before));
+    }
+
+    std::vector<FdReturnState> contributions;
+
+private:
+    FdReturnState ownershipOf(const Expr* expr,
+                              const State& state) const {
+        if (!expr) return FdReturnState::Unknown;
+        if (isFdAcquisitionExpr(expr, previous_))
+            return FdReturnState::Owned;
+        if (isMinusOneFdFailure(expr)) return FdReturnState::Failure;
+        expr = expr->IgnoreParenImpCasts();
+        if (const auto* var = dyn_cast_or_null<VarDecl>(
+                asVarOrParam(expr))) {
+            auto it = state.find(var);
+            return it == state.end() ? FdReturnState::Borrowed
+                                     : it->second;
+        }
+        if (const auto* conditional = dyn_cast<ConditionalOperator>(expr))
+            return mergeFdReturnState(
+                ownershipOf(conditional->getTrueExpr(), state),
+                ownershipOf(conditional->getFalseExpr(), state));
+        const auto* call = dyn_cast<CallExpr>(expr);
+        if (!call || !isFdIntegerType(call->getType()))
+            return FdReturnState::Unknown;
+        const auto summary = lookupPrev(previous_, call);
+        if (!summary) return FdReturnState::Unknown;
+        if (summary->returnOwnership == ReturnOwnership::Owned)
+            return FdReturnState::Owned;
+        if (summary->returnOwnership == ReturnOwnership::Borrowed)
+            return FdReturnState::Borrowed;
+        return FdReturnState::Unknown;
+    }
+
+    void applyCallEffects(const CallExpr* call, State& state) const {
+        const llvm::StringRef direct =
+            globalFdCalleeName(call->getDirectCallee());
+        const unsigned offset = callParamOffset(call);
+        const auto summary = lookupPrev(previous_, call);
+        for (unsigned argIndex = offset;
+             argIndex < call->getNumArgs(); ++argIndex) {
+            const unsigned paramIndex = argIndex - offset;
+            if (isKnownFdPrimitive(direct)) {
+                if (direct == "close" && paramIndex == 0)
+                    kill(asVarOrParam(call->getArg(argIndex)), state);
+                continue;
+            }
+            if (!summary ||
+                summary->paramOwnership(paramIndex) !=
+                    ParamOwnership::Borrowed)
+                kill(asVarOrParam(call->getArg(argIndex)), state);
+        }
+    }
+
+    static void kill(const ValueDecl* value, State& state) {
+        const auto* var = dyn_cast_or_null<VarDecl>(value);
+        auto it = var ? state.find(var) : state.end();
+        if (it != state.end()) it->second = FdReturnState::Unknown;
+    }
+
+    const SummaryTable& previous_;
+    State initial_;
+};
+
+ReturnOwnership computeFdReturnOwnership(const FunctionDecl* func,
+                                         ASTContext& ctx,
+                                         const SummaryTable& previous) {
+    if (!isFdIntegerType(func->getReturnType()))
+        return ReturnOwnership::Unknown;
+    FdReturnOwnershipAnalysis analysis(
+        collectTypedVars(func, [](QualType type) {
+            return isFdIntegerType(type);
+        }),
+        previous);
+    auto result = codeskeptic::runDataflow(func, ctx, analysis);
+    if (!result.converged || analysis.contributions.empty())
+        return ReturnOwnership::Unknown;
+
+    FdReturnState aggregate = FdReturnState::Failure;
+    for (FdReturnState contribution : analysis.contributions) {
+        if (contribution == FdReturnState::Unknown)
+            return ReturnOwnership::Unknown;
+        aggregate = mergeFdReturnState(aggregate, contribution);
+        if (aggregate == FdReturnState::Unknown)
+            return ReturnOwnership::Unknown;
+    }
+    // Only acquisition ownership is a strong descriptor fact. Returning an
+    // ordinary integer/parameter is not enough to assert a resource borrow.
+    if (aggregate == FdReturnState::Owned) return ReturnOwnership::Owned;
+    return ReturnOwnership::Unknown;
+}
+
+struct FdParamBinding {
+    std::set<unsigned> sources;
+    bool opaque = false;
+
+    bool operator==(const FdParamBinding& other) const {
+        return sources == other.sources && opaque == other.opaque;
+    }
+    bool operator!=(const FdParamBinding& other) const {
+        return !(*this == other);
+    }
+};
+
+enum class FdParamEffect { None, Consumed, Transferred, Unknown };
+
+struct FdParamState {
+    std::map<const VarDecl*, FdParamBinding> bindings;
+    std::vector<FdParamEffect> effects;
+
+    bool operator==(const FdParamState& other) const {
+        return bindings == other.bindings && effects == other.effects;
+    }
+    bool operator!=(const FdParamState& other) const {
+        return !(*this == other);
+    }
+};
+
+FdParamEffect mergeFdParamEffect(FdParamEffect lhs,
+                                 FdParamEffect rhs) {
+    return lhs == rhs ? lhs : FdParamEffect::Unknown;
+}
+
+FdParamEffect sequenceFdParamEffect(FdParamEffect current,
+                                    FdParamEffect next) {
+    if (next == FdParamEffect::None) return current;
+    if (current == FdParamEffect::None || current == next) return next;
+    return FdParamEffect::Unknown;
+}
+
+FdParamBinding fdParamBindingFor(const Expr* expr,
+                                 const FdParamState& state) {
+    const auto* var = dyn_cast_or_null<VarDecl>(asVarOrParam(expr));
+    if (!var) return FdParamBinding{{}, true};
+    auto it = state.bindings.find(var);
+    return it == state.bindings.end()
+               ? FdParamBinding{{}, true} : it->second;
+}
+
+void applyFdParamEffect(const FdParamBinding& binding,
+                        FdParamEffect effect,
+                        FdParamState& state) {
+    if (binding.sources.empty()) return;
+    if (binding.opaque || binding.sources.size() != 1) {
+        for (unsigned source : binding.sources)
+            state.effects[source] = FdParamEffect::Unknown;
+        return;
+    }
+    const unsigned source = *binding.sources.begin();
+    state.effects[source] = sequenceFdParamEffect(
+        state.effects[source], effect);
+}
+
+class FdParamOwnershipAnalysis {
+public:
+    using State = FdParamState;
+
+    FdParamOwnershipAnalysis(const FunctionDecl* func,
+                             const SummaryTable& previous)
+        : previous_(previous) {
+        initial_.effects.assign(func->getNumParams(), FdParamEffect::None);
+        for (unsigned i = 0; i < func->getNumParams(); ++i) {
+            const ParmVarDecl* param = func->getParamDecl(i);
+            if (isFdIntegerType(param->getType()))
+                initial_.bindings[param] = FdParamBinding{{i}, false};
+        }
+    }
+
+    State initialState() const { return initial_; }
+
+    unsigned latticeHeight() const {
+        return static_cast<unsigned>(initial_.effects.size()) * 8 + 16;
+    }
+
+    State merge(const State& lhs, const State& rhs) const {
+        State out;
+        out.effects.resize(lhs.effects.size(), FdParamEffect::Unknown);
+        for (size_t i = 0; i < out.effects.size(); ++i)
+            out.effects[i] = mergeFdParamEffect(
+                lhs.effects[i], rhs.effects[i]);
+
+        std::set<const VarDecl*> vars;
+        for (const auto& [var, binding] : lhs.bindings) {
+            (void)binding;
+            vars.insert(var);
+        }
+        for (const auto& [var, binding] : rhs.bindings) {
+            (void)binding;
+            vars.insert(var);
+        }
+        for (const VarDecl* var : vars) {
+            auto left = lhs.bindings.find(var);
+            auto right = rhs.bindings.find(var);
+            if (left == lhs.bindings.end()) {
+                FdParamBinding merged = right->second;
+                merged.opaque = true;
+                out.bindings[var] = std::move(merged);
+            } else if (right == rhs.bindings.end()) {
+                FdParamBinding merged = left->second;
+                merged.opaque = true;
+                out.bindings[var] = std::move(merged);
+            } else {
+                FdParamBinding merged = left->second;
+                merged.sources.insert(right->second.sources.begin(),
+                                      right->second.sources.end());
+                merged.opaque = left->second.opaque || right->second.opaque;
+                out.bindings[var] = std::move(merged);
+            }
+        }
+        return out;
+    }
+
+    State transfer(const Stmt* stmt, const State& in,
+                   ASTContext&) const {
+        State out = in;
+        if (const auto* declaration = dyn_cast<DeclStmt>(stmt)) {
+            for (const Decl* decl : declaration->decls()) {
+                const auto* var = dyn_cast<VarDecl>(decl);
+                if (!var || !isFdIntegerType(var->getType()) ||
+                    !var->hasInit())
+                    continue;
+                FdParamBinding source =
+                    fdParamBindingFor(var->getInit(), out);
+                if (var->hasLocalStorage())
+                    out.bindings[var] = std::move(source);
+                else
+                    applyFdParamEffect(source,
+                                       FdParamEffect::Transferred, out);
+            }
+            return out;
+        }
+
+        if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
+            if (assignment->getOpcode() != BO_Assign) return out;
+            FdParamBinding source =
+                fdParamBindingFor(assignment->getRHS(), out);
+            const auto* target = dyn_cast_or_null<VarDecl>(
+                asVarOrParam(assignment->getLHS()));
+            if (target && (isa<ParmVarDecl>(target) ||
+                           target->hasLocalStorage()))
+                out.bindings[target] = std::move(source);
+            else
+                applyFdParamEffect(source,
+                                   FdParamEffect::Transferred, out);
+            return out;
+        }
+
+        if (const auto* call = dyn_cast<CallExpr>(stmt))
+            applyCall(call, out);
+        return out;
+    }
+
+    void refineOnEdge(const Stmt*, bool, State&, ASTContext&) const {}
+
+private:
+    void applyCall(const CallExpr* call, State& state) const {
+        const llvm::StringRef direct =
+            globalFdCalleeName(call->getDirectCallee());
+        const unsigned offset = callParamOffset(call);
+        if (isKnownFdPrimitive(direct)) {
+            if (direct == "close" && call->getNumArgs() > offset)
+                applyFdParamEffect(
+                    fdParamBindingFor(call->getArg(offset), state),
+                    FdParamEffect::Consumed, state);
+            return;
+        }
+
+        const auto summary = lookupPrev(previous_, call);
+        for (unsigned argIndex = offset;
+             argIndex < call->getNumArgs(); ++argIndex) {
+            const unsigned paramIndex = argIndex - offset;
+            FdParamEffect effect = FdParamEffect::Unknown;
+            if (summary) {
+                switch (summary->paramOwnership(paramIndex)) {
+                    case ParamOwnership::Borrowed:
+                        effect = FdParamEffect::None;
+                        break;
+                    case ParamOwnership::Consumed:
+                        effect = FdParamEffect::Consumed;
+                        break;
+                    case ParamOwnership::Transferred:
+                        effect = FdParamEffect::Transferred;
+                        break;
+                    case ParamOwnership::Unknown:
+                        break;
+                }
+            }
+            applyFdParamEffect(
+                fdParamBindingFor(call->getArg(argIndex), state),
+                effect, state);
+        }
+    }
+
+    const SummaryTable& previous_;
+    State initial_;
+};
+
+std::vector<ParamOwnership> computeFdParamOwnerships(
+        const FunctionDecl* func, ASTContext& ctx,
+        const SummaryTable& previous) {
+    std::vector<ParamOwnership> out(
+        func->getNumParams(), ParamOwnership::Unknown);
+    bool hasFdParam = false;
+    for (const ParmVarDecl* param : func->parameters())
+        hasFdParam = hasFdParam || isFdIntegerType(param->getType());
+    if (!hasFdParam) return out;
+    FdParamOwnershipAnalysis analysis(func, previous);
+    auto result = codeskeptic::runDataflow(func, ctx, analysis);
+    if (!result.converged) return out;
+    auto exit = result.blockExitStates.find(result.exitBlockID);
+    if (exit == result.blockExitStates.end()) return out;
+
+    for (unsigned i = 0; i < func->getNumParams(); ++i) {
+        if (!isFdIntegerType(func->getParamDecl(i)->getType())) continue;
+        switch (exit->second.effects[i]) {
+            case FdParamEffect::Consumed:
+                out[i] = ParamOwnership::Consumed;
+                break;
+            case FdParamEffect::Transferred:
+                out[i] = ParamOwnership::Transferred;
+                break;
+            case FdParamEffect::None:
+            case FdParamEffect::Unknown:
+                break;
+        }
+    }
+    return out;
+}
 // --- Parameter preconditions and postconditions (interprocedural v2) ---
 
 std::vector<ParamPrecondition> computeParamPreconditions(
@@ -2853,11 +3315,20 @@ FunctionSummary summarizeFunction(const FunctionDecl* func, ASTContext& ctx,
         func, ctx, previous, &summary.nullFromParam);
     summary.returnZeroness = computeReturnZeroness(
         func, ctx, previous, &summary.zeroFromParam);
-    summary.returnOwnership = computeReturnOwnership(func, ctx, previous);
+    summary.returnOwnership = isFdIntegerType(func->getReturnType())
+                                  ? computeFdReturnOwnership(
+                                        func, ctx, previous)
+                                  : computeReturnOwnership(
+                                        func, ctx, previous);
     summary.params = computeParamEffects(func, previous);
     ParamRelations relations = computeParamRelations(func, ctx, previous);
     summary.paramAccesses = std::move(relations.accesses);
     summary.paramOwnerships = std::move(relations.ownerships);
+    std::vector<ParamOwnership> fdOwnerships =
+        computeFdParamOwnerships(func, ctx, previous);
+    for (size_t i = 0; i < fdOwnerships.size(); ++i)
+        if (fdOwnerships[i] != ParamOwnership::Unknown)
+            summary.paramOwnerships[i] = fdOwnerships[i];
     summary.paramFieldWrites = std::move(relations.fieldWrites);
     summary.paramPreconditions = computeParamPreconditions(func, ctx);
     summary.paramPostconditions =

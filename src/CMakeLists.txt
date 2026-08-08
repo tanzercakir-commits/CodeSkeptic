@@ -31,6 +31,7 @@ add_library(codeskeptic_core STATIC
     server/McpServer.cpp
     rules/UninitPointerRule_Ex.cpp
     rules/MemoryLeakRule_Ex.cpp
+    rules/FdResourceRule.cpp
     rules/DivByZeroRule.cpp
     rules/IntOverflowRule.cpp
     rules/SignConversionRule.cpp
