@@ -93,13 +93,22 @@ const Expr* unwrapZeroPassthrough(const Expr* expr, const ASTContext& ctx) {
         if (!call) break;
         const FunctionDecl* callee = call->getDirectCallee();
         const auto* summary =
-            codeskeptic::SummaryRegistry::instance().lookup(callee);
+            codeskeptic::SummaryRegistry::instance().lookup(call);
         if (!summary || summary->zeroFromParam < 0) break;
         const unsigned idx = static_cast<unsigned>(summary->zeroFromParam);
         if (idx >= call->getNumArgs()) break;
         QualType paramTy;
         if (callee && idx < callee->getNumParams())
             paramTy = callee->getParamDecl(idx)->getType();
+        else if (call->getCallee()) {
+            QualType functionType = call->getCallee()->getType();
+            if (const auto* pointer = functionType->getAs<PointerType>())
+                functionType = pointer->getPointeeType();
+            if (const auto* prototype =
+                    functionType->getAs<FunctionProtoType>())
+                if (idx < prototype->getNumParams())
+                    paramTy = prototype->getParamType(idx);
+        }
         const Expr* arg = call->getArg(idx);
         const Expr* argCore = arg->IgnoreParenImpCasts();
         if (paramTy.isNull() || !paramTy->isIntegerType() ||
@@ -119,7 +128,7 @@ ZeroState evaluateAssignedValue(const Expr* expr) {
     if (const auto* call = dyn_cast<CallExpr>(stripped)) {
         using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
         if (const auto* summary = codeskeptic::SummaryRegistry::instance()
-                                      .lookup(call->getDirectCallee())) {
+                                      .lookup(call)) {
             if (summary->returnZeroness == RZ::AlwaysZero)
                 return ZeroState::MaybeZero;
             if (summary->returnZeroness == RZ::NeverZero)

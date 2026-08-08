@@ -26,11 +26,18 @@ SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
 
 `WEAKENED` means a strong claim callers may rely on was lost — a
 function that could never return null now can, a callee that used to
-be read-only now stores its argument. The exit code is `1` in that
-case, so the diff doubles as a CI gate: *this change silently altered
-function contracts; the callers deserve a look*. Gained claims report
-as `STRENGTHENED` (informational), directionless drifts as `CHANGED`,
-and signature changes appear as `REMOVED`+`ADDED` (the key includes
+be read-only now stores its argument. Losing or changing an exact pointee
+access, parameter-ownership, return-ownership, return-alias, or output
+postcondition claim is also a weakening. Adding a possible field write,
+replacing an exact field set with unknown, or changing to an incomparable
+set is likewise WEAKENED; removing possible writes is STRENGTHENED.
+Preconditions use the caller-compatibility direction: adding a new non-null obligation, or changing
+rejection into crash, is WEAKENED; removing/softening it is STRENGTHENED. The
+exit code is `1` for a weakening,
+so the diff doubles as a CI gate: *this change silently altered function
+contracts; the callers deserve a look*. Other gained claims report as
+`STRENGTHENED` (informational), directionless drifts as `CHANGED`, and
+signature changes appear as `REMOVED`+`ADDED` (the key includes
 arity — an arity change breaks callers anyway).
 
 The gate is configurable for adoption: `--gate warn` (or
@@ -114,9 +121,11 @@ Both analyzer runs receive identical settings (arguments after `--` are
 forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
 `--summary-in .codeskeptic-summaries` to review with whole-project
 knowledge, …); a delta between two differently-configured runs would
-not be a delta. Known limits, stated rather than hidden: a header-only
-change analyzes no TU (it is listed in the coverage section), and
-deleted files' base-only findings are not counted as fixed.
+not be a delta. Loaded summaries also compose through a controlled automatic
+local function-pointer target when that target set is closed. Unresolved
+indirect dispatch remains conservative. Known limits are stated rather than
+hidden: a header-only change analyzes no TU (it is listed in the coverage
+section), and deleted files' base-only findings are not counted as fixed.
 
 A minimal GitHub Actions gate:
 

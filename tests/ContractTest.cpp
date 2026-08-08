@@ -149,15 +149,33 @@ TEST(ContractRuleTest, SyntaxError_IsContractSyntaxError) {
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
-TEST(ContractRuleTest, LaterRoundClause_ReportedNotSilent) {
-    // `returns owned` needs a return-ownership summary the engine
-    // does not infer yet: until then the contract is explicitly
-    // reported as unverified — never silently "accepted".
+TEST(ContractRuleTest, ReturnsOwned_Satisfied_Silent) {
     ContractRule rule;
     auto results = runRule(rule, R"(
-        char *dup(const char *s);
         // cs: returns owned
-        char *make_name(const char *base) { return dup(base); }
+        int *make_value() { return new int(7); }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ContractRuleTest, ReturnsOwned_BorrowedReturn_IsError) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        int value;
+        // cs: returns owned
+        int *borrow_value() { return &value; }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ContractRuleTest, ReturnsOwned_UnknownReturn_ReportedNotSilent) {
+    ContractRule rule;
+    auto results = runRule(rule, R"(
+        int *external_factory();
+        // cs: returns owned
+        int *make_value() { return external_factory(); }
     )");
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "contract-unsupported");

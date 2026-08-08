@@ -8,7 +8,13 @@ namespace {
 
 using RN = codeskeptic::SummaryRegistry::ReturnNullness;
 using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
+using RO = codeskeptic::SummaryRegistry::ReturnOwnership;
 using PE = codeskeptic::SummaryRegistry::ParamEffect;
+using PA = codeskeptic::SummaryRegistry::ParamAccess;
+using PO = codeskeptic::SummaryRegistry::ParamOwnership;
+using PPre = codeskeptic::SummaryRegistry::ParamPrecondition;
+using PPost = codeskeptic::SummaryRegistry::ParamPostcondition;
+using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 
 const char* rnName(RN v) {
@@ -30,6 +36,14 @@ const char* rzName(RZ v) {
     return "Unknown";
 }
 
+const char* roName(RO value) {
+    switch (value) {
+        case RO::Owned: return "Owned";
+        case RO::Borrowed: return "Borrowed";
+        case RO::Unknown: break;
+    }
+    return "Unknown";
+}
 const char* peName(PE v) {
     switch (v) {
         case PE::ReadsOnly: return "ReadsOnly";
@@ -40,14 +54,61 @@ const char* peName(PE v) {
     return "Opaque";
 }
 
+const char* accessName(PA value) {
+    switch (value) {
+        case PA::None: return "None";
+        case PA::Reads: return "Reads";
+        case PA::Writes: return "Writes";
+        case PA::ReadsWrites: return "ReadsWrites";
+        case PA::Unknown: break;
+    }
+    return "Unknown";
+}
+
+const char* ownershipName(PO value) {
+    switch (value) {
+        case PO::Borrowed: return "Borrowed";
+        case PO::Consumed: return "Consumed";
+        case PO::Transferred: return "Transferred";
+        case PO::Unknown: break;
+    }
+    return "Unknown";
+}
+
+const char* preName(PPre v) {
+    switch (v) {
+        case PPre::NonNullCrash: return "NonNullCrash";
+        case PPre::NonNullRejected: return "NonNullRejected";
+        case PPre::None: break;
+    }
+    return "None";
+}
+
+const char* postName(PPost v) {
+    switch (v) {
+        case PPost::Null: return "Null";
+        case PPost::NonNull: return "NonNull";
+        case PPost::Unknown: break;
+    }
+    return "Unknown";
+}
+
+std::string aliasName(int v) {
+    return v < 0 ? "none" : "param#" + std::to_string(v);
+}
+
 // "Strong" claims: guarantees that change analysis results on the
 // caller side. Their loss/change is a weakening — callers leaning on
 // the claim must be re-examined.
 bool rnStrong(RN v) { return v == RN::NeverNull; }
+bool roStrong(RO value) { return value != RO::Unknown; }
 bool rzStrong(RZ v) {
     return v == RZ::AlwaysZero || v == RZ::NeverZero;
 }
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
+bool accessStrong(PA value) { return value != PA::Unknown; }
+bool ownershipStrong(PO value) { return value != PO::Unknown; }
+bool aliasStrong(int v) { return v >= 0; }
 
 struct FieldVerdict {
     bool weakened = false;
@@ -68,6 +129,83 @@ void classifyField(T oldV, T newV, StrongFn isStrong, NameFn name,
         verdict.changed = true;
     if (!detail.empty()) detail += "; ";
     detail += label + ": " + name(oldV) + " -> " + name(newV);
+}
+
+void appendDetail(std::string& detail, const std::string& label,
+                  const char* oldName, const char* newName) {
+    if (!detail.empty()) detail += "; ";
+    detail += label + ": " + oldName + " -> " + newName;
+}
+
+void classifyPrecondition(PPre oldV, PPre newV,
+                          const std::string& label,
+                          FieldVerdict& verdict, std::string& detail) {
+    if (oldV == newV) return;
+    // A new caller obligation is a compatibility weakening. Changing a
+    // rejection into a crash is also a worsening; the reverse directions
+    // relax or make the contract safer.
+    if (oldV == PPre::None ||
+        (oldV == PPre::NonNullRejected &&
+         newV == PPre::NonNullCrash))
+        verdict.weakened = true;
+    else
+        verdict.strengthened = true;
+    appendDetail(detail, label, preName(oldV), preName(newV));
+}
+
+void classifyPostcondition(PPost oldV, PPost newV,
+                           const std::string& label,
+                           FieldVerdict& verdict, std::string& detail) {
+    if (oldV == newV) return;
+    if (oldV != PPost::Unknown)
+        verdict.weakened = true;
+    else
+        verdict.strengthened = true;
+    appendDetail(detail, label, postName(oldV), postName(newV));
+}
+
+std::string fieldWriteName(const FieldWriteSet* value) {
+    if (!value) return "unknown";
+    std::string out = "{";
+    bool first = true;
+    for (const std::string& field : value->fields) {
+        if (!first) out += ',';
+        out += field;
+        first = false;
+    }
+    out += '}';
+    return out;
+}
+
+void classifyFieldWrites(const FunctionSummary& oldSum,
+                         const FunctionSummary& newSum, unsigned index,
+                         const std::string& label, FieldVerdict& verdict,
+                         std::string& detail) {
+    const FieldWriteSet* oldValue = oldSum.exactParamFieldWrites(index);
+    const FieldWriteSet* newValue = newSum.exactParamFieldWrites(index);
+    if ((!oldValue && !newValue) ||
+        (oldValue && newValue && oldValue->fields == newValue->fields))
+        return;
+
+    if (!oldValue) {
+        verdict.strengthened = true;
+    } else if (!newValue) {
+        verdict.weakened = true;
+    } else {
+        const bool oldContainsNew = std::includes(
+            oldValue->fields.begin(), oldValue->fields.end(),
+            newValue->fields.begin(), newValue->fields.end());
+        const bool newContainsOld = std::includes(
+            newValue->fields.begin(), newValue->fields.end(),
+            oldValue->fields.begin(), oldValue->fields.end());
+        if (newContainsOld || !oldContainsNew)
+            verdict.weakened = true;
+        else
+            verdict.strengthened = true;
+    }
+    if (!detail.empty()) detail += "; ";
+    detail += label + ": " + fieldWriteName(oldValue) + " -> " +
+              fieldWriteName(newValue);
 }
 
 } // anonymous namespace
@@ -94,17 +232,54 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                       rnStrong, rnName, "returnNullness", verdict, detail);
         classifyField(oldSum.returnZeroness, newSum.returnZeroness,
                       rzStrong, rzName, "returnZeroness", verdict, detail);
+        classifyField(oldSum.returnOwnership, newSum.returnOwnership,
+                      roStrong, roName, "returnOwnership", verdict, detail);
+        classifyField(oldSum.returnAliasParam, newSum.returnAliasParam,
+                      aliasStrong, aliasName, "returnAliasParam",
+                      verdict, detail);
 
         // Parameters are compared by index; vector sizes may differ
         // (the conservative merge may have emptied one) — paramEffect()
         // treats the missing ones as Opaque
-        const size_t numParams =
-            std::max(oldSum.params.size(), newSum.params.size());
+        const size_t numParams = std::max(
+            {oldSum.params.size(), newSum.params.size(),
+             oldSum.paramPreconditions.size(),
+             newSum.paramPreconditions.size(),
+             oldSum.paramPostconditions.size(),
+             newSum.paramPostconditions.size(), oldSum.paramAccesses.size(),
+             newSum.paramAccesses.size(), oldSum.paramOwnerships.size(),
+             newSum.paramOwnerships.size(), oldSum.paramFieldWrites.size(),
+             newSum.paramFieldWrites.size()});
         for (size_t i = 0; i < numParams; ++i) {
             classifyField(oldSum.paramEffect(static_cast<unsigned>(i)),
                           newSum.paramEffect(static_cast<unsigned>(i)),
                           peStrong, peName,
                           "param#" + std::to_string(i), verdict, detail);
+            classifyPrecondition(
+                oldSum.paramPrecondition(static_cast<unsigned>(i)),
+                newSum.paramPrecondition(static_cast<unsigned>(i)),
+                "param#" + std::to_string(i) + ".precondition",
+                verdict, detail);
+            classifyPostcondition(
+                oldSum.paramPostcondition(static_cast<unsigned>(i)),
+                newSum.paramPostcondition(static_cast<unsigned>(i)),
+                "param#" + std::to_string(i) + ".postcondition",
+                verdict, detail);
+            classifyField(
+                oldSum.paramAccess(static_cast<unsigned>(i)),
+                newSum.paramAccess(static_cast<unsigned>(i)),
+                accessStrong, accessName,
+                "param#" + std::to_string(i) + ".access", verdict, detail);
+            classifyField(
+                oldSum.paramOwnership(static_cast<unsigned>(i)),
+                newSum.paramOwnership(static_cast<unsigned>(i)),
+                ownershipStrong, ownershipName,
+                "param#" + std::to_string(i) + ".ownership", verdict,
+                detail);
+            classifyFieldWrites(
+                oldSum, newSum, static_cast<unsigned>(i),
+                "param#" + std::to_string(i) + ".fieldWrites", verdict,
+                detail);
         }
 
         if (detail.empty()) continue;  // contract unchanged

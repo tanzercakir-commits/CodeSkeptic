@@ -17,6 +17,7 @@ namespace codeskeptic {
 //               NeverZero dropped; a ReadsOnly/Frees param claim
 //               turned into something else). CALLERS leaning on that
 //               claim must be re-examined — CI gate: exit code 1.
+//               Exact return-alias identity is also a strong claim.
 //  STRENGTHENED a new strong claim was gained (informational; no risk).
 //  CHANGED      a directionless change (like Unknown <-> Maybe*) —
 //               the finding set may shift but no contract risk.

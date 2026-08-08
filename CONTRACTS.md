@@ -17,8 +17,11 @@ what it was supposed to do. Contracts close that gap:
 
 The key architectural insight: **a contract is a declared function
 summary.** The engine already INFERS summaries (return nullness,
-zeroness, parameter effects) and already diffs them as contracts
-(`--summary-diff`, WEAKENED = CI gate). Contracts replace "inferred
+zeroness, pointee read/write effects, parameter and return ownership,
+exact return identity, inferred non-null parameter preconditions and exact
+pointer-output postconditions) and already
+diffs them as contracts (`--summary-diff`, WEAKENED = CI gate). Contracts
+replace "inferred
 vs inferred" with "declared vs inferred": the declaration pins the
 intent, the dataflow engine checks the pin.
 
@@ -124,8 +127,9 @@ Design notes:
 - Ownership clauses (`owns`, `borrows`, `returns owned`) are EFFECT
   declarations, not value predicates — forcing them into the
   expression grammar would be artificial. They stay keyword forms and
-  map onto the existing parameter-effect summary lattice
-  (Frees/Stores vs ReadsOnly).
+  map onto independent ownership summaries. Pointee reads/writes are kept
+  separate: observing memory is not the same thing as consuming or
+  transferring its ownership.
 - The grammar is deliberately tiny (a dozen productions). It is
   parsed by a small hand-written recursive-descent parser inside the
   analyzer; the binding design constraint is not parser technology
@@ -153,7 +157,7 @@ prove today:
 | `ensures ... if <guard>` | per-disjunct return states | guard must be FACT-KEYABLE: parameter/enum/template-constant vs integer constant, `&&`/`||`/`!`, unsigned zero-identities — exactly `conditionFact`'s domain |
 | `requires p != null` | (a) callee side: `p` seeds as NonNull — derefs of `p` stop warning, the contract carries the proof burden; (b) caller side: passing a maybe-null argument at a visible call site is a violation | |
 | `requires <relational>` e.g. `p != null \|\| n == 0` | caller side, fact-keyable guards | the systemd/fprime assert shape, now as a declared contract |
-| `owns(p)` / `borrows(p)` / `returns owned` | parameter-effect / return-ownership summaries | `owns` also suppresses caller-side leak reports for that argument |
+| `owns(p)` / `borrows(p)` / `returns owned` | parameter ownership (Borrowed/Consumed/Transferred) and return ownership (Borrowed/Owned) | `owns` also suppresses caller-side leak reports for that argument; ambiguous/opaque flows remain explicitly unverified |
 
 Everything else (arithmetic between variables, `strlen(...)` calls in
 predicates, quantifiers) is `contract-unsupported` in v1 and becomes

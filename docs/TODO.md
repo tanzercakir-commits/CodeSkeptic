@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = be577ab
-uçuşta = phase-precision-debt
+base   = e75bcab
+uçuşta = phase-interprocedural-v2
 ```
 <!-- cs:state-end -->
 
@@ -42,14 +42,29 @@ kolateral sıfır. BULGU 3 kod değil önkoşul; backlog #1'e işlendi.
 Yan ürün: corpus pin'i 53→54 merkeze alındı (895c813'ten beri
 sürükleniyordu, toleransın içinde sessizce).
 
-## Sıradaki iş
+## Next work
 
-Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. Return-alias
-ilişkileri, parametre precondition/postcondition özetleri, yan etkiler ve
-ownership transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
-function-pointer çözümü ve kütüphane model dosyaları küçük dilimler halinde
-eklenecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
-bulgu artışı olmayacak.
+The first six slices of Phase 4 interprocedural engine v2 are locally
+RED-to-GREEN complete: exact pointer return identity (v7), parameter
+pre/postconditions (v8), independent access/ownership relations (v9), the
+callee-first call-graph SCC fixed point, field-sensitive writes (v10), and
+controlled local function-pointer targets.
+
+The controlled resolver accepts only automatic local raw function pointers
+whose initializer and every assignment produce a closed target set. Clean
+aliases, conditional choices, direct/C targets, persisted cross-TU target
+summaries, and every existing summary relation compose. Unknown sources,
+address or mutable-reference escape, by-reference capture, inline-assembly
+output, volatile/non-local storage, pointer parameters, member pointers, and
+global/table dispatch remain conservative.
+
+The exact local gates are 971/971 tests, thesis `clean_fp=0` with
+`bug_caught=9/15`, a clean 47/47-TU self-scan, cJSON 54 findings
+(76 attempted / 35 analyzed / 41 explicitly accepted broken), and tinyxml2 9
+findings (3/3). Corpus diagnostic-site deltas versus Phase 4.5 are zero.
+
+The next slice is library model files. Every relation still requires a RED
+receipt, the full suite, documentation sync, and an exact real-corpus audit.
 
 ## Açık kullanıcı kararları
 

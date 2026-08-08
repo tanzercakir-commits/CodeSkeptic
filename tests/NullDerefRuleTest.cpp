@@ -1823,6 +1823,589 @@ TEST(NullDerefRuleTest, MemberFlagCallClobber_Reported) {
     ASSERT_EQ(results.size(), 1u);
 }
 
+TEST(NullDerefRuleTest, MemberFlagDifferentFieldCallee_Clean) {
+    // A visible callee that writes only `other` must not invalidate the
+    // independent has_source correlation.
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp *out) { out->other = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDifferentFieldWrapperAndAlias_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_leaf(struct comp *out) {
+            struct comp *alias = out;
+            alias->other = 1;
+        }
+        void touch_wrapper(struct comp *out) { touch_leaf(out); }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_wrapper(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagReadOnlyCallee_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        int inspect(const struct comp *value) { return value->other; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            (void)inspect(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagGuardFieldCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp *out) { out->has_source = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagGuardCallInitializer_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        int rewrite_guard(struct comp *out) {
+            out->has_source = 1;
+            return 0;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            int rc = rewrite_guard(&c);
+            if (c.has_source) { *p = rc; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagWholeObjectCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_all(struct comp *out) {
+            struct comp replacement = {1, 0};
+            *out = replacement;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_all(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDotDereferenceDifferentField_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp *out) { (*out).other = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagAddressAliasGuardCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp *out) {
+            int *alias = &out->has_source;
+            *alias = 1;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagAddressAliasDifferentField_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp *out) {
+            int *alias = &out->other;
+            *alias = 1;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagReferenceAliasGuardCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp *out) {
+            int &alias = out->has_source;
+            alias = 1;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagNonConstMethodCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            int has_source;
+            int other;
+            void mutate() { has_source = 1; }
+        };
+        void call_mutate(struct comp *out) { out->mutate(); }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            call_mutate(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagConstMethodCallee_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            int has_source;
+            int other;
+            int inspect() const { return other; }
+        };
+        int call_inspect(const struct comp *out) { return out->inspect(); }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            (void)call_inspect(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagConstMutableGuardCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            mutable int has_source;
+            int other;
+            void mutate() const { has_source = 1; }
+        };
+        void call_mutate(const struct comp *out) { out->mutate(); }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            call_mutate(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagConstMutableSiblingCallee_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            int has_source;
+            mutable int other;
+            void mutate() const { other = 1; }
+        };
+        void call_mutate(const struct comp *out) { out->mutate(); }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            call_mutate(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagReturnedAddressGuardCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        int *expose_guard(struct comp *out) { return &out->has_source; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            int *alias = expose_guard(&c);
+            *alias = 1;
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+
+TEST(NullDerefRuleTest, MemberFlagRecordReferenceGuardCallee_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp &out) { out.has_source = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagRecordReferenceDifferentField_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp &out) { out.other = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+
+TEST(NullDerefRuleTest, MemberFlagRecordReferenceAddressAlias_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp &out) {
+            struct comp *alias = &out;
+            alias->has_source = 1;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagReturnedRecordReference_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        struct comp &expose(struct comp &out) { return out; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            struct comp &alias = expose(c);
+            alias.has_source = 1;
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagRecordReferenceWholeObject_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite(struct comp &out) {
+            struct comp replacement = {1, 0};
+            out = replacement;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite(c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+TEST(NullDerefRuleTest, MemberFlagWholeObjectReferenceAlias_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite(struct comp *out) {
+            struct comp &alias = *out;
+            alias.has_source = 1;
+        }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite(&c);
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDirectNonConstMethod_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            int has_source;
+            int other;
+            void mutate() { has_source = 1; }
+        };
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            c.mutate();
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDirectConstMethod_Clean) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            int has_source;
+            int other;
+            int inspect() const { return other; }
+        };
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            (void)c.inspect();
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagDirectConstMutableGuard_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp {
+            mutable int has_source;
+            int other;
+            void mutate() const { has_source = 1; }
+        };
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            c.mutate();
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+TEST(NullDerefRuleTest, MemberFlagRvalueReferenceGuard_Reported) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite(struct comp &&out) { out.has_source = 1; }
+        int f(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = 0;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite(static_cast<struct comp &&>(c));
+            if (c.has_source) { *p = 1; }
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
 TEST(NullDerefRuleTest, MemberFlagReassignedBetween_Reported) {
     // A direct store to the flag between the guards breaks the
     // correlation the same way (erase-and-restamp lifecycle).
