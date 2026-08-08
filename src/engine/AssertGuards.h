@@ -97,6 +97,7 @@ namespace clang {
 class ASTContext;
 class CompilerInstance;
 class FunctionDecl;
+class FieldDecl;
 class SourceManager;
 class Stmt;
 class VarDecl;
@@ -104,11 +105,15 @@ class VarDecl;
 
 namespace codeskeptic {
 
-// A recovered guard: "this variable is non-null from here on".
+// A recovered guard: "this variable is non-null from here on". A
+// one-hop member assertion also keeps the resolved field identity; the
+// current null domain consumes the entailed base-pointer fact, while
+// field-sensitive domains can consume the narrower subject later.
 struct AssertGuard {
     enum class Kind { NonNull };
     Kind kind = Kind::NonNull;
     const clang::VarDecl* var = nullptr;
+    const clang::FieldDecl* field = nullptr;
 };
 
 // --- Configuration ---

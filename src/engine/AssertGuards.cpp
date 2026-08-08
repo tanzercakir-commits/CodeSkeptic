@@ -47,9 +47,13 @@ std::set<std::string>& negativeNames() {
 // (SourceManager runs the whole pipeline on ONE worker thread), and
 // the list is reset by installAssertRecovery at the start of every TU.
 struct VanishedAssert {
+    struct Subject {
+        std::string base;
+        std::optional<std::string> member;
+    };
     clang::SourceLocation begin;  // the macro name token
     clang::SourceLocation end;    // the closing paren
-    std::vector<std::string> names;  // variables asserted non-null
+    std::vector<Subject> subjects;  // variables / one-hop members
 };
 
 std::vector<VanishedAssert>& records() {
@@ -132,13 +136,11 @@ std::optional<size_t> matchNullConstant(const std::vector<std::string>& toks,
     return std::nullopt;
 }
 
-// One conjunct -> the variable it proves non-null, or nullopt when the
-// shape is out of v1 scope. The token filter is a WHITELIST: anything
-// that is not `!=`, an identifier, or part of a null constant drops
-// this conjunct. `->`, `*`, `!`, `?`, calls and arithmetic all land
-// here and are dropped by construction rather than by an ever-growing
-// list of exclusions.
-std::optional<std::string> parseConjunct(const std::vector<std::string>& raw) {
+// One conjunct -> the plain variable or one-hop `base->field` subject
+// it proves non-null. The token filter remains a whitelist: calls,
+// dereference, arithmetic and nested member chains are rejected.
+std::optional<VanishedAssert::Subject>
+parseConjunct(const std::vector<std::string>& raw) {
     std::vector<std::string> t;
     for (size_t i = 0; i < raw.size();) {
         if (auto next = matchNullConstant(raw, i, 0)) {
@@ -146,18 +148,30 @@ std::optional<std::string> parseConjunct(const std::vector<std::string>& raw) {
             i = *next;
             continue;
         }
-        if (raw[i] != "!=" && !isIdentifierSpelling(raw[i]))
+        if (raw[i] != "!=" && raw[i] != "->" &&
+            !isIdentifierSpelling(raw[i]))
             return std::nullopt;
         t.push_back(raw[i]);
         ++i;
     }
-    if (t.size() == 1)
-        return t[0] == "NULL" ? std::nullopt : std::optional<std::string>(t[0]);
-    if (t.size() == 3 && t[1] == "!=") {
-        if (t[0] != "NULL" && t[2] == "NULL") return t[0];
-        if (t[2] != "NULL" && t[0] == "NULL") return t[2];
-        // `a != b` between two variables says nothing about either
-        // one's nullness.
+    auto subject = [](const std::vector<std::string>& toks, size_t begin,
+                      size_t end)
+        -> std::optional<VanishedAssert::Subject> {
+        if (end - begin == 1 && toks[begin] != "NULL")
+            return VanishedAssert::Subject{toks[begin], std::nullopt};
+        if (end - begin == 3 && toks[begin] != "NULL" &&
+            toks[begin + 1] == "->" && toks[begin + 2] != "NULL")
+            return VanishedAssert::Subject{toks[begin], toks[begin + 2]};
+        return std::nullopt;
+    };
+    if (auto s = subject(t, 0, t.size())) return s;
+    auto ne = std::find(t.begin(), t.end(), "!=");
+    if (ne != t.end()) {
+        size_t pos = static_cast<size_t>(ne - t.begin());
+        if (pos + 2 == t.size() && t.back() == "NULL")
+            return subject(t, 0, pos);
+        if (pos == 1 && t.front() == "NULL")
+            return subject(t, 2, t.size());
     }
     return std::nullopt;
 }
@@ -190,18 +204,18 @@ splitConjuncts(const std::vector<std::string>& toks) {
     return parts;
 }
 
-// Parses the argument token spellings into the set of variable names
-// the assertion proves non-null. Returns nullopt when nothing in the
-// shape is usable — the caller then records nothing at all.
-std::optional<std::vector<std::string>>
+// Parses the argument token spellings into the plain-variable and
+// one-hop-member subjects the assertion proves non-null. Returns
+// nullopt when nothing in the shape is usable.
+std::optional<std::vector<VanishedAssert::Subject>>
 parseAssertShape(const std::vector<std::string>& toks) {
     if (toks.empty()) return std::nullopt;
     auto parts = splitConjuncts(toks);
     if (!parts) return std::nullopt;
 
-    std::vector<std::string> out;
+    std::vector<VanishedAssert::Subject> out;
     for (const auto& part : *parts)
-        if (auto name = parseConjunct(part)) out.push_back(*name);
+        if (auto subject = parseConjunct(part)) out.push_back(*subject);
     if (out.empty()) return std::nullopt;
     return out;
 }
@@ -262,11 +276,11 @@ public:
             spellings.push_back(pp_.getSpelling(*tok));
         }
 
-        auto names = parseAssertShape(spellings);
-        if (!names) return;
+        auto subjects = parseAssertShape(spellings);
+        if (!subjects) return;
 
         records().push_back({range.getBegin(), range.getEnd(),
-                             std::move(*names)});
+                             std::move(*subjects)});
     }
 
 private:
@@ -746,14 +760,31 @@ const AssertGuardMap& AssertGuardCache::get(const clang::FunctionDecl* func,
         const clang::Stmt* enclosingLoop = nullptr;
         if (!locateTarget(next, target, enclosingLoop)) continue;
 
-        for (const std::string& name : rec.names) {
-            auto it = byName.find(name);
+        for (const auto& subject : rec.subjects) {
+            auto it = byName.find(subject.base);
             if (it == byName.end() || !it->second) continue;  // unknown
             const clang::VarDecl* vd = it->second;
-            if (!vd->getType()->isPointerType()) continue;   // v1: pointers
+            if (!vd->getType()->isPointerType()) continue;
+            const clang::FieldDecl* field = nullptr;
+            if (subject.member) {
+                const auto* record =
+                    vd->getType()->getPointeeType()->getAsRecordDecl();
+                if (!record) continue;
+                const clang::RecordDecl* definition = record->getDefinition();
+                if (!definition) definition = record;
+                for (const clang::FieldDecl* candidate :
+                     definition->fields()) {
+                    if (candidate->getName() == *subject.member) {
+                        field = candidate;
+                        break;
+                    }
+                }
+                if (!field) continue;  // spelling must resolve honestly
+            }
             if (enclosingLoop && writesVar(enclosingLoop, vd))
                 continue;  // back edge would re-assert a rebound pointer
-            map[target].push_back({AssertGuard::Kind::NonNull, vd});
+            map[target].push_back(
+                {AssertGuard::Kind::NonNull, vd, field});
         }
     }
 
