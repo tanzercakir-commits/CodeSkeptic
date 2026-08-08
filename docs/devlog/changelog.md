@@ -1,5 +1,67 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 5.1 direct POSIX descriptor lifecycle
+
+CWE-775 now has a separate integer-resource dataflow rule instead of being
+forced through the pointer-oriented MemoryLeak lattice. The rule recognizes
+only global POSIX `open`, `openat`, `socket`, `dup`, and `mkstemp` calls as
+owned acquisitions and `close` as release. A global namespace check prevents
+same-named C++ namespace functions and methods from acquiring or releasing a
+descriptor accidentally. `shutdown` deliberately does not release ownership:
+POSIX still requires `close` to dispose of the descriptor.
+
+Each acquisition site carries an independent lifecycle and local integer
+bindings carry its origin. Exact local copies can release or transfer the
+same origin; return and global/reachable stores transfer responsibility.
+Ambiguous integer bindings degrade toward escape rather than manufacturing a
+leak. The `-1` failure sentinel is refined for `==`, `!=`, `< 0`, `>= 0`,
+`<= -1`, `> -1`, reversed comparisons, and logical negation. Branches, early
+returns, conditional cleanup, and cleanup labels therefore preserve a leak
+whenever any success path remains open while dropping the failed-acquisition
+path. Discarded acquisitions report at the call site. Wrapper propagation and
+custom resource models remain explicitly outside this first slice.
+
+The initial RED receipt was 6/16 failing test cases; the combined direct-
+acquirer case contained five independently checked opener failures. After the
+first GREEN pass, a precision review added three more RED cases showing that
+`vendor::open`, `vendor::close`, and `Sink::close` were incorrectly classified
+by unqualified name. The global-function constraint closed all three. The
+focused matrix is now 21/21 and pins direct acquisition/release, shutdown,
+sentinel branches, early returns, conditional and label cleanup, return/global
+transfer, local aliases, discarded results, namespace/method collisions, and
+an unrecognized integer factory.
+
+The exact Windows binary passed 998/998 tests both in the direct single-process
+run and through CTest. End-to-end CLI smoke produced exactly one experimental,
+report-only `resource-leak` with exit 0 for an unclosed `open`, and a clean exit
+0 for the guarded-and-closed twin. The frozen thesis gate remains
+`clean_fp=0`, `bug_caught=9/15`, and `total_findings=11`. The self-scan is
+clean and complete across 48/48 translation units (the new rule adds one),
+with zero broken TUs and zero incomplete functions. Corpus pins remain cJSON
+54 findings (76 attempted, 35 analyzed, 41 explicitly accepted broken
+fixtures) and tinyxml2 9 findings (3/3).
+
+Contract-first shadow audit considered 40 materially changed or created source
+functions. Production functions were `mergeLife`, both `Binding` comparisons,
+both `State` comparisons, `resourceLife`, `mergeStates`, `calleeName`,
+`isAcquireName`, `acquisition`, `asVar`, `isTrackableLocal`, `bindingFor`,
+`escape`, `release`, `integerConstant`, `swappedComparison`, `failureEdge`,
+the four `ResourceInventory` visitor methods, the `FdAnalysis` constructor and
+six analysis methods, `reportLeaks`, `analyzeFunction`, the callback
+constructor/run pair, and the three `FdResourceRule` methods. The two explicit
+test helpers plus the `main` and MCP registration functions complete the
+count; GoogleTest macro-generated bodies are not source-level contract
+targets.
+
+Dogfood was not applicable. The current referee can adjudicate selected
+zero/null/ownership summaries, but not enum-to-enum lattice relations,
+`StringRef`, containers, optional/set state, Clang AST identity, CFG
+transitions, diagnostic side effects, or analyzer lifetime. Counts: proposals
+0, eligible 0, rejected 0, unsupported 40. The independent RED suite exposed
+the planned implementation gap, and the later precision RED exposed the
+namespace/method assumption problem; no proposal exposed a separate problem.
+Candidate contracts requiring later human review: none. No `cs: ai` proposal
+became accepted intent.
 
 ## 2026-08-08 — Phase 4.7 opt-in library model files
 
