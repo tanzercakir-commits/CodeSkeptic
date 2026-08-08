@@ -40,6 +40,10 @@ const char* peName(PE v) {
     return "Opaque";
 }
 
+std::string aliasName(int v) {
+    return v < 0 ? "none" : "param#" + std::to_string(v);
+}
+
 // "Strong" claims: guarantees that change analysis results on the
 // caller side. Their loss/change is a weakening — callers leaning on
 // the claim must be re-examined.
@@ -48,6 +52,7 @@ bool rzStrong(RZ v) {
     return v == RZ::AlwaysZero || v == RZ::NeverZero;
 }
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
+bool aliasStrong(int v) { return v >= 0; }
 
 struct FieldVerdict {
     bool weakened = false;
@@ -94,6 +99,9 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                       rnStrong, rnName, "returnNullness", verdict, detail);
         classifyField(oldSum.returnZeroness, newSum.returnZeroness,
                       rzStrong, rzName, "returnZeroness", verdict, detail);
+        classifyField(oldSum.returnAliasParam, newSum.returnAliasParam,
+                      aliasStrong, aliasName, "returnAliasParam",
+                      verdict, detail);
 
         // Parameters are compared by index; vector sizes may differ
         // (the conservative merge may have emptied one) — paramEffect()

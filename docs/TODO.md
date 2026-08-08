@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = be577ab
-uçuşta = phase-precision-debt
+base   = e75bcab
+uçuşta = phase-interprocedural-v2
 ```
 <!-- cs:state-end -->
 
@@ -44,12 +44,14 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. Return-alias
-ilişkileri, parametre precondition/postcondition özetleri, yan etkiler ve
-ownership transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
-function-pointer çözümü ve kütüphane model dosyaları küçük dilimler halinde
-eklenecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
-bulgu artışı olmayacak.
+Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. İlk dilim olan
+exact pointer return-alias ilişkisi RED→GREEN tamamlandı; flow-sensitive yerel
+kopyalar, doğrudan/operator çağrı zincirleri, muhafazakâr merge, summary-diff
+ve v1-v6 uyumlu v7 kalıcılık testlerle kilitlendi. Sıradaki dilim parametre
+precondition/postcondition özetleri; ardından yan etkiler ve ownership
+transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
+function-pointer çözümü ve kütüphane model dosyaları gelecek. Her ilişki önce
+RED testle kanıtlanacak; gerçek korpusta kontrolsüz bulgu artışı olmayacak.
 
 ## Açık kullanıcı kararları
 

@@ -48,7 +48,7 @@ freed" path is infeasible). Function-call conditions are never keyed
 and the disjunct budget degrades gracefully to the classic merged
 analysis.
 
-## Interprocedural analysis (v1)
+## Interprocedural analysis (v2)
 
 Functions with visible bodies are summarized before rules run — return
 nullness (a `find()`-style function that can return null makes
@@ -60,6 +60,14 @@ parameter effects (free-wrappers count as frees, so double-free/
 use-after-free through wrappers is caught; read-only helpers no longer
 hide leaks behind them). Recursion-safe fixpoint; external and aliasing
 callees stay conservative.
+
+The v2 schema also records exact pointer return identity: a relation is
+published only when every reachable return aliases the same pointer
+parameter's entry object. Local copies and direct call chains preserve it;
+mixed sources, mutation and exposed write channels lose it conservatively.
+This identity relation is independent from null correspondence and is
+currently the proof input for the remaining ownership/side-effect v2 slices.
+Summary format v7 persists it while remaining able to read v1-v6 files.
 
 Summaries are deterministic and serializable (`--summary-out` /
 `--summary-in`), which is what makes the

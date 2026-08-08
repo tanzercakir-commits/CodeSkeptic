@@ -221,6 +221,10 @@ The MCP `analyze` tool accepts the same file via its optional
 Stale or malformed summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the
 weaker claim, so a wrong strong claim cannot enter through the file.
+The current v7 format includes exact pointer return-alias identity. Readers
+remain backward compatible with v1-v6 files; version-specific field counts are
+strict, so a newer column under an older header is rejected rather than
+guessed.
 
 ## Exit codes
 
