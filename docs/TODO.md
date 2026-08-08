@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = a4fc98f
-uçuşta = phase-v048-ghcr-legacy-cleanup
+base   = 3a056a0
+uçuşta = phase-v048-ghcr-current-digest
 ```
 <!-- cs:state-end -->
 
@@ -22,8 +22,10 @@ Serbest not (insanda kalır): Faz 0 analyzer/release zinciri v0.4.8 olarak
 Exact release SHA/tag binding PR #123, eski etiketlere güvenilir tarif desteği
 PR #124 ile indi. Korumalı republish `0.4.8` kimliğini doğrulayıp `v0.4.8` ve
 `latest` etiketlerini aynı doğru digest'e yayımladı. Yanlış GHCR `v0.4.9`
-versiyonu şimdi tek-tag + tam-digest kapılı geçici cleanup ile kaldırılacak;
-makbuzdan sonra cleanup adımı da silinecek.
+versiyonu tek-tag + tam-digest kapılı geçici cleanup ile kaldırılacak. İlk
+cleanup denemesi doğru imajın yeniden-build digest'inin değişebildiğini
+fail-closed yakaladı; current koruması şimdi `v0.4.8` + `latest` çiftiyle
+dinamik bağlanıyor. Makbuzdan sonra cleanup adımı da silinecek.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
