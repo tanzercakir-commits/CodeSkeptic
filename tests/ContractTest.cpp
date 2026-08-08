@@ -788,6 +788,24 @@ TEST(SidecarTest, RequiresFromSidecar_CallSiteViolation) {
     EXPECT_EQ(results[0].severity, Severity::Error);
 }
 
+TEST(SidecarTest, RequiresFromSidecar_SeedsCalleeBody) {
+    NullDerefRule rule;
+    const std::string body = R"(
+        int parse(int *arg) {
+            if (arg && arg[0] == 1) return 1;
+            return arg[0];
+        }
+    )";
+    auto control = runRule(
+        rule, body, ::testing::TempDir() + "cs_sc_seed_control.cc");
+    ASSERT_GE(control.size(), 1u);
+
+    const std::string src = writeSidecar(
+        "cs_sc_seed.cc", "parse/1: requires arg != null\n");
+    auto guarded = runRule(rule, body, src);
+    EXPECT_EQ(guarded.size(), 0u);
+}
+
 TEST(SidecarTest, EnsuresFromSidecar_ViolationPointsAtCskFile) {
     ContractRule rule;
     const std::string src = writeSidecar(

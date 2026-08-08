@@ -62,7 +62,7 @@ TEST(JsonReporterTest, PublishesPerFindingCapabilityMetadata) {
     result.findings = result.report_only_findings = 1;
     Diagnostic diagnostic;
     diagnostic.severity = Severity::Warning;
-    diagnostic.rule_id = "memory-leak";
+    diagnostic.rule_id = "bounds";
     diagnostic.file = "sample.cpp";
     diagnostic.line = diagnostic.column = 1;
     diagnostic.message = "leak";

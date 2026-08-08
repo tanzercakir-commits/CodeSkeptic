@@ -4,14 +4,14 @@
 // entry on one line: scripts/check_capabilities_sync.py also reads it to
 // prove README.md and docs/capabilities.md publish the same contract.
 CODESKEPTIC_RULE_CAPABILITY("uninit-ptr", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("memory-leak", Experimental, true, false, false, "Juliet precision 0.714; Phase 3 target >= 0.85")
-CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (97 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (198 TP / 0 FP)")
+CODESKEPTIC_RULE_CAPABILITY("memory-leak", Supported, true, true, true, "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85")
+CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (101 TP / 0 FP)")
+CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (212 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("resource-leak", Experimental, true, false, false, "per-rule precision sample pending")
 CODESKEPTIC_RULE_CAPABILITY("div-by-zero", Supported, true, true, true, "Juliet 1.000 precision (43 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("null-deref", Supported, true, true, true, "Juliet 1.000 precision (140 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("bounds", Experimental, true, false, false, "per-rule precision sample pending")
-CODESKEPTIC_RULE_CAPABILITY("int-overflow", Supported, true, true, true, "Juliet 1.000 precision (21 TP / 0 FP)")
+CODESKEPTIC_RULE_CAPABILITY("int-overflow", Supported, true, true, true, "Juliet 1.000 precision (23 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("sign-conversion", Experimental, true, false, false, "per-rule precision sample pending")
 CODESKEPTIC_RULE_CAPABILITY("alloc-size-overflow", Experimental, true, false, false, "per-rule precision sample pending")
 CODESKEPTIC_RULE_CAPABILITY("assumption", Experimental, false, false, false, "explicit --assumptions report-only mode")

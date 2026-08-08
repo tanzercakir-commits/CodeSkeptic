@@ -640,11 +640,11 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     return {vars.begin(), vars.end()};
 }
 
-// Flow-insensitive alias groups over direct local-to-local pointer
-// copies (`b = a;` / `T* b = a;` between tracked locals). Used ONLY to
-// propagate ESCAPES (see transfer): once one alias is handed out, the
-// allocation is reachable by the caller regardless of which name we
-// first saw it under.
+// Flow-insensitive alias groups over local-to-local pointer copies.
+// Every copy edge is collected BEFORE filtering for ownership, so a
+// tracked allocation can travel through multiple shadows or a local
+// pointer reference (Juliet variants 31/33). Only components connected
+// to a tracked owner are materialized.
 std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
         const FunctionDecl* funcDecl, ASTContext& ctx,
         const std::set<const VarDecl*>& tracked) {
@@ -656,49 +656,59 @@ std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
         return parent[v] = find(it->second);
     };
     auto unite = [&](const VarDecl* a, const VarDecl* b) {
-        // Register both nodes: the group materialization below walks
-        // the parent map's keys, so roots must appear there too.
         parent.emplace(a, a);
         parent.emplace(b, b);
         const VarDecl* ra = find(a);
         const VarDecl* rb = find(b);
         if (ra != rb) parent[ra] = rb;
     };
+    auto pointerLike = [](const VarDecl* v) {
+        if (!v) return false;
+        QualType type = v->getType();
+        if (type->isPointerType()) return true;
+        return type->isReferenceType() &&
+               type->getPointeeType()->isPointerType();
+    };
+    auto localPair = [&](const VarDecl* l, const VarDecl* r) {
+        return l && r && l != r && l->hasLocalStorage() &&
+               r->hasLocalStorage() && pointerLike(l) && pointerLike(r);
+    };
 
-    auto copyAssign = binaryOperator(
-        hasOperatorName("="),
-        hasLHS(ignoringParenImpCasts(declRefExpr(
-            to(varDecl(hasType(pointerType())).bind("lhs"))))),
-        hasRHS(ignoringParenCasts(declRefExpr(
-            to(varDecl(hasType(pointerType())).bind("rhs"))))));
+    auto copyAssign =
+        binaryOperator(hasOperatorName("=")).bind("assign");
     for (const auto& result :
          match(findAll(copyAssign), *funcDecl->getBody(), ctx)) {
-        const auto* l = result.getNodeAs<VarDecl>("lhs");
-        const auto* r = result.getNodeAs<VarDecl>("rhs");
-        if (l && r && l != r && l->hasLocalStorage() &&
-            (tracked.count(l) || tracked.count(r)))
-            unite(l, r);
+        const auto* assign = result.getNodeAs<BinaryOperator>("assign");
+        if (!assign) continue;
+        const VarDecl* l = asVar(assign->getLHS());
+        const VarDecl* r = asVar(assign->getRHS());
+        if (localPair(l, r)) unite(l, r);
     }
-    auto copyInit = varDecl(
-        hasType(pointerType()),
-        hasInitializer(ignoringParenCasts(declRefExpr(
-            to(varDecl(hasType(pointerType())).bind("rhs")))))).bind("lhs");
+
+    auto copyInit =
+        varDecl(hasInitializer(expr().bind("init"))).bind("lhs");
     auto wrapper = functionDecl(equalsNode(funcDecl),
                                  forEachDescendant(copyInit));
     for (const auto& result : match(wrapper, *funcDecl, ctx)) {
         const auto* l = result.getNodeAs<VarDecl>("lhs");
-        const auto* r = result.getNodeAs<VarDecl>("rhs");
-        if (l && r && l != r && l->hasLocalStorage() &&
-            (tracked.count(l) || tracked.count(r)))
-            unite(l, r);
+        const auto* init = result.getNodeAs<Expr>("init");
+        const VarDecl* r = asVar(init);
+        if (localPair(l, r)) unite(l, r);
     }
 
-    // Materialize: for each var, its group members (self excluded)
     std::map<const VarDecl*, std::vector<const VarDecl*>> byRoot;
     for (const auto& [v, _] : parent) byRoot[find(v)].push_back(v);
     std::map<const VarDecl*, std::vector<const VarDecl*>> groups;
     for (const auto& [root, members] : byRoot) {
+        (void)root;
         if (members.size() < 2) continue;
+        bool ownsTracked = false;
+        for (const VarDecl* v : members)
+            if (tracked.count(v)) {
+                ownsTracked = true;
+                break;
+            }
+        if (!ownsTracked) continue;
         for (const VarDecl* v : members) {
             auto& list = groups[v];
             for (const VarDecl* other : members)

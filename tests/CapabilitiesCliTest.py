@@ -54,6 +54,7 @@ if len({rule.get("id") for rule in rules}) != len(rules):
 
 expected_supported = {
     "double-free",
+    "memory-leak",
     "use-after-free",
     "div-by-zero",
     "null-deref",
@@ -105,4 +106,4 @@ text_result = subprocess.run(
 if text_result.returncode != 0 or "experimental rules:" not in text_result.stdout:
     fail("human-readable discovery contract failed")
 
-print("CAPABILITIES_CLI_OK schema=2 rules=14 supported=5 out_of_scope=5")
+print("CAPABILITIES_CLI_OK schema=2 rules=14 supported=6 out_of_scope=5")
