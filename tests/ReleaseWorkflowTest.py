@@ -47,6 +47,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertEqual(workflow.count("gh release create"), 1)
         prepare = job("prepare")
         self.assertIn("gh release create", prepare)
+        self.assertIn("GH_REPO: ${{ github.repository }}", prepare)
         self.assertIn("--json isDraft", prepare)
         self.assertIn('test "$draft" = "true"', prepare)
         for platform in ("linux", "macos", "windows"):
