@@ -129,21 +129,22 @@ jobs:
           PACKAGE_NAME: codeskeptic
           LEGACY_TAG: v0.4.9
           LEGACY_DIGEST: sha256:03b346e66f1b292a5c2a1ddd1b5cb9190d21899077b6d646eee115f320d6197c
-          CURRENT_DIGEST: sha256:039b10d81dbceb6cd8d16c93c4e640b84febc55e02365b0537e78652f90e9f56
         run: |
           endpoint="/users/$OWNER/packages/container/$PACKAGE_NAME/versions?per_page=100"
           versions=$(gh api -H "Accept: application/vnd.github+json" "$endpoint")
           count=$(jq 'length' <<<"$versions")
           test "$count" -lt 100
 
-          current_before=$(jq -c --arg digest "$CURRENT_DIGEST" '
+          current_before=$(jq -c '
             [.[] | select(
-              .name == $digest and
               (((.metadata.container.tags // []) | index("v0.4.8")) != null) and
               (((.metadata.container.tags // []) | index("latest")) != null)
             )]
           ' <<<"$versions")
           test "$(jq 'length' <<<"$current_before")" -eq 1
+          current_digest=$(jq -r '.[0].name' <<<"$current_before")
+          [[ "$current_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$current_digest" != "$LEGACY_DIGEST"
 
           matches=$(jq -c --arg tag "$LEGACY_TAG" --arg digest "$LEGACY_DIGEST" '
             [.[] | select(
@@ -174,7 +175,7 @@ jobs:
           ' <<<"$remaining_versions")
           test "$remaining" -eq 0
 
-          current_after=$(jq -c --arg digest "$CURRENT_DIGEST" '
+          current_after=$(jq -c --arg digest "$current_digest" '
             [.[] | select(
               .name == $digest and
               (((.metadata.container.tags // []) | index("v0.4.8")) != null) and

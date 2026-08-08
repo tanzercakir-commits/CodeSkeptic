@@ -67,6 +67,17 @@ and exactly the sole tag `v0.4.9`; any ambiguity fails without deleting. It
 also re-lists the package and requires both the digest and tag to be absent.
 The step is removed after its deletion receipt is recorded.
 
+The first cleanup dispatch (`31237082007`) was superseded before publication
+by the single concurrency winner (`31237090369`). That run again passed exact
+source build, smoke and publish, producing the correct `0.4.8` image at the new
+digest `sha256:bc6994d7f6e0fdcbfedf38813b36c7e663a4aae0eb25194161d8b74fbc2d0fb0`,
+then failed closed before deletion. Container rebuilds are not byte-for-byte
+reproducible, so pinning the previous *good* digest was not a stable protection.
+The guard now derives exactly one current version carrying both `v0.4.8` and
+`latest`, requires that digest to differ from the stale digest, and requires
+that same dynamically bound digest and both tags after deletion. The stale
+target itself remains fixed by its exact digest and sole tag.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is
