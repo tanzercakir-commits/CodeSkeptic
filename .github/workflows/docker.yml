@@ -4,7 +4,7 @@ name: Docker
 # gate). A successful Release workflow additionally publishes to
 # ghcr.io as its exact tag and latest. The smoke is the same contract
 # as the release tarball's:
-# analyze docs/demo.c in the fresh image -> exactly exit 1, findings
+# analyze docs/demo.c in the fresh image -> exactly exit 1, supported findings
 # present.
 on:
   push:
@@ -71,7 +71,7 @@ jobs:
           fi
           docker build "${args[@]}" -f "$PWD/Dockerfile" -t codeskeptic:test "$context" 2>&1 | tee /tmp/docker_build.log
 
-      - name: Smoke (fresh image, demo.c, exit 1 + findings)
+      - name: Smoke (fresh image, demo.c, exit 1 + supported findings)
         id: smoke
         run: |
           docs="$PWD/docs"

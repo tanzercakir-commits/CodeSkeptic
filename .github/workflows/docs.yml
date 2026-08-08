@@ -75,9 +75,9 @@ jobs:
           set -o pipefail
           bash -ex /tmp/setup.sh 2>&1 | tee /tmp/setup.log
 
-      - name: Run the analyze line (must find the demo bugs, exit 1)
+      - name: Run the analyze line (must find supported demo bugs, exit 1)
         # The last quickstart line runs the analyzer on docs/demo.c.
-        # Exit code must be exactly 1 (findings reported) and the
+        # Exit code must be exactly 1 (supported findings reported) and the
         # output must actually contain findings — a build breakage or
         # a silent analyzer would both fail here.
         run: |

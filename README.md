@@ -182,13 +182,14 @@ Read its silence accordingly:
   missed case is *classified*: by-design silences (float division,
   opaque `rand()`) vs addressable gaps, so the denominator is honest.
   Numbers and why: [docs/benchmarks.md](docs/benchmarks.md).
-- **`memory-leak` is the one noisy rule** (Juliet precision 0.714 vs
-  1.000 for the others) and the standing improvement target — evaluate
-  it separately ([how](docs/evaluate.md)).
+- **`memory-leak` is experimental/report-only** (Juliet precision 0.714
+  vs 1.000 for supported rules) and the standing Phase 3 improvement
+  target — evaluate it separately ([how](docs/evaluate.md)).
 - **A compiled-out assert is believed, not checked.** Under `NDEBUG` the
   condition never runs, but CodeSkeptic recovers it from the preprocessor
   and trusts it — `--no-assert-recovery` reports the shipped build instead.
-- Checked bug classes only: the [rules below](#rules) — not style, not concurrency, not undefined behavior at large.
+- **Out of scope for v1:** `injection-taint`, `race-detection`,
+  `automatic-fixes`, `ide`, `cloud-dashboard`; CWE count is not a success metric.
 
 ## Use it alongside, not instead
 
@@ -206,33 +207,33 @@ others are weakest: gating *new* changes (human or AI-generated).
 
 ## Rules
 
-| Rule | ID | Detects |
-|------|----|---------|
-| Uninitialized pointer | `uninit-ptr` | Dereference of a pointer that may be unassigned on some path (CFG dataflow) |
-| Memory leak | `memory-leak` | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
-| Double free | `double-free` | Freeing a pointer already in freed state (shares the memory-leak dataflow) |
-| Use after free | `use-after-free` | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
-| Resource leak | `resource-leak` | A `FILE*`/`DIR*` from `fopen`/`freopen`/`fdopen`/`tmpfile`/`opendir` lost without a matching `fclose`/`closedir` (CWE-404) — built-in, classified apart from heap `memory-leak` |
-| Division by zero | `div-by-zero` | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
-| Null dereference | `null-deref` | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
-| Array/heap bounds | `bounds` | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
-| Integer overflow / underflow | `int-overflow` | Signed `*`/`+`/`-` whose proven ranges escape the type (CWE-190 overflow, CWE-191 subtraction underflow) — including 64-bit operands, results implicitly narrowed into a smaller type (`char r = d + 1`), and untrusted sources (`int n = atoi(s); n * k`) |
-| Sign conversion | `sign-conversion` | An untrusted signed value converted to unsigned while provably able to be negative (CWE-195), turning a small length into a huge one — opt-in via `--untrusted-int-sources`; allocator sizes are the alloc-size rule's domain |
-| Alloc-size overflow | `alloc-size-overflow` | An untrusted length that wraps an unsigned allocation-size computation (`malloc(sizeof(T) * (n + 1))`) to a small value before the allocator sees it (CWE-131) — opt-in via `--untrusted-int-sources` |
-| Assumption | `assumption` | An honest **may**-warning where null-safety rests on an unproven invariant (an accessor that may return null, a param dereferenced without a check) — the class a `// cs:` contract or a baseline resolves |
-| Contract verification | `contract` | Violations of declared `// cs:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries |
-| Policy enforcement | `policy` | `cs:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
+| Rule | ID | Tier | Verdict | Detects |
+|------|----|------|---------|---------|
+| Uninitialized pointer | `uninit-ptr` | experimental | report-only | Dereference of a pointer that may be unassigned on some path (CFG dataflow) |
+| Memory leak | `memory-leak` | experimental | report-only | Leaks at function exit and reassignment leaks, `malloc`/`calloc`/`strdup`/`free` and `new`/`delete` (CFG dataflow with escape analysis) |
+| Double free | `double-free` | supported | blocking | Freeing a pointer already in freed state (shares the memory-leak dataflow) |
+| Use after free | `use-after-free` | supported | blocking | Dereference (`*p`, `p->`, `p[i]`) of a pointer in freed state (shares the memory-leak dataflow) |
+| Resource leak | `resource-leak` | experimental | report-only | A `FILE*`/`DIR*` from `fopen`/`freopen`/`fdopen`/`tmpfile`/`opendir` lost without a matching `fclose`/`closedir` (CWE-404) — built-in, classified apart from heap `memory-leak` |
+| Division by zero | `div-by-zero` | supported | blocking | Definite and possible integer division/modulo by zero, with **branch-condition refinement** — `if (z != 0)` guards are understood, so guarded divisions don't produce false positives |
+| Null dereference | `null-deref` | supported | blocking | Definite and possible dereference of null pointers; tracks `nullptr`/`NULL`/`0` flow with branch-condition refinement (`if (p)`, `if (!p) return`, `p != nullptr`, short-circuit `&&`/`\|\|`); unknown values stay silent, so unguarded parameters don't spam warnings |
+| Array/heap bounds | `bounds` | experimental | report-only | Out-of-bounds access proven whole-range, and copies (`memcpy`/`memmove`/`memset`, `strcpy`/`strcat`/`gets`) past a fixed-size destination (CWE-125/787/120), on an interval + extent lattice |
+| Integer overflow / underflow | `int-overflow` | supported | blocking | Signed `*`/`+`/`-` whose proven ranges escape the type (CWE-190 overflow, CWE-191 subtraction underflow) — including 64-bit operands, results implicitly narrowed into a smaller type (`char r = d + 1`), and untrusted sources (`int n = atoi(s); n * k`) |
+| Sign conversion | `sign-conversion` | experimental | report-only | An untrusted signed value converted to unsigned while provably able to be negative (CWE-195), turning a small length into a huge one — opt-in via `--untrusted-int-sources`; allocator sizes are the alloc-size rule's domain |
+| Alloc-size overflow | `alloc-size-overflow` | experimental | report-only | An untrusted length that wraps an unsigned allocation-size computation (`malloc(sizeof(T) * (n + 1))`) to a small value before the allocator sees it (CWE-131) — opt-in via `--untrusted-int-sources` |
+| Assumption | `assumption` | experimental | report-only | An honest **may**-warning where null-safety rests on an unproven invariant (an accessor that may return null, a param dereferenced without a check) — the class a `// cs:` contract or a baseline resolves |
+| Contract verification | `contract` | experimental | report-only | Violations of declared `// cs:` contracts (preconditions, postconditions, ownership effects) — checked by the same dataflow that infers summaries |
+| Policy enforcement | `policy` | experimental | report-only | `cs:policy` pattern prohibitions; v1 ships `no-absolute-paths` (hard-coded absolute path literals) |
 
-The machinery behind the table — intrinsic-source recall, targeted
-path-sensitivity, interprocedural function summaries — is described in
+The full [capability contract](docs/capabilities.md) defines these tiers,
+interfaces and explicit non-goals; analysis machinery is in
 [docs/engine.md](docs/engine.md).
 
 ## The numbers
 
 Two axes, tracked separately ([full methodology](docs/benchmarks.md)):
 
-- **Mature code (NIST Juliet 1.3):** rule precision **1.000** on five
-  of six rules (memory-leak 0.714); recall 0.496 / 0.347 / 0.242 /
+- **Mature code (NIST Juliet 1.3):** rule precision **1.000** on all five
+  supported rules (experimental memory-leak: 0.714); recall 0.496 / 0.347 / 0.242 /
   0.193 / 0.108 / 0.052 by CWE — lower bounds with a classified
   denominator (floating-point variants and opaque sources are
   by-design silences, not gaps), every improvement locked by a
