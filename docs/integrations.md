@@ -28,8 +28,10 @@ SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
 function that could never return null now can, a callee that used to
 be read-only now stores its argument. Losing or changing an exact pointee
 access, parameter-ownership, return-ownership, return-alias, or output
-postcondition claim is also a weakening. Preconditions use the
-caller-compatibility direction: adding a new non-null obligation, or changing
+postcondition claim is also a weakening. Adding a possible field write,
+replacing an exact field set with unknown, or changing to an incomparable
+set is likewise WEAKENED; removing possible writes is STRENGTHENED.
+Preconditions use the caller-compatibility direction: adding a new non-null obligation, or changing
 rejection into crash, is WEAKENED; removing/softening it is STRENGTHENED. The
 exit code is `1` for a weakening,
 so the diff doubles as a CI gate: *this change silently altered function

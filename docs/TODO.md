@@ -44,24 +44,23 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. İlk dilim olan
-exact pointer return-alias ilişkisi RED→GREEN tamamlandı; flow-sensitive yerel
-kopyalar, doğrudan/operator çağrı zincirleri, muhafazakâr merge, summary-diff
-ve v1-v6 uyumlu v7 kalıcılık testlerle kilitlendi. Parametre precondition/
-postcondition dilimi de RED→GREEN tamamlandı: cross-TU crash/reject non-null
-girişleri, kesin `T**`/`T*&` Null/NonNull çıkışları, zincir/operator bileşimi,
-muhafazakâr alias/path merge, v1-v7 uyumlu v8 kalıcılık ve summary-diff yönleri
-kilitlendi. Yan etki/ownership dilimi de RED→GREEN: pointee read/write,
-Borrowed/Consumed/Transferred parametre ownership'i, Owned/Borrowed dönüşler,
-cross-TU leak/contract tüketimi ve v1-v8 uyumlu katı v9 kalıcılık birbirinden
-bağımsız ilişkiler olarak kilitlendi. Call-graph SCC dilimi de RED→GREEN:
-doğrudan görünür çağrılar callee-first Tarjan bileşenleriyle çözülüyor, derin
-asiklik zincirler kaynak sırasından bağımsız ve özyinelemeli bileşenler
-muhafazakâr başlangıçtan senkron sabit noktaya gidiyor. 922/922 test ve sabit
-cJSON 54 / tinyxml2 9 korpus makbuzu alındı. Sıradaki dilim alan duyarlılığı;
-ardından kontrollü function-pointer çözümü ve kütüphane model dosyaları
-gelecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
-bulgu artışı olmayacak.
+Bağlayıcı ürün programında Faz 4 interprocedural motor v2'nin ilk beş dilimi
+RED→GREEN tamamlandı: exact pointer return-alias (v7), parametre precondition/
+postcondition (v8), bağımsız side-effect/ownership ilişkileri (v9), callee-first
+call-graph SCC sabit noktası ve alan-duyarlı yazma etkileri (v10).
+
+Alan-duyarlılığı; pointer ve record-reference parametrelerinde kesin tek-atlamalı
+may-write kümelerini, sibling-field korunmasını, `(*p).field`, temiz alias,
+alan adresi/reference'i, dönüş aliası, whole-object yazımı, const/non-const üye
+metodu, doğrudan zincir, cross-TU kalıcılık, muhafazakâr merge ve summary-diff
+yönlerini kapsıyor. v1-v9 dosyaları muhafazakâr okunuyor; bozuk v10 genişliği,
+vektör uzunluğu ve alan kodlaması toptan reddediliyor. Tam Windows kapısı
+956/956; exact korpus cJSON 54 (76 attempted / 35 analyzed / 41 açıkça kabul
+edilmiş broken) ve tinyxml2 9 (3/3), Faz 4.4'e göre bulgu-site deltası sıfır.
+
+Sıradaki dilim kontrollü function-pointer hedef çözümü; ardından kütüphane
+model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak; tam suite,
+doküman senkronu ve gerçek korpus kapıları geçmeden dilim kapanmayacak.
 
 ## Açık kullanıcı kararları
 

@@ -858,7 +858,7 @@ public:
         // truth. Domain logic below then reads the fact-current state.
         State in = inRaw;
         codeskeptic::applyStmtFactsOps(in, stmt, stampable_, ptrFacts_,
-                                      ops());
+                                      ops(), false);
         // #70: an assignment to a guard variable stales every
         // implication keyed on it — the exact mirror of the fact
         // erasure applyStmtFacts just performed.
@@ -880,14 +880,141 @@ public:
         }
         if (const auto* call = dyn_cast<CallExpr>(stmt)) {
             if (const auto* bases = codeskeptic::activeMemberFactBases()) {
-                for (const Expr* arg : call->arguments()) {
-                    const VarDecl* base = codeskeptic::addrOfBaseVar(arg);
+                const FunctionDecl* callee = call->getDirectCallee();
+                const auto* summary =
+                    codeskeptic::SummaryRegistry::instance().lookup(callee);
+                const unsigned offset = callParamArgOffset(call, callee);
+                for (unsigned argIndex = 0;
+                     argIndex < call->getNumArgs(); ++argIndex) {
+                    const Expr* arg = call->getArg(argIndex);
+                    const Expr* stripped = arg->IgnoreParenCasts();
+                    const VarDecl* base =
+                        codeskeptic::addrOfBaseVar(arg);
+                    bool directReference = false;
+                    if (!base && callee && argIndex >= offset) {
+                        const unsigned paramIndex = argIndex - offset;
+                        if (paramIndex < callee->getNumParams()) {
+                            QualType type =
+                                callee->getParamDecl(paramIndex)->getType();
+                            if (type->isReferenceType()) {
+                                QualType referred =
+                                    type.getNonReferenceType();
+                                if (!referred.isConstQualified() &&
+                                    referred->isRecordType()) {
+                                    const Expr* value =
+                                        stripped->IgnoreParenImpCasts();
+                                    if (const auto* ref =
+                                            dyn_cast<DeclRefExpr>(value)) {
+                                        base = dyn_cast<VarDecl>(
+                                            ref->getDecl());
+                                        directReference = base != nullptr;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (!base || !bases->count(base)) continue;
-                    for (auto& d : in)
-                        for (auto& [var, val] : d.vars)
+
+                    // Field precision is valid only for `&whole_object`.
+                    // Passing `&c.field` exposes that field itself, so the
+                    // legacy all-facts invalidation remains conservative.
+                    bool wholeObject = directReference;
+                    if (const auto* address =
+                            dyn_cast<UnaryOperator>(stripped)) {
+                        if (address->getOpcode() == UO_AddrOf) {
+                            const Expr* target = address->getSubExpr()
+                                ->IgnoreParenImpCasts();
+                            if (const auto* ref =
+                                    dyn_cast<DeclRefExpr>(target))
+                                wholeObject = ref->getDecl() == base;
+                        }
+                    }
+
+                    const codeskeptic::SummaryRegistry::FieldWriteSet*
+                        exact = nullptr;
+                    if (wholeObject && callee && summary &&
+                        argIndex >= offset) {
+                        const unsigned paramIndex = argIndex - offset;
+                        if (paramIndex < callee->getNumParams())
+                            exact = summary->exactParamFieldWrites(paramIndex);
+                    }
+                    bool memberChanged = false;
+                    for (auto& d : in) {
+                        for (auto it = d.facts.begin();
+                             it != d.facts.end();) {
+                            const bool matches =
+                                it->first.var == base && it->first.field &&
+                                (!exact || exact->fields.count(
+                                    it->first.field->getNameAsString()));
+                            if (matches) {
+                                it = d.facts.erase(it);
+                                memberChanged = true;
+                            } else {
+                                ++it;
+                            }
+                        }
+                        for (auto& [var, val] : d.vars) {
                             if (val.fact && val.fact->var == base &&
-                                val.fact->field)
+                                val.fact->field &&
+                                (!exact || exact->fields.count(
+                                    val.fact->field->getNameAsString()))) {
                                 val.fact.reset();
+                                memberChanged = true;
+                            }
+                        }
+                    }
+                    if (memberChanged)
+                        codeskeptic::normalizeGuardedOps(in, ops());
+                }
+                if (const auto* memberCall =
+                        dyn_cast<CXXMemberCallExpr>(call)) {
+                    const CXXMethodDecl* method =
+                        memberCall->getMethodDecl();
+                    const Expr* object =
+                        memberCall->getImplicitObjectArgument();
+                    if (method && object) {
+                        object = object->IgnoreParenImpCasts();
+                        const auto* ref =
+                            dyn_cast<DeclRefExpr>(object);
+                        const auto* base = ref
+                            ? dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+                        if (base && bases->count(base)) {
+                            const auto affectedByMethod =
+                                [method](const ValueDecl* field) {
+                                    const auto* member =
+                                        dyn_cast_or_null<FieldDecl>(field);
+                                    return !method->isConst() ||
+                                           (member && member->isMutable());
+                                };
+                            bool memberChanged = false;
+                            for (auto& d : in) {
+                                for (auto it = d.facts.begin();
+                                     it != d.facts.end();) {
+                                    const bool matches =
+                                        it->first.var == base &&
+                                        it->first.field &&
+                                        affectedByMethod(it->first.field);
+                                    if (matches) {
+                                        it = d.facts.erase(it);
+                                        memberChanged = true;
+                                    } else {
+                                        ++it;
+                                    }
+                                }
+                                for (auto& [var, val] : d.vars) {
+                                    if (val.fact &&
+                                        val.fact->var == base &&
+                                        val.fact->field &&
+                                        affectedByMethod(val.fact->field)) {
+                                        val.fact.reset();
+                                        memberChanged = true;
+                                    }
+                                }
+                            }
+                            if (memberChanged)
+                                codeskeptic::normalizeGuardedOps(in, ops());
+                        }
+                    }
                 }
             }
         }

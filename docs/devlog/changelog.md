@@ -1,5 +1,46 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 4.5 field-sensitive effect summaries
+
+Interprocedural v2 now records the exact set of one-hop record fields that
+may be written through each pointer or reference parameter. Direct
+arrow/dot stores, `(*p).field`, clean pointer aliases, field addresses and
+references, returned aliases, record-reference parameters, and direct call
+chains compose through the call-graph SCC fixed point. Whole-object writes,
+non-const member calls, opaque/indirect calls, captures, ambiguous aliases,
+and escaped whole-record references remain conservative. Const member calls
+write only their declared `mutable` fields; rvalue-record references retain
+the same exact caller binding as lvalue-record references.
+
+NullDeref consumes the relation for its member-keyed guard implications.
+Passing `&c`, or `c` to a non-const record reference, invalidates only the
+exact fields a visible/persisted callee may write. Sibling-field and
+read-only calls preserve correlation. Unknown effects, `&c.field`,
+whole-object writes, and direct non-const calls on `c` still invalidate
+conservatively; direct const calls invalidate only `mutable` fields. The same
+rules cover calls used as initializers rather than only standalone call
+statements.
+
+Summary format v10 adds a strict field-write vector: `?` is unknown, `!` is
+the exact empty set, and comma-separated identifiers are the deterministic
+may-write set. Readers accept v1-v9 conservatively; v10 segment counts,
+identifiers, duplicates, delimiters, and row widths are rejected strictly
+when malformed. Cross-TU collisions union exact may-write sets and fall to
+unknown if either side is unknown. Summary-diff classifies added writes,
+unknown loss, and incomparable sets as WEAKENED; removed writes are
+STRENGTHENED.
+
+RED receipts covered a sibling-field false invalidation and the soundness
+boundaries for guard writes, `(*p).field`, address/reference aliases,
+returned field/record aliases, record-reference whole-object assignment,
+non-const versus const methods, and persistence/cross-TU composition. The
+final focused matrix is 87/87. The full Windows suite grew from 922 to
+956 tests and is 956/956 green.
+
+The exact historical corpus lane is unchanged at cJSON 54
+(76 attempted, 35 analyzed, 41 explicitly accepted broken fixtures) and
+tinyxml2 9 (3/3). Primary finding-site deltas against Phase 4.4 are zero
+for both corpora.
 ## 2026-08-08 — Phase 4.4 call-graph SCC fixed point
 
 Visible same-translation-unit direct calls now form an explicit call graph.

@@ -89,10 +89,27 @@ aliases are Borrowed; mixed, opaque, capture, and conflicting flows remain
 Unknown. MemoryLeak consumes the ownership relations, and ContractRule now
 verifies `owns`, `borrows`, and `returns owned` against the same facts.
 
-Summary format v9 persists the access (`O/R/W/B/U`), parameter ownership
-(`B/C/T/U`), and return ownership (`B/O/U`) fields alongside the v8
-pre/postcondition vectors. Readers still accept v1-v8 files; old parameter
-effects are conservatively upgraded for ownership behavior.
+Record pointers and record references carry an additional field-write
+relation: the exact set of one-hop fields that may be written through that
+parameter. Arrow/dot stores, `(*p).field`, clean pointer aliases, field
+addresses/references, record-reference parameters, and direct call chains
+compose through the same SCC solver. Whole-object stores, non-const member
+calls, opaque/indirect calls, escaping ambiguity, and captures fall back to
+“unknown fields.” Const member calls contribute only the record's declared
+`mutable` fields, and both lvalue- and rvalue-record references retain exact
+caller binding. A caller passing `&c`, or `c` to a non-const record
+reference, therefore invalidates only correlated facts for fields in an
+exact set; unknown effects and direct non-const calls on `c` still invalidate
+all of its member facts, while direct const calls invalidate only `mutable`
+fields.
+
+Summary format v10 persists this relation after the v9 access
+(`O/R/W/B/U`), parameter ownership (`B/C/T/U`), and return ownership
+(`B/O/U`) fields. `?` means unknown fields, `!` proves no field write, and
+comma-separated identifiers are the exact may-write set. Readers still
+accept v1-v9 files; older rows acquire an unknown field relation and all
+version-specific widths, vector lengths, codes, and identifiers remain
+strict.
 
 Summaries are deterministic and serializable (`--summary-out` /
 `--summary-in`), which is what makes the

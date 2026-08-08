@@ -305,3 +305,55 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     EXPECT_EQ(reportSummaryDiff("/no/such.txt", newPathWeak, out2,
                                 /*gateWeakened=*/false), 2);
 }
+
+TEST(SummaryDiffTest, AddedPossibleFieldWriteIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet oldFields;
+    oldFields.known = true;
+    oldFields.fields = {"other"};
+    oldSum.paramFieldWrites = {oldFields};
+
+    auto newSum = oldSum;
+    newSum.paramFieldWrites[0].fields.insert("guard");
+    auto result = diffSummaries({{"touch/1", oldSum}},
+                                {{"touch/1", newSum}});
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.fieldWrites: {other} -> {guard,other}"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, RemovedPossibleFieldWriteIsStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet fields;
+    fields.known = true;
+    fields.fields = {"guard", "other"};
+    oldSum.paramFieldWrites = {fields};
+
+    auto newSum = oldSum;
+    newSum.paramFieldWrites[0].fields.erase("guard");
+    auto result = diffSummaries({{"touch/1", oldSum}},
+                                {{"touch/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+}
+
+TEST(SummaryDiffTest, ExactFieldWritesLostIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    SummaryRegistry::FieldWriteSet exact;
+    exact.known = true;
+    oldSum.paramFieldWrites = {exact};
+    auto unknownSum = oldSum;
+    unknownSum.paramFieldWrites = {SummaryRegistry::FieldWriteSet{}};
+
+    auto lost = diffSummaries({{"inspect/1", oldSum}},
+                              {{"inspect/1", unknownSum}});
+    ASSERT_EQ(lost.weakened, 1u);
+    EXPECT_NE(lost.changes[0].detail.find(
+                  "param#0.fieldWrites: {} -> unknown"),
+              std::string::npos);
+
+    auto gained = diffSummaries({{"inspect/1", unknownSum}},
+                                {{"inspect/1", oldSum}});
+    ASSERT_EQ(gained.strengthened, 1u);
+}

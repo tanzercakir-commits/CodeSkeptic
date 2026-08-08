@@ -4,6 +4,7 @@
 #include "engine/Interval.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -14,32 +15,24 @@ class FunctionDecl;
 
 namespace codeskeptic {
 
-// Interprocedural analysis v1: TU-local function summaries.
+// Interprocedural analysis v2: deterministic function summaries.
 //
-// Two pieces of information are extracted:
-//  1. Return nullness — if the function returns a pointer, can the
-//     return value never be null on any path (NeverNull), be null on
-//     some paths (MaybeNull), or is it unknown (Unknown)?
-//  2. Parameter effects — does the body free the parameter (Frees),
-//     only read it (ReadsOnly), or store/escape it (Stores)?
-//     Functions whose body is not visible are Opaque.
+// Independent relations cover return nullness/zeroness/ownership and
+// identity, parameter effects/access/ownership, entry preconditions,
+// output postconditions, and exact one-hop record fields that may be
+// written. Keeping the axes separate lets callers consume a strong fact
+// without inventing strength on an unrelated relation.
 //
-// Scope and safety limits (v1):
-//  - Only functions whose BODY is visible in the same TU get
-//    summarized; outsiders stay Opaque (callers act conservatively).
-//  - Blind to aliases: assigning the parameter to ANYTHING ELSE
-//    (locals included) counts as Stores — cJSON_Delete's
-//    `q = p; free(q)` pattern is deliberately left Escaped
-//    (v2: alias tracking).
-//  - Return nullness is limited to literal/new/&x/string and call
-//    chains; paths that return a variable fall to Unknown.
+// Visible bodies are solved TU-locally; externally linked summaries can
+// be harvested, persisted, and loaded for cross-TU callers. Clean local
+// aliases and direct calls compose. Opaque/indirect calls, ambiguous
+// aliases, captures, and conflicting paths degrade only the affected
+// relations to their conservative value.
 //
-// Convergence: summaries are recomputed from scratch over a bounded
-// number of sweeps (<= kMaxSweeps); we stop once nothing changes. A
-// recursive function sees its own previous summary — the
-// Unknown/Opaque start keeps strong claims such as NeverNull and
-// ReadsOnly/Frees from leaking in through recursion (no optimism in
-// the wrong direction).
+// Visible direct calls form a call graph. Acyclic components are evaluated
+// callee-first; recursive strongly connected components iterate
+// synchronously from conservative seeds to an exact fixed point. A safety
+// guard falls back conservatively if a future relation fails to converge.
 class SummaryRegistry {
 public:
     enum class ReturnNullness { Unknown, NeverNull, MaybeNull };
@@ -57,6 +50,17 @@ public:
     enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
     enum class ParamPostcondition { Unknown, Null, NonNull };
 
+    // Exact one-hop fields that may be written through a record pointer
+    // or reference. known=false is conservative; known=true with an empty
+    // set proves that the callee writes no fields through this parameter.
+    struct FieldWriteSet {
+        bool known = false;
+        std::set<std::string> fields;
+        bool operator==(const FieldWriteSet& other) const {
+            return known == other.known && fields == other.fields;
+        }
+    };
+
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
@@ -70,6 +74,7 @@ public:
         // ownership transfer merely because the pointer value escapes.
         std::vector<ParamAccess> paramAccesses;
         std::vector<ParamOwnership> paramOwnerships;
+        std::vector<FieldWriteSet> paramFieldWrites;
 
         // Entry requirements inferred from the callee's own leading
         // guard, and exact normal-return effects on pointer out-params.
@@ -133,6 +138,13 @@ public:
             return paramAccesses[index];
         }
 
+        const FieldWriteSet* exactParamFieldWrites(unsigned index) const {
+            if (index >= paramFieldWrites.size() ||
+                !paramFieldWrites[index].known)
+                return nullptr;
+            return &paramFieldWrites[index];
+        }
+
         ParamOwnership paramOwnership(unsigned index) const {
             if (index < paramOwnerships.size()) return paramOwnerships[index];
             // v1-v8 compatibility: preserve the old caller behavior when
@@ -178,7 +190,7 @@ public:
     // like Juliet, occur in every file under the same name; keying
     // them would produce false matches. C++ overloads may land on the
     // same key: on collision, fields merge conservatively
-    // (returnNullness -> Unknown, param -> Opaque) — ambiguity always
+    // relation by relation toward weaker claims — ambiguity always
     // loses, no false strong claim can arise.
 
     // Folds the externally-linked summaries of the TU-local table into

@@ -810,10 +810,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v9\n"
-              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n"
-              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\tUU\tUC\tU\n"
-              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\t-\t-\tU\n");
+              "codeskeptic-summaries v10\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\tUU\tUC\tU\t?;?\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -831,8 +831,8 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v9\n"
-              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
+              "codeskeptic-summaries v10\n"
+              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -854,8 +854,8 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v9\n"
-              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\n");
+              "codeskeptic-summaries v10\n"
+              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\t?\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -898,8 +898,8 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v9\n"
-              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
+              "codeskeptic-summaries v10\n"
+              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1431,7 +1431,7 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
 
 // --- v6 persistence: exact always-zero return ---
 
-TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV9) {
+TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV10) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v6\n"
@@ -1447,8 +1447,8 @@ TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV9) {
     auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
     ASSERT_TRUE(registry.saveGlobal(out));
     EXPECT_EQ(readWholeFile(out),
-              "codeskeptic-summaries v9\n"
-              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\n");
+              "codeskeptic-summaries v10\n"
+              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n");
 }
 
 TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
@@ -1554,22 +1554,22 @@ TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\n"),
+    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\n"),
+    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\n"),
+    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\n"),
               std::string::npos);
     EXPECT_NE(saved.find(
-                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\tOU\tBU\tB\n"),
+                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\tOU\tBU\tB\t?;?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\tOOU\tBBU\tB\n"),
+    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\tOOU\tBBU\tB\t?;?;?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\n"),
+    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\tOU\tBU\tB\n"),
+    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\tOU\tBU\tB\t?;?\n"),
               std::string::npos);
 
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
@@ -1583,7 +1583,7 @@ TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
     EXPECT_EQ(parsed["operator_chain/1"].returnAliasParam, 0);
 }
 
-TEST(ReturnAliasSummaryTest, V7FileUpgradesToV9Exactly) {
+TEST(ReturnAliasSummaryTest, V7FileUpgradesToV10Exactly) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v7\n"
@@ -1601,9 +1601,9 @@ TEST(ReturnAliasSummaryTest, V7FileUpgradesToV9Exactly) {
     auto output = ::testing::TempDir() + "sum_v7_return_alias_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
     EXPECT_EQ(readWholeFile(output),
-              "codeskeptic-summaries v9\n"
-              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tU\tT\tU\n"
-              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\n");
+              "codeskeptic-summaries v10\n"
+              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tU\tT\tU\t?\n"
+              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
 }
 
 TEST(ReturnAliasSummaryTest, V6FileWithV7ColumnIsRejected) {
@@ -1674,19 +1674,19 @@ TEST(ParamContractSummaryTest, HarvestsPreAndPostconditionsExactly) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\n"),
+    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\n"),
+    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\tW\tB\tU\n"),
-              std::string::npos);
-    EXPECT_NE(saved.find(
-                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\n"),
+    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\tW\tB\tU\t?\n"),
               std::string::npos);
     EXPECT_NE(saved.find(
-                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\t?;?\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
               std::string::npos);
 }
 
@@ -1713,7 +1713,10 @@ TEST(ParamContractSummaryTest, V9FileRoundTripsAndValidatesVectors) {
     ASSERT_TRUE(registry.loadGlobal(input));
     auto output = ::testing::TempDir() + "sum_v9_param_contracts_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
-    EXPECT_EQ(readWholeFile(output), content);
+    EXPECT_EQ(readWholeFile(output),
+              "codeskeptic-summaries v10\n"
+              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\n"
+              "consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\n");
 
     auto badLength = writePersistFile(
         "sum_v9_bad_param_length.txt",
@@ -1737,7 +1740,7 @@ TEST(ParamContractSummaryTest, V9FileRoundTripsAndValidatesVectors) {
     EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badOwnership, parsed));
 }
 
-TEST(ParamContractSummaryTest, V8FileUpgradesToV9WithUnknownOwnership) {
+TEST(ParamContractSummaryTest, V8FileUpgradesToV10Conservatively) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v8\n"
@@ -1758,8 +1761,8 @@ TEST(ParamContractSummaryTest, V8FileUpgradesToV9WithUnknownOwnership) {
     auto output = ::testing::TempDir() + "sum_v8_ownership_upgrade_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
     EXPECT_EQ(readWholeFile(output),
-              "codeskeptic-summaries v9\n"
-              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tU\tB\tU\n");
+              "codeskeptic-summaries v10\n"
+              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tU\tB\tU\t?\n");
 }
 TEST(ParamContractSummaryTest, V8HeaderRejectsV9Columns) {
     GlobalStoreGuard guard;
@@ -2006,29 +2009,29 @@ TEST(OwnershipSummaryTest, HarvestsAccessOwnershipAndOwnedReturns) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v9\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\n"),
+    EXPECT_NE(saved.find("read_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("write_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+    EXPECT_NE(saved.find("write_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_write/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tB\tB\tU\n"),
+    EXPECT_NE(saved.find("read_write/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tB\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("untouched/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\n"),
+    EXPECT_NE(saved.find("untouched/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\n"),
+    EXPECT_NE(saved.find("read_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("write_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\n"),
+    EXPECT_NE(saved.find("write_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("consume/1\tU\tF\tU\t-\t-\t-\t-\tO\tU\tO\tC\tU\n"),
+    EXPECT_NE(saved.find("consume/1\tU\tF\tU\t-\t-\t-\t-\tO\tU\tO\tC\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("transfer/1\tU\tS\tU\t-\t-\t-\t-\tO\tU\tO\tT\tU\n"),
+    EXPECT_NE(saved.find("transfer/1\tU\tS\tU\t-\t-\t-\t-\tO\tU\tO\tT\tU\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("borrow/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\n"),
+    EXPECT_NE(saved.find("borrow/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("make_owned/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\n"),
+    EXPECT_NE(saved.find("make_owned/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("make_owned_chain/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\n"),
+    EXPECT_NE(saved.find("make_owned_chain/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\n"),
               std::string::npos);
 
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
@@ -2185,6 +2188,206 @@ TEST(ReturnOwnershipSummaryTest, CrossTUOwnedReturnMakesCallerResponsible) {
     EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
+TEST(FieldSensitivitySummaryTest, CrossTUDifferentFieldPreservesCorrelation) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp *out) { out->other = 1; }
+    )", R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp*);
+        int caller(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = nullptr;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(&c);
+            if (c.has_source) *p = 1;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(FieldSensitivitySummaryTest, CrossTUGuardFieldStillInvalidates) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp *out) { out->has_source = 1; }
+    )", R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp*);
+        int caller(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = nullptr;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(&c);
+            if (c.has_source) *p = 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+
+
+TEST(FieldSensitivitySummaryTest, CrossTURecordReferencePreservesSibling) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp &out) { out.other = 1; }
+    )", R"(
+        struct comp { int has_source; int other; };
+        void touch_other(struct comp&);
+        int caller(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = nullptr;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            touch_other(c);
+            if (c.has_source) *p = 1;
+            return 0;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(FieldSensitivitySummaryTest, CrossTURecordReferenceGuardInvalidates) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp &out) { out.has_source = 1; }
+    )", R"(
+        struct comp { int has_source; int other; };
+        void rewrite_guard(struct comp&);
+        int caller(int flag) {
+            struct comp c;
+            c.has_source = flag;
+            char *p = nullptr;
+            if (c.has_source) {
+                p = new char;
+                if (!p) return -1;
+            }
+            rewrite_guard(c);
+            if (c.has_source) *p = 1;
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+}
+TEST(FieldSensitivitySummaryTest, HarvestsComposesAndPersistsExactWrites) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("field_write_summary.cpp", R"(
+        struct config { int guard; int other; int third; };
+        int inspect(const struct config *value) { return value->guard; }
+        void touch_other(struct config *value) { value->other = 1; }
+        void touch_alias(struct config *value) {
+            struct config *alias = value;
+            alias->other = 2;
+        }
+        void touch_chain(struct config *value) { touch_other(value); }
+        void touch_dot(struct config *value) { (*value).other = 3; }
+        void touch_address(struct config *value) {
+            int *alias = &value->other;
+            *alias = 4;
+        }
+        void touch_reference(struct config &value) { value.other = 5; }
+        int *expose_guard(struct config *value) { return &value->guard; }
+        void touch_two(struct config *value) {
+            value->other = 1;
+            value->third = 2;
+        }
+        void replace_all(struct config *value) {
+            struct config next = {1, 2, 3};
+            *value = next;
+        }
+        void opaque(struct config*);
+        void pass_opaque(struct config *value) { opaque(value); }
+    )");
+    auto summaryPath = ::testing::TempDir() + "field_write_summary.csk";
+
+    Config config;
+    config.setSourcePath(source);
+    config.setSummaryOut(summaryPath);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<NullDerefRule>();
+    analyzer.run();
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    const auto* inspect = parsed["inspect/1"].exactParamFieldWrites(0);
+    ASSERT_NE(inspect, nullptr);
+    EXPECT_TRUE(inspect->fields.empty());
+    for (const char* name : {"touch_other/1", "touch_alias/1",
+                             "touch_chain/1", "touch_dot/1",
+                             "touch_address/1", "touch_reference/1"}) {
+        const auto* exact = parsed[name].exactParamFieldWrites(0);
+        ASSERT_NE(exact, nullptr) << name;
+        EXPECT_EQ(exact->fields, std::set<std::string>({"other"})) << name;
+    }
+    const auto* exposed =
+        parsed["expose_guard/1"].exactParamFieldWrites(0);
+    ASSERT_NE(exposed, nullptr);
+    EXPECT_EQ(exposed->fields,
+              std::set<std::string>({"guard"}));
+
+    const auto* two = parsed["touch_two/1"].exactParamFieldWrites(0);
+    ASSERT_NE(two, nullptr);
+    EXPECT_EQ(two->fields,
+              std::set<std::string>({"other", "third"}));
+    EXPECT_EQ(parsed["replace_all/1"].exactParamFieldWrites(0), nullptr);
+    EXPECT_EQ(parsed["pass_opaque/1"].exactParamFieldWrites(0), nullptr);
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+        "touch_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother\n"),
+        std::string::npos);
+}
+
+TEST(FieldSensitivitySummaryTest, V10StrictParsingAndConservativeMerge) {
+    GlobalStoreGuard guard;
+    auto first = writePersistFile("field_v10_a.csk",
+        "codeskeptic-summaries v10\n"
+        "touch/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother\n");
+    auto second = writePersistFile("field_v10_b.csk",
+        "codeskeptic-summaries v10\n"
+        "touch/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tthird\n");
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(first));
+    ASSERT_TRUE(registry.loadGlobal(second));
+    auto mergedPath = ::testing::TempDir() + "field_v10_merged.csk";
+    ASSERT_TRUE(registry.saveGlobal(mergedPath));
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(mergedPath, parsed));
+    const auto* merged = parsed["touch/1"].exactParamFieldWrites(0);
+    ASSERT_NE(merged, nullptr);
+    EXPECT_EQ(merged->fields,
+              std::set<std::string>({"other", "third"}));
+
+    auto badWidth = writePersistFile("field_v10_bad_width.csk",
+        "codeskeptic-summaries v10\n"
+        "bad/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\tother\n");
+    auto duplicate = writePersistFile("field_v10_duplicate.csk",
+        "codeskeptic-summaries v10\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother,other\n");
+    auto emptyName = writePersistFile("field_v10_empty.csk",
+        "codeskeptic-summaries v10\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother,\n");
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badWidth, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(duplicate, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(emptyName, parsed));
+}
 TEST(CallGraphSccTest, DeepAcyclicChainExceedsLegacySweepCap) {
     MemoryLeakRule_Ex rule;
     auto results = runRuleCrossTU(rule, R"(

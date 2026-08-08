@@ -37,6 +37,7 @@ using ParamAccess = codeskeptic::SummaryRegistry::ParamAccess;
 using ParamOwnership = codeskeptic::SummaryRegistry::ParamOwnership;
 using ParamPrecondition = codeskeptic::SummaryRegistry::ParamPrecondition;
 using ParamPostcondition = codeskeptic::SummaryRegistry::ParamPostcondition;
+using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
 
@@ -1624,6 +1625,7 @@ struct ParamRelationFlags {
     bool transfers = false;
     bool unknownAccess = false;
     bool unknownOwnership = false;
+    FieldWriteSet fieldWrites;
 };
 
 enum class DirectAccess { None, Read, Write, ReadWrite };
@@ -1684,6 +1686,16 @@ bool isReleaseCall(const CallExpr* call) {
            codeskeptic::freeFunctionNames().count(name.str()) != 0;
 }
 
+bool pointsToRecord(QualType type) {
+    if (type->isReferenceType()) {
+        type = type.getNonReferenceType();
+        return !type.isNull() && type->isRecordType();
+    }
+    if (!type->isPointerType()) return false;
+    QualType pointee = type->getPointeeType();
+    return !pointee.isNull() && pointee->isRecordType();
+}
+
 class ParamRelationVisitor
     : public RecursiveASTVisitor<ParamRelationVisitor> {
 public:
@@ -1691,9 +1703,14 @@ public:
                          const SummaryTable& previous,
                          const AliasInfo& aliases,
                          std::map<const ParmVarDecl*, ParamRelationFlags>& flags)
-        : ctx_(ctx), previous_(previous), aliases_(aliases), flags_(flags) {
+        : func_(func), ctx_(ctx), previous_(previous), aliases_(aliases),
+          flags_(flags) {
         for (const auto* param : func->parameters())
-            if (isPointerCarrier(param->getType())) flags_[param];
+            if (isPointerCarrier(param->getType()) ||
+                pointsToRecord(param->getType())) {
+                flags_[param].fieldWrites.known =
+                    pointsToRecord(param->getType());
+            }
     }
 
     bool VisitCXXDeleteExpr(CXXDeleteExpr* deletion) {
@@ -1712,10 +1729,11 @@ public:
             const auto* param = resolve(arg);
             if (!param) {
                 for (auto& [candidate, relation] : flags_) {
-                    if (!containsAnyRef(arg, aliases_.family.at(candidate)))
+                    if (!containsParamRef(arg, candidate))
                         continue;
                     relation.unknownAccess = true;
                     relation.unknownOwnership = true;
+                    relation.fieldWrites.known = false;
                 }
                 continue;
             }
@@ -1728,6 +1746,7 @@ public:
             if (!summary) {
                 relation.unknownAccess = true;
                 relation.unknownOwnership = true;
+                relation.fieldWrites.known = false;
                 continue;
             }
             switch (summary->paramAccess(paramIndex)) {
@@ -1740,6 +1759,7 @@ public:
                 case ParamAccess::None: break;
                 case ParamAccess::Unknown: relation.unknownAccess = true; break;
             }
+            composeFieldWrites(relation, summary, paramIndex);
             switch (summary->paramOwnership(paramIndex)) {
                 case ParamOwnership::Consumed:
                     relation.consumes = true;
@@ -1757,23 +1777,106 @@ public:
         return true;
     }
 
+    bool VisitCXXOperatorCallExpr(CXXOperatorCallExpr* call) {
+        if (call->getNumArgs() == 0) return true;
+        const OverloadedOperatorKind op = call->getOperator();
+        if (op != OO_Equal && op != OO_PlusEqual && op != OO_MinusEqual &&
+            op != OO_StarEqual && op != OO_SlashEqual &&
+            op != OO_PercentEqual)
+            return true;
+        const Expr* receiver = call->getArg(0)->IgnoreParenImpCasts();
+        const DirectAccess access =
+            op == OO_Equal ? DirectAccess::Write
+                           : DirectAccess::ReadWrite;
+        if (const auto* dereference =
+                dyn_cast<UnaryOperator>(receiver)) {
+            if (dereference->getOpcode() == UO_Deref)
+                if (const auto* param = resolve(dereference->getSubExpr()))
+                    recordAccess(param, access);
+            return true;
+        }
+        if (const auto* member = dyn_cast<MemberExpr>(receiver)) {
+            if (const auto field = resolveField(member))
+                recordAccess(field->first, access, field->second);
+            return true;
+        }
+        if (const auto* param = resolve(receiver))
+            recordAccess(param, access);
+        return true;
+    }
+
     bool VisitUnaryOperator(UnaryOperator* unary) {
         if (unary->getOpcode() == UO_Deref) {
+            if (isMemberBase(unary)) return true;
             if (const auto* param = resolve(unary->getSubExpr()))
                 recordAccess(param, classifyDirectAccess(unary, ctx_));
         } else if (unary->getOpcode() == UO_AddrOf) {
+            const auto* member = dyn_cast<MemberExpr>(
+                unary->getSubExpr()->IgnoreParenImpCasts());
+            if (member) {
+                if (const auto field = resolveField(member))
+                    recordAccess(field->first, DirectAccess::Write,
+                                 field->second);
+            }
             const ValueDecl* value = asVarOrParam(unary->getSubExpr());
             if (const auto* param = dyn_cast_or_null<ParmVarDecl>(value))
-                if (flags_.count(param))
+                if (flags_.count(param)) {
                     flags_[param].unknownOwnership = true;
+                    if (param->getType()->isReferenceType() &&
+                        pointsToRecord(param->getType()))
+                        recordAccess(param, DirectAccess::Write);
+                }
         }
         return true;
     }
 
     bool VisitMemberExpr(MemberExpr* member) {
-        if (!member->isArrow()) return true;
-        if (const auto* param = resolve(member->getBase()))
-            recordAccess(param, classifyDirectAccess(member, ctx_));
+        if (const auto field = resolveField(member))
+            recordAccess(field->first, classifyDirectAccess(member, ctx_),
+                         field->second);
+        return true;
+    }
+
+    bool VisitCXXMemberCallExpr(CXXMemberCallExpr* call) {
+        const CXXMethodDecl* method = call->getMethodDecl();
+        if (!method) return true;
+        std::vector<const FieldDecl*> mutableFields;
+        if (method->isConst()) {
+            for (const FieldDecl* field : method->getParent()->fields()) {
+                if (field->isMutable() && field->getIdentifier())
+                    mutableFields.push_back(field);
+            }
+            if (mutableFields.empty()) return true;
+        }
+        const Expr* object = call->getImplicitObjectArgument();
+        if (!object) return true;
+        object = object->IgnoreParenImpCasts();
+        if (const auto* member = dyn_cast<MemberExpr>(object)) {
+            if (const auto field = resolveField(member))
+                recordAccess(field->first, DirectAccess::Write,
+                             field->second);
+            return true;
+        }
+        if (const auto* dereference = dyn_cast<UnaryOperator>(object)) {
+            if (dereference->getOpcode() == UO_Deref)
+                if (const auto* param = resolve(dereference->getSubExpr())) {
+                    if (method->isConst()) {
+                        for (const auto& field : mutableFields)
+                            recordAccess(param, DirectAccess::Write, field);
+                    } else {
+                        recordAccess(param, DirectAccess::Write);
+                    }
+                }
+            return true;
+        }
+        if (const auto* param = resolve(object)) {
+            if (method->isConst()) {
+                for (const auto& field : mutableFields)
+                    recordAccess(param, DirectAccess::Write, field);
+            } else {
+                recordAccess(param, DirectAccess::Write);
+            }
+        }
         return true;
     }
 
@@ -1785,6 +1888,14 @@ public:
 
     bool VisitBinaryOperator(BinaryOperator* assign) {
         if (assign->getOpcode() != BO_Assign) return true;
+        const Expr* lhsExpr = assign->getLHS()->IgnoreParenImpCasts();
+        if (const auto* dereference =
+                dyn_cast<UnaryOperator>(lhsExpr)) {
+            if (dereference->getOpcode() == UO_Deref)
+                if (const auto* param =
+                        resolve(dereference->getSubExpr()))
+                    recordAccess(param, DirectAccess::Write);
+        }
         const ValueDecl* lhsValue = asVarOrParam(assign->getLHS());
         if (const auto* lhsParam =
                 dyn_cast_or_null<ParmVarDecl>(lhsValue)) {
@@ -1805,24 +1916,97 @@ public:
     }
 
     bool VisitVarDecl(VarDecl* var) {
-        if (isa<ParmVarDecl>(var) || !var->hasInit() ||
-            var->hasLocalStorage())
-            return true;
+        if (isa<ParmVarDecl>(var) || !var->hasInit()) return true;
+        if (var->getType()->isReferenceType() &&
+            !var->getType().getNonReferenceType().isConstQualified()) {
+            const Expr* init = var->getInit()->IgnoreParenImpCasts();
+            if (const auto* member = dyn_cast<MemberExpr>(init)) {
+                if (const auto field = resolveField(member))
+                    recordAccess(field->first, DirectAccess::Write,
+                                 field->second);
+            } else if (const auto* dereference =
+                           dyn_cast<UnaryOperator>(init)) {
+                if (dereference->getOpcode() == UO_Deref)
+                    if (const auto* param =
+                            resolve(dereference->getSubExpr()))
+                        recordAccess(param, DirectAccess::Write);
+            } else if (const auto* param = resolve(init)) {
+                recordAccess(param, DirectAccess::Write);
+            }
+        }
+        if (var->hasLocalStorage()) return true;
         if (const auto* param = resolve(var->getInit()))
             flags_[param].transfers = true;
         return true;
     }
 
+    bool VisitReturnStmt(ReturnStmt* ret) {
+        QualType type = func_->getReturnType();
+        if (!type->isReferenceType() ||
+            type.getNonReferenceType().isConstQualified())
+            return true;
+        const Expr* value = ret->getRetValue();
+        const auto* member = value
+            ? dyn_cast<MemberExpr>(value->IgnoreParenImpCasts()) : nullptr;
+        if (member) {
+            if (const auto field = resolveField(member))
+                recordAccess(field->first, DirectAccess::Write,
+                             field->second);
+            return true;
+        }
+        value = value ? value->IgnoreParenImpCasts() : nullptr;
+        if (const auto* dereference =
+                dyn_cast_or_null<UnaryOperator>(value)) {
+            if (dereference->getOpcode() == UO_Deref)
+                if (const auto* param = resolve(dereference->getSubExpr()))
+                    recordAccess(param, DirectAccess::Write);
+        } else if (const auto* param = resolve(value)) {
+            recordAccess(param, DirectAccess::Write);
+        }
+        return true;
+    }
+
     bool TraverseLambdaExpr(LambdaExpr* lambda) {
         for (auto& [param, relation] : flags_) {
-            if (!containsAnyRef(lambda, aliases_.family.at(param))) continue;
+            if (!containsParamRef(lambda, param)) continue;
             relation.unknownAccess = true;
             relation.unknownOwnership = true;
+            relation.fieldWrites.known = false;
         }
         return true;
     }
 
 private:
+    bool containsParamRef(const Expr* root,
+                          const ParmVarDecl* param) const {
+        const auto it = aliases_.family.find(param);
+        if (it != aliases_.family.end())
+            return containsAnyRef(root, it->second);
+        const std::set<const ValueDecl*> direct{param};
+        return containsAnyRef(root, direct);
+    }
+
+    bool isMemberBase(const Expr* expr) const {
+        const Expr* child = expr;
+        DynTypedNode node = DynTypedNode::create(*expr);
+        for (unsigned depth = 0; depth < 8; ++depth) {
+            const auto parents = ctx_.getParents(node);
+            if (parents.empty()) return false;
+            const Stmt* parent = parents[0].get<Stmt>();
+            if (!parent) return false;
+            if (isa<ParenExpr>(parent) || isa<CastExpr>(parent)) {
+                child = cast<Expr>(parent);
+                node = DynTypedNode::create(*parent);
+                continue;
+            }
+            const auto* member = dyn_cast<MemberExpr>(parent);
+            return member &&
+                   member->getBase()->IgnoreParenImpCasts() ==
+                       child->IgnoreParenImpCasts();
+        }
+        return false;
+    }
+
     const ParmVarDecl* resolve(const Expr* expr) const {
         const ValueDecl* decl = asVarOrParam(expr);
         if (!decl) return nullptr;
@@ -1832,14 +2016,61 @@ private:
         return it == aliases_.cleanAlias.end() ? nullptr : it->second;
     }
 
-    void recordAccess(const ParmVarDecl* param, DirectAccess access) {
+    std::optional<std::pair<const ParmVarDecl*, const FieldDecl*>>
+    resolveField(const MemberExpr* member) const {
+        const FieldDecl* topField = nullptr;
+        const Expr* cursor = member;
+        while (const auto* current = dyn_cast<MemberExpr>(
+                   cursor->IgnoreParenImpCasts())) {
+            const auto* field = dyn_cast<FieldDecl>(current->getMemberDecl());
+            if (!field || field->getName().empty()) return std::nullopt;
+            topField = field;
+            cursor = current->getBase();
+        }
+        cursor = cursor->IgnoreParenImpCasts();
+        if (const auto* dereference = dyn_cast<UnaryOperator>(cursor)) {
+            if (dereference->getOpcode() != UO_Deref) return std::nullopt;
+            cursor = dereference->getSubExpr();
+        }
+        const ParmVarDecl* param = resolve(cursor);
+        if (!param || !topField) return std::nullopt;
+        return std::make_pair(param, topField);
+    }
+
+    void composeFieldWrites(ParamRelationFlags& relation,
+                            const FunctionSummary* summary,
+                            unsigned paramIndex) {
+        if (!relation.fieldWrites.known) return;
+        if (const FieldWriteSet* exact =
+                summary->exactParamFieldWrites(paramIndex)) {
+            relation.fieldWrites.fields.insert(exact->fields.begin(),
+                                                exact->fields.end());
+            return;
+        }
+        const ParamAccess access = summary->paramAccess(paramIndex);
+        if (access == ParamAccess::Writes ||
+            access == ParamAccess::ReadsWrites ||
+            access == ParamAccess::Unknown)
+            relation.fieldWrites.known = false;
+    }
+
+    void recordAccess(const ParmVarDecl* param, DirectAccess access,
+                      const FieldDecl* field = nullptr) {
         ParamRelationFlags& relation = flags_[param];
         if (access == DirectAccess::Read || access == DirectAccess::ReadWrite)
             relation.reads = true;
-        if (access == DirectAccess::Write || access == DirectAccess::ReadWrite)
+        if (access == DirectAccess::Write || access == DirectAccess::ReadWrite) {
             relation.writes = true;
+            if (!relation.fieldWrites.known) return;
+            if (!field || field->getName().empty()) {
+                relation.fieldWrites.known = false;
+                return;
+            }
+            relation.fieldWrites.fields.insert(field->getNameAsString());
+        }
     }
 
+    const FunctionDecl* func_;
     ASTContext& ctx_;
     const SummaryTable& previous_;
     const AliasInfo& aliases_;
@@ -1849,6 +2080,7 @@ private:
 struct ParamRelations {
     std::vector<ParamAccess> accesses;
     std::vector<ParamOwnership> ownerships;
+    std::vector<FieldWriteSet> fieldWrites;
 };
 
 ParamRelations computeParamRelations(const FunctionDecl* func,
@@ -1866,15 +2098,19 @@ ParamRelations computeParamRelations(const FunctionDecl* func,
         if (it == flags.end()) continue;
         it->second.unknownAccess = true;
         it->second.unknownOwnership = true;
+        it->second.fieldWrites.known = false;
     }
 
     ParamRelations out;
     out.accesses.reserve(func->getNumParams());
     out.ownerships.reserve(func->getNumParams());
+    out.fieldWrites.reserve(func->getNumParams());
     for (const auto* param : func->parameters()) {
-        if (!isPointerCarrier(param->getType())) {
+        if (!isPointerCarrier(param->getType()) &&
+            !pointsToRecord(param->getType())) {
             out.accesses.push_back(ParamAccess::Unknown);
             out.ownerships.push_back(ParamOwnership::Unknown);
+            out.fieldWrites.push_back(FieldWriteSet{});
             continue;
         }
         const ParamRelationFlags& relation = flags[param];
@@ -1898,6 +2134,7 @@ ParamRelations computeParamRelations(const FunctionDecl* func,
             out.ownerships.push_back(ParamOwnership::Consumed);
         else
             out.ownerships.push_back(ParamOwnership::Borrowed);
+        out.fieldWrites.push_back(relation.fieldWrites);
     }
     return out;
 }
@@ -2364,6 +2601,7 @@ FunctionSummary summarizeFunction(const FunctionDecl* func, ASTContext& ctx,
     ParamRelations relations = computeParamRelations(func, ctx, previous);
     summary.paramAccesses = std::move(relations.accesses);
     summary.paramOwnerships = std::move(relations.ownerships);
+    summary.paramFieldWrites = std::move(relations.fieldWrites);
     summary.paramPreconditions = computeParamPreconditions(func, ctx);
     summary.paramPostconditions =
         computeParamPostconditions(func, ctx, previous);
@@ -2393,6 +2631,7 @@ bool sameSummary(const FunctionSummary& lhs, const FunctionSummary& rhs) {
            lhs.params == rhs.params &&
            lhs.paramAccesses == rhs.paramAccesses &&
            lhs.paramOwnerships == rhs.paramOwnerships &&
+           lhs.paramFieldWrites == rhs.paramFieldWrites &&
            lhs.paramPreconditions == rhs.paramPreconditions &&
            lhs.paramPostconditions == rhs.paramPostconditions;
 }
@@ -2566,6 +2805,19 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
             if (into.paramOwnerships[i] != from.paramOwnerships[i])
                 into.paramOwnerships[i] = PO::Unknown;
     }
+    if (into.paramFieldWrites.size() != from.paramFieldWrites.size()) {
+        into.paramFieldWrites.clear();
+    } else {
+        for (size_t i = 0; i < into.paramFieldWrites.size(); ++i) {
+            FieldWriteSet& target = into.paramFieldWrites[i];
+            const FieldWriteSet& source = from.paramFieldWrites[i];
+            if (!target.known || !source.known) {
+                target = FieldWriteSet{};
+                continue;
+            }
+            target.fields.insert(source.fields.begin(), source.fields.end());
+        }
+    }
     if (into.paramPreconditions.size() !=
         from.paramPreconditions.size()) {
         into.paramPreconditions.clear();
@@ -2590,7 +2842,8 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/Z/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v9";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v10";
+constexpr const char* kSummaryFileHeaderV9 = "codeskeptic-summaries v9";
 constexpr const char* kSummaryFileHeaderV8 = "codeskeptic-summaries v8";
 constexpr const char* kSummaryFileHeaderV7 = "codeskeptic-summaries v7";
 constexpr const char* kSummaryFileHeaderV6 = "codeskeptic-summaries v6";
@@ -2761,6 +3014,31 @@ void writeParamVector(std::ostream& out, size_t count, ToChar toChar,
         out << toChar(i < values.size() ? values[i] : fallback);
 }
 
+void writeFieldWriteVector(std::ostream& out, size_t count,
+                           const std::vector<FieldWriteSet>& values) {
+    if (count == 0) {
+        out << '-';
+        return;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        if (i != 0) out << ';';
+        if (i >= values.size() || !values[i].known) {
+            out << '?';
+            continue;
+        }
+        if (values[i].fields.empty()) {
+            out << '!';
+            continue;
+        }
+        bool first = true;
+        for (const std::string& field : values[i].fields) {
+            if (!first) out << ',';
+            out << field;
+            first = false;
+        }
+    }
+}
+
 } // anonymous namespace
 
 void SummaryRegistry::harvestGlobal() {
@@ -2849,6 +3127,10 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
                     static_cast<unsigned>(i)));
         }
         out << '\t' << roToChar(summary.returnOwnership);
+        // v10: exact one-hop field writes per parameter.
+        out << '\t';
+        writeFieldWriteVector(out, summary.params.size(),
+                              summary.paramFieldWrites);
         out << '\n';
     }
     return out.good();
@@ -2863,7 +3145,8 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 9;
+    if (line == kSummaryFileHeader) version = 10;
+    else if (line == kSummaryFileHeaderV9) version = 9;
     else if (line == kSummaryFileHeaderV8) version = 8;
     else if (line == kSummaryFileHeaderV7) version = 7;
     else if (line == kSummaryFileHeaderV6) version = 6;
@@ -2876,7 +3159,8 @@ bool SummaryRegistry::parseSummaryFile(
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
     const size_t maxFields =
-        (version >= 9) ? 13 : (version >= 8) ? 10
+        (version >= 10) ? 14 : (version >= 9) ? 13
+                           : (version >= 8) ? 10
                            : (version >= 7) ? 8 : (version >= 5) ? 7
                        : (version == 4) ? 6 : (version == 3) ? 5 : 4;
 
@@ -2900,6 +3184,7 @@ bool SummaryRegistry::parseSummaryFile(
         if (fields.size() < 3 || fields.size() > maxFields) return false;
         if (version == 9 && fields.size() != 13) return false;
         if (version == 8 && fields.size() != 10) return false;
+        if (version == 10 && fields.size() != 14) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
@@ -3049,6 +3334,54 @@ bool SummaryRegistry::parseSummaryFile(
             if (returnOwnership.size() != 1 ||
                 !roFromChar(returnOwnership[0], summary.returnOwnership))
                 return false;
+        }
+        if (version >= 10) {
+            const std::string& encoded = fields[13];
+            const size_t paramCount = summary.params.size();
+            if ((encoded == "-") != (paramCount == 0)) return false;
+            if (paramCount != 0) {
+                size_t fieldSetStart = 0;
+                for (size_t i = 0; i < paramCount; ++i) {
+                    const size_t end = encoded.find(';', fieldSetStart);
+                    if ((i + 1 == paramCount) !=
+                        (end == std::string::npos))
+                        return false;
+                    const std::string part = encoded.substr(
+                        fieldSetStart,
+                        end == std::string::npos
+                            ? std::string::npos : end - fieldSetStart);
+                    FieldWriteSet parsedFields;
+                    if (part == "?") {
+                        parsedFields.known = false;
+                    } else {
+                        parsedFields.known = true;
+                        if (part != "!") {
+                            size_t nameStart = 0;
+                            for (;;) {
+                                const size_t comma = part.find(',', nameStart);
+                                const std::string name = part.substr(
+                                    nameStart,
+                                    comma == std::string::npos
+                                        ? std::string::npos
+                                        : comma - nameStart);
+                                if (name.empty()) return false;
+                                for (unsigned char c : name)
+                                    if (c <= 0x20 || c == ',' || c == ';' ||
+                                        c == '!' || c == '?')
+                                        return false;
+                                if (!parsedFields.fields.insert(name).second)
+                                    return false;
+                                if (comma == std::string::npos) break;
+                                nameStart = comma + 1;
+                            }
+                        }
+                    }
+                    summary.paramFieldWrites.push_back(
+                        std::move(parsedFields));
+                    if (end == std::string::npos) break;
+                    fieldSetStart = end + 1;
+                }
+            }
         }
         auto [it, inserted] = parsed.emplace(key, summary);
         if (!inserted) mergeConservative(it->second, summary);

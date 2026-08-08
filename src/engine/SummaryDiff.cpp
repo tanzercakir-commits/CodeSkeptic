@@ -14,6 +14,7 @@ using PA = codeskeptic::SummaryRegistry::ParamAccess;
 using PO = codeskeptic::SummaryRegistry::ParamOwnership;
 using PPre = codeskeptic::SummaryRegistry::ParamPrecondition;
 using PPost = codeskeptic::SummaryRegistry::ParamPostcondition;
+using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 
 const char* rnName(RN v) {
@@ -163,6 +164,50 @@ void classifyPostcondition(PPost oldV, PPost newV,
     appendDetail(detail, label, postName(oldV), postName(newV));
 }
 
+std::string fieldWriteName(const FieldWriteSet* value) {
+    if (!value) return "unknown";
+    std::string out = "{";
+    bool first = true;
+    for (const std::string& field : value->fields) {
+        if (!first) out += ',';
+        out += field;
+        first = false;
+    }
+    out += '}';
+    return out;
+}
+
+void classifyFieldWrites(const FunctionSummary& oldSum,
+                         const FunctionSummary& newSum, unsigned index,
+                         const std::string& label, FieldVerdict& verdict,
+                         std::string& detail) {
+    const FieldWriteSet* oldValue = oldSum.exactParamFieldWrites(index);
+    const FieldWriteSet* newValue = newSum.exactParamFieldWrites(index);
+    if ((!oldValue && !newValue) ||
+        (oldValue && newValue && oldValue->fields == newValue->fields))
+        return;
+
+    if (!oldValue) {
+        verdict.strengthened = true;
+    } else if (!newValue) {
+        verdict.weakened = true;
+    } else {
+        const bool oldContainsNew = std::includes(
+            oldValue->fields.begin(), oldValue->fields.end(),
+            newValue->fields.begin(), newValue->fields.end());
+        const bool newContainsOld = std::includes(
+            newValue->fields.begin(), newValue->fields.end(),
+            oldValue->fields.begin(), oldValue->fields.end());
+        if (newContainsOld || !oldContainsNew)
+            verdict.weakened = true;
+        else
+            verdict.strengthened = true;
+    }
+    if (!detail.empty()) detail += "; ";
+    detail += label + ": " + fieldWriteName(oldValue) + " -> " +
+              fieldWriteName(newValue);
+}
+
 } // anonymous namespace
 
 namespace codeskeptic {
@@ -203,7 +248,8 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
              oldSum.paramPostconditions.size(),
              newSum.paramPostconditions.size(), oldSum.paramAccesses.size(),
              newSum.paramAccesses.size(), oldSum.paramOwnerships.size(),
-             newSum.paramOwnerships.size()});
+             newSum.paramOwnerships.size(), oldSum.paramFieldWrites.size(),
+             newSum.paramFieldWrites.size()});
         for (size_t i = 0; i < numParams; ++i) {
             classifyField(oldSum.paramEffect(static_cast<unsigned>(i)),
                           newSum.paramEffect(static_cast<unsigned>(i)),
@@ -229,6 +275,10 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                 newSum.paramOwnership(static_cast<unsigned>(i)),
                 ownershipStrong, ownershipName,
                 "param#" + std::to_string(i) + ".ownership", verdict,
+                detail);
+            classifyFieldWrites(
+                oldSum, newSum, static_cast<unsigned>(i),
+                "param#" + std::to_string(i) + ".fieldWrites", verdict,
                 detail);
         }
 
