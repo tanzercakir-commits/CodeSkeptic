@@ -45,7 +45,10 @@ class ReleaseWorkflowTest(unittest.TestCase):
     def test_draft_release_is_created_once_before_parallel_jobs(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(workflow.count("gh release create"), 1)
-        self.assertIn("gh release create", job("prepare"))
+        prepare = job("prepare")
+        self.assertIn("gh release create", prepare)
+        self.assertIn("--json isDraft", prepare)
+        self.assertIn('test "$draft" = "true"', prepare)
         for platform in ("linux", "macos", "windows"):
             self.assertIn("    needs: prepare", job(platform))
 
