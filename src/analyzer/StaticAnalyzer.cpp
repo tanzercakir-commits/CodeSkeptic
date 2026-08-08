@@ -3,6 +3,7 @@
 #include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
 #include "core/Capabilities.h"
+#include "core/FindingFingerprint.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "contracts/Policy.h"
@@ -342,6 +343,10 @@ AnalysisResult StaticAnalyzer::run() {
         std::cerr << msg(MsgId::SuppressedCount, std::to_string(suppressed))
                   << "\n";
     }
+
+    // Assign once, after paths and suppressions are canonical, so every
+    // reporter and integration observes exactly the same stable identity.
+    assignFindingFingerprints(diagnostics_);
 
     // Record mode: findings are written to the baseline, no reporting,
     // exit clean (for producing a baseline in CI)

@@ -118,6 +118,7 @@ TEST(VerdictIntegrityTest, ExperimentalFindingIsVisibleButDoesNotBlock) {
     const auto result = analyzer.run();
 
     EXPECT_EQ(analyzer.diagnostics().size(), 1u);
+    EXPECT_EQ(analyzer.diagnostics()[0].fingerprint.rfind("csf1-", 0), 0u);
     EXPECT_EQ(result.findings, 1u);
     EXPECT_EQ(result.report_only_findings, 1u);
     EXPECT_EQ(result.blockingFindings(), 0u);

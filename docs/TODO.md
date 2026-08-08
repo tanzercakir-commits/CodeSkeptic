@@ -12,19 +12,21 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = af3ebb6
-uçuşta = phase-product-scope-contract
+base   = 44695b1
+uçuşta = phase-measurement-lab
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): Faz 0 ve Faz 1 KAPANDI. v0.4.8 üç platform paketi,
+Serbest not (insanda kalır): Faz 0, Faz 1 ve Faz 2 KAPANDI. v0.4.8 üç platform paketi,
 Action, WSL2 ve Docker kapıları yeşil; public release ve GHCR `v0.4.8` /
 `latest` kimlikleri doğru. Yanlış GHCR `v0.4.9` versiyonu tam digest + tek-tag
 kapısıyla kaldırıldı, post-delete current koruması geçti ve tek-seferlik
 cleanup kodu silindi. Ürün kapsamı 14 bulgu ailesi için merkezi registry,
 schema-v2 capability çıktısı ve docs-sync kapısıyla kilitlendi; experimental
-bulgular ölçülür/raporlanır fakat verdict'i engellemez. Makbuzlar changelog
-2026-08-08 kayıtlarında.
+bulgular ölçülür/raporlanır fakat verdict'i engellemez. Ölçüm laboratuvarı exact
+base/head temiz-kusurlu-gerçek depo makbuzlarını, `csf1` semantik bulgu kimliğini,
+Juliet üç-yollu kaçırma sınıflamasını ve PR kalite/performance/coverage panosunu
+fail-closed CI sözleşmesine bağladı. Makbuzlar changelog 2026-08-08 kayıtlarında.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -38,10 +40,12 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 2 ölçüm laboratuvarı. Juliet kaçırmalarını
-adreslenebilir/model eksiği/bilinçli kapsam dışı olarak sınıflandır; kararlı
-semantik bulgu parmak izini, ayrı temiz/kusurlu/gerçek-depo korpuslarını ve
-PR başına kural bazlı precision/recall + süre/RAM/TU/bulgu delta panosunu kur.
+Bağlayıcı ürün programı sırası: Faz 3 precision borcunu kapatma. Önce
+rtp2httpd'deki iki bağlam kaynaklı FP, alan duyarlı assert'ler
+(`DEBUGASSERT(data->conn)`), caller contract/safe post-cast range yanlış
+alarmları ve memory-leak ownership/escape idiyomları. Çıkış: rtp2httpd'nin iki
+FP'si giderken dört uygulanabilir bulgu korunacak; memory-leak precision en az
+%85 olacak; Juliet ve temiz-korpus kapıları gerilemeyecek.
 
 ## Açık kullanıcı kararları
 

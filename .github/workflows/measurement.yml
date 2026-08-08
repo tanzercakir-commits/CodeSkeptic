@@ -1,0 +1,96 @@
+name: Measurement delta
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: measurement-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  base-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install LLVM 20 and measurement tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            clang-20 ninja-build time
+
+      - name: Build head analyzer
+        run: |
+          cmake -S . -B build-measure-head -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build-measure-head
+
+      - name: Build exact PR base analyzer
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          BASE_ROOT="$RUNNER_TEMP/codeskeptic-base"
+          git worktree add --detach "$BASE_ROOT" "$BASE_SHA"
+          cmake -S "$BASE_ROOT" -B "$BASE_ROOT/build-measure" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build "$BASE_ROOT/build-measure"
+
+      - name: Measure exact base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          BASE_ROOT="$RUNNER_TEMP/codeskeptic-base"
+          python3 scripts/run_measurement_lab.py \
+            --binary "$BASE_ROOT/build-measure/src/codeskeptic" \
+            --repo-root "$BASE_ROOT" \
+            --build-path "$BASE_ROOT/build-measure" \
+            --revision "$BASE_SHA" \
+            --output measurement-base.json
+
+      - name: Measure exact head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/run_measurement_lab.py \
+            --binary build-measure-head/src/codeskeptic \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --build-path build-measure-head \
+            --revision "$HEAD_SHA" \
+            --output measurement-head.json
+
+      - name: Compare quality, performance, coverage, and fingerprints
+        run: |
+          code=0
+          python3 scripts/compare_measurements.py \
+            --base measurement-base.json \
+            --head measurement-head.json \
+            --json-output measurement-delta.json \
+            --markdown-output measurement-delta.md || code=$?
+          test -f measurement-delta.md && cat measurement-delta.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
+
+      - name: Upload measurement receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: measurement-delta-${{ github.event.pull_request.head.sha }}
+          path: |
+            measurement-base.json
+            measurement-head.json
+            measurement-delta.json
+            measurement-delta.md
+          if-no-files-found: error
+          retention-days: 14

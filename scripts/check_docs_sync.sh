@@ -188,6 +188,24 @@ if [ -n "$ver" ]; then
     done
 fi
 
+# 5b. Phase 2 measurement is one executable/documented contract. A missing
+# workflow, receipt producer, comparator, baseline, or schema explanation
+# would make the PR dashboard look present while silently dropping an axis.
+for f in .github/workflows/measurement.yml \
+         scripts/run_measurement_lab.py scripts/compare_measurements.py \
+         scripts/render_quality_dashboard.py scripts/measurement_baseline.json; do
+    if [ ! -s "$f" ]; then
+        echo "FAIL: missing or empty measurement contract file: $f"
+        fail=1
+    fi
+done
+for marker in 'csf1' 'JULIET_MISS_CLASS' 'measurement.yml'; do
+    if ! grep -qF "$marker" docs/benchmarks.md; then
+        echo "FAIL: docs/benchmarks.md omits measurement contract marker: $marker"
+        fail=1
+    fi
+done
+
 # 7. A measurement ledger is a contract, not prose. Reject duplicate/missing
 # projects, non-SHA inputs, unavailable verdicts, and dishonest triage sums
 # before realworld.yml consumes the values.
