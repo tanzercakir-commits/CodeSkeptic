@@ -36,6 +36,9 @@ ledger needs no pin relaxation: the stored libgit2 replay contains supported
 null-deref findings alongside its experimental leaks, and rtp2httpd contains
 two supported null-deref findings alongside four experimental sign-conversion
 findings, so both complete scans still honestly exit 1.
+The thesis runner also emits native compile-database paths under MSYS and
+normalizes CRLF manifests, making its pinned precision/recall gate reproducible
+from Git Bash as well as Linux CI.
 
 ## 2026-08-08 — v0.4.8 release smoke contract repair
 
