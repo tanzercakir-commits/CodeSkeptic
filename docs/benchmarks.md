@@ -26,6 +26,46 @@ this the hard way — see the devlog). CodeSkeptic tracks both:
 - **Real-world corpus** (cJSON, tinyxml2, weekly abseil) — pinned
   finding counts; deviation = semantic regression.
 
+## PR measurement laboratory
+
+Every pull request runs `.github/workflows/measurement.yml` against the exact
+PR base SHA and head SHA. Both analyzers are built independently, then the
+same head-owned harness measures three deliberately separate corpora:
+
+- `clean`: the nine adjudicated clean thesis programs; any new finding is a
+  false-positive regression and fails the gate;
+- `defective`: the fifteen adjudicated defective thesis programs; caught-case
+  recall and each case's minimum finding floor may not drop;
+- `real-repository`: CodeSkeptic's own `src/` tree, analyzed from its real
+  compilation database with the product's self-scan policy enabled.
+
+The machine receipts record findings and per-rule counts, attempted/analyzed/
+broken TUs, incomplete functions, wall time, peak RSS where the platform
+provides GNU `time`, and stable finding fingerprints. `compare_measurements.py`
+publishes quality, performance, coverage and fingerprint deltas in the PR job
+summary and uploads the exact base/head/delta JSON plus Markdown for 14 days.
+Unavailable analysis, broken TUs, lost TU coverage, a clean-corpus finding
+increase, or a defective-corpus recall/floor loss fails closed. Runtime and
+memory deltas are visible evidence in Phase 2, not noisy threshold gates;
+Phase 10 owns the measured performance budgets.
+
+Each finding has a `csf1-` semantic site identity. Schema `csf1` hashes the
+rule ID, the last three normalized path components, function name, and source
+statement with formatting whitespace removed outside literals. Checkout root,
+line/column, severity and message wording are excluded, so a harmless line
+shift or presentation change does not manufacture a new finding. It is an
+identity key rather than a security hash; duplicate sites are retained as
+multiset counts. The C++ implementation and an independent Python oracle must
+agree on every head finding before a receipt is accepted.
+
+The Juliet lane separately emits a six-rule precision/recall/F1 dashboard.
+Every false negative is partitioned into exactly one product-decision class:
+`addressable` (`baseline`, `other`), `model_gap` (`multifile`, `flow`, `cpp`),
+or `out_of_scope` (`float`, `opaque`). The detailed `JULIET_FN_CLASS` rows stay
+available for engine work; `JULIET_MISS_CLASS` is the complete three-way
+product view. `scripts/measurement_baseline.json` binds dashboard deltas to an
+exact analyzer tree, workflow run and sample limit.
+
 ## Benchmark (NIST Juliet C/C++ 1.3)
 
 Weekly CI runs the analyzer against the [NIST Juliet test

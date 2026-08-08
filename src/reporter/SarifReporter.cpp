@@ -1,6 +1,7 @@
 #include "reporter/SarifReporter.h"
 
 #include "core/Capabilities.h"
+#include "core/FindingFingerprint.h"
 
 #include "core/Messages.h"
 
@@ -126,6 +127,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
 
     for (size_t i = 0; i < diagnostics.size(); ++i) {
         const auto& diag = diagnostics[i];
+        const std::string fingerprint = diag.fingerprint.empty()
+            ? findingFingerprint(diag)
+            : diag.fingerprint;
         if (i > 0) file << ",";
         file << "\n        {\n";
         file << "          \"ruleId\": \"" << escapeJson(diag.rule_id)
@@ -138,6 +142,9 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
              << "\", \"codeskeptic/blocksVerdict\": "
              << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
              << " },\n";
+        file << "          \"partialFingerprints\": { "
+             << "\"codeskeptic/v1\": \"" << escapeJson(fingerprint)
+             << "\" },\n";
         file << "          \"level\": \"" << sarifLevel(diag.severity)
              << "\",\n";
         file << "          \"message\": { \"text\": \""

@@ -55,6 +55,8 @@ TEST(SarifReporterTest, ResultFields) {
               std::string::npos);
     EXPECT_NE(out.find("\"codeskeptic/blocksVerdict\": false"),
               std::string::npos);
+    EXPECT_NE(out.find("\"partialFingerprints\": { \"codeskeptic/v1\": \"csf1-"),
+              std::string::npos);
     // Absolute paths are converted to file:// URIs
     EXPECT_NE(out.find("\"uri\": \"file:///src/a.cpp\""), std::string::npos);
 }

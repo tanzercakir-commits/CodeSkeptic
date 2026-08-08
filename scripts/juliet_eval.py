@@ -78,6 +78,15 @@ import re
 
 _FLOW_RE = re.compile(r"_(\d{2})[a-e]?\.(?:c|cpp)$")
 
+# Binding Phase 2 decision map. Every miss belongs to exactly one product
+# decision class; detailed flow buckets remain available for engine work.
+# Unknown filename shapes stay addressable rather than being silently excused.
+MISS_CLASSES = {
+    "addressable": ("baseline", "other"),
+    "model_gap": ("multifile", "flow", "cpp"),
+    "out_of_scope": ("float", "opaque"),
+}
+
 
 def classify_fn(basename: str) -> str:
     name = basename.lower()
@@ -289,6 +298,28 @@ def main() -> int:
                       for k in ("float", "opaque", "multifile",
                                 "baseline", "flow", "cpp", "other"))
     print(f"JULIET_FN_CLASS {cwe} total={len(missed)} {counts}")
+    decision_counts = {
+        decision: sum(len(buckets.get(bucket, [])) for bucket in members)
+        for decision, members in MISS_CLASSES.items()
+    }
+    classified = sum(decision_counts.values())
+    if classified != len(missed):
+        print(f"JULIET_MISS_CLASS_FAIL {cwe} classified={classified} "
+              f"total={len(missed)}")
+        return 1
+    print(
+        f"JULIET_MISS_CLASS {cwe} total={len(missed)} "
+        f"addressable={decision_counts['addressable']} "
+        f"model_gap={decision_counts['model_gap']} "
+        f"out_of_scope={decision_counts['out_of_scope']}"
+    )
+    for decision, members in MISS_CLASSES.items():
+        samples = [
+            path for bucket in members for path in buckets.get(bucket, [])
+        ]
+        for path in sorted(samples)[:5]:
+            print(f"MISS_SAMPLE {cwe} {decision} "
+                  f"{os.path.basename(path)}")
     for bucket in ("baseline", "flow", "multifile", "cpp", "other"):
         for path in buckets.get(bucket, [])[:5]:
             print(f"FN_SAMPLE {cwe} {bucket} {os.path.basename(path)}")

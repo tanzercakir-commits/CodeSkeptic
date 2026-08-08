@@ -1,6 +1,7 @@
 add_library(codeskeptic_core STATIC
     core/Messages.cpp
     core/Capabilities.cpp
+    core/FindingFingerprint.cpp
     core/FunctionFilter.cpp
     source_manager/SourceManager.cpp
     source_manager/ResourceDir.cpp

@@ -40,6 +40,24 @@ before letting it break CI. The default stays `error` — and an
 unreadable summary file is exit `2` regardless: a gate that cannot
 read its input never looks green.
 
+## Repository PR measurement
+
+CodeSkeptic's own `measurement.yml` is the product-quality companion to the
+per-change review. It builds the exact `pull_request.base.sha` and
+`pull_request.head.sha`, runs the same clean, defective and real-repository
+corpora on each, and publishes four independent delta axes: finding quality,
+runtime/peak RAM, analyzed/broken TU coverage, and semantic fingerprint
+additions/removals. The job fails closed when evidence is unavailable, clean
+noise grows, defective caught-case recall falls, or coverage regresses.
+Performance remains visible but ungated until a measured budget is adopted.
+
+The workflow uploads the base, head and comparison JSON receipts plus its
+Markdown summary. Juliet's companion artifact adds the per-rule
+precision/recall/F1 table and the complete addressable/model-gap/out-of-scope
+miss partition. See
+[benchmarks.md](benchmarks.md#pr-measurement-laboratory) for the schemas and
+reproduction contract.
+
 ## PR review (diff-native)
 
 `review_diff.sh` turns the analyzer into a PR reviewer: it analyzes the

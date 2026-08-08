@@ -1,5 +1,47 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 2 measurement laboratory
+
+Every pull request now receives an exact base-to-head measurement rather than
+a collection of unrelated green checks. `measurement.yml` builds the analyzer
+at `pull_request.base.sha` and `pull_request.head.sha`, then uses one head-owned
+harness to measure the clean thesis cases, defective thesis cases and the real
+CodeSkeptic source tree separately. The receipts record duration, GNU-time
+peak RSS where available, attempted/analyzed/broken TU coverage, complete or
+unavailable runs, findings, per-rule counts and semantic fingerprint
+multisets. The Markdown/JSON comparison exposes all four requested delta axes.
+It fails closed on unavailable or broken analysis, TU coverage loss, added
+clean-corpus findings, defective caught-case loss, or an adjudicated case-floor
+violation. Performance deltas are evidence only in this phase; threshold
+budgets remain Phase 10 work.
+
+Findings now carry a stable `csf1` semantic site identity through JSON, SARIF,
+HTML and MCP. The payload combines rule ID, a portable three-component path
+tail, function and a formatting-normalized source statement; checkout root,
+line/column, severity and message text do not perturb it. Duplicate sites are
+preserved as multiset counts. C++ tests pin root/line/format and presentation
+stability plus semantic changes, while the measurement harness independently
+recomputes each head fingerprint in Python and rejects any parity mismatch.
+Reporter and verdict-integrity regressions prove the value survives every
+structured surface without changing diagnostic ordering or blocking policy.
+
+Juliet false negatives now retain their detailed flow-family buckets and also
+form an exhaustive product-decision partition: addressable, engine/model gap,
+or intentionally out of scope. A versioned baseline binds the six current
+rule-matched precision/recall/F1 rows and miss counts to analyzer tree
+`7decb6b09ac2ee3c09a03bb37eebf17df71e97d5`, workflow run `31242561307` and
+the 400-file sample. The Juliet workflow publishes the per-rule delta table,
+three-way miss counts, runtime and peak RSS as both job summary and bounded
+artifacts; an incomplete partition or missing dashboard fails instead of
+silently degrading to prose.
+
+Local Phase 2 receipts used the Windows analyzer against all three corpora:
+9 clean cases, 15 defective cases and one real-repository scan produced
+71/71 analyzed TUs with zero broken TUs, and every emitted fingerprint matched
+the independent oracle. Five schema/delta tests, two workflow-contract tests,
+the Juliet classifier self-test, workflow YAML parsing and the focused 50-test
+reporter/fingerprint/verdict set passed before the full suite.
+
 ## 2026-08-08 — Phase 1 product-scope contract
 
 The capability surface is now a versioned runtime contract instead of a flat
