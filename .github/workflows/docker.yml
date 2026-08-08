@@ -69,7 +69,7 @@ jobs:
             args+=(--build-arg "CODESKEPTIC_VERSION_OVERRIDE=${RELEASE_TAG#v}")
             context="release-source"
           fi
-          docker build "${args[@]}" -f Dockerfile -t codeskeptic:test "$context" 2>&1 | tee /tmp/docker_build.log
+          docker build "${args[@]}" -f "$PWD/Dockerfile" -t codeskeptic:test "$context" 2>&1 | tee /tmp/docker_build.log
 
       - name: Smoke (fresh image, demo.c, exit 1 + findings)
         id: smoke

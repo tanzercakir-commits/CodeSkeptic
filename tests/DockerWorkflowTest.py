@@ -21,7 +21,7 @@ class DockerWorkflowTest(unittest.TestCase):
         self.assertIn("Checkout exact release source", workflow)
         self.assertIn("path: release-source", workflow)
         self.assertIn('context="release-source"', workflow)
-        self.assertIn('-f Dockerfile', workflow)
+        self.assertIn('-f "$PWD/Dockerfile"', workflow)
 
     def test_release_build_is_pinned_to_triggering_source_and_tag(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
