@@ -2184,3 +2184,124 @@ TEST(ReturnOwnershipSummaryTest, CrossTUOwnedReturnMakesCallerResponsible) {
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
+
+TEST(CallGraphSccTest, DeepAcyclicChainExceedsLegacySweepCap) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void* malloc(unsigned long);
+        void* level0() { return malloc(16); }
+        void* level1() { return level0(); }
+        void* level2() { return level1(); }
+        void* level3() { return level2(); }
+        void* level4() { return level3(); }
+        void* level5() { return level4(); }
+        void* level6() { return level5(); }
+        void* level7() { return level6(); }
+    )", R"(
+        void* level7();
+        void caller() {
+            void* p = level7();
+            (void)p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CallGraphSccTest, DeepNullChainIsIndependentOfSourceOrder) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int* level6();
+        int* level5();
+        int* level4();
+        int* level3();
+        int* level2();
+        int* level1();
+        int* level0();
+        int* level7() { return level6(); }
+        int* level6() { return level5(); }
+        int* level5() { return level4(); }
+        int* level4() { return level3(); }
+        int* level3() { return level2(); }
+        int* level2() { return level1(); }
+        int* level1() { return level0(); }
+        int* level0() { return nullptr; }
+        int caller() {
+            int* value = level7();
+            return *value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}
+
+TEST(CallGraphSccTest, DeepBorrowChainKeepsCallerLeakVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void use0(int* p) { (void)*p; }
+        void use1(int* p) { use0(p); }
+        void use2(int* p) { use1(p); }
+        void use3(int* p) { use2(p); }
+        void use4(int* p) { use3(p); }
+        void use5(int* p) { use4(p); }
+        void use6(int* p) { use5(p); }
+        void use7(int* p) { use6(p); }
+        void caller() {
+            int* p = new int(7);
+            use7(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(CallGraphSccTest, DeepAccessChainReachesFixedPoint) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("scc_access_chain.cpp", R"(
+        void write0(int* p) { *p = 1; }
+        void write1(int* p) { write0(p); }
+        void write2(int* p) { write1(p); }
+        void write3(int* p) { write2(p); }
+        void write4(int* p) { write3(p); }
+        void write5(int* p) { write4(p); }
+        void write6(int* p) { write5(p); }
+        void write7(int* p) { write6(p); }
+    )");
+    auto summaryPath = ::testing::TempDir() + "scc_access_chain.csk";
+
+    Config config;
+    config.setSourcePath(source);
+    config.setSummaryOut(summaryPath);
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<MemoryLeakRule_Ex>();
+    analyzer.run();
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["write7/1"].paramAccess(0),
+              SummaryRegistry::ParamAccess::Writes);
+    EXPECT_EQ(parsed["write7/1"].paramOwnership(0),
+              SummaryRegistry::ParamOwnership::Borrowed);
+}
+
+TEST(CallGraphSccTest, NullableFactPropagatesInsideRecursiveComponent) {
+    NullDerefRule rule;
+    auto results = runRule(rule, R"(
+        int value;
+        int* odd(int);
+        int* even(int n) {
+            if (n <= 0) return &value;
+            return odd(n - 1);
+        }
+        int* odd(int n) {
+            if (n <= 0) return nullptr;
+            return even(n - 1);
+        }
+        int use(int n) {
+            int* p = even(n);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+}

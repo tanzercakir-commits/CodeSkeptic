@@ -27,7 +27,7 @@ using namespace clang;
 
 namespace {
 
-constexpr unsigned kMaxSweeps = 5;
+constexpr unsigned kMinimumSccSweeps = 16;
 
 using ReturnNullness = codeskeptic::SummaryRegistry::ReturnNullness;
 using ReturnZeroness = codeskeptic::SummaryRegistry::ReturnZeroness;
@@ -2253,6 +2253,162 @@ struct FunctionCollector : RecursiveASTVisitor<FunctionCollector> {
     }
 };
 
+using FunctionNode = const FunctionDecl*;
+using CallEdges = std::map<FunctionNode, std::vector<FunctionNode>>;
+
+struct DirectCallCollector : RecursiveASTVisitor<DirectCallCollector> {
+    const std::set<FunctionNode>* known = nullptr;
+    std::set<FunctionNode> callees;
+
+    bool VisitCallExpr(CallExpr* call) {
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (!callee) return true;
+        const FunctionNode key = callee->getCanonicalDecl();
+        if (known->count(key)) callees.insert(key);
+        return true;
+    }
+
+    // A lambda body has its own FunctionDecl and summary. Calls inside it
+    // must not become dependencies of the enclosing function.
+    bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+};
+
+struct FunctionCallGraph {
+    std::vector<FunctionNode> order;
+    std::map<FunctionNode, const FunctionDecl*> definitions;
+    CallEdges edges;
+};
+
+FunctionCallGraph buildCallGraph(
+        const std::vector<const FunctionDecl*>& functions) {
+    FunctionCallGraph graph;
+    std::set<FunctionNode> known;
+    for (const FunctionDecl* func : functions) {
+        const FunctionNode key = func->getCanonicalDecl();
+        if (!known.insert(key).second) continue;
+        graph.order.push_back(key);
+        graph.definitions[key] = func;
+    }
+    for (FunctionNode key : graph.order) {
+        DirectCallCollector collector;
+        collector.known = &known;
+        collector.TraverseStmt(const_cast<Stmt*>(
+            graph.definitions.at(key)->getBody()));
+        graph.edges[key] = {collector.callees.begin(),
+                            collector.callees.end()};
+    }
+    return graph;
+}
+
+// Tarjan over caller -> callee edges emits sink components first. That is
+// exactly the summary evaluation order: every acyclic callee is finalized
+// before its caller, independent of source order or chain depth.
+class SccFinder {
+public:
+    explicit SccFinder(const CallEdges& edges) : edges_(edges) {}
+
+    std::vector<std::vector<FunctionNode>> run(
+            const std::vector<FunctionNode>& order) {
+        for (FunctionNode node : order)
+            if (!index_.count(node)) visit(node);
+        return components_;
+    }
+
+private:
+    void visit(FunctionNode node) {
+        index_[node] = nextIndex_;
+        low_[node] = nextIndex_;
+        ++nextIndex_;
+        stack_.push_back(node);
+        onStack_.insert(node);
+
+        for (FunctionNode callee : edges_.at(node)) {
+            if (!index_.count(callee)) {
+                visit(callee);
+                low_[node] = std::min(low_[node], low_[callee]);
+            } else if (onStack_.count(callee)) {
+                low_[node] = std::min(low_[node], index_[callee]);
+            }
+        }
+
+        if (low_[node] != index_[node]) return;
+        std::vector<FunctionNode> component;
+        for (;;) {
+            FunctionNode member = stack_.back();
+            stack_.pop_back();
+            onStack_.erase(member);
+            component.push_back(member);
+            if (member == node) break;
+        }
+        components_.push_back(std::move(component));
+    }
+
+    const CallEdges& edges_;
+    int nextIndex_ = 0;
+    std::map<FunctionNode, int> index_;
+    std::map<FunctionNode, int> low_;
+    std::vector<FunctionNode> stack_;
+    std::set<FunctionNode> onStack_;
+    std::vector<std::vector<FunctionNode>> components_;
+};
+
+FunctionSummary summarizeFunction(const FunctionDecl* func, ASTContext& ctx,
+                                  const SummaryTable& previous) {
+    FunctionSummary summary;
+    summary.returnNullness = computeReturnNullness(
+        func, ctx, previous, &summary.nullFromParam);
+    summary.returnZeroness = computeReturnZeroness(
+        func, ctx, previous, &summary.zeroFromParam);
+    summary.returnOwnership = computeReturnOwnership(func, ctx, previous);
+    summary.params = computeParamEffects(func, previous);
+    ParamRelations relations = computeParamRelations(func, ctx, previous);
+    summary.paramAccesses = std::move(relations.accesses);
+    summary.paramOwnerships = std::move(relations.ownerships);
+    summary.paramPreconditions = computeParamPreconditions(func, ctx);
+    summary.paramPostconditions =
+        computeParamPostconditions(func, ctx, previous);
+    summary.returnAliasParam = computeReturnAliasParam(func, ctx, previous);
+
+    if (summary.returnNullness == ReturnNullness::MaybeNull) {
+        int condParam = -1;
+        codeskeptic::Interval condRange = codeskeptic::Interval::top();
+        if (detectNullCondition(func, ctx, previous, &condParam,
+                                &condRange)) {
+            summary.nullCondParam = condParam;
+            summary.nullCondRange = condRange;
+        }
+    }
+    return summary;
+}
+
+bool sameSummary(const FunctionSummary& lhs, const FunctionSummary& rhs) {
+    return lhs.returnNullness == rhs.returnNullness &&
+           lhs.returnZeroness == rhs.returnZeroness &&
+           lhs.returnOwnership == rhs.returnOwnership &&
+           lhs.zeroFromParam == rhs.zeroFromParam &&
+           lhs.nullFromParam == rhs.nullFromParam &&
+           lhs.returnAliasParam == rhs.returnAliasParam &&
+           lhs.nullCondParam == rhs.nullCondParam &&
+           lhs.nullCondRange == rhs.nullCondRange &&
+           lhs.params == rhs.params &&
+           lhs.paramAccesses == rhs.paramAccesses &&
+           lhs.paramOwnerships == rhs.paramOwnerships &&
+           lhs.paramPreconditions == rhs.paramPreconditions &&
+           lhs.paramPostconditions == rhs.paramPostconditions;
+}
+
+bool sameComponent(const std::vector<FunctionNode>& component,
+                   const SummaryTable& lhs, const SummaryTable& rhs) {
+    for (FunctionNode node : component) {
+        auto left = lhs.find(node);
+        auto right = rhs.find(node);
+        if (left == lhs.end() || right == rhs.end() ||
+            !sameSummary(left->second, right->second))
+            return false;
+    }
+    return true;
+}
+
 } // anonymous namespace
 
 namespace codeskeptic {
@@ -2274,69 +2430,60 @@ void SummaryRegistry::rebuild(clang::ASTContext& ctx) {
     FunctionCollector collector;
     collector.TraverseDecl(ctx.getTranslationUnitDecl());
 
-    // Fixpoint sweeping: each round recomputes the summaries FROM
-    // SCRATCH against the previous round's table; we stop when nothing
-    // changes. Recursion sees its own old summary — strong claims
-    // (NeverNull, ReadsOnly) form only when supported.
+    // Solve the direct-call graph component-by-component. Tarjan emits
+    // callee SCCs before callers, so an acyclic wrapper is evaluated once
+    // with all dependencies final instead of waiting for a global sweep.
+    // Recursive SCCs start from conservative summaries and iterate
+    // synchronously to a fixed point; a guard fallback keeps the first
+    // conservative round if a future relation ever oscillates.
+    FunctionCallGraph graph = buildCallGraph(collector.functions);
+    auto components = SccFinder(graph.edges).run(graph.order);
     SummaryTable current;
-    for (unsigned sweep = 0; sweep < kMaxSweeps; ++sweep) {
-        SummaryTable next;
-        bool changed = false;
-        for (const auto* func : collector.functions) {
-            FunctionSummary summary;
-            summary.returnNullness = computeReturnNullness(
-                func, ctx, current, &summary.nullFromParam);
-            summary.returnZeroness = computeReturnZeroness(
-                func, ctx, current, &summary.zeroFromParam);
-            summary.returnOwnership =
-                computeReturnOwnership(func, ctx, current);
-            summary.params = computeParamEffects(func, current);
-            ParamRelations relations =
-                computeParamRelations(func, ctx, current);
-            summary.paramAccesses = std::move(relations.accesses);
-            summary.paramOwnerships = std::move(relations.ownerships);
-            summary.paramPreconditions =
-                computeParamPreconditions(func, ctx);
-            summary.paramPostconditions =
-                computeParamPostconditions(func, ctx, current);
-            summary.returnAliasParam =
-                computeReturnAliasParam(func, ctx, current);
 
-            // #69b: try to strengthen a plain MaybeNull into the
-            // value-conditioned form (null only if param outside R).
-            if (summary.returnNullness == ReturnNullness::MaybeNull) {
-                int condParam = -1;
-                Interval condRange = Interval::top();
-                if (detectNullCondition(func, ctx, current, &condParam,
-                                        &condRange)) {
-                    summary.nullCondParam = condParam;
-                    summary.nullCondRange = condRange;
-                }
-            }
+    for (const auto& component : components) {
+        const FunctionNode first = component.front();
+        const auto& firstEdges = graph.edges.at(first);
+        const bool recursive =
+            component.size() > 1 ||
+            std::find(firstEdges.begin(), firstEdges.end(), first) !=
+                firstEdges.end();
 
-            const auto* key = func->getCanonicalDecl();
-            next[key] = summary;
-
-            auto prev = current.find(key);
-            if (prev == current.end() ||
-                prev->second.returnNullness != summary.returnNullness ||
-                prev->second.returnZeroness != summary.returnZeroness ||
-                prev->second.returnOwnership != summary.returnOwnership ||
-                prev->second.zeroFromParam != summary.zeroFromParam ||
-                prev->second.nullFromParam != summary.nullFromParam ||
-                prev->second.returnAliasParam != summary.returnAliasParam ||
-                prev->second.nullCondParam != summary.nullCondParam ||
-                prev->second.nullCondRange != summary.nullCondRange ||
-                prev->second.params != summary.params ||
-                prev->second.paramAccesses != summary.paramAccesses ||
-                prev->second.paramOwnerships != summary.paramOwnerships ||
-                prev->second.paramPreconditions != summary.paramPreconditions ||
-                prev->second.paramPostconditions != summary.paramPostconditions) {
-                changed = true;
-            }
+        if (!recursive) {
+            current[first] = summarizeFunction(
+                graph.definitions.at(first), ctx, current);
+            continue;
         }
-        current = std::move(next);
-        if (!changed) break;
+
+        SummaryTable previous;
+        for (FunctionNode node : component)
+            previous[node] = FunctionSummary{};
+        SummaryTable conservativeFirst;
+        bool converged = false;
+        const unsigned maxSweeps = std::max(
+            kMinimumSccSweeps,
+            static_cast<unsigned>(component.size()) * 4u + 4u);
+        SummaryTable visible = current;
+
+        for (unsigned sweep = 0; sweep < maxSweeps; ++sweep) {
+            for (const auto& [node, summary] : previous)
+                visible[node] = summary;
+
+            SummaryTable next;
+            for (FunctionNode node : component)
+                next[node] = summarizeFunction(
+                    graph.definitions.at(node), ctx, visible);
+            if (sweep == 0) conservativeFirst = next;
+            if (sameComponent(component, previous, next)) {
+                previous = std::move(next);
+                converged = true;
+                break;
+            }
+            previous = std::move(next);
+        }
+
+        if (!converged) previous = std::move(conservativeFirst);
+        for (auto& [node, summary] : previous)
+            current[node] = std::move(summary);
     }
     summaries_ = std::move(current);
     stable_ = true;  // consumers may now fold on these (see stable())

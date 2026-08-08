@@ -1,5 +1,26 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 4.4 call-graph SCC fixed point
+
+Visible same-translation-unit direct calls now form an explicit call graph.
+Tarjan strongly connected components are emitted callee-first, so acyclic
+wrappers are summarized once after their dependencies regardless of source
+order or chain depth. Recursive components are seeded conservatively and
+recomputed synchronously to an exact fixed point; a bounded safety guard
+falls back to the first conservative round if a future summary relation ever
+fails to converge. Indirect calls remain conservative until the controlled
+function-pointer slice.
+
+The RED receipt was an eight-level owned-return wrapper that the legacy five
+global sweeps could not carry to its caller. GREEN covers deep ownership,
+nullness, borrowed-access and persisted write-access chains, plus nullable
+facts inside a mutually recursive component. Existing recursion soundness
+tests continue to reject invented strong claims.
+
+The final Windows suite is 922/922. The exact historical corpus lane stayed
+cJSON 54 (35/76 TUs analyzed, 41 explicitly accepted broken fixtures) and
+tinyxml2 9 (3/3), with no finding-count or verdict-tier change.
+
 ## 2026-08-08 — Phase 4.3 side effects and ownership transfer
 
 Interprocedural v2 now keeps pointee access and ownership on independent

@@ -54,10 +54,14 @@ muhafazakâr alias/path merge, v1-v7 uyumlu v8 kalıcılık ve summary-diff yön
 kilitlendi. Yan etki/ownership dilimi de RED→GREEN: pointee read/write,
 Borrowed/Consumed/Transferred parametre ownership'i, Owned/Borrowed dönüşler,
 cross-TU leak/contract tüketimi ve v1-v8 uyumlu katı v9 kalıcılık birbirinden
-bağımsız ilişkiler olarak kilitlendi. Sıradaki dilim call-graph SCC sabit
-noktası; ardından alan duyarlılığı, kontrollü function-pointer çözümü ve
-kütüphane model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak;
-gerçek korpusta kontrolsüz bulgu artışı olmayacak.
+bağımsız ilişkiler olarak kilitlendi. Call-graph SCC dilimi de RED→GREEN:
+doğrudan görünür çağrılar callee-first Tarjan bileşenleriyle çözülüyor, derin
+asiklik zincirler kaynak sırasından bağımsız ve özyinelemeli bileşenler
+muhafazakâr başlangıçtan senkron sabit noktaya gidiyor. 922/922 test ve sabit
+cJSON 54 / tinyxml2 9 korpus makbuzu alındı. Sıradaki dilim alan duyarlılığı;
+ardından kontrollü function-pointer çözümü ve kütüphane model dosyaları
+gelecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
+bulgu artışı olmayacak.
 
 ## Açık kullanıcı kararları
 

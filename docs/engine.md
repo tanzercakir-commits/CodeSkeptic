@@ -58,8 +58,11 @@ division by the assigned result a warning — the classic
 `data = badSource(); 100 / data` split across functions or files) and
 parameter effects (free-wrappers count as frees, so double-free/
 use-after-free through wrappers is caught; read-only helpers no longer
-hide leaks behind them). Recursion-safe fixpoint; external and aliasing
-callees stay conservative.
+hide leaks behind them). Visible direct calls form a call graph whose
+strongly connected components are solved callee-first. Acyclic wrappers are
+evaluated once after their dependencies; recursive components iterate
+synchronously from conservative summaries to a fixed point. External,
+indirect and aliasing callees stay conservative.
 
 The v2 schema also records exact pointer return identity: a relation is
 published only when every reachable return aliases the same pointer
@@ -80,7 +83,7 @@ Side effects and ownership are separate summary axes. For every pointer-like
 parameter, the access relation records no access, read, write, or read+write;
 the ownership relation records borrowed, consumed, transferred, or unknown.
 Direct dereference/member/subscript uses, clean local aliases, direct call
-chains and non-static `operator()` calls compose through the fixpoint. Fresh
+chains and non-static `operator()` calls compose through the SCC solver. Fresh
 heap/resource returns and their wrapper chains are Owned; parameter/global
 aliases are Borrowed; mixed, opaque, capture, and conflicting flows remain
 Unknown. MemoryLeak consumes the ownership relations, and ContractRule now
