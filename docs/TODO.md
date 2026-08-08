@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = be577ab
-uçuşta = phase-precision-debt
+base   = e75bcab
+uçuşta = phase-interprocedural-v2
 ```
 <!-- cs:state-end -->
 
@@ -44,12 +44,23 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. Return-alias
-ilişkileri, parametre precondition/postcondition özetleri, yan etkiler ve
-ownership transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
-function-pointer çözümü ve kütüphane model dosyaları küçük dilimler halinde
-eklenecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
-bulgu artışı olmayacak.
+Bağlayıcı ürün programında Faz 4 interprocedural motor v2'nin ilk beş dilimi
+RED→GREEN tamamlandı: exact pointer return-alias (v7), parametre precondition/
+postcondition (v8), bağımsız side-effect/ownership ilişkileri (v9), callee-first
+call-graph SCC sabit noktası ve alan-duyarlı yazma etkileri (v10).
+
+Alan-duyarlılığı; pointer ve record-reference parametrelerinde kesin tek-atlamalı
+may-write kümelerini, sibling-field korunmasını, `(*p).field`, temiz alias,
+alan adresi/reference'i, dönüş aliası, whole-object yazımı, const/non-const üye
+metodu, doğrudan zincir, cross-TU kalıcılık, muhafazakâr merge ve summary-diff
+yönlerini kapsıyor. v1-v9 dosyaları muhafazakâr okunuyor; bozuk v10 genişliği,
+vektör uzunluğu ve alan kodlaması toptan reddediliyor. Tam Windows kapısı
+956/956; exact korpus cJSON 54 (76 attempted / 35 analyzed / 41 açıkça kabul
+edilmiş broken) ve tinyxml2 9 (3/3), Faz 4.4'e göre bulgu-site deltası sıfır.
+
+Sıradaki dilim kontrollü function-pointer hedef çözümü; ardından kütüphane
+model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak; tam suite,
+doküman senkronu ve gerçek korpus kapıları geçmeden dilim kapanmayacak.
 
 ## Açık kullanıcı kararları
 

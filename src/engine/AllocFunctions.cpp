@@ -2,6 +2,7 @@
 
 #include <clang/AST/Decl.h>
 #include <clang/AST/Expr.h>
+#include <clang/AST/ExprCXX.h>
 
 #include <string>
 #include <utility>
@@ -31,6 +32,64 @@ bool isAllocatorCall(const clang::CallExpr* call) {
     return !extra.empty() && extra.count(n) > 0;
 }
 
+namespace {
+
+bool isStdNothrowT(const clang::CXXRecordDecl* record) {
+    if (!record || record->getName() != "nothrow_t") return false;
+    for (const clang::DeclContext* context = record->getDeclContext(); context;
+         context = context->getParent()) {
+        if (const auto* ns = llvm::dyn_cast<clang::NamespaceDecl>(context))
+            if (ns->getName() == "std") return true;
+    }
+    return false;
+}
+
+} // anonymous namespace
+
+bool isOwnedPointerReturnCall(const clang::CallExpr* call) {
+    if (!call) return false;
+    const clang::FunctionDecl* fd = call->getDirectCallee();
+    if (!fd || !fd->getIdentifier()) return false;
+    const std::string name = fd->getName().str();
+    static const std::set<std::string> kOwnedReturns = {
+        "malloc", "calloc", "realloc", "reallocarray", "aligned_alloc",
+        "valloc", "pvalloc", "memalign", "strdup", "strndup", "fopen",
+        "freopen", "fdopen", "tmpfile", "opendir", "fdopendir",
+    };
+    if (kOwnedReturns.count(name)) return true;
+    const auto& extra = allocFunctionNames();
+    return !extra.empty() && extra.count(name) > 0;
+}
+
+bool isOwnedAllocationExpr(const clang::Expr* expr) {
+    if (!expr) return false;
+    expr = expr->IgnoreParenImpCasts();
+    if (const auto* cleanups =
+            llvm::dyn_cast<clang::ExprWithCleanups>(expr))
+        return isOwnedAllocationExpr(cleanups->getSubExpr());
+    if (const auto* materialized =
+            llvm::dyn_cast<clang::MaterializeTemporaryExpr>(expr))
+        return isOwnedAllocationExpr(materialized->getSubExpr());
+    if (const auto* bound =
+            llvm::dyn_cast<clang::CXXBindTemporaryExpr>(expr))
+        return isOwnedAllocationExpr(bound->getSubExpr());
+    if (const auto* allocation = llvm::dyn_cast<clang::CXXNewExpr>(expr)) {
+        for (unsigned i = 0; i < allocation->getNumPlacementArgs(); ++i) {
+            clang::QualType type = allocation->getPlacementArg(i)->getType();
+            if (type->isPointerType()) return false;
+            clang::QualType plain =
+                type.getNonReferenceType().getUnqualifiedType();
+            if (const auto* record = plain->getAsCXXRecordDecl())
+                if (!isStdNothrowT(record)) return false;
+        }
+        return true;
+    }
+    if (const auto* cast = llvm::dyn_cast<clang::CastExpr>(expr))
+        return isOwnedAllocationExpr(cast->getSubExpr());
+    if (const auto* call = llvm::dyn_cast<clang::CallExpr>(expr))
+        return isOwnedPointerReturnCall(call);
+    return false;
+}
 namespace {
 std::set<std::string>& allocStorage() {
     static std::set<std::string> names;
