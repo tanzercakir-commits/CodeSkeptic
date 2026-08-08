@@ -22,10 +22,11 @@ class DockerWorkflowTest(unittest.TestCase):
             "LEGACY_DIGEST: sha256:03b346e66f1b292a5c2a1ddd1b5cb9190d21899077b6d646eee115f320d6197c",
             workflow,
         )
-        self.assertIn(
-            "CURRENT_DIGEST: sha256:039b10d81dbceb6cd8d16c93c4e640b84febc55e02365b0537e78652f90e9f56",
-            workflow,
-        )
+        self.assertNotIn("CURRENT_DIGEST:", workflow)
+        self.assertIn("current_digest=$(jq -r '.[0].name'", workflow)
+        self.assertIn('[[ "$current_digest" =~ ^sha256:[0-9a-f]{64}$ ]]', workflow)
+        self.assertIn('test "$current_digest" != "$LEGACY_DIGEST"', workflow)
+        self.assertIn('--arg digest "$current_digest"', workflow)
         self.assertIn("current_before", workflow)
         self.assertIn("current_after", workflow)
         self.assertIn(
