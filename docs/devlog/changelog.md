@@ -18,6 +18,13 @@ the single draft before any platform starts, while the three platform jobs
 only upload to it. The workflow contract pins one create command and all three
 dependency edges, preventing incomplete or orphaned release state on retries.
 
+The first retag retry (`31232746706`) then failed closed in three seconds,
+before any platform job started: the deliberately checkout-free `prepare` job
+gave `gh` neither a Git repository nor an explicit repository context. Its log
+reported `fatal: not a git repository`. `GH_REPO` is now bound to
+`github.repository`, and the release-workflow contract requires that binding;
+the same command can create the draft without an unnecessary checkout.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is
