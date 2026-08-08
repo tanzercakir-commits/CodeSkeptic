@@ -5,7 +5,7 @@ name: Real-world scan
 # (the dev sandbox cannot use workflow_dispatch — git protocol only).
 # Each project is built with its own build system at a PINNED revision,
 # analyzed only across the translation units in its real compilation
-# database with its idiom profile,
+# database with its idiom profile / verified contract pack,
 # and the resulting counts + reports are published to
 # refs/ci-logs/<sha>/realworld for git-protocol readback.
 #
@@ -82,7 +82,7 @@ jobs:
           test "$code" -eq "$expected_exit"
           test "$n" -eq "$expected_findings"
 
-      - name: Scan rtp2httpd (ledger-pinned revision, no profile needed)
+      - name: Scan rtp2httpd (ledger-pinned revision, verified contract pack)
         run: |
           set -euo pipefail
           mapfile -t ledger < <(awk '!/^#/ && $1 == "rtp2httpd" { print }' \
@@ -97,6 +97,8 @@ jobs:
           git -C rtp2httpd remote add origin https://github.com/stackia/rtp2httpd
           git -C rtp2httpd fetch -q --depth 1 origin "$revision"
           git -C rtp2httpd checkout -q --detach FETCH_HEAD
+          install -m 0644 profiles/contracts/rtp2httpd/configuration.c.csk \
+            rtp2httpd/src/configuration.c.csk
           cmake -S rtp2httpd -B rtp2httpd/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-20 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON

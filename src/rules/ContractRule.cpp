@@ -118,14 +118,23 @@ ClauseStatus classifyAndCheck(const ContractClause& clause,
             }
         }
         if (isReturnVsInt(clause.pred, 0)) {
-            if (clause.pred.op == ContractCmpOp::EQ)
-                return ClauseStatus::Unverified;  // no AlwaysZero lattice point
-            if (clause.pred.op != ContractCmpOp::NE)
+            if (clause.pred.op != ContractCmpOp::EQ &&
+                clause.pred.op != ContractCmpOp::NE)
                 return ClauseStatus::Unverified;  // orderings: later rounds
             if (!summary) return ClauseStatus::Unverified;
             switch (summary->returnZeroness) {
-                case RZ::NeverZero: return ClauseStatus::Satisfied;
-                case RZ::MaybeZero: return ClauseStatus::Violated;
+                case RZ::AlwaysZero:
+                    return clause.pred.op == ContractCmpOp::EQ
+                               ? ClauseStatus::Satisfied
+                               : ClauseStatus::Violated;
+                case RZ::NeverZero:
+                    return clause.pred.op == ContractCmpOp::NE
+                               ? ClauseStatus::Satisfied
+                               : ClauseStatus::Violated;
+                case RZ::MaybeZero:
+                    return clause.pred.op == ContractCmpOp::NE
+                               ? ClauseStatus::Violated
+                               : ClauseStatus::Unverified;
                 case RZ::Unknown: return ClauseStatus::Unverified;
             }
         }

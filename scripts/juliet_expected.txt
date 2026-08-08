@@ -74,9 +74,16 @@ CWE476 0.95 0.30
 # CWE476/415/416 files also dropped. Precision floor RAISED to 0.68.
 # Remaining FP families (documented): external-linkage globals (cannot
 # fold soundly), constant-return call flags, flag copies.
-CWE401 0.68 0.18
-CWE415 0.95 0.23
-CWE416 0.95 0.48
+# 2026-08-08 (Phase 3 precision debt + shared support TU): transitive
+# pointer/reference aliases and exact AlwaysZero helper summaries removed
+# 19 rule-matched leak FPs without losing a TP: precision 0.714 -> 0.860
+# (80 TP / 13 FP), recall 0.193. The precision floor is now the product
+# gate, 0.85. Analyzing testcasesupport/io.c also made constant-return
+# controls visible to the other ownership rules: double-free recall
+# 0.242 -> 0.253 and use-after-free 0.496 -> 0.531.
+CWE401 0.85 0.18
+CWE415 0.95 0.24
+CWE416 0.95 0.50
 # 2026-07-22 (v0.4 recall round, copy-taint): zeroness flows through
 # var-to-var copies (the fgets *_31/_33 launder). Sampled rhitrate
 # 0.093 -> 0.098 @ rprecision 1.000; floor RAISED 0.03 -> 0.085.
@@ -98,4 +105,7 @@ CWE369 0.95 0.095
 # variance). Remaining known-FN classes: rand bit-shuffle (opaque),
 # abs/sqrt-guarded squares (documented), opaque-flag control variants
 # (the correlation machinery round).
-CWE190 0.95 0.040
+# The same shared support TU exposes two constant-flag integer-overflow
+# cases (21 -> 23 TP, recall 0.052 -> 0.057); lock the deterministic
+# truth correction with a 0.050 floor.
+CWE190 0.95 0.050

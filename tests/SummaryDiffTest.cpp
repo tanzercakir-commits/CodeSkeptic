@@ -67,6 +67,16 @@ TEST(SummaryDiffTest, StrongClaimGained_Strengthened) {
     EXPECT_EQ(result.changes[0].kind, ChangeKind::Strengthened);
 }
 
+TEST(SummaryDiffTest, AlwaysZeroClaimGained_Strengthened) {
+    SummaryMap oldMap{{"false/0", makeSum(RN::Unknown, RZ::Unknown)}};
+    SummaryMap newMap{{"false/0", makeSum(RN::Unknown, RZ::AlwaysZero)}};
+    auto result = diffSummaries(oldMap, newMap);
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+    EXPECT_NE(result.changes[0].detail.find("AlwaysZero"),
+              std::string::npos);
+}
+
 TEST(SummaryDiffTest, DirectionlessDrift_Changed) {
     SummaryMap oldMap{{"g/1", makeSum(RN::Unknown, RZ::Unknown)}};
     SummaryMap newMap{{"g/1", makeSum(RN::MaybeNull, RZ::Unknown)}};
