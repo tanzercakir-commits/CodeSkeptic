@@ -76,6 +76,14 @@ public:
         // null-correspondence). -1 = no claim.
         int nullFromParam = -1;
 
+        // Exact pointer return-alias relation (interprocedural v2):
+        // every reachable return denotes pointer parameter
+        // #returnAliasParam's entry object. Unlike nullFromParam this
+        // describes identity, not merely null correspondence, and is
+        // therefore valid independently of returnNullness. -1 = no
+        // proven exact relation.
+        int returnAliasParam = -1;
+
         // Value-conditioned null return (#69b). When returnNullness is
         // MaybeNull AND the harvest PROVED that every null-returning
         // path is guarded by "parameter #nullCondParam outside

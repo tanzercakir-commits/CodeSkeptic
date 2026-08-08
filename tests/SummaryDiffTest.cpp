@@ -25,11 +25,13 @@ std::string writeFile(const std::string& name, const std::string& body) {
 }
 
 SummaryRegistry::FunctionSummary makeSum(RN rn, RZ rz,
-                                         std::vector<PE> params = {}) {
+                                         std::vector<PE> params = {},
+                                         int returnAliasParam = -1) {
     SummaryRegistry::FunctionSummary s;
     s.returnNullness = rn;
     s.returnZeroness = rz;
     s.params = std::move(params);
+    s.returnAliasParam = returnAliasParam;
     return s;
 }
 
@@ -74,6 +76,47 @@ TEST(SummaryDiffTest, AlwaysZeroClaimGained_Strengthened) {
     EXPECT_EQ(result.weakened, 0u);
     ASSERT_EQ(result.strengthened, 1u);
     EXPECT_NE(result.changes[0].detail.find("AlwaysZero"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasClaimLostIsWeakened) {
+    SummaryMap oldMap{
+        {"identity/1",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    SummaryMap newMap{
+        {"identity/1", makeSum(RN::Unknown, RZ::Unknown)}};
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: param#0 -> none"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasClaimGainedIsStrengthened) {
+    SummaryMap oldMap{
+        {"identity/1", makeSum(RN::Unknown, RZ::Unknown)}};
+    SummaryMap newMap{
+        {"identity/1",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    auto result = diffSummaries(oldMap, newMap);
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: none -> param#0"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnAliasSourceChangeIsWeakened) {
+    SummaryMap oldMap{
+        {"choose/2",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/0)}};
+    SummaryMap newMap{
+        {"choose/2",
+         makeSum(RN::Unknown, RZ::Unknown, {}, /*returnAliasParam=*/1)}};
+    auto result = diffSummaries(oldMap, newMap);
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "returnAliasParam: param#0 -> param#1"),
               std::string::npos);
 }
 

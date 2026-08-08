@@ -809,10 +809,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\n"
-              "alpha/1\tN\tR\tU\t-\t-\t-\n"
-              "beta/2\tM\tOF\tM\t-\t-\t-\n"
-              "gamma/0\tU\t-\tN\t-\t-\t-\n");
+              "codeskeptic-summaries v7\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\t-\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\t-\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -830,7 +830,7 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v7\nlegacy/1\tN\tR\tU\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -852,7 +852,7 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nfoo/1\tU\tO\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v7\nfoo/1\tU\tO\tU\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -895,7 +895,7 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nkeep/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v7\nkeep/1\tN\tR\tU\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1427,7 +1427,7 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
 
 // --- v6 persistence: exact always-zero return ---
 
-TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
+TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV7) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v6\n"
@@ -1442,7 +1442,9 @@ TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
     ASSERT_TRUE(registry.loadGlobal(p));
     auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
     ASSERT_TRUE(registry.saveGlobal(out));
-    EXPECT_EQ(readWholeFile(out), content);
+    EXPECT_EQ(readWholeFile(out),
+              "codeskeptic-summaries v7\n"
+              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
@@ -1466,4 +1468,143 @@ TEST(SummaryPersistTest, V4File_ZeroFromParamStillParses) {
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
     EXPECT_EQ(parsed["id/1"].zeroFromParam, 0);
+}
+
+// ===================================================================
+// Interprocedural v2: exact pointer return-alias relation.
+//
+// A strong claim is emitted only when every reachable return denotes
+// the same pointer parameter's entry object. Local copies and chains of
+// exact summaries preserve identity; mixed sources, pointer arithmetic,
+// mutation, and exposed write channels deliberately lose it. The
+// relation is persisted independently from null-passthrough.
+// ===================================================================
+
+TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("return_alias_summary.cpp", R"(
+        int g;
+        int* direct(int* p) { return p; }
+        int* local_copy(int* p) {
+            int* q = p;
+            return q;
+        }
+        int* chain(int* p) { return local_copy(p); }
+        int* same_on_both_paths(int* p, int c) {
+            if (c) return p;
+            return p;
+        }
+        int* mixed(int* p, int* q, int c) {
+            if (c) return p;
+            return q;
+        }
+        int* altered(int* p) { return p + 1; }
+        int* alternate(int* p, int c) {
+            if (c) return p;
+            return &g;
+        }
+        void replace(int*& p);
+        int* reassigned_global(int* p) {
+            p = &g;
+            return p;
+        }
+        int* reassigned_param(int* p, int* q) {
+            p = q;
+            return p;
+        }
+        int* path_merge(int* p, int* q, int c) {
+            int* r = p;
+            if (c) r = q;
+            return r;
+        }
+        int* ref_escape(int* p) {
+            replace(p);
+            return p;
+        }
+        int* address_exposed(int* p) {
+            int* q = p;
+            int** out = &q;
+            (void)out;
+            return q;
+        }
+        int* conditional_same(int* p, int c) {
+            return c ? p : p;
+        }
+        struct IdentityOp {
+            int* operator()(int* p) { return p; }
+        };
+        int* operator_chain(int* p) {
+            IdentityOp identity;
+            return identity(p);
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "return_alias_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v7\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\n"),
+              std::string::npos);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["reassigned_global/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["reassigned_param/2"].returnAliasParam, 1);
+    EXPECT_EQ(parsed["path_merge/3"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["ref_escape/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["address_exposed/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["conditional_same/2"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["operator_chain/1"].returnAliasParam, 0);
+}
+
+TEST(ReturnAliasSummaryTest, V7FileRoundTripsExactly) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v7\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n"
+        "plain/1\tU\tR\tU\t-\t-\t-\t-\n";
+    auto input = writePersistFile("sum_v7_return_alias.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["identity/1"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["plain/1"].returnAliasParam, -1);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v7_return_alias_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output), content);
+}
+
+TEST(ReturnAliasSummaryTest, V6FileWithV7ColumnIsRejected) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "sum_v6_with_return_alias.txt",
+        "codeskeptic-summaries v6\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(input, parsed));
 }
