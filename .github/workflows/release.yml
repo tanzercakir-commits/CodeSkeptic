@@ -19,6 +19,7 @@ jobs:
       - name: Create the single shared draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if draft=$(gh release view "$GITHUB_REF_NAME" \
               --json isDraft --jq .isDraft 2>/dev/null); then

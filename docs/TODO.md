@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 38e29e2
-uçuşta = phase-truth-sync-v048 phase-v048-release-smoke-fix phase-verdict-integrity-validation
+base   = 625c245
+uçuşta = phase-truth-sync-v048 phase-v048-release-prepare-context phase-v048-release-smoke-fix phase-verdict-integrity-validation
 ```
 <!-- cs:state-end -->
 
