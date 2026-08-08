@@ -170,7 +170,7 @@ jobs:
           code2=0; out2=$(SDKROOT=/nonexistent/sdk ./bin/codeskeptic "$GITHUB_WORKSPACE/docs/demo.c" 2>&1) || code2=$?
           echo "SDKROOT-invalid exit_code=$code2" | tee -a /tmp/smoke.log
           test "$code2" -eq 2
-          echo "$out2" | grep -q "ANALYSIS FAILED"
+          echo "$out2" | grep -q "VERDICT UNAVAILABLE"
 
       - name: Upload to draft release
         env:
