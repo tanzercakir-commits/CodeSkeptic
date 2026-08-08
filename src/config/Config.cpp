@@ -43,7 +43,8 @@ const std::set<std::string>& singleValueOptions() {
         "--negative-assert-macros", "--alloc-functions",
         "--free-functions", "--untrusted-int-sources",
         "--owning-pointers", "--report-paths", "--policy", "--gate",
-        "--lines", "--summary-in", "--summary-out", "--files",
+        "--lines", "--summary-in", "--summary-out", "--model-file",
+        "--files",
         "--write-baseline"
     };
     return options;
@@ -164,6 +165,15 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "untrusted_int_sources") addNamesTo(untrusted_int_sources_, value);
         else if (key == "report_paths")    addReportPaths(value);
         else if (key == "policy")          addNamesTo(policies_, value);
+        else if (key == "model_file") {
+            if (value.empty()) {
+                configError(path, lineNumber,
+                            "model_file expects a non-empty path");
+                ok = false;
+            } else {
+                model_files_.push_back(value);
+            }
+        }
         else if (key == "summary_diff_gate") {
             if (value != "error" && value != "warn") {
                 configError(path, lineNumber,
@@ -303,6 +313,8 @@ bool Config::parseArgs(int argc, char* argv[]) {
             summary_in_path_ = argv[++i];
         } else if (arg == "--summary-out" && i + 1 < argc) {
             summary_out_path_ = argv[++i];
+        } else if (arg == "--model-file" && i + 1 < argc) {
+            model_files_.push_back(argv[++i]);
         } else if (arg == "--summary-diff" && i + 2 < argc) {
             summary_diff_old_ = argv[++i];
             summary_diff_new_ = argv[++i];
@@ -399,6 +411,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "  --summary-in <file>    Load function summaries saved earlier;\n"
                       << "                         analyze single files with whole-project\n"
                       << "                         knowledge (incremental whole-program)\n"
+                      << "  --model-file <file>    Load an opt-in library model using the\n"
+                      << "                         strict summary schema (repeatable;\n"
+                      << "                         malformed or missing files exit 2)\n"
                       << "  --summary-diff <old> <new>  Report contract changes between two\n"
                       << "                         summary files instead of analyzing;\n"
                       << "                         exits 1 if any contract weakened\n"

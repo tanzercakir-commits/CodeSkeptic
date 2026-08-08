@@ -70,8 +70,17 @@ ClauseStatus classifyAndCheck(const ContractClause& clause,
                               const FunctionDecl* func) {
     using RN = SummaryRegistry::ReturnNullness;
     using RZ = SummaryRegistry::ReturnZeroness;
-    using PE = SummaryRegistry::ParamEffect;
+    using RO = SummaryRegistry::ReturnOwnership;
+    using PO = SummaryRegistry::ParamOwnership;
 
+    if (clause.kind == ContractClauseKind::ReturnsOwned) {
+        if (!summary) return ClauseStatus::Unverified;
+        switch (summary->returnOwnership) {
+            case RO::Owned: return ClauseStatus::Satisfied;
+            case RO::Borrowed: return ClauseStatus::Violated;
+            case RO::Unknown: return ClauseStatus::Unverified;
+        }
+    }
     // Ownership effects vs the inferred parameter effects (Round D).
     // `owns(p)`: the callee claims to take ownership — a body that
     // provably only READS the parameter makes that claim false (the
@@ -85,20 +94,20 @@ ClauseStatus classifyAndCheck(const ContractClause& clause,
         auto idx = paramIndexByName(func, clause.paramName);
         if (!idx) return ClauseStatus::UnknownParam;
         if (!summary) return ClauseStatus::Unverified;
-        PE effect = summary->paramEffect(*idx);
+        PO ownership = summary->paramOwnership(*idx);
         if (clause.kind == ContractClauseKind::Owns) {
-            switch (effect) {
-                case PE::Frees:
-                case PE::Stores:    return ClauseStatus::Satisfied;
-                case PE::ReadsOnly: return ClauseStatus::Violated;
-                case PE::Opaque:    return ClauseStatus::Unverified;
+            switch (ownership) {
+                case PO::Consumed:
+                case PO::Transferred: return ClauseStatus::Satisfied;
+                case PO::Borrowed: return ClauseStatus::Violated;
+                case PO::Unknown: return ClauseStatus::Unverified;
             }
         } else {
-            switch (effect) {
-                case PE::ReadsOnly: return ClauseStatus::Satisfied;
-                case PE::Frees:     return ClauseStatus::Violated;
-                case PE::Stores:
-                case PE::Opaque:    return ClauseStatus::Unverified;
+            switch (ownership) {
+                case PO::Borrowed: return ClauseStatus::Satisfied;
+                case PO::Consumed: return ClauseStatus::Violated;
+                case PO::Transferred:
+                case PO::Unknown: return ClauseStatus::Unverified;
             }
         }
         return ClauseStatus::Unverified;

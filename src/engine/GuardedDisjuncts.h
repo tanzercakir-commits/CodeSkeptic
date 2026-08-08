@@ -599,12 +599,14 @@ template <typename VarMap, typename Ops>
 bool applyStmtFactsOps(GuardedState<VarMap>& state, const clang::Stmt* stmt,
                        const std::set<const clang::ValueDecl*>& stampable,
                        const std::set<const clang::ValueDecl*>& ptrStampable,
-                       const Ops& ops) {
+                       const Ops& ops,
+                       bool eraseMemberCalls = true) {
     const clang::ValueDecl* target = assignedDecl(stmt);
     if (!target) {
         bool memberChanged = applyMemberStmtFacts(state, stmt);
-        if (const auto* call = clang::dyn_cast<clang::CallExpr>(stmt))
-            memberChanged |= eraseMemberFactsAtCall(state, call);
+        if (eraseMemberCalls)
+            if (const auto* call = clang::dyn_cast<clang::CallExpr>(stmt))
+                memberChanged |= eraseMemberFactsAtCall(state, call);
         if (memberChanged) normalizeGuardedOps(state, ops);
         return memberChanged;
     }
