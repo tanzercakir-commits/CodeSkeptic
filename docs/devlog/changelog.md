@@ -89,6 +89,20 @@ with its sole `v0.4.9` tag, re-listed zero stale matches, and proved the same
 current digest still carried both release tags. Its one-shot deletion code is
 now removed; a permanent workflow contract requires it to remain absent.
 
+Release run `31233391177` published one checksum manifest plus generic and
+versioned aliases for all three platforms (seven assets total). GitHub's asset
+digests and the downloaded manifest agreed exactly: macOS aliases
+`sha256:24e269cd73f6bf83748532b8005fc73e78d60ed1caadffef51f8342a89c0f7d0`,
+Linux aliases
+`sha256:2ad28e773d134edb9d4b21e68b050c3942c07b5304fd225a1fbb0e08a508427c`,
+Windows aliases
+`sha256:f16ee1cf5f4068f5fd3f47d33af0cb55488cd85b497497c7106519d4963f5964`,
+and the checksum asset
+`sha256:913e763bc95b49815de3c23599b08cf11957b0e841be3fa1e7a7b3cb62093175`.
+Packaged Action self-test `31233885003`, real WSL2 smoke `31233885002`,
+and release housekeeping `31233885009` all passed before the final Docker
+receipt `31237949505`.
+
 This closes Phase 0: verdict-integrity PR #119 is on `main`; the v0.4.8
 macOS, Linux and Windows packages passed tests, version, packaging and
 relocation smokes; the public release, Action, real WSL2 and Docker paths all
