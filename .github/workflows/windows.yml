@@ -63,9 +63,10 @@ jobs:
         shell: bash
         run: |
           cat > smoke.cpp << 'EOF'
-          void leak() {
+          int use_after_free() {
               int* p = new int(42);
-              p = new int(7);
+              delete p;
+              return *p;
           }
           EOF
           code=0
@@ -91,15 +92,15 @@ jobs:
           @'
           #include <stdio.h>
           #include <stdlib.h>
-          void f(void) {
-              int* p = (int*)malloc(4 * sizeof(int));
-              p[10] = 1;
+          int f(void) {
+              int* p = NULL;
+              return *p;
           }
           '@ | Set-Content probe_dir\probe.c
           $out = & .\build\src\codeskeptic.exe probe_dir 2>&1 | Out-String
           $code = $LASTEXITCODE
           "exit=$code`n$out" | Set-Content probe_result.txt
-          if (-not ($code -eq 1 -and $out -match 'bounds')) {
+          if (-not ($code -eq 1 -and $out -match 'null-deref')) {
             Write-Host $out
             throw "no-dev-prompt directory mode regressed (exit=$code)"
           }

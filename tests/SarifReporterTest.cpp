@@ -51,6 +51,10 @@ TEST(SarifReporterTest, ResultFields) {
     EXPECT_NE(out.find("\"text\": \"bad deref\""), std::string::npos);
     EXPECT_NE(out.find("\"startLine\": 10"), std::string::npos);
     EXPECT_NE(out.find("\"startColumn\": 5"), std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/capabilityTier\": \"experimental\""),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/blocksVerdict\": false"),
+              std::string::npos);
     // Absolute paths are converted to file:// URIs
     EXPECT_NE(out.find("\"uri\": \"file:///src/a.cpp\""), std::string::npos);
 }
@@ -88,6 +92,23 @@ TEST(SarifReporterTest, InvocationPublishesCompleteVerdictContract) {
     EXPECT_NE(out.find("\"codeskeptic/status\": \"incomplete\""),
               std::string::npos);
     EXPECT_NE(out.find("\"codeskeptic/exitCode\": 2"),
+              std::string::npos);
+}
+
+TEST(SarifReporterTest, InvocationPublishesReportOnlyCounts) {
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.findings = result.report_only_findings = 2;
+
+    std::string out = reportToString({}, &result);
+
+    EXPECT_NE(out.find("\"codeskeptic/status\": \"report-only\""),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/exitCode\": 0"),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/blockingFindings\": 0"),
+              std::string::npos);
+    EXPECT_NE(out.find("\"codeskeptic/reportOnlyFindings\": 2"),
               std::string::npos);
 }
 

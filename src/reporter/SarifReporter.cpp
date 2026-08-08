@@ -1,5 +1,7 @@
 #include "reporter/SarifReporter.h"
 
+#include "core/Capabilities.h"
+
 #include "core/Messages.h"
 
 #include <fstream>
@@ -114,7 +116,11 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
              << ", \"codeskeptic/analyzedTUs\": " << result->analyzed_tus
              << ", \"codeskeptic/brokenTUs\": " << result->broken_tus
              << ", \"codeskeptic/incompleteFunctions\": "
-             << result->incomplete_functions << " } } ],\n";
+             << result->incomplete_functions
+             << ", \"codeskeptic/blockingFindings\": "
+             << result->blockingFindings()
+             << ", \"codeskeptic/reportOnlyFindings\": "
+             << result->report_only_findings << " } } ],\n";
     }
     file << "      \"results\": [";
 
@@ -124,6 +130,14 @@ bool SarifReporter::report(const DiagnosticList& diagnostics,
         file << "\n        {\n";
         file << "          \"ruleId\": \"" << escapeJson(diag.rule_id)
              << "\",\n";
+        const RuleCapability* capability =
+            findRuleCapability(diag.rule_id);
+        file << "          \"properties\": { \"codeskeptic/capabilityTier\": \""
+             << (capability ? capabilityTierName(capability->tier)
+                            : "unclassified")
+             << "\", \"codeskeptic/blocksVerdict\": "
+             << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
+             << " },\n";
         file << "          \"level\": \"" << sarifLevel(diag.severity)
              << "\",\n";
         file << "          \"message\": { \"text\": \""

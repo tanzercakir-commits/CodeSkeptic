@@ -154,7 +154,7 @@ fi
 #    be silently absent from the public capability list (the drift an
 #    external review flagged, 2026-07-30). Skip-list holds ids that are
 #    diagnostics, not detection rules (malformed-contract reporting).
-rule_skip=" contract-syntax "
+rule_skip=" contract-syntax contract-unsupported "
 ids=$( { grep -rhoE 'return "[a-z0-9-]+";' src/rules/*.cpp src/rules/*.h;
          grep -rhoE 'rule_id = "[a-z0-9-]+"' src/rules/*.cpp; } \
        | grep -oE '"[a-z0-9-]+"' | tr -d '"' | sort -u )
@@ -166,6 +166,11 @@ for id in $ids; do
         fail=1
     fi
 done
+
+# 4b. Product-scope tiers are one contract across runtime source, README and
+#     the detailed rule documentation. This also enforces supported/default/
+#     quality/blocking and experimental/report-only invariants.
+python3 scripts/check_capabilities_sync.py || fail=1
 
 # 5. Doc version pins agree with the canonical CMake version, so a
 #    release bumps the install docs in the same commit (README already

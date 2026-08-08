@@ -2,7 +2,7 @@ name: Release
 
 # Tag push v* -> build, package (scripts/package_release.sh), smoke the
 # tarball in CLEAN containers (the release-blocking gate: extract ->
-# analyze docs/demo.c -> exactly exit 1 with findings), upload assets to
+# analyze docs/demo.c -> exactly exit 1 with supported findings), upload assets to
 # a DRAFT release, and publish only when every leg is green. A release
 # that never ran on a clean machine never goes public.
 on:
@@ -264,7 +264,7 @@ jobs:
         # terms: the vcvars family is stripped, C:\llvm (build LLVM AND
         # the baked resource dir) is renamed away, and the packaged exe
         # must analyze docs/demo.c from its own bundled headers with
-        # exactly exit 1 + findings.
+        # exactly exit 1 + supported findings.
         shell: pwsh
         run: |
           $family = '^(INCLUDE|EXTERNAL_INCLUDE|LIB|LIBPATH|DevEnvDir|VSINSTALLDIR|VCINSTALLDIR|VCIDEInstallDir|VCToolsInstallDir|VCToolsVersion|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion|WindowsSdkBinPath|WindowsSdkVerBinPath|WindowsSDKLibVersion|UniversalCRTSdkDir|UCRTVersion|VSCMD_.*|Framework.*|ExtensionSdkDir)$'

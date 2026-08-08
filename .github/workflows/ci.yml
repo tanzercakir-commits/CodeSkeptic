@@ -71,14 +71,15 @@ jobs:
         id: smoke
         run: |
           cat > /tmp/smoke.cpp << 'EOF'
-          void leak() {
+          int use_after_free() {
               int* p = new int(42);
-              p = new int(7);
+              delete p;
+              return *p;
           }
           EOF
-          # Exit code must be 1 when there are findings. Actions steps run
-          # with `bash -e`: a failing command not caught with || kills the
-          # script immediately.
+          # Exit 1 is reserved for supported/blocking findings. Use-after-free
+          # is quality-gated; an experimental-only fixture would correctly
+          # return 0 while still reporting its finding.
           code=0
           ./build/src/codeskeptic /tmp/smoke.cpp || code=$?
           test "$code" -eq 1
@@ -86,9 +87,15 @@ jobs:
       - name: Self-scan (dogfood gate)
         id: selfscan
         # The analyzer analyzes its own sources — with the founding
-        # policy active. Any finding (or a hard-coded absolute path)
-        # fails CI: exit 0 means clean.
-        run: ./build/src/codeskeptic src/ --build-path build --policy no-absolute-paths
+        # policy active. Experimental rules are product-level report-only,
+        # but this repository's dogfood quality gate deliberately requires
+        # zero findings of either tier.
+        run: |
+          code=0
+          ./build/src/codeskeptic src/ --build-path build \
+            --policy no-absolute-paths --json /tmp/selfscan.json || code=$?
+          test "$code" -eq 0
+          python3 -c 'import json; data=json.load(open("/tmp/selfscan.json")); assert data["total"] == 0, data["total"]'
 
       - name: Real-world corpus (cJSON + tinyxml2)
         id: corpus

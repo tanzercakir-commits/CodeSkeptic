@@ -1,6 +1,7 @@
 #include "server/McpServer.h"
 
 #include "analyzer/StaticAnalyzer.h"
+#include "core/Capabilities.h"
 #include "config/Config.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/IntOverflowRule.h"
@@ -206,6 +207,8 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 
     json::Array findings;
     for (const auto& diag : analyzer.diagnostics()) {
+        const codeskeptic::RuleCapability* capability =
+            codeskeptic::findRuleCapability(diag.rule_id);
         json::Array notes;
         for (const auto& note : diag.notes) {
             notes.push_back(json::Object{
@@ -221,6 +224,12 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
             {"column", static_cast<int64_t>(diag.column)},
             {"severity", diag.severityToString()},
             {"rule", diag.rule_id},
+            {"capability_tier",
+             capability
+                 ? codeskeptic::capabilityTierName(capability->tier)
+                 : "unclassified"},
+            {"blocks_verdict",
+             codeskeptic::findingBlocksVerdict(diag.rule_id)},
             {"message", diag.message},
             {"trace", std::move(notes)},
         });
@@ -243,6 +252,10 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
             {"summary_stale", result.summary_stale},
         }},
         {"count", static_cast<int64_t>(findings.size())},
+        {"blocking_count",
+         static_cast<int64_t>(result.blockingFindings())},
+        {"report_only_count",
+         static_cast<int64_t>(result.report_only_findings)},
         {"findings", std::move(findings)},
     };
 

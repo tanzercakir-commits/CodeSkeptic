@@ -97,13 +97,15 @@ codeskeptic <source_path> [options]
                          whole-program: single-file analysis with
                          whole-project knowledge)
   --lang <en|tr>         Diagnostic message language (default: en)
+  --capabilities [--json] Print the tiered product scope and exit
 ```
 
-The verdict contract is stable: `0` means a complete clean analysis,
-`1` means a complete analysis with findings, and `2` means no trustworthy
+The verdict contract is stable: `0` means complete evidence with no blocking
+findings (it may include experimental report-only findings), `1` means a
+complete analysis with supported findings, and `2` means no trustworthy
 verdict was produced (invalid input/config, incomplete coverage/evidence,
-or an output artifact could not be written). Report-only integrations may
-relax `1`; they must never turn `2` green.
+or an output artifact could not be written). Integrations must never turn
+`2` green. The tier matrix is the [capability contract](capabilities.md).
 
 JSON, SARIF and HTML artifacts carry that same status and exit code together
 with translation-unit/dataflow coverage. An empty HTML findings list says
@@ -214,8 +216,8 @@ weaker claim, so a wrong strong claim cannot enter through the file.
 
 | Code | Meaning |
 |---|---|
-| 0 | Complete analysis; no findings (or baseline recorded successfully). |
-| 1 | Complete analysis; findings were reported. |
+| 0 | Complete analysis; no supported/blocking findings (experimental findings may be report-only), or baseline recorded successfully. |
+| 1 | Complete analysis; at least one supported/blocking finding was reported. |
 | 2 | **Verdict unavailable** — invalid CLI/config, no inputs, skipped TUs, incomplete dataflow/summary evidence, or artifact I/O failure. |
 
 A partially broken run fails closed with `2`. A deliberately scoped adoption

@@ -12,16 +12,19 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = eecbcfe
-uçuşta = phase-v048-phase0-closeout
+base   = af3ebb6
+uçuşta = phase-product-scope-contract
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): Faz 0 KAPANDI. v0.4.8 üç platform paketi,
+Serbest not (insanda kalır): Faz 0 ve Faz 1 KAPANDI. v0.4.8 üç platform paketi,
 Action, WSL2 ve Docker kapıları yeşil; public release ve GHCR `v0.4.8` /
 `latest` kimlikleri doğru. Yanlış GHCR `v0.4.9` versiyonu tam digest + tek-tag
 kapısıyla kaldırıldı, post-delete current koruması geçti ve tek-seferlik
-cleanup kodu silindi. Makbuzlar changelog 2026-08-08 kaydında.
+cleanup kodu silindi. Ürün kapsamı 14 bulgu ailesi için merkezi registry,
+schema-v2 capability çıktısı ve docs-sync kapısıyla kilitlendi; experimental
+bulgular ölçülür/raporlanır fakat verdict'i engellemez. Makbuzlar changelog
+2026-08-08 kayıtlarında.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -35,10 +38,10 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 1 ürün kapsam sözleşmesi. Her yeteneği
-`supported`, `experimental` veya `out-of-scope` olarak tek kaynaktan yayınla;
-CLI `--capabilities --json`, README ve kural dokümanlarını aynı kapsamda
-kilitle. CWE sayısını başarı metriği yapma.
+Bağlayıcı ürün programı sırası: Faz 2 ölçüm laboratuvarı. Juliet kaçırmalarını
+adreslenebilir/model eksiği/bilinçli kapsam dışı olarak sınıflandır; kararlı
+semantik bulgu parmak izini, ayrı temiz/kusurlu/gerçek-depo korpuslarını ve
+PR başına kural bazlı precision/recall + süre/RAM/TU/bulgu delta panosunu kur.
 
 ## Açık kullanıcı kararları
 
