@@ -1412,7 +1412,8 @@ TEST(OwningPointerTest, LambdaNotCapturingPtr_LeakStays) {
     ASSERT_EQ(results.size(), 1);
 }
 
-// Real-world regression pin: tensorflow/tensorflow #123387 (still open).
+// Accepted real-world regression pin: tensorflow/tensorflow #123387,
+// fixed by merged PR #123994 (68a7e5821cbb2beb76eeebbbbdffda85a418b254).
 // TFLite rfft2d Rfft2dHelper allocates fft_input_output, then a
 // temporary-tensor lookup (TF_LITE_ENSURE_OK) can return early before the
 // delete[] — leaking the FFT work buffer on the error path. Conditional
