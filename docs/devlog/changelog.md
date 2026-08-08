@@ -1,5 +1,71 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 4.2 parameter precondition/postcondition summaries
+
+Interprocedural v2 now persists and consumes two parameter relations across
+translation-unit boundaries. A callee's exact leading non-null guard becomes
+an entry precondition while preserving its observable consequence: an
+assert/abort violation is an error, and a complain-then-return rejection is a
+warning. Exact normal-return Null/NonNull effects are harvested for direct
+`T**` and `T*&` output slots. Every reachable path must agree; partial writes,
+conflicting values, pointer rebinding, copied/member aliases, lambda capture
+and opaque forwarding degrade to Unknown.
+
+The relations compose through direct calls, non-static `operator()` calls and
+the existing bounded summary sweep. NullDeref applies exact output effects
+after conservative out-parameter invalidation, so a proven NonNull result
+cleans the next dereference and a proven Null result produces the existing
+definite error. Body-less callers also wake for persisted preconditions.
+
+Summary format v8 adds fixed-width precondition (`O/C/R`) and postcondition
+(`U/0/N`) vectors. Readers retain v1-v7 compatibility; v8 row width, vector
+lengths and codes are strict, and an older header carrying v8 columns is
+rejected wholesale. Conservative key collisions keep either relation only on
+exact agreement. Summary diff uses caller compatibility for preconditions
+(new obligation or reject-to-crash is WEAKENED) and guarantee strength for
+postconditions (loss/change is WEAKENED, gain is STRENGTHENED).
+
+RED was captured before implementation: the cross-TU guard test returned zero
+diagnostics instead of one, and the Phase 4.1 executable still emitted v7
+summaries with no parameter-relation fields for the same fixture. After
+implementation, all focused inference, persistence, cross-TU,
+chain/operator, alias/path and summary-diff tests passed; the full Windows
+suite is 899/899. The pinned local corpus stayed exactly at cJSON 54 and
+tinyxml2 9, with no finding-count rise.
+
+## 2026-08-08 — Phase 4.1 exact pointer return-alias summaries
+
+Interprocedural v2 now harvests an independent, strong relation stating that
+every reachable return denotes the entry object of one exact pointer
+parameter. The analysis is flow-sensitive across local copies, direct
+assignment and CFG joins; direct call chains and non-static operator() calls
+compose through the prior fixpoint sweep. Mixed sources, pointer arithmetic,
+dynamic casts, address exposure, compound mutation and non-const reference
+write channels conservatively drop the relation. It is intentionally separate
+from null passthrough: null correspondence does not imply object identity.
+
+The deterministic summary format is v7 with a trailing return-alias parameter
+column. Readers still accept v1-v6; an old header carrying a v7 column is
+rejected wholesale. Conservative cross-TU/key-collision merges retain the
+relation only on exact agreement. Summary diff treats gaining the relation as
+STRENGTHENED, and losing or changing its source parameter as WEAKENED.
+
+The required RED receipt was captured before implementation: the exact
+harvest test failed every alias assertion and the v7 round-trip file was
+rejected. After implementation, the 30/30 focused return-alias, persistence
+and summary-diff tests and the full 881/881 Windows suite passed, including
+assignment, path merge, reference escape, address exposure, ternary and
+operator-call boundaries. The pre-existing v1-v6 compatibility matrix remains
+covered.
+Final local gates passed 881/881 CTest cases and the documentation/capability/
+real-world-ledger sync check. The dogfood scan was clean across 47/47
+translation units with zero findings and no broken TU. The frozen thesis gate
+held at clean_fp=0, bug_caught=9/15 and total_findings=11. The pinned
+open-source corpus remained exactly cJSON 54 findings (35/76 analyzed, 41
+known broken fixtures accepted explicitly) and tinyxml2 9 findings (3/3
+analyzed), so this relation produced no uncontrolled finding-count increase.
+
+
 ## 2026-08-08 — Phase 3 precision-debt implementation
 
 Phase 3 replaces two rtp2httpd context false positives with explicit

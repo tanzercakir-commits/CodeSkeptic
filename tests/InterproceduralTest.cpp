@@ -809,10 +809,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\n"
-              "alpha/1\tN\tR\tU\t-\t-\t-\n"
-              "beta/2\tM\tOF\tM\t-\t-\t-\n"
-              "gamma/0\tU\t-\tN\t-\t-\t-\n");
+              "codeskeptic-summaries v8\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -830,7 +830,8 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nlegacy/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v8\n"
+              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -852,7 +853,8 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nfoo/1\tU\tO\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v8\n"
+              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -895,7 +897,8 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v6\nkeep/1\tN\tR\tU\t-\t-\t-\n");
+              "codeskeptic-summaries v8\n"
+              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1427,7 +1430,7 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
 
 // --- v6 persistence: exact always-zero return ---
 
-TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
+TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV8) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v6\n"
@@ -1442,7 +1445,9 @@ TEST(SummaryPersistTest, V6File_AlwaysZeroRoundTrips) {
     ASSERT_TRUE(registry.loadGlobal(p));
     auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
     ASSERT_TRUE(registry.saveGlobal(out));
-    EXPECT_EQ(readWholeFile(out), content);
+    EXPECT_EQ(readWholeFile(out),
+              "codeskeptic-summaries v8\n"
+              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
@@ -1466,4 +1471,443 @@ TEST(SummaryPersistTest, V4File_ZeroFromParamStillParses) {
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     ASSERT_TRUE(SummaryRegistry::parseSummaryFile(p, parsed));
     EXPECT_EQ(parsed["id/1"].zeroFromParam, 0);
+}
+
+// ===================================================================
+// Interprocedural v2: exact pointer return-alias relation.
+//
+// A strong claim is emitted only when every reachable return denotes
+// the same pointer parameter's entry object. Local copies and chains of
+// exact summaries preserve identity; mixed sources, pointer arithmetic,
+// mutation, and exposed write channels deliberately lose it. The
+// relation is persisted independently from null-passthrough.
+// ===================================================================
+
+TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("return_alias_summary.cpp", R"(
+        int g;
+        int* direct(int* p) { return p; }
+        int* local_copy(int* p) {
+            int* q = p;
+            return q;
+        }
+        int* chain(int* p) { return local_copy(p); }
+        int* same_on_both_paths(int* p, int c) {
+            if (c) return p;
+            return p;
+        }
+        int* mixed(int* p, int* q, int c) {
+            if (c) return p;
+            return q;
+        }
+        int* altered(int* p) { return p + 1; }
+        int* alternate(int* p, int c) {
+            if (c) return p;
+            return &g;
+        }
+        void replace(int*& p);
+        int* reassigned_global(int* p) {
+            p = &g;
+            return p;
+        }
+        int* reassigned_param(int* p, int* q) {
+            p = q;
+            return p;
+        }
+        int* path_merge(int* p, int* q, int c) {
+            int* r = p;
+            if (c) r = q;
+            return r;
+        }
+        int* ref_escape(int* p) {
+            replace(p);
+            return p;
+        }
+        int* address_exposed(int* p) {
+            int* q = p;
+            int** out = &q;
+            (void)out;
+            return q;
+        }
+        int* conditional_same(int* p, int c) {
+            return c ? p : p;
+        }
+        struct IdentityOp {
+            int* operator()(int* p) { return p; }
+        };
+        int* operator_chain(int* p) {
+            IdentityOp identity;
+            return identity(p);
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "return_alias_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v8\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\n"),
+              std::string::npos);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(summaryPath, parsed));
+    EXPECT_EQ(parsed["reassigned_global/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["reassigned_param/2"].returnAliasParam, 1);
+    EXPECT_EQ(parsed["path_merge/3"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["ref_escape/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["address_exposed/1"].returnAliasParam, -1);
+    EXPECT_EQ(parsed["conditional_same/2"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["operator_chain/1"].returnAliasParam, 0);
+}
+
+TEST(ReturnAliasSummaryTest, V7FileUpgradesToV8Exactly) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v7\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n"
+        "plain/1\tU\tR\tU\t-\t-\t-\t-\n";
+    auto input = writePersistFile("sum_v7_return_alias.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["identity/1"].returnAliasParam, 0);
+    EXPECT_EQ(parsed["plain/1"].returnAliasParam, -1);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v7_return_alias_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output),
+              "codeskeptic-summaries v8\n"
+              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\n"
+              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\n");
+}
+
+TEST(ReturnAliasSummaryTest, V6FileWithV7ColumnIsRejected) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "sum_v6_with_return_alias.txt",
+        "codeskeptic-summaries v6\n"
+        "identity/1\tU\tS\tU\t-\t-\t0\t0\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(input, parsed));
+}
+
+// ===================================================================
+// Interprocedural v2: parameter precondition/postcondition summaries.
+// The caller sees declarations only; summaries are the proof channel.
+// ===================================================================
+
+TEST(ParamContractSummaryTest, CrossTUNonNullPreconditionViolationReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        [[noreturn]] void die();
+        void consume(int* p) {
+            if (!p) die();
+            *p = 1;
+        }
+    )", R"(
+        void consume(int*);
+        void caller() { consume(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, HarvestsPreAndPostconditionsExactly) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("param_contract_summary.cpp", R"(
+        [[noreturn]] void die();
+        void complain();
+        int storage;
+        void consume(int* p) {
+            if (!p) die();
+            *p = 1;
+        }
+        void reject(int* p) {
+            if (!p) { complain(); return; }
+            *p = 1;
+        }
+        void bind(int** out) { *out = &storage; }
+        void maybe_bind(int** out, int c) {
+            if (c) *out = &storage;
+        }
+        void alias_overwrite(int** out) {
+            *out = &storage;
+            int** alias = out;
+            *alias = nullptr;
+        }
+    )");
+    auto summaryPath = ::testing::TempDir() + "param_contract_summary.csk";
+
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<NullDerefRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_NE(saved.find("codeskeptic-summaries v8\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\n"),
+              std::string::npos);
+}
+
+TEST(ParamContractSummaryTest, V8FileRoundTripsAndValidatesVectors) {
+    GlobalStoreGuard guard;
+    const std::string content =
+        "codeskeptic-summaries v8\n"
+        "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\n"
+        "consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\n";
+    auto input = writePersistFile("sum_v8_param_contracts.txt", content);
+
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryFile(input, parsed));
+    EXPECT_EQ(parsed["bind/1"].paramPostcondition(0),
+              SummaryRegistry::ParamPostcondition::NonNull);
+    EXPECT_EQ(parsed["consume/1"].paramPrecondition(0),
+              SummaryRegistry::ParamPrecondition::NonNullCrash);
+
+    auto& registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+    auto output = ::testing::TempDir() + "sum_v8_param_contracts_out.txt";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output), content);
+
+    auto badLength = writePersistFile(
+        "sum_v8_bad_param_length.txt",
+        "codeskeptic-summaries v8\n"
+        "bad/2\tU\tRO\tU\t-\t-\t-\t-\tO\tUU\n");
+    auto badCode = writePersistFile(
+        "sum_v8_bad_param_code.txt",
+        "codeskeptic-summaries v8\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tX\tU\n");
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badLength, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badCode, parsed));
+}
+
+TEST(ParamContractSummaryTest, V7HeaderRejectsV8Columns) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "sum_v7_with_param_contracts.txt",
+        "codeskeptic-summaries v7\n"
+        "bad/1\tU\tR\tU\t-\t-\t-\t-\tC\tN\n");
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(input, parsed));
+}
+
+TEST(ParamContractSummaryTest, CrossTUDefiniteNonNullOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind(int** out) { *out = &storage; }
+    )", R"(
+        void bind(int**);
+        int caller() {
+            int* p = nullptr;
+            bind(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUReferenceOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind_ref(int*& out) { out = &storage; }
+    )", R"(
+        void bind_ref(int*&);
+        int caller() {
+            int* p = nullptr;
+            bind_ref(p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUChainedOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void bind(int** out) { *out = &storage; }
+        void bind_chain(int** out) { bind(out); }
+    )", R"(
+        void bind_chain(int**);
+        int caller() {
+            int* p = nullptr;
+            bind_chain(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTUOperatorOutPostconditionCleans) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        struct Binder {
+            void operator()(int*& out) { out = &storage; }
+        };
+    )", R"(
+        struct Binder { void operator()(int*&); };
+        int caller(Binder& bind) {
+            int* p = nullptr;
+            bind(p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, OperatorCallForwardsOutPostcondition) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        struct Binder {
+            void operator()(int** out) { *out = &storage; }
+        };
+        void bind_operator(int** out) {
+            Binder binder;
+            binder(out);
+        }
+    )", R"(
+        void bind_operator(int**);
+        int caller() {
+            int* p = nullptr;
+            bind_operator(&p);
+            return *p;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, CrossTURejectedPreconditionWarns) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void complain();
+        void consume(int* p) {
+            if (!p) { complain(); return; }
+            *p = 1;
+        }
+    )", R"(
+        void consume(int*);
+        void caller() { consume(nullptr); }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "contract");
+    EXPECT_EQ(results[0].severity, Severity::Warning);
+}
+
+TEST(ParamContractSummaryTest, CrossTUDefiniteNullOutPostconditionReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void clear(int** out) { *out = nullptr; }
+    )", R"(
+        int storage;
+        void clear(int**);
+        int caller() {
+            int* p = &storage;
+            clear(&p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, CrossTUReferenceNullPostconditionReports) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void clear_ref(int*& out) { out = nullptr; }
+    )", R"(
+        int storage;
+        void clear_ref(int*&);
+        int caller() {
+            int* p = &storage;
+            clear_ref(p);
+            return *p;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "null-deref");
+    EXPECT_EQ(results[0].severity, Severity::Error);
+}
+
+TEST(ParamContractSummaryTest, PartialOutWriteStaysUnknown) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int storage;
+        void maybe_bind(int** out, bool write) {
+            if (write) *out = &storage;
+        }
+    )", R"(
+        void maybe_bind(int**, bool);
+        int caller(bool write) {
+            int* p = nullptr;
+            maybe_bind(&p, write);
+            return *p;
+        }
+    )");
+    // Unknown is deliberately silent: no exact guarantee was proven.
+    EXPECT_EQ(results.size(), 0u);
+}
+
+TEST(ParamContractSummaryTest, LocalPointerToPointerRebindDoesNotEscape) {
+    NullDerefRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        void rebind_local(int*** slot) { *slot = nullptr; }
+        void leave_slot(int** out) { rebind_local(&out); }
+    )", R"(
+        int storage;
+        void leave_slot(int**);
+        int caller() {
+            int* p = &storage;
+            leave_slot(&p);
+            return *p;
+        }
+    )");
+    // `&out` exposes only the callee's local T** parameter variable;
+    // rebinding it cannot change the caller's `p` slot.
+    EXPECT_EQ(results.size(), 0u);
 }

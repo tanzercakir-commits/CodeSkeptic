@@ -49,11 +49,21 @@ public:
     // The mirror of null: same mini-flow, with the zero domain.
     enum class ReturnZeroness { Unknown, AlwaysZero, NeverZero, MaybeZero };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
+    enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
+    enum class ParamPostcondition { Unknown, Null, NonNull };
 
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
         std::vector<ParamEffect> params;
+
+        // Entry requirements inferred from the callee's own leading
+        // guard, and exact normal-return effects on pointer out-params.
+        // The vectors are indexed like params. Missing entries (legacy
+        // summary files and conservative overload merges) mean no
+        // precondition / unknown postcondition.
+        std::vector<ParamPrecondition> paramPreconditions;
+        std::vector<ParamPostcondition> paramPostconditions;
 
         // Zero-passthrough (the zeroness-through-summaries slice): when
         // returnZeroness is Unknown ONLY because some paths return
@@ -76,6 +86,14 @@ public:
         // null-correspondence). -1 = no claim.
         int nullFromParam = -1;
 
+        // Exact pointer return-alias relation (interprocedural v2):
+        // every reachable return denotes pointer parameter
+        // #returnAliasParam's entry object. Unlike nullFromParam this
+        // describes identity, not merely null correspondence, and is
+        // therefore valid independently of returnNullness. -1 = no
+        // proven exact relation.
+        int returnAliasParam = -1;
+
         // Value-conditioned null return (#69b). When returnNullness is
         // MaybeNull AND the harvest PROVED that every null-returning
         // path is guarded by "parameter #nullCondParam outside
@@ -94,6 +112,18 @@ public:
         ParamEffect paramEffect(unsigned index) const {
             if (index >= params.size()) return ParamEffect::Opaque;
             return params[index];
+        }
+
+        ParamPrecondition paramPrecondition(unsigned index) const {
+            if (index >= paramPreconditions.size())
+                return ParamPrecondition::None;
+            return paramPreconditions[index];
+        }
+
+        ParamPostcondition paramPostcondition(unsigned index) const {
+            if (index >= paramPostconditions.size())
+                return ParamPostcondition::Unknown;
+            return paramPostconditions[index];
         }
     };
 

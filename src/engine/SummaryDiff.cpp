@@ -9,6 +9,8 @@ namespace {
 using RN = codeskeptic::SummaryRegistry::ReturnNullness;
 using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
 using PE = codeskeptic::SummaryRegistry::ParamEffect;
+using PPre = codeskeptic::SummaryRegistry::ParamPrecondition;
+using PPost = codeskeptic::SummaryRegistry::ParamPostcondition;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 
 const char* rnName(RN v) {
@@ -40,6 +42,28 @@ const char* peName(PE v) {
     return "Opaque";
 }
 
+const char* preName(PPre v) {
+    switch (v) {
+        case PPre::NonNullCrash: return "NonNullCrash";
+        case PPre::NonNullRejected: return "NonNullRejected";
+        case PPre::None: break;
+    }
+    return "None";
+}
+
+const char* postName(PPost v) {
+    switch (v) {
+        case PPost::Null: return "Null";
+        case PPost::NonNull: return "NonNull";
+        case PPost::Unknown: break;
+    }
+    return "Unknown";
+}
+
+std::string aliasName(int v) {
+    return v < 0 ? "none" : "param#" + std::to_string(v);
+}
+
 // "Strong" claims: guarantees that change analysis results on the
 // caller side. Their loss/change is a weakening — callers leaning on
 // the claim must be re-examined.
@@ -48,6 +72,7 @@ bool rzStrong(RZ v) {
     return v == RZ::AlwaysZero || v == RZ::NeverZero;
 }
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
+bool aliasStrong(int v) { return v >= 0; }
 
 struct FieldVerdict {
     bool weakened = false;
@@ -68,6 +93,39 @@ void classifyField(T oldV, T newV, StrongFn isStrong, NameFn name,
         verdict.changed = true;
     if (!detail.empty()) detail += "; ";
     detail += label + ": " + name(oldV) + " -> " + name(newV);
+}
+
+void appendDetail(std::string& detail, const std::string& label,
+                  const char* oldName, const char* newName) {
+    if (!detail.empty()) detail += "; ";
+    detail += label + ": " + oldName + " -> " + newName;
+}
+
+void classifyPrecondition(PPre oldV, PPre newV,
+                          const std::string& label,
+                          FieldVerdict& verdict, std::string& detail) {
+    if (oldV == newV) return;
+    // A new caller obligation is a compatibility weakening. Changing a
+    // rejection into a crash is also a worsening; the reverse directions
+    // relax or make the contract safer.
+    if (oldV == PPre::None ||
+        (oldV == PPre::NonNullRejected &&
+         newV == PPre::NonNullCrash))
+        verdict.weakened = true;
+    else
+        verdict.strengthened = true;
+    appendDetail(detail, label, preName(oldV), preName(newV));
+}
+
+void classifyPostcondition(PPost oldV, PPost newV,
+                           const std::string& label,
+                           FieldVerdict& verdict, std::string& detail) {
+    if (oldV == newV) return;
+    if (oldV != PPost::Unknown)
+        verdict.weakened = true;
+    else
+        verdict.strengthened = true;
+    appendDetail(detail, label, postName(oldV), postName(newV));
 }
 
 } // anonymous namespace
@@ -94,17 +152,34 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                       rnStrong, rnName, "returnNullness", verdict, detail);
         classifyField(oldSum.returnZeroness, newSum.returnZeroness,
                       rzStrong, rzName, "returnZeroness", verdict, detail);
+        classifyField(oldSum.returnAliasParam, newSum.returnAliasParam,
+                      aliasStrong, aliasName, "returnAliasParam",
+                      verdict, detail);
 
         // Parameters are compared by index; vector sizes may differ
         // (the conservative merge may have emptied one) — paramEffect()
         // treats the missing ones as Opaque
-        const size_t numParams =
-            std::max(oldSum.params.size(), newSum.params.size());
+        const size_t numParams = std::max(
+            {oldSum.params.size(), newSum.params.size(),
+             oldSum.paramPreconditions.size(),
+             newSum.paramPreconditions.size(),
+             oldSum.paramPostconditions.size(),
+             newSum.paramPostconditions.size()});
         for (size_t i = 0; i < numParams; ++i) {
             classifyField(oldSum.paramEffect(static_cast<unsigned>(i)),
                           newSum.paramEffect(static_cast<unsigned>(i)),
                           peStrong, peName,
                           "param#" + std::to_string(i), verdict, detail);
+            classifyPrecondition(
+                oldSum.paramPrecondition(static_cast<unsigned>(i)),
+                newSum.paramPrecondition(static_cast<unsigned>(i)),
+                "param#" + std::to_string(i) + ".precondition",
+                verdict, detail);
+            classifyPostcondition(
+                oldSum.paramPostcondition(static_cast<unsigned>(i)),
+                newSum.paramPostcondition(static_cast<unsigned>(i)),
+                "param#" + std::to_string(i) + ".postcondition",
+                verdict, detail);
         }
 
         if (detail.empty()) continue;  // contract unchanged

@@ -26,11 +26,15 @@ SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
 
 `WEAKENED` means a strong claim callers may rely on was lost — a
 function that could never return null now can, a callee that used to
-be read-only now stores its argument. The exit code is `1` in that
-case, so the diff doubles as a CI gate: *this change silently altered
-function contracts; the callers deserve a look*. Gained claims report
-as `STRENGTHENED` (informational), directionless drifts as `CHANGED`,
-and signature changes appear as `REMOVED`+`ADDED` (the key includes
+be read-only now stores its argument. Losing or changing the source parameter
+of an exact return-alias identity or an exact output postcondition is also a
+weakening. Preconditions use the caller-compatibility direction: adding a
+new non-null obligation, or changing rejection into crash, is WEAKENED;
+removing/softening it is STRENGTHENED. The exit code is `1` for a weakening,
+so the diff doubles as a CI gate: *this change silently altered function
+contracts; the callers deserve a look*. Other gained claims report as
+`STRENGTHENED` (informational), directionless drifts as `CHANGED`, and
+signature changes appear as `REMOVED`+`ADDED` (the key includes
 arity — an arity change breaks callers anyway).
 
 The gate is configurable for adoption: `--gate warn` (or
