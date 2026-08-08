@@ -12,15 +12,16 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = dd08970
-uçuşta = phase-truth-sync-v048 phase-verdict-integrity-validation
+base   = 38e29e2
+uçuşta = phase-truth-sync-v048 phase-v048-release-smoke-fix phase-verdict-integrity-validation
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): verdict-integrity Faz 0, tüm kapıları yeşilken
-kullanıcının açıkça onayladığı tek seferlik yönetici squash merge'iyle PR
-#119'dan `main`e alındı (`dd08970`). v0.4.8 truth-sync doğrulanmış yeni `main`
-tabanına taşındı; yayın gerçeği ve replay ledger'ı bu dalda hazırlanıyor.
+Serbest not (insanda kalır): Faz 0 verdict-integrity ve truth-sync dilimleri
+PR #119 (`dd08970`) ve PR #120 (`38e29e2`) ile `main`e alındı. İlk v0.4.8
+tag koşusu ürün/paket kontrollerini geçti; macOS negative-smoke adımı doğru
+`VERDICT UNAVAILABLE` çıktısında eski metni aradığı için release-contract
+hotfix'i hazırlanıyor.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -34,9 +35,10 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 0 truth-sync dalını CI kanıtıyla kapat;
-TensorFlow/ölçüm ledger'ı/v0.4.8 yayın gerçeğini ve paket taşıma smoke'unu
-koru. Ardından Faz 1 capability tier sözleşmesine geç.
+Bağlayıcı ürün programı sırası: v0.4.8 release-smoke sözleşme düzeltmesini
+CI kanıtıyla birleştir, etiketi doğrulanmış `main`e taşı ve üç platformlu
+yayını tamamla. Ardından Faz 0'ı kapatıp Faz 1 capability tier sözleşmesine
+geç.
 
 ## Açık kullanıcı kararları
 
