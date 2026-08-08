@@ -13,7 +13,10 @@
 using namespace codeskeptic;
 using RN = SummaryRegistry::ReturnNullness;
 using RZ = SummaryRegistry::ReturnZeroness;
+using RO = SummaryRegistry::ReturnOwnership;
 using PE = SummaryRegistry::ParamEffect;
+using PA = SummaryRegistry::ParamAccess;
+using PO = SummaryRegistry::ParamOwnership;
 using PPre = SummaryRegistry::ParamPrecondition;
 using PPost = SummaryRegistry::ParamPostcondition;
 
@@ -119,6 +122,54 @@ TEST(SummaryDiffTest, ReturnAliasSourceChangeIsWeakened) {
     ASSERT_EQ(result.weakened, 1u);
     EXPECT_NE(result.changes[0].detail.find(
                   "returnAliasParam: param#0 -> param#1"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ReturnOwnershipLossOrChangeIsWeakened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown);
+    oldSum.returnOwnership = RO::Owned;
+    auto lostSum = oldSum;
+    lostSum.returnOwnership = RO::Unknown;
+    auto changedSum = oldSum;
+    changedSum.returnOwnership = RO::Borrowed;
+
+    EXPECT_EQ(diffSummaries({{"make/0", oldSum}},
+                            {{"make/0", lostSum}}).weakened,
+              1u);
+    EXPECT_EQ(diffSummaries({{"make/0", oldSum}},
+                            {{"make/0", changedSum}}).weakened,
+              1u);
+}
+
+TEST(SummaryDiffTest, ParamAccessAndOwnershipGainsAreStrengthened) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramAccesses = {PA::Unknown};
+    oldSum.paramOwnerships = {PO::Unknown};
+    auto newSum = oldSum;
+    newSum.paramAccesses = {PA::Writes};
+    newSum.paramOwnerships = {PO::Consumed};
+
+    auto result = diffSummaries({{"consume/1", oldSum}},
+                                {{"consume/1", newSum}});
+    EXPECT_EQ(result.weakened, 0u);
+    ASSERT_EQ(result.strengthened, 1u);
+    EXPECT_NE(result.changes[0].detail.find("param#0.access"),
+              std::string::npos);
+    EXPECT_NE(result.changes[0].detail.find("param#0.ownership"),
+              std::string::npos);
+}
+
+TEST(SummaryDiffTest, ParamOwnershipChangeRequiresCallerRecheck) {
+    auto oldSum = makeSum(RN::Unknown, RZ::Unknown, {PE::ReadsOnly});
+    oldSum.paramOwnerships = {PO::Borrowed};
+    auto newSum = oldSum;
+    newSum.paramOwnerships = {PO::Transferred};
+
+    auto result = diffSummaries({{"keep/1", oldSum}},
+                                {{"keep/1", newSum}});
+    ASSERT_EQ(result.weakened, 1u);
+    EXPECT_NE(result.changes[0].detail.find(
+                  "param#0.ownership: Borrowed -> Transferred"),
               std::string::npos);
 }
 

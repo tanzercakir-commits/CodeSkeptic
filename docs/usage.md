@@ -221,12 +221,15 @@ The MCP `analyze` tool accepts the same file via its optional
 Stale or malformed summary files are rejected whole (analysis continues
 without them, conservatively); conflicting entries merge toward the
 weaker claim, so a wrong strong claim cannot enter through the file.
-The current v8 format includes exact pointer return-alias identity, inferred
+The current v9 format includes exact pointer return-alias identity, inferred
 non-null parameter preconditions (crash versus rejected-call consequence),
-and exact Null/NonNull normal-return effects for `T**`/`T*&` output slots.
-Readers remain backward compatible with v1-v7 files; version-specific field
-counts and parameter-vector lengths are strict, so a newer column under an
-older header or a truncated vector is rejected rather than guessed.
+exact Null/NonNull normal-return effects for `T**`/`T*&` output slots,
+pointee access (`none/read/write/read+write`), parameter ownership
+(`borrowed/consumed/transferred`), and non-null return ownership
+(`borrowed/owned`). Readers remain backward compatible with v1-v8 files;
+version-specific field counts, codes, and parameter-vector lengths are
+strict, so a newer column under an older header or a truncated vector is
+rejected rather than guessed.
 
 ## Exit codes
 

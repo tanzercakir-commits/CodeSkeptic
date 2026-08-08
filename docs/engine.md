@@ -65,8 +65,7 @@ The v2 schema also records exact pointer return identity: a relation is
 published only when every reachable return aliases the same pointer
 parameter's entry object. Local copies and direct call chains preserve it;
 mixed sources, mutation and exposed write channels lose it conservatively.
-This identity relation is independent from null correspondence and is
-currently the proof input for the remaining ownership/side-effect v2 slices.
+This identity relation is independent from null correspondence.
 
 Parameter contracts now cross translation-unit boundaries too. Leading
 assert/abort and complain-then-return guards become exact non-null entry
@@ -75,7 +74,22 @@ return, direct `T**` and `T*&` output slots carry an exact Null/NonNull
 postcondition only when every reachable path agrees; partial writes,
 conflicting paths, rebinding and untracked aliases fall back to Unknown.
 Callers consume both relations, including direct chains and `operator()`
-calls. Summary format v8 persists these vectors and still reads v1-v7 files.
+calls.
+
+Side effects and ownership are separate summary axes. For every pointer-like
+parameter, the access relation records no access, read, write, or read+write;
+the ownership relation records borrowed, consumed, transferred, or unknown.
+Direct dereference/member/subscript uses, clean local aliases, direct call
+chains and non-static `operator()` calls compose through the fixpoint. Fresh
+heap/resource returns and their wrapper chains are Owned; parameter/global
+aliases are Borrowed; mixed, opaque, capture, and conflicting flows remain
+Unknown. MemoryLeak consumes the ownership relations, and ContractRule now
+verifies `owns`, `borrows`, and `returns owned` against the same facts.
+
+Summary format v9 persists the access (`O/R/W/B/U`), parameter ownership
+(`B/C/T/U`), and return ownership (`B/O/U`) fields alongside the v8
+pre/postcondition vectors. Readers still accept v1-v8 files; old parameter
+effects are conservatively upgraded for ownership behavior.
 
 Summaries are deterministic and serializable (`--summary-out` /
 `--summary-in`), which is what makes the

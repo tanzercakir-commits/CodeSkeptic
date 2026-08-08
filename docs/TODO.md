@@ -51,9 +51,12 @@ ve v1-v6 uyumlu v7 kalıcılık testlerle kilitlendi. Parametre precondition/
 postcondition dilimi de RED→GREEN tamamlandı: cross-TU crash/reject non-null
 girişleri, kesin `T**`/`T*&` Null/NonNull çıkışları, zincir/operator bileşimi,
 muhafazakâr alias/path merge, v1-v7 uyumlu v8 kalıcılık ve summary-diff yönleri
-kilitlendi. Sıradaki dilim yan etkiler ve ownership transferi; ardından call-
-graph SCC sabit noktası, alan duyarlılığı, kontrollü function-pointer çözümü
-ve kütüphane model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak;
+kilitlendi. Yan etki/ownership dilimi de RED→GREEN: pointee read/write,
+Borrowed/Consumed/Transferred parametre ownership'i, Owned/Borrowed dönüşler,
+cross-TU leak/contract tüketimi ve v1-v8 uyumlu katı v9 kalıcılık birbirinden
+bağımsız ilişkiler olarak kilitlendi. Sıradaki dilim call-graph SCC sabit
+noktası; ardından alan duyarlılığı, kontrollü function-pointer çözümü ve
+kütüphane model dosyaları gelecek. Her ilişki önce RED testle kanıtlanacak;
 gerçek korpusta kontrolsüz bulgu artışı olmayacak.
 
 ## Açık kullanıcı kararları

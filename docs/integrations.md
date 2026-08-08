@@ -26,11 +26,12 @@ SUMMARY_DIFF WEAKENED find/1 returnNullness: NeverNull -> MaybeNull
 
 `WEAKENED` means a strong claim callers may rely on was lost — a
 function that could never return null now can, a callee that used to
-be read-only now stores its argument. Losing or changing the source parameter
-of an exact return-alias identity or an exact output postcondition is also a
-weakening. Preconditions use the caller-compatibility direction: adding a
-new non-null obligation, or changing rejection into crash, is WEAKENED;
-removing/softening it is STRENGTHENED. The exit code is `1` for a weakening,
+be read-only now stores its argument. Losing or changing an exact pointee
+access, parameter-ownership, return-ownership, return-alias, or output
+postcondition claim is also a weakening. Preconditions use the
+caller-compatibility direction: adding a new non-null obligation, or changing
+rejection into crash, is WEAKENED; removing/softening it is STRENGTHENED. The
+exit code is `1` for a weakening,
 so the diff doubles as a CI gate: *this change silently altered function
 contracts; the callers deserve a look*. Other gained claims report as
 `STRENGTHENED` (informational), directionless drifts as `CHANGED`, and

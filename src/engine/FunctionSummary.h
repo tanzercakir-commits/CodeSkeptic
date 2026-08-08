@@ -48,14 +48,28 @@ public:
     // `data = 0; return data;` source lives in another function/file).
     // The mirror of null: same mini-flow, with the zero domain.
     enum class ReturnZeroness { Unknown, AlwaysZero, NeverZero, MaybeZero };
+    enum class ReturnOwnership { Unknown, Owned, Borrowed };
     enum class ParamEffect { Opaque, ReadsOnly, Frees, Stores };
+    enum class ParamAccess { Unknown, None, Reads, Writes, ReadsWrites };
+    enum class ParamOwnership {
+        Unknown, Borrowed, Consumed, Transferred
+    };
     enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
     enum class ParamPostcondition { Unknown, Null, NonNull };
 
     struct FunctionSummary {
         ReturnNullness returnNullness = ReturnNullness::Unknown;
         ReturnZeroness returnZeroness = ReturnZeroness::Unknown;
+        ReturnOwnership returnOwnership = ReturnOwnership::Unknown;
         std::vector<ParamEffect> params;
+
+        // Independent interprocedural-v2 relations. ParamAccess describes
+        // reads/writes through the pointer, while ParamOwnership describes
+        // what happens to responsibility for the pointed-to allocation.
+        // Keeping these axes separate avoids treating `return p` as an
+        // ownership transfer merely because the pointer value escapes.
+        std::vector<ParamAccess> paramAccesses;
+        std::vector<ParamOwnership> paramOwnerships;
 
         // Entry requirements inferred from the callee's own leading
         // guard, and exact normal-return effects on pointer out-params.
@@ -112,6 +126,24 @@ public:
         ParamEffect paramEffect(unsigned index) const {
             if (index >= params.size()) return ParamEffect::Opaque;
             return params[index];
+        }
+
+        ParamAccess paramAccess(unsigned index) const {
+            if (index >= paramAccesses.size()) return ParamAccess::Unknown;
+            return paramAccesses[index];
+        }
+
+        ParamOwnership paramOwnership(unsigned index) const {
+            if (index < paramOwnerships.size()) return paramOwnerships[index];
+            // v1-v8 compatibility: preserve the old caller behavior when
+            // a persisted summary predates the independent ownership axis.
+            switch (paramEffect(index)) {
+                case ParamEffect::ReadsOnly: return ParamOwnership::Borrowed;
+                case ParamEffect::Frees: return ParamOwnership::Consumed;
+                case ParamEffect::Stores: return ParamOwnership::Transferred;
+                case ParamEffect::Opaque: break;
+            }
+            return ParamOwnership::Unknown;
         }
 
         ParamPrecondition paramPrecondition(unsigned index) const {

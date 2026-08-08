@@ -22,6 +22,9 @@ const MsgEntry kMessages[] = {
     // LeakEndOfFunction
     {"Memory leak: allocation stored in '{0}' may not be freed",
      "Bellek sizintisi: {0} icin ayrilan bellek serbest birakilmamis olabilir"},
+    // OwnedResultDiscarded
+    {"Owned result is discarded without being released",
+     "Sahip olunan sonuc serbest birakilmadan atiliyor"},
     // ResourceLeakEndOfFunction
     {"Resource leak: handle stored in '{0}' may not be closed",
      "Kaynak sizintisi: {0} icin acilan tanitici (handle) kapatilmamis olabilir"},

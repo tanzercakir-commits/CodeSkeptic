@@ -270,7 +270,8 @@ below ~50 lines; measurement, method and limits in
   milliseconds; `--summary-in` keeps whole-project knowledge in
   single-file runs. [docs/usage.md](docs/usage.md#incremental-analysis)
 - **Semantic regression gate:** inferred contracts fail CI on
-  `NeverNull → MaybeNull`, lost output guarantees, or new non-null obligations.
+  `NeverNull → MaybeNull`, lost output/ownership/access guarantees, or new
+  non-null obligations.
   [docs/integrations.md](docs/integrations.md#semantic-regression-gate-summary-diff)
 - **Baselines & suppression:** adopt on a legacy codebase without
   fixing history first. [docs/usage.md](docs/usage.md#baseline-workflow)

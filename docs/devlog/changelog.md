@@ -1,5 +1,48 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-08 — Phase 4.3 side effects and ownership transfer
+
+Interprocedural v2 now keeps pointee access and ownership on independent
+axes. Pointer-like parameters carry an exact access relation
+(`None/Reads/Writes/ReadsWrites`) and an ownership result
+(`Borrowed/Consumed/Transferred`); opaque, captured, aliased-conflict, and
+consume-plus-transfer flows remain Unknown. Direct dereference, member and
+subscript uses compose through clean aliases, call chains, and non-static
+`operator()` calls.
+
+Pointer returns independently record `Owned` or `Borrowed` when every
+reachable non-null path agrees. Ordinary heap allocation, configured
+allocators, FILE*/DIR* acquisitions, and wrapper chains produce Owned;
+parameter/global aliases produce Borrowed. Placement-new exemptions are
+shared with MemoryLeak instead of duplicated. MemoryLeak now tracks owned
+wrapper results, including a standalone discarded result, and no longer
+treats a returned borrowed alias as ownership escape. Direct discarded
+FILE*/DIR* acquisitions retain the `resource-leak` classification.
+ContractRule verifies `owns`, `borrows`, and `returns owned` against the same
+relations; unknown evidence stays explicitly unverified.
+
+Summary format v9 adds fixed-width access (`O/R/W/B/U`), parameter ownership
+(`B/C/T/U`), and return ownership (`B/O/U`) fields. Readers retain v1-v8
+compatibility, upgrading legacy parameter effects conservatively; v9 width,
+vector lengths, and codes are strict. Conservative key merges drop
+disagreement to Unknown, and summary-diff treats loss/change of an exact
+relation as WEAKENED.
+
+RED was captured before implementation: owned allocation wrappers were
+invisible to caller leak tracking, borrowed return aliases hid leaks,
+`returns owned` stayed unverified, and persisted summaries had no access or
+ownership columns (five expected failures across the focused fixture). The
+first GREEN pass covered 59 persistence, compatibility, contract, cross-TU,
+alias, ownership, and summary-diff tests.
+
+The final Windows suite is 917/917. The exact historical local corpus lane
+stayed cJSON 54 (35/76 TUs analyzed, 41 explicitly accepted broken fixtures)
+and tinyxml2 9 (3/3), with no uncontrolled finding increase. A separate
+Windows Ninja probe generated a different tinyxml2 compilation database with
+`TINYXML2_DEBUG` enabled and therefore a different 54-finding nullness
+surface; that result is retained as an environment observation, not
+misreported as a delta against the 9-finding pin.
+
 ## 2026-08-08 — Phase 4.2 parameter precondition/postcondition summaries
 
 Interprocedural v2 now persists and consumes two parameter relations across

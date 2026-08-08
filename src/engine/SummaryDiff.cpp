@@ -8,7 +8,10 @@ namespace {
 
 using RN = codeskeptic::SummaryRegistry::ReturnNullness;
 using RZ = codeskeptic::SummaryRegistry::ReturnZeroness;
+using RO = codeskeptic::SummaryRegistry::ReturnOwnership;
 using PE = codeskeptic::SummaryRegistry::ParamEffect;
+using PA = codeskeptic::SummaryRegistry::ParamAccess;
+using PO = codeskeptic::SummaryRegistry::ParamOwnership;
 using PPre = codeskeptic::SummaryRegistry::ParamPrecondition;
 using PPost = codeskeptic::SummaryRegistry::ParamPostcondition;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
@@ -32,6 +35,14 @@ const char* rzName(RZ v) {
     return "Unknown";
 }
 
+const char* roName(RO value) {
+    switch (value) {
+        case RO::Owned: return "Owned";
+        case RO::Borrowed: return "Borrowed";
+        case RO::Unknown: break;
+    }
+    return "Unknown";
+}
 const char* peName(PE v) {
     switch (v) {
         case PE::ReadsOnly: return "ReadsOnly";
@@ -40,6 +51,27 @@ const char* peName(PE v) {
         case PE::Opaque:    break;
     }
     return "Opaque";
+}
+
+const char* accessName(PA value) {
+    switch (value) {
+        case PA::None: return "None";
+        case PA::Reads: return "Reads";
+        case PA::Writes: return "Writes";
+        case PA::ReadsWrites: return "ReadsWrites";
+        case PA::Unknown: break;
+    }
+    return "Unknown";
+}
+
+const char* ownershipName(PO value) {
+    switch (value) {
+        case PO::Borrowed: return "Borrowed";
+        case PO::Consumed: return "Consumed";
+        case PO::Transferred: return "Transferred";
+        case PO::Unknown: break;
+    }
+    return "Unknown";
 }
 
 const char* preName(PPre v) {
@@ -68,10 +100,13 @@ std::string aliasName(int v) {
 // caller side. Their loss/change is a weakening — callers leaning on
 // the claim must be re-examined.
 bool rnStrong(RN v) { return v == RN::NeverNull; }
+bool roStrong(RO value) { return value != RO::Unknown; }
 bool rzStrong(RZ v) {
     return v == RZ::AlwaysZero || v == RZ::NeverZero;
 }
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
+bool accessStrong(PA value) { return value != PA::Unknown; }
+bool ownershipStrong(PO value) { return value != PO::Unknown; }
 bool aliasStrong(int v) { return v >= 0; }
 
 struct FieldVerdict {
@@ -152,6 +187,8 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                       rnStrong, rnName, "returnNullness", verdict, detail);
         classifyField(oldSum.returnZeroness, newSum.returnZeroness,
                       rzStrong, rzName, "returnZeroness", verdict, detail);
+        classifyField(oldSum.returnOwnership, newSum.returnOwnership,
+                      roStrong, roName, "returnOwnership", verdict, detail);
         classifyField(oldSum.returnAliasParam, newSum.returnAliasParam,
                       aliasStrong, aliasName, "returnAliasParam",
                       verdict, detail);
@@ -164,7 +201,9 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
              oldSum.paramPreconditions.size(),
              newSum.paramPreconditions.size(),
              oldSum.paramPostconditions.size(),
-             newSum.paramPostconditions.size()});
+             newSum.paramPostconditions.size(), oldSum.paramAccesses.size(),
+             newSum.paramAccesses.size(), oldSum.paramOwnerships.size(),
+             newSum.paramOwnerships.size()});
         for (size_t i = 0; i < numParams; ++i) {
             classifyField(oldSum.paramEffect(static_cast<unsigned>(i)),
                           newSum.paramEffect(static_cast<unsigned>(i)),
@@ -180,6 +219,17 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
                 newSum.paramPostcondition(static_cast<unsigned>(i)),
                 "param#" + std::to_string(i) + ".postcondition",
                 verdict, detail);
+            classifyField(
+                oldSum.paramAccess(static_cast<unsigned>(i)),
+                newSum.paramAccess(static_cast<unsigned>(i)),
+                accessStrong, accessName,
+                "param#" + std::to_string(i) + ".access", verdict, detail);
+            classifyField(
+                oldSum.paramOwnership(static_cast<unsigned>(i)),
+                newSum.paramOwnership(static_cast<unsigned>(i)),
+                ownershipStrong, ownershipName,
+                "param#" + std::to_string(i) + ".ownership", verdict,
+                detail);
         }
 
         if (detail.empty()) continue;  // contract unchanged
