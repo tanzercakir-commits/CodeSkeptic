@@ -116,7 +116,7 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 2. Uygula → yeşil
 3. Push ÖNCESİ yerel kapılar: full suite + thesis (clean_fp=0) + corpus
 4. phase-* dala push → CI 6 hat (build-and-test·juliet·docker·windows·docs×2)
-5. 6/6 yeşil → "MERGE-READY" bildir → kullanıcı kilidi açar → ff → temizle
+5. Zorunlu kapılar yeşil → exact head/tree doğrula → sürekli yetkiyle merge et → temizle
 6. Her adımı changelog'a yaz; TODO'yu güncelle; PLAN sabit kalır
 ```
 

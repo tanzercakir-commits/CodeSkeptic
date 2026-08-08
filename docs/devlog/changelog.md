@@ -78,6 +78,23 @@ The guard now derives exactly one current version carrying both `v0.4.8` and
 that same dynamically bound digest and both tags after deletion. The stale
 target itself remains fixed by its exact digest and sole tag.
 
+PR #126 merged the dynamic-current guard as `eecbcfea`. The final single
+dispatch (`31237949505`) passed exact checkout, built and packaged identity
+`0.4.8`, reproduced the three-finding smoke, and published both `v0.4.8` and
+`latest` at
+`sha256:8c39cb9602e8a60d410687b7fdecf04f2910d2fe854bdce6e66ea5349f4d5b14`.
+The cleanup step then passed every precondition, deleted only stale digest
+`sha256:03b346e66f1b292a5c2a1ddd1b5cb9190d21899077b6d646eee115f320d6197c`
+with its sole `v0.4.9` tag, re-listed zero stale matches, and proved the same
+current digest still carried both release tags. Its one-shot deletion code is
+now removed; a permanent workflow contract requires it to remain absent.
+
+This closes Phase 0: verdict-integrity PR #119 is on `main`; the v0.4.8
+macOS, Linux and Windows packages passed tests, version, packaging and
+relocation smokes; the public release, Action, real WSL2 and Docker paths all
+carry the fail-closed contract; and the accidental future GHCR identity is
+gone. Phase 1 starts from this evidence boundary.
+
 A new `ReleaseWorkflowContract` regression first reproduced that mismatch.
 The release workflow now requires both exit 2 and the canonical
 `VERDICT UNAVAILABLE` marker in the unpacked macOS package. The regression is

@@ -12,20 +12,16 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 3a056a0
-uçuşta = phase-v048-ghcr-current-digest
+base   = eecbcfe
+uçuşta = phase-v048-phase0-closeout
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): Faz 0 analyzer/release zinciri v0.4.8 olarak
-`530e8f2` commitinden yayımlandı; üç platform, Action ve WSL2 kapıları yeşil.
-Exact release SHA/tag binding PR #123, eski etiketlere güvenilir tarif desteği
-PR #124 ile indi. Korumalı republish `0.4.8` kimliğini doğrulayıp `v0.4.8` ve
-`latest` etiketlerini aynı doğru digest'e yayımladı. Yanlış GHCR `v0.4.9`
-versiyonu tek-tag + tam-digest kapılı geçici cleanup ile kaldırılacak. İlk
-cleanup denemesi doğru imajın yeniden-build digest'inin değişebildiğini
-fail-closed yakaladı; current koruması şimdi `v0.4.8` + `latest` çiftiyle
-dinamik bağlanıyor. Makbuzdan sonra cleanup adımı da silinecek.
+Serbest not (insanda kalır): Faz 0 KAPANDI. v0.4.8 üç platform paketi,
+Action, WSL2 ve Docker kapıları yeşil; public release ve GHCR `v0.4.8` /
+`latest` kimlikleri doğru. Yanlış GHCR `v0.4.9` versiyonu tam digest + tek-tag
+kapısıyla kaldırıldı, post-delete current koruması geçti ve tek-seferlik
+cleanup kodu silindi. Makbuzlar changelog 2026-08-08 kaydında.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -39,10 +35,10 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Docker release kimliğini exact tag'e bağla,
-CI ile birleştir, v0.4.8 image'ını yeniden yayınla ve yanlış v0.4.9 paket
-versiyonunu kaldır. Nihai makbuzla Faz 0'ı kapatıp Faz 1 capability tier
-sözleşmesine geç.
+Bağlayıcı ürün programı sırası: Faz 1 ürün kapsam sözleşmesi. Her yeteneği
+`supported`, `experimental` veya `out-of-scope` olarak tek kaynaktan yayınla;
+CLI `--capabilities --json`, README ve kural dokümanlarını aynı kapsamda
+kilitle. CWE sayısını başarı metriği yapma.
 
 ## Açık kullanıcı kararları
 
