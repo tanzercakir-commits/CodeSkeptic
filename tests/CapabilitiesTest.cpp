@@ -23,7 +23,7 @@ TEST(CapabilitiesTest, RegistryEnforcesTierBehavior) {
     }
 
     EXPECT_TRUE(codeskeptic::findingBlocksVerdict("use-after-free"));
-    EXPECT_FALSE(codeskeptic::findingBlocksVerdict("memory-leak"));
+    EXPECT_TRUE(codeskeptic::findingBlocksVerdict("memory-leak"));
     EXPECT_FALSE(codeskeptic::findingBlocksVerdict("contract-syntax"));
     EXPECT_FALSE(codeskeptic::findingBlocksVerdict("contract-unsupported"));
     // Extensions and unknown future diagnostics fail closed until they are

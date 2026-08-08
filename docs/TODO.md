@@ -17,16 +17,20 @@ uçuşta = phase-precision-debt
 ```
 <!-- cs:state-end -->
 
-Serbest not (insanda kalır): Faz 0, Faz 1 ve Faz 2 KAPANDI. v0.4.8 üç platform paketi,
-Action, WSL2 ve Docker kapıları yeşil; public release ve GHCR `v0.4.8` /
-`latest` kimlikleri doğru. Yanlış GHCR `v0.4.9` versiyonu tam digest + tek-tag
-kapısıyla kaldırıldı, post-delete current koruması geçti ve tek-seferlik
-cleanup kodu silindi. Ürün kapsamı 14 bulgu ailesi için merkezi registry,
-schema-v2 capability çıktısı ve docs-sync kapısıyla kilitlendi; experimental
-bulgular ölçülür/raporlanır fakat verdict'i engellemez. Ölçüm laboratuvarı exact
-base/head temiz-kusurlu-gerçek depo makbuzlarını, `csf1` semantik bulgu kimliğini,
-Juliet üç-yollu kaçırma sınıflamasını ve PR kalite/performance/coverage panosunu
-fail-closed CI sözleşmesine bağladı. Makbuzlar changelog 2026-08-08 kayıtlarında.
+Serbest not (insanda kalır): Faz 0, Faz 1, Faz 2 ve Faz 3 KAPANDI. v0.4.8 üç
+platform paketi, Action, WSL2 ve Docker kapıları yeşil; public release ve GHCR
+`v0.4.8` / `latest` kimlikleri doğru. Yanlış GHCR `v0.4.9` versiyonu tam digest ve
+tek-tag kapısıyla kaldırıldı, post-delete current koruması geçti ve tek-
+seferlik cleanup kodu silindi. Ürün kapsamı 14 bulgu ailesi için merkezi
+registry, schema-v2 capability çıktısı ve docs-sync kapısıyla kilitlendi;
+experimental bulgular ölçülür/raporlanır fakat verdict'i engellemez. Ölçüm
+laboratuvarı exact base/head temiz-kusurlu-gerçek depo makbuzlarını, `csf1`
+semantik bulgu kimliğini, Juliet üç-yollu kaçırma sınıflamasını ve PR kalite /
+performance / coverage panosunu fail-closed CI sözleşmesine bağladı. Faz 3,
+rtp2httpd'yi 38/38 TU'da 4 uygulanabilir / 0 bağlam FP'ye indirdi ve memory-leak
+precision'ını 0.714→0.860'a yükseltti; `memory-leak` artık supported/blocking,
+bağımsız örneklemi olmayan `resource-leak` experimental kaldı. Makbuzlar
+changelog 2026-08-08 kayıtlarında.
 
 ## libarchive değerlendirmesi — KAPANDI (2026-08-01)
 
@@ -40,12 +44,12 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Sıradaki iş
 
-Bağlayıcı ürün programı sırası: Faz 3 precision borcunu kapatma. Önce
-rtp2httpd'deki iki bağlam kaynaklı FP, alan duyarlı assert'ler
-(`DEBUGASSERT(data->conn)`), caller contract/safe post-cast range yanlış
-alarmları ve memory-leak ownership/escape idiyomları. Çıkış: rtp2httpd'nin iki
-FP'si giderken dört uygulanabilir bulgu korunacak; memory-leak precision en az
-%85 olacak; Juliet ve temiz-korpus kapıları gerilemeyecek.
+Bağlayıcı ürün programı sırası: Faz 4 interprocedural motor v2. Return-alias
+ilişkileri, parametre precondition/postcondition özetleri, yan etkiler ve
+ownership transferi, call-graph SCC sabit noktası, alan duyarlılığı, kontrollü
+function-pointer çözümü ve kütüphane model dosyaları küçük dilimler halinde
+eklenecek. Her ilişki önce RED testle kanıtlanacak; gerçek korpusta kontrolsüz
+bulgu artışı olmayacak.
 
 ## Açık kullanıcı kararları
 
@@ -67,8 +71,7 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
    > zamana dek "resource leak" kapsamı FILE*/DIR* ile sınırlı
    > anlatılmalı. Makbuz: changelog 2026-08-01 (BULGU 1 kaydı).
 2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
-3. FINDING 3 kalıntısı: alan-özneli assert'ler   (DEBUGASSERT(data->conn) sınıfı)
-5. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
+3. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
 ```
 
 ## Not — dosya disiplini (2026-07-30 kararı)
