@@ -9,6 +9,13 @@ administrator bypass; this work did not modify the repository ruleset. The
 truth-sync change was then rebased onto that exact `main` commit, whose Git
 tree matches the reviewed PR head `4db8205` byte for byte.
 
+On 2026-08-08 the user replaced the per-operation approval lock with standing
+authorization through completion of the product program. Push, draft/ready
+PR, merge, release/tag and necessary upstream actions no longer pause for a
+second approval. The protocol still requires exact target/head verification,
+green mandatory gates, protected `main`, and unchanged quality floors; the
+authorization is not a gate bypass.
+
 Prepared the v0.4.8 release identity and rewrote the release notes around the
 contract the candidate actually ships: exit 0 is complete+clean, exit 1 is
 complete+findings, and exit 2 is verdict unavailable across CLI, reports, MCP

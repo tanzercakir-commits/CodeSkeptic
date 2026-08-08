@@ -99,8 +99,13 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 **Bağlayıcı kurallar:**
 - `main`'e ASLA doğrudan iş yapılmaz. Her şey `phase-*` dalında.
 - `main` GitHub ruleset ile korunuyor: DOĞRUDAN push reddedilir
-  (deneyip gördük). Dal 6/6 yeşil → "MERGE-READY" bildir → kullanıcı
-  kilidi açar → ff. Ben asla tek başıma main'i ilerletemem.
+  (deneyip gördük). Dalın zorunlu kapıları yeşil olmadan merge edilmez;
+  ruleset kalite kapısıdır ve gevşetilmez.
+- **Sürekli yürütme yetkisi (2026-08-08):** kullanıcı, ürün programı
+  tamamlanana kadar push, draft/ready PR, merge, release/tag ve gerekli
+  upstream işlemleri için yeniden onay bekleme şartını kaldırdı. Her dış
+  etkiden önce hedef ref/SHA, CI ve kapsam yine doğrulanır; bu yetki kalite
+  kapılarını atlama veya `main`e doğrudan çalışma izni değildir.
 - Yanıtlar **Türkçe**, teknik jargon parantez içinde, plan/şema/tree ile.
 - Her zaman dürüst; max efor gerekiyorsa önceden söyle; model düştüğünü
   içeriden teyit EDEMEM — kullanıcının ekranı asıl sinyaldir.

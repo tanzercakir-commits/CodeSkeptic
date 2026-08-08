@@ -40,11 +40,11 @@ koru. Ardından Faz 1 capability tier sözleşmesine geç.
 
 ## Açık kullanıcı kararları
 
-Draft PR #120'yi ready-for-review durumuna geçirmek ve sonrasında merge etmek
-çalışma kuralı 12 onay kilidinde. Güncel CI makbuzları PR açıklamasında tutulur;
-bu TODO geçici run durumlarını kopyalamaz. PR #119'un tek seferlik yönetici
-bypass'ı tamamlandı; TensorFlow PR #123994 merge edildi, issue #123387 kapandı
-ve PLAN §6 ledger'ı güncellendi.
+Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
+işlemler için sürekli yürütme yetkisi verdi; tekrar onay beklenmeyecek. Güncel
+CI makbuzları PR açıklamasında tutulur, bu TODO geçici run durumlarını
+kopyalamaz. PR #119'un yönetici bypass'ı tamamlandı; TensorFlow PR #123994
+merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
