@@ -15,6 +15,12 @@ CodeSkeptic: Clang LibTooling tabanlı C/C++ statik analizci.
 zaman raporlanır; kaçırmak (recall), yanlış alarmdan (precision) iyidir.
 Aynı ilke iş akışına da uygulanır (bkz. §5).
 
+Ürün kapsamının bağlayıcı tier sözleşmesi `docs/capabilities.md` ve
+`src/core/RuleCapabilities.def` içindedir: `supported` varsayılan açık,
+kalite kapılı ve blocking; `experimental` ölçülen/report-only;
+`out-of-scope` v1'de bilinçli olarak yapılmaz. CWE sayısı başarı metriği
+değildir.
+
 ## 2. Mimari
 
 ```
@@ -29,11 +35,13 @@ Clang LibTooling (AST + Preprocessor)
 ```
 
 Çıktı: bulgular **STDERR**'e; `CodeSkeptic: N finding(s)` / `Clean!`.
-Exit 1 = bulgu, 0 = temiz, 2 = analiz edilemedi.
+Exit 1 = supported/blocking bulgu, 0 = blocking bulgu yok (experimental
+bulgular report-only kalabilir), 2 = güvenilir verdict üretilemedi.
 
 ## 3. CWE kapsam haritası
 
-**Aktif taranan (15) — kural eşleşmesi:**
+**Bulgu üreten aileler (15 CWE eşleşmesi) — support tier'ları için
+`docs/capabilities.md`:**
 
 | CWE | Zafiyet | Kural | Juliet floor? |
 |---|---|---|:--:|
@@ -63,9 +71,10 @@ Meta kurallar (CWE-bağımsız): AssumptionRule · ContractRule · PolicyRule.
 | 775 | file descriptor sızıntısı (int fd: open/socket) | ertelendi — integer-kaynak modeli ister (CWE-404 FILE*/DIR* aktif) |
 | 131-64bit | 64-bit size_t çarpım sarması | ertelendi — operand-köşe ispatı (alloc-size v1 sub-64) |
 
-**Bilinçli kapsam-DIŞI:** enjeksiyon ailesi (CWE-89 SQLi, 79 XSS, 78
-cmd-inj, 22 path-traversal, 352 CSRF) — kaynak→sink taint izleme farklı
-motor ister; precision-first hedefi değil.
+**Bilinçli kapsam-DIŞI:** enjeksiyon/taint ailesi (CWE-89 SQLi, 79 XSS,
+78 cmd-inj, 22 path-traversal, 352 CSRF), race detection, otomatik fix,
+IDE ürünü ve bulut dashboard. Kaynak→sink taint ile concurrency farklı
+motor ister; precision-first v1 hedefi değildir.
 
 ## 4. Kural spec'i — alloc-size-overflow (CWE-131, UYGULANDI 2026-07-30)
 

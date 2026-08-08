@@ -121,6 +121,22 @@ TEST(HtmlReporterTest, MissingVerdictNeverClaimsClean) {
     EXPECT_EQ(html.find("Clean! No issues found."), std::string::npos);
 }
 
+TEST(HtmlReporterTest, ReportOnlyVerdictPublishesTierCounts) {
+    std::string out = ::testing::TempDir() + "report_only.html";
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.findings = result.report_only_findings = 2;
+
+    HtmlReporter reporter(out);
+    reporter.report({}, &result);
+
+    std::string html = readWhole(out);
+    EXPECT_NE(html.find("Verdict: report-only"), std::string::npos);
+    EXPECT_NE(html.find("Exit code: 0"), std::string::npos);
+    EXPECT_NE(html.find("Blocking findings: 0"), std::string::npos);
+    EXPECT_NE(html.find("report-only: 2"), std::string::npos);
+}
+
 TEST(HtmlReporterTest, IncompleteEmptyReportNeverClaimsClean) {
     std::string out = ::testing::TempDir() + "report_incomplete.html";
     AnalysisResult result;

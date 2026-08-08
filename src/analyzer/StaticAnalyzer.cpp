@@ -2,6 +2,7 @@
 
 #include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
+#include "core/Capabilities.h"
 #include "core/FunctionFilter.h"
 #include "core/Messages.h"
 #include "contracts/Policy.h"
@@ -23,6 +24,19 @@
 #include <iostream>
 
 namespace codeskeptic {
+
+namespace {
+
+void setFindingCounts(AnalysisResult& result,
+                      const DiagnosticList& diagnostics) {
+    result.findings = diagnostics.size();
+    result.report_only_findings = static_cast<std::size_t>(std::count_if(
+        diagnostics.begin(), diagnostics.end(), [](const Diagnostic& diag) {
+            return !findingBlocksVerdict(diag.rule_id);
+        }));
+}
+
+} // namespace
 
 std::size_t StaticAnalyzer::totalTUs() const {
     return source_mgr_ ? source_mgr_->fileCount() : 0;
@@ -336,11 +350,11 @@ AnalysisResult StaticAnalyzer::run() {
             std::cerr << msg(MsgId::BaselineWritten,
                              std::to_string(diagnostics_.size()),
                              config_.writeBaselinePath()) << "\n";
-            result.findings = diagnostics_.size();
+            setFindingCounts(result, diagnostics_);
             result.baseline_recorded = true;
             return result;
         }
-        result.findings = diagnostics_.size();
+        setFindingCounts(result, diagnostics_);
         result.baseline_write_failed = true;
         std::cerr << msg(MsgId::OutputFileOpenError,
                          config_.writeBaselinePath()) << "\n";
@@ -376,7 +390,7 @@ AnalysisResult StaticAnalyzer::run() {
         std::unique(diagnostics_.begin(), diagnostics_.end()),
         diagnostics_.end());
 
-    result.findings = diagnostics_.size();
+    setFindingCounts(result, diagnostics_);
     if (!reporter_->report(diagnostics_, &result))
         result.report_write_failed = true;
 

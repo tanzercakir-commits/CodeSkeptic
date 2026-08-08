@@ -1,5 +1,6 @@
 #include "reporter/JsonReporter.h"
 
+#include "core/Capabilities.h"
 #include "core/Messages.h"
 
 #include <fstream>
@@ -71,6 +72,10 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
              << ", \"report_write_failed\": "
              << (result->report_write_failed ? "true" : "false")
              << " },\n";
+        file << "  \"finding_counts\": { \"total\": "
+             << result->findings << ", \"blocking\": "
+             << result->blockingFindings() << ", \"report_only\": "
+             << result->report_only_findings << " },\n";
     }
     file << "  \"total\": " << diagnostics.size() << ",\n";
     file << "  \"diagnostics\": [";
@@ -81,6 +86,15 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
         file << "\n    {\n";
         file << "      \"severity\": \"" << diag.severityToString() << "\",\n";
         file << "      \"rule_id\": \"" << escapeJson(diag.rule_id) << "\",\n";
+        const RuleCapability* capability =
+            findRuleCapability(diag.rule_id);
+        file << "      \"capability_tier\": \""
+             << (capability ? capabilityTierName(capability->tier)
+                            : "unclassified")
+             << "\",\n";
+        file << "      \"blocks_verdict\": "
+             << (findingBlocksVerdict(diag.rule_id) ? "true" : "false")
+             << ",\n";
         file << "      \"file\": \"" << escapeJson(diag.file) << "\",\n";
         file << "      \"line\": " << diag.line << ",\n";
         file << "      \"column\": " << diag.column << ",\n";

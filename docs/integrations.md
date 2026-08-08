@@ -65,7 +65,7 @@ The markdown review contains:
   exist to catch; in the field trial it pinpointed cJSON's #991 null
   dereference as one single finding, and produced zero noise across a
   116-commit history range (the delta bounds the assumption engine's
-  volume). Info severity — it informs, and gates only under
+  volume). It is experimental/report-only, so it informs even under
   `--strict`. Opt out with `--no-assumptions`.
 * **Fixed findings** — present at base, gone at head.
 * **Contract changes** — the summary diff of both sides' inferred
@@ -80,10 +80,12 @@ directories exercise null paths on purpose. `--exclude 'tests/*'`
 the coverage section, never silently dropped.
 
 The exit code is the verdict, on the same evidence ladder as the rules
-themselves: **new definite findings (error) and weakened contracts
-gate; new "may" findings (warning) are reported but do not** — pass
-`--strict` to gate them too, or `--gate warn` to always exit `0` while
-still printing the failing verdict (adoption ramp). The last line is
+themselves: **new supported definite findings (error) and weakened contracts
+gate; new supported "may" findings (warning) are reported but do not** —
+pass `--strict` to gate supported warnings too. Experimental findings are
+always report-only, including under `--strict`. Use `--gate warn` to
+always exit `0` while still printing a supported failing verdict (adoption
+ramp). The last line is
 machine-greppable for CI dashboards:
 
 ```
@@ -145,10 +147,12 @@ sees custom assert handlers and allocator wrappers the same way the
 CLI flags do. Idiom registrations are per-call: nothing leaks into the
 next request of the long-lived server process.
 
-The MCP payload exposes the same verdict contract as the CLI: `0` means a
-complete clean run, `1` means complete with findings, and `2` means the
-requested evidence was not sufficient for a trustworthy verdict. Findings are
-a successful tool response; only verdict-unavailable sets `isError`.
+The MCP payload exposes the same verdict contract as the CLI: `0` means
+complete evidence with no supported/blocking findings (experimental findings
+may still be returned report-only), `1` means complete with supported
+findings, and `2` means the requested evidence was not sufficient for a
+trustworthy verdict. It publishes total, blocking and report-only counts;
+only verdict-unavailable sets `isError`.
 
 ## Editor & code-scanning integration (via SARIF)
 

@@ -247,9 +247,13 @@ def compute_delta(base_diags, head_diags, base_root, head_root, renames):
 
 def render_finding(diag, rel, head_root, added_lines):
     mark = " *(on changed line)*" if diag["line"] in added_lines.get(rel, ()) else ""
+    tier_mark = (
+        " *(experimental, report-only)*"
+        if not diag.get("blocks_verdict", True) else ""
+    )
     lines = ["- **[%s] %s** `%s:%d` in `%s` — %s%s" % (
         diag["severity"], diag["rule_id"], rel, diag["line"],
-        diag.get("function", "?"), diag["message"], mark)]
+        diag.get("function", "?"), diag["message"], mark + tier_mark)]
     for note in diag.get("notes", []):
         nrel = rel_to_root(note["file"], head_root)
         nmark = " *(changed)*" if note["line"] in added_lines.get(nrel, ()) else ""
@@ -278,11 +282,19 @@ def cmd_assemble(args):
                                args.head_root, renames)
     new_errors = [(d, r) for d, r in new if d["severity"] == "error"]
     new_warnings = [(d, r) for d, r in new if d["severity"] != "error"]
+    blocking = [(d, r) for d, r in new
+                if d.get("blocks_verdict", True)]
+    blocking_errors = [(d, r) for d, r in blocking
+                       if d["severity"] == "error"]
+    blocking_warnings = [(d, r) for d, r in blocking
+                         if d["severity"] != "error"]
+    report_only = [(d, r) for d, r in new
+                   if not d.get("blocks_verdict", True)]
 
     # Human label counts by ACTUAL severity (an assumption finding is
     # info, not warning); the REVIEW_RESULT machine line keeps its
-    # stable two-bucket schema (new_warnings = everything non-error,
-    # the "does not gate unless --strict" set).
+    # stable two-bucket schema (new_warnings = everything non-error).
+    # Verdict gating is independently determined by blocks_verdict.
     sev_counts = Counter(d["severity"] for d, _ in new)
     sev_label = ", ".join(
         "%d %s" % (sev_counts[s], s)
@@ -294,8 +306,8 @@ def cmd_assemble(args):
     weakened = [rest for kind, rest in sum_changes if kind == "WEAKENED"]
     other_changes = [(k, rest) for k, rest in sum_changes if k != "WEAKENED"]
 
-    gate_fail = bool(new_errors) or bool(weakened) or \
-        (args.strict and bool(new_warnings))
+    gate_fail = bool(blocking_errors) or bool(weakened) or \
+        (args.strict and bool(blocking_warnings))
 
     # --- render -----------------------------------------------------------
     md = []
@@ -304,15 +316,16 @@ def cmd_assemble(args):
     md.append("Base `%s` -> head `%s`." % (args.base_label, args.head_label))
     if gate_fail:
         reasons = []
-        if new_errors:
-            reasons.append("%d new error(s)" % len(new_errors))
-        if args.strict and new_warnings:
-            reasons.append("%d new warning(s) (--strict)" % len(new_warnings))
+        if blocking_errors:
+            reasons.append("%d new blocking error(s)" % len(blocking_errors))
+        if args.strict and blocking_warnings:
+            reasons.append("%d new blocking warning(s) (--strict)" %
+                           len(blocking_warnings))
         if weakened:
             reasons.append("%d weakened contract(s)" % len(weakened))
         md.append("**Verdict: FAIL** — " + ", ".join(reasons))
     else:
-        md.append("**Verdict: PASS** — no new definite findings, "
+        md.append("**Verdict: PASS** — no new blocking findings, "
                   "no weakened contracts")
 
     md.append("")
@@ -389,9 +402,14 @@ def cmd_assemble(args):
     else:
         md.append("- All analyzed head functions reached a dataflow "
                   "fixpoint.")
-    if new_warnings and not args.strict:
-        md.append("- New warnings are reported but do not gate; pass "
-                  "--strict to gate them.")
+    if blocking_warnings and not args.strict:
+        md.append("- New supported warnings are reported but do not gate; "
+                  "pass --strict to gate them.")
+    if report_only:
+        md.append(
+            "- %d experimental finding(s) are report-only and never gate, "
+            "including under --strict." % len(report_only)
+        )
 
     result_line = ("REVIEW_RESULT new_errors=%d new_warnings=%d fixed=%d "
                    "weakened=%d gate=%s" %

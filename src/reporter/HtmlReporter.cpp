@@ -192,6 +192,9 @@ bool HtmlReporter::report(const DiagnosticList& diagnostics,
              << result->broken_tus << " broken &middot; "
              << result->incomplete_functions
              << " incomplete function(s)</p>\n";
+        file << "<p class=\"sub\">Blocking findings: "
+             << result->blockingFindings() << " &middot; report-only: "
+             << result->report_only_findings << "</p>\n";
     }
     file
          << "<p class=\"sub\"><span id=\"shown\">" << diagnostics.size()

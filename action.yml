@@ -28,9 +28,9 @@ inputs:
     default: "true"
   gate:
     description: >-
-      report-only (default): always exit 0, findings inform.
-      error: exit 1 when findings are reported — opt in AFTER a
-      report-only adoption week (see docs/evaluate.md).
+      report-only (default): supported findings inform without failing the job.
+      error: fail on supported/blocking findings — opt in AFTER a report-only
+      adoption week. Experimental findings always remain report-only.
     required: false
     default: "report-only"
   version:
@@ -48,7 +48,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: "Raw analyzer exit code (0 clean, 1 findings, 2 verdict unavailable)"
+    description: "Raw analyzer exit code (0 no blocking findings, 1 supported findings, 2 unavailable)"
     value: ${{ steps.analyze.outputs.exit-code }}
 
 runs:
@@ -155,9 +155,9 @@ runs:
         fi
         if [ "$code" -eq 1 ]; then
           if [ "$INPUT_GATE" = "error" ]; then
-            echo "::error::CodeSkeptic reported findings (gate: error)"; exit 1
+            echo "::error::CodeSkeptic reported supported findings (gate: error)"; exit 1
           fi
-          echo "::notice::CodeSkeptic reported findings (gate: report-only — job stays green)"
+          echo "::notice::CodeSkeptic reported supported findings (gate: report-only — job stays green)"
         fi
 
     - name: Upload SARIF to code scanning

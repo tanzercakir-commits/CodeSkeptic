@@ -25,16 +25,29 @@ for c in clang-20 clang-19 clang-18 clang cc; do
 done
 [ -n "$CC" ] || { echo "THESIS_FAIL no C compiler for compile DB"; exit 1; }
 
+# MSYS converts command-line path arguments for native Windows programs, but
+# it cannot rewrite paths embedded inside compile_commands.json. Emit native
+# drive paths there when cygpath is available; Linux/CI keeps POSIX paths.
+db_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
 # Deterministic compile DB: one -std=gnu11 entry per corpus file.
 DB="$(mktemp -d)/compile_commands.json"
+DIR_DB="$(db_path "$DIR")"
 {
     echo "["
     first=1
     for f in "$DIR"/*.c; do
         [ "$first" -eq 1 ] || echo ","
         first=0
+        f_db="$(db_path "$f")"
         printf '  {"directory": "%s", "command": "%s -std=gnu11 -c %s", "file": "%s"}' \
-            "$DIR" "$CC" "$f" "$f"
+            "$DIR_DB" "$CC" "$f_db" "$f_db"
     done
     echo ""
     echo "]"
@@ -49,6 +62,12 @@ total_findings=0
 
 # Read the manifest (skip comments/blank lines).
 while read -r file role floor; do
+    # Git for Windows may materialize the manifest with CRLF even though this
+    # script runs under Git Bash. Normalize the parsed fields so blank lines
+    # and numeric floors keep their Linux/CI meaning.
+    file="${file%$'\r'}"
+    role="${role%$'\r'}"
+    floor="${floor%$'\r'}"
     case "$file" in ""|\#*) continue ;; esac
     src="$DIR/$file"
     [ -f "$src" ] || { echo "THESIS_FAIL manifest lists missing file: $file"; fail=1; continue; }
