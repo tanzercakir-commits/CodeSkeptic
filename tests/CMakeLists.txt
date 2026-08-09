@@ -20,6 +20,7 @@ add_executable(codeskeptic_tests
     JsonReporterTest.cpp
     UninitPointerRuleExTest.cpp
     MemoryLeakRuleExTest.cpp
+    FdResourceRuleTest.cpp
     DivByZeroRuleTest.cpp
     IntOverflowRuleTest.cpp
     SignConversionRuleTest.cpp

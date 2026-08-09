@@ -1,5 +1,212 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 5.3 capability CLI contract sync
+
+The full GitHub Actions run correctly rejected the promoted capability because
+the end-to-end CLI fixture still pinned six supported rules. The Phase 5.3 file
+boundary was explicitly expanded to include `tests/CapabilitiesCliTest.py`;
+its exact supported set and receipt now cover all seven supported rules. This
+fixture-only correction changes no production code or accepted specification.
+
+## 2026-08-08 — Phase 5.3 pinned libarchive validation and promotion
+
+Phase 5 closed against the pinned libarchive v3.8.9 tag object
+`f1f785cc218bb05876c54680f10d3d4e54575ea2`, peeled commit
+`27cbc7827172698143e440801fc0ba39ccb4f1f5`. The exact library surface is
+132 C files: 123 have compile-database entries and nine platform files use
+the controlled fallback, producing 255 analysis executions in whole-program
+mode. Both the clean and mutation runs are complete with zero broken
+translation units and zero incomplete functions.
+
+The first clean scan produced 47 findings: 17 `memory-leak`, 18
+`null-deref`, and 12 `resource-leak`. Every descriptor finding was manually
+triaged against the source and was false: one caller-owned negative-input
+replacement, two output stores, four struct/member ownership stores, one
+streaming parser state store, one saved-directory transfer, two writer-state
+stores, and one registered-close-callback store. This exposed two concrete
+analysis assumptions: non-local stores were not treated as responsibility
+transfer, and the path-correlated relation between an incoming negative
+descriptor snapshot and its successful replacement was not retained.
+
+RED was recorded before implementation: exactly three of 39 focused tests
+failed for member transfer, output-parameter transfer, and the negative
+snapshot cleanup. The dataflow now marks direct and wrapped non-local
+acquisition stores as escaped responsibility, tracks reassigned integer
+parameters without claiming ownership of the incoming value, and preserves
+only path-common negative witnesses. Reassignment invalidates stale copies
+and witnesses; conditional or equality cleanup without proof still reports.
+The final focused matrix is 42/42, including wrapper/member transfer and a
+reassigned-snapshot precision control.
+
+The final clean scan with binary SHA-256
+`5f59aa44c94b68e3d6b8d96f3974baac48b87b907a49bb4c2b6affced2c37aaa`
+contains 35 findings: the unchanged 17 `memory-leak` and 18 `null-deref`
+findings, with zero `resource-leak`. It completed in 36.39 seconds at
+102292 KiB peak RSS. The clean checkout has no tracked source changes.
+
+A separate worktree at the same peeled commit contains exactly three
+load-bearing close mutations: the replacement descriptor cleanup in
+`archive_read_disk_entry_from_file`, the write-disk fixup-loop cleanup, and
+the internal descriptor cleanup in `set_fflags_platform`. The scan contains
+38 findings: the same 17 memory and 18 null findings plus exactly three
+blocking `resource-leak` findings at the seeded sites, with no extra
+descriptor report. It completed in 32.66 seconds at 103404 KiB peak RSS.
+Measured descriptor precision is 3 / (3 + 0) = 1.000 and mutation recall is
+3/3, above the Phase 5 precision gate of 0.90.
+
+`resource-leak` is therefore promoted to supported, quality-gated, and
+blocking in the central registry. README and the capability contract now
+cover both `FILE*`/`DIR*` and POSIX `open`/`openat`/`socket`/`dup`/`mkstemp`
+descriptors, including visible wrappers and reviewed v10 models. The
+capability JSON publishes the promoted tier. CLI smoke reports one blocking
+descriptor finding with exit 1 for the leaking fixture and stays clean with
+exit 0 for its closed twin.
+
+Final local gates are focused capability/descriptor 45/45, direct suite
+1019/1019, CTest 1019/1019, frozen thesis `clean_fp=0` and
+`bug_caught=9/15` with 11 total findings, clean 48/48-TU self-scan, cJSON 54
+findings (76 attempted, 35 analyzed, 41 explicitly accepted broken
+fixtures), and tinyxml2 9 findings (3/3 analyzed). The exact Phase 5.3 file
+set is `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
+`src/core/RuleCapabilities.def`, `tests/CapabilitiesTest.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `README.md`, `docs/capabilities.md`,
+`tests/CapabilitiesCliTest.py`, `docs/TODO.md`, and this changelog; `PLAN.md`
+remains unchanged.
+
+Contract-first shadow audit considered 15 new or materially changed
+production functions: `State::operator==`, `mergeStates`,
+`isTrackableLocal`, `forgetValue`, `rememberValueCopy`,
+`markNegativeEquivalents`, `rememberNegativeWitnesses`, `equalityEdge`,
+`discardImpossibleEquality`, `ResourceInventory::VisitVarDecl`, the
+`FdAnalysis` constructor, `FdAnalysis::latticeHeight`,
+`FdAnalysis::transfer`, `FdAnalysis::refineOnEdge`, and `analyzeFunction`.
+Dogfood was not applicable because every candidate depends on Clang AST/CFG
+identity, container/lattice state, class members, or resource-ownership
+lifetime beyond the current deterministic contract referee. Counts:
+proposals 0, eligible 0, rejected 0, unsupported 15. No proposal exposed an
+implementation or assumption problem; the independent libarchive scan
+exposed the two problems above and both are closed. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent. No native pointer, heap, alias, ownership, or lifetime verification
+semantics were added; those claims remain deferred to executable A7 fixtures.
+
+## 2026-08-08 — Phase 5.2 descriptor wrappers and explicit models
+
+Phase 5 now propagates POSIX descriptor ownership through visible wrappers
+and the existing strict v10 model channel. The shared SCC summary solver
+infers `Owned` for non-boolean integer returns only when every non-`-1`
+return path originates at global `open`, `openat`, `socket`, `dup`, or
+`mkstemp`, or at a wrapper with the same proven relation. It infers
+`Consumed` or `Transferred` for integer parameters only when every normal
+exit agrees that the descriptor reaches `close` or non-local storage.
+Conditional, conflicting, opaque, and ambiguous flows remain `Unknown`;
+ordinary integer returns do not acquire a borrowed-resource claim.
+
+`FdResourceRule` consumes those same relations for local, cross-TU, and
+controlled summary calls. `Owned` results become acquisition origins;
+`Consumed` closes an exact origin and `Transferred` escapes it. `Borrowed`
+and `Unknown` never suppress a leak. Exact global POSIX primitives retain
+their built-in meaning, so `shutdown` still borrows and same-named namespace
+functions or methods gain no implicit authority. Bodyless vendor APIs can
+opt in through reviewed v10 `--model-file` rows for acquire, consume, or
+transfer. Duplicate model/harvest rows use the existing conservative join;
+a disagreement falls to `Unknown` instead of allowing the last file to win.
+No header/API, configuration, grammar, ContractRule, default model, or native
+pointer/heap/alias/lifetime claim was added.
+
+RED was recorded before implementation: 5 of 29 focused cases failed exactly
+on acquisition chains, `-1`-neutral acquisition wrappers, consuming wrappers,
+transfer wrappers, and explicit model acquire/consume. GREEN plus precision
+review expanded the matrix to 33/33 with consumer chains, conditional
+consume/transfer negatives, cross-TU acquire/consume, explicit model transfer,
+Borrowed/Unknown non-suppression, and conflicting-model degradation. The
+summary/model/contract regression selection passed 129/129. The exact Windows
+binary and CTest both passed 1010/1010.
+
+The production CLI smoke emitted exactly two experimental/report-only
+`resource-leak` diagnostics for the deliberately leaking visible and modeled
+wrappers, while wrapper/model close and transfer twins stayed clean; exit was
+0. The frozen thesis receipt remains `clean_fp=0`, `bug_caught=9/15`, and
+`total_findings=11`. Self-scan is clean and complete across 48/48 translation
+units with zero broken TUs and zero incomplete functions. Corpus pins remain
+cJSON 54 findings (76 enumerated, 41 explicitly accepted broken, 35 analyzed)
+and tinyxml2 9 findings (3/3 analyzed).
+
+Contract-first shadow audit considered 46 new or materially changed C++
+functions: 35 summary-domain functions/methods including `summarizeFunction`,
+eight FD-rule functions/methods, and three explicit test helpers. Dogfood was
+not applicable because every candidate depends on Clang `QualType`/AST/CFG
+identity, enum lattice relations, containers, call-summary registry state,
+filesystem streams, or analyzer lifetime beyond the current deterministic
+contract referee. Counts: proposals 0, eligible 0, rejected 0, unsupported
+46. No proposal exposed an implementation or assumption problem; the
+independent RED suite exposed the planned feature gap, and precision review
+removed a potential ordinary-integer Borrowed overclaim. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent.
+
+## 2026-08-08 — Phase 5.1 direct POSIX descriptor lifecycle
+
+CWE-775 now has a separate integer-resource dataflow rule instead of being
+forced through the pointer-oriented MemoryLeak lattice. The rule recognizes
+only global POSIX `open`, `openat`, `socket`, `dup`, and `mkstemp` calls as
+owned acquisitions and `close` as release. A global namespace check prevents
+same-named C++ namespace functions and methods from acquiring or releasing a
+descriptor accidentally. `shutdown` deliberately does not release ownership:
+POSIX still requires `close` to dispose of the descriptor.
+
+Each acquisition site carries an independent lifecycle and local integer
+bindings carry its origin. Exact local copies can release or transfer the
+same origin; return and global/reachable stores transfer responsibility.
+Ambiguous integer bindings degrade toward escape rather than manufacturing a
+leak. The `-1` failure sentinel is refined for `==`, `!=`, `< 0`, `>= 0`,
+`<= -1`, `> -1`, reversed comparisons, and logical negation. Branches, early
+returns, conditional cleanup, and cleanup labels therefore preserve a leak
+whenever any success path remains open while dropping the failed-acquisition
+path. Discarded acquisitions report at the call site. Wrapper propagation and
+custom resource models remain explicitly outside this first slice.
+
+The initial RED receipt was 6/16 failing test cases; the combined direct-
+acquirer case contained five independently checked opener failures. After the
+first GREEN pass, a precision review added three more RED cases showing that
+`vendor::open`, `vendor::close`, and `Sink::close` were incorrectly classified
+by unqualified name. The global-function constraint closed all three. The
+focused matrix is now 21/21 and pins direct acquisition/release, shutdown,
+sentinel branches, early returns, conditional and label cleanup, return/global
+transfer, local aliases, discarded results, namespace/method collisions, and
+an unrecognized integer factory.
+
+The exact Windows binary passed 998/998 tests both in the direct single-process
+run and through CTest. End-to-end CLI smoke produced exactly one experimental,
+report-only `resource-leak` with exit 0 for an unclosed `open`, and a clean exit
+0 for the guarded-and-closed twin. The frozen thesis gate remains
+`clean_fp=0`, `bug_caught=9/15`, and `total_findings=11`. The self-scan is
+clean and complete across 48/48 translation units (the new rule adds one),
+with zero broken TUs and zero incomplete functions. Corpus pins remain cJSON
+54 findings (76 attempted, 35 analyzed, 41 explicitly accepted broken
+fixtures) and tinyxml2 9 findings (3/3).
+
+Contract-first shadow audit considered 40 materially changed or created source
+functions. Production functions were `mergeLife`, both `Binding` comparisons,
+both `State` comparisons, `resourceLife`, `mergeStates`, `calleeName`,
+`isAcquireName`, `acquisition`, `asVar`, `isTrackableLocal`, `bindingFor`,
+`escape`, `release`, `integerConstant`, `swappedComparison`, `failureEdge`,
+the four `ResourceInventory` visitor methods, the `FdAnalysis` constructor and
+six analysis methods, `reportLeaks`, `analyzeFunction`, the callback
+constructor/run pair, and the three `FdResourceRule` methods. The two explicit
+test helpers plus the `main` and MCP registration functions complete the
+count; GoogleTest macro-generated bodies are not source-level contract
+targets.
+
+Dogfood was not applicable. The current referee can adjudicate selected
+zero/null/ownership summaries, but not enum-to-enum lattice relations,
+`StringRef`, containers, optional/set state, Clang AST identity, CFG
+transitions, diagnostic side effects, or analyzer lifetime. Counts: proposals
+0, eligible 0, rejected 0, unsupported 40. The independent RED suite exposed
+the planned implementation gap, and the later precision RED exposed the
+namespace/method assumption problem; no proposal exposed a separate problem.
+Candidate contracts requiring later human review: none. No `cs: ai` proposal
+became accepted intent.
 
 ## 2026-08-08 — Phase 4.7 opt-in library model files
 

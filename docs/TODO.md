@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = e75bcab
-uçuşta = phase-interprocedural-v2
+base   = 6aad09c
+uçuşta = phase-fd-resource-model
 ```
 <!-- cs:state-end -->
 
@@ -44,29 +44,83 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Next work
 
-All seven Phase 4 interprocedural-engine-v2 slices are locally RED-to-GREEN
-complete: exact pointer return identity (v7), parameter pre/postconditions
-(v8), independent access/ownership relations (v9), the callee-first
-call-graph SCC fixed point, field-sensitive writes (v10), controlled local
-function-pointer targets, and opt-in library model files.
+Phase 4 is merged through PR #131. Its exact squash commit is
+`6aad09c8030ebdf14b4bef2eeb6596f25f650e17`; the squash tree matches the
+fully gated Phase 4 head, and the local and remote `main` branches agree.
 
-Library models reuse the strict summary schema through repeatable
-`--model-file` / `model_file` inputs. They load before harvested summaries,
-merge conflicts conservatively, skip snapshot-freshness checks, and make the
-verdict unavailable on missing or malformed input. They are reviewed trusted
-assumptions, not verifier proof; there are no built-in models, new grammar, or
-native pointer/heap/alias/ownership/lifetime semantics in this slice.
+Phase 5 is locally complete on `phase-fd-resource-model` and remains split
+into measurable RED-to-GREEN slices pending its PR gates and merge:
 
-The exact local gates are 977/977 tests through both CTest and the direct
-single-process binary, thesis `clean_fp=0` with `bug_caught=9/15`, a clean
-47/47-TU self-scan, cJSON 54 findings (76 attempted / 35 analyzed / 41
-explicitly accepted broken), and tinyxml2 9 findings (3/3). Corpus diagnostic-
-site deltas versus Phase 4.6 are exactly zero additions and zero removals.
+1. **Direct POSIX descriptor lifecycle — locally complete.** A separate
+   integer-resource rule covers global `open`/`openat`/`socket`/`dup`/
+   `mkstemp`, `close`, the `-1` failure sentinel, branches, early returns,
+   cleanup labels, local aliases, discarded results, and return/global
+   ownership transfer. `shutdown` correctly does not close a descriptor.
+   Namespace functions and methods with colliding names are excluded. The
+   exact slice file set stayed
+   `src/rules/FdResourceRule.{h,cpp}`, `src/main.cpp`,
+   `src/server/McpServer.cpp`, `src/CMakeLists.txt`,
+   `tests/FdResourceRuleTest.cpp`, `tests/CMakeLists.txt`, this TODO, and
+   `docs/devlog/changelog.md`; `MemoryLeakRule_Ex` remained untouched.
+   Gates: focused 21/21, direct and CTest 998/998, exact CLI smoke,
+   thesis `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan,
+   cJSON 54 and tinyxml2 9.
+2. **Wrapper propagation and explicit models — locally complete.** The
+   existing v10 return/parameter ownership axes are the only declaration
+   channel. Visible integer wrapper chains now compose locally and across TUs
+   through the existing SCC solver; bodyless acquire/consume/transfer APIs
+   require an explicit reviewed v10 model. Conditional/conflicting effects
+   degrade to `Unknown`, and `Unknown`/`Borrowed` never suppress a leak.
+   The exact file set stayed `src/engine/FunctionSummary.cpp`,
+   `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
+   `docs/engine.md`, `docs/usage.md`, this TODO, and
+   `docs/devlog/changelog.md`; no header/API, configuration, grammar,
+   ContractRule, or default model changed. Gates: RED 5/29, focused 33/33,
+   summary/model/contract 129/129, direct and CTest 1010/1010, exact CLI
+   smoke 2 report-only findings, thesis `clean_fp=0` / `bug_caught=9/15`,
+   clean 48/48-TU self-scan, cJSON 54, and tinyxml2 9.
+3. **Pinned libarchive validation and promotion — locally complete.** The
+   exact 132-file library surface (123 compile-DB files plus nine controlled
+   fallbacks, 255 analysis executions) is complete with zero broken TUs and
+   zero incomplete functions. Manual triage classified all 12 initial
+   descriptor reports as false and exposed non-local transfer plus negative
+   snapshot gaps. RED was 3/39; GREEN is 42/42. The final clean run has zero
+   descriptor findings, while three independent load-bearing close mutations
+   produce exactly 3 TP / 0 FP: precision 1.000 and mutation recall 3/3.
+   `resource-leak` is now supported, quality-gated, and blocking. The
+   end-to-end capability CLI contract pins all seven supported rules.
+   Final local
+   gates are focused 45/45, direct and CTest 1019/1019, thesis
+   `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan, cJSON 54,
+   and tinyxml2 9.
 
-PR #131 remains the Phase 4 integration boundary. After its exact pushed
-commit satisfies every required check, merge Phase 4 and begin Phase 5's
-general dataflow-engine work from the canonical PLAN without reopening the
-completed Phase 4 slices.
+The first slice's contract-first shadow audit found no eligible function: its
+40 new or materially changed source functions depend on enum lattice
+relations, strings/containers, Clang AST/CFG identity, resource ownership, or
+analyzer lifetime beyond the current contract referee. Counts are proposals
+0, eligible 0, rejected 0, unsupported 40; no `cs: ai` proposal became
+accepted intent. The independent RED suite found the planned feature gap and
+the namespace/method precision assumption; both are closed.
+
+The second slice's shadow audit likewise found no eligible function among 46
+new or materially changed C++ functions. They depend on Clang type/AST/CFG
+identity, enum/resource lattices, containers, summary-registry state,
+filesystem streams, or analyzer lifetime beyond the current referee. Counts:
+proposals 0, eligible 0, rejected 0, unsupported 46. The independent RED found
+the planned wrapper/model gap; precision review removed an ordinary-integer
+Borrowed overclaim. Candidate contracts: none. No `cs: ai` proposal became
+accepted intent.
+
+The third slice's shadow audit considered 15 new or materially changed
+production functions. Every candidate depends on Clang AST/CFG identity,
+container/lattice state, class members, or resource-ownership lifetime beyond
+the current referee, so dogfood was not applicable. Counts: proposals 0,
+eligible 0, rejected 0, unsupported 15. No proposal exposed a problem; the
+independent libarchive scan exposed the non-local transfer and negative
+snapshot assumptions, and both are closed. Candidate contracts: none. No
+`cs: ai` proposal became accepted intent, and native memory semantics remain
+deferred to executable A7 fixtures.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
@@ -78,16 +132,9 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 ## Backlog (öncelik sırası)
 
 ```
-1. CWE-775 strict (int fd: open/socket) — integer-kaynak modeli
-   > BULGU 3 (libarchive, 2026-08-01): artık tahmin değil ÖNKOŞUL.
-   > Dosya açan bir kütüphanede resource-leak 0 verdi; sebebi ölçüldü —
-   > 43 ham fd açıcı (open 28 · openat 8 · dup 4 · mkstemp 3) karşısında
-   > pointer tabanlı domain'in gördüğü fopen/opendir/tmpfile toplam 3.
-   > CWE-404'ün idiyomatik POSIX C'de karşılık bulması buna bağlı; o
-   > zamana dek "resource leak" kapsamı FILE*/DIR* ile sınırlı
-   > anlatılmalı. Makbuz: changelog 2026-08-01 (BULGU 1 kaydı).
-2. alloc-size v2: 64-bit size_t çarpım köşe-ispatı
-3. sign-conversion v2: interprocedural sink (nlohmann'da harm başka fn'deydi)
+1. alloc-size v2: 64-bit size_t multiplication corner proof
+2. sign-conversion v2: interprocedural sink (the nlohmann harm was in a
+   different function)
 ```
 
 ## Not — dosya disiplini (2026-07-30 kararı)
