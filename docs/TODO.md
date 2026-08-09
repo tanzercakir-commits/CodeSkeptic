@@ -197,9 +197,63 @@ independently measurable RED-to-GREEN slices:
    contracts requiring later human review: none. No `cs: ai` proposal became
    accepted intent, and native owned-memory parity remains deferred to
    executable A7 fixtures.
-3. **Custom allocator/deallocator pairs — pending.** Move beyond independent
-   name lists to exact configured families and validate mismatch, wrapper,
-   indirect-summary, and conservative unknown-target behavior.
+3. **Custom allocator/deallocator pairs — boundary locked before
+   implementation.** Add an opt-in exact-family channel without changing the
+   meaning of the legacy independent `--alloc-functions` and
+   `--free-functions` lists.
+
+   The locked development contract is separate from production code. The CLI
+   accepts `--allocator-pairs <allocator=deallocator,...>`, project config
+   accepts `allocator_pairs = ...`, and MCP `analyze` accepts the same string
+   as `allocator_pairs`. Each comma-separated entry has exactly one `=`, a
+   nonempty allocator, and a nonempty deallocator. Malformed input rejects the
+   complete value without partially registering it. Duplicate entries are
+   idempotent; repeating an allocator with another deallocator adds another
+   admitted release for that exact family.
+
+   Pair authority requires a direct non-instance callee. A spelling containing
+   `::` matches the exact qualified name; an unqualified spelling matches the
+   direct callee identifier for compatibility with existing configuration.
+   Paired names automatically enter allocator/deallocator recognition. An
+   allocation produced directly by a paired allocator carries that exact
+   family in each guarded disjunct. Only a directly called admitted
+   deallocator on argument zero proves release, enables later UAF/double-free
+   evidence, and closes the leak. Another paired or legacy deallocator,
+   `delete`, or built-in `realloc` does not prove release for that family; a
+   still-live allocation remains reportable as a leak.
+
+   Conflicting family paths degrade to unknown family. A summary-owned return,
+   summary-consumed parameter, unresolved or ambiguous indirect call, method
+   receiver, non-variable argument, or unknown target cannot manufacture an
+   exact family match. Passing an exact-family allocation through such a
+   release-shaped call conservatively escapes it rather than asserting either
+   release or a leak. A wrapper gains exact authority only when the wrapper
+   names themselves are explicitly paired. Legacy independent name lists stay
+   family-agnostic and retain their current behavior. Pair registration is
+   scoped to one analyzer/MCP call and is cleared with the other idiom
+   registries.
+
+   The exact file set is `src/config/Config.h`, `src/config/Config.cpp`,
+   `src/engine/AllocFunctions.h`, `src/engine/AllocFunctions.cpp`,
+   `src/analyzer/StaticAnalyzer.cpp`, `src/server/McpServer.cpp`,
+   `src/rules/MemoryLeakRule_Ex.cpp`, `tests/ConfigTest.cpp`,
+   `tests/McpServerTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+   `docs/usage.md`, `docs/integrations.md`, this TODO, and
+   `docs/devlog/changelog.md`. Contract grammar, capability tiers, accepted
+   model channels, summary schema, existing profiles, and quality floors remain
+   unchanged.
+
+   Contract-first shadow pre-screen considered `Config::addAllocatorPairs`,
+   `setAllocatorPairs`, `pairedAllocatorFamily`,
+   `isPairedDeallocatorCall`, `matchesAllocatorFamily`,
+   `allocationFamilyOf`, and `releaseAuthority`. String/container parsing,
+   Clang declaration identity, and native pointer/heap lifetime are outside the
+   current verifier, so dogfood is not applicable: proposals 0, eligible 0,
+   rejected 0, unsupported 7. Candidate contracts requiring human review:
+   none. No proof-bearing contract is invented and no `cs: ai` proposal can
+   become accepted intent. Executable A7 RED fixtures and ordinary tests are
+   the referee; this pre-implementation contract record will not change during
+   the slice.
 4. **RAII and smart pointers — pending.** Model exact adoption, release,
    reset, move, and destruction paths for supported standard owners while
    keeping project wrappers explicitly configured and non-owning views silent.

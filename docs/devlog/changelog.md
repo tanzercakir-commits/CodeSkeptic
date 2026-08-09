@@ -1,5 +1,52 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.3 allocator-family boundary and contract record
+
+Phase 7.2 is sealed in commit `a242b3c` and published in draft PR #134. The
+next independently measurable slice is restricted to opt-in exact custom
+allocator/deallocator families; the prior alias and realloc slices are not
+reopened.
+
+The locked pre-implementation contract is recorded separately in
+`docs/TODO.md`. New CLI, config, and MCP input uses comma-separated
+`allocator=deallocator` entries. Parsing is atomic and fail-closed; duplicate
+pairs are idempotent and one allocator may admit multiple exact deallocators.
+Qualified spellings match qualified direct non-instance callees, while
+unqualified spellings preserve the existing identifier convention. Paired
+names automatically join allocation and release recognition.
+
+Each direct paired allocation carries its exact family per disjunct. Only an
+admitted direct argument-zero deallocator proves release and enables later UAF
+or double-free evidence. A mismatched paired/legacy deallocator, `delete`, or
+built-in `realloc` cannot close that allocation, so a live allocation remains a
+leak. Conflicting family paths degrade to unknown. Summary-only ownership,
+summary-only consumption, unresolved or ambiguous indirect calls, instance
+methods, non-variable arguments, and unknown targets cannot create exact
+family authority; release-shaped uncertainty escapes instead of fabricating a
+release or leak. A wrapper receives authority only by explicit pairing. Legacy
+independent allocator/free lists retain their family-agnostic behavior, and
+all pair state is cleared between analyzer/MCP calls.
+
+The exact file boundary is `src/config/Config.h`, `src/config/Config.cpp`,
+`src/engine/AllocFunctions.h`, `src/engine/AllocFunctions.cpp`,
+`src/analyzer/StaticAnalyzer.cpp`, `src/server/McpServer.cpp`,
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/ConfigTest.cpp`,
+`tests/McpServerTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`, `docs/usage.md`,
+`docs/integrations.md`, `docs/TODO.md`, and this changelog. Contract grammar,
+capability tiers, accepted model channels, summary schema, profiles, and
+quality floors remain unchanged.
+
+Contract-first shadow pre-screen considered `Config::addAllocatorPairs`,
+`setAllocatorPairs`, `pairedAllocatorFamily`, `isPairedDeallocatorCall`,
+`matchesAllocatorFamily`, `allocationFamilyOf`, and `releaseAuthority`.
+String/container parsing, Clang declaration identity, and native pointer/heap
+lifetime are unsupported by the current verifier, so dogfood is not
+applicable: proposals 0, eligible 0, rejected 0, unsupported 7. Candidate
+contracts requiring later human review: none. No proof-bearing contract was
+invented and no `cs: ai` proposal became accepted intent. Executable A7 RED
+fixtures and ordinary tests are the referee; this contract record will not
+change during Phase 7.3.
+
 ## 2026-08-09 — Phase 7.2 realloc outcome lifetimes
 
 The memory-lifetime analysis now records an exact pending source/result
