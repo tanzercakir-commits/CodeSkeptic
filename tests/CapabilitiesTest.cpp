@@ -24,6 +24,13 @@ TEST(CapabilitiesTest, RegistryEnforcesTierBehavior) {
 
     EXPECT_TRUE(codeskeptic::findingBlocksVerdict("use-after-free"));
     EXPECT_TRUE(codeskeptic::findingBlocksVerdict("memory-leak"));
+    const auto* resource =
+        codeskeptic::findRuleCapability("resource-leak");
+    ASSERT_NE(resource, nullptr);
+    EXPECT_EQ(resource->tier, codeskeptic::CapabilityTier::Supported);
+    EXPECT_TRUE(resource->quality_gated);
+    EXPECT_TRUE(resource->blocks_verdict);
+    EXPECT_TRUE(codeskeptic::findingBlocksVerdict("resource-leak"));
     EXPECT_FALSE(codeskeptic::findingBlocksVerdict("contract-syntax"));
     EXPECT_FALSE(codeskeptic::findingBlocksVerdict("contract-unsupported"));
     // Extensions and unknown future diagnostics fail closed until they are

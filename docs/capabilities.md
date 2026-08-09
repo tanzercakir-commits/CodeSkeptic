@@ -54,7 +54,7 @@ stay silent until their source/contract/policy signal exists.
 | Memory leak | `memory-leak` | supported | on | yes | blocking |
 | Double free | `double-free` | supported | on | yes | blocking |
 | Use after free | `use-after-free` | supported | on | yes | blocking |
-| Resource leak (`FILE*`/`DIR*`) | `resource-leak` | experimental | on | no | report-only |
+| Resource leak (`FILE*`/`DIR*`/POSIX fd) | `resource-leak` | supported | on | yes | blocking |
 | Division by zero | `div-by-zero` | supported | on | yes | blocking |
 | Null dereference | `null-deref` | supported | on | yes | blocking |
 | Array/heap bounds | `bounds` | experimental | on | no | report-only |
@@ -69,13 +69,17 @@ The supported evidence is the pinned Juliet precision gate: double-free
 1.000 (101 TP / 0 FP), use-after-free 1.000 (212 / 0), div-by-zero 1.000
 (43 / 0), null-deref 1.000 (140 / 0), and int-overflow 1.000 (23 / 0).
 Phase 3 promoted `memory-leak` after it reached 0.860 precision (80 TP /
-13 FP), above its 0.85 product gate. Families without an independent
-precision sample — including `resource-leak`, despite sharing the same
-engine pass — remain experimental.
+13 FP), above its 0.85 product gate. Phase 5 promoted `resource-leak` after
+the pinned libarchive v3.8.9 clean run removed all 12 manually adjudicated
+false reports and a separate load-bearing mutation run produced exactly
+3 TP / 0 FP: precision 1.000 at the 0.90 gate. Families without an
+independent precision sample remain experimental.
 
-The four heap/resource finding IDs share the `memory-leak` engine pass.
-`--disable-rule memory-leak` disables that pass; their verdict tiers are
-still decided independently from each emitted finding ID.
+Heap, `FILE*`, and `DIR*` findings come from the `memory-leak` engine
+pass; POSIX integer-descriptor findings come from the separate
+`resource-leak` rule. `--disable-rule memory-leak` disables the pointer
+pass, while `--disable-rule resource-leak` disables the descriptor pass.
+Verdict tiers are decided from each emitted finding ID.
 `contract-syntax` and `contract-unsupported` are internal diagnostics, not
 separate selectable rules; both inherit the experimental `contract` tier.
 

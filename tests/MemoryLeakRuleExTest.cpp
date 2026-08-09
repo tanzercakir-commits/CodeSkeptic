@@ -1702,13 +1702,13 @@ TEST(MemoryLeakRuleExTest, MutatedFlagCopy_NotFolded) {
     ASSERT_EQ(results.size(), 1u);
 }
 
-// --- CWE-404/775: resource leak (2026-07-30). fopen-family / opendir
+// --- CWE-404: pointer-resource leak (2026-07-30). fopen-family / opendir
 // return an owned handle that a matching close must release. Recognised
 // built-in (no --alloc-functions config), tracked by the same
 // pointer-ownership machinery as heap memory, reported as "resource-leak"
 // (classified by the acquiring name, robust across libc FILE typedefs).
-// Raw-fd openers (open/socket) return an int the pointer domain cannot
-// track — CWE-775 strict deferred to an integer-resource model.
+// Raw-fd openers return an int and are covered by the separate
+// FdResourceRule CWE-775 matrix.
 
 TEST(MemoryLeakRuleExTest, FopenNotClosed_ResourceLeak) {
     MemoryLeakRule_Ex rule;

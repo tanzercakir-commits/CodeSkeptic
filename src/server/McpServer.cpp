@@ -11,6 +11,7 @@
 #include "rules/BoundsRule.h"
 #include "rules/AssumptionRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
+#include "rules/FdResourceRule.h"
 #include "rules/NullDerefRule.h"
 #include "rules/ContractRule.h"
 #include "rules/PolicyRule.h"
@@ -195,6 +196,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
     analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
     analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
+    analyzer.addRule<codeskeptic::FdResourceRule>();
     analyzer.addRule<codeskeptic::DivByZeroRule>();
     analyzer.addRule<codeskeptic::IntOverflowRule>();
     analyzer.addRule<codeskeptic::SignConversionRule>();

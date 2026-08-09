@@ -7,7 +7,7 @@ CODESKEPTIC_RULE_CAPABILITY("uninit-ptr", Experimental, true, false, false, "per
 CODESKEPTIC_RULE_CAPABILITY("memory-leak", Supported, true, true, true, "Juliet 0.860 precision (80 TP / 13 FP); Phase 3 gate >= 0.85")
 CODESKEPTIC_RULE_CAPABILITY("double-free", Supported, true, true, true, "Juliet 1.000 precision (101 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("use-after-free", Supported, true, true, true, "Juliet 1.000 precision (212 TP / 0 FP)")
-CODESKEPTIC_RULE_CAPABILITY("resource-leak", Experimental, true, false, false, "per-rule precision sample pending")
+CODESKEPTIC_RULE_CAPABILITY("resource-leak", Supported, true, true, true, "pinned libarchive v3.8.9 mutation sample 1.000 precision (3 TP / 0 FP); Phase 5 gate >= 0.90")
 CODESKEPTIC_RULE_CAPABILITY("div-by-zero", Supported, true, true, true, "Juliet 1.000 precision (43 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("null-deref", Supported, true, true, true, "Juliet 1.000 precision (140 TP / 0 FP)")
 CODESKEPTIC_RULE_CAPABILITY("bounds", Experimental, true, false, false, "per-rule precision sample pending")
