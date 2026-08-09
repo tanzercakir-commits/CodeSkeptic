@@ -1,6 +1,8 @@
 #ifndef CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H
 #define CODESKEPTIC_ENGINE_ALLOCFUNCTIONS_H
 
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -10,6 +12,9 @@ class Expr;
 }
 
 namespace codeskeptic {
+
+using AllocatorPairMap =
+    std::map<std::string, std::set<std::string>>;
 
 // Custom allocator registry (--alloc-functions / --free-functions).
 //
@@ -43,6 +48,17 @@ bool isOwnedAllocationExpr(const clang::Expr* expr);
 
 void setFreeFunctionNames(std::set<std::string> names);
 const std::set<std::string>& freeFunctionNames();
+
+// Exact opt-in custom allocation families. Pair recognition is direct-call
+// only; a qualified configured spelling matches the qualified declaration,
+// while an unqualified spelling retains the historical identifier behavior.
+void setAllocatorPairs(AllocatorPairMap pairs);
+const AllocatorPairMap& allocatorPairs();
+std::optional<std::string> pairedAllocatorFamily(
+    const clang::CallExpr* call);
+bool isPairedDeallocatorCall(const clang::CallExpr* call);
+bool matchesAllocatorFamily(const std::string& family,
+                            const clang::CallExpr* call);
 
 // Custom owning-smart-pointer registry (--owning-pointers).
 //

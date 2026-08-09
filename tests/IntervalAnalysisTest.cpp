@@ -124,7 +124,75 @@ Interval divisorInterval(const std::string& code) {
     return out.divisor;
 }
 
+struct DestructorElementAnalysis {
+    using State = bool;
+    State initialState() const { return false; }
+    State merge(State left, State right) const { return left || right; }
+    State transfer(const Stmt*, State state, ASTContext&) const {
+        return state;
+    }
+    State transferElement(const CFGElement& element, State state,
+                          ASTContext&) const {
+        return state || element.getAs<CFGAutomaticObjDtor>().has_value();
+    }
+};
+
+struct DestructorResult {
+    bool found = false;
+    bool converged = false;
+    bool reachedExit = false;
+};
+
+class DestructorConsumer : public ASTConsumer {
+public:
+    explicit DestructorConsumer(DestructorResult& out) : out_(out) {}
+    void HandleTranslationUnit(ASTContext& ctx) override {
+        codeskeptic::CfgCache::instance().clear();
+        struct V : RecursiveASTVisitor<V> {
+            const FunctionDecl* fn = nullptr;
+            bool VisitFunctionDecl(FunctionDecl* f) {
+                if (f->hasBody() && f->getName() == "f") fn = f;
+                return true;
+            }
+        } visitor;
+        visitor.TraverseDecl(ctx.getTranslationUnitDecl());
+        if (!visitor.fn) return;
+        DestructorElementAnalysis analysis;
+        auto dataflow = codeskeptic::runDataflow(visitor.fn, ctx, analysis);
+        out_.found = true;
+        out_.converged = dataflow.converged;
+        for (const auto& [block, state] : dataflow.blockExitStates) {
+            (void)block;
+            out_.reachedExit = out_.reachedExit || state;
+        }
+    }
+private:
+    DestructorResult& out_;
+};
+
+class DestructorAction : public ASTFrontendAction {
+public:
+    explicit DestructorAction(DestructorResult& out) : out_(out) {}
+    std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance&,
+                                                   llvm::StringRef) override {
+        return std::make_unique<DestructorConsumer>(out_);
+    }
+private:
+    DestructorResult& out_;
+};
+
 } // namespace
+
+TEST(DataflowEngineTest, OptionalElementHookReceivesAutomaticDestructor) {
+    DestructorResult out;
+    clang::tooling::runToolOnCode(
+        std::make_unique<DestructorAction>(out),
+        "struct Owner { ~Owner(); }; void f(){ Owner owner; }",
+        "destructor_element_test.cpp");
+    EXPECT_TRUE(out.found);
+    EXPECT_TRUE(out.converged);
+    EXPECT_TRUE(out.reachedExit);
+}
 
 TEST(IntervalAnalysisTest, ConstantAssignment) {
     Interval n = divisorInterval("int f(int x){ int n = 5; return x / n; }");

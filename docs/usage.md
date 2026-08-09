@@ -75,10 +75,14 @@ codeskeptic <source_path> [options]
                          (e.g. --alloc-functions git__malloc,zmalloc)
   --free-functions <names> Treat these functions as deallocators
                          (their first argument is freed)
+  --allocator-pairs <pairs> Declare exact custom allocation families
+                         (comma-separated allocator=deallocator entries).
+                         Only a matching direct deallocator closes the
+                         allocation; malformed values fail closed
   --owning-pointers <names> Treat these class templates as owning smart
-                         pointers (comma list). A raw pointer adopted by
-                         constructing one is no longer leaked;
-                         std::unique_ptr/shared_ptr are built in
+                         pointers (comma list). Configured project wrappers
+                         conservatively transfer an adopted raw pointer;
+                         standard unique/shared/auto_ptr owners are built in
                          (e.g. --owning-pointers Ref,RefPtr,scoped_refptr)
   --untrusted-int-sources <names> Treat these functions' return as a
                          full-range untrusted integer (comma list), the
@@ -145,11 +149,27 @@ fail with exit `2`):
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
-`alloc_functions`, `free_functions`, and repeatable `model_file` entries.
+`alloc_functions`, `free_functions`, `allocator_pairs`, and repeatable
+`model_file` entries. An allocator may appear in multiple `allocator_pairs`
+entries to admit multiple exact deallocators.
 
-Project idioms are configuration, not code: allocator wrappers, fatal
-assert handlers and owning smart pointers belong in the project's conf
-file so the analysis sees the code the way the project means it.
+Project idioms are configuration, not code: allocator wrappers, exact
+allocator families, fatal assert handlers and owning smart pointers belong in
+the project's conf file so the analysis sees the code the way the project
+means it. The legacy independent allocator/free lists remain family-agnostic;
+use `allocator_pairs` when mismatch evidence matters.
+
+For direct automatic local `std::unique_ptr`, `std::shared_ptr`, and legacy
+`std::auto_ptr`, the analyzer follows compatible raw adoption, `get`,
+`release`, `reset`, standard copy/move, replacement, and normal scope/return
+destruction. Only the last exact local owner proves release; a retained raw
+alias can therefore support UAF or double-free evidence, while `release()`
+leaves a live allocation leak-reportable. Custom deleters, aliasing
+constructors, incompatible conversions, owner exposure/references, fields,
+indirect targets, and exact custom allocator families remain conservative and
+cannot manufacture a release. `--owning-pointers` wrappers retain their
+adoption-only escape behavior; the option does not grant native lifecycle
+proof to arbitrary project methods.
 
 ## Suppressing findings
 
