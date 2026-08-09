@@ -41,7 +41,7 @@ const std::set<std::string>& singleValueOptions() {
         "--severity", "--disable-rule", "--lang", "--baseline",
         "--function", "--fatal-asserts", "--assert-macros",
         "--negative-assert-macros", "--alloc-functions",
-        "--free-functions", "--untrusted-int-sources",
+        "--free-functions", "--allocator-pairs", "--untrusted-int-sources",
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
         "--files",
@@ -161,6 +161,14 @@ bool Config::loadFromFile(const std::string& path) {
         }
         else if (key == "alloc_functions") addNamesTo(alloc_functions_, value);
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
+        else if (key == "allocator_pairs") {
+            if (!addAllocatorPairs(value)) {
+                configError(path, lineNumber,
+                            "allocator_pairs expects allocator=deallocator"
+                            " entries separated by commas");
+                ok = false;
+            }
+        }
         else if (key == "owning_pointers") addNamesTo(owning_pointers_, value);
         else if (key == "untrusted_int_sources") addNamesTo(untrusted_int_sources_, value);
         else if (key == "report_paths")    addReportPaths(value);
@@ -274,6 +282,13 @@ bool Config::parseArgs(int argc, char* argv[]) {
             addNamesTo(alloc_functions_, argv[++i]);
         } else if (arg == "--free-functions" && i + 1 < argc) {
             addNamesTo(free_functions_, argv[++i]);
+        } else if (arg == "--allocator-pairs" && i + 1 < argc) {
+            if (!addAllocatorPairs(argv[++i])) {
+                std::cerr << "[CodeSkeptic] --allocator-pairs expects "
+                             "allocator=deallocator entries separated by "
+                             "commas\n";
+                return false;
+            }
         } else if (arg == "--untrusted-int-sources" && i + 1 < argc) {
             addNamesTo(untrusted_int_sources_, argv[++i]);
         } else if (arg == "--owning-pointers" && i + 1 < argc) {
@@ -390,6 +405,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         sign-conversion rule)\n"
                       << "  --free-functions <names> Treat these functions as deallocators\n"
                       << "                         (first argument is freed)\n"
+                      << "  --allocator-pairs <pairs> Exact custom allocation families\n"
+                      << "                         (allocator=deallocator, comma list;\n"
+                      << "                         malformed values are rejected)\n"
                       << "  --owning-pointers <names> Treat these class templates as\n"
                       << "                         owning smart pointers (comma list;\n"
                       << "                         a raw pointer adopted by constructing\n"
@@ -495,6 +513,30 @@ void Config::addAllocFunctions(const std::string& list) {
 
 void Config::addFreeFunctions(const std::string& list) {
     addNamesTo(free_functions_, list);
+}
+
+bool Config::addAllocatorPairs(const std::string& list) {
+    auto parsed = allocator_pairs_;
+    std::size_t begin = 0;
+    while (begin <= list.size()) {
+        const std::size_t comma = list.find(',', begin);
+        const std::string entry = trim(list.substr(
+            begin, comma == std::string::npos ? std::string::npos
+                                               : comma - begin));
+        const std::size_t separator = entry.find('=');
+        if (entry.empty() || separator == std::string::npos ||
+            entry.find('=', separator + 1) != std::string::npos) {
+            return false;
+        }
+        const std::string allocator = trim(entry.substr(0, separator));
+        const std::string deallocator = trim(entry.substr(separator + 1));
+        if (allocator.empty() || deallocator.empty()) return false;
+        parsed[allocator].insert(deallocator);
+        if (comma == std::string::npos) break;
+        begin = comma + 1;
+    }
+    allocator_pairs_ = std::move(parsed);
+    return true;
 }
 
 void Config::addOwningPointers(const std::string& list) {

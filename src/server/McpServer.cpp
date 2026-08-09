@@ -129,6 +129,13 @@ json::Value handleToolsList(const json::Value& id) {
                  "Comma-separated project deallocator wrappers (e.g. "
                  "\"git__free\") paired with alloc_functions"},
             }},
+            {"allocator_pairs", json::Object{
+                {"type", "string"},
+                {"description",
+                 "Comma-separated exact custom allocation families "
+                 "(e.g. \"pool_alloc=pool_free\"); malformed values "
+                 "are rejected without partial registration"},
+            }},
         }},
         {"required", json::Array{"path"}},
     };
@@ -151,7 +158,8 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 
     static const std::set<std::string> allowedFields = {
         "path", "build_path", "functions", "lines", "summaries",
-        "fatal_asserts", "alloc_functions", "free_functions"
+        "fatal_asserts", "alloc_functions", "free_functions",
+        "allocator_pairs"
     };
     for (const auto& field : *args) {
         const std::string name = field.first.str();
@@ -189,6 +197,13 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addAllocFunctions(allocFns->str());
     if (auto freeFns = args->getString("free_functions"))
         config.addFreeFunctions(freeFns->str());
+    if (auto pairs = args->getString("allocator_pairs")) {
+        if (!config.addAllocatorPairs(pairs->str()))
+            return makeError(
+                id, -32602,
+                "invalid allocator_pairs; expected allocator=deallocator "
+                "entries separated by commas");
+    }
     // Long-lived process: parsed ASTs are kept warm between calls (the
     // fingerprint catches staleness — a stale AST is NEVER served)
     config.setWarmCache(true);
