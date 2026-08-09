@@ -111,10 +111,49 @@ independently measurable RED-to-GREEN slices:
    Candidate contracts requiring later human review: none. No `cs: ai`
    proposal became accepted intent, and native owned-memory parity remains
    deferred to executable A7 fixtures.
-2. **`realloc` success/failure paths — pending.** Preserve the original
-   allocation on failure, transfer lifetime on success, and cover direct,
-   temporary, overwrite, `reallocarray`, null-input, zero-size, guarded, and
-   unknown outcomes without treating possible release as definite.
+2. **`realloc` success/failure paths — boundary locked before
+   implementation.** Preserve the original allocation on failure, transfer
+   lifetime on success, and cover direct, temporary, overwrite,
+   `reallocarray`, null-input, zero-size, guarded, and unknown outcomes without
+   treating possible release as definite.
+
+   The locked development contract is intentionally separate from production
+   code. Reallocation authority is limited to direct global-C or `std`
+   `realloc`/`reallocarray` calls whose local result and source have the same
+   exact pointer type. A distinct temporary with a proven nonzero request
+   keeps an exact pending relation: a proven null result preserves the old
+   allocation, while a proven non-null result transfers the old lifetime and
+   makes the result the owner. A direct overwrite with a proven nonzero
+   request reports the possible failure-path leak when an old allocation is
+   live. A null source behaves as allocation rather than replacement.
+   `reallocarray` additionally requires both multiplicands to be proven
+   nonzero; its overflow-failure path preserves the old allocation.
+
+   Zero-size or otherwise unproven-size calls, indirect calls, methods, other
+   namespaces, custom wrappers, type-changing results, address-exposed state,
+   and conflicting paths cannot prove release, transfer, UAF, double-free, or
+   an overwrite leak. Reassignment or exposure invalidates only the pending
+   relation. An unresolved temporary result/source pair represents alternative
+   outcomes and may emit at most one exit leak unless later evidence separates
+   them. This slice does not invent implementation-defined zero-size behavior,
+   allocator-family semantics, or native heap/alias proof authority.
+
+   The exact file set is `src/rules/MemoryLeakRule_Ex.cpp`,
+   `tests/MemoryLeakRuleExTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. Shared dataflow/guard engines, allocator
+   registries, contract grammar, capability tiers, configuration, summary
+   schemas, accepted model channels, and quality floors remain unchanged.
+
+   Contract-first shadow pre-screen considered the seven critical call
+   recognition, request classification, pending-relation, success transfer,
+   failure preservation, overwrite, and exit-deduplication decisions. They all
+   require native pointer/heap lifetime semantics unsupported by the current
+   verifier, so dogfood is not applicable: proposals 0, eligible 0, rejected
+   0, unsupported 7. Candidate contracts requiring human review: none. No
+   proof-bearing contract is invented and no `cs: ai` proposal can become
+   accepted intent. Executable A7 RED fixtures and ordinary tests are the
+   referee; this pre-implementation contract record will not change during the
+   slice.
 3. **Custom allocator/deallocator pairs — pending.** Move beyond independent
    name lists to exact configured families and validate mismatch, wrapper,
    indirect-summary, and conservative unknown-target behavior.

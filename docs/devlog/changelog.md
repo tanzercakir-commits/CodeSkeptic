@@ -1,5 +1,37 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.2 realloc boundary and contract record
+
+Phase 7.1 is sealed in commit `1475adb8754c75174ef4057d62a1f8b5c543a605`
+with tree `5aac1b25da279bed85ab60332152020c7ba74e24`. The next independently
+measurable slice is restricted to exact `realloc`/`reallocarray`
+success/failure lifetime behavior; the prior slice is not reopened.
+
+The locked pre-implementation contract is recorded separately from production
+code in `docs/TODO.md`. Only direct global-C or `std` calls with exact local,
+same-pointer-type result/source identities may create a pending realloc
+relation. For a proven nonzero request, null preserves the original allocation
+and non-null transfers its lifetime to the result. Proven-nonzero direct
+overwrite reports the possible failure leak; null input remains ordinary
+allocation. `reallocarray` requires both size operands to be proven nonzero
+and preserves the source on overflow failure. Zero or unknown sizes, indirect
+or custom calls, methods and other namespaces, type changes, exposure, and
+conflicts cannot create release, transfer, UAF, double-free, or overwrite-leak
+evidence. Alternative unresolved result/source outcomes produce at most one
+exit leak unless later evidence separates them.
+
+The exact file boundary is `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+engines, allocator registries, contract grammar, capability tiers,
+configuration, summary schemas, accepted model channels, and quality floors
+remain unchanged. Contract-first shadow review considered seven critical
+semantic decisions. All depend on native pointer/heap lifetime semantics that
+the current verifier does not support, so dogfood is not applicable: proposals
+0, eligible 0, rejected 0, unsupported 7. Candidate contracts requiring later
+human review: none. No proof-bearing contract was invented and no `cs: ai`
+proposal became accepted intent. Executable A7 RED fixtures and ordinary tests
+are the referee; this contract record will not change during Phase 7.2.
+
 ## 2026-08-09 — Phase 7.1 exact local alias lifetime
 
 The memory-lifetime analysis now carries an exact must-binding beside each
