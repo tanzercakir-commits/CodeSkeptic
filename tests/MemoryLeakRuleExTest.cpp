@@ -2286,6 +2286,44 @@ namespace std {
 struct S { int x; };
 )";
 
+const std::string kStdSmartPtrLifetimes = R"(
+namespace std {
+  template <class T> T&& move(T& value);
+  template <class T> class unique_ptr {
+   public:
+    explicit unique_ptr(T* p = nullptr);
+    unique_ptr(unique_ptr&& other);
+    unique_ptr& operator=(unique_ptr&& other);
+    T* get() const;
+    T* release();
+    void reset(T* p = nullptr);
+    ~unique_ptr();
+  };
+  template <class T> class shared_ptr {
+   public:
+    explicit shared_ptr(T* p = nullptr);
+    shared_ptr(const shared_ptr& other);
+    shared_ptr(shared_ptr&& other);
+    shared_ptr& operator=(const shared_ptr& other);
+    shared_ptr& operator=(shared_ptr&& other);
+    T* get() const;
+    void reset(T* p = nullptr);
+    ~shared_ptr();
+  };
+  template <class T> class auto_ptr {
+   public:
+    explicit auto_ptr(T* p = nullptr);
+    auto_ptr(auto_ptr& other);
+    auto_ptr& operator=(auto_ptr& other);
+    T* get() const;
+    T* release();
+    void reset(T* p = nullptr);
+    ~auto_ptr();
+  };
+}
+struct S { int x; };
+)";
+
 // Process-global registry, cleared on scope exit (single-process test
 // run is what catches leaked state).
 class OwningPtrScope {
@@ -2436,6 +2474,456 @@ TEST(OwningPointerTest, LambdaNotCapturingPtr_LeakStays) {
         }
     )");
     ASSERT_EQ(results.size(), 1);
+}
+
+// --- Phase 7.4: exact local standard smart-owner lifetimes ---
+
+TEST(SmartOwnerLifetimeV2Test, UniqueDestructorThenRawUseReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueRawUseBeforeDestructorStaysClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, IgnoredUniqueReleaseLeavesLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.release();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(SmartOwnerLifetimeV2Test, CapturedReleaseAliasesRawAndDeleteIsClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            S* released = nullptr;
+            {
+                std::unique_ptr<S> owner(raw);
+                released = owner.release();
+            }
+            delete released;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, GetAliasObservesLastOwnerDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            S* view = nullptr;
+            {
+                std::unique_ptr<S> owner(raw);
+                view = owner.get();
+            }
+            return view->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueResetThenRawUseReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.reset();
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueResetReplacementFreesOnlyOldRaw) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* oldRaw = new S;
+            S* newRaw = new S;
+            std::unique_ptr<S> owner(oldRaw);
+            owner.reset(newRaw);
+            return oldRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ManualDeleteThenDestructorReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            delete raw;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ManualDeleteThenResetReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            delete raw;
+            owner.reset();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueMoveConstructionTransfersDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> first(raw);
+            { std::unique_ptr<S> second(std::move(first)); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueMoveAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::unique_ptr<S> source(sourceRaw);
+            std::unique_ptr<S> destination(replacedRaw);
+            destination = std::move(source);
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedCopyKeepsRawAliveUntilLastOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> outer(raw);
+            { std::shared_ptr<S> inner(outer); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedLastOwnerDestructionReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            { std::shared_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedResetRetainsOtherExactOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> first(raw);
+            std::shared_ptr<S> second(first);
+            first.reset();
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, ConfiguredWrapperLifetimeStaysConservative) {
+    OwningPtrScope scope({"Ref"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        template <class T> struct Ref {
+            explicit Ref(T* value);
+            ~Ref();
+        };
+        int f() {
+            S* raw = new S;
+            { Ref<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, ExactCustomFamilyImplicitDeleterIsUnknown) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void* pool_alloc(unsigned long);
+        int f() {
+            S* raw = (S*)pool_alloc(sizeof(S));
+            { std::unique_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, IncompatiblePointeeAdoptionIsUnknown) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        struct Base { int x; };
+        struct Derived : Base {};
+        int f() {
+            Derived* raw = new Derived;
+            { std::unique_ptr<Base> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerAddressExposureIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void mutate(std::unique_ptr<S>*);
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                mutate(&owner);
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerReferenceMutationIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                std::unique_ptr<S>& alias = owner;
+                alias.release();
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerLambdaCaptureIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                auto cleanup = [&owner] { owner.release(); };
+                cleanup();
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, CustomDeleterConstructorIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            unique_ptr(T*, D);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S, Deleter> owner(raw, Deleter{}); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, CustomDeleterTypeWithOneArgumentIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            explicit unique_ptr(T*);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S, Deleter> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedAliasingConstructorIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T> class shared_ptr {
+           public:
+            explicit shared_ptr(T*);
+            template <class U> shared_ptr(const shared_ptr<U>&, T*);
+            ~shared_ptr();
+          };
+        }
+        struct Box { int value; };
+        int f() {
+            Box* raw = new Box;
+            {
+                std::shared_ptr<Box> base(raw);
+                std::shared_ptr<int> alias(base, &raw->value);
+            }
+            return raw->value;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedMoveConstructionTransfersLastOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> first(raw);
+            { std::shared_ptr<S> second(std::move(first)); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedMoveAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::shared_ptr<S> source(sourceRaw);
+            std::shared_ptr<S> destination(replacedRaw);
+            destination = std::move(source);
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedCopyAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::shared_ptr<S> source(sourceRaw);
+            std::shared_ptr<S> destination(replacedRaw);
+            destination = source;
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, AutoPtrCopyTransfersDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::auto_ptr<S> first(raw);
+            { std::auto_ptr<S> second(first); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ReleaseKeepsRawUseLiveAndReportsOnlyLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.release();
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ResetThenReleaseReplacementSeparatesLifetimes) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* oldRaw = new S;
+            S* replacement = new S;
+            std::unique_ptr<S> owner(oldRaw);
+            owner.reset(replacement);
+            owner.release();
+            return oldRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    EXPECT_EQ(results[1].rule_id, "memory-leak");
 }
 
 // Accepted real-world regression pin: tensorflow/tensorflow #123387,

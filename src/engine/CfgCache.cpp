@@ -17,7 +17,8 @@ CfgCache& CfgCache::instance() {
 }
 
 clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
-                          clang::ASTContext& ctx) {
+                          clang::ASTContext& ctx,
+                          bool addImplicitDtors) {
     if (!func || !func->hasBody()) return nullptr;
 
     // Backup safety: if another TU's context arrives, the old keys
@@ -28,8 +29,9 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
     }
 
     const clang::FunctionDecl* key = func->getCanonicalDecl();
-    auto it = cache_.find(key);
-    if (it != cache_.end()) {
+    FunctionCache& selected = cache_[addImplicitDtors];
+    auto it = selected.find(key);
+    if (it != selected.end()) {
         ++g_hits;
         return it->second.get();
     }
@@ -40,9 +42,10 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
     // granularity as the CSA). Analyses look only at each element's
     // top node; no nested search inside a statement is needed.
     opts.setAllAlwaysAdd();
+    opts.AddImplicitDtors = addImplicitDtors;
     auto cfg = clang::CFG::buildCFG(func, func->getBody(), &ctx, opts);
     clang::CFG* raw = cfg.get();
-    cache_[key] = std::move(cfg);  // if the build failed, the nullptr
+    selected[key] = std::move(cfg);  // if the build failed, the nullptr
                                    // is cached too — no repeated retries
     return raw;
 }

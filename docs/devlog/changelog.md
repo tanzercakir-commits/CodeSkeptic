@@ -1,5 +1,55 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7.4 exact local standard smart-owner lifetimes
+
+CodeSkeptic now carries exact per-disjunct owner identity for direct automatic
+local `std::unique_ptr`, `std::shared_ptr`, and legacy `std::auto_ptr` objects.
+Compatible raw adoption, captured `get`/`release` aliases, reset, standard
+copy/move construction and assignment, destination replacement, and normal
+last-owner destruction update the existing allocation lifetime. This makes
+released allocations leak-reportable and supports UAF or double-free evidence
+after an exact reset, raw release, or automatic destructor.
+
+The shared CFG cache separately keys ordinary and implicit-destructor graphs.
+Only analyses declaring the optional CFG-element hook request the latter;
+statement-only consumers retain their original path. Configured project owner
+wrappers preserve adoption-only escape behavior. Custom deleters, exact custom
+allocator families, aliasing constructors, incompatible pointees, fields,
+owner exposure/references/lambdas, unknown methods or calls, conflicts, and
+indirect targets remain conservative and cannot manufacture release evidence.
+Exceptional cleanup remains Phase 7.5 work.
+
+The compile RED first established the missing option-keyed CFG API. After the
+engine hook was added, 10 of 17 initial semantic owner cases stayed RED. The
+owner-lifetime implementation closed them. Precision review then found three
+false authorities—owner address exposure, writable owner references, and a
+shared aliasing constructor—and conservative escape closed all three. A
+custom-deleter template with a single constructor argument exposed one final
+false authority; admitting only the implicit/default deleter shape closed it.
+The lambda-capture control was already conservative. The final Phase 7.4 plus
+legacy owner regression matrix passes 41/41, and direct and CTest suites pass
+1148/1148.
+
+Interface gates remain schema 2 / rules 14 / supported 7 / out-of-scope 5 and
+ActionArgs 5/5. Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings;
+self-scan is clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings
+(76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+findings (3/3). The unchanged 400-file/CWE Juliet replay passes every floor:
+CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416 212/0,
+CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+`19875c442be7e3f6bed6e50eba1f29374b685bc19275757a2c6370be7b9fd3d6`.
+
+Contract-first shadow completion considered `CfgCache::get`, `runDataflow`,
+`standardOwnerKind`, `ownerOperation`, `applyOwnerOperation`,
+`MemoryFlow::transferElement`, and `MemoryFlow::onCFGElement`: proposals 0,
+eligible 0, rejected 0, unsupported 7. Current verifier semantics cannot prove
+the template/CFG dispatch, Clang identity, native alias, ownership, or heap
+lifetime authority involved, so no proposal was eligible. Independent RED and
+precision fixtures exposed and closed the implementation/assumption problems.
+Candidate contracts requiring later human review: none. No `cs: ai` proposal
+became accepted intent, and native owned-memory parity remains deferred to
+executable A7 fixtures. The locked ten-file boundary was preserved.
+
 ## 2026-08-10 — Phase 7.4 RAII lifetime boundary and contract record
 
 Phase 7.3 is sealed in commit `3aeb20e6926544056e3382f77e761c7a3f203479`

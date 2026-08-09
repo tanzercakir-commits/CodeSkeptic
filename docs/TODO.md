@@ -345,6 +345,46 @@ independently measurable RED-to-GREEN slices:
    is invented and no `cs: ai` proposal can become accepted intent.
    Executable A7 RED fixtures and ordinary tests are the referee; this
    pre-implementation contract record will not change during the slice.
+
+   **Completed 2026-08-10.** The shared CFG cache now keeps ordinary and
+   implicit-destructor graphs under separate option keys, and the dataflow
+   engine invokes optional transfer/reporting hooks for non-statement CFG
+   elements without changing statement-only consumers. Memory lifetime state
+   records exact local standard owners per guarded disjunct. Direct compatible
+   adoption, `get`, `release`, `reset`, standard copy/move and replacement,
+   last-owner destruction, raw-result aliases, UAF, and double-free evidence
+   are implemented within the locked file set. Unsupported owner/deleter,
+   custom-family, aliasing, exposure, reference, lambda, and ambiguous paths
+   remain conservative.
+
+   The initial compile RED proved that the option-keyed CFG API was absent.
+   After engine plumbing, 10 of 17 initial lifetime cases remained semantic
+   RED. The first lifetime implementation closed them. Precision fixtures then
+   exposed three false authorities: owner address exposure, writable owner
+   references, and a shared aliasing constructor; conservative owner escape
+   closed all three. A later custom-deleter template fixture exposed one more
+   false authority and was closed by requiring the admitted implicit/default
+   deleter shape. The lambda-capture control was already conservative. The
+   final Phase 7.4 plus legacy owner regression matrix is 41/41.
+
+   Final local gates are direct suite 1148/1148, CTest 1148/1148,
+   `CapabilitiesCliTest.py` schema 2 / rules 14 / supported 7 /
+   out-of-scope 5, and `ActionArgsTest.py` 5/5. Frozen thesis remains
+   `clean_fp=0`, `bug_caught=9/15`, 11 findings; self-scan is clean and
+   complete at 48/48 translation units. Corpus receipts are cJSON 54 findings
+   (76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+   findings (3/3). The full unchanged 400-file/CWE Juliet floors pass:
+   CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416
+   212/0, CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+   `19875c442be7e3f6bed6e50eba1f29374b685bc19275757a2c6370be7b9fd3d6`.
+
+   Contract-first shadow completion considered the same seven functions:
+   proposals 0, eligible 0, rejected 0, unsupported 7. No proposal was
+   eligible, so none exposed an implementation or assumption problem;
+   independent RED and precision-review tests exposed and closed the problems
+   above. Candidate contracts requiring later human review: none. No `cs: ai`
+   proposal became accepted intent, and native owned-memory parity remains
+   deferred to executable A7 fixtures.
 5. **Escape, ownership transfer, and exceptional exits — pending.** Complete
    exact local/member/summary transfers and admitted cleanup or exceptional
    exits, then pin real-repository and Juliet deltas.
