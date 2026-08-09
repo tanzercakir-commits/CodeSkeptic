@@ -1,5 +1,40 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.1 exact-alias boundary and contract record
+
+Phase 6 merged through fully green PR #133 as squash commit
+`3aa85f9ed773c2473683e5a41593208e8945a0d9`; its tree
+`12f62243ba39b3b7b49369f843f33af640619efb` exactly matches the gated branch
+head. Both feature-branch refs were removed after that equality check.
+
+The pre-implementation lifetime audit passed the existing 68-test focused
+memory/alias/path/custom-owner matrix and identified the first Phase 7 gap:
+local pointer copies are collected into whole-function alias components.
+Those components can suppress an exit leak through any member's free, but
+they deliberately cannot carry a free into UAF or double-free reporting and
+cannot invalidate a reused alias. The accepted
+`AliasReuse_FirstAllocationFN_Documented` fixture pins the resulting missed
+leak.
+
+The locked slice contract is recorded separately from production code in
+`docs/TODO.md`: only unchanged, exact, local pointer bindings within one
+guarded disjunct may transfer lifetime evidence; reassignment invalidates the
+overwritten binding, and conflicting/non-local/address-exposed/field/heap or
+unknown aliases cannot create a finding. The exact file boundary is
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+`docs/TODO.md`, and this changelog. Shared engines, contract grammar,
+capability tiers, configuration, summary schemas, and accepted model channels
+remain outside the slice.
+
+Contract-first shadow review considered the six critical binding,
+root-resolution, merge, release, dereference, and exit decisions. All depend
+on native pointer identity, alias, and heap-lifetime semantics unsupported by
+the current verifier, so dogfood is not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proof-bearing contract was invented and no
+`cs: ai` proposal became accepted intent. Executable A7 fixtures are the
+referee; this pre-implementation contract record will not change during the
+slice.
+
 ## 2026-08-09 — Phase 6.3 interprocedural allocator sinks and access evidence
 
 Function summaries now carry a versioned, exact integer-parameter-to-allocator-

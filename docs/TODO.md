@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 8393a8b
-uçuşta = phase-integer-allocation-v2
+base   = 3aa85f9
+uçuşta = phase-memory-lifetime-v2
 ```
 <!-- cs:state-end -->
 
@@ -44,82 +44,57 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Next work
 
-Phase 5 is merged through PR #132. Its exact squash commit is
-`8393a8b0c07460c6636e4aa79528bdd7b55a5b22`; the squash tree
-`bba0359b379cf264e52fca03a46eade2e542a760` matches the fully gated branch
-head, the remote feature branch is deleted, and local/remote `main` agree.
+Phase 6 is merged through PR #133. Its exact squash commit is
+`3aa85f9ed773c2473683e5a41593208e8945a0d9`; the squash tree
+`12f62243ba39b3b7b49369f843f33af640619efb` matches the fully gated branch
+head. The local and remote feature branches are deleted, and local/remote
+`main` agree.
 
-Phase 6 is active on `phase-integer-allocation-v2` and is divided into
+Phase 7 is active on `phase-memory-lifetime-v2` and is divided into five
 independently measurable RED-to-GREEN slices:
 
-1. **64-bit `size_t` multiplication corner proof — locally complete.** Extend
-   the allocation-size rule only when an untrusted unsigned operand, a finite
-   constant factor, and the result type's width prove that the mathematical
-   product can exceed the 64-bit maximum. A dominating division guard must
-   silence the report; unknown factors, non-allocator arithmetic, ordinary
-   inputs, and insufficient proof stay silent. The exact slice file set is
-   `src/rules/AllocSizeOverflowRule.{h,cpp}`,
-   `tests/AllocSizeOverflowRuleTest.cpp`, this TODO, and
-   `docs/devlog/changelog.md`. `PLAN.md`, the interval engine, contract
-   grammar, capability registry/tier, configuration, and accepted models
-   remain unchanged. Gates: RED 2/12; focused 14/14; direct and CTest
-   1026/1026; exact CLI 1 report / guarded twin 0; thesis `clean_fp=0` and
-   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
-   Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 6;
-   no `cs: ai` proposal became accepted intent.
-2. **Checked arithmetic and signed/unsigned chains — locally complete.**
-   Preserve the
-   exact reachable upper corner through stable, local signed-to-unsigned cast
-   and alias chains, including narrowing conversions. Recognize the
-   Clang/GCC `__builtin_*mul*_overflow` family when its direct output variable
-   reaches an allocator: a proven no-overflow branch is silent, while an
-   ignored or overflow-path result reports only when the same finite-corner
-   proof establishes wrap. Unknown factors, unstable/reassigned chains,
-   non-allocator uses, and unproven relations stay silent. The exact slice
-   file set is `src/rules/AllocSizeOverflowRule.{h,cpp}`,
-   `tests/AllocSizeOverflowRuleTest.cpp`, this TODO, and
-   `docs/devlog/changelog.md`. The shared interval engine,
-   `SignConversionRule`, contract grammar, capability registry/tier,
-   configuration, and accepted models remain unchanged. Gates: RED 5/25;
-   focused 32/32; direct and CTest 1044/1044; exact CLI 1/0 for both the
-   signed-cast and checked-builtin unsafe/safe pairs; thesis `clean_fp=0` and
-   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
-   Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 50;
-   no `cs: ai` proposal became accepted intent.
-3. **Interprocedural allocator sinks and allocation-to-access evidence —
-   locally complete.** Add a versioned allocator-size parameter relation to
-   function summaries and propagate only exact, visible parameter-to-size flows through
-   the existing SCC, indirect-target, persistence, and conservative-merge
-   paths. The allocation rule may consume only a proven sink parameter;
-   bodyless, conflicting, transformed, or unknown flows stay silent. Attach
-   access trace evidence only when an exact local allocation result is later
-   indexed or used by a bounded memory-access call with the same declared
-   untrusted origin; absence of access evidence does not replace the existing
-   wrap proof. Pin and replay the relevant LVGL example. The exact slice file
-   set is `src/engine/FunctionSummary.{h,cpp}`,
-   `src/engine/SummaryDiff.cpp`,
-   `src/rules/AllocSizeOverflowRule.{h,cpp}`,
-   `tests/AllocSizeOverflowRuleTest.cpp`, `tests/InterproceduralTest.cpp`,
-   `tests/SummaryDiffTest.cpp`, `tests/CapabilitiesCliTest.py`, this TODO, and
-   `docs/devlog/changelog.md`. `PLAN.md`, the shared interval engine,
-   contract grammar, capability registry/tier, configuration, and accepted
-   model channels remain unchanged. RED was recorded as 8 failures in the
-   initial 11-case matrix; the expanded pointer-reassignment and uninvoked-
-   lambda precision controls were each independently RED before their fixes.
-   Gates: focused 51/51; direct and CTest 1063/1063; exact CLI wrapper 1 report
-   / guarded twin 0; exact access fixture 1 report with one trace note; pinned
-   LVGL v9.2.2 replay 1 report at `lv_binfont_loader.c:511:72`; capability CLI
-   schema 2 / 14 rules / 7 supported with alloc-size-overflow still
-   experimental and non-blocking; frozen thesis `clean_fp=0` and
-   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
-   Shadow counts are proposals 2, eligible 0, rejected 2, unsupported 40;
-   Linux CI classified both proposals as `contract-unsupported`, so they were
-   removed and no candidate remains for human review. Neither became accepted
-   intent.
+1. **Exact local alias lifetime — boundary locked before implementation.**
+   Replace the flow-insensitive alias-free suppression with a per-disjunct,
+   exact local pointer-binding relation. A free through an unchanged exact
+   alias must update the allocation owner so later dereference or release
+   through any still-exact alias reports UAF or double-free. Direct
+   reassignment invalidates only the overwritten binding; branch-conflicting,
+   non-local, address-exposed, cast-changing, field, heap, and unknown aliases
+   remain unproven and cannot create a finding. Reusing an alias for a second
+   allocation must no longer hide a first-allocation leak. This development
+   contract is stored here, separately from production code, and must not be
+   changed during the slice. The exact file set is
+   `src/rules/MemoryLeakRule_Ex.cpp`,
+   `tests/MemoryLeakRuleExTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. `PLAN.md`, shared dataflow/guard engines,
+   contract grammar, capability tiers, configuration, summary schemas, and
+   accepted model channels remain unchanged.
 
-Phase 6 exits only when guarded cases are silent, unknown values remain
-reportless, real-repository examples are pinned, and the full local/CI
-referees pass without weakening existing floors.
+   Contract-first shadow pre-screen: the critical binding, root-resolution,
+   merge, release, dereference, and exit decisions all express native pointer
+   identity/alias/heap lifetime semantics that the current verifier cannot
+   prove. Dogfood is therefore not applicable: proposals 0, eligible 0,
+   rejected 0, unsupported 6. No proof-bearing contract is invented; no
+   `cs: ai` proposal can become accepted intent. The executable A7 RED fixtures
+   and ordinary tests are the referee for this slice.
+2. **`realloc` success/failure paths — pending.** Preserve the original
+   allocation on failure, transfer lifetime on success, and cover direct,
+   temporary, overwrite, `reallocarray`, null-input, zero-size, guarded, and
+   unknown outcomes without treating possible release as definite.
+3. **Custom allocator/deallocator pairs — pending.** Move beyond independent
+   name lists to exact configured families and validate mismatch, wrapper,
+   indirect-summary, and conservative unknown-target behavior.
+4. **RAII and smart pointers — pending.** Model exact adoption, release,
+   reset, move, and destruction paths for supported standard owners while
+   keeping project wrappers explicitly configured and non-owning views silent.
+5. **Escape, ownership transfer, and exceptional exits — pending.** Complete
+   exact local/member/summary transfers and admitted cleanup or exceptional
+   exits, then pin real-repository and Juliet deltas.
+
+Phase 7 exits only when addressable UAF/double-free/leak recall rises,
+`memory-leak` precision remains at least 0.85 (target 0.90), supported UAF and
+double-free precision floors remain at least 0.95, clean corpora stay clean,
+and every local/CI referee passes without weakening an existing floor.
 
 ## Açık kullanıcı kararları
 
@@ -131,8 +106,8 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-The former alloc-size v2 and sign-conversion v2 entries are now owned by the
-active Phase 6 slices above; there is no separate unowned item.
+The Phase 7 lifetime-v2 requirements are owned by the five active slices
+above; there is no separate unowned lifetime item.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
