@@ -285,9 +285,66 @@ independently measurable RED-to-GREEN slices:
    contracts requiring later human review: none. No `cs: ai` proposal became
    accepted intent, and native owned-memory parity remains deferred to
    executable A7 fixtures.
-4. **RAII and smart pointers — pending.** Model exact adoption, release,
-   reset, move, and destruction paths for supported standard owners while
-   keeping project wrappers explicitly configured and non-owning views silent.
+4. **RAII and smart pointers — boundary locked before implementation.**
+   Replace the current adoption-only escape with an exact, opt-in local-owner
+   lifetime channel for supported standard smart pointers. The legacy
+   configured-wrapper behavior remains conservative and is not promoted into
+   native proof authority.
+
+   The locked development contract is separate from production code. Exact
+   owner state is limited to direct automatic local `std::unique_ptr`,
+   `std::shared_ptr`, and `std::auto_ptr` objects whose declaration and raw
+   allocation identity are visible in the same function and guarded
+   disjunct. Direct construction or `reset(raw)` may adopt only an exact
+   tracked local raw pointer with a compatible pointee type. `unique_ptr` and
+   `auto_ptr` have one exact owner; `shared_ptr` may have an exact local owner
+   set. Direct standard copy/move construction and assignment update that set:
+   shared copies retain the source, while moves and `auto_ptr` transfer it.
+   Replacing an owner releases its old object before acquiring the new one.
+
+   A direct `unique_ptr`/`auto_ptr` `release()` removes that owner without
+   freeing the allocation. If the result is captured in a compatible local raw
+   pointer, it becomes an exact alias of the allocation; ignored release still
+   leaves the allocation live and leak-reportable. Direct `reset()` and an
+   automatic-object destructor remove one owner and prove a release only when
+   that was the last exact owner. A raw alias used after that release may prove
+   UAF, and another exact raw or owner release may prove double-free. A direct
+   `get()` result captured in a compatible local raw pointer may become an
+   exact non-owning alias. Normal scope exit and return cleanup are admitted;
+   exceptional cleanup remains owned by Phase 7.5.
+
+   Exact custom allocator families are not silently matched to an implicit
+   smart-pointer deleter. Adoption of such a family, custom deleter arguments,
+   incompatible pointee conversions, aliasing `shared_ptr` constructors,
+   owner fields or heap objects, owner address exposure, references, lambdas,
+   indirect or ambiguous calls, derived lookalikes, unsupported owner methods,
+   conflicting owner paths, and unknown copy/move targets degrade to escape or
+   unknown. They cannot fabricate release, UAF, double-free, or a blocking
+   leak. Project owner wrappers still require `--owning-pointers` and retain
+   the existing conservative adoption escape; unconfigured wrappers and
+   non-owning views remain silent and leave genuine raw leaks visible.
+
+   Implicit destructor CFGs are requested only by analyses that expose the new
+   optional element hook. The normal cached CFG remains separately keyed and
+   byte-for-byte available to every existing statement-only consumer. The
+   exact file set is `src/engine/CfgCache.h`, `src/engine/CfgCache.cpp`,
+   `src/engine/DataflowEngine.h`, `src/rules/MemoryLeakRule_Ex.cpp`,
+   `tests/CfgCacheTest.cpp`, `tests/IntervalAnalysisTest.cpp`,
+   `tests/MemoryLeakRuleExTest.cpp`, `docs/usage.md`, this TODO, and
+   `docs/devlog/changelog.md`. Configuration, allocator-pair syntax, contract
+   grammar, capability tiers, accepted model channels, summary schema,
+   profiles, and quality floors remain unchanged.
+
+   Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+   `standardOwnerKind`, `ownerOperation`, `applyOwnerOperation`,
+   `MemoryFlow::transferElement`, and `MemoryFlow::onCFGElement`. Template/CFG
+   event dispatch, Clang declaration identity, native pointer aliasing, smart
+   ownership, and heap lifetime are outside the current verifier, so dogfood
+   is not applicable: proposals 0, eligible 0, rejected 0, unsupported 7.
+   Candidate contracts requiring human review: none. No proof-bearing contract
+   is invented and no `cs: ai` proposal can become accepted intent.
+   Executable A7 RED fixtures and ordinary tests are the referee; this
+   pre-implementation contract record will not change during the slice.
 5. **Escape, ownership transfer, and exceptional exits — pending.** Complete
    exact local/member/summary transfers and admitted cleanup or exceptional
    exits, then pin real-repository and Juliet deltas.

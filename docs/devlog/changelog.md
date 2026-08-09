@@ -1,5 +1,59 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7.4 RAII lifetime boundary and contract record
+
+Phase 7.3 is sealed in commit `3aeb20e6926544056e3382f77e761c7a3f203479`
+and published in draft PR #134. The next independently measurable slice is
+restricted to exact local standard smart-owner lifetimes; allocator-family
+semantics and the prior raw alias/realloc slices are not reopened.
+
+The pre-implementation audit confirmed that the existing smart-pointer helper
+only converts a tracked raw allocation to `Escaped` at construction. It
+suppresses known adoption false positives but carries no owner identity and
+cannot model `release`, `reset`, copy/move, last-owner destruction, UAF, or
+double-free. The shared dataflow engine also deliberately visits only
+`CFGStmt`, so Clang automatic-object destructor elements are currently absent
+from every analysis transition.
+
+The locked contract is recorded separately in `docs/TODO.md`. Direct automatic
+local `std::unique_ptr`, `std::shared_ptr`, and `std::auto_ptr` objects may hold
+an exact per-disjunct raw allocation relation. Compatible direct construction,
+`reset`, `release`, `get`, standard copy/move, replacement, normal scope exit,
+and return cleanup update that relation. Exclusive owners transfer; shared
+copies retain a set; only the last exact reset/destructor proves release.
+Captured release/get results may form exact local raw aliases. Proven release
+may support later UAF/double-free, while a released live allocation remains
+leak-reportable.
+
+Custom allocator families never inherit an implicit deleter match. Custom
+deleters, conversions, aliasing constructors, fields/heap owners, exposure,
+references, lambdas, indirect/ambiguous targets, lookalikes, unsupported
+methods, and conflicts remain non-authoritative. Configured project wrappers
+retain their existing conservative adoption escape and must still be named by
+`--owning-pointers`; unconfigured wrappers and non-owning views do not suppress
+raw leaks. Exceptional cleanup remains Phase 7.5 work.
+
+Only an analysis exposing the optional CFG-element hook requests a separately
+cached implicit-destructor CFG; statement-only consumers retain the existing
+cache key and path. The exact file boundary is `src/engine/CfgCache.h`,
+`src/engine/CfgCache.cpp`, `src/engine/DataflowEngine.h`,
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/CfgCacheTest.cpp`,
+`tests/IntervalAnalysisTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+`docs/usage.md`, `docs/TODO.md`, and this changelog. Configuration,
+allocator-pair syntax, contract grammar, capabilities, accepted model
+channels, summary schema, profiles, and quality floors remain unchanged.
+
+Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+`standardOwnerKind`, `ownerOperation`, `applyOwnerOperation`,
+`MemoryFlow::transferElement`, and `MemoryFlow::onCFGElement`. Current verifier
+semantics cannot prove template/CFG event dispatch, Clang declaration
+identity, native pointer aliasing, smart ownership, or heap lifetime, so
+dogfood is not applicable: proposals 0, eligible 0, rejected 0, unsupported 7.
+Candidate contracts requiring later human review: none. No proof-bearing
+contract was invented and no `cs: ai` proposal became accepted intent.
+Executable A7 RED fixtures and ordinary tests are the referee; this contract
+record will not change during Phase 7.4.
+
 ## 2026-08-09 — Phase 7.3 exact custom allocator families
 
 CodeSkeptic now accepts atomic, fail-closed custom allocation families through
