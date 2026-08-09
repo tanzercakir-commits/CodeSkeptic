@@ -37,6 +37,11 @@ namespace codeskeptic {
 // operand-corner proof: one side must be a finite constant and the other
 // a declared untrusted unsigned value. The operands are widened to 128
 // bits for the mathematical comparison; runtime/unknown factors remain
+// silent. Phase 6.2 preserves the exact modulo corner through stable local
+// signed-to-unsigned casts and aliases, including narrowing conversions. It
+// also tracks compiler checked-multiply outputs: a proven no-overflow edge is
+// silent, while an unchecked/overflow-edge result needs the same finite
+// corner proof. Reassigned, escaped, or otherwise unstable relations remain
 // silent. Sub-64 arithmetic continues to use the shared int64 interval.
 class AllocSizeOverflowRule : public Rule {
 public:

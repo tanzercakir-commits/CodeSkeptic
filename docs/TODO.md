@@ -67,10 +67,25 @@ independently measurable RED-to-GREEN slices:
    `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
    Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 6;
    no `cs: ai` proposal became accepted intent.
-2. **Checked arithmetic and signed/unsigned chains — pending.** Recognize
-   established checked-multiply idioms and retain precision through explicit
-   signed/unsigned conversion chains. Its exact file boundary will be
-   declared before implementation.
+2. **Checked arithmetic and signed/unsigned chains — locally complete.**
+   Preserve the
+   exact reachable upper corner through stable, local signed-to-unsigned cast
+   and alias chains, including narrowing conversions. Recognize the
+   Clang/GCC `__builtin_*mul*_overflow` family when its direct output variable
+   reaches an allocator: a proven no-overflow branch is silent, while an
+   ignored or overflow-path result reports only when the same finite-corner
+   proof establishes wrap. Unknown factors, unstable/reassigned chains,
+   non-allocator uses, and unproven relations stay silent. The exact slice
+   file set is `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+   `tests/AllocSizeOverflowRuleTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. The shared interval engine,
+   `SignConversionRule`, contract grammar, capability registry/tier,
+   configuration, and accepted models remain unchanged. Gates: RED 5/25;
+   focused 32/32; direct and CTest 1044/1044; exact CLI 1/0 for both the
+   signed-cast and checked-builtin unsafe/safe pairs; thesis `clean_fp=0` and
+   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
+   Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 50;
+   no `cs: ai` proposal became accepted intent.
 3. **Interprocedural allocator sinks and allocation-to-access evidence —
    pending.** Propagate a bounded allocator-size sink relation across visible
    calls, connect under-allocation to a proven access relation, and pin the

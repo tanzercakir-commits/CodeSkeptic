@@ -255,10 +255,10 @@ TEST(AllocSizeOverflowRuleTest, SizeT64NarrowOperandPromoted_Silent) {
     EXPECT_EQ(results.size(), 0u);
 }
 
-// Signed-to-unsigned conversion chains belong to the next Phase 6 slice.
-// The 64-bit unsigned-corner fallback must not treat a signed source as if
-// its declared domain were the full size_t range.
-TEST(AllocSizeOverflowRuleTest, SizeT64SignedSourceCast_NotThisSlice_Silent) {
+// A stable signed-to-unsigned chain retains its actual signed source range.
+// A full-range signed 64-bit source can reach both UINT64_MAX through -1 and
+// large positive corners, so multiplication by 16 provably wraps.
+TEST(AllocSizeOverflowRuleTest, SizeT64SignedSourceCast_Reports) {
     SourceScope scope({"read_signed"});
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
@@ -270,7 +270,8 @@ TEST(AllocSizeOverflowRuleTest, SizeT64SignedSourceCast_NotThisSlice_Silent) {
             return malloc((size_t)n * 16);
         }
     )");
-    EXPECT_EQ(results.size(), 0u);
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
 }
 
 // Multiplication by one cannot cross the result type's maximum.
@@ -284,6 +285,350 @@ TEST(AllocSizeOverflowRuleTest, SizeT64IdentityFactor_Silent) {
         void* f(void) {
             size_t n = read_size();
             return malloc(n * 1);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// A non-negative guard alone is not enough, but a factor-aware upper bound
+// proves the signed value safe before its unsigned conversion.
+TEST(AllocSizeOverflowRuleTest, SizeT64SignedSourceDivisionGuard_Silent) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long n = read_signed();
+            if (n < 0) return 0;
+            if ((size_t)n > ((size_t)-1) / 16) return 0;
+            return malloc((size_t)n * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// The signed origin remains visible through a stable unsigned local alias.
+TEST(AllocSizeOverflowRuleTest, SizeT64SignedAlias_Reports) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long raw = read_signed();
+            size_t count = (size_t)raw;
+            return malloc(count * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// Once a signed 32-bit source is proven non-negative, widening it to size_t
+// cannot make a 64-bit product by 16 wrap. The alias must retain that bound.
+TEST(AllocSizeOverflowRuleTest, SizeT64NonNegativeSigned32Alias_Silent) {
+    SourceScope scope({"read_signed32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern int read_signed32(void);
+        void* f(void) {
+            int raw = read_signed32();
+            size_t count = (size_t)raw;
+            if (raw < 0) return 0;
+            return malloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Bounds on the unchanged signed source remain valid after a stable alias was
+// formed; together they prove the aliased product safe.
+TEST(AllocSizeOverflowRuleTest, SizeT64SignedAliasGuarded_Silent) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long raw = read_signed();
+            size_t count = (size_t)raw;
+            if (raw < 0) return 0;
+            if ((size_t)raw > ((size_t)-1) / 16) return 0;
+            return malloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Ignoring the checked-multiply status still feeds the wrapped output to the
+// allocator. The finite untrusted corner proves that overflow is reachable.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowIgnored_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, (size_t)16, &bytes);
+            return malloc(bytes);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// The false edge of the builtin status proves that its output did not wrap.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowDirectCheck_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            if (__builtin_mul_overflow(n, (size_t)16, &bytes)) return 0;
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Saving the status in a stable local and rejecting true is equivalent to the
+// direct checked-multiply guard.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowStatusCheck_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            int overflow = __builtin_mul_overflow(n, (size_t)16, &bytes);
+            if (overflow) return 0;
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Using the builtin output on the true/overflow edge is an under-allocation.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowTrueBranch_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            if (__builtin_mul_overflow(n, (size_t)16, &bytes))
+                return malloc(bytes);
+            return 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A runtime factor supplies no finite multiplication witness.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowUnknownFactor_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        extern size_t runtime_factor(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, runtime_factor(), &bytes);
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// A later plain assignment kills the builtin-output relation.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowOutputReassigned_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, (size_t)16, &bytes);
+            bytes = 16;
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Checked arithmetic without an allocator consumer is outside this rule.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowNonAllocator_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        size_t f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, (size_t)16, &bytes);
+            return bytes;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Narrowing the signed source to uint32_t bounds the later size_t corner.
+TEST(AllocSizeOverflowRuleTest, NarrowedSignedCornerSmallFactor_Silent) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long raw = read_signed();
+            uint32_t narrowed = (uint32_t)raw;
+            return malloc((size_t)narrowed * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// The same exact uint32_t residue corner can still prove a 64-bit wrap when
+// the constant factor is large enough.
+TEST(AllocSizeOverflowRuleTest, NarrowedSignedCornerLargeFactor_Reports) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long raw = read_signed();
+            uint32_t narrowed = (uint32_t)raw;
+            return malloc((size_t)narrowed * 4294967298ULL);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A plain assignment chain has no stable single definition in this slice.
+TEST(AllocSizeOverflowRuleTest, UnstableSignedAlias_Silent) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long raw = read_signed();
+            size_t count = 0;
+            count = (size_t)raw;
+            return malloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Comparing a saved status with zero proves the same safe edge as `if (flag)`.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowEqualityCheck_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            int overflow = __builtin_mul_overflow(n, (size_t)16, &bytes);
+            if (overflow != 0) return 0;
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// An unknown callee may rewrite the output, so the exact builtin relation is
+// killed before the allocator and cannot support a report.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowOutputEscaped_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        extern void rewrite(size_t* value);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, (size_t)16, &bytes);
+            rewrite(&bytes);
+            return malloc(bytes);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// The fixed unsigned-long-long builtin uses the same checked-output contract.
+TEST(AllocSizeOverflowRuleTest, BuiltinUnsignedLongLongIgnored_Reports) {
+    SourceScope scope({"read_ull"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern unsigned long long read_ull(void);
+        void* f(void) {
+            unsigned long long n = read_ull();
+            unsigned long long bytes = 0;
+            (void)__builtin_umulll_overflow(n, 16ULL, &bytes);
+            return malloc((size_t)bytes);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A non-const C++ reference may rewrite the output just like an address escape.
+TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowReferenceEscaped_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        extern void rewrite(size_t& value);
+        void* f(void) {
+            size_t n = read_size();
+            size_t bytes = 0;
+            (void)__builtin_mul_overflow(n, (size_t)16, &bytes);
+            rewrite(bytes);
+            return malloc(bytes);
         }
     )");
     EXPECT_EQ(results.size(), 0u);

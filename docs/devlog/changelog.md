@@ -1,5 +1,57 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 6.2 checked allocation arithmetic
+
+The allocation-size rule now preserves an exact reachable upper corner
+through stable local signed-to-unsigned cast and alias chains, including
+narrowing conversions. It also recognizes the Clang/GCC
+`__builtin_*mul*_overflow` family when the direct output variable reaches an
+allocator. A proven no-overflow edge is silent; an ignored result or proven
+overflow edge reports only when the same finite-corner proof establishes
+wrap. Reassignment, address escape, writable-reference escape, unknown
+factors, non-allocator use, and unproven relations remain silent.
+
+RED was recorded before implementation: 5 of 25 focused cases failed exactly
+for the signed direct and alias paths and the ignored and overflow-edge
+builtin paths. Review corrected one fixture premise: an unguarded signed
+32-bit value can be negative and therefore can convert to `UINT64_MAX`; the
+safe fixture now proves non-negativity. The Clang AST also exposed an outer
+`NoOp` cast around the integral cast, which required a local, path-sensitive
+normalization rather than a shared interval-engine change. Writable-reference
+escape coverage closed the final stale-relation risk. The focused precision
+matrix is 32/32.
+
+The exact CLI smoke emits one experimental/report-only
+`alloc-size-overflow` diagnostic for each unsafe signed-cast and checked-
+builtin fixture and zero for each guarded twin; all exit 0. The tested binary
+SHA-256 is
+`7638041d48e2a8aff2dc00569b614ae2e5cc99a7b33b8e612751ba229fa81ec7`.
+Final local gates are direct suite 1044/1044, CTest 1044/1044, frozen thesis
+`clean_fp=0` and `bug_caught=9/15` with 11 total findings, clean 48/48-TU
+self-scan, cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly
+accepted broken fixtures), and tinyxml2 9 findings (3/3 analyzed). The exact
+slice file set is `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+`tests/AllocSizeOverflowRuleTest.cpp`, `docs/TODO.md`, and this changelog.
+The shared interval engine, `SignConversionRule`, contract grammar,
+capability registry/tier, configuration, and accepted models are unchanged.
+
+Contract-first shadow audit considered 50 new or materially changed
+production functions. The groups were direct/addressed-variable and builtin
+recognizers; `DefinitionIndex` construction, visitor callbacks, and signed-
+origin/range/corner proofs; size inventory collection; the rule-local
+`AllocIntervalAnalysis` adapter; `CheckedMulAnalysis` state, transfer, edge,
+widening, and observation methods; and `analyzeFunction`. Dogfood was not
+applicable because every candidate depends on Clang AST/type/CFG identity,
+APInt/APSInt or interval/container lattice state, or analyzer class context
+beyond the current deterministic contract referee. Counts: proposals 0,
+eligible 0, rejected 0, unsupported 50. No proposal exposed an implementation
+or assumption problem. Independent tests and AST review exposed the signed-
+32-bit fixture premise, cast normalization, and writable-reference
+invalidation issues above; all are closed. Candidate contracts requiring
+later human review: none. No `cs: ai` proposal became accepted intent. No
+native pointer, heap, alias, ownership, or lifetime verification semantics
+were added; those claims remain deferred to executable A7 fixtures.
+
 ## 2026-08-09 — Phase 6.1 exact 64-bit allocation-size corner proof
 
 The allocation-size rule now proves 64-bit unsigned multiplication wraps
