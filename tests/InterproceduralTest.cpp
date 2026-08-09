@@ -8,6 +8,7 @@
 
 #include "TestHelper.h"
 #include "engine/FunctionSummary.h"
+#include "rules/AllocSizeOverflowRule.h"
 #include "rules/DivByZeroRule.h"
 #include "rules/MemoryLeakRule_Ex.h"
 #include "rules/NullDerefRule.h"
@@ -810,10 +811,10 @@ TEST(SummaryPersistTest, FileFormat_RoundTripDeterministic) {
     // writes the newest ("-" when absent); loading old versions stays
     // accepted.
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v10\n"
-              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n"
-              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\tUU\tUC\tU\t?;?\n"
-              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n");
+              "codeskeptic-summaries v11\n"
+              "alpha/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n"
+              "beta/2\tM\tOF\tM\t-\t-\t-\t-\tOO\tUU\tUU\tUC\tU\t?;?\t??\n"
+              "gamma/0\tU\t-\tN\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
@@ -831,8 +832,8 @@ TEST(SummaryPersistTest, OldV1File_AcceptedZeronessUnknown) {
     auto outPath = ::testing::TempDir() + "sum_v1_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v10\n"
-              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "legacy/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n");
 }
 
 TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
@@ -854,8 +855,8 @@ TEST(SummaryPersistTest, ConflictingLoad_MergesConservative) {
     auto outPath = ::testing::TempDir() + "sum_conflict_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v10\n"
-              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "foo/1\tU\tO\tU\t-\t-\t-\t-\tO\tU\tU\tU\tU\t?\t?\n");
 }
 
 TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
@@ -898,8 +899,8 @@ TEST(SummaryPersistTest, CorruptFile_RejectedWhole) {
     auto outPath = ::testing::TempDir() + "sum_untouched_out.txt";
     ASSERT_TRUE(registry.saveGlobal(outPath));
     EXPECT_EQ(readWholeFile(outPath),
-              "codeskeptic-summaries v10\n"
-              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "keep/1\tN\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n");
 }
 
 TEST(SummaryPersistTest, MissingFile_ReturnsFalse) {
@@ -1431,7 +1432,7 @@ TEST(SummaryPersistTest, V5File_NullFromParamOnNonUnknown_Rejected) {
 
 // --- v6 persistence: exact always-zero return ---
 
-TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV10) {
+TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV11) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v6\n"
@@ -1447,8 +1448,8 @@ TEST(SummaryPersistTest, V6File_AlwaysZeroParsesAndUpgradesToV10) {
     auto out = ::testing::TempDir() + "sum_v6_always_zero_out.txt";
     ASSERT_TRUE(registry.saveGlobal(out));
     EXPECT_EQ(readWholeFile(out),
-              "codeskeptic-summaries v10\n"
-              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\n");
+              "codeskeptic-summaries v11\n"
+              "globalReturnsFalse/0\tU\t-\tZ\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-\n");
 }
 
 TEST(SummaryPersistTest, V5File_AlwaysZeroEncodingRejected) {
@@ -1554,22 +1555,22 @@ TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v11\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\n"),
+    EXPECT_NE(saved.find("direct/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\n"),
+    EXPECT_NE(saved.find("local_copy/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\n"),
+    EXPECT_NE(saved.find("chain/1\tU\tS\tU\t-\t-\t-\t0\tO\tU\tO\tB\tB\t?\tO\n"),
               std::string::npos);
     EXPECT_NE(saved.find(
-                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\tOU\tBU\tB\t?;?\n"),
+                  "same_on_both_paths/2\tU\tSO\tU\t-\t-\t0\t0\tOO\tUU\tOU\tBU\tB\t?;?\tOO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\tOOU\tBBU\tB\t?;?;?\n"),
+    EXPECT_NE(saved.find("mixed/3\tU\tSSO\tU\t-\t-\t-\t-\tOOO\tUUU\tOOU\tBBU\tB\t?;?;?\tOOO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("altered/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\tOU\tBU\tB\t?;?\n"),
+    EXPECT_NE(saved.find("alternate/2\tU\tSO\tU\t-\t-\t0\t-\tOO\tUU\tOU\tBU\tB\t?;?\tOO\n"),
               std::string::npos);
 
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
@@ -1583,7 +1584,7 @@ TEST(ReturnAliasSummaryTest, HarvestsExactRelationsAndRejectsMixedSources) {
     EXPECT_EQ(parsed["operator_chain/1"].returnAliasParam, 0);
 }
 
-TEST(ReturnAliasSummaryTest, V7FileUpgradesToV10Exactly) {
+TEST(ReturnAliasSummaryTest, V7FileUpgradesToV11Exactly) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v7\n"
@@ -1601,9 +1602,9 @@ TEST(ReturnAliasSummaryTest, V7FileUpgradesToV10Exactly) {
     auto output = ::testing::TempDir() + "sum_v7_return_alias_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
     EXPECT_EQ(readWholeFile(output),
-              "codeskeptic-summaries v10\n"
-              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tU\tT\tU\t?\n"
-              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "identity/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tU\tT\tU\t?\t?\n"
+              "plain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n");
 }
 
 TEST(ReturnAliasSummaryTest, V6FileWithV7ColumnIsRejected) {
@@ -1674,19 +1675,19 @@ TEST(ParamContractSummaryTest, HarvestsPreAndPostconditionsExactly) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v11\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\tW\tB\tU\t?\n"),
-              std::string::npos);
-    EXPECT_NE(saved.find(
-                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\t?;?\n"),
+    EXPECT_NE(saved.find("reject/1\tU\tR\tU\t-\t-\t-\t-\tR\tU\tW\tB\tU\t?\tO\n"),
               std::string::npos);
     EXPECT_NE(saved.find(
-                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
+                  "maybe_bind/2\tU\tRO\tU\t-\t-\t-\t-\tOO\tUU\tWU\tBU\tU\t?;?\tOO\n"),
+              std::string::npos);
+    EXPECT_NE(saved.find(
+                  "alias_overwrite/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\tO\n"),
               std::string::npos);
 }
 
@@ -1714,9 +1715,9 @@ TEST(ParamContractSummaryTest, V9FileRoundTripsAndValidatesVectors) {
     auto output = ::testing::TempDir() + "sum_v9_param_contracts_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
     EXPECT_EQ(readWholeFile(output),
-              "codeskeptic-summaries v10\n"
-              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\n"
-              "consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tW\tB\tU\t?\t?\n"
+              "consume/1\tU\tR\tU\t-\t-\t-\t-\tC\tU\tW\tB\tU\t?\t?\n");
 
     auto badLength = writePersistFile(
         "sum_v9_bad_param_length.txt",
@@ -1740,7 +1741,7 @@ TEST(ParamContractSummaryTest, V9FileRoundTripsAndValidatesVectors) {
     EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badOwnership, parsed));
 }
 
-TEST(ParamContractSummaryTest, V8FileUpgradesToV10Conservatively) {
+TEST(ParamContractSummaryTest, V8FileUpgradesToV11Conservatively) {
     GlobalStoreGuard guard;
     const std::string content =
         "codeskeptic-summaries v8\n"
@@ -1761,8 +1762,8 @@ TEST(ParamContractSummaryTest, V8FileUpgradesToV10Conservatively) {
     auto output = ::testing::TempDir() + "sum_v8_ownership_upgrade_out.txt";
     ASSERT_TRUE(registry.saveGlobal(output));
     EXPECT_EQ(readWholeFile(output),
-              "codeskeptic-summaries v10\n"
-              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tU\tB\tU\t?\n");
+              "codeskeptic-summaries v11\n"
+              "bind/1\tU\tR\tU\t-\t-\t-\t-\tO\tN\tU\tB\tU\t?\t?\n");
 }
 TEST(ParamContractSummaryTest, V8HeaderRejectsV9Columns) {
     GlobalStoreGuard guard;
@@ -2009,29 +2010,29 @@ TEST(OwnershipSummaryTest, HarvestsAccessOwnershipAndOwnedReturns) {
     }
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v11\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("read_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("write_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("write_value/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_write/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tB\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("read_write/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tB\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("untouched/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("untouched/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tO\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("read_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("read_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tR\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("write_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\n"),
+    EXPECT_NE(saved.find("write_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("consume/1\tU\tF\tU\t-\t-\t-\t-\tO\tU\tO\tC\tU\t?\n"),
+    EXPECT_NE(saved.find("consume/1\tU\tF\tU\t-\t-\t-\t-\tO\tU\tO\tC\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("transfer/1\tU\tS\tU\t-\t-\t-\t-\tO\tU\tO\tT\tU\t?\n"),
+    EXPECT_NE(saved.find("transfer/1\tU\tS\tU\t-\t-\t-\t-\tO\tU\tO\tT\tU\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("borrow/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\n"),
+    EXPECT_NE(saved.find("borrow/1\tU\tS\tU\t-\t-\t0\t0\tO\tU\tO\tB\tB\t?\tO\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("make_owned/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\n"),
+    EXPECT_NE(saved.find("make_owned/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\t-\n"),
               std::string::npos);
-    EXPECT_NE(saved.find("make_owned_chain/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\n"),
+    EXPECT_NE(saved.find("make_owned_chain/0\tN\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tO\t-\t-\n"),
               std::string::npos);
 
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
@@ -2348,10 +2349,10 @@ TEST(FieldSensitivitySummaryTest, HarvestsComposesAndPersistsExactWrites) {
     EXPECT_EQ(parsed["pass_opaque/1"].exactParamFieldWrites(0), nullptr);
 
     const std::string saved = readWholeFile(summaryPath);
-    EXPECT_NE(saved.find("codeskeptic-summaries v10\n"),
+    EXPECT_NE(saved.find("codeskeptic-summaries v11\n"),
               std::string::npos);
     EXPECT_NE(saved.find(
-        "touch_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother\n"),
+        "touch_chain/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tW\tB\tU\tother\tO\n"),
         std::string::npos);
 }
 
@@ -3036,4 +3037,108 @@ TEST(LibraryModelFileTest, ModelAndHarvestedSummaryMergeConservatively) {
     EXPECT_FALSE(result.summary_stale);
     EXPECT_EQ(result.exitCode(), 0);
     EXPECT_TRUE(analyzer.diagnostics().empty());
+}
+
+// Phase 6.3 disk contract: allocator-size sink parameters are persisted in
+// v11 so an incremental caller-only run observes the same relation.
+TEST(AllocatorSizeSummaryTest, PersistsV11AllocatorSizeParameter) {
+    GlobalStoreGuard guard;
+    auto source = writePersistFile("alloc_sink_summary.cpp", R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+    )");
+    auto summaryPath = ::testing::TempDir() + "alloc_sink_summary.csk";
+    {
+        Config config;
+        config.setSourcePath(source);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<AllocSizeOverflowRule>();
+        analyzer.run();
+    }
+
+    const std::string saved = readWholeFile(summaryPath);
+    EXPECT_EQ(saved.find("codeskeptic-summaries v11\n"), 0u);
+    const size_t wrapper = saved.find("alloc_bytes/1\t");
+    ASSERT_NE(wrapper, std::string::npos);
+    EXPECT_NE(saved.find("\tS\n", wrapper), std::string::npos);
+}
+
+// A v10 file has no allocator-size column. Upgrading must preserve that as
+// unknown/non-authoritative, never invent a sink.
+TEST(AllocatorSizeSummaryTest, V10UpgradesAllocatorSizeToUnknown) {
+    GlobalStoreGuard guard;
+    auto input = writePersistFile(
+        "alloc_sink_v10.csk",
+        "codeskeptic-summaries v10\n"
+        "legacy_alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\n");
+    auto &registry = SummaryRegistry::instance();
+    ASSERT_TRUE(registry.loadGlobal(input));
+
+    auto output = ::testing::TempDir() + "alloc_sink_v11.csk";
+    ASSERT_TRUE(registry.saveGlobal(output));
+    EXPECT_EQ(readWholeFile(output),
+              "codeskeptic-summaries v11\n"
+              "legacy_alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n");
+}
+// Persisted v11 evidence must drive a caller-only incremental analysis, not
+// merely round-trip as inert text.
+TEST(AllocatorSizeSummaryTest, SummaryInReportsCallerOnlyWrapperUse) {
+    GlobalStoreGuard guard;
+    auto callee = writePersistFile("alloc_sink_reload_callee.cpp", R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+    )");
+    auto caller = writePersistFile("alloc_sink_reload_caller.cpp", R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t);
+        void* caller(void) {
+            size_t count = read_size();
+            return alloc_bytes(count * 16);
+        }
+    )");
+    auto configPath = writePersistFile("alloc_sink_reload.conf",
+                                       "untrusted_int_sources = read_size\n");
+    auto summaryPath = ::testing::TempDir() + "alloc_sink_reload.csk";
+
+    {
+        Config config;
+        ASSERT_TRUE(config.loadFromFile(configPath));
+        config.setSourcePath(callee);
+        config.setSummaryOut(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<AllocSizeOverflowRule>();
+        EXPECT_EQ(analyzer.run().exitCode(), 0);
+    }
+    {
+        Config config;
+        ASSERT_TRUE(config.loadFromFile(configPath));
+        config.setSourcePath(caller);
+        config.setSummaryIn(summaryPath);
+        StaticAnalyzer analyzer(std::move(config));
+        analyzer.addRule<AllocSizeOverflowRule>();
+        EXPECT_EQ(analyzer.run().exitCode(), 0);
+        ASSERT_EQ(analyzer.diagnostics().size(), 1u);
+        EXPECT_EQ(analyzer.diagnostics()[0].rule_id, "alloc-size-overflow");
+    }
+}
+
+// v11 is strict: wrong vector width or an unknown code rejects the whole file.
+TEST(AllocatorSizeSummaryTest, V11RejectsMalformedAllocatorSizeVector) {
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    auto badWidth = writePersistFile(
+        "alloc_sink_v11_bad_width.csk",
+        "codeskeptic-summaries v11\n"
+        "bad/2	U	RO	U	-	-	-	-	"
+        "OO	UU	UU	BB	U	?;?	S\n");
+    auto badCode = writePersistFile(
+        "alloc_sink_v11_bad_code.csk",
+        "codeskeptic-summaries v11\n"
+        "bad/1	U	R	U	-	-	-	-	"
+        "O	U	U	B	U	?	X\n");
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badWidth, parsed));
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(badCode, parsed));
 }

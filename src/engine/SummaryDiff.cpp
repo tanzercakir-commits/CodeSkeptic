@@ -14,6 +14,7 @@ using PA = codeskeptic::SummaryRegistry::ParamAccess;
 using PO = codeskeptic::SummaryRegistry::ParamOwnership;
 using PPre = codeskeptic::SummaryRegistry::ParamPrecondition;
 using PPost = codeskeptic::SummaryRegistry::ParamPostcondition;
+using PAS = codeskeptic::SummaryRegistry::ParamAllocatorSize;
 using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 
@@ -93,6 +94,15 @@ const char* postName(PPost v) {
     return "Unknown";
 }
 
+const char* allocatorSizeName(PAS value) {
+    switch (value) {
+        case PAS::None: return "None";
+        case PAS::Sink: return "Sink";
+        case PAS::Unknown: break;
+    }
+    return "Unknown";
+}
+
 std::string aliasName(int v) {
     return v < 0 ? "none" : "param#" + std::to_string(v);
 }
@@ -108,6 +118,7 @@ bool rzStrong(RZ v) {
 bool peStrong(PE v) { return v == PE::ReadsOnly || v == PE::Frees; }
 bool accessStrong(PA value) { return value != PA::Unknown; }
 bool ownershipStrong(PO value) { return value != PO::Unknown; }
+bool allocatorSizeStrong(PAS value) { return value == PAS::Sink; }
 bool aliasStrong(int v) { return v >= 0; }
 
 struct FieldVerdict {
@@ -249,7 +260,9 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
              newSum.paramPostconditions.size(), oldSum.paramAccesses.size(),
              newSum.paramAccesses.size(), oldSum.paramOwnerships.size(),
              newSum.paramOwnerships.size(), oldSum.paramFieldWrites.size(),
-             newSum.paramFieldWrites.size()});
+             newSum.paramFieldWrites.size(),
+             oldSum.paramAllocatorSizes.size(),
+             newSum.paramAllocatorSizes.size()});
         for (size_t i = 0; i < numParams; ++i) {
             classifyField(oldSum.paramEffect(static_cast<unsigned>(i)),
                           newSum.paramEffect(static_cast<unsigned>(i)),
@@ -279,6 +292,12 @@ SummaryDiffResult diffSummaries(const SummaryMap& oldMap,
             classifyFieldWrites(
                 oldSum, newSum, static_cast<unsigned>(i),
                 "param#" + std::to_string(i) + ".fieldWrites", verdict,
+                detail);
+            classifyField(
+                oldSum.paramAllocatorSize(static_cast<unsigned>(i)),
+                newSum.paramAllocatorSize(static_cast<unsigned>(i)),
+                allocatorSizeStrong, allocatorSizeName,
+                "param#" + std::to_string(i) + ".allocatorSize", verdict,
                 detail);
         }
 
