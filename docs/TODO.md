@@ -87,7 +87,9 @@ into measurable RED-to-GREEN slices pending its PR gates and merge:
    snapshot gaps. RED was 3/39; GREEN is 42/42. The final clean run has zero
    descriptor findings, while three independent load-bearing close mutations
    produce exactly 3 TP / 0 FP: precision 1.000 and mutation recall 3/3.
-   `resource-leak` is now supported, quality-gated, and blocking. Final local
+   `resource-leak` is now supported, quality-gated, and blocking. The
+   end-to-end capability CLI contract pins all seven supported rules.
+   Final local
    gates are focused 45/45, direct and CTest 1019/1019, thesis
    `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan, cJSON 54,
    and tinyxml2 9.

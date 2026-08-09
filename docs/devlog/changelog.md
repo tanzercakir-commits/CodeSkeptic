@@ -1,5 +1,13 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 5.3 capability CLI contract sync
+
+The full GitHub Actions run correctly rejected the promoted capability because
+the end-to-end CLI fixture still pinned six supported rules. The Phase 5.3 file
+boundary was explicitly expanded to include `tests/CapabilitiesCliTest.py`;
+its exact supported set and receipt now cover all seven supported rules. This
+fixture-only correction changes no production code or accepted specification.
+
 ## 2026-08-08 — Phase 5.3 pinned libarchive validation and promotion
 
 Phase 5 closed against the pinned libarchive v3.8.9 tag object
@@ -62,7 +70,8 @@ fixtures), and tinyxml2 9 findings (3/3 analyzed). The exact Phase 5.3 file
 set is `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
 `src/core/RuleCapabilities.def`, `tests/CapabilitiesTest.cpp`,
 `tests/MemoryLeakRuleExTest.cpp`, `README.md`, `docs/capabilities.md`,
-`docs/TODO.md`, and this changelog; `PLAN.md` remains unchanged.
+`tests/CapabilitiesCliTest.py`, `docs/TODO.md`, and this changelog; `PLAN.md`
+remains unchanged.
 
 Contract-first shadow audit considered 15 new or materially changed
 production functions: `State::operator==`, `mergeStates`,
