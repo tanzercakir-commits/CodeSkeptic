@@ -49,6 +49,8 @@ using ParamAccess = codeskeptic::SummaryRegistry::ParamAccess;
 using ParamOwnership = codeskeptic::SummaryRegistry::ParamOwnership;
 using ParamPrecondition = codeskeptic::SummaryRegistry::ParamPrecondition;
 using ParamPostcondition = codeskeptic::SummaryRegistry::ParamPostcondition;
+using ParamAllocatorSize =
+    codeskeptic::SummaryRegistry::ParamAllocatorSize;
 using FieldWriteSet = codeskeptic::SummaryRegistry::FieldWriteSet;
 using FunctionSummary = codeskeptic::SummaryRegistry::FunctionSummary;
 using SummaryTable = std::map<const FunctionDecl*, FunctionSummary>;
@@ -3308,6 +3310,81 @@ private:
     std::vector<std::vector<FunctionNode>> components_;
 };
 
+const ParmVarDecl* exactIntegerParam(const Expr* expr, ASTContext& ctx) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParens();
+    while (const auto* cast = dyn_cast<CastExpr>(expr)) {
+        const Expr* sub = cast->getSubExpr()->IgnoreParens();
+        const CastKind kind = cast->getCastKind();
+        bool exact = kind == CK_LValueToRValue || kind == CK_NoOp;
+        if (kind == CK_IntegralCast && cast->getType()->isIntegerType() &&
+            sub->getType()->isIntegerType()) {
+            exact = ctx.getIntWidth(cast->getType()) ==
+                        ctx.getIntWidth(sub->getType()) &&
+                    cast->getType()->isSignedIntegerType() ==
+                        sub->getType()->isSignedIntegerType();
+        }
+        if (!exact) return nullptr;
+        expr = sub;
+    }
+    const auto* reference = dyn_cast<DeclRefExpr>(expr);
+    const auto* param =
+        reference ? dyn_cast<ParmVarDecl>(reference->getDecl()) : nullptr;
+    return param && param->getType()->isIntegerType() ? param : nullptr;
+}
+
+std::vector<ParamAllocatorSize> computeParamAllocatorSizes(
+        const FunctionDecl* func, ASTContext& ctx,
+        const SummaryTable& previous) {
+    std::vector<ParamAllocatorSize> result(
+        func->getNumParams(), ParamAllocatorSize::None);
+    std::map<const ParmVarDecl*, unsigned> indexes;
+    for (unsigned i = 0; i < func->getNumParams(); ++i)
+        indexes[func->getParamDecl(i)] = i;
+
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        ASTContext& ctx;
+        const SummaryTable& previous;
+        const std::map<const ParmVarDecl*, unsigned>& indexes;
+        std::vector<ParamAllocatorSize>& result;
+
+        Visitor(
+            ASTContext& context, const SummaryTable& summaries,
+            const std::map<const ParmVarDecl*, unsigned>& paramIndexes,
+            std::vector<ParamAllocatorSize>& relations)
+            : ctx(context), previous(summaries), indexes(paramIndexes),
+              result(relations) {}
+
+        void mark(const Expr* expr) {
+            const ParmVarDecl* param = exactIntegerParam(expr, ctx);
+            auto found = indexes.find(param);
+            if (found != indexes.end())
+                result[found->second] = ParamAllocatorSize::Sink;
+        }
+
+        bool VisitCallExpr(CallExpr* call) {
+            if (codeskeptic::isAllocatorCall(call)) {
+                for (const Expr* argument : call->arguments())
+                    mark(argument);
+                return true;
+            }
+
+            auto summary = lookupPrev(previous, call);
+            if (!summary) return true;
+            for (unsigned i = 0; i < call->getNumArgs(); ++i)
+                if (summary->paramAllocatorSize(i) ==
+                    ParamAllocatorSize::Sink)
+                    mark(call->getArg(i));
+            return true;
+        }
+
+        // cs:ai ensures return != 0
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } visitor{ctx, previous, indexes, result};
+    visitor.TraverseStmt(const_cast<Stmt*>(func->getBody()));
+    return result;
+}
+
 FunctionSummary summarizeFunction(const FunctionDecl* func, ASTContext& ctx,
                                   const SummaryTable& previous) {
     FunctionSummary summary;
@@ -3333,6 +3410,8 @@ FunctionSummary summarizeFunction(const FunctionDecl* func, ASTContext& ctx,
     summary.paramPreconditions = computeParamPreconditions(func, ctx);
     summary.paramPostconditions =
         computeParamPostconditions(func, ctx, previous);
+    summary.paramAllocatorSizes =
+        computeParamAllocatorSizes(func, ctx, previous);
     summary.returnAliasParam = computeReturnAliasParam(func, ctx, previous);
 
     if (summary.returnNullness == ReturnNullness::MaybeNull) {
@@ -3361,7 +3440,8 @@ bool sameSummary(const FunctionSummary& lhs, const FunctionSummary& rhs) {
            lhs.paramOwnerships == rhs.paramOwnerships &&
            lhs.paramFieldWrites == rhs.paramFieldWrites &&
            lhs.paramPreconditions == rhs.paramPreconditions &&
-           lhs.paramPostconditions == rhs.paramPostconditions;
+           lhs.paramPostconditions == rhs.paramPostconditions &&
+           lhs.paramAllocatorSizes == rhs.paramAllocatorSizes;
 }
 
 bool sameComponent(const std::vector<FunctionNode>& component,
@@ -3517,6 +3597,7 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
     using PO = SummaryRegistry::ParamOwnership;
     using PPre = SummaryRegistry::ParamPrecondition;
     using PPost = SummaryRegistry::ParamPostcondition;
+    using PAS = SummaryRegistry::ParamAllocatorSize;
     if (into.returnNullness != from.returnNullness)
         into.returnNullness = RN::Unknown;
     // A conditioned claim survives a merge only when BOTH sides carry
@@ -3594,6 +3675,15 @@ void mergeConservative(SummaryRegistry::FunctionSummary& into,
         for (size_t i = 0; i < into.paramPostconditions.size(); ++i)
             if (into.paramPostconditions[i] != from.paramPostconditions[i])
                 into.paramPostconditions[i] = PPost::Unknown;
+    }
+    if (into.paramAllocatorSizes.size() !=
+        from.paramAllocatorSizes.size()) {
+        into.paramAllocatorSizes.clear();
+    } else {
+        for (size_t i = 0; i < into.paramAllocatorSizes.size(); ++i)
+            if (into.paramAllocatorSizes[i] !=
+                from.paramAllocatorSizes[i])
+                into.paramAllocatorSizes[i] = PAS::Unknown;
     }
 }
 
@@ -3681,7 +3771,8 @@ namespace {
 // v1 (legacy): no last column — recognized on load, zeroness stays Unknown.
 // Returns: U/Z/N/M; params are a char string of O/R/F/S, empty vector "-".
 // Qualified names cannot contain TAB/newline — the key is safe.
-constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v10";
+constexpr const char* kSummaryFileHeader = "codeskeptic-summaries v11";
+constexpr const char* kSummaryFileHeaderV10 = "codeskeptic-summaries v10";
 constexpr const char* kSummaryFileHeaderV9 = "codeskeptic-summaries v9";
 constexpr const char* kSummaryFileHeaderV8 = "codeskeptic-summaries v8";
 constexpr const char* kSummaryFileHeaderV7 = "codeskeptic-summaries v7";
@@ -3845,6 +3936,25 @@ bool ownershipFromChar(char c, ParamOwnership& out) {
     return false;
 }
 
+// cs:ai ensures return != 0
+char allocatorSizeToChar(ParamAllocatorSize value) {
+    switch (value) {
+        case ParamAllocatorSize::None: return 'O';
+        case ParamAllocatorSize::Sink: return 'S';
+        case ParamAllocatorSize::Unknown: break;
+    }
+    return '?';
+}
+
+bool allocatorSizeFromChar(char c, ParamAllocatorSize& out) {
+    switch (c) {
+        case '?': out = ParamAllocatorSize::Unknown; return true;
+        case 'O': out = ParamAllocatorSize::None; return true;
+        case 'S': out = ParamAllocatorSize::Sink; return true;
+    }
+    return false;
+}
+
 template <typename Value, typename ToChar>
 void writeParamVector(std::ostream& out, size_t count, ToChar toChar,
                       const std::vector<Value>& values, Value fallback) {
@@ -3970,6 +4080,12 @@ bool SummaryRegistry::saveGlobal(const std::string& path) const {
         out << '\t';
         writeFieldWriteVector(out, summary.params.size(),
                               summary.paramFieldWrites);
+        // v11: exact unchanged parameter-to-allocator-size relation.
+        out << '\t';
+        writeParamVector(out, summary.params.size(),
+                         allocatorSizeToChar,
+                         summary.paramAllocatorSizes,
+                         ParamAllocatorSize::Unknown);
         out << '\n';
     }
     return out.good();
@@ -3984,7 +4100,8 @@ bool SummaryRegistry::parseSummaryFile(
     std::string line;
     if (!std::getline(in, line)) return false;
     int version = 0;
-    if (line == kSummaryFileHeader) version = 10;
+    if (line == kSummaryFileHeader) version = 11;
+    else if (line == kSummaryFileHeaderV10) version = 10;
     else if (line == kSummaryFileHeaderV9) version = 9;
     else if (line == kSummaryFileHeaderV8) version = 8;
     else if (line == kSummaryFileHeaderV7) version = 7;
@@ -3998,7 +4115,8 @@ bool SummaryRegistry::parseSummaryFile(
     // Field count is VERSION-strict: extra columns under an old header
     // are corruption, not a future format (rejected wholesale).
     const size_t maxFields =
-        (version >= 10) ? 14 : (version >= 9) ? 13
+        (version >= 11) ? 15 : (version >= 10) ? 14
+                           : (version >= 9) ? 13
                            : (version >= 8) ? 10
                            : (version >= 7) ? 8 : (version >= 5) ? 7
                        : (version == 4) ? 6 : (version == 3) ? 5 : 4;
@@ -4024,6 +4142,7 @@ bool SummaryRegistry::parseSummaryFile(
         if (version == 9 && fields.size() != 13) return false;
         if (version == 8 && fields.size() != 10) return false;
         if (version == 10 && fields.size() != 14) return false;
+        if (version == 11 && fields.size() != 15) return false;
         const std::string& key = fields[0];
         const std::string& rn = fields[1];
         const std::string& pe = fields[2];
@@ -4219,6 +4338,20 @@ bool SummaryRegistry::parseSummaryFile(
                         std::move(parsedFields));
                     if (end == std::string::npos) break;
                     fieldSetStart = end + 1;
+                }
+            }
+        }
+        if (version >= 11) {
+            const std::string& encoded = fields[14];
+            const size_t paramCount = summary.params.size();
+            if ((encoded == "-") != (paramCount == 0)) return false;
+            if (paramCount != 0) {
+                if (encoded.size() != paramCount) return false;
+                summary.paramAllocatorSizes.reserve(paramCount);
+                for (char c : encoded) {
+                    ParamAllocatorSize value;
+                    if (!allocatorSizeFromChar(c, value)) return false;
+                    summary.paramAllocatorSizes.push_back(value);
                 }
             }
         }

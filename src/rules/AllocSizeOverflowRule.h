@@ -42,7 +42,14 @@ namespace codeskeptic {
 // also tracks compiler checked-multiply outputs: a proven no-overflow edge is
 // silent, while an unchecked/overflow-edge result needs the same finite
 // corner proof. Reassigned, escaped, or otherwise unstable relations remain
-// silent. Sub-64 arithmetic continues to use the shared int64 interval.
+// silent. Phase 6.3 consumes only exact unchanged parameter-to-allocator-size
+// relations from the versioned function summaries, including visible chains
+// and harvested cross-TU wrappers. Bodyless, transformed, conflicting, and
+// unknown relations stay silent. When an exact local allocation binding is
+// later indexed or passed to a bounded memory-access primitive with the same
+// declared-untrusted origin, a trace note records that evidence without
+// replacing the allocation-wrap proof. Sub-64 arithmetic continues to use
+// the shared int64 interval.
 class AllocSizeOverflowRule : public Rule {
 public:
     std::string id() const override { return "alloc-size-overflow"; }

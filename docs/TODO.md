@@ -87,8 +87,8 @@ independently measurable RED-to-GREEN slices:
    Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 50;
    no `cs: ai` proposal became accepted intent.
 3. **Interprocedural allocator sinks and allocation-to-access evidence —
-   active.** Add a versioned allocator-size parameter relation to function
-   summaries and propagate only exact, visible parameter-to-size flows through
+   locally complete.** Add a versioned allocator-size parameter relation to
+   function summaries and propagate only exact, visible parameter-to-size flows through
    the existing SCC, indirect-target, persistence, and conservative-merge
    paths. The allocation rule may consume only a proven sink parameter;
    bodyless, conflicting, transformed, or unknown flows stay silent. Attach
@@ -100,10 +100,21 @@ independently measurable RED-to-GREEN slices:
    `src/engine/SummaryDiff.cpp`,
    `src/rules/AllocSizeOverflowRule.{h,cpp}`,
    `tests/AllocSizeOverflowRuleTest.cpp`, `tests/InterproceduralTest.cpp`,
-   `tests/SummaryDiffTest.cpp`, this TODO, and
+   `tests/SummaryDiffTest.cpp`, `tests/CapabilitiesCliTest.py`, this TODO, and
    `docs/devlog/changelog.md`. `PLAN.md`, the shared interval engine,
    contract grammar, capability registry/tier, configuration, and accepted
-   model channels remain unchanged.
+   model channels remain unchanged. RED was recorded as 8 failures in the
+   initial 11-case matrix; the expanded pointer-reassignment and uninvoked-
+   lambda precision controls were each independently RED before their fixes.
+   Gates: focused 51/51; direct and CTest 1063/1063; exact CLI wrapper 1 report
+   / guarded twin 0; exact access fixture 1 report with one trace note; pinned
+   LVGL v9.2.2 replay 1 report at `lv_binfont_loader.c:511:72`; capability CLI
+   schema 2 / 14 rules / 7 supported with alloc-size-overflow still
+   experimental and non-blocking; frozen thesis `clean_fp=0` and
+   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
+   Shadow counts are proposals 2, eligible 2, rejected 0, unsupported 40;
+   both candidates remain `cs:ai` proposals pending human review and neither
+   became accepted intent.
 
 Phase 6 exits only when guarded cases are silent, unknown values remain
 reportless, real-repository examples are pinned, and the full local/CI

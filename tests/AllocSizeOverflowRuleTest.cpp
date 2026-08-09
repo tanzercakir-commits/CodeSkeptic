@@ -633,3 +633,272 @@ TEST(AllocSizeOverflowRuleTest, BuiltinMulOverflowReferenceEscaped_Silent) {
     )");
     EXPECT_EQ(results.size(), 0u);
 }
+
+// Phase 6.3: an exact wrapper parameter that reaches an allocator size is
+// itself a size sink. The caller-side arithmetic must retain the sink.
+TEST(AllocSizeOverflowRuleTest, VisibleAllocatorWrapper_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+        void* f(void) {
+            size_t count = read_size();
+            return alloc_bytes(count * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// The existing SCC solver must carry the exact sink through visible wrappers.
+TEST(AllocSizeOverflowRuleTest, VisibleAllocatorWrapperChain_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+        void* alloc_chain(size_t bytes) { return alloc_bytes(bytes); }
+        void* f(void) {
+            size_t count = read_size();
+            return alloc_chain(count * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// Whole-program harvest carries the same exact relation across a TU boundary.
+TEST(AllocSizeOverflowRuleTest, CrossTUAllocatorWrapper_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+    )",
+                                  R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t);
+        void* f(void) {
+            size_t count = read_size();
+            return alloc_bytes(count * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A declaration without a harvested or visible body grants no sink authority.
+TEST(AllocSizeOverflowRuleTest, BodylessAllocatorWrapper_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        extern void* opaque_alloc(size_t);
+        void* f(void) {
+            size_t count = read_size();
+            return opaque_alloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Transforming a parameter before forwarding it is not an exact bounded
+// parameter-to-size relation, so callers cannot borrow allocator authority.
+TEST(AllocSizeOverflowRuleTest, TransformedAllocatorWrapper_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* adjusted_alloc(size_t bytes) { return malloc(bytes + 1); }
+        void* f(void) {
+            size_t count = read_size();
+            return adjusted_alloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Pinned allocation replay: LVGL v9.2.2 commit 7f07a129, lines 505-524
+// of lv_binfont_loader.c. The real loop indexes glyph_offset with `i`, not
+// directly with loca_count, so the allocation report is retained without
+// overstating that use as exact same-origin access evidence.
+TEST(AllocSizeOverflowRuleTest, LvglPinnedAllocationReplay_Reports) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern int read_u32(uint32_t*);
+        void load_table(void) {
+            uint32_t loca_count = 0;
+            if (!read_u32(&loca_count)) return;
+            uint32_t* glyph_offset =
+                (uint32_t*)malloc(sizeof(uint32_t) * (loca_count + 1));
+            for (unsigned i = 0; i < loca_count; ++i)
+                glyph_offset[i] = i;
+        }
+    )",
+                           "lv_binfont_loader.c");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].notes.empty());
+}
+// An unrelated constant access cannot be advertised as count-linked evidence.
+TEST(AllocSizeOverflowRuleTest, UnrelatedAccess_HasNoTrace) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern int read_u32(uint32_t*);
+        void load_table(void) {
+            uint32_t loca_count = 0;
+            if (!read_u32(&loca_count)) return;
+            uint32_t* table =
+                (uint32_t*)malloc(sizeof(uint32_t) * (loca_count + 1));
+            table[0] = 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].notes.empty());
+}
+// A controlled single function-pointer target carries the exact sink relation.
+TEST(AllocSizeOverflowRuleTest, IndirectAllocatorWrapper_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        typedef void* (*allocator_fn)(size_t);
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+        void* f(void) {
+            allocator_fn allocate = alloc_bytes;
+            size_t count = read_size();
+            return allocate(count * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A closed target set that disagrees on allocator reachability degrades to
+// Unknown. The indirect call therefore grants no sink authority.
+TEST(AllocSizeOverflowRuleTest, MixedIndirectAllocatorTargets_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        typedef void* (*allocator_fn)(size_t);
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* alloc_bytes(size_t bytes) { return malloc(bytes); }
+        void* inspect_bytes(size_t bytes) { (void)bytes; return 0; }
+        void* f(int choose) {
+            allocator_fn target = choose ? alloc_bytes : inspect_bytes;
+            size_t count = read_size();
+            return target(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Cross-TU overloads collide in the persisted qualified-name/arity key. A
+// Sink/None disagreement must merge to Unknown instead of a false authority.
+TEST(AllocSizeOverflowRuleTest, CrossTUOverloadConflict_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRuleCrossTU(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        void* project_alloc(size_t bytes) { return malloc(bytes); }
+        void* project_alloc(unsigned bytes) { (void)bytes; return 0; }
+    )",
+                                  R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern size_t read_size(void);
+        void* project_alloc(size_t);
+        void* f(void) {
+            size_t count = read_size();
+            return project_alloc(count * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// A bounded memory primitive is access evidence only when its destination is
+// the exact allocation binding and its size shares the untrusted origin.
+TEST(AllocSizeOverflowRuleTest, MemoryAccessEvidence_HasTrace) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern void* memset(void*, int, size_t);
+        extern int read_u32(uint32_t*);
+        void load_table(void) {
+            uint32_t loca_count = 0;
+            if (!read_u32(&loca_count)) return;
+            uint32_t* table =
+                (uint32_t*)malloc(sizeof(uint32_t) * (loca_count + 1));
+            memset(table, 0, (size_t)loca_count * sizeof(uint32_t));
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    ASSERT_EQ(results[0].notes.size(), 1u);
+    EXPECT_NE(results[0].notes[0].message.find("access"), std::string::npos);
+}
+// A later access through a reassigned local no longer refers to the allocation
+// result, even when its index happens to share the same untrusted origin.
+TEST(AllocSizeOverflowRuleTest, ReassignedAllocationBinding_HasNoTrace) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern int read_u32(uint32_t*);
+        void load_table(uint32_t* replacement) {
+            uint32_t loca_count = 0;
+            if (!read_u32(&loca_count)) return;
+            uint32_t* table =
+                (uint32_t*)malloc(sizeof(uint32_t) * (loca_count + 1));
+            table = replacement;
+            table[loca_count] = 0;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_TRUE(results[0].notes.empty());
+}
+// A lambda body has its own function summary. Merely constructing a lambda
+// must not grant allocator-sink authority to the enclosing function.
+TEST(AllocSizeOverflowRuleTest, UninvokedLambdaAllocatorWrapper_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void inspect(size_t bytes) {
+            auto deferred = [bytes]() { return malloc(bytes); };
+            (void)deferred;
+        }
+        void caller(void) {
+            size_t count = read_size();
+            inspect(count * 16);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}

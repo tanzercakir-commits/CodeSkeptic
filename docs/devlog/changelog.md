@@ -1,5 +1,80 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 6.3 interprocedural allocator sinks and access evidence
+
+Function summaries now carry a versioned, exact integer-parameter-to-allocator-
+size relation. Only unchanged visible parameters that reach a direct or proven
+summary sink become authoritative; SCC chains, controlled indirect target sets,
+cross-TU harvest/reload, strict persistence, and conservative conflict merges
+all use the same relation. Summary schema v11 encodes `Unknown`, `None`, and
+`Sink` as `?`, `O`, and `S`; v10 and older inputs upgrade to non-authoritative
+`Unknown`. Losing a proven sink is a weakening in summary diff, while gaining
+one is strengthening. Bodyless, transformed, conflicting, incomplete indirect,
+legacy-unknown, and uninvoked-lambda flows remain silent.
+
+The allocation rule consumes only a stable proven `Sink`. An optional trace note
+is attached after the existing finite wrap proof only when the allocation call
+has an exact local pointer binding, that binding remains unchanged and does not
+escape by address before the access, and an exact array index or supported
+`memcpy`/`memmove`/`memset` length shares the same declared-untrusted origin.
+Absence of this evidence never suppresses or creates the allocation finding.
+Precision review found and closed two additional RED cases: a pointer reassigned
+before access incorrectly received a note, and an uninvoked lambda body leaked
+sink authority into its enclosing function.
+
+The real-repository replay pins LVGL v9.2.2 tag object
+`c98ab243621a2a948674da5339c15da88832f928`, peeled commit
+`7f07a129e8d77f4984fff8e623fd5be18ff42e74`. Using LVGL's generated
+`compile_commands.json`, `lv_fs_read` as the declared untrusted source, and
+`lv_malloc` as the configured allocator, the exact
+`src/font/lv_binfont_loader.c` scan reports one experimental finding at
+line 511, column 72. It intentionally carries no access note: the real direct
+index is `glyph_offset[i]`, not the same `loca_count` expression, and
+`lv_fs_read` is outside the admitted bounded-memory primitive set. A separate
+controlled `memset` fixture proves the supported same-origin trace path.
+
+RED was recorded before production implementation: 8 of the initial 11 focused
+cases failed exactly for the new positive summary/persistence/diff paths; three
+precision controls passed. The two review cases above were then independently
+RED before correction. The final focused matrix is 51/51. Exact product CLI
+receipts are one report for the unsafe visible wrapper, zero for its dominating-
+division-guard twin, and one report plus one access note for the controlled
+bounded-memory fixture. `tests/CapabilitiesCliTest.py` now explicitly locks
+`alloc-size-overflow` as default-enabled, experimental, not quality-gated, and
+non-blocking; schema 2 still publishes 14 rules with seven supported. The tested
+binary SHA-256 is
+`cc90fd78638cc877dc1e4e9635bfe3b49669170bbde110e791d6ca9bb80c0f14`.
+
+Final local gates are direct suite 1063/1063, CTest 1063/1063, frozen thesis
+`clean_fp=0` and `bug_caught=9/15` with 11 total findings, clean and complete
+48/48-TU self-scan with zero findings/broken/incomplete units, cJSON 54 findings
+(76 enumerated, 35 analyzed, 41 explicitly accepted broken fixtures), and
+tinyxml2 9 findings (3/3 analyzed). The exact slice file set is
+`src/engine/FunctionSummary.{h,cpp}`, `src/engine/SummaryDiff.cpp`,
+`src/rules/AllocSizeOverflowRule.{h,cpp}`,
+`tests/AllocSizeOverflowRuleTest.cpp`, `tests/InterproceduralTest.cpp`,
+`tests/SummaryDiffTest.cpp`, `tests/CapabilitiesCliTest.py`, `docs/TODO.md`, and
+this changelog. `PLAN.md`, the shared interval engine, contract grammar,
+capability registry/tier, configuration, and accepted model channels are
+unchanged.
+
+Contract-first shadow audit considered 42 new or materially changed production
+functions: the allocator-size summary accessor, exact-param extraction,
+collection visitor and integration, equality/merge/persistence/parser paths;
+summary-diff naming/classification; allocator argument and inventory visitors;
+exact allocation-binding, origin, stability, and access-evidence visitors; and
+`analyzeFunction`. Two minimal proposals were produced:
+`allocatorSizeToChar: ensures return != 0` and
+`computeParamAllocatorSizes::Visitor::TraverseLambdaExpr: ensures return != 0`.
+The deterministic ContractRule referee reports the modified file clean, so both
+are eligible candidates; rejected 0, unsupported 40. Neither proposal exposed
+an implementation or assumption problem. Independent RED tests and pinned-
+source review exposed the binding-reassignment, lambda-isolation, and LVGL
+access-evidence premise issues above; all are closed. Both candidates require
+later human review. No `cs:ai` proposal became marker-free accepted intent.
+No native pointer, heap, alias, ownership, or lifetime contract semantics were
+added; owned-memory verification remains deferred to executable A7 fixtures.
+
 ## 2026-08-09 — Phase 6.2 checked allocation arithmetic
 
 The allocation-size rule now preserves an exact reachable upper corner

@@ -5,6 +5,7 @@
 #include "engine/AllocFunctions.h"
 #include "engine/CoverageReport.h"
 #include "engine/DataflowEngine.h"
+#include "engine/FunctionSummary.h"
 #include "engine/Interval.h"
 #include "engine/IntervalAnalysis.h"
 #include "engine/IntervalEval.h"
@@ -53,6 +54,7 @@ std::set<const VarDecl*> collectIntVars(const FunctionDecl* fn) {
 struct SizeSite {
     const BinaryOperator* op;
     unsigned bits;  // width of the unsigned result type
+    const CallExpr* allocator;
 };
 
 struct CheckedSizeSite {
@@ -495,31 +497,46 @@ bool wrapsUnsigned64Multiply(
                                  untrusted, definitions, ctx);
 }
 
+bool isAllocatorSizeArgument(const CallExpr* call, unsigned index) {
+    if (!call || index >= call->getNumArgs()) return false;
+    if (codeskeptic::isAllocatorCall(call)) return true;
+
+    const auto& registry = codeskeptic::SummaryRegistry::instance();
+    if (!registry.stable()) return false;
+    const auto* summary = registry.lookup(call);
+    return summary &&
+           summary->paramAllocatorSize(index) ==
+               codeskeptic::SummaryRegistry::ParamAllocatorSize::Sink;
+}
+
 SizeInventory collectSizeInventory(const FunctionDecl* fn,
                                    ASTContext& ctx) {
     struct V : RecursiveASTVisitor<V> {
         ASTContext& ctx;
         SizeInventory inventory;
-        // Every Expr under an allocator call's arguments. Recorded on
-        // the way down (RAV is pre-order) so a nested arithmetic is
-        // already known to be a size sub-expression when visited.
-        std::set<const Expr*> allocArgExprs;
+        // Every Expr under a proven allocator-size argument. Recorded on
+        // the way down (RAV is pre-order) so nested arithmetic is already
+        // known to be a size sub-expression when visited.
+        std::map<const Expr*, const CallExpr*> allocArgExprs;
         explicit V(ASTContext& c) : ctx(c) {}
 
         bool VisitCallExpr(CallExpr* call) {
             if (isMulOverflowBuiltin(call))
                 inventory.hasMulOverflow = true;
-            if (!codeskeptic::isAllocatorCall(call)) return true;
-            for (const Expr* arg : call->arguments()) {
-                if (const VarDecl* var = directIntegerVar(arg))
+            for (unsigned i = 0; i < call->getNumArgs(); ++i) {
+                if (!isAllocatorSizeArgument(call, i)) continue;
+                const Expr* argument = call->getArg(i);
+                if (const VarDecl* var = directIntegerVar(argument))
                     inventory.checked.push_back({call, var});
-                std::function<void(const Stmt*)> mark = [&](const Stmt* s) {
-                    if (!s) return;
-                    if (const auto* e = llvm::dyn_cast<Expr>(s))
-                        allocArgExprs.insert(e);
-                    for (const Stmt* child : s->children()) mark(child);
-                };
-                mark(arg);
+                std::function<void(const Stmt*)> mark =
+                    [&](const Stmt* stmt) {
+                        if (!stmt) return;
+                        if (const auto* expr = llvm::dyn_cast<Expr>(stmt))
+                            allocArgExprs[expr] = call;
+                        for (const Stmt* child : stmt->children())
+                            mark(child);
+                    };
+                mark(argument);
             }
             return true;
         }
@@ -527,14 +544,15 @@ SizeInventory collectSizeInventory(const FunctionDecl* fn,
         bool VisitBinaryOperator(BinaryOperator* op) {
             if (op->getOpcode() != BO_Mul && op->getOpcode() != BO_Add)
                 return true;
-            if (!allocArgExprs.count(op)) return true;
+            auto sink = allocArgExprs.find(op);
+            if (sink == allocArgExprs.end()) return true;
             QualType type = op->getType();
             if (!type->isIntegerType() ||
                 !type->isUnsignedIntegerType())
                 return true;
             const unsigned bits = ctx.getIntWidth(type);
             if (bits == 0 || bits > 64) return true;
-            inventory.arithmetic.push_back({op, bits});
+            inventory.arithmetic.push_back({op, bits, sink->second});
             return true;
         }
     } visitor(ctx);
@@ -859,6 +877,217 @@ private:
     std::map<const Stmt*, State> atStmt_;
 };
 
+const VarDecl* directPointerVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    const auto* reference =
+        llvm::dyn_cast<DeclRefExpr>(expr->IgnoreParenImpCasts());
+    const auto* var =
+        reference ? llvm::dyn_cast<VarDecl>(reference->getDecl()) : nullptr;
+    return var && var->getType()->isPointerType() ? var : nullptr;
+}
+
+bool containsStmt(const Stmt* root, const Stmt* target) {
+    if (!root || !target) return false;
+    if (root == target) return true;
+    for (const Stmt* child : root->children())
+        if (containsStmt(child, target)) return true;
+    return false;
+}
+
+const VarDecl* allocationBinding(const FunctionDecl* function,
+                                 const CallExpr* allocator) {
+    const VarDecl* binding = nullptr;
+    bool ambiguous = false;
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const CallExpr* allocator;
+        const VarDecl*& binding;
+        bool& ambiguous;
+
+        Visitor(const CallExpr* target, const VarDecl*& result,
+                bool& hasAmbiguity)
+            : allocator(target), binding(result),
+              ambiguous(hasAmbiguity) {}
+
+        void record(const VarDecl* candidate) {
+            if (!candidate || !candidate->getType()->isPointerType()) return;
+            if (binding && binding != candidate)
+                ambiguous = true;
+            else
+                binding = candidate;
+        }
+
+        bool VisitVarDecl(VarDecl* var) {
+            if (var->hasInit() && containsStmt(var->getInit(), allocator))
+                record(var);
+            return true;
+        }
+
+        bool VisitBinaryOperator(BinaryOperator* op) {
+            if (op->getOpcode() == BO_Assign &&
+                containsStmt(op->getRHS(), allocator))
+                record(directPointerVar(op->getLHS()));
+            return true;
+        }
+    } visitor{allocator, binding, ambiguous};
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return ambiguous ? nullptr : binding;
+}
+
+std::set<const VarDecl*> referencedUntrusted(
+    const Stmt* root, const std::set<const VarDecl*>& untrusted) {
+    std::set<const VarDecl*> found;
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const std::set<const VarDecl*>& untrusted;
+        std::set<const VarDecl*>& found;
+
+        Visitor(const std::set<const VarDecl*>& origins,
+                std::set<const VarDecl*>& result)
+            : untrusted(origins), found(result) {}
+
+        bool VisitDeclRefExpr(DeclRefExpr* reference) {
+            const auto* var =
+                llvm::dyn_cast<VarDecl>(reference->getDecl());
+            if (var && untrusted.count(var)) found.insert(var);
+            return true;
+        }
+    } visitor{untrusted, found};
+    if (root) visitor.TraverseStmt(const_cast<Stmt*>(root));
+    return found;
+}
+
+bool sharesUntrustedOrigin(
+    const Stmt* allocation, const Stmt* access,
+    const std::set<const VarDecl*>& untrusted) {
+    const auto allocationOrigins =
+        referencedUntrusted(allocation, untrusted);
+    if (allocationOrigins.empty()) return false;
+    const auto accessOrigins = referencedUntrusted(access, untrusted);
+    for (const VarDecl* origin : allocationOrigins)
+        if (accessOrigins.count(origin)) return true;
+    return false;
+}
+
+bool bindingStableUntil(
+    const FunctionDecl* function, const VarDecl* binding,
+    const CallExpr* allocator, const Stmt* evidence,
+    const SourceManager& sm) {
+    if (!function || !binding || !allocator || !evidence) return false;
+    const SourceLocation begin =
+        sm.getExpansionLoc(allocator->getExprLoc());
+    const SourceLocation end =
+        sm.getExpansionLoc(evidence->getBeginLoc());
+    if (begin.isInvalid() || end.isInvalid() ||
+        !sm.isBeforeInTranslationUnit(begin, end))
+        return false;
+
+    bool unstable = false;
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const VarDecl* binding;
+        const SourceManager& sm;
+        SourceLocation begin;
+        SourceLocation end;
+        bool& unstable;
+
+        Visitor(const VarDecl* tracked, const SourceManager& sourceManager,
+                SourceLocation first, SourceLocation last, bool& changed)
+            : binding(tracked), sm(sourceManager), begin(first), end(last),
+              unstable(changed) {}
+
+        bool between(SourceLocation location) const {
+            if (location.isInvalid()) return false;
+            const SourceLocation point = sm.getExpansionLoc(location);
+            return point.isValid() &&
+                   sm.isBeforeInTranslationUnit(begin, point) &&
+                   sm.isBeforeInTranslationUnit(point, end);
+        }
+
+        bool VisitBinaryOperator(BinaryOperator* op) {
+            if (op->isAssignmentOp() &&
+                directPointerVar(op->getLHS()) == binding &&
+                between(op->getOperatorLoc()))
+                unstable = true;
+            return !unstable;
+        }
+
+        bool VisitUnaryOperator(UnaryOperator* op) {
+            const UnaryOperatorKind kind = op->getOpcode();
+            const bool changesBinding = op->isIncrementDecrementOp();
+            const bool escapesBinding = kind == UO_AddrOf;
+            if ((changesBinding || escapesBinding) &&
+                directPointerVar(op->getSubExpr()) == binding &&
+                between(op->getOperatorLoc()))
+                unstable = true;
+            return !unstable;
+        }
+    } visitor{binding, sm, begin, end, unstable};
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return !unstable;
+}
+
+std::optional<SourceLocation> findAccessEvidence(
+    const FunctionDecl* function, const CallExpr* allocator,
+    const Stmt* allocationOrigin,
+    const std::set<const VarDecl*>& untrusted, ASTContext& ctx) {
+    const VarDecl* binding = allocationBinding(function, allocator);
+    if (!binding) return std::nullopt;
+
+    const SourceManager& sm = ctx.getSourceManager();
+    SourceLocation best;
+    const auto record = [&](const Stmt* evidence, SourceLocation location) {
+        if (!evidence || location.isInvalid()) return;
+        SourceLocation candidate = sm.getExpansionLoc(location);
+        SourceLocation allocation =
+            sm.getExpansionLoc(allocator->getExprLoc());
+        if (!sm.isBeforeInTranslationUnit(allocation, candidate) ||
+            !bindingStableUntil(function, binding, allocator, evidence, sm))
+            return;
+        if (best.isInvalid() ||
+            sm.isBeforeInTranslationUnit(candidate, best))
+            best = candidate;
+    };
+
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        const VarDecl* binding;
+        const Stmt* allocationOrigin;
+        const std::set<const VarDecl*>& untrusted;
+        std::function<void(const Stmt*, SourceLocation)> record;
+
+        Visitor(
+            const VarDecl* allocationBinding, const Stmt* origin,
+            const std::set<const VarDecl*>& untrustedOrigins,
+            std::function<void(const Stmt*, SourceLocation)> recorder)
+            : binding(allocationBinding), allocationOrigin(origin),
+              untrusted(untrustedOrigins), record(std::move(recorder)) {}
+
+        bool VisitArraySubscriptExpr(ArraySubscriptExpr* access) {
+            if (directPointerVar(access->getBase()) == binding &&
+                sharesUntrustedOrigin(
+                    allocationOrigin, access->getIdx(), untrusted))
+                record(access, access->getExprLoc());
+            return true;
+        }
+
+        bool VisitCallExpr(CallExpr* call) {
+            const FunctionDecl* callee = call->getDirectCallee();
+            const IdentifierInfo* id =
+                callee ? callee->getIdentifier() : nullptr;
+            if (!id || call->getNumArgs() < 3) return true;
+            const llvm::StringRef name = id->getName();
+            if (name != "memcpy" && name != "memmove" &&
+                name != "memset")
+                return true;
+            if (directPointerVar(call->getArg(0)) == binding &&
+                sharesUntrustedOrigin(
+                    allocationOrigin, call->getArg(2), untrusted))
+                record(call, call->getExprLoc());
+            return true;
+        }
+    } visitor{binding, allocationOrigin, untrusted, record};
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return best.isValid() ? std::optional<SourceLocation>(best)
+                          : std::nullopt;
+}
+
 void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                      const codeskeptic::ParamIntervalMap& paramMap,
                      codeskeptic::DiagnosticList& results) {
@@ -889,7 +1118,10 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
     const SourceManager& sm = ctx.getSourceManager();
     std::set<unsigned> reportedLines;
     static const std::set<const VarDecl*> kNoUntrusted;
-    const auto report = [&](SourceLocation source, QualType type) {
+    const auto report = [&](
+        SourceLocation source, QualType type, const CallExpr* allocator,
+        const Stmt* allocationOrigin,
+        const std::set<const VarDecl*>& untrusted) {
         SourceLocation loc = sm.getExpansionLoc(source);
         const unsigned line = sm.getSpellingLineNumber(loc);
         if (!reportedLines.insert(line).second) return;
@@ -903,6 +1135,21 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         diag.severity = codeskeptic::Severity::Warning;
         diag.message = codeskeptic::msg(
             codeskeptic::MsgId::AllocSizeOverflow, type.getAsString());
+        if (allocator) {
+            auto access = findAccessEvidence(
+                fn, allocator, allocationOrigin, untrusted, ctx);
+            if (access) {
+                SourceLocation noteLoc = sm.getExpansionLoc(*access);
+                codeskeptic::TraceNote note;
+                note.file = sm.getFilename(noteLoc).str();
+                note.line = sm.getSpellingLineNumber(noteLoc);
+                note.column = sm.getSpellingColumnNumber(noteLoc);
+                note.message =
+                    "allocation result is accessed with the same "
+                    "untrusted length";
+                diag.notes.push_back(std::move(note));
+            }
+        }
         results.push_back(std::move(diag));
     };
 
@@ -922,7 +1169,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
             wraps = wrapsUnsigned64Multiply(
                 site.op, *state, *untrusted, definitions, ctx);
         if (!wraps) continue;
-        report(site.op->getOperatorLoc(), site.op->getType());
+        report(site.op->getOperatorLoc(), site.op->getType(),
+               site.allocator, site.op, *untrusted);
     }
 
     if (!checkedRan) return;
@@ -955,7 +1203,8 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
                 checked->getArg(0), checked->getArg(1), bits, *state,
                 *untrusted, definitions, ctx))
             continue;
-        report(checked->getExprLoc(), resultType);
+        report(checked->getExprLoc(), resultType, site.allocator,
+               checked, *untrusted);
     }
 }
 class AllocSizeOverflowCallback : public MatchFinder::MatchCallback {
