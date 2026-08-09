@@ -3378,7 +3378,6 @@ std::vector<ParamAllocatorSize> computeParamAllocatorSizes(
             return true;
         }
 
-        // cs:ai ensures return != 0
         bool TraverseLambdaExpr(LambdaExpr*) { return true; }
     } visitor{ctx, previous, indexes, result};
     visitor.TraverseStmt(const_cast<Stmt*>(func->getBody()));
@@ -3936,7 +3935,6 @@ bool ownershipFromChar(char c, ParamOwnership& out) {
     return false;
 }
 
-// cs:ai ensures return != 0
 char allocatorSizeToChar(ParamAllocatorSize value) {
     switch (value) {
         case ParamAllocatorSize::None: return 'O';

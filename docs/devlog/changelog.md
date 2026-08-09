@@ -43,7 +43,7 @@ bounded-memory fixture. `tests/CapabilitiesCliTest.py` now explicitly locks
 `alloc-size-overflow` as default-enabled, experimental, not quality-gated, and
 non-blocking; schema 2 still publishes 14 rules with seven supported. The tested
 binary SHA-256 is
-`cc90fd78638cc877dc1e4e9635bfe3b49669170bbde110e791d6ca9bb80c0f14`.
+`c5c73f49750d12ae1a24cbe96c8120425fbcd79a35505063b6a3a721f9c6d8dc`.
 
 Final local gates are direct suite 1063/1063, CTest 1063/1063, frozen thesis
 `clean_fp=0` and `bug_caught=9/15` with 11 total findings, clean and complete
@@ -66,13 +66,16 @@ exact allocation-binding, origin, stability, and access-evidence visitors; and
 `analyzeFunction`. Two minimal proposals were produced:
 `allocatorSizeToChar: ensures return != 0` and
 `computeParamAllocatorSizes::Visitor::TraverseLambdaExpr: ensures return != 0`.
-The deterministic ContractRule referee reports the modified file clean, so both
-are eligible candidates; rejected 0, unsupported 40. Neither proposal exposed
-an implementation or assumption problem. Independent RED tests and pinned-
-source review exposed the binding-reassignment, lambda-isolation, and LVGL
-access-evidence premise issues above; all are closed. Both candidates require
-later human review. No `cs:ai` proposal became marker-free accepted intent.
-No native pointer, heap, alias, ownership, or lifetime contract semantics were
+The Windows pre-screen reported the modified file clean, but both independent
+Linux CI self-scans classified the proposals as `contract-unsupported`. Under
+the shadow eligibility rule, unsupported evidence is not eligible: both marker
+lines were removed. Final counts are eligible 0, rejected 2, unsupported 40;
+no candidate remains for human review. The proposals exposed a cross-platform
+verifier eligibility gap, not an implementation or assumption problem.
+Independent RED tests and pinned-source review exposed the binding-
+reassignment, lambda-isolation, and LVGL access-evidence premise issues above;
+all are closed. No `cs:ai` proposal became marker-free accepted intent. No
+native pointer, heap, alias, ownership, or lifetime contract semantics were
 added; owned-memory verification remains deferred to executable A7 fixtures.
 
 ## 2026-08-09 — Phase 6.2 checked allocation arithmetic

@@ -112,9 +112,10 @@ independently measurable RED-to-GREEN slices:
    schema 2 / 14 rules / 7 supported with alloc-size-overflow still
    experimental and non-blocking; frozen thesis `clean_fp=0` and
    `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
-   Shadow counts are proposals 2, eligible 2, rejected 0, unsupported 40;
-   both candidates remain `cs:ai` proposals pending human review and neither
-   became accepted intent.
+   Shadow counts are proposals 2, eligible 0, rejected 2, unsupported 40;
+   Linux CI classified both proposals as `contract-unsupported`, so they were
+   removed and no candidate remains for human review. Neither became accepted
+   intent.
 
 Phase 6 exits only when guarded cases are silent, unknown values remain
 reportless, real-repository examples are pinned, and the full local/CI
