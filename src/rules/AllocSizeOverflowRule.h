@@ -33,9 +33,11 @@ namespace codeskeptic {
 //   - its proven interval PROVABLY reaches past the unsigned result
 //     type's max (a finite witness; an unknown operand stays silent).
 // A guard (`if (n < LIMIT)`) narrows the interval and silences on its
-// own edge. v1 scope: sub-64-bit result types, where the int64 interval
-// can witness the wrap; 64-bit size_t multiplication needs the operand-
-// corner proof and is deferred (documented, not silently dropped).
+// own edge. Phase 6.1 adds 64-bit multiplication through an exact
+// operand-corner proof: one side must be a finite constant and the other
+// a declared untrusted unsigned value. The operands are widened to 128
+// bits for the mathematical comparison; runtime/unknown factors remain
+// silent. Sub-64 arithmetic continues to use the shared int64 interval.
 class AllocSizeOverflowRule : public Rule {
 public:
     std::string id() const override { return "alloc-size-overflow"; }

@@ -19,8 +19,11 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/APSInt.h>
 
 #include <functional>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -52,16 +55,133 @@ struct SizeSite {
 };
 
 // Does the true (unbounded) result of this unsigned arithmetic PROVABLY
-// reach past what the result type can hold? The interval is int64, so a
-// sub-64 unsigned type's max is representable and hi() > max witnesses a
-// wrap. A 64-bit result cannot be witnessed this way (2^64-1 exceeds
-// int64) — deferred, and the site is not collected for it, so this is
-// never asked with bits >= 64.
+// reach past what the result type can hold? The int64 interval remains the
+// primary proof for sub-64 result types.
 bool wrapsUnsignedFinite(const codeskeptic::Interval& r, unsigned bits) {
     if (r.isEmpty() || r.isTop()) return false;
     if (bits == 0 || bits >= 64) return false;
     const int64_t umax = (int64_t(1) << bits) - 1;
     return !r.hiIsInf() && r.hi() > umax;
+}
+
+// Evaluate a factor exactly in the result type. Runtime values deliberately
+// return nullopt: a second unknown operand is not a finite wrap witness.
+std::optional<llvm::APInt> constantUnsigned(const Expr* expr, unsigned bits,
+                                            ASTContext& ctx) {
+    if (!expr || bits == 0) return std::nullopt;
+    Expr::EvalResult result;
+    if (!expr->EvaluateAsInt(result, ctx)) return std::nullopt;
+    const llvm::APSInt& value = result.Val.getInt();
+    if (value.isSigned() && value.isNegative()) return std::nullopt;
+    return value.zextOrTrunc(bits);
+}
+
+// Return the largest reachable value when the existing interval can express
+// it. For an unbounded unsigned expression, its declared type maximum is an
+// admitted corner only for the untrusted operand; callers enforce that gate.
+std::optional<llvm::APInt> unsignedUpperCorner(
+    const Expr* expr, const codeskeptic::IntervalMap& state, unsigned bits,
+    ASTContext& ctx) {
+    const Expr* rangeExpr = expr ? expr->IgnoreParens() : nullptr;
+    if (!rangeExpr) return std::nullopt;
+
+    // Recover the real source width through value-preserving unsigned
+    // widening casts. The shared evaluator intentionally treats explicit
+    // casts conservatively; using the destination width here would turn
+    // `(size_t)uint32_value` into a false 64-bit full-range corner.
+    while (const auto* cast = llvm::dyn_cast<CastExpr>(rangeExpr)) {
+        const CastKind kind = cast->getCastKind();
+        const Expr* sub = cast->getSubExpr()->IgnoreParens();
+        bool transparent = kind == CK_LValueToRValue || kind == CK_NoOp;
+        if (kind == CK_IntegralCast &&
+            cast->getType()->isUnsignedIntegerType() &&
+            sub->getType()->isUnsignedIntegerType()) {
+            transparent = ctx.getIntWidth(cast->getType()) >=
+                          ctx.getIntWidth(sub->getType());
+        }
+        if (!transparent) break;
+        rangeExpr = sub;
+    }
+
+    codeskeptic::Interval interval =
+        codeskeptic::evalInterval(rangeExpr, state, &ctx);
+    if (interval.isEmpty()) return std::nullopt;
+    if (!interval.hiIsInf()) {
+        if (interval.hi() < 0) return std::nullopt;
+        return llvm::APInt(bits, static_cast<uint64_t>(interval.hi()));
+    }
+
+    QualType type = rangeExpr->getType();
+    if (!type->isIntegerType() || !type->isUnsignedIntegerType())
+        return std::nullopt;
+    const unsigned exprBits = ctx.getIntWidth(type);
+    if (exprBits == 0 || exprBits > bits) return std::nullopt;
+    return llvm::APInt::getMaxValue(exprBits).zext(bits);
+}
+
+// Keep this slice on genuinely unsigned provenance. Casts are transparent
+// to the shared origin bit, so inspect the visible origin leaves before
+// admitting the full 64-bit unsigned corner. Signed/unsigned chains are
+// handled by the next Phase 6 slice with their own evidence rules.
+bool hasOnlyUnsignedUntrustedOrigins(
+    const Expr* expr, const std::set<const VarDecl*>& untrusted) {
+    if (!codeskeptic::exprDerivesFromUntrusted(expr, untrusted)) return true;
+    expr = expr->IgnoreParenCasts();
+    if (const auto* ref = llvm::dyn_cast<DeclRefExpr>(expr)) {
+        const auto* var = llvm::dyn_cast<VarDecl>(ref->getDecl());
+        return var && untrusted.count(var) > 0 &&
+               var->getType()->isUnsignedIntegerType();
+    }
+    if (const auto* call = llvm::dyn_cast<CallExpr>(expr))
+        return call->getType()->isUnsignedIntegerType();
+    if (const auto* unary = llvm::dyn_cast<UnaryOperator>(expr))
+        return hasOnlyUnsignedUntrustedOrigins(unary->getSubExpr(),
+                                               untrusted);
+    if (const auto* binary = llvm::dyn_cast<BinaryOperator>(expr))
+        return hasOnlyUnsignedUntrustedOrigins(binary->getLHS(), untrusted) &&
+               hasOnlyUnsignedUntrustedOrigins(binary->getRHS(), untrusted);
+    if (const auto* conditional =
+            llvm::dyn_cast<ConditionalOperator>(expr))
+        return hasOnlyUnsignedUntrustedOrigins(conditional->getTrueExpr(),
+                                               untrusted) &&
+               hasOnlyUnsignedUntrustedOrigins(conditional->getFalseExpr(),
+                                               untrusted);
+    return false;
+}
+
+// A 64-bit product cannot be represented by the int64 interval. Widen both
+// operand corners to 128 bits and compare the mathematical product with the
+// 64-bit result maximum. One side must be a finite constant and the other
+// must carry declared untrusted provenance; guards are honored through the
+// finite upper bound recorded in the existing path-sensitive state.
+bool wrapsUnsigned64Multiply(
+    const BinaryOperator* op, const codeskeptic::IntervalMap& state,
+    const std::set<const VarDecl*>& untrusted, ASTContext& ctx) {
+    constexpr unsigned kBits = 64;
+    constexpr unsigned kWideBits = kBits * 2;
+    if (!op || op->getOpcode() != BO_Mul ||
+        ctx.getIntWidth(op->getType()) != kBits)
+        return false;
+
+    const auto cornerExceeds = [&](const Expr* valueExpr,
+                                   const Expr* factorExpr) {
+        if (!codeskeptic::exprDerivesFromUntrusted(valueExpr, untrusted) ||
+            !hasOnlyUnsignedUntrustedOrigins(valueExpr, untrusted))
+            return false;
+        auto factor = constantUnsigned(factorExpr, kBits, ctx);
+        if (!factor || factor->ule(llvm::APInt(kBits, 1))) return false;
+        auto upper = unsignedUpperCorner(valueExpr, state, kBits, ctx);
+        if (!upper) return false;
+
+        const llvm::APInt product =
+            upper->zext(kWideBits) * factor->zext(kWideBits);
+        const llvm::APInt maximum =
+            llvm::APInt::getMaxValue(kBits).zext(kWideBits);
+        return product.ugt(maximum);
+    };
+
+    return cornerExceeds(op->getLHS(), op->getRHS()) ||
+           cornerExceeds(op->getRHS(), op->getLHS());
 }
 
 std::vector<SizeSite> collectSizeSites(const FunctionDecl* fn,
@@ -97,7 +217,7 @@ std::vector<SizeSite> collectSizeSites(const FunctionDecl* fn,
             if (!t->isIntegerType() || !t->isUnsignedIntegerType())
                 return true;  // signed is IntOverflowRule's question
             unsigned bits = ctx.getIntWidth(t);
-            if (bits == 0 || bits >= 64) return true;  // v1: sub-64 only
+            if (bits == 0 || bits > 64) return true;
             sites.push_back({op, bits});
             return true;
         }
@@ -144,12 +264,16 @@ void analyzeFunction(const FunctionDecl* fn, ASTContext& ctx,
         // Gate: an untrusted operand (provenance, never guessed).
         if (!hasUntrustedOperand(site.op, *utr)) continue;
 
-        // Gate: the size PROVABLY wraps its unsigned result type. A
-        // guard on the untrusted length narrows the interval and this
-        // is false; an unknown operand yields top() and is silent.
+        // Gate: the size PROVABLY wraps its unsigned result type. The
+        // shared interval handles sub-64 arithmetic. For a 64-bit multiply,
+        // only a declared untrusted corner plus a finite constant factor is
+        // admitted; path guards can narrow that corner back to safety.
         codeskeptic::Interval iv =
             codeskeptic::evalInterval(site.op, *st, &ctx);
-        if (!wrapsUnsignedFinite(iv, site.bits)) continue;
+        bool wraps = wrapsUnsignedFinite(iv, site.bits);
+        if (!wraps && site.bits == 64)
+            wraps = wrapsUnsigned64Multiply(site.op, *st, *utr, ctx);
+        if (!wraps) continue;
 
         SourceLocation loc = sm.getExpansionLoc(site.op->getOperatorLoc());
         unsigned line = sm.getSpellingLineNumber(loc);

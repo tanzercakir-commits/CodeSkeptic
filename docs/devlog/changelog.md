@@ -1,5 +1,54 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 6.1 exact 64-bit allocation-size corner proof
+
+The allocation-size rule now proves 64-bit unsigned multiplication wraps
+without widening the shared int64 interval domain. At an allocator size sink,
+one operand must carry declared untrusted unsigned provenance and the other
+must be an exactly evaluated constant greater than one. The untrusted upper
+corner and factor are widened to 128 bits before comparison with `UINT64_MAX`.
+A dominating `SIZE_MAX / factor` guard narrows the existing path state and
+silences the report. Runtime factors, ordinary inputs, signed provenance,
+value-preserving 32-to-64-bit promotions, and identity multiplication remain
+silent unless their own finite evidence proves a wrap.
+
+RED was recorded before implementation: 2 of 12 focused cases failed exactly
+for the unguarded 64-bit product and an insufficient division guard, while the
+canonical safe guard, unknown-factor control, and existing seven cases held.
+Precision review then caught a promoted `uint32_t` false positive at 11/12 and
+a signed-source scope leak at 12/13; recovering value-preserving source width
+and requiring unsigned origin leaves closed both. Six pre-existing fixtures
+also used a target-dependent `unsigned long` size type; replacing it with
+Clang's `__SIZE_TYPE__` made the tests express the host target truth instead of
+passing alongside parse diagnostics. The final focused matrix is 14/14.
+
+The exact CLI smoke emits one experimental/report-only
+`alloc-size-overflow` diagnostic for `sizeof(int) * read_size()` and zero for
+its dominating division-guard twin; both exit 0. Final local gates are direct
+suite 1026/1026, CTest 1026/1026, frozen thesis `clean_fp=0` and
+`bug_caught=9/15` with 11 total findings, clean 48/48-TU self-scan, cJSON 54
+findings (76 enumerated, 35 analyzed, 41 explicitly accepted broken fixtures),
+tinyxml2 9 findings (3/3 analyzed), and docs-sync clean. The exact slice file
+set is `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+`tests/AllocSizeOverflowRuleTest.cpp`, `docs/TODO.md`, and this changelog.
+`PLAN.md`, the interval engine, contract grammar, capability tier,
+configuration, and accepted models are unchanged.
+
+Contract-first shadow audit considered six new or materially changed
+production functions: `constantUnsigned`, `unsignedUpperCorner`,
+`hasOnlyUnsignedUntrustedOrigins`, `wrapsUnsigned64Multiply`,
+`collectSizeSites::V::VisitBinaryOperator`, and `analyzeFunction`. Dogfood was
+not applicable because every candidate depends on Clang AST/type identity,
+APInt/APSInt, interval/container state, or allocator-sink analyzer context
+beyond the current deterministic contract referee. Counts: proposals 0,
+eligible 0, rejected 0, unsupported 6. No proposal exposed an implementation
+or assumption problem; the independent RED and precision tests exposed the
+two false-positive assumptions and the stale fixture type above, all closed.
+Candidate contracts requiring later human review: none. No `cs: ai` proposal
+became accepted intent. No pointer, heap, alias, ownership, or lifetime
+verification semantics were added; native memory claims remain deferred to
+executable A7 fixtures.
+
 ## 2026-08-09 — Phase 5.3 capability CLI contract sync
 
 The full GitHub Actions run correctly rejected the promoted capability because

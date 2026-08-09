@@ -34,7 +34,7 @@ TEST(AllocSizeOverflowRuleTest, LvglLocaCount_OutParamPlusOne_Reports) {
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
         typedef unsigned int uint32_t;
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* malloc(size_t);
         extern int read_u32(uint32_t* out);
         void* f(void) {
@@ -54,7 +54,7 @@ TEST(AllocSizeOverflowRuleTest, ReturnValueSource_MultiplyWraps_Reports) {
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
         typedef unsigned int uint32_t;
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* malloc(size_t);
         extern uint32_t packet_count(void);
         void* f(void) {
@@ -73,7 +73,7 @@ TEST(AllocSizeOverflowRuleTest, BoundedLength_Silent) {
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
         typedef unsigned int uint32_t;
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* malloc(size_t);
         extern int read_u32(uint32_t* out);
         void* f(void) {
@@ -92,7 +92,7 @@ TEST(AllocSizeOverflowRuleTest, NoDeclaredSource_Silent) {
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
         typedef unsigned int uint32_t;
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* malloc(size_t);
         void* f(uint32_t n) {
             return malloc(sizeof(uint32_t) * (n + 1));
@@ -127,7 +127,7 @@ TEST(AllocSizeOverflowRuleTest, SignedArithmetic_NotThisRule) {
     SourceScope scope({"read_int"});
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* malloc(size_t);
         extern int read_int(void);
         void* f(void) {
@@ -147,7 +147,7 @@ TEST(AllocSizeOverflowRuleTest, CustomAllocatorWrapper_Reports) {
     AllocSizeOverflowRule rule;
     auto results = runRule(rule, R"(
         typedef unsigned int uint32_t;
-        typedef unsigned long size_t;
+        typedef __SIZE_TYPE__ size_t;
         extern void* lv_malloc(size_t);
         extern int read_u32(uint32_t* out);
         void* f(void) {
@@ -159,4 +159,132 @@ TEST(AllocSizeOverflowRuleTest, CustomAllocatorWrapper_Reports) {
     setAllocFunctionNames({});
     ASSERT_GE(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// Phase 6.1: a 64-bit allocation-size expression needs operand-corner
+// reasoning because the mathematical product does not fit the int64
+// interval domain. A declared untrusted size_t and a finite factor are
+// sufficient evidence that the upper corner can wrap.
+TEST(AllocSizeOverflowRuleTest, SizeT64ConstantMultiply_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(sizeof(int) * n);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// The canonical checked-multiply guard narrows n to SIZE_MAX / factor.
+// Its quotient fits int64 for every factor greater than one, so the
+// existing path-sensitive interval state can prove the product safe.
+TEST(AllocSizeOverflowRuleTest, SizeT64DivisionGuard_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (n > ((size_t)-1) / 16) return 0;
+            return malloc(n * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// A guard for a smaller factor does not prove the actual product safe.
+TEST(AllocSizeOverflowRuleTest, SizeT64InsufficientDivisionGuard_Reports) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            if (n > ((size_t)-1) / 8) return 0;
+            return malloc(n * 16);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "alloc-size-overflow");
+}
+
+// A second runtime value is not a finite corner witness. Shadowing its
+// full unsigned type range would turn ordinary unknowns into reports.
+TEST(AllocSizeOverflowRuleTest, SizeT64UnknownFactor_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        extern size_t runtime_factor(void);
+        void* f(void) {
+            size_t n = read_size();
+            size_t factor = runtime_factor();
+            return malloc(n * factor);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Widening a 32-bit source before multiplying by 16 is provably safe in
+// the 64-bit result type and must not inherit the size_t full-range corner.
+TEST(AllocSizeOverflowRuleTest, SizeT64NarrowOperandPromoted_Silent) {
+    SourceScope scope({"read_u32"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef unsigned int uint32_t;
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern uint32_t read_u32(void);
+        void* f(void) {
+            uint32_t n = read_u32();
+            return malloc((size_t)n * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Signed-to-unsigned conversion chains belong to the next Phase 6 slice.
+// The 64-bit unsigned-corner fallback must not treat a signed source as if
+// its declared domain were the full size_t range.
+TEST(AllocSizeOverflowRuleTest, SizeT64SignedSourceCast_NotThisSlice_Silent) {
+    SourceScope scope({"read_signed"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern long long read_signed(void);
+        void* f(void) {
+            long long n = read_signed();
+            return malloc((size_t)n * 16);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
+}
+
+// Multiplication by one cannot cross the result type's maximum.
+TEST(AllocSizeOverflowRuleTest, SizeT64IdentityFactor_Silent) {
+    SourceScope scope({"read_size"});
+    AllocSizeOverflowRule rule;
+    auto results = runRule(rule, R"(
+        typedef __SIZE_TYPE__ size_t;
+        extern void* malloc(size_t);
+        extern size_t read_size(void);
+        void* f(void) {
+            size_t n = read_size();
+            return malloc(n * 1);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0u);
 }
