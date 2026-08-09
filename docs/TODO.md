@@ -77,6 +77,40 @@ independently measurable RED-to-GREEN slices:
    rejected 0, unsupported 6. No proof-bearing contract is invented; no
    `cs: ai` proposal can become accepted intent. The executable A7 RED fixtures
    and ordinary tests are the referee for this slice.
+
+   **Completion evidence (appended after implementation; the locked contract
+   above is unchanged).** Phase 7.1 is locally complete. A per-disjunct exact
+   binding now carries releases, UAF, double-free, null-failure refinement,
+   and exit-leak evidence through unchanged local pointer copies. Local
+   pointer references are distinguished from value copies: a reference tracks
+   its bound pointer variable across later allocation, while a copied pointer
+   retains only the copied value. Reassignment, conflicting paths, address or
+   writable-reference exposure, and cast-changing aliases remain conservative.
+   The old alias-reuse accepted FN is now a positive leak fixture. Fifteen
+   Phase 7.1 cases and the adjacent reference/Systemd controls pass; direct and
+   CTest suites are 1077/1077.
+
+   The first 400-file/CWE Juliet replay exposed a real reference-binding
+   assumption bug: CWE401 moved to 92 TP / 17 FP, precision 0.844, below the
+   unchanged 0.85 floor. The four added FPs were exactly local `T*&` variant-33
+   good sinks. The corrected final replay is CWE401 92/13 (precision 0.876,
+   hit rate 0.223), CWE415 119/0 (precision 1.000, hit rate 0.297), and CWE416
+   212/0 (precision 1.000, hit rate 0.531). The other rule-matched receipts
+   remain CWE476 140/0, CWE369 43/0, and CWE190 23/0. No floor changed. Frozen
+   thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings; self-scan is clean
+   and complete at 48/48 TUs; cJSON remains 54 and tinyxml2 9. The tested
+   product SHA-256 is
+   `2a0a43114832761ea60617bc553393f4b6b7b15fd64cd5bcbdc0e0659f9ad197`.
+
+   Shadow completion report: the six critical binding, merge,
+   root-resolution, release, dereference, and exit semantic units were
+   considered; proposals 0, eligible 0, rejected 0, unsupported 6. No proposal
+   exposed a problem because no native pointer/heap proposal was eligible.
+   Independent RED tests, the Systemd full-suite regression, and Juliet exposed
+   the implementation and reference-storage assumptions; all are closed.
+   Candidate contracts requiring later human review: none. No `cs: ai`
+   proposal became accepted intent, and native owned-memory parity remains
+   deferred to executable A7 fixtures.
 2. **`realloc` success/failure paths — pending.** Preserve the original
    allocation on failure, transfer lifetime on success, and cover direct,
    temporary, overwrite, `reallocarray`, null-input, zero-size, guarded, and
@@ -95,6 +129,13 @@ Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 `memory-leak` precision remains at least 0.85 (target 0.90), supported UAF and
 double-free precision floors remain at least 0.95, clean corpora stay clean,
 and every local/CI referee passes without weakening an existing floor.
+
+Documentation automation follow-up (owner request, 2026-08-09): after the
+Phase 7.1 commit, declare a separate maintenance boundary for extending the
+existing docs-sync path so verified stage transitions and progress receipts
+update TODO/progress artifacts automatically. The automation must remain
+fail-closed and must never infer completion before the relevant verifier
+passes.
 
 ## Açık kullanıcı kararları
 

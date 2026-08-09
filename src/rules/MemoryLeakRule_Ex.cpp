@@ -49,6 +49,46 @@ AllocState mergeAllocStates(AllocState a, AllocState b) {
     return AllocState::Allocated;
 }
 
+// Per-disjunct pointer state. `binding` is a must-alias root: it is present
+// only while an exact local pointer copy remains unchanged on every path
+// represented by the disjunct. Allocation state stays attached to the
+// variable that acquired it; bindings merely let a release/access resolve
+// back to that owner. This deliberately does not model pointees, heap
+// objects, fields, casts, or may-alias relations.
+struct LifetimeState {
+    AllocState allocation = AllocState::None;
+    const VarDecl* binding = nullptr;
+    bool referenceBinding = false;
+
+    bool operator==(const LifetimeState& other) const {
+        return allocation == other.allocation && binding == other.binding &&
+               referenceBinding == other.referenceBinding;
+    }
+    bool operator!=(const LifetimeState& other) const {
+        return !(*this == other);
+    }
+    bool operator<(const LifetimeState& other) const {
+        if (allocation != other.allocation)
+            return static_cast<unsigned>(allocation) <
+                   static_cast<unsigned>(other.allocation);
+        if (binding != other.binding)
+            return std::less<const VarDecl*>{}(binding, other.binding);
+        return referenceBinding < other.referenceBinding;
+    }
+};
+
+LifetimeState mergeLifetimeStates(const LifetimeState& a,
+                                  const LifetimeState& b) {
+    LifetimeState result;
+    result.allocation = mergeAllocStates(a.allocation, b.allocation);
+    if (a.binding == b.binding &&
+        a.referenceBinding == b.referenceBinding) {
+        result.binding = a.binding;
+        result.referenceBinding = a.referenceBinding;
+    }
+    return result;
+}
+
 // --- Statement classification ---
 
 enum class StmtEffect { None, Allocates, Frees, Escapes };
@@ -101,6 +141,146 @@ const VarDecl* asVar(const Expr* expr) {
     if (const auto* ref = dyn_cast<DeclRefExpr>(expr))
         return dyn_cast<VarDecl>(ref->getDecl());
     return nullptr;
+}
+
+const VarDecl* asExactPointerVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* ref = dyn_cast<DeclRefExpr>(expr);
+    if (!ref) return nullptr;
+    const auto* var = dyn_cast<VarDecl>(ref->getDecl());
+    if (!var || !var->hasLocalStorage()) return nullptr;
+    QualType type = var->getType().getNonReferenceType();
+    return type->isPointerType() ? var : nullptr;
+}
+
+QualType pointerBindingType(const VarDecl* var) {
+    if (!var) return {};
+    QualType type = var->getType().getNonReferenceType();
+    return type->isPointerType()
+               ? type.getCanonicalType().getUnqualifiedType()
+               : QualType{};
+}
+
+bool sameExactPointerType(const VarDecl* lhs, const VarDecl* rhs) {
+    QualType left = pointerBindingType(lhs);
+    QualType right = pointerBindingType(rhs);
+    return !left.isNull() && !right.isNull() && left == right;
+}
+
+struct BindingUpdate {
+    const VarDecl* lhs = nullptr;
+    const VarDecl* rhs = nullptr;
+    bool deferred = false;
+    bool throughReference = false;
+};
+
+std::vector<BindingUpdate> pointerBindingUpdates(const Stmt* stmt) {
+    std::vector<BindingUpdate> updates;
+    if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* decl : declStmt->decls()) {
+            const auto* lhs = dyn_cast<VarDecl>(decl);
+            if (!lhs || !lhs->hasLocalStorage() || !lhs->hasInit() ||
+                pointerBindingType(lhs).isNull())
+                continue;
+            const VarDecl* rhs = asExactPointerVar(lhs->getInit());
+            updates.push_back(
+                {lhs, sameExactPointerType(lhs, rhs) ? rhs : nullptr});
+        }
+        return updates;
+    }
+    const auto* assignment = dyn_cast<BinaryOperator>(stmt);
+    if (assignment && assignment->getOpcode() == BO_Assign) {
+        const VarDecl* lhs = asExactPointerVar(assignment->getLHS());
+        if (!lhs) return updates;
+        const VarDecl* rhs = asExactPointerVar(assignment->getRHS());
+        updates.push_back({lhs,
+                           sameExactPointerType(lhs, rhs) ? rhs : nullptr,
+                           false,
+                           lhs->getType()->isReferenceType()});
+        return updates;
+    }
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    if (!call) return updates;
+    std::set<const VarDecl*> invalidated;
+    auto addInvalidation = [&](const VarDecl* var) {
+        if (var && invalidated.insert(var).second)
+            updates.push_back({var, nullptr, true, false});
+    };
+    for (const Expr* argument : call->arguments()) {
+        const Expr* core = argument->IgnoreParenCasts();
+        const auto* address = dyn_cast<UnaryOperator>(core);
+        if (!address || address->getOpcode() != UO_AddrOf) continue;
+        addInvalidation(asExactPointerVar(address->getSubExpr()));
+    }
+    codeskeptic::forEachNonConstRefArg(
+        call, [&](const Expr* argument) {
+            addInvalidation(asExactPointerVar(argument));
+        });
+    return updates;
+}
+
+const CallExpr* coreCall(const Expr* expr) {
+    if (!expr) return nullptr;
+    const Expr* current = expr;
+    while (current) {
+        current = current->IgnoreParenImpCasts();
+        if (const auto* cast = dyn_cast<CastExpr>(current)) {
+            current = cast->getSubExpr();
+            continue;
+        }
+        if (const auto* cleanups = dyn_cast<ExprWithCleanups>(current)) {
+            current = cleanups->getSubExpr();
+            continue;
+        }
+        break;
+    }
+    return dyn_cast_or_null<CallExpr>(current);
+}
+
+const VarDecl* reallocInput(const Expr* expr) {
+    const CallExpr* call = coreCall(expr);
+    if (!call || call->getNumArgs() == 0) return nullptr;
+    const FunctionDecl* callee = call->getDirectCallee();
+    const IdentifierInfo* id = callee ? callee->getIdentifier() : nullptr;
+    if (!id || (id->getName() != "realloc" &&
+                id->getName() != "reallocarray"))
+        return nullptr;
+    return asVar(call->getArg(0));
+}
+
+std::map<const VarDecl*, const VarDecl*> collectReallocSources(
+        const FunctionDecl* function) {
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        std::map<const VarDecl*, const VarDecl*> sources;
+
+        void record(const VarDecl* result, const Expr* value) {
+            const VarDecl* source = reallocInput(value);
+            if (!result || !source || !result->hasLocalStorage() ||
+                !source->hasLocalStorage())
+                return;
+            auto [it, inserted] = sources.emplace(result, source);
+            if (!inserted && it->second != source) it->second = nullptr;
+        }
+
+        bool VisitVarDecl(VarDecl* declaration) {
+            if (declaration->hasInit())
+                record(declaration, declaration->getInit());
+            return true;
+        }
+
+        bool VisitBinaryOperator(BinaryOperator* assignment) {
+            if (assignment->getOpcode() == BO_Assign)
+                record(asExactPointerVar(assignment->getLHS()),
+                       assignment->getRHS());
+            return true;
+        }
+
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } visitor;
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return visitor.sources;
 }
 
 // `&var->member`, `&var.member`, `&var` (chained members/subscripts
@@ -601,12 +781,11 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     return {vars.begin(), vars.end()};
 }
 
-// Flow-insensitive alias groups over local-to-local pointer copies.
-// Every copy edge is collected BEFORE filtering for ownership, so a
-// tracked allocation can travel through multiple shadows or a local
-// pointer reference (Juliet variants 31/33). Only components connected
-// to a tracked owner are materialized.
-std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
+// Flow-insensitive inventory of local pointer-copy candidates. This pass
+// admits alias variables into the dataflow state; it conveys no lifetime
+// evidence. Exact bindings are created, invalidated, and merged separately
+// per guarded disjunct during transfer.
+std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasInventory(
         const FunctionDecl* funcDecl, ASTContext& ctx,
         const std::set<const VarDecl*>& tracked) {
     std::map<const VarDecl*, const VarDecl*> parent;  // union-find
@@ -681,7 +860,94 @@ std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
 
 // --- Branch condition refinement (assume edges) ---
 
-using VarState = std::map<const VarDecl*, AllocState>;
+using VarState = std::map<const VarDecl*, LifetimeState>;
+
+const VarDecl* resolveBinding(const VarDecl* var, const VarState& state) {
+    if (!var) return nullptr;
+    std::set<const VarDecl*> seen;
+    const VarDecl* current = var;
+    bool followedCopy = false;
+    while (current && seen.insert(current).second) {
+        auto it = state.find(current);
+        if (it == state.end()) return nullptr;
+        if (it->second.referenceBinding) {
+            if (!it->second.binding) return nullptr;
+            current = it->second.binding;
+            followedCopy = false;
+            continue;
+        }
+        if (!it->second.binding)
+            return followedCopy && it->second.allocation != AllocState::None
+                       ? current
+                       : nullptr;
+        if (it->second.binding == current) return current;
+        followedCopy = true;
+        current = it->second.binding;
+    }
+    return nullptr;
+}
+
+void invalidateBindingDependents(VarState& state, const VarDecl* overwritten) {
+    if (!overwritten) return;
+    for (auto& [var, lifetime] : state) {
+        // A local pointer reference aliases the variable itself, not the
+        // variable's current pointer value. Reassigning that variable must
+        // invalidate copied pointer values while leaving `T*& ref = owner`
+        // bound to `owner`.
+        if (var == overwritten || var->getType()->isReferenceType() ||
+            !lifetime.binding)
+            continue;
+        std::set<const VarDecl*> seen;
+        const VarDecl* current = var;
+        while (current && seen.insert(current).second) {
+            auto it = state.find(current);
+            if (it == state.end() || !it->second.binding) break;
+            if (it->second.binding == overwritten) {
+                lifetime.binding = nullptr;
+                break;
+            }
+            if (it->second.binding == current) break;
+            current = it->second.binding;
+        }
+    }
+}
+
+void applyBindingUpdate(VarState& state, const BindingUpdate& update) {
+    auto lhs = state.find(update.lhs);
+    if (lhs == state.end()) return;
+    if (update.rhs == update.lhs) return;
+    if (update.throughReference) {
+        const VarDecl* overwritten = resolveBinding(update.lhs, state);
+        if (overwritten) {
+            state[overwritten].allocation = AllocState::Escaped;
+            state[overwritten].binding = nullptr;
+            state[overwritten].referenceBinding = false;
+        }
+        if (!update.lhs->getType()->isReferenceType())
+            state[update.lhs].binding = nullptr;
+        return;
+    }
+    const bool bindsVariable = update.lhs->getType()->isReferenceType();
+    const VarDecl* rhsRoot = bindsVariable
+                                 ? update.rhs
+                                 : resolveBinding(update.rhs, state);
+    if (bindsVariable && rhsRoot &&
+        rhsRoot->getType()->isReferenceType()) {
+        auto rhs = state.find(rhsRoot);
+        rhsRoot = rhs != state.end() ? rhs->second.binding : nullptr;
+    }
+    lhs = state.find(update.lhs);
+    lhs->second.binding = rhsRoot;
+    lhs->second.referenceBinding = bindsVariable && rhsRoot;
+}
+
+bool provesNonNull(const codeskeptic::Guarded<VarState>& disjunct,
+                   const VarDecl* var) {
+    if (!var) return false;
+    auto it = disjunct.facts.find(
+        codeskeptic::FactKey{var, BO_EQ, 0, nullptr});
+    return it != disjunct.facts.end() && !it->second;
+}
 
 // On an edge known to be null there is no "allocation": the malloc/new
 // failure path is NOT a leak (p = malloc; if (!p) return;).
@@ -691,9 +957,11 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
     codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
             if (!isNull) return;
-            auto it = state.find(var);
-            if (it != state.end() && it->second == AllocState::Allocated)
-                it->second = AllocState::None;
+            const VarDecl* owner = resolveBinding(var, state);
+            auto it = owner ? state.find(owner) : state.end();
+            if (it != state.end() &&
+                it->second.allocation == AllocState::Allocated)
+                it->second.allocation = AllocState::None;
         });
 }
 
@@ -709,7 +977,7 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
 using DisjunctState = codeskeptic::GuardedState<VarState>;
 
 VarState flattenState(const DisjunctState& state) {
-    return codeskeptic::flattenGuarded(state, mergeAllocStates);
+    return codeskeptic::flattenGuarded(state, mergeLifetimeStates);
 }
 
 // --- Analysis struct for DataflowEngine ---
@@ -722,18 +990,19 @@ public:
                     std::set<const ValueDecl*> unkeyableDecls,
                     std::set<const ValueDecl*> stampableDecls,
                     std::string funcName,
-                    std::map<const VarDecl*, std::vector<const VarDecl*>>
-                        aliasGroups,
+                    std::map<const VarDecl*, const VarDecl*> reallocSources,
                     codeskeptic::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
           mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)),
-          aliasGroups_(std::move(aliasGroups)),
+          reallocSources_(std::move(reallocSources)),
           funcName_(std::move(funcName)), results_(results) {
         codeskeptic::Guarded<VarState> init;
-        for (const auto* var : trackedVars_)
-            init.vars[var] = AllocState::None;
+        for (const auto* var : trackedVars_) {
+            init.vars[var] = LifetimeState{};
+            pointerFacts_.insert(var);
+        }
         initState_.push_back(std::move(init));
     }
 
@@ -743,7 +1012,7 @@ public:
     // the number of disjuncts multiplies the height (each disjunct can
     // rise independently)
     unsigned latticeHeight() const {
-        return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
+        return (static_cast<unsigned>(trackedVars_.size()) * 5 + 1) *
                    static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
@@ -751,17 +1020,20 @@ public:
     // never counted (v2b); bounded so pathological functions do not
     // explode the iteration cap.
     unsigned factBudget() const {
-        auto n = static_cast<unsigned>(stampable_.size());
+        auto n = static_cast<unsigned>(stampable_.size() +
+                                       pointerFacts_.size());
         return (n > 16 ? 16u : n) * 2 *
                static_cast<unsigned>(codeskeptic::kMaxDisjuncts);
     }
 
     // Engine convergence hook: collapse the disjuncts when a block is
     // revisited beyond any monotone explanation (see DataflowEngine).
-    void widen(State& s) const { codeskeptic::widenGuarded(s, mergeAllocStates); }
+    void widen(State& s) const {
+        codeskeptic::widenGuarded(s, mergeLifetimeStates);
+    }
 
     State merge(const State& a, const State& b) const {
-        return codeskeptic::mergeGuarded(a, b, mergeAllocStates);
+        return codeskeptic::mergeGuarded(a, b, mergeLifetimeStates);
     }
 
     // Pure state transition — produces no reports. Reporting lives in
@@ -771,50 +1043,82 @@ public:
         // Fact lifecycle first (v2b): see NullDerefRule — erase facts
         // on assigned locals, stamp integer-constant stores.
         State in = inRaw;
-        codeskeptic::applyStmtFacts(in, stmt, stampable_, mergeAllocStates);
+        codeskeptic::applyStmtFacts(in, stmt, stampable_, pointerFacts_,
+                                    mergeLifetimeStates);
+
+        const std::vector<BindingUpdate> bindings =
+            pointerBindingUpdates(stmt);
+        auto applyBindings = [&](bool deferred) {
+            for (auto& disjunct : in) {
+                for (const BindingUpdate& binding : bindings) {
+                    if (binding.deferred != deferred) continue;
+                    auto replacement = reallocSources_.find(binding.rhs);
+                    if (replacement != reallocSources_.end() &&
+                        replacement->second &&
+                        provesNonNull(disjunct, binding.rhs)) {
+                        const VarDecl* oldOwner =
+                            resolveBinding(binding.lhs, disjunct.vars);
+                        const VarDecl* reallocOwner =
+                            resolveBinding(replacement->second,
+                                           disjunct.vars);
+                        if (oldOwner && oldOwner == reallocOwner)
+                            disjunct.vars[oldOwner].allocation =
+                                AllocState::Escaped;
+                    }
+                    applyBindingUpdate(disjunct.vars, binding);
+                }
+            }
+        };
+        applyBindings(false);
 
         // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
-        if (effects.empty()) return in;
+        if (effects.empty()) {
+            applyBindings(true);
+            return in;
+        }
 
         State out = in;
         for (auto& d : out) {
             for (const auto& [var, effect] : effects) {
                 switch (effect) {
                     case StmtEffect::Allocates:
-                        d.vars[var] = AllocState::Allocated; break;
-                    case StmtEffect::Frees:
-                        d.vars[var] = AllocState::Freed; break;
+                        invalidateBindingDependents(d.vars, var);
+                        d.vars[var].binding = var;
+                        d.vars[var].referenceBinding = false;
+                        d.vars[var].allocation = AllocState::Allocated;
+                        break;
+                    case StmtEffect::Frees: {
+                        const VarDecl* owner = resolveBinding(var, d.vars);
+                        if (owner)
+                            d.vars[owner].allocation = AllocState::Freed;
+                        break;
+                    }
                     case StmtEffect::Escapes: {
-                        // An escape travels through local aliases:
-                        // `dup = git__strdup(s); result = dup;
-                        // return result;` hands the SAME allocation
-                        // out, so dup escapes too (the libgit2
-                        // realpath copy-then-return shape). Escape is
-                        // the safe direction to propagate — it only
-                        // silences reports. Frees stay per-variable:
-                        // flow-insensitive groups would fabricate
-                        // double-frees for `b = a; b = other;
-                        // free(b); free(a)`.
-                        d.vars[var] = AllocState::Escaped;
-                        auto group = aliasGroups_.find(var);
-                        if (group != aliasGroups_.end())
-                            for (const VarDecl* member : group->second)
-                                d.vars[member] = AllocState::Escaped;
+                        const VarDecl* owner = resolveBinding(var, d.vars);
+                        if (owner)
+                            d.vars[owner].allocation = AllocState::Escaped;
                         break;
                     }
                     case StmtEffect::None: break;
                 }
             }
         }
-        return out;
+        in = std::move(out);
+        applyBindings(true);
+        return in;
     }
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        codeskeptic::refineGuardedFacts(state, condExpr, isTrueBranch,
-                                       mutated_, mergeAllocStates);
+        codeskeptic::refineGuardedFactsWith(
+            state, condExpr, isTrueBranch, mutated_, pointerFacts_,
+            mergeLifetimeStates,
+            [](const codeskeptic::Guarded<VarState>&, const Expr*, bool) {
+                return false;
+            },
+            [](codeskeptic::Guarded<VarState>&, const Expr*, bool) {});
         for (auto& d : state)
             applyNullCondition(condExpr, isTrueBranch, d.vars);
     }
@@ -833,11 +1137,13 @@ public:
         // reporting pass's block order is not source order.
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
-            if (b == before.end() || b->second == afterState) continue;
-            if (afterState == AllocState::Allocated)
+            if (b == before.end() ||
+                b->second.allocation == afterState.allocation)
+                continue;
+            if (afterState.allocation == AllocState::Allocated)
                 recordEvent(stmt, var, ctx,
                             codeskeptic::MsgId::TraceAllocatedHere);
-            else if (afterState == AllocState::Freed)
+            else if (afterState.allocation == AllocState::Freed)
                 recordEvent(stmt, var, ctx,
                             codeskeptic::MsgId::TraceFreedHere);
         }
@@ -848,25 +1154,33 @@ public:
             if (it == before.end()) continue;
 
             if (effect == StmtEffect::Allocates &&
-                it->second == AllocState::Allocated) {
+                it->second.allocation == AllocState::Allocated) {
                 report(stmt, var, ctx, codeskeptic::Severity::Warning,
                        "memory-leak", codeskeptic::MsgId::LeakReassign);
-            } else if (effect == StmtEffect::Frees &&
-                       it->second == AllocState::Freed) {
+            } else if (effect == StmtEffect::Frees) {
+                const VarDecl* owner = resolveBinding(var, before);
+                auto ownerState = owner ? before.find(owner) : before.end();
+                if (ownerState == before.end() ||
+                    ownerState->second.allocation != AllocState::Freed)
+                    continue;
                 // Under its own identity, like UAF: so the CWE415 mapping
                 // and the --disable-rule taxonomy can tell the finding
                 // kinds apart
                 report(stmt, var, ctx, codeskeptic::Severity::Error,
-                       "double-free", codeskeptic::MsgId::DoubleFree);
+                       "double-free", codeskeptic::MsgId::DoubleFree,
+                       owner);
             }
         }
 
         // Dereference of a pointer in the Freed state: use-after-free
         if (const VarDecl* var = derefTarget(stmt)) {
-            auto it = before.find(var);
-            if (it != before.end() && it->second == AllocState::Freed) {
+            const VarDecl* owner = resolveBinding(var, before);
+            auto it = owner ? before.find(owner) : before.end();
+            if (it != before.end() &&
+                it->second.allocation == AllocState::Freed) {
                 report(stmt, var, ctx, codeskeptic::Severity::Error,
-                       "use-after-free", codeskeptic::MsgId::UseAfterFree);
+                       "use-after-free", codeskeptic::MsgId::UseAfterFree,
+                       owner);
             }
         }
     }
@@ -917,7 +1231,8 @@ private:
 
     void report(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
                 codeskeptic::Severity severity, const char* ruleId,
-                codeskeptic::MsgId msgId) {
+                codeskeptic::MsgId msgId,
+                const VarDecl* traceVar = nullptr) {
         const SourceManager& sm = ctx.getSourceManager();
         // Findings inside macros are bound to the use site (expansion);
         // otherwise the file name can end up empty (scratch buffer)
@@ -934,14 +1249,16 @@ private:
         diag.function = funcName_;
         diag.message = codeskeptic::msg(msgId, var->getNameAsString());
         results_.push_back(diag);
-        noteTargets_.emplace_back(results_.size() - 1, var);
+        noteTargets_.emplace_back(results_.size() - 1,
+                                  traceVar ? traceVar : var);
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
     std::set<const VarDecl*> trackedSet_;
     std::set<const ValueDecl*> mutated_;
     std::set<const ValueDecl*> stampable_;
-    std::map<const VarDecl*, std::vector<const VarDecl*>> aliasGroups_;
+    std::set<const ValueDecl*> pointerFacts_;
+    std::map<const VarDecl*, const VarDecl*> reallocSources_;
     std::string funcName_;
     codeskeptic::DiagnosticList& results_;
     State initState_;
@@ -1024,22 +1341,20 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     std::set<const VarDecl*> trackedSet(trackedVars.begin(),
                                         trackedVars.end());
-    auto aliasGroups = collectAliasGroups(funcDecl, ctx, trackedSet);
-    // Alias-connected variables join the tracked set: their state
-    // starts None (they never produce leak reports of their own), but
-    // an escape THROUGH them (`result = dup; return result;`) must be
-    // visible so it can propagate to the allocation they alias.
-    for (const auto& [var, members] : aliasGroups) {
+    auto aliasInventory = collectAliasInventory(funcDecl, ctx, trackedSet);
+    // Alias-connected variables join the tracked set with no binding. Their
+    // exact relation is established only when the corresponding statement is
+    // transferred on a concrete guarded disjunct.
+    for (const auto& [var, members] : aliasInventory) {
         (void)members;
         if (trackedSet.insert(var).second) trackedVars.push_back(var);
     }
-    // The exit-leak check below consults the groups too
-    const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
         trackedVars, codeskeptic::collectUnkeyableDecls(funcDecl),
         codeskeptic::collectFactDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
-        std::move(aliasGroups), results);
+        collectReallocSources(funcDecl),
+        results);
     auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
@@ -1054,42 +1369,19 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     const VarState exitVars = flattenState(exitIt->second);
     for (const auto& [var, state] : exitVars) {
-        if (state == AllocState::Allocated) {
-            // Freed THROUGH a local alias? `tmpData = realloc(data, n);
-            // if (tmpData) data = tmpData; free(data);` frees the same
-            // allocation under the alias's name (the Juliet
-            // malloc_realloc good1 shape). Frees deliberately do not
-            // propagate through the flow-insensitive groups (that
-            // would fabricate double-frees) — but AT THE EXIT, a Freed
-            // group member means this allocation was released; only
-            // the leak REPORT is suppressed. Accepted FN: reusing an
-            // alias variable for a second allocation and leaking the
-            // first (pinned as documentation).
-            // The check runs PER DISJUNCT: flattening first would
-            // dissolve the alias's Freed into None on guarded paths
-            // (Freed ⊔ None = None) and hide exactly the correlation
-            // the disjuncts preserved. The variable leaks only if some
-            // disjunct holds it Allocated with NO group member Freed
-            // in that same disjunct.
-            auto group = aliasGroupsCopy.find(var);
+        if (state.allocation == AllocState::Allocated) {
+            // A release through an exact alias updates the owner during
+            // transfer. The exit check therefore needs no flow-insensitive
+            // group suppression: an allocation leaks when at least one live
+            // disjunct still carries its owner as Allocated.
             bool leaksSomewhere = false;
             for (const auto& d : exitIt->second) {
                 auto v = d.vars.find(var);
                 if (v == d.vars.end() ||
-                    v->second != AllocState::Allocated)
+                    v->second.allocation != AllocState::Allocated)
                     continue;
-                bool freedHere = false;
-                if (group != aliasGroupsCopy.end()) {
-                    for (const VarDecl* member : group->second) {
-                        auto m = d.vars.find(member);
-                        if (m != d.vars.end() &&
-                            m->second == AllocState::Freed) {
-                            freedHere = true;
-                            break;
-                        }
-                    }
-                }
-                if (!freedHere) { leaksSomewhere = true; break; }
+                leaksSomewhere = true;
+                break;
             }
             if (!leaksSomewhere) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);

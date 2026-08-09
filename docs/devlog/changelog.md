@@ -1,5 +1,70 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.1 exact local alias lifetime
+
+The memory-lifetime analysis now carries an exact must-binding beside each
+allocation state in every guarded disjunct. A release through an unchanged
+local pointer copy updates the allocation owner, so later access or release
+through the owner, the alias, or a transitive exact alias reports UAF or
+double-free with the original allocation/free trace. Null failure edges refine
+the owner, conflicting bindings merge to unknown, and exit leaks no longer use
+flow-insensitive group suppression. Reusing an alias for a second allocation
+therefore exposes the first allocation leak instead of preserving the old
+accepted FN.
+
+Local pointer references and pointer value copies have separate binding
+semantics. `T*& ref = owner` stays attached to the pointer variable when
+`owner` later receives an allocation; `T* copy = owner` preserves only the
+value present at the copy. Direct reassignment and allocation overwrite only
+the affected binding. Address exposure, writable-reference calls,
+cast-changing copies, conflicting paths, fields, heap aliases, and unknown
+relations remain non-authoritative and cannot manufacture UAF/double-free
+evidence. A narrow same-source, proven-non-null compatibility bridge preserves
+the existing Juliet realloc good shapes; complete realloc success/failure,
+zero-size, null-input, and overwrite semantics remain owned by Phase 7.2.
+
+RED was recorded before implementation: six of the initial eight alias cases
+failed while both precision controls passed. Null-guard, address-exposure, and
+writable-reference controls were independently RED. The first full suite then
+found the Systemd copy-before-null escape regression. Precision review added
+cast-changing, reference-before-allocation, copy-before-allocation, and
+reference-storage-reassignment controls. The final Phase 7.1 matrix is 15/15;
+the adjacent local-reference and Systemd controls make the focused replay
+17/17.
+
+The first 400-file/CWE Juliet replay was deliberately kept red: CWE401 reached
+92 TP / 17 FP, precision 0.844, below the unchanged 0.85 floor. All four added
+FPs were variant-33 good sinks where a local `T*&` was incorrectly invalidated
+when its bound pointer variable received the allocation. Distinguishing
+reference-to-variable bindings from pointer-value copies removed exactly those
+four FPs without losing a TP. Final rule-matched results are CWE401 92/13
+(precision 0.876, hit rate 0.223), CWE415 119/0 (precision 1.000, hit rate
+0.297), and CWE416 212/0 (precision 1.000, hit rate 0.531). The unaffected
+rule-matched receipts are CWE476 140/0 (hit rate 0.347), CWE369 43/0 (0.108),
+and CWE190 23/0 (0.057). Every existing floor passes and no floor changed.
+
+Final local gates are direct suite 1077/1077, CTest 1077/1077, frozen thesis
+`clean_fp=0` and `bug_caught=9/15` with 11 findings, clean and complete 48/48-TU
+self-scan, cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly
+accepted broken fixtures), and tinyxml2 9 findings (3/3 analyzed). The tested
+Windows product SHA-256 is
+`2a0a43114832761ea60617bc553393f4b6b7b15fd64cd5bcbdc0e0659f9ad197`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, contract grammar, capability tiers, configuration,
+summary schemas, accepted model channels, and Juliet floors are unchanged.
+
+Contract-first shadow completion considered the six critical binding, merge,
+root-resolution, release, dereference, and exit semantic units. Native pointer
+identity, reference storage, alias, and heap lifetime remain unsupported by the
+current verifier, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proposal exposed a problem because none was
+eligible. Independent RED tests, the Systemd full-suite regression, and the
+Juliet floor exposed the implementation and assumption problems above; all are
+closed. Candidate contracts requiring later human review: none. No `cs: ai`
+proposal became accepted intent, and native owned-memory verification parity
+remains deferred to executable A7 fixtures.
+
 ## 2026-08-09 — Phase 7.1 exact-alias boundary and contract record
 
 Phase 6 merged through fully green PR #133 as squash commit

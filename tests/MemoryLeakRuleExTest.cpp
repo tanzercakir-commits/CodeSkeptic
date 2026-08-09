@@ -1119,12 +1119,9 @@ TEST(AliasEscapeTest, FreedThroughLocalReferenceAlias_NoLeak) {
     ASSERT_EQ(results.size(), 0);
 }
 
-TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
-    // DOCUMENTED accepted FN of the exit-time alias-free check:
-    // reusing the alias variable for a SECOND allocation and freeing
-    // only that one leaks the first — the flow-insensitive group
-    // cannot tell the two apart. This test pins the trade-off; if a
-    // future flow-sensitive alias model fixes it, flip the count to 1.
+TEST(AliasLifetimeV2Test, AliasReuse_FirstAllocationLeak_Reports) {
+    // Rebinding b must sever only b's exact relation to a. Freeing the
+    // second allocation cannot discharge the first allocation held by a.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" void* malloc(unsigned long);
@@ -1136,7 +1133,245 @@ TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
             free(b);
         }
     )");
-    ASSERT_EQ(results.size(), 0);
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AliasLifetimeV2Test, FreeThroughAliasThenUseOwner_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(alias);
+            return *owner;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    ASSERT_EQ(results[0].notes.size(), 2u);
+    EXPECT_NE(results[0].notes[0].message.find("allocated"),
+              std::string::npos);
+    EXPECT_NE(results[0].notes[1].message.find("freed"),
+              std::string::npos);
+}
+
+TEST(AliasLifetimeV2Test, FreeOwnerThenUseAlias_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(owner);
+            return alias[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AliasLifetimeV2Test, FreeThroughAliasThenFreeOwner_ReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(alias);
+            free(owner);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+    ASSERT_EQ(results[0].notes.size(), 2u);
+    EXPECT_NE(results[0].notes[0].message.find("allocated"),
+              std::string::npos);
+    EXPECT_NE(results[0].notes[1].message.find("freed"),
+              std::string::npos);
+}
+
+TEST(AliasLifetimeV2Test, FreeOwnerThenFreeAlias_ReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(owner);
+            free(alias);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(AliasLifetimeV2Test, TransitiveAliasFreeThenUseOwner_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* middle = owner;
+            int* alias = middle;
+            free(alias);
+            return *owner;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AliasLifetimeV2Test, ReassignedAliasDoesNotPoisonOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int local = 7;
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            alias = &local;
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, BranchConflictingAliasRemainsPathExact) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f(int choose_local) {
+            int local = 0;
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            if (choose_local) alias = &local;
+            free(alias);
+            if (choose_local) free(owner);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, AliasNullGuardClearsOwnerFailurePath) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            if (!alias) return;
+            free(owner);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, AddressExposedAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void mutate(int**);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            mutate(&alias);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, WritableReferenceAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void mutate(int*&);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            mutate(alias);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, CastChangingAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            unsigned int* alias = reinterpret_cast<unsigned int*>(owner);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, ReferenceBoundBeforeAllocationStillReleasesOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            int*& reference = owner;
+            owner = (int*)malloc(sizeof(int));
+            free(reference);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, PointerCopyBeforeAllocationDoesNotFollowOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            int* copy = owner;
+            owner = (int*)malloc(sizeof(int));
+            free(copy);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AliasLifetimeV2Test, ReferenceFollowsReassignedStorageNotOldAllocation) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int local = 0;
+            int* owner = (int*)malloc(sizeof(int));
+            int*& reference = owner;
+            owner = &local;
+            free(reference);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
 TEST(AliasEscapeTest, FreedThroughAlias_UnderGuard_NoLeak) {
