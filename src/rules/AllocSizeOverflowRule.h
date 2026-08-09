@@ -33,9 +33,23 @@ namespace codeskeptic {
 //   - its proven interval PROVABLY reaches past the unsigned result
 //     type's max (a finite witness; an unknown operand stays silent).
 // A guard (`if (n < LIMIT)`) narrows the interval and silences on its
-// own edge. v1 scope: sub-64-bit result types, where the int64 interval
-// can witness the wrap; 64-bit size_t multiplication needs the operand-
-// corner proof and is deferred (documented, not silently dropped).
+// own edge. Phase 6.1 adds 64-bit multiplication through an exact
+// operand-corner proof: one side must be a finite constant and the other
+// a declared untrusted unsigned value. The operands are widened to 128
+// bits for the mathematical comparison; runtime/unknown factors remain
+// silent. Phase 6.2 preserves the exact modulo corner through stable local
+// signed-to-unsigned casts and aliases, including narrowing conversions. It
+// also tracks compiler checked-multiply outputs: a proven no-overflow edge is
+// silent, while an unchecked/overflow-edge result needs the same finite
+// corner proof. Reassigned, escaped, or otherwise unstable relations remain
+// silent. Phase 6.3 consumes only exact unchanged parameter-to-allocator-size
+// relations from the versioned function summaries, including visible chains
+// and harvested cross-TU wrappers. Bodyless, transformed, conflicting, and
+// unknown relations stay silent. When an exact local allocation binding is
+// later indexed or passed to a bounded memory-access primitive with the same
+// declared-untrusted origin, a trace note records that evidence without
+// replacing the allocation-wrap proof. Sub-64 arithmetic continues to use
+// the shared int64 interval.
 class AllocSizeOverflowRule : public Rule {
 public:
     std::string id() const override { return "alloc-size-overflow"; }

@@ -357,3 +357,36 @@ TEST(SummaryDiffTest, ExactFieldWritesLostIsWeakened) {
                                 {{"inspect/1", oldSum}});
     ASSERT_EQ(gained.strengthened, 1u);
 }
+
+// Losing allocator-size reachability removes caller analysis coverage and is
+// therefore a weakening in the persisted semantic contract.
+TEST(SummaryDiffTest, AllocatorSizeSinkLossIsWeakened) {
+    auto oldPath =
+        writeFile("sd_alloc_old.csk",
+                  "codeskeptic-summaries v11\n"
+                  "alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\tS\n");
+    auto newPath =
+        writeFile("sd_alloc_new.csk",
+                  "codeskeptic-summaries v11\n"
+                  "alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\tO\n");
+    std::ostringstream out;
+    EXPECT_EQ(reportSummaryDiff(oldPath, newPath, out), 1);
+    EXPECT_NE(out.str().find("param#0.allocatorSize: Sink -> None"),
+              std::string::npos);
+}
+
+// Gaining a proven sink is coverage strengthening and does not fail the gate.
+TEST(SummaryDiffTest, AllocatorSizeSinkGainIsStrengthened) {
+    auto oldPath =
+        writeFile("sd_alloc_gain_old.csk",
+                  "codeskeptic-summaries v11\n"
+                  "alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\tO\n");
+    auto newPath =
+        writeFile("sd_alloc_gain_new.csk",
+                  "codeskeptic-summaries v11\n"
+                  "alloc/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\tS\n");
+    std::ostringstream out;
+    EXPECT_EQ(reportSummaryDiff(oldPath, newPath, out), 0);
+    EXPECT_NE(out.str().find("SUMMARY_DIFF STRENGTHENED alloc/1"),
+              std::string::npos);
+}

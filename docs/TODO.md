@@ -12,8 +12,8 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 6aad09c
-uçuşta = phase-fd-resource-model
+base   = 8393a8b
+uçuşta = phase-integer-allocation-v2
 ```
 <!-- cs:state-end -->
 
@@ -44,82 +44,81 @@ sürükleniyordu, toleransın içinde sessizce).
 
 ## Next work
 
-Phase 4 is merged through PR #131. Its exact squash commit is
-`6aad09c8030ebdf14b4bef2eeb6596f25f650e17`; the squash tree matches the
-fully gated Phase 4 head, and the local and remote `main` branches agree.
+Phase 5 is merged through PR #132. Its exact squash commit is
+`8393a8b0c07460c6636e4aa79528bdd7b55a5b22`; the squash tree
+`bba0359b379cf264e52fca03a46eade2e542a760` matches the fully gated branch
+head, the remote feature branch is deleted, and local/remote `main` agree.
 
-Phase 5 is locally complete on `phase-fd-resource-model` and remains split
-into measurable RED-to-GREEN slices pending its PR gates and merge:
+Phase 6 is active on `phase-integer-allocation-v2` and is divided into
+independently measurable RED-to-GREEN slices:
 
-1. **Direct POSIX descriptor lifecycle — locally complete.** A separate
-   integer-resource rule covers global `open`/`openat`/`socket`/`dup`/
-   `mkstemp`, `close`, the `-1` failure sentinel, branches, early returns,
-   cleanup labels, local aliases, discarded results, and return/global
-   ownership transfer. `shutdown` correctly does not close a descriptor.
-   Namespace functions and methods with colliding names are excluded. The
-   exact slice file set stayed
-   `src/rules/FdResourceRule.{h,cpp}`, `src/main.cpp`,
-   `src/server/McpServer.cpp`, `src/CMakeLists.txt`,
-   `tests/FdResourceRuleTest.cpp`, `tests/CMakeLists.txt`, this TODO, and
-   `docs/devlog/changelog.md`; `MemoryLeakRule_Ex` remained untouched.
-   Gates: focused 21/21, direct and CTest 998/998, exact CLI smoke,
-   thesis `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan,
-   cJSON 54 and tinyxml2 9.
-2. **Wrapper propagation and explicit models — locally complete.** The
-   existing v10 return/parameter ownership axes are the only declaration
-   channel. Visible integer wrapper chains now compose locally and across TUs
-   through the existing SCC solver; bodyless acquire/consume/transfer APIs
-   require an explicit reviewed v10 model. Conditional/conflicting effects
-   degrade to `Unknown`, and `Unknown`/`Borrowed` never suppress a leak.
-   The exact file set stayed `src/engine/FunctionSummary.cpp`,
-   `src/rules/FdResourceRule.cpp`, `tests/FdResourceRuleTest.cpp`,
-   `docs/engine.md`, `docs/usage.md`, this TODO, and
-   `docs/devlog/changelog.md`; no header/API, configuration, grammar,
-   ContractRule, or default model changed. Gates: RED 5/29, focused 33/33,
-   summary/model/contract 129/129, direct and CTest 1010/1010, exact CLI
-   smoke 2 report-only findings, thesis `clean_fp=0` / `bug_caught=9/15`,
-   clean 48/48-TU self-scan, cJSON 54, and tinyxml2 9.
-3. **Pinned libarchive validation and promotion — locally complete.** The
-   exact 132-file library surface (123 compile-DB files plus nine controlled
-   fallbacks, 255 analysis executions) is complete with zero broken TUs and
-   zero incomplete functions. Manual triage classified all 12 initial
-   descriptor reports as false and exposed non-local transfer plus negative
-   snapshot gaps. RED was 3/39; GREEN is 42/42. The final clean run has zero
-   descriptor findings, while three independent load-bearing close mutations
-   produce exactly 3 TP / 0 FP: precision 1.000 and mutation recall 3/3.
-   `resource-leak` is now supported, quality-gated, and blocking. The
-   end-to-end capability CLI contract pins all seven supported rules.
-   Final local
-   gates are focused 45/45, direct and CTest 1019/1019, thesis
-   `clean_fp=0` / `bug_caught=9/15`, clean 48/48-TU self-scan, cJSON 54,
-   and tinyxml2 9.
+1. **64-bit `size_t` multiplication corner proof — locally complete.** Extend
+   the allocation-size rule only when an untrusted unsigned operand, a finite
+   constant factor, and the result type's width prove that the mathematical
+   product can exceed the 64-bit maximum. A dominating division guard must
+   silence the report; unknown factors, non-allocator arithmetic, ordinary
+   inputs, and insufficient proof stay silent. The exact slice file set is
+   `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+   `tests/AllocSizeOverflowRuleTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. `PLAN.md`, the interval engine, contract
+   grammar, capability registry/tier, configuration, and accepted models
+   remain unchanged. Gates: RED 2/12; focused 14/14; direct and CTest
+   1026/1026; exact CLI 1 report / guarded twin 0; thesis `clean_fp=0` and
+   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
+   Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 6;
+   no `cs: ai` proposal became accepted intent.
+2. **Checked arithmetic and signed/unsigned chains — locally complete.**
+   Preserve the
+   exact reachable upper corner through stable, local signed-to-unsigned cast
+   and alias chains, including narrowing conversions. Recognize the
+   Clang/GCC `__builtin_*mul*_overflow` family when its direct output variable
+   reaches an allocator: a proven no-overflow branch is silent, while an
+   ignored or overflow-path result reports only when the same finite-corner
+   proof establishes wrap. Unknown factors, unstable/reassigned chains,
+   non-allocator uses, and unproven relations stay silent. The exact slice
+   file set is `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+   `tests/AllocSizeOverflowRuleTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. The shared interval engine,
+   `SignConversionRule`, contract grammar, capability registry/tier,
+   configuration, and accepted models remain unchanged. Gates: RED 5/25;
+   focused 32/32; direct and CTest 1044/1044; exact CLI 1/0 for both the
+   signed-cast and checked-builtin unsafe/safe pairs; thesis `clean_fp=0` and
+   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
+   Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 50;
+   no `cs: ai` proposal became accepted intent.
+3. **Interprocedural allocator sinks and allocation-to-access evidence —
+   locally complete.** Add a versioned allocator-size parameter relation to
+   function summaries and propagate only exact, visible parameter-to-size flows through
+   the existing SCC, indirect-target, persistence, and conservative-merge
+   paths. The allocation rule may consume only a proven sink parameter;
+   bodyless, conflicting, transformed, or unknown flows stay silent. Attach
+   access trace evidence only when an exact local allocation result is later
+   indexed or used by a bounded memory-access call with the same declared
+   untrusted origin; absence of access evidence does not replace the existing
+   wrap proof. Pin and replay the relevant LVGL example. The exact slice file
+   set is `src/engine/FunctionSummary.{h,cpp}`,
+   `src/engine/SummaryDiff.cpp`,
+   `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+   `tests/AllocSizeOverflowRuleTest.cpp`, `tests/InterproceduralTest.cpp`,
+   `tests/SummaryDiffTest.cpp`, `tests/CapabilitiesCliTest.py`, this TODO, and
+   `docs/devlog/changelog.md`. `PLAN.md`, the shared interval engine,
+   contract grammar, capability registry/tier, configuration, and accepted
+   model channels remain unchanged. RED was recorded as 8 failures in the
+   initial 11-case matrix; the expanded pointer-reassignment and uninvoked-
+   lambda precision controls were each independently RED before their fixes.
+   Gates: focused 51/51; direct and CTest 1063/1063; exact CLI wrapper 1 report
+   / guarded twin 0; exact access fixture 1 report with one trace note; pinned
+   LVGL v9.2.2 replay 1 report at `lv_binfont_loader.c:511:72`; capability CLI
+   schema 2 / 14 rules / 7 supported with alloc-size-overflow still
+   experimental and non-blocking; frozen thesis `clean_fp=0` and
+   `bug_caught=9/15`; clean 48/48-TU self-scan; cJSON 54 and tinyxml2 9.
+   Shadow counts are proposals 2, eligible 2, rejected 0, unsupported 40;
+   both candidates remain `cs:ai` proposals pending human review and neither
+   became accepted intent.
 
-The first slice's contract-first shadow audit found no eligible function: its
-40 new or materially changed source functions depend on enum lattice
-relations, strings/containers, Clang AST/CFG identity, resource ownership, or
-analyzer lifetime beyond the current contract referee. Counts are proposals
-0, eligible 0, rejected 0, unsupported 40; no `cs: ai` proposal became
-accepted intent. The independent RED suite found the planned feature gap and
-the namespace/method precision assumption; both are closed.
-
-The second slice's shadow audit likewise found no eligible function among 46
-new or materially changed C++ functions. They depend on Clang type/AST/CFG
-identity, enum/resource lattices, containers, summary-registry state,
-filesystem streams, or analyzer lifetime beyond the current referee. Counts:
-proposals 0, eligible 0, rejected 0, unsupported 46. The independent RED found
-the planned wrapper/model gap; precision review removed an ordinary-integer
-Borrowed overclaim. Candidate contracts: none. No `cs: ai` proposal became
-accepted intent.
-
-The third slice's shadow audit considered 15 new or materially changed
-production functions. Every candidate depends on Clang AST/CFG identity,
-container/lattice state, class members, or resource-ownership lifetime beyond
-the current referee, so dogfood was not applicable. Counts: proposals 0,
-eligible 0, rejected 0, unsupported 15. No proposal exposed a problem; the
-independent libarchive scan exposed the non-local transfer and negative
-snapshot assumptions, and both are closed. Candidate contracts: none. No
-`cs: ai` proposal became accepted intent, and native memory semantics remain
-deferred to executable A7 fixtures.
+Phase 6 exits only when guarded cases are silent, unknown values remain
+reportless, real-repository examples are pinned, and the full local/CI
+referees pass without weakening existing floors.
 
 ## Açık kullanıcı kararları
 
@@ -131,11 +130,8 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-```
-1. alloc-size v2: 64-bit size_t multiplication corner proof
-2. sign-conversion v2: interprocedural sink (the nlohmann harm was in a
-   different function)
-```
+The former alloc-size v2 and sign-conversion v2 entries are now owned by the
+active Phase 6 slices above; there is no separate unowned item.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
