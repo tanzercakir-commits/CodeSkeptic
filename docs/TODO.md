@@ -254,6 +254,37 @@ independently measurable RED-to-GREEN slices:
    become accepted intent. Executable A7 RED fixtures and ordinary tests are
    the referee; this pre-implementation contract record will not change during
    the slice.
+
+   **Completed 2026-08-09.** Atomic CLI/config/MCP parsing, direct-callee
+   qualified and unqualified matching, per-disjunct exact family state,
+   matching-release authority, conservative uncertainty, and analyzer-scoped
+   registry cleanup are implemented within the locked file set. The initial
+   compile RED established the missing API; after registry plumbing, 6 of 14
+   semantic cases remained RED. The first implementation closed all 14. A
+   precision-review fixture then exposed that a paired allocation passed to
+   built-in `realloc` emitted two leaks instead of one; preserving the direct
+   source owner before binding invalidation closed that assumption gap. The
+   final focused matrix is 20/20.
+
+   Final local gates are direct suite 1117/1117, CTest 1117/1117,
+   `CapabilitiesCliTest.py` schema 2 / rules 14 / supported 7 /
+   out-of-scope 5, `ActionArgsTest.py` 5/5, docs sync, 8/8 profiles,
+   README 315/315, and capability sync. Frozen thesis remains
+   `clean_fp=0`, `bug_caught=9/15`, 11 findings; self-scan is clean and
+   complete at 48/48 translation units. Corpus receipts are cJSON 54 findings
+   (76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+   findings (3/3). The full unchanged 400-file/CWE Juliet floors pass:
+   CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416
+   212/0, CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+   `db1f7ba8eea153edaec1b9e4e77df191d77eb1f56a12e199b2494cd8de13fc68`.
+
+   Contract-first shadow completion considered the same seven functions:
+   proposals 0, eligible 0, rejected 0, unsupported 7. No proposal exposed a
+   problem because none was eligible; independent RED and precision-review
+   tests exposed the implementation and assumption problems above. Candidate
+   contracts requiring later human review: none. No `cs: ai` proposal became
+   accepted intent, and native owned-memory parity remains deferred to
+   executable A7 fixtures.
 4. **RAII and smart pointers — pending.** Model exact adoption, release,
    reset, move, and destruction paths for supported standard owners while
    keeping project wrappers explicitly configured and non-owning views silent.

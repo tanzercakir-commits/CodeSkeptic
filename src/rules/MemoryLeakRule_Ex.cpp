@@ -59,11 +59,15 @@ struct LifetimeState {
     AllocState allocation = AllocState::None;
     const VarDecl* binding = nullptr;
     const VarDecl* reallocSource = nullptr;
+    std::string allocatorFamily;
+    bool allocatorFamilyKnown = true;
     bool referenceBinding = false;
 
     bool operator==(const LifetimeState& other) const {
         return allocation == other.allocation && binding == other.binding &&
                reallocSource == other.reallocSource &&
+               allocatorFamily == other.allocatorFamily &&
+               allocatorFamilyKnown == other.allocatorFamilyKnown &&
                referenceBinding == other.referenceBinding;
     }
     bool operator!=(const LifetimeState& other) const {
@@ -78,6 +82,10 @@ struct LifetimeState {
         if (reallocSource != other.reallocSource)
             return std::less<const VarDecl*>{}(reallocSource,
                                                 other.reallocSource);
+        if (allocatorFamily != other.allocatorFamily)
+            return allocatorFamily < other.allocatorFamily;
+        if (allocatorFamilyKnown != other.allocatorFamilyKnown)
+            return allocatorFamilyKnown < other.allocatorFamilyKnown;
         return referenceBinding < other.referenceBinding;
     }
 };
@@ -93,6 +101,21 @@ LifetimeState mergeLifetimeStates(const LifetimeState& a,
     }
     if (a.reallocSource == b.reallocSource)
         result.reallocSource = a.reallocSource;
+    if (a.allocation == AllocState::None &&
+        b.allocation != AllocState::None) {
+        result.allocatorFamily = b.allocatorFamily;
+        result.allocatorFamilyKnown = b.allocatorFamilyKnown;
+    } else if (b.allocation == AllocState::None &&
+               a.allocation != AllocState::None) {
+        result.allocatorFamily = a.allocatorFamily;
+        result.allocatorFamilyKnown = a.allocatorFamilyKnown;
+    } else if (a.allocatorFamilyKnown && b.allocatorFamilyKnown &&
+               a.allocatorFamily == b.allocatorFamily) {
+        result.allocatorFamily = a.allocatorFamily;
+        result.allocatorFamilyKnown = true;
+    } else {
+        result.allocatorFamilyKnown = false;
+    }
     return result;
 }
 
@@ -244,6 +267,69 @@ const CallExpr* coreCall(const Expr* expr) {
         break;
     }
     return dyn_cast_or_null<CallExpr>(current);
+}
+
+struct AllocationFamily {
+    std::string name;
+    bool known = true;
+};
+
+const Expr* allocationExprFor(const Stmt* stmt, const VarDecl* var) {
+    if (!stmt || !var) return nullptr;
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* candidate = dyn_cast<VarDecl>(declaration);
+            if (candidate == var && candidate->hasInit())
+                return candidate->getInit();
+        }
+    }
+    if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
+        if (assignment->getOpcode() == BO_Assign &&
+            asVar(assignment->getLHS()) == var)
+            return assignment->getRHS();
+    }
+    return nullptr;
+}
+
+AllocationFamily allocationFamilyOf(const Expr* expr) {
+    const CallExpr* call = coreCall(expr);
+    if (!call) return {};
+    if (auto family = codeskeptic::pairedAllocatorFamily(call))
+        return {*family, true};
+
+    const auto* summary =
+        codeskeptic::SummaryRegistry::instance().lookup(call);
+    if (summary &&
+        summary->returnOwnership ==
+            codeskeptic::SummaryRegistry::ReturnOwnership::Owned &&
+        !codeskeptic::allocatorPairs().empty())
+        return {{}, false};
+    return {};
+}
+
+enum class ReleaseAuthority { Match, Mismatch, Unknown };
+
+ReleaseAuthority releaseAuthority(const Stmt* stmt,
+                                  const LifetimeState& lifetime) {
+    if (!lifetime.allocatorFamilyKnown)
+        return ReleaseAuthority::Unknown;
+    if (lifetime.allocatorFamily.empty())
+        return ReleaseAuthority::Match;
+    if (isa<CXXDeleteExpr>(stmt)) return ReleaseAuthority::Mismatch;
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    if (!call) return ReleaseAuthority::Unknown;
+    if (codeskeptic::matchesAllocatorFamily(lifetime.allocatorFamily, call))
+        return ReleaseAuthority::Match;
+
+    const llvm::StringRef name = calleeName(call->getDirectCallee());
+    const bool knownRelease =
+        name == "free" || isResourceReleaseName(name) ||
+        codeskeptic::isPairedDeallocatorCall(call) ||
+        (!name.empty() &&
+         codeskeptic::freeFunctionNames().count(name.str()) != 0);
+    return knownRelease ? ReleaseAuthority::Mismatch
+                        : ReleaseAuthority::Unknown;
 }
 
 struct ReallocSite {
@@ -680,6 +766,7 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         const llvm::StringRef name = calleeName(callee);
         const bool isFreeByName =
             name == "free" || isResourceReleaseName(name) ||
+            codeskeptic::isPairedDeallocatorCall(call) ||
             (!name.empty() &&
              codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
@@ -1108,7 +1195,7 @@ public:
     // Allocation, binding and pending-reallocation state can each climb
     // independently; the guarded-disjunct count multiplies that bound.
     unsigned latticeHeight() const {
-        return (static_cast<unsigned>(trackedVars_.size()) * 7 + 1) *
+        return (static_cast<unsigned>(trackedVars_.size()) * 9 + 1) *
                    static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
@@ -1188,27 +1275,66 @@ public:
                             update
                                 ? resolveBinding(update->source, d.vars)
                                 : nullptr;
+                        if (update && !sourceOwner) {
+                            auto directSource = d.vars.find(update->source);
+                            if (directSource != d.vars.end() &&
+                                directSource->second.allocation !=
+                                    AllocState::None)
+                                sourceOwner = update->source;
+                        }
                         const bool provenRequest =
                             update && provesNonZeroRequest(*update, d, ctx);
+                        const AllocationFamily family = allocationFamilyOf(
+                            allocationExprFor(stmt, var));
+                        auto source = sourceOwner
+                                          ? d.vars.find(sourceOwner)
+                                          : d.vars.end();
+                        const bool incompatibleRealloc =
+                            update && source != d.vars.end() &&
+                            source->second.allocation ==
+                                AllocState::Allocated &&
+                            (!source->second.allocatorFamilyKnown ||
+                             !source->second.allocatorFamily.empty());
                         invalidateBindingDependents(d.vars, var);
+                        if (incompatibleRealloc) {
+                            d.vars[var].binding = nullptr;
+                            d.vars[var].reallocSource = nullptr;
+                            d.vars[var].allocatorFamily.clear();
+                            d.vars[var].allocatorFamilyKnown = false;
+                            d.vars[var].referenceBinding = false;
+                            d.vars[var].allocation = AllocState::Escaped;
+                            break;
+                        }
                         d.vars[var].binding = var;
                         d.vars[var].reallocSource = nullptr;
+                        d.vars[var].allocatorFamily = family.name;
+                        d.vars[var].allocatorFamilyKnown = family.known;
                         d.vars[var].referenceBinding = false;
                         d.vars[var].allocation = AllocState::Allocated;
                         if (provenRequest && sourceOwner &&
                             sourceOwner != var) {
-                            auto source = d.vars.find(sourceOwner);
+                            source = d.vars.find(sourceOwner);
                             if (source != d.vars.end() &&
                                 source->second.allocation ==
-                                    AllocState::Allocated)
+                                    AllocState::Allocated &&
+                                source->second.allocatorFamilyKnown &&
+                                source->second.allocatorFamily.empty())
                                 d.vars[var].reallocSource = sourceOwner;
                         }
                         break;
                     }
                     case StmtEffect::Frees: {
                         const VarDecl* owner = resolveBinding(var, d.vars);
-                        if (owner)
-                            d.vars[owner].allocation = AllocState::Freed;
+                        if (!owner) break;
+                        LifetimeState& lifetime = d.vars[owner];
+                        const ReleaseAuthority authority =
+                            releaseAuthority(stmt, lifetime);
+                        if (authority == ReleaseAuthority::Match) {
+                            lifetime.allocation = AllocState::Freed;
+                        } else if (authority == ReleaseAuthority::Unknown) {
+                            invalidateReallocRelations(d.vars, owner);
+                            lifetime.allocation = AllocState::Escaped;
+                        }
                         break;
                     }
                     case StmtEffect::Escapes: {
@@ -1306,7 +1432,9 @@ public:
                 const VarDecl* owner = resolveBinding(var, before);
                 auto ownerState = owner ? before.find(owner) : before.end();
                 if (ownerState == before.end() ||
-                    ownerState->second.allocation != AllocState::Freed)
+                    ownerState->second.allocation != AllocState::Freed ||
+                    releaseAuthority(stmt, ownerState->second) !=
+                        ReleaseAuthority::Match)
                     continue;
                 // Under its own identity, like UAF: so the CWE415 mapping
                 // and the --disable-rule taxonomy can tell the finding

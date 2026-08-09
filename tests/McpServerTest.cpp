@@ -313,7 +313,7 @@ TEST(McpServerTest, UnknownTool_Error) {
     EXPECT_NE(response.find("-32602"), std::string::npos);
 }
 
-// --- Project-idiom parameters (fatal_asserts / alloc/free_functions) ---
+// --- Project-idiom parameters (fatal_asserts / allocator families) ---
 
 TEST(McpServerTest, ToolsListContainsIdiomParams) {
     auto response = handleMcpMessage(
@@ -321,6 +321,7 @@ TEST(McpServerTest, ToolsListContainsIdiomParams) {
     EXPECT_NE(response.find("fatal_asserts"), std::string::npos);
     EXPECT_NE(response.find("alloc_functions"), std::string::npos);
     EXPECT_NE(response.find("free_functions"), std::string::npos);
+    EXPECT_NE(response.find("allocator_pairs"), std::string::npos);
 }
 
 TEST(McpServerTest, FatalAsserts_KillsPath_AndDoesNotLeakToNextCall) {
@@ -368,4 +369,38 @@ TEST(McpServerTest, AllocFunctions_ExtendLeakTracking) {
         R"("free_functions":"my_pool_free"}}})";
     auto response = handleMcpMessage(request);
     EXPECT_NE(response.find("memory-leak"), std::string::npos);
+}
+
+TEST(McpServerTest, AllocatorPairsAreExactFailClosedAndRequestScoped) {
+    auto path = writeTempSource("mcp_allocator_pairs.cpp", R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void mismatch() {
+            void* p = pool_alloc(64);
+            arena_free(p);
+        }
+    )");
+
+    std::string withPairs =
+        std::string(R"({"jsonrpc":"2.0","id":15,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","allocator_pairs":"pool_alloc=pool_free,arena_alloc=arena_free"}}})";
+    auto response = handleMcpMessage(withPairs);
+    EXPECT_NE(response.find("memory-leak"), std::string::npos);
+
+    std::string malformed =
+        std::string(R"({"jsonrpc":"2.0","id":16,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"(","allocator_pairs":"pool_alloc=pool_free,bad"}}})";
+    response = handleMcpMessage(malformed);
+    EXPECT_NE(response.find("-32602"), std::string::npos);
+
+    std::string withoutPairs =
+        std::string(R"({"jsonrpc":"2.0","id":17,"method":"tools/call",)") +
+        R"("params":{"name":"analyze","arguments":{"path":")" + path +
+        R"("}}})";
+    response = handleMcpMessage(withoutPairs);
+    EXPECT_EQ(response.find("memory-leak"), std::string::npos);
 }

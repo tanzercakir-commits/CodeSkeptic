@@ -75,6 +75,10 @@ codeskeptic <source_path> [options]
                          (e.g. --alloc-functions git__malloc,zmalloc)
   --free-functions <names> Treat these functions as deallocators
                          (their first argument is freed)
+  --allocator-pairs <pairs> Declare exact custom allocation families
+                         (comma-separated allocator=deallocator entries).
+                         Only a matching direct deallocator closes the
+                         allocation; malformed values fail closed
   --owning-pointers <names> Treat these class templates as owning smart
                          pointers (comma list). A raw pointer adopted by
                          constructing one is no longer leaked;
@@ -145,11 +149,15 @@ fail with exit `2`):
 `source_path`, `build_path`, `output_format`, `json_output`,
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
-`alloc_functions`, `free_functions`, and repeatable `model_file` entries.
+`alloc_functions`, `free_functions`, `allocator_pairs`, and repeatable
+`model_file` entries. An allocator may appear in multiple `allocator_pairs`
+entries to admit multiple exact deallocators.
 
-Project idioms are configuration, not code: allocator wrappers, fatal
-assert handlers and owning smart pointers belong in the project's conf
-file so the analysis sees the code the way the project means it.
+Project idioms are configuration, not code: allocator wrappers, exact
+allocator families, fatal assert handlers and owning smart pointers belong in
+the project's conf file so the analysis sees the code the way the project
+means it. The legacy independent allocator/free lists remain family-agnostic;
+use `allocator_pairs` when mismatch evidence matters.
 
 ## Suppressing findings
 

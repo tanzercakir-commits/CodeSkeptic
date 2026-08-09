@@ -1,5 +1,64 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.3 exact custom allocator families
+
+CodeSkeptic now accepts atomic, fail-closed custom allocation families through
+CLI `--allocator-pairs`, project `allocator_pairs`, and MCP
+`allocator_pairs`. Direct non-instance paired allocators carry an exact family
+per guarded disjunct. Only an admitted argument-zero deallocator closes that
+family and enables UAF or double-free evidence. Qualified configuration matches
+the exact qualified declaration; unqualified configuration retains identifier
+compatibility. Duplicate pairs are idempotent, an allocator may admit multiple
+deallocators, and each analyzer/MCP call clears the pair registry afterward.
+
+Mismatched paired or legacy frees, `delete`, and built-in `realloc` do not
+close an exact custom family, so a live allocation remains leak-reportable.
+Conflicting paths and summary-only, indirect, ambiguous, method-receiver, or
+otherwise non-exact release evidence cannot manufacture family authority;
+release-shaped uncertainty escapes conservatively. Explicitly paired wrapper
+names are the only wrapper authority. Legacy independent allocation/free lists
+remain family-agnostic, and summary schema, grammar, capabilities, profiles,
+and all quality floors are unchanged.
+
+The initial compile RED established the absent configuration API. After
+configuration, registry, and MCP plumbing, 8 of 14 focused cases passed and 6
+semantic cases remained RED: mismatched-family leak retention, no fabricated
+UAF/double-free after mismatch, qualified matching, built-in free/delete
+mismatch, conflicting families, and MCP behavior. The first semantic
+implementation closed all 14. Precision review added six cases and exposed a
+second RED: a paired source passed to built-in `realloc` produced two leaks
+instead of the required single old-allocation leak. Preserving the direct
+source owner before binding invalidation closed it. The final allocator-family
+matrix is 20/20; direct and CTest suites pass 1117/1117.
+
+Interface and documentation gates pass: `CapabilitiesCliTest.py` reports
+schema 2, rules 14, supported 7, and out-of-scope 5; `ActionArgsTest.py` is
+5/5; docs sync, 8/8 profiles, README 315/315, and capability sync are green.
+Frozen thesis remains `clean_fp=0`, `bug_caught=9/15`, 11 findings, and the
+self-scan is clean and complete at 48/48 translation units. Corpus results are
+cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly accepted broken
+fixtures) and tinyxml2 9 findings (3/3 analyzed).
+
+The full unchanged 400-file/CWE Juliet replay passes every floor. Rule-matched
+results are CWE476 140/0 (precision 1.000, hit rate 0.347), CWE401 105/15
+(precision 0.875, hit rate 0.253), CWE415 119/0 (precision 1.000, hit rate
+0.297), CWE416 212/0 (precision 1.000, hit rate 0.531), CWE369 43/0 (precision
+1.000, hit rate 0.108), and CWE190 23/0 (precision 1.000, hit rate 0.057). The
+tested Windows product SHA-256 is
+`db1f7ba8eea153edaec1b9e4e77df191d77eb1f56a12e199b2494cd8de13fc68`.
+
+Contract-first shadow completion considered `Config::addAllocatorPairs`,
+`setAllocatorPairs`, `pairedAllocatorFamily`, `isPairedDeallocatorCall`,
+`matchesAllocatorFamily`, `allocationFamilyOf`, and `releaseAuthority`:
+proposals 0, eligible 0, rejected 0, unsupported 7. Their semantics depend on
+string/container parsing, Clang declaration identity, and native pointer/heap
+lifetime outside the current verifier. No proposal exposed a problem because
+none was eligible; independent RED and precision-review tests exposed and
+closed the implementation and assumption problems above. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent, and native owned-memory parity remains deferred to executable A7
+fixtures. The exact locked file set was preserved.
+
 ## 2026-08-09 — Phase 7.3 allocator-family boundary and contract record
 
 Phase 7.2 is sealed in commit `a242b3c` and published in draft PR #134. The

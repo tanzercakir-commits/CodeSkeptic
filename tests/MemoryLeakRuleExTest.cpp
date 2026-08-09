@@ -765,6 +765,14 @@ public:
         setFreeFunctionNames({});
     }
 };
+
+class AllocatorPairScope {
+public:
+    explicit AllocatorPairScope(AllocatorPairMap pairs) {
+        setAllocatorPairs(std::move(pairs));
+    }
+    ~AllocatorPairScope() { setAllocatorPairs({}); }
+};
 } // namespace
 
 TEST(AllocFunctionsTest, WrapperLeak_VisibleWhenRegistered) {
@@ -822,6 +830,300 @@ TEST(AllocFunctionsTest, Unregistered_WrapperStaysInvisible) {
         }
     )");
     ASSERT_EQ(results.size(), 0);
+}
+
+// --- Exact custom allocator families (Phase 7.3) ---
+
+TEST(AllocatorPairTest, CorrectDirectDeallocatorClosesLeakAndEnablesUAF) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            pool_free(p);
+            *p = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AllocatorPairTest, CorrectDirectDeallocatorTwiceReportsDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free(p);
+            pool_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(AllocatorPairTest, CorrectDeallocatorThroughExactAliasClosesOwner) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            void* owner = pool_alloc(16);
+            void* alias = owner;
+            pool_free(alias);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, MismatchedDeallocatorLeavesAllocationLeaked) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            arena_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, MismatchDoesNotInventUAFOrDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            arena_free(p);
+            arena_free(p);
+            *p = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, MismatchAfterCorrectReleaseDoesNotInventDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free(p);
+            arena_free(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, QualifiedFamiliesDoNotCrossNamespaces) {
+    AllocatorPairScope scope({{"alpha::make", {"alpha::drop"}},
+                              {"beta::make", {"beta::drop"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace alpha {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        namespace beta {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        void f() {
+            void* p = alpha::make(16);
+            beta::drop(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, UnqualifiedNamesRetainIdentifierCompatibility) {
+    AllocatorPairScope scope({{"make", {"drop"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace alpha {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        void f() {
+            void* p = alpha::make(16);
+            alpha::drop(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, OneFamilyMayAdmitMultipleDeallocators) {
+    AllocatorPairScope scope(
+        {{"pool_alloc", {"pool_free", "pool_free_sized"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free_sized(void*, unsigned long);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free_sized(p, 16);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, BuiltinFreeAndDeleteDoNotCloseCustomFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void free(void*);
+        void f() {
+            int* a = (int*)pool_alloc(sizeof(int));
+            int* b = (int*)pool_alloc(sizeof(int));
+            free(a);
+            delete b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& result : results)
+        EXPECT_EQ(result.rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, BuiltinReallocCannotTransferCustomFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* realloc(void*, unsigned long);
+        void f() {
+            char* p = (char*)pool_alloc(16);
+            p = (char*)realloc(p, 32);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, InstanceMethodsDoNotGainPairAuthority) {
+    AllocatorPairScope scope({{"Pool::alloc", {"Pool::release"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Pool {
+            void* alloc(unsigned long);
+            void release(void*);
+        };
+        void f(Pool& pool) {
+            void* p = pool.alloc(16);
+            pool.release(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, StaticMethodsMayFormExactFamily) {
+    AllocatorPairScope scope({{"Pool::alloc", {"Pool::release"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Pool {
+            static void* alloc(unsigned long);
+            static void release(void*);
+        };
+        void f() {
+            void* p = Pool::alloc(16);
+            Pool::release(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, ConflictingFamiliesPreserveMismatchLeakPath) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f(int choose) {
+            void* p;
+            if (choose)
+                p = pool_alloc(16);
+            else
+                p = arena_alloc(16);
+            pool_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, ConsumedSummaryCannotInventExactFamilyRelease) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void release_wrapper(void* p) { pool_free(p); }
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            release_wrapper(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, ClosedIndirectSummaryStaysConservative) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void release_wrapper(void* p) { pool_free(p); }
+        void f() {
+            void (*release)(void*) = release_wrapper;
+            int* p = (int*)pool_alloc(sizeof(int));
+            release(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, SummaryOwnedReturnHasNoInventedFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* make_wrapper() { return pool_alloc(sizeof(int)); }
+        void f() {
+            int* p = (int*)make_wrapper();
+            pool_free(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
 }
 
 // --- Address-of-member escape (libgit2 iterator / fprime font) ---
