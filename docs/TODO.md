@@ -87,10 +87,23 @@ independently measurable RED-to-GREEN slices:
    Shadow counts are proposals 0, eligible 0, rejected 0, unsupported 50;
    no `cs: ai` proposal became accepted intent.
 3. **Interprocedural allocator sinks and allocation-to-access evidence —
-   pending.** Propagate a bounded allocator-size sink relation across visible
-   calls, connect under-allocation to a proven access relation, and pin the
-   relevant real-repository examples. Its exact file boundary will be
-   declared before implementation.
+   active.** Add a versioned allocator-size parameter relation to function
+   summaries and propagate only exact, visible parameter-to-size flows through
+   the existing SCC, indirect-target, persistence, and conservative-merge
+   paths. The allocation rule may consume only a proven sink parameter;
+   bodyless, conflicting, transformed, or unknown flows stay silent. Attach
+   access trace evidence only when an exact local allocation result is later
+   indexed or used by a bounded memory-access call with the same declared
+   untrusted origin; absence of access evidence does not replace the existing
+   wrap proof. Pin and replay the relevant LVGL example. The exact slice file
+   set is `src/engine/FunctionSummary.{h,cpp}`,
+   `src/engine/SummaryDiff.cpp`,
+   `src/rules/AllocSizeOverflowRule.{h,cpp}`,
+   `tests/AllocSizeOverflowRuleTest.cpp`, `tests/InterproceduralTest.cpp`,
+   `tests/SummaryDiffTest.cpp`, this TODO, and
+   `docs/devlog/changelog.md`. `PLAN.md`, the shared interval engine,
+   contract grammar, capability registry/tier, configuration, and accepted
+   model channels remain unchanged.
 
 Phase 6 exits only when guarded cases are silent, unknown values remain
 reportless, real-repository examples are pinned, and the full local/CI
