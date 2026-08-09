@@ -1,5 +1,196 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.2 realloc outcome lifetimes
+
+The memory-lifetime analysis now records an exact pending source/result
+relation for direct global-C or `std` `realloc`/`reallocarray` calls with local,
+same-pointer-type identities and proven nonzero requests. A proven null result
+preserves the original allocation; a proven non-null result transfers the
+lifetime to the result and invalidates the old owner. Proven-nonzero direct
+overwrite reports the possible failure-path leak, null input remains ordinary
+allocation, and `reallocarray` requires both multiplicands to be nonzero.
+
+Zero or unknown sizes, indirect and custom calls, methods and other namespaces,
+type-changing results, address exposure, and conflicting relations remain
+non-authoritative. They cannot manufacture release, transfer, UAF,
+double-free, or overwrite-leak evidence. Reassignment and exposure invalidate
+only the pending relation, while unresolved result/source alternatives are
+deduplicated at exit.
+
+Initial RED recorded four implementation gaps after one other-namespace test
+was corrected because its original leak expectation contradicted the existing
+generic escape semantics. The first full suite then exposed a Systemd
+copy-before-null regression: realloc invalidation had accidentally erased a
+normal pointer-value copy binding. Preserving that binding closed the
+regression. Precision review added an exact-result-alias guard RED; resolving
+the guard to its binding owner closed it. The final Phase 7.2 matrix has 20
+cases, the focused realloc/alias/Systemd replay is 24/24, and both the direct
+and CTest suites pass 1097/1097.
+
+The final 400-file/CWE Juliet replay passes every unchanged floor. Rule-matched
+results are CWE476 140/0 (precision 1.000, hit rate 0.347), CWE401 105/15
+(precision 0.875, hit rate 0.253), CWE415 119/0 (precision 1.000, hit rate
+0.297), CWE416 212/0 (precision 1.000, hit rate 0.531), CWE369 43/0 (precision
+1.000, hit rate 0.108), and CWE190 23/0 (precision 1.000, hit rate 0.057).
+Compared with the sealed Phase 7.1 baseline, realloc modeling adds 13 CWE401
+true positives and two false positives while holding precision above its 0.85
+floor; no quality floor changed.
+
+Final local gates are frozen thesis `clean_fp=0`, `bug_caught=9/15`, 11
+findings; clean and complete 48/48-TU self-scan; cJSON 54 findings (76
+enumerated, 35 analyzed, 41 explicitly accepted broken fixtures); and tinyxml2
+9 findings (3/3 analyzed). The tested Windows product SHA-256 is
+`4ccb8e52a53e1af0905830c2889bb9ffc1467960c17a44cf4ac8e76c423c656d`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, allocator registries, contract grammar, capability
+tiers, configuration, summary schemas, accepted model channels, and Juliet
+floors are unchanged.
+
+Contract-first shadow completion considered `reallocSite`, `reallocUpdates`,
+`collectReallocSites`, `invalidateReallocRelations`, `provesNonZero`,
+`provesNonZeroRequest`, and `applyNullCondition`. Their composite authority
+depends on native pointer identity and heap lifetime semantics that the current
+verifier cannot prove, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 7. No proposal exposed a problem because none was
+eligible. Independent RED, full-suite, and precision-review tests exposed the
+implementation and assumption problems above; all are closed. Candidate
+contracts requiring later human review: none. No `cs: ai` proposal became
+accepted intent, and native owned-memory verification parity remains deferred
+to executable A7 fixtures.
+
+## 2026-08-09 — Phase 7.2 realloc boundary and contract record
+
+Phase 7.1 is sealed in commit `1475adb8754c75174ef4057d62a1f8b5c543a605`
+with tree `5aac1b25da279bed85ab60332152020c7ba74e24`. The next independently
+measurable slice is restricted to exact `realloc`/`reallocarray`
+success/failure lifetime behavior; the prior slice is not reopened.
+
+The locked pre-implementation contract is recorded separately from production
+code in `docs/TODO.md`. Only direct global-C or `std` calls with exact local,
+same-pointer-type result/source identities may create a pending realloc
+relation. For a proven nonzero request, null preserves the original allocation
+and non-null transfers its lifetime to the result. Proven-nonzero direct
+overwrite reports the possible failure leak; null input remains ordinary
+allocation. `reallocarray` requires both size operands to be proven nonzero
+and preserves the source on overflow failure. Zero or unknown sizes, indirect
+or custom calls, methods and other namespaces, type changes, exposure, and
+conflicts cannot create release, transfer, UAF, double-free, or overwrite-leak
+evidence. Alternative unresolved result/source outcomes produce at most one
+exit leak unless later evidence separates them.
+
+The exact file boundary is `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+engines, allocator registries, contract grammar, capability tiers,
+configuration, summary schemas, accepted model channels, and quality floors
+remain unchanged. Contract-first shadow review considered seven critical
+semantic decisions. All depend on native pointer/heap lifetime semantics that
+the current verifier does not support, so dogfood is not applicable: proposals
+0, eligible 0, rejected 0, unsupported 7. Candidate contracts requiring later
+human review: none. No proof-bearing contract was invented and no `cs: ai`
+proposal became accepted intent. Executable A7 RED fixtures and ordinary tests
+are the referee; this contract record will not change during Phase 7.2.
+
+## 2026-08-09 — Phase 7.1 exact local alias lifetime
+
+The memory-lifetime analysis now carries an exact must-binding beside each
+allocation state in every guarded disjunct. A release through an unchanged
+local pointer copy updates the allocation owner, so later access or release
+through the owner, the alias, or a transitive exact alias reports UAF or
+double-free with the original allocation/free trace. Null failure edges refine
+the owner, conflicting bindings merge to unknown, and exit leaks no longer use
+flow-insensitive group suppression. Reusing an alias for a second allocation
+therefore exposes the first allocation leak instead of preserving the old
+accepted FN.
+
+Local pointer references and pointer value copies have separate binding
+semantics. `T*& ref = owner` stays attached to the pointer variable when
+`owner` later receives an allocation; `T* copy = owner` preserves only the
+value present at the copy. Direct reassignment and allocation overwrite only
+the affected binding. Address exposure, writable-reference calls,
+cast-changing copies, conflicting paths, fields, heap aliases, and unknown
+relations remain non-authoritative and cannot manufacture UAF/double-free
+evidence. A narrow same-source, proven-non-null compatibility bridge preserves
+the existing Juliet realloc good shapes; complete realloc success/failure,
+zero-size, null-input, and overwrite semantics remain owned by Phase 7.2.
+
+RED was recorded before implementation: six of the initial eight alias cases
+failed while both precision controls passed. Null-guard, address-exposure, and
+writable-reference controls were independently RED. The first full suite then
+found the Systemd copy-before-null escape regression. Precision review added
+cast-changing, reference-before-allocation, copy-before-allocation, and
+reference-storage-reassignment controls. The final Phase 7.1 matrix is 15/15;
+the adjacent local-reference and Systemd controls make the focused replay
+17/17.
+
+The first 400-file/CWE Juliet replay was deliberately kept red: CWE401 reached
+92 TP / 17 FP, precision 0.844, below the unchanged 0.85 floor. All four added
+FPs were variant-33 good sinks where a local `T*&` was incorrectly invalidated
+when its bound pointer variable received the allocation. Distinguishing
+reference-to-variable bindings from pointer-value copies removed exactly those
+four FPs without losing a TP. Final rule-matched results are CWE401 92/13
+(precision 0.876, hit rate 0.223), CWE415 119/0 (precision 1.000, hit rate
+0.297), and CWE416 212/0 (precision 1.000, hit rate 0.531). The unaffected
+rule-matched receipts are CWE476 140/0 (hit rate 0.347), CWE369 43/0 (0.108),
+and CWE190 23/0 (0.057). Every existing floor passes and no floor changed.
+
+Final local gates are direct suite 1077/1077, CTest 1077/1077, frozen thesis
+`clean_fp=0` and `bug_caught=9/15` with 11 findings, clean and complete 48/48-TU
+self-scan, cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly
+accepted broken fixtures), and tinyxml2 9 findings (3/3 analyzed). The tested
+Windows product SHA-256 is
+`2a0a43114832761ea60617bc553393f4b6b7b15fd64cd5bcbdc0e0659f9ad197`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, contract grammar, capability tiers, configuration,
+summary schemas, accepted model channels, and Juliet floors are unchanged.
+
+Contract-first shadow completion considered the six critical binding, merge,
+root-resolution, release, dereference, and exit semantic units. Native pointer
+identity, reference storage, alias, and heap lifetime remain unsupported by the
+current verifier, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proposal exposed a problem because none was
+eligible. Independent RED tests, the Systemd full-suite regression, and the
+Juliet floor exposed the implementation and assumption problems above; all are
+closed. Candidate contracts requiring later human review: none. No `cs: ai`
+proposal became accepted intent, and native owned-memory verification parity
+remains deferred to executable A7 fixtures.
+
+## 2026-08-09 — Phase 7.1 exact-alias boundary and contract record
+
+Phase 6 merged through fully green PR #133 as squash commit
+`3aa85f9ed773c2473683e5a41593208e8945a0d9`; its tree
+`12f62243ba39b3b7b49369f843f33af640619efb` exactly matches the gated branch
+head. Both feature-branch refs were removed after that equality check.
+
+The pre-implementation lifetime audit passed the existing 68-test focused
+memory/alias/path/custom-owner matrix and identified the first Phase 7 gap:
+local pointer copies are collected into whole-function alias components.
+Those components can suppress an exit leak through any member's free, but
+they deliberately cannot carry a free into UAF or double-free reporting and
+cannot invalidate a reused alias. The accepted
+`AliasReuse_FirstAllocationFN_Documented` fixture pins the resulting missed
+leak.
+
+The locked slice contract is recorded separately from production code in
+`docs/TODO.md`: only unchanged, exact, local pointer bindings within one
+guarded disjunct may transfer lifetime evidence; reassignment invalidates the
+overwritten binding, and conflicting/non-local/address-exposed/field/heap or
+unknown aliases cannot create a finding. The exact file boundary is
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+`docs/TODO.md`, and this changelog. Shared engines, contract grammar,
+capability tiers, configuration, summary schemas, and accepted model channels
+remain outside the slice.
+
+Contract-first shadow review considered the six critical binding,
+root-resolution, merge, release, dereference, and exit decisions. All depend
+on native pointer identity, alias, and heap-lifetime semantics unsupported by
+the current verifier, so dogfood is not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proof-bearing contract was invented and no
+`cs: ai` proposal became accepted intent. Executable A7 fixtures are the
+referee; this pre-implementation contract record will not change during the
+slice.
+
 ## 2026-08-09 — Phase 6.3 interprocedural allocator sinks and access evidence
 
 Function summaries now carry a versioned, exact integer-parameter-to-allocator-
