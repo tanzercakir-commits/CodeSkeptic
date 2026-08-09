@@ -385,9 +385,63 @@ independently measurable RED-to-GREEN slices:
    above. Candidate contracts requiring later human review: none. No `cs: ai`
    proposal became accepted intent, and native owned-memory parity remains
    deferred to executable A7 fixtures.
-5. **Escape, ownership transfer, and exceptional exits — pending.** Complete
-   exact local/member/summary transfers and admitted cleanup or exceptional
-   exits, then pin real-repository and Juliet deltas.
+5. **Escape, ownership transfer, and exceptional exits — boundary locked
+   before implementation.** Complete the Phase 7 production boundary without
+   inventing native member/heap/whole-project pointer semantics ahead of the
+   executable A7 reference fixtures.
+
+   The locked development contract is separate from production code. The only
+   new release authority in this slice is an explicit Clang exceptional CFG
+   path that contains the same `CFGAutomaticObjDtor` already admitted for a
+   direct automatic local standard owner in Phase 7.4. A throw from the
+   owner's live lexical scope to a visible same-function handler, or to the
+   function's exceptional exit when Clang emits that cleanup, removes the
+   exact owner and proves release only for the last exact owner. A later raw
+   alias use or exact release may therefore prove UAF or double-free. An owner
+   declared outside the unwound scope remains live; `release()` before the
+   throw leaves the allocation live; and exceptional paths without an emitted
+   admitted destructor cannot manufacture cleanup.
+
+   Exception-edge construction is opt-in per analysis and separately cached
+   from both the ordinary statement-only CFG and the normal implicit-
+   destructor CFG. Existing consumers retain their current graph and transfer
+   behavior. Temporary destructors, constructor-failure cleanup, exception
+   objects, catch-object ownership, rethrow identity, exception specifications,
+   coroutine cleanup, and interprocedural exception propagation are not
+   admitted in this slice.
+
+   Existing summary ownership remains the transfer boundary. A direct or
+   closed-target `Consumed` summary may retain its current exact release
+   authority for a compatible legacy allocator family; `Transferred` and
+   unknown ownership escape because the destination lifetime is outside the
+   caller's view. `Owned` returns remain caller-owned and `Borrowed` returns do
+   not hide a live allocation. Direct member/global stores keep their current
+   conservative classification. No local record field, smart-owner field,
+   heap owner, aliasing owner, persisted member identity, or cross-function
+   pointee lifetime becomes exact without executable A7 fixtures. These
+   controls pin the honest boundary; they do not claim native memory-
+   verification parity.
+
+   The exact file set is `src/engine/CfgCache.h`,
+   `src/engine/CfgCache.cpp`, `src/engine/DataflowEngine.h`,
+   `src/rules/MemoryLeakRule_Ex.cpp`, `tests/CfgCacheTest.cpp`,
+   `tests/IntervalAnalysisTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+   `tests/InterproceduralTest.cpp`, `docs/usage.md`, this TODO, and
+   `docs/devlog/changelog.md`. Summary schema/persistence, contract grammar,
+   capability tiers, configuration, accepted model channels, profiles, and
+   quality floors remain unchanged.
+
+   Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+   the exceptional-CFG opt-in trait, `classifyStmtEffects`,
+   `MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
+   `analyzeFunction`. Template dispatch, Clang exceptional CFG identity,
+   native pointer aliasing, ownership, and heap lifetime are outside the
+   current verifier, so dogfood is not applicable: proposals 0, eligible 0,
+   rejected 0, unsupported 7. Candidate contracts requiring human review:
+   none. No proof-bearing contract is invented and no `cs: ai` proposal can
+   become accepted intent. Clang-backed RED fixtures and ordinary tests are
+   the referee; this pre-implementation contract record will not change during
+   the slice.
 
 Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 `memory-leak` precision remains at least 0.85 (target 0.90), supported UAF and

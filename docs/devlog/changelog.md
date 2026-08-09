@@ -1,5 +1,53 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7.5 exceptional cleanup and transfer boundary
+
+Phase 7.4 is sealed in commit `21277325e73b513d3da4d949fcd093ce23082078`
+with tree `b2921225f8a90d8aac2c8898496d6174f23fb9a8`, published in draft
+PR #134, and locally gated. The final Phase 7 slice is restricted to explicit
+exceptional cleanup for the exact automatic local standard owners already
+admitted in Phase 7.4, plus regression pins for the existing summary and
+member-transfer boundaries.
+
+The pre-implementation audit found that ownership summaries already separate
+`Owned`, `Borrowed`, `Consumed`, and `Transferred`. Memory lifetime consumes
+exact `Consumed` releases for compatible legacy allocations, keeps owned
+returns caller-owned, preserves borrowed visibility, and conservatively
+escapes transfers whose destination lifetime is outside the caller. Direct
+member/global stores likewise already separate local non-escape controls from
+outliving storage. No new summary schema or native member identity is needed
+or justified without executable A7 fixtures.
+
+The remaining executable gap is CFG construction: Phase 7.4 requests implicit
+automatic destructors but does not request exception-handling edges. The
+locked contract in `docs/TODO.md` admits cleanup only when an opt-in Clang CFG
+emits the existing `CFGAutomaticObjDtor` on an exceptional path. Last-owner
+release may then support UAF or double-free evidence. Owners outside the
+unwound scope, prior `release`, absent destructor evidence, temporary and
+constructor-failure cleanup, rethrow/catch ownership, coroutine cleanup, and
+interprocedural exception propagation remain non-authoritative.
+
+The exceptional CFG is separately keyed from ordinary and normal-dtor graphs,
+and only an explicitly opting-in analysis receives it. The exact file boundary
+is `src/engine/CfgCache.h`, `src/engine/CfgCache.cpp`,
+`src/engine/DataflowEngine.h`, `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/CfgCacheTest.cpp`, `tests/IntervalAnalysisTest.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `tests/InterproceduralTest.cpp`,
+`docs/usage.md`, `docs/TODO.md`, and this changelog. Summary persistence,
+grammar, capabilities, configuration, model authority, profiles, and quality
+floors remain unchanged.
+
+Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+the exceptional-CFG opt-in trait, `classifyStmtEffects`,
+`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
+`analyzeFunction`: proposals 0, eligible 0, rejected 0, unsupported 7. The
+current verifier cannot prove template dispatch, Clang EH identity, or native
+pointer/ownership/heap lifetime. Candidate contracts requiring later human
+review: none. No `cs: ai` proposal became accepted intent. Clang-backed RED
+fixtures are the implementation referee; native memory-verification parity
+remains deferred to executable A7 fixtures, and this record will not change
+during Phase 7.5.
+
 ## 2026-08-10 — Phase 7.4 exact local standard smart-owner lifetimes
 
 CodeSkeptic now carries exact per-disjunct owner identity for direct automatic
