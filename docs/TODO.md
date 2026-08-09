@@ -154,6 +154,49 @@ independently measurable RED-to-GREEN slices:
    accepted intent. Executable A7 RED fixtures and ordinary tests are the
    referee; this pre-implementation contract record will not change during the
    slice.
+
+   **Completion evidence (appended after implementation; the locked contract
+   above is unchanged).** Phase 7.2 is locally complete. Exact direct global-C
+   and `std` `realloc`/`reallocarray` calls now carry a per-disjunct pending
+   source/result relation for proven nonzero requests. Null results preserve
+   the source allocation, non-null results transfer its lifetime and invalidate
+   the old owner, and proven-nonzero direct overwrite reports the possible
+   failure-path leak. Null input remains allocation, `reallocarray` requires
+   both operands to be nonzero, and zero/unknown sizes plus unsupported call,
+   type, exposure, or conflict shapes remain conservative. Unresolved
+   alternatives are deduplicated at exit.
+
+   RED first recorded four implementation gaps after correcting one
+   other-namespace test whose original leak expectation contradicted the
+   existing generic escape semantics. The first full-suite replay exposed the
+   Systemd copy-before-null regression; preserving pointer-value copy bindings
+   closed it. Precision review then added an exact-result-alias guard RED and
+   closed it by resolving the guard to the binding owner. Twenty Phase 7.2
+   cases pass; the focused realloc/alias/Systemd replay is 24/24, and direct
+   plus CTest suites are 1097/1097.
+
+   Final 400-file/CWE Juliet rule-matched results are CWE476 140/0 (precision
+   1.000, hit rate 0.347), CWE401 105/15 (precision 0.875, hit rate 0.253),
+   CWE415 119/0 (precision 1.000, hit rate 0.297), CWE416 212/0 (precision
+   1.000, hit rate 0.531), CWE369 43/0 (precision 1.000, hit rate 0.108), and
+   CWE190 23/0 (precision 1.000, hit rate 0.057). Every existing floor passes
+   and no floor changed. Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11
+   findings; self-scan is clean and complete at 48/48 TUs; cJSON remains 54
+   findings (76 enumerated, 35 analyzed, 41 explicitly accepted broken
+   fixtures) and tinyxml2 9 (3/3 analyzed). The tested Windows product SHA-256
+   is `4ccb8e52a53e1af0905830c2889bb9ffc1467960c17a44cf4ac8e76c423c656d`.
+
+   Shadow completion considered `reallocSite`, `reallocUpdates`,
+   `collectReallocSites`, `invalidateReallocRelations`, `provesNonZero`,
+   `provesNonZeroRequest`, and `applyNullCondition`: proposals 0, eligible 0,
+   rejected 0, unsupported 7. Their composite authority depends on native
+   pointer identity and heap lifetime semantics outside the current verifier,
+   so no proposal was eligible and none exposed an implementation problem.
+   Independent RED, full-suite, and precision-review tests exposed the
+   implementation and assumption problems above; all are closed. Candidate
+   contracts requiring later human review: none. No `cs: ai` proposal became
+   accepted intent, and native owned-memory parity remains deferred to
+   executable A7 fixtures.
 3. **Custom allocator/deallocator pairs — pending.** Move beyond independent
    name lists to exact configured families and validate mismatch, wrapper,
    indirect-summary, and conservative unknown-target behavior.

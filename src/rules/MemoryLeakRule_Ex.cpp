@@ -58,10 +58,12 @@ AllocState mergeAllocStates(AllocState a, AllocState b) {
 struct LifetimeState {
     AllocState allocation = AllocState::None;
     const VarDecl* binding = nullptr;
+    const VarDecl* reallocSource = nullptr;
     bool referenceBinding = false;
 
     bool operator==(const LifetimeState& other) const {
         return allocation == other.allocation && binding == other.binding &&
+               reallocSource == other.reallocSource &&
                referenceBinding == other.referenceBinding;
     }
     bool operator!=(const LifetimeState& other) const {
@@ -73,6 +75,9 @@ struct LifetimeState {
                    static_cast<unsigned>(other.allocation);
         if (binding != other.binding)
             return std::less<const VarDecl*>{}(binding, other.binding);
+        if (reallocSource != other.reallocSource)
+            return std::less<const VarDecl*>{}(reallocSource,
+                                                other.reallocSource);
         return referenceBinding < other.referenceBinding;
     }
 };
@@ -86,6 +91,8 @@ LifetimeState mergeLifetimeStates(const LifetimeState& a,
         result.binding = a.binding;
         result.referenceBinding = a.referenceBinding;
     }
+    if (a.reallocSource == b.reallocSource)
+        result.reallocSource = a.reallocSource;
     return result;
 }
 
@@ -239,29 +246,73 @@ const CallExpr* coreCall(const Expr* expr) {
     return dyn_cast_or_null<CallExpr>(current);
 }
 
-const VarDecl* reallocInput(const Expr* expr) {
-    const CallExpr* call = coreCall(expr);
-    if (!call || call->getNumArgs() == 0) return nullptr;
-    const FunctionDecl* callee = call->getDirectCallee();
+struct ReallocSite {
+    const VarDecl* result = nullptr;
+    const VarDecl* source = nullptr;
+    const CallExpr* call = nullptr;
+};
+
+bool isAuthoritativeReallocCallee(const FunctionDecl* callee) {
     const IdentifierInfo* id = callee ? callee->getIdentifier() : nullptr;
     if (!id || (id->getName() != "realloc" &&
                 id->getName() != "reallocarray"))
-        return nullptr;
-    return asVar(call->getArg(0));
+        return false;
+    const std::string qualified = callee->getQualifiedNameAsString();
+    return qualified == id->getName().str() ||
+           qualified == "std::" + id->getName().str();
 }
 
-std::map<const VarDecl*, const VarDecl*> collectReallocSources(
+ReallocSite reallocSite(const VarDecl* result, const Expr* expr) {
+    const CallExpr* call = coreCall(expr);
+    if (!call || call->getNumArgs() == 0) return {};
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!isAuthoritativeReallocCallee(callee)) return {};
+    const llvm::StringRef name = calleeName(callee);
+    if ((name == "realloc" && call->getNumArgs() != 2) ||
+        (name == "reallocarray" && call->getNumArgs() != 3))
+        return {};
+    const VarDecl* source = asExactPointerVar(call->getArg(0));
+    if (!result || !source || !result->hasLocalStorage() ||
+        !sameExactPointerType(result, source))
+        return {};
+    return {result, source, call};
+}
+
+std::vector<ReallocSite> reallocUpdates(const Stmt* stmt) {
+    std::vector<ReallocSite> sites;
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* result = dyn_cast<VarDecl>(declaration);
+            ReallocSite site =
+                result && result->hasInit()
+                    ? reallocSite(result, result->getInit())
+                    : ReallocSite{};
+            if (site.call) sites.push_back(site);
+        }
+    } else if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
+        if (assignment->getOpcode() == BO_Assign) {
+            ReallocSite site = reallocSite(
+                asExactPointerVar(assignment->getLHS()),
+                assignment->getRHS());
+            if (site.call) sites.push_back(site);
+        }
+    }
+    return sites;
+}
+
+std::map<const CallExpr*, ReallocSite> collectReallocSites(
         const FunctionDecl* function) {
     struct Visitor : RecursiveASTVisitor<Visitor> {
-        std::map<const VarDecl*, const VarDecl*> sources;
+        std::map<const CallExpr*, ReallocSite> sites;
 
         void record(const VarDecl* result, const Expr* value) {
-            const VarDecl* source = reallocInput(value);
-            if (!result || !source || !result->hasLocalStorage() ||
-                !source->hasLocalStorage())
-                return;
-            auto [it, inserted] = sources.emplace(result, source);
-            if (!inserted && it->second != source) it->second = nullptr;
+            ReallocSite site = reallocSite(result, value);
+            if (!site.call) return;
+            auto [it, inserted] = sites.emplace(site.call, site);
+            if (!inserted &&
+                (it->second.result != site.result ||
+                 it->second.source != site.source))
+                it->second = {};
         }
 
         bool VisitVarDecl(VarDecl* declaration) {
@@ -280,7 +331,7 @@ std::map<const VarDecl*, const VarDecl*> collectReallocSources(
         bool TraverseLambdaExpr(LambdaExpr*) { return true; }
     } visitor;
     visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
-    return visitor.sources;
+    return visitor.sites;
 }
 
 // `&var->member`, `&var.member`, `&var` (chained members/subscripts
@@ -887,8 +938,17 @@ const VarDecl* resolveBinding(const VarDecl* var, const VarState& state) {
     return nullptr;
 }
 
+void invalidateReallocRelations(VarState& state,
+                                const VarDecl* changed) {
+    if (!changed) return;
+    for (auto& [var, lifetime] : state)
+        if (var == changed || lifetime.reallocSource == changed)
+            lifetime.reallocSource = nullptr;
+}
+
 void invalidateBindingDependents(VarState& state, const VarDecl* overwritten) {
     if (!overwritten) return;
+    invalidateReallocRelations(state, overwritten);
     for (auto& [var, lifetime] : state) {
         // A local pointer reference aliases the variable itself, not the
         // variable's current pointer value. Reassigning that variable must
@@ -916,6 +976,8 @@ void applyBindingUpdate(VarState& state, const BindingUpdate& update) {
     auto lhs = state.find(update.lhs);
     if (lhs == state.end()) return;
     if (update.rhs == update.lhs) return;
+    invalidateReallocRelations(state, update.lhs);
+    lhs = state.find(update.lhs);
     if (update.throughReference) {
         const VarDecl* overwritten = resolveBinding(update.lhs, state);
         if (overwritten) {
@@ -941,21 +1003,56 @@ void applyBindingUpdate(VarState& state, const BindingUpdate& update) {
     lhs->second.referenceBinding = bindsVariable && rhsRoot;
 }
 
-bool provesNonNull(const codeskeptic::Guarded<VarState>& disjunct,
-                   const VarDecl* var) {
+bool provesNonZero(const Expr* expr,
+                   const codeskeptic::Guarded<VarState>& disjunct,
+                   ASTContext& ctx) {
+    if (!expr) return false;
+    Expr::EvalResult result;
+    if (expr->EvaluateAsInt(result, ctx) && result.Val.isInt())
+        return !result.Val.getInt().isZero();
+    const VarDecl* var = asVar(expr);
     if (!var) return false;
     auto it = disjunct.facts.find(
         codeskeptic::FactKey{var, BO_EQ, 0, nullptr});
     return it != disjunct.facts.end() && !it->second;
 }
 
+bool provesNonZeroRequest(
+        const ReallocSite& site,
+        const codeskeptic::Guarded<VarState>& disjunct,
+        ASTContext& ctx) {
+    if (!site.call) return false;
+    if (!provesNonZero(site.call->getArg(1), disjunct, ctx))
+        return false;
+    return calleeName(site.call->getDirectCallee()) != "reallocarray" ||
+           provesNonZero(site.call->getArg(2), disjunct, ctx);
+}
+
 // On an edge known to be null there is no "allocation": the malloc/new
 // failure path is NOT a leak (p = malloc; if (!p) return;).
 // The walk comes from the shared skeleton (engine/ConditionWalk.h); this
-// domain only cares about the null edge and ignores non-null knowledge.
+// Ordinary allocations only need the null edge. A pending exact realloc
+// relation also consumes the non-null edge: success invalidates the old
+// pointer value, while failure preserves it.
 void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
     codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
+            const VarDecl* guardedOwner = resolveBinding(var, state);
+            auto result = guardedOwner ? state.find(guardedOwner)
+                                       : state.find(var);
+            if (result != state.end() && result->second.reallocSource) {
+                const VarDecl* source = result->second.reallocSource;
+                result->second.reallocSource = nullptr;
+                if (isNull) {
+                    result->second.allocation = AllocState::None;
+                } else {
+                    auto old = state.find(source);
+                    if (old != state.end() &&
+                        old->second.allocation == AllocState::Allocated)
+                        old->second.allocation = AllocState::Freed;
+                }
+                return;
+            }
             if (!isNull) return;
             const VarDecl* owner = resolveBinding(var, state);
             auto it = owner ? state.find(owner) : state.end();
@@ -990,13 +1087,13 @@ public:
                     std::set<const ValueDecl*> unkeyableDecls,
                     std::set<const ValueDecl*> stampableDecls,
                     std::string funcName,
-                    std::map<const VarDecl*, const VarDecl*> reallocSources,
+                    std::map<const CallExpr*, ReallocSite> reallocSites,
                     codeskeptic::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
           mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)),
-          reallocSources_(std::move(reallocSources)),
+          reallocSites_(std::move(reallocSites)),
           funcName_(std::move(funcName)), results_(results) {
         codeskeptic::Guarded<VarState> init;
         for (const auto* var : trackedVars_) {
@@ -1008,11 +1105,10 @@ public:
 
     State initialState() const { return initState_; }
 
-    // The per-variable AllocState chain makes at most 3 transitions;
-    // the number of disjuncts multiplies the height (each disjunct can
-    // rise independently)
+    // Allocation, binding and pending-reallocation state can each climb
+    // independently; the guarded-disjunct count multiplies that bound.
     unsigned latticeHeight() const {
-        return (static_cast<unsigned>(trackedVars_.size()) * 5 + 1) *
+        return (static_cast<unsigned>(trackedVars_.size()) * 7 + 1) *
                    static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
@@ -1048,23 +1144,18 @@ public:
 
         const std::vector<BindingUpdate> bindings =
             pointerBindingUpdates(stmt);
+        const std::vector<ReallocSite> reallocSites =
+            reallocUpdates(stmt);
+        const ReallocSite* callSite = nullptr;
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            auto found = reallocSites_.find(call);
+            if (found != reallocSites_.end() && found->second.call)
+                callSite = &found->second;
+        }
         auto applyBindings = [&](bool deferred) {
             for (auto& disjunct : in) {
                 for (const BindingUpdate& binding : bindings) {
                     if (binding.deferred != deferred) continue;
-                    auto replacement = reallocSources_.find(binding.rhs);
-                    if (replacement != reallocSources_.end() &&
-                        replacement->second &&
-                        provesNonNull(disjunct, binding.rhs)) {
-                        const VarDecl* oldOwner =
-                            resolveBinding(binding.lhs, disjunct.vars);
-                        const VarDecl* reallocOwner =
-                            resolveBinding(replacement->second,
-                                           disjunct.vars);
-                        if (oldOwner && oldOwner == reallocOwner)
-                            disjunct.vars[oldOwner].allocation =
-                                AllocState::Escaped;
-                    }
                     applyBindingUpdate(disjunct.vars, binding);
                 }
             }
@@ -1081,13 +1172,39 @@ public:
         State out = in;
         for (auto& d : out) {
             for (const auto& [var, effect] : effects) {
+                if (effect == StmtEffect::Escapes && callSite &&
+                    callSite->source == var &&
+                    provesNonZeroRequest(*callSite, d, ctx))
+                    continue;
                 switch (effect) {
-                    case StmtEffect::Allocates:
+                    case StmtEffect::Allocates: {
+                        const ReallocSite* update = nullptr;
+                        for (const ReallocSite& candidate : reallocSites)
+                            if (candidate.result == var) {
+                                update = &candidate;
+                                break;
+                            }
+                        const VarDecl* sourceOwner =
+                            update
+                                ? resolveBinding(update->source, d.vars)
+                                : nullptr;
+                        const bool provenRequest =
+                            update && provesNonZeroRequest(*update, d, ctx);
                         invalidateBindingDependents(d.vars, var);
                         d.vars[var].binding = var;
+                        d.vars[var].reallocSource = nullptr;
                         d.vars[var].referenceBinding = false;
                         d.vars[var].allocation = AllocState::Allocated;
+                        if (provenRequest && sourceOwner &&
+                            sourceOwner != var) {
+                            auto source = d.vars.find(sourceOwner);
+                            if (source != d.vars.end() &&
+                                source->second.allocation ==
+                                    AllocState::Allocated)
+                                d.vars[var].reallocSource = sourceOwner;
+                        }
                         break;
+                    }
                     case StmtEffect::Frees: {
                         const VarDecl* owner = resolveBinding(var, d.vars);
                         if (owner)
@@ -1096,8 +1213,10 @@ public:
                     }
                     case StmtEffect::Escapes: {
                         const VarDecl* owner = resolveBinding(var, d.vars);
-                        if (owner)
+                        if (owner) {
+                            invalidateReallocRelations(d.vars, owner);
                             d.vars[owner].allocation = AllocState::Escaped;
+                        }
                         break;
                     }
                     case StmtEffect::None: break;
@@ -1155,8 +1274,34 @@ public:
 
             if (effect == StmtEffect::Allocates &&
                 it->second.allocation == AllocState::Allocated) {
-                report(stmt, var, ctx, codeskeptic::Severity::Warning,
-                       "memory-leak", codeskeptic::MsgId::LeakReassign);
+                bool reportOverwrite = true;
+                for (const ReallocSite& site : reallocUpdates(stmt)) {
+                    if (site.result != var) continue;
+                    bool sourceOverwriteOnly = true;
+                    bool provenFailureLeak = false;
+                    for (const auto& disjunct : beforeDisjuncts) {
+                        auto old = disjunct.vars.find(var);
+                        if (old == disjunct.vars.end() ||
+                            old->second.allocation != AllocState::Allocated)
+                            continue;
+                        const VarDecl* sourceOwner =
+                            resolveBinding(site.source, disjunct.vars);
+                        if (site.source != var && sourceOwner != var) {
+                            sourceOverwriteOnly = false;
+                            break;
+                        }
+                        if (provesNonZeroRequest(site, disjunct, ctx))
+                            provenFailureLeak = true;
+                    }
+                    if (sourceOverwriteOnly)
+                        reportOverwrite = provenFailureLeak;
+                    break;
+                }
+                if (reportOverwrite)
+                    report(stmt, var, ctx,
+                           codeskeptic::Severity::Warning,
+                           "memory-leak",
+                           codeskeptic::MsgId::LeakReassign);
             } else if (effect == StmtEffect::Frees) {
                 const VarDecl* owner = resolveBinding(var, before);
                 auto ownerState = owner ? before.find(owner) : before.end();
@@ -1258,7 +1403,7 @@ private:
     std::set<const ValueDecl*> mutated_;
     std::set<const ValueDecl*> stampable_;
     std::set<const ValueDecl*> pointerFacts_;
-    std::map<const VarDecl*, const VarDecl*> reallocSources_;
+    std::map<const CallExpr*, ReallocSite> reallocSites_;
     std::string funcName_;
     codeskeptic::DiagnosticList& results_;
     State initState_;
@@ -1353,7 +1498,7 @@ void analyzeFunction(const FunctionDecl* funcDecl,
         trackedVars, codeskeptic::collectUnkeyableDecls(funcDecl),
         codeskeptic::collectFactDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
-        collectReallocSources(funcDecl),
+        collectReallocSites(funcDecl),
         results);
     auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
@@ -1380,6 +1525,16 @@ void analyzeFunction(const FunctionDecl* funcDecl,
                 if (v == d.vars.end() ||
                     v->second.allocation != AllocState::Allocated)
                     continue;
+                bool coveredByAlternative = false;
+                for (const auto& [resultVar, resultState] : d.vars) {
+                    if (resultVar != var &&
+                        resultState.allocation == AllocState::Allocated &&
+                        resultState.reallocSource == var) {
+                        coveredByAlternative = true;
+                        break;
+                    }
+                }
+                if (coveredByAlternative) continue;
                 leaksSomewhere = true;
                 break;
             }

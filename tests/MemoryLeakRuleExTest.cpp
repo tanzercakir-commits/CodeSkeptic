@@ -1430,6 +1430,412 @@ TEST(AliasEscapeTest, ExitGuard_DoesNotDiluteFreedAlias) {
     ASSERT_EQ(results.size(), 0);
 }
 
+// --- Phase 7.2: exact realloc success/failure lifetime ---
+
+TEST(ReallocLifetimeV2Test,
+     TemporaryFailurePreservesOriginal_SuccessTransfers) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (replacement == nullptr) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ProvenSuccessInvalidatesOriginal_ReportsUAF) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ExactResultAliasGuardProvesSuccess) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            int* checked = replacement;
+            if (!checked) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ProvenSuccessFreeOriginal_ReportsDoubleFree) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(owner);
+            free(replacement);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(ReallocLifetimeV2Test, UnresolvedTemporaryReportsOneAlternativeLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            (void)replacement;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test,
+     ReallocarrayFailurePreservesOriginal_SuccessTransfers) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)reallocarray(owner, 4, 16);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, DirectOverwriteNonzeroReportsFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, 16);
+            free(owner);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test, GuardedNonzeroDirectOverwriteReportsFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            if (size == 0) {
+                free(owner);
+                return;
+            }
+            owner = (int*)realloc(owner, size);
+            free(owner);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test, UnknownSizeTemporaryDegradesWithoutLifetimeClaim) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, size);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, UnknownSizeDirectOverwriteDoesNotClaimFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, size);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ZeroSizeDirectOverwriteDoesNotInventSemantics) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, 0);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, NullInputBehavesAsAllocation) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            owner = (int*)realloc(owner, 16);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, StdReallocHasExactSuccessAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        namespace std {
+        void* realloc(void*, unsigned long);
+        }
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)std::realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ReallocarrayOverflowFailurePreservesOriginal) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)reallocarray(owner, ~0UL, 2);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, GuardedReallocarrayRequiresBothNonzeroOperands) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        int f(unsigned long count, unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            if (count == 0) {
+                free(owner);
+                return 0;
+            }
+            if (size == 0) {
+                free(owner);
+                return 0;
+            }
+            int* replacement = (int*)reallocarray(owner, count, size);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ZeroSizeTemporaryDoesNotInventSuccessRelease) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 0);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, TypeChangingResultDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            char* owner = (char*)malloc(16);
+            int* replacement = (int*)realloc(owner, 32);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, IndirectCallDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            void* (*resize)(void*, unsigned long) = realloc;
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)resize(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ExposedResultInvalidatesPendingRelation) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void mutate(int**);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            mutate(&replacement);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  for (const auto &result : results)
+    EXPECT_NE(result.rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, OtherNamespaceDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        namespace custom {
+        void* realloc(void*, unsigned long);
+        }
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)custom::realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
 // --- systemd FP hunt (2026-07-12): __attribute__((cleanup)) ---
 
 TEST(CleanupAttrTest, CleanupVar_CannotLeak) {

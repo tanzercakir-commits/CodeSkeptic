@@ -1,5 +1,64 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-09 — Phase 7.2 realloc outcome lifetimes
+
+The memory-lifetime analysis now records an exact pending source/result
+relation for direct global-C or `std` `realloc`/`reallocarray` calls with local,
+same-pointer-type identities and proven nonzero requests. A proven null result
+preserves the original allocation; a proven non-null result transfers the
+lifetime to the result and invalidates the old owner. Proven-nonzero direct
+overwrite reports the possible failure-path leak, null input remains ordinary
+allocation, and `reallocarray` requires both multiplicands to be nonzero.
+
+Zero or unknown sizes, indirect and custom calls, methods and other namespaces,
+type-changing results, address exposure, and conflicting relations remain
+non-authoritative. They cannot manufacture release, transfer, UAF,
+double-free, or overwrite-leak evidence. Reassignment and exposure invalidate
+only the pending relation, while unresolved result/source alternatives are
+deduplicated at exit.
+
+Initial RED recorded four implementation gaps after one other-namespace test
+was corrected because its original leak expectation contradicted the existing
+generic escape semantics. The first full suite then exposed a Systemd
+copy-before-null regression: realloc invalidation had accidentally erased a
+normal pointer-value copy binding. Preserving that binding closed the
+regression. Precision review added an exact-result-alias guard RED; resolving
+the guard to its binding owner closed it. The final Phase 7.2 matrix has 20
+cases, the focused realloc/alias/Systemd replay is 24/24, and both the direct
+and CTest suites pass 1097/1097.
+
+The final 400-file/CWE Juliet replay passes every unchanged floor. Rule-matched
+results are CWE476 140/0 (precision 1.000, hit rate 0.347), CWE401 105/15
+(precision 0.875, hit rate 0.253), CWE415 119/0 (precision 1.000, hit rate
+0.297), CWE416 212/0 (precision 1.000, hit rate 0.531), CWE369 43/0 (precision
+1.000, hit rate 0.108), and CWE190 23/0 (precision 1.000, hit rate 0.057).
+Compared with the sealed Phase 7.1 baseline, realloc modeling adds 13 CWE401
+true positives and two false positives while holding precision above its 0.85
+floor; no quality floor changed.
+
+Final local gates are frozen thesis `clean_fp=0`, `bug_caught=9/15`, 11
+findings; clean and complete 48/48-TU self-scan; cJSON 54 findings (76
+enumerated, 35 analyzed, 41 explicitly accepted broken fixtures); and tinyxml2
+9 findings (3/3 analyzed). The tested Windows product SHA-256 is
+`4ccb8e52a53e1af0905830c2889bb9ffc1467960c17a44cf4ac8e76c423c656d`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, allocator registries, contract grammar, capability
+tiers, configuration, summary schemas, accepted model channels, and Juliet
+floors are unchanged.
+
+Contract-first shadow completion considered `reallocSite`, `reallocUpdates`,
+`collectReallocSites`, `invalidateReallocRelations`, `provesNonZero`,
+`provesNonZeroRequest`, and `applyNullCondition`. Their composite authority
+depends on native pointer identity and heap lifetime semantics that the current
+verifier cannot prove, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 7. No proposal exposed a problem because none was
+eligible. Independent RED, full-suite, and precision-review tests exposed the
+implementation and assumption problems above; all are closed. Candidate
+contracts requiring later human review: none. No `cs: ai` proposal became
+accepted intent, and native owned-memory verification parity remains deferred
+to executable A7 fixtures.
+
 ## 2026-08-09 — Phase 7.2 realloc boundary and contract record
 
 Phase 7.1 is sealed in commit `1475adb8754c75174ef4057d62a1f8b5c543a605`
