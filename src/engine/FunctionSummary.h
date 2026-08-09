@@ -51,6 +51,7 @@ public:
     };
     enum class ParamPrecondition { None, NonNullCrash, NonNullRejected };
     enum class ParamPostcondition { Unknown, Null, NonNull };
+    enum class ParamAllocatorSize { Unknown, None, Sink };
 
     // Exact one-hop fields that may be written through a record pointer
     // or reference. known=false is conservative; known=true with an empty
@@ -85,6 +86,11 @@ public:
         // precondition / unknown postcondition.
         std::vector<ParamPrecondition> paramPreconditions;
         std::vector<ParamPostcondition> paramPostconditions;
+
+        // Exact integer parameters whose unchanged entry value reaches an
+        // allocator size argument. Unknown is non-authoritative (legacy,
+        // bodyless, or conflicting summaries); only Sink is consumed.
+        std::vector<ParamAllocatorSize> paramAllocatorSizes;
 
         // Zero-passthrough (the zeroness-through-summaries slice): when
         // returnZeroness is Unknown ONLY because some paths return
@@ -170,6 +176,12 @@ public:
             if (index >= paramPostconditions.size())
                 return ParamPostcondition::Unknown;
             return paramPostconditions[index];
+        }
+
+        ParamAllocatorSize paramAllocatorSize(unsigned index) const {
+            if (index >= paramAllocatorSizes.size())
+                return ParamAllocatorSize::Unknown;
+            return paramAllocatorSizes[index];
         }
     };
 

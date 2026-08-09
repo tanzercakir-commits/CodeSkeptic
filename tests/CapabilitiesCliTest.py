@@ -80,6 +80,25 @@ for rule in rules:
 if actual_supported != expected_supported:
     fail(f"supported set expected={sorted(expected_supported)} got={sorted(actual_supported)}")
 
+alloc_size = next(
+    (rule for rule in rules if rule.get("id") == "alloc-size-overflow"),
+    None,
+)
+expected_alloc_size = {
+    "tier": "experimental",
+    "default_enabled": True,
+    "quality_gated": False,
+    "blocks_verdict": False,
+}
+if alloc_size is None:
+    fail("alloc-size-overflow capability is missing")
+for field, expected in expected_alloc_size.items():
+    if alloc_size.get(field) != expected:
+        fail(
+            f"alloc-size-overflow {field} expected={expected!r} "
+            f"got={alloc_size.get(field)!r}"
+        )
+
 out_of_scope = {
     item.get("id")
     for item in payload.get("capabilities", {}).get("out_of_scope", [])
