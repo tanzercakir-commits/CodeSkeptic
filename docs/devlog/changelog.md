@@ -1,5 +1,52 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.2 weekend factory boundary
+
+Protected main contains Phase 8.1 through PR #136 at
+`3b1714e1e9e3997ab63507837c3a177c1bdefab1`, tree
+`0293f291d2a4a7876eaa734e6b23dd0a82779377`. The branch-opening status sync
+mechanically appended that merge to PROGRESS and regenerated TODO's state
+block before new implementation work.
+
+The separately locked weekend tier consists of systemd v256.17 at
+`009adf6c0e435376c80fbc11675d581e0a94d350`, curl 8.11.0 at
+`b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a`, Redis 7.4.2 at
+`a0a6f23d997b024689ba157916837f493a593a34`, and LVGL 9.2.2 at
+`7f07a129e8d77f4984fff8e623fd5be18ff42e74`. Exact minimal-build source
+identities measured before implementation are systemd 390
+(`5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c`),
+curl 169
+(`213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01`),
+Redis 103
+(`3b01da3958fa65529f859ca097ef6e471a8ec45f9976c31d833311559588aa1b`),
+and LVGL 311
+(`30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50`).
+Historical measurements from other revisions or build configurations are not
+interchangeable with these identities.
+
+The implementation may add only strict Meson setup/compile and Bear-wrapped
+native-Make command shapes to the existing token-array runner. It will add an
+exact 2,880-minute, three-repeat weekend manifest tier and a distinct weekly
+Actions selection while preserving the nightly tier and every existing
+fail-closed receipt rule. Finding and fingerprint expectations must be
+measured with the current analyzer and repeated three times; they are not
+inferred from historical documentation.
+
+The exact file set is `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`tests/RealworldCampaignTest.py`, `docs/benchmarks.md`, `docs/reproduce.md`,
+`docs/TODO.md`, `docs/PROGRESS.md`, and this changelog. No C++, grammar,
+accepted intent, capability, profile, schema, release, quality-floor, nightly
+project, or ordinary PR gate change is admitted. RED-first tests are the
+implementation referee and this pre-implementation boundary will not change.
+
+Contract-first shadow dogfood is not applicable because no C++ function is
+created or materially changed. Functions considered 0; proposals 0; eligible
+0; rejected 0; unsupported 0. No proposal exposed a problem, no candidate
+contract requires human review, and no `cs: ai` proposal can become accepted
+intent. Native owned-memory semantics remain deferred to executable A7
+fixtures.
+
 ## 2026-08-10 — Phase 8.1 factory implementation and local qualification
 
 The nightly factory now has one structured authority for four immutable

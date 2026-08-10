@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = e146a43
-in_flight     = phase-realworld-test-factory
-verified_main = e146a43
-progress      = sha256:f912666b0c80a64febd031a30043cb60bcafb49f8070fef4287b224807297e1d
+base          = 3b1714e
+in_flight     = phase-realworld-weekend-factory
+verified_main = 3b1714e
+progress      = sha256:e4abb350fc0516a20cc450f8fd3dbfd9d84ebb647b60a399844ea9bbe49294ef
 ```
 <!-- cs:state-end -->
 
@@ -676,7 +676,14 @@ Its campaign-wide analyzer SHA-256 is
 `146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
 its checksummed aggregate receipt SHA-256 is
 `08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
-Phase 8.1 remains active until protected main contains the merged result.
+Phase 8.1 is delivered through protected-main PR #136 at squash commit
+`3b1714e1e9e3997ab63507837c3a177c1bdefab1`, tree
+`0293f291d2a4a7876eaa734e6b23dd0a82779377`. A second hosted replay on the
+final documentation head, workflow run `31371349360`, accepted the same
+project semantics with analyzer SHA-256
+`e40d6c02b160c13a8bf9010b03dafe2d21fc1aed068c706770a79e95250cb72e`
+and aggregate receipt SHA-256
+`b576a9affbb2cc31d1fb0f7d94c1f1bcf4d25d678e7e166691d928a7cbe479b2`.
 
 The hardened factory contract has 12/12 Python tests. It covers early
 unavailable shard receipts, campaign-wide single-analyzer identity, semantic
@@ -691,6 +698,78 @@ sync, frozen thesis `clean_fp=0` and `bug_caught=9/15` with 11 findings,
 self-scan clean and complete at 48/48, cJSON 54 (76 attempted, 35 analyzed,
 41 explicitly accepted broken fixtures), tinyxml2 9 (3/3), and the unchanged
 400-file/CWE Juliet floors.
+
+## Phase 8.2 — deterministic weekend real-repository capacity — BOUNDARY LOCKED (2026-08-10)
+
+The weekend tier adds exactly four independently pinned projects to the
+factory without changing the nightly tier: systemd v256.17 at
+`009adf6c0e435376c80fbc11675d581e0a94d350`, curl 8.11.0 at
+`b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a`, Redis 7.4.2 at
+`a0a6f23d997b024689ba157916837f493a593a34`, and LVGL 9.2.2 at
+`7f07a129e8d77f4984fff8e623fd5be18ff42e74`. The weekend campaign has exactly
+three repetitions and a 2,880-minute aggregate capacity; the validator must
+reject a weekend boundary below 36 hours or above 48 hours. Each hosted shard
+retains the existing 330-minute runner ceiling and 355-minute job ceiling.
+
+The build surfaces were qualified against those exact commits before the
+implementation boundary was opened. systemd uses Meson release setup with
+tests, documentation, translations, boot/EFI, BPF, security integrations,
+compression, crypto, and optional network dependencies disabled, followed by
+the `systemd:executable` target; the admitted source roots are `src/basic`,
+`src/core`, and `src/shared`. curl uses its CMake/Ninja HTTP-only static-lib
+configuration with tests, the executable, TLS, PSL, SSH2, and zlib disabled,
+and admits `lib`. Redis uses Bear around its native Make build with clang-20,
+`MALLOC=libc`, `BUILD_TLS=no`, and `USE_SYSTEMD=no`, and admits `src`. LVGL uses
+CMake/Ninja with `LV_CONF_SKIP=ON` and examples/demos disabled, and admits
+`src`. All four surfaces admit only `.c` files and no fallback glob.
+
+The locked sorted translation-unit identities are systemd 390 / SHA-256
+`5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c`,
+curl 169 / `213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01`,
+Redis 103 / `3b01da3958fa65529f859ca097ef6e471a8ec45f9976c31d833311559588aa1b`,
+and LVGL 311 / `30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50`.
+These counts describe the newly locked minimal build surfaces and must not be
+substituted with historical README scan sizes from other revisions or build
+configurations. Finding, coverage, exit, and fingerprint expectations remain
+unclaimed until the current analyzer produces measured receipts; three-way
+semantic equality is required before acceptance.
+
+The command authority expands only through two strictly shaped adapters.
+`meson` is admitted only as `setup {build} {source} ...` in configure rows and
+`compile -C {build} ...` in build rows. `bear` is admitted only in a build row
+whose fixed prefix is
+`bear --output {build}/compile_commands.json -- make -C {source}`, followed
+only by `-j{jobs}` and simple make variable assignments. Shell commands,
+control tokens, response files, alternate makefiles, Meson introspection, and
+other subcommands remain invalid. The existing token-array execution model is
+unchanged; no shell authority is introduced.
+
+GitHub Actions adds a `weekend` dispatch choice and one distinct weekly cron.
+The scheduler maps only that exact weekly cron to `weekend`; the existing
+daily cron remains `nightly`, and an unknown tier fails before matrix
+execution. The scan image adds only the measured build dependencies needed by
+the locked recipes. RED-first tests must pin the exact project membership,
+weekend bounds, immutable revisions and TU identities, reject malformed Meson
+and Bear shapes, and statically prove the dispatch/schedule/dependency and
+hosted-time boundaries. Existing checksum, checkpoint, coverage,
+determinism, and fail-closed evidence rules remain unchanged.
+
+The exact Phase 8.2 file set is `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`tests/RealworldCampaignTest.py`, `docs/benchmarks.md`, `docs/reproduce.md`,
+this TODO, `docs/PROGRESS.md`, and `docs/devlog/changelog.md`. No product C++,
+contract grammar, accepted contract intent, capability tier, profile, summary
+schema, release configuration, quality floor, nightly project, or ordinary PR
+gate is admitted to change. This boundary is stored separately from
+implementation and will not change during the slice.
+
+Contract-first shadow dogfood is not applicable because Phase 8.2 creates or
+materially changes no C++ function. Functions considered 0; proposals 0;
+eligible 0; rejected 0; unsupported 0. No proposal has exposed an
+implementation or assumption problem. Candidate contracts requiring later
+human review: none. No `cs: ai` proposal can become accepted intent. Native
+pointer, ownership, heap, alias, and lifetime parity remain deferred to
+executable A7 fixtures.
 
 ## Recovered product program — Phases 8–12
 
