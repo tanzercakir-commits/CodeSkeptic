@@ -113,7 +113,10 @@ def rel_to_root(abs_path: str, root: str) -> str:
     if p == r:
         return ""
     if p.startswith(r + os.sep):
-        return p[len(r) + 1:]
+        # Git diffs and rename maps always use '/'. Native Windows relative
+        # paths must use the same spelling or the honesty report says a TU was
+        # both analyzed and not analyzed.
+        return p[len(r) + 1:].replace(os.sep, "/")
     return p
 
 
@@ -436,6 +439,54 @@ def cmd_assemble(args):
 # remap-db
 # ---------------------------------------------------------------------------
 
+def _path_pattern_body(path):
+    """Return a regex body matching a path with either separator style."""
+    path = path.rstrip("/\\")
+    if not path:
+        raise ValueError("path prefix must not be empty")
+    pieces = re.split(r"([/\\]+)", path)
+    return "".join(
+        r"[/\\]+" if re.fullmatch(r"[/\\]+", piece) else re.escape(piece)
+        for piece in pieces
+        if piece
+    )
+
+
+def _path_prefix_pattern(path):
+    return re.compile(
+        _path_pattern_body(path) + r"(?=[/\\\s\"\']|$)",
+        re.IGNORECASE,
+    )
+
+
+def _rewrite_compile_path(value, src_root, dst_root, protect=None):
+    """Rewrite source paths while preserving build-only dependencies."""
+    hidden = []
+
+    def hide(match):
+        token = f"\x00CS_PROTECTED_{len(hidden)}\x00"
+        hidden.append((token, match.group(0)))
+        return token
+
+    if protect:
+        value = _path_prefix_pattern(protect).sub(hide, value)
+
+    # A compile DB may reuse dependencies from an older sibling build. Those
+    # directories do not exist in a source-only base worktree and must retain
+    # their HEAD paths just like the explicitly selected BUILD_PATH.
+    build_root = re.compile(
+        _path_pattern_body(src_root)
+        + r"[/\\]+(?:build|cmake-build)(?:[-_.][^/\\\s\"\']*)?"
+        + r"(?=[/\\\s\"\']|$)",
+        re.IGNORECASE,
+    )
+    value = build_root.sub(hide, value)
+    value = _path_prefix_pattern(src_root).sub(lambda _m: dst_root, value)
+    for token, original in hidden:
+        value = value.replace(token, original)
+    return value
+
+
 def cmd_remap_db(args):
     src_root = os.path.realpath(args.from_root).rstrip(os.sep)
     dst_root = os.path.realpath(args.to_root).rstrip(os.sep)
@@ -443,10 +494,6 @@ def cmd_remap_db(args):
         print("[review] refusing to remap from root '%s'" % src_root,
               file=sys.stderr)
         return 2
-    # Prefix-safe: /a/b must not rewrite inside /a/bc — require a
-    # separator, whitespace, quote, or end after the match.
-    pat = re.compile(re.escape(src_root) + r'(?=[/\s"\']|$)')
-
     # The BUILD directory is typically inside the repo root but is NOT in
     # git — a worktree has no build/. Paths under it (generated headers,
     # -Ibuild/_deps/...) must keep pointing at the HEAD build: protect
@@ -456,19 +503,15 @@ def cmd_remap_db(args):
     protect = None
     if args.protect:
         protect = os.path.realpath(args.protect).rstrip(os.sep)
-        if not protect.startswith(src_root + os.sep):
+        try:
+            common = os.path.commonpath((src_root, protect))
+        except ValueError:
+            common = ""
+        if os.path.normcase(common) != os.path.normcase(src_root):
             protect = None  # outside the root: the rewrite can't touch it
-    sentinel = "\x00CS_PROTECTED\x00"
-    prot_pat = re.compile(re.escape(protect) + r'(?=[/\s"\']|$)') \
-        if protect else None
 
     def rw(s):
-        if prot_pat is not None:
-            s = prot_pat.sub(lambda _m: sentinel, s)
-        s = pat.sub(lambda _m: dst_root, s)
-        if prot_pat is not None:
-            s = s.replace(sentinel, protect)
-        return s
+        return _rewrite_compile_path(s, src_root, dst_root, protect)
 
     with open(args.src, "r", encoding="utf-8") as f:
         entries = json.load(f)

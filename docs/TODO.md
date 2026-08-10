@@ -12,8 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 3aa85f9
-uçuşta = phase-memory-lifetime-v2
+base          = 47b03f4
+in_flight     = phase-progress-automation
+verified_main = 47b03f4
+progress      = sha256:65e44b23b57b417a4e07f7595e84f2ba8704ed8d1976225d279dba4eae745cf0
 ```
 <!-- cs:state-end -->
 
@@ -528,12 +530,65 @@ Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 double-free precision floors remain at least 0.95, clean corpora stay clean,
 and every local/CI referee passes without weakening an existing floor.
 
-Documentation automation follow-up (owner request, 2026-08-09): after the
-Phase 7.1 commit, declare a separate maintenance boundary for extending the
-existing docs-sync path so verified stage transitions and progress receipts
-update TODO/progress artifacts automatically. The automation must remain
-fail-closed and must never infer completion before the relevant verifier
-passes.
+## Documentation/progress automation maintenance — VERIFIED, MERGE PENDING (2026-08-10)
+
+Phase 7 is merged through protected-main PR #134 at
+`47b03f4076f246c38a81fbc834693bed0f98ccc4`, tree
+`d21f47b802f5a824626501d39425e98fb6509142`. The owner-requested maintenance
+boundary is now locked before implementation.
+
+The authority contract is deliberately mechanical. Only commits reachable
+from `origin/main` may be appended to the generated progress ledger as
+`MERGED`; a phase branch, local test run, changelog sentence, or AI statement
+can never become completion authority. `sync` may append newly observed
+protected-main commits to `docs/PROGRESS.md` and regenerate only TODO's marked
+state block. `check` is read-only and must fail when the progress cursor is
+missing, malformed, not an ancestor of main, behind main, or when TODO does
+not match the derivable git/progress facts. Existing progress bytes are
+append-only: history may not be rewritten to make a later result look older.
+Git facts that cannot be resolved are errors under CI, never a silent green.
+The changelog remains the rationale/evidence narrative; PROGRESS is the terse
+verified transition ledger, and TODO remains the current compass.
+
+The same boundary closes two measured Windows review-harness defects from the
+Phase 7 referee. Compile-database root matching must accept both slash styles,
+must not remap protected or build-output paths into the base worktree, and
+must keep source paths on the base side. Repository-relative finding and
+coverage paths must use Git's slash-separated form on every host. The strict
+review must then report every changed C/C++ source as analyzed instead of the
+contradictory "12 analyzed / 12 not analyzed" receipt observed before the
+temporary referee correction.
+
+The exact file set is `docs/PROGRESS.md`, this TODO,
+`docs/devlog/changelog.md`, `CONTRIBUTING.md`,
+`scripts/progress_status.py`, `scripts/check_docs_sync.sh`,
+`scripts/review_report.py`, `tests/StatusAutomationTest.py`, and
+`tests/CMakeLists.txt`. PLAN, product/runtime sources, contract grammar,
+capabilities, profiles, workflows, release configuration, and quality floors
+remain unchanged. Contract-first shadow dogfood is not applicable: this
+maintenance slice creates or materially changes no C++ function. Functions
+considered 0; proposals 0; eligible 0; rejected 0; unsupported 0. Candidate
+contracts requiring later human review: none. No `cs: ai` proposal can become
+accepted intent. The new automation tests, existing diff-review flow, full
+suite, docs-sync, and a real branch/main replay are the referees; this contract
+will not change during implementation.
+
+Implementation stays inside the locked nine-file set. The status tool
+bootstraps the append-only ledger at protected-main Phase 7, derives commit
+and tree receipts from git, records live phase refs only as in-flight, and
+atomically repairs the marked TODO view. Five focused tests prove initial
+sync, stale-main detection, append-only advancement, missing-cursor/manual
+rewrite rejection, non-ancestor rejection, TODO repair, and mixed Windows
+path handling. The direct C++ suite passes 1164/1164 and CTest passes
+1165/1165 including `StatusAutomationContract`; the existing end-to-end
+review fixture passes. A real strict replay from `3aa85f9` analyzes all 12
+changed C/C++ sources, reaches every fixpoint, and reports zero new errors,
+warnings, or weakened contracts, without the former contradictory coverage
+list. The read-only docs gate resolves `origin/main` at `47b03f4`, appends no
+unmerged work, and passes capability, real-world ledger, and documentation
+checks. These are branch verification facts only; this slice becomes
+`MERGED` solely after protected main contains its squash commit and a later
+`sync` appends that git fact to PROGRESS.
 
 ## Açık kullanıcı kararları
 
@@ -545,8 +600,10 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-The Phase 7 lifetime-v2 requirements are owned by the five active slices
-above; there is no separate unowned lifetime item.
+Phase 7 lifetime-v2 is delivered by PR #134. The separately bounded
+documentation/progress and Windows review-harness maintenance slice above is
+locally verified and awaiting protected-main merge; the next product stage
+starts only after that merge is mechanically observed.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
