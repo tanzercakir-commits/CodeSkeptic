@@ -1,5 +1,66 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.1 factory implementation and local qualification
+
+The nightly factory now has one structured authority for four immutable
+projects and twelve independent shards. The validator reserves obvious
+placeholder SHA-256 values, admits only controlled token-array recipes, and
+rejects mutable revisions, unsafe paths, unavailable verdicts, partial
+coverage, or unbounded campaign inputs. Shards check out and build the exact
+project, hash the sorted requested TU identity, run one analyzer under time
+and memory bounds, and write a receipt plus checksum even when evidence is
+unavailable. Exact-identity checkpoints are optimization only. The separate
+aggregate referee requires three accepted, checksum-valid, semantically
+identical receipts per project and one valid analyzer digest across the whole
+campaign. It recomputes semantic structure and fingerprint identities rather
+than trusting a checksummed payload, and early shard or aggregate failures
+still publish checksummed unavailable evidence. The 355-minute scan-job bound
+leaves a 25-minute evidence-publication margin above the 330-minute project
+limit while remaining below GitHub's six-hour ceiling.
+
+RED-first qualification exposed one factory assumption: libarchive requests
+132 exact source files but `--whole-program` deliberately produces 255
+analysis executions. Requiring analyzed executions to equal requested files
+rejected complete evidence. The corrected contract still requires the exact
+requested count, permits only an analysis count at least that large, pins the
+exact project-specific value in the manifest, and continues to require zero
+broken TUs and zero incomplete functions. The new regression test proves both
+the 2-request/3-execution case and rejection of under-coverage.
+
+Historical-to-current finding drift was classified before updating the
+manifest. libgit2 moved 34 to 39 by closing three prior reports and adding
+eight findings under the later ownership/lifetime engine. rtp2httpd retains
+its four historical findings and adds 17 memory-leak plus three promoted
+resource-leak reports. Abseil moves 4 to 12 under the later interprocedural and
+ownership/lifetime engine. libarchive moves 35 to 38, from 17 memory-leak and
+18 null-deref to 19 of each. Project revisions, build recipes, and requested
+source identities remain immutable; these are classified analyzer-semantic
+changes, not silently accepted upstream drift.
+
+The local Linux aggregate accepted all twelve receipts with analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`
+and manifest SHA-256
+`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
+Per-project results are libgit2 167/167 and 39 findings, rtp2httpd 38/38 and
+24, Abseil 158/158 and 12, and libarchive 132 requested / 255 analyzed and 38;
+all have zero broken TUs, zero incomplete functions, exit 1, and identical
+fingerprint identities across three repetitions. Remote publication evidence
+and protected-main merge remain pending.
+
+Local release gates are green: the deterministic factory suite passes 12/12,
+the full NMake/CTest suite passes 1166/1166, the direct C++ suite passes
+1164/1164, capability/profile/documentation/corpus/thesis/self-scan gates pass,
+and the bounded 400-case-per-CWE Juliet campaign retains every published
+recall and false-positive floor. Python bytecode compilation, workflow YAML
+parsing, and whitespace validation also pass.
+
+No product C++ function changed, so contract-first shadow dogfood is not
+applicable. Functions considered 0; proposals 0; eligible 0; rejected 0;
+unsupported 0. No proposal exposed an implementation or assumption problem;
+there are no candidate contracts requiring later human review, and no
+`cs: ai` proposal became accepted intent. Native owned-memory semantics remain
+deferred to executable A7 fixtures.
+
 ## 2026-08-10 — Phase 8.1 deterministic real-repository factory boundary
 
 Protected main contains the progress/review automation maintenance through PR
@@ -46,6 +107,14 @@ materially changed. Functions considered 0; proposals 0; eligible 0; rejected
 contracts for later human review, and no `cs: ai` proposal can become accepted
 intent. Native owned-memory semantics remain deferred to executable A7
 fixtures.
+
+The former external development note was no longer present at its original
+desktop path. Its recovered Phase 8–12 program is now recorded as the durable
+queue in `docs/TODO.md`: real-repository factory, upstream validation,
+robustness/performance, distribution/governance, and external beta/v1.0. This
+does not alter the fixed `docs/PLAN.md` or create a forbidden parallel plan;
+only Phase 8.1 is active, and later phases still require their own locked
+boundaries before implementation.
 
 ## 2026-08-10 — Verified progress and Windows review maintenance boundary
 

@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "campaigns": {
+    "nightly": {
+      "window_minutes": 720,
+      "repetitions": 3,
+      "projects": [
+        "libgit2",
+        "rtp2httpd",
+        "abseil",
+        "libarchive"
+      ]
+    }
+  },
+  "projects": [
+    {
+      "id": "libgit2",
+      "label": "v1.9.0",
+      "repository": "https://github.com/libgit2/libgit2.git",
+      "revision": "338e6fb681369ff0537719095e22ce9dc602dbf0",
+      "timeout_minutes": 120,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DBUILD_TESTS=OFF",
+            "-DBUILD_CLI=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "git__malloc,git__calloc,git__realloc,git__strdup",
+        "--free-functions",
+        "git__free",
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 167,
+        "translation_unit_sha256": "85f45a6cfa12bf9df0855fa1ca5c6895d050d676b0814ab0f8a53a04c6689b33",
+        "attempted_tus": 167,
+        "analyzed_tus": 167,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 39,
+        "exit_code": 1,
+        "fingerprint_sha256": "34874313efb0f492f08b77d9ab17d7ac4fe478dec41fa57fe563675334635cd3"
+      }
+    },
+    {
+      "id": "rtp2httpd",
+      "label": "a7a1e568",
+      "repository": "https://github.com/stackia/rtp2httpd.git",
+      "revision": "a7a1e568d46ee3176f8a3e94e0f88f131ebd444e",
+      "timeout_minutes": 60,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [
+        {
+          "from": "profiles/contracts/rtp2httpd/configuration.c.csk",
+          "to": "src/configuration.c.csk"
+        }
+      ],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 38,
+        "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+        "attempted_tus": 38,
+        "analyzed_tus": 38,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 24,
+        "exit_code": 1,
+        "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
+      }
+    },
+    {
+      "id": "abseil",
+      "label": "20260526.0",
+      "repository": "https://github.com/abseil/abseil-cpp.git",
+      "revision": "5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a",
+      "timeout_minutes": 180,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_CXX_STANDARD=17",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DABSL_BUILD_TESTING=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "absl"
+        ],
+        "extensions": [
+          ".cc"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/absl"
+      ],
+      "expected": {
+        "translation_units": 158,
+        "translation_unit_sha256": "b37e177e7d29d865a747a8bdd4a85c20c399dfe8f5203b09db99098e01257cb0",
+        "attempted_tus": 158,
+        "analyzed_tus": 158,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 12,
+        "exit_code": 1,
+        "fingerprint_sha256": "3c022eaaac3da402b3076efcb7960e8d67eaa612c3e6c1b822e77c67f1a4157f"
+      }
+    },
+    {
+      "id": "libarchive",
+      "label": "v3.8.9",
+      "repository": "https://github.com/libarchive/libarchive.git",
+      "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DENABLE_TEST=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "libarchive"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": [
+          "libarchive/archive_disk_acl_darwin.c",
+          "libarchive/archive_disk_acl_freebsd.c",
+          "libarchive/archive_disk_acl_linux.c",
+          "libarchive/archive_disk_acl_sunos.c",
+          "libarchive/archive_entry_copy_bhfi.c",
+          "libarchive/archive_read_disk_windows.c",
+          "libarchive/archive_windows.c",
+          "libarchive/archive_write_disk_windows.c",
+          "libarchive/filter_fork_windows.c"
+        ]
+      },
+      "analyzer_args": [
+        "--whole-program",
+        "--report-paths",
+        "{source}/libarchive"
+      ],
+      "expected": {
+        "translation_units": 132,
+        "translation_unit_sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3",
+        "attempted_tus": 132,
+        "analyzed_tus": 255,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 38,
+        "exit_code": 1,
+        "fingerprint_sha256": "5db1b06b24804f3d7864131525ebdc2be500778f33e8c0021866cc4632bcf10a"
+      }
+    }
+  ]
+}

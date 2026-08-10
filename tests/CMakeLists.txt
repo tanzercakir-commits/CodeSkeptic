@@ -72,6 +72,9 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_test(NAME StatusAutomationContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/StatusAutomationTest.py)
+add_test(NAME RealworldCampaignContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/RealworldCampaignTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
@@ -86,9 +89,6 @@ if(NOT WIN32)
     add_test(NAME ActionArgsParser
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/ActionArgsTest.py)
-    add_test(NAME RealworldLedgerValidator
-             COMMAND ${Python3_EXECUTABLE}
-                     ${CMAKE_CURRENT_SOURCE_DIR}/RealworldLedgerTest.py)
     add_test(NAME ReleaseWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/ReleaseWorkflowTest.py)

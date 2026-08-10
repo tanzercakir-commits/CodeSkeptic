@@ -660,6 +660,80 @@ none. No `cs: ai` proposal can become accepted intent. Native pointer,
 ownership, heap, alias, and lifetime parity remain deferred to executable A7
 fixtures.
 
+**Local qualification complete; publication evidence pending.** The Linux
+referee accepted all twelve receipts from analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
+The three independent repetitions agree for libgit2 (167/167, 39 findings),
+rtp2httpd (38/38, 24), Abseil (158/158, 12), and libarchive (132 requested,
+255 whole-program executions, 38). All have zero broken TUs and zero
+incomplete functions. The aggregate manifest SHA-256 is
+`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
+Phase 8.1 remains active until the publication workflow independently
+reproduces the receipts and protected main contains the merged result.
+
+The hardened factory contract has 12/12 Python tests. It covers early
+unavailable shard receipts, campaign-wide single-analyzer identity, semantic
+fingerprint recomputation, malformed report roots, placeholder digests,
+whole-program execution counts, checksum tampering, stale checkpoints,
+missing repetitions, and nondeterminism. The scan job allows 355 minutes so
+the runner's 330-minute project timeout retains 25 minutes to write and upload
+fail-closed evidence below the hosted 360-minute ceiling. Final local product
+gates are direct 1164/1164 and CTest 1166/1166, capability schema 2 / rules 14
+/ supported 7 / out-of-scope 5, ActionArgs 5/5, docs/profile/README/capability
+sync, frozen thesis `clean_fp=0` and `bug_caught=9/15` with 11 findings,
+self-scan clean and complete at 48/48, cJSON 54 (76 attempted, 35 analyzed,
+41 explicitly accepted broken fixtures), tinyxml2 9 (3/3), and the unchanged
+400-file/CWE Juliet floors.
+
+## Recovered product program — Phases 8–12
+
+The owner-approved program recovered from the former external development
+note is recorded here because `docs/PLAN.md` is intentionally fixed and the
+repository forbids new `PLAN-*.md` files. This section is the durable queue;
+each active slice still requires its own immutable boundary and RED-to-GREEN
+evidence above before implementation.
+
+- **Phase 8 — real-repository test factory.** PR work stays within 30 minutes:
+  unit/full CTest, bounded Juliet, cJSON, tinyxml2, and self-scan. Nightly
+  8–12-hour capacity covers libgit2, rtp2httpd, Abseil, and libarchive;
+  weekend 36–48-hour capacity later covers systemd, curl, Redis, and measured
+  larger projects; release-candidate 72-hour capacity later covers llama.cpp,
+  shadPS4, and selected TensorFlow Lite surfaces. Every project requires an
+  immutable commit, real compile database, exact requested-TU identity,
+  timeout, resumable checkpoint, checksummed artifacts, and three independent
+  identical semantic receipts. Broken/skipped TUs make the verdict explicitly
+  unavailable; they never become a partial green.
+- **Phase 9 — upstream validation.** Apply PLAN §6 Gates A, B, and C to current
+  upstream HEADs. Target at least five independent projects and ten accepted
+  fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
+  remain classified learning evidence rather than being hidden or promoted.
+- **Phase 10 — robustness and performance.** Fuzz configuration,
+  compile-database, JSON summary, and SARIF inputs; exercise ASAN/UBSAN and,
+  if parallel execution exists, TSAN; stress broken ASTs, templates, macros,
+  and CFGs; enforce per-TU timeout/memory budgets, cache correctness, and
+  resumable checkpoints. Exit only after 72 hours without crash/hang and
+  without an unexplained performance regression above 10%.
+- **Phase 11 — distribution and governance.** Freeze stable JSON/SARIF with a
+  migration policy; ship Baseline v2 with suppression reason and expiry;
+  complete SECURITY, contribution/issue templates, public roadmap, dependency
+  policy, SBOM, provenance/signing, troubleshooting, and offline operation
+  documentation. Distribution artifacts must produce the same verdicts as
+  source builds.
+- **Phase 12 — beta and v1.0.** Run three external projects for 30 days in
+  report-only mode, measure triage/suppression behavior, and permit optional
+  blocking only after a clean week. Freeze breaking CLI/schema changes and
+  publish the 1.0 checklist and support policy.
+
+The cross-phase v1 gates remain cumulative: every analyzable requested TU is
+processed or returns exit 2; 10/10 runs have deterministic fingerprints; no
+default rule has precision below 0.85 and total default precision is at least
+0.90; low-precision rules remain experimental; addressable default recall is
+at least 0.70; the clean corpus has zero false positives; at least 200 findings
+are triaged; at least five projects and ten upstream fixes are accepted; the
+72-hour stability gate passes; distribution parity holds; and three external
+pilots complete 30 days. No phase prose overrides measured evidence or the
+protected-main PROGRESS authority.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
