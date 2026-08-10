@@ -1,5 +1,42 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.3 hosted qualification contract
+
+Locked the observational hosted-qualification boundary before implementation.
+The dedicated candidate document, observer, workflow, and contract tests may
+measure only llama.cpp, shadPS4, and the selected production TensorFlow Lite
+library surface. Receipts are `observed` or fail-closed `unavailable`; they are
+not canonical expectations or campaign acceptance. The existing manifest,
+runner, expected ledger, production workflow, analyzer, grammar, and accepted
+contract semantics remain outside this boundary. No C++ function changes, so
+contract-first shadow dogfood is not applicable and no `cs: ai` proposal can
+become accepted intent.
+
+## 2026-08-10 — Phase 8.3 qualification checkpoint
+
+Phase 8.3 release-candidate qualification started without opening an
+implementation boundary. llama.cpp is pinned at
+`4dee52f82dc455a035e900fed6a40cb45cd7a454`; its low-parallelism production
+`llama` target completed from a Release clang-20 CMake/Ninja build. The
+factory's canonical source derivation selected 200 translation units below
+`src` and `ggml/src`, with SHA-256
+`e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783`.
+
+shadPS4 v0.17.0 is pinned at
+`5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa`; all 53 recursive submodules were
+fetched at their superproject gitlinks. Its build and TU identity remain
+unqualified. TensorFlow Lite has not started. A hidden local `sudo` prompt and
+subsequent host-memory exhaustion demonstrated that the two remaining heavy
+builds are not safe local work on this machine. They are moved to hosted
+qualification; local work is limited to sequential low-memory configure and
+identity probes. No factory implementation, expectation, accepted contract,
+or existing campaign tier changed in this checkpoint.
+
+Contract-first shadow dogfood is not applicable: no C++ function changed.
+Functions considered 0; proposals 0; eligible 0; rejected 0; unsupported 0.
+Candidate contracts requiring later human review: none, and no `cs: ai`
+proposal became accepted intent.
+
 ## 2026-08-10 — Phase 8.2 weekend factory implementation and qualification
 
 The canonical factory now has separate, non-overlapping nightly and weekend
