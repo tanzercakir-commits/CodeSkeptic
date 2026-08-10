@@ -1,5 +1,17 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.3 hosted qualification contract
+
+Locked the observational hosted-qualification boundary before implementation.
+The dedicated candidate document, observer, workflow, and contract tests may
+measure only llama.cpp, shadPS4, and the selected production TensorFlow Lite
+library surface. Receipts are `observed` or fail-closed `unavailable`; they are
+not canonical expectations or campaign acceptance. The existing manifest,
+runner, expected ledger, production workflow, analyzer, grammar, and accepted
+contract semantics remain outside this boundary. No C++ function changes, so
+contract-first shadow dogfood is not applicable and no `cs: ai` proposal can
+become accepted intent.
+
 ## 2026-08-10 — Phase 8.3 qualification checkpoint
 
 Phase 8.3 release-candidate qualification started without opening an

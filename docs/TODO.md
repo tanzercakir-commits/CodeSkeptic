@@ -868,6 +868,15 @@ TensorFlow Lite heavy builds locally. Local work is limited to low-memory,
 sequential configure/identity probes; full builds, analyzer scans, repetitions,
 and determinism evidence belong on hosted runners. This checkpoint changes no
 factory code, accepted intent, quality floor, or existing nightly/weekend tier.
+
+The branch-only hosted qualification contract is now locked in
+`docs/phase83-qualification-contract.md`. Its file boundary is the dedicated
+qualification workflow, candidate document, observer, contract tests, and these
+status records. It cannot mutate or stand in for the canonical manifest,
+runner, expected ledger, or production workflow. Its receipts are explicitly
+`observed` or `unavailable`, never `accepted`; only later locked expectations
+and three independent repetitions can open the production boundary.
+
 Contract-first shadow dogfood is not applicable because no C++ function is
 created or materially changed: functions 0, proposals 0, eligible 0, rejected
 0, unsupported 0. No `cs: ai` proposal became accepted intent.
