@@ -24,6 +24,7 @@ KIND = "phase83-qualification"
 CANDIDATE_IDS = ["llama-cpp", "shadps4", "tensorflow-lite"]
 CMAKE_DEFINITION = re.compile(r"-D[A-Za-z0-9_]+=[A-Za-z0-9_./:+,=-]+")
 CMAKE_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
+TENSORFLOW_SOURCE_DEFINITION = "-DTENSORFLOW_SOURCE_DIR={source}"
 SUBMODULE_LINE = re.compile(r" ([0-9a-f]{40}) (.+?)(?: \([^\r\n]*\))?$")
 
 
@@ -38,7 +39,9 @@ def _load_document(path: Path | str) -> dict[str, Any]:
     return value
 
 
-def _validate_cmake_command(tokens: Any, field: str, group: str) -> list[str]:
+def _validate_cmake_command(
+    tokens: Any, field: str, group: str, project_id: str
+) -> list[str]:
     command = campaign._validate_tokens(
         tokens, field, command=True, command_group=group
     )
@@ -50,7 +53,14 @@ def _validate_cmake_command(tokens: Any, field: str, group: str) -> list[str]:
             or command[1] != "-S"
             or not command[2].startswith("{source}")
             or command[3:7] != ["-B", "{build}", "-G", "Ninja"]
-            or any(not CMAKE_DEFINITION.fullmatch(token) for token in command[7:])
+            or any(
+                not CMAKE_DEFINITION.fullmatch(token)
+                and not (
+                    project_id == "tensorflow-lite"
+                    and token == TENSORFLOW_SOURCE_DEFINITION
+                )
+                for token in command[7:]
+            )
         ):
             raise campaign.ManifestError(f"{field} has an invalid configure shape")
         suffix = command[2][len("{source}") :]
@@ -145,10 +155,20 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
             )
         commands[group] = [
             _validate_cmake_command(
-                row, f"project {project_id} commands.{group}[{row_index}]", group
+                row,
+                f"project {project_id} commands.{group}[{row_index}]",
+                group,
+                project_id,
             )
             for row_index, row in enumerate(rows)
         ]
+    source_bindings = sum(
+        row.count(TENSORFLOW_SOURCE_DEFINITION) for row in commands["configure"]
+    )
+    if project_id == "tensorflow-lite" and source_bindings != 1:
+        raise campaign.ManifestError(
+            "tensorflow-lite must bind the pinned TensorFlow source exactly once"
+        )
 
     if project.get("compile_database") != "{build}/compile_commands.json":
         raise campaign.ManifestError(

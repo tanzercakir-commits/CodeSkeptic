@@ -151,6 +151,7 @@
             "-DCMAKE_CXX_COMPILER=clang++-20",
             "-DCMAKE_CXX_STANDARD=17",
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DTENSORFLOW_SOURCE_DIR={source}",
             "-DTFLITE_ENABLE_XNNPACK=OFF",
             "-DTFLITE_ENABLE_GPU=OFF",
             "-DTFLITE_ENABLE_METAL=OFF",
