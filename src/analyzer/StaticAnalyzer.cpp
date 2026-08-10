@@ -59,6 +59,7 @@ StaticAnalyzer::StaticAnalyzer(Config config)
     setNegativeAssertMacros(config_.negativeAssertMacros());
     setAllocFunctionNames(config_.allocFunctions());
     setFreeFunctionNames(config_.freeFunctions());
+    setAllocatorPairs(config_.allocatorPairs());
     setOwningPointerNames(config_.owningPointers());
     setUntrustedIntSourceNames(config_.untrustedIntSources());
     setProfilePolicies(config_.policies());
@@ -124,6 +125,7 @@ StaticAnalyzer::~StaticAnalyzer() {
     setNegativeAssertMacros({});
     setAllocFunctionNames({});
     setFreeFunctionNames({});
+    setAllocatorPairs({});
     setOwningPointerNames({});
     setUntrustedIntSourceNames({});
     setAssumptionMode(false);

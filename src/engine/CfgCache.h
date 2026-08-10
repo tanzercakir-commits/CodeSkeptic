@@ -12,9 +12,10 @@ class FunctionDecl;
 
 namespace codeskeptic {
 
-// Per-function CFG cache: the CFG of a function is built ONCE within
-// the TU and shared by all consumers (4 rules + every sweep of the
-// summary mini-flows). Previously there were 6+ builds per function.
+// Per-function/options CFG cache: each requested graph is built once within
+// the TU. Statement-only consumers share the original graph; analyses that
+// explicitly request implicit destructors or exception-handling edges use a
+// separate entry for each exact option pair.
 //
 // Build options (setAllAlwaysAdd) now live ONLY here — consumers must
 // see the same granularity (two-phase reporting and the top-node
@@ -32,11 +33,12 @@ class CfgCache {
 public:
     static CfgCache& instance();
 
-    // Returns the function's CFG (building it if needed). nullptr if
-    // it cannot be built. The returned pointer is valid until the
-    // next clear().
+    // Returns the function/options CFG (building it if needed). nullptr if it
+    // cannot be built. The returned pointer is valid until the next clear().
     clang::CFG* get(const clang::FunctionDecl* func,
-                    clang::ASTContext& ctx);
+                    clang::ASTContext& ctx,
+                    bool addImplicitDtors = false,
+                    bool addEHEdges = false);
 
     void clear();
 
@@ -44,11 +46,20 @@ public:
     static unsigned hits();
     static unsigned misses();
     static void resetCounters();
-    size_t size() const { return cache_.size(); }
+    size_t size() const {
+        size_t result = 0;
+        for (const auto& [options, entries] : cache_) {
+            (void)options;
+            result += entries.size();
+        }
+        return result;
+    }
 
 private:
-    std::map<const clang::FunctionDecl*, std::unique_ptr<clang::CFG>>
-        cache_;
+    using FunctionCache =
+        std::map<const clang::FunctionDecl*, std::unique_ptr<clang::CFG>>;
+    using OptionsKey = std::pair<bool, bool>;
+    std::map<OptionsKey, FunctionCache> cache_;
     const clang::ASTContext* ctx_ = nullptr;
 };
 

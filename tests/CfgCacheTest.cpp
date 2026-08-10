@@ -8,10 +8,55 @@
 #include "engine/CfgCache.h"
 #include "rules/NullDerefRule.h"
 
+#include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/Analysis/CFG.h>
 #include <gtest/gtest.h>
 
 using namespace codeskeptic;
 using namespace codeskeptic::testing;
+
+namespace {
+
+class ImplicitDtorProbeRule : public Rule {
+public:
+    std::string id() const override { return "implicit-dtor-probe"; }
+    std::string description() const override { return "test probe"; }
+
+    void check(clang::ASTContext& ctx, DiagnosticList&) override {
+        struct Visitor : clang::RecursiveASTVisitor<Visitor> {
+            const clang::FunctionDecl* target = nullptr;
+            bool VisitFunctionDecl(clang::FunctionDecl* function) {
+                if (function->hasBody() && function->getName() == "f")
+                    target = function;
+                return true;
+            }
+        } visitor;
+        visitor.TraverseDecl(ctx.getTranslationUnitDecl());
+        if (!visitor.target) return;
+
+        clang::CFG* ordinary = CfgCache::instance().get(visitor.target, ctx);
+        clang::CFG* withDtors =
+            CfgCache::instance().get(visitor.target, ctx, true);
+        clang::CFG* withExceptionalDtors =
+            CfgCache::instance().get(visitor.target, ctx, true, true);
+        separateKeys = ordinary && withDtors && ordinary != withDtors;
+        separateExceptionalKey = withDtors && withExceptionalDtors &&
+                                 withDtors != withExceptionalDtors;
+        if (!withDtors) return;
+        for (const clang::CFGBlock* block : *withDtors) {
+            if (!block) continue;
+            for (const clang::CFGElement& element : *block)
+                if (element.getAs<clang::CFGAutomaticObjDtor>())
+                    sawAutomaticDtor = true;
+        }
+    }
+
+    bool separateKeys = false;
+    bool separateExceptionalKey = false;
+    bool sawAutomaticDtor = false;
+};
+
+} // namespace
 
 TEST(CfgCacheTest, SharedWithinTU_SummaryFlowAndRuleReuse) {
     CfgCache::resetCounters();
@@ -46,4 +91,28 @@ TEST(CfgCacheTest, ClearedAtTUEnd_NoStaleCarryover) {
     // A new TU must build from scratch — no false hits from the previous TU
     EXPECT_GE(CfgCache::misses(), 1u);
     EXPECT_EQ(CfgCache::instance().size(), 0u);
+}
+
+TEST(CfgCacheTest, ImplicitDestructorCfgUsesSeparateCacheKey) {
+    ImplicitDtorProbeRule rule;
+    auto results = runRule(rule, R"(
+        struct Owner { ~Owner(); };
+        void f() { Owner owner; }
+    )");
+    EXPECT_TRUE(results.empty());
+    EXPECT_TRUE(rule.separateKeys);
+    EXPECT_TRUE(rule.sawAutomaticDtor);
+}
+
+TEST(CfgCacheTest, ExceptionalDestructorCfgUsesSeparateCacheKey) {
+    ImplicitDtorProbeRule rule;
+    auto results = runRule(rule, R"(
+        struct Owner { ~Owner(); };
+        void f() {
+            try { Owner owner; throw 1; }
+            catch (...) {}
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+    EXPECT_TRUE(rule.separateExceptionalKey);
 }
