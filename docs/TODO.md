@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = 47b03f4
-in_flight     = phase-progress-automation
-verified_main = 47b03f4
-progress      = sha256:65e44b23b57b417a4e07f7595e84f2ba8704ed8d1976225d279dba4eae745cf0
+base          = e146a43
+in_flight     = phase-realworld-test-factory
+verified_main = e146a43
+progress      = sha256:f912666b0c80a64febd031a30043cb60bcafb49f8070fef4287b224807297e1d
 ```
 <!-- cs:state-end -->
 
@@ -530,7 +530,7 @@ Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 double-free precision floors remain at least 0.95, clean corpora stay clean,
 and every local/CI referee passes without weakening an existing floor.
 
-## Documentation/progress automation maintenance — VERIFIED, MERGE PENDING (2026-08-10)
+## Documentation/progress automation maintenance — MERGED (2026-08-10)
 
 Phase 7 is merged through protected-main PR #134 at
 `47b03f4076f246c38a81fbc834693bed0f98ccc4`, tree
@@ -590,6 +590,157 @@ checks. These are branch verification facts only; this slice becomes
 `MERGED` solely after protected main contains its squash commit and a later
 `sync` appends that git fact to PROGRESS.
 
+Protected main now contains the maintenance squash as PR #135 commit
+`e146a434f17e61813cceb175ea8791c9065a1b38`, tree
+`fc719f17f30e32bac49d80dac5f80b4002e9f32b`. The first Phase 8 branch sync
+mechanically appended that transition to `docs/PROGRESS.md` and regenerated
+the state block above; no manual completion statement supplied authority.
+
+## Phase 8.1 — deterministic real-repository test factory — BOUNDARY LOCKED (2026-08-10)
+
+Phase 8 starts with the nightly core factory: libgit2, rtp2httpd, Abseil, and
+libarchive. Each project is defined once in a canonical machine-readable
+manifest with its immutable 40-hex commit, repository URL, controlled
+configure/build recipe, source selection, exact sorted translation-unit count
+and SHA-256, expected analyzer coverage, expected finding/verdict tuple,
+per-shard timeout, and three required independent repetitions. Mutable refs,
+implicit current HEAD, partial translation-unit success, and an unclassified
+verdict are invalid campaign inputs.
+
+The runner has three separate authorities. `plan` validates the manifest and
+emits a project-by-repetition matrix without executing projects. `run` checks
+out one exact revision, produces a real compile database, derives and hashes
+the exact translation-unit list, executes one analyzer process under its time
+and memory boundary, and writes a receipt even when the verdict is
+unavailable. `aggregate` verifies receipt and artifact checksums and accepts a
+project only when all three independent receipts have identical semantic
+coverage, finding fingerprints, and exit classification. Duration and host
+metadata are evidence but are not part of semantic equality. Missing,
+malformed, timed-out, stale, checksum-mismatched, broken, incomplete, skipped,
+or solver-error evidence fails closed with exit 2.
+
+Checkpoints are optimization evidence, never truth. A checkpoint may be
+resumed only when its schema, manifest digest, project commit, analyzer digest,
+recipe digest, translation-unit digest, and repetition identity all match the
+requested shard; otherwise the project is rerun. Receipts carry SHA-256
+sidecars, aggregation is order-independent, and one project failure cannot
+erase the other project artifacts. GitHub Actions builds the analyzer once,
+fans out the matrix into independent shards, always uploads each shard's
+evidence, and gates the campaign in a separate aggregate job. The nightly
+campaign has an honest aggregate window of at most 12 hours while each hosted
+runner shard stays below the platform job limit. Later weekend and release-
+candidate tiers will be separately bounded with measured pins and expectations
+instead of being fabricated in this slice.
+
+The ordinary PR contract remains fast and explicit: unit/full CTest, cJSON,
+tinyxml2, self-scan, and the bounded Juliet PR sample each have a 30-minute job
+ceiling. No floor, test, corpus expectation, or hook is weakened. RED-first
+tests must reject mutable pins, duplicate identities, unsafe command shapes,
+translation-unit drift, incomplete coverage, unavailable verdicts, stale
+checkpoints, receipt tampering, missing repetitions, and nondeterministic
+results, and must statically verify the workflow budget/sharding contract.
+
+The exact Phase 8.1 file set is `.github/workflows/ci.yml`,
+`.github/workflows/juliet.yml`, `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`scripts/check_realworld_ledger.py`, `scripts/realworld_expected.txt`,
+`tests/RealworldCampaignTest.py`, `tests/RealworldLedgerTest.py`,
+`tests/CMakeLists.txt`, `docs/benchmarks.md`, `docs/reproduce.md`, this TODO,
+`docs/PROGRESS.md`, and `docs/devlog/changelog.md`. Product/runtime C++,
+contract grammar, accepted contract intent, capability tiers, profiles,
+summary schemas, release configuration, and all quality floors remain
+unchanged. This development contract is stored separately from implementation
+and will not change during the slice.
+
+Contract-first shadow dogfood is not applicable because Phase 8.1 creates or
+materially changes no C++ function. Functions considered 0; proposals 0;
+eligible 0; rejected 0; unsupported 0. No proposal exposed an implementation
+or assumption problem. Candidate contracts requiring later human review:
+none. No `cs: ai` proposal can become accepted intent. Native pointer,
+ownership, heap, alias, and lifetime parity remain deferred to executable A7
+fixtures.
+
+**Local and GitHub qualification complete; protected-main merge pending.** The Linux
+referee accepted all twelve receipts from analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
+The three independent repetitions agree for libgit2 (167/167, 39 findings),
+rtp2httpd (38/38, 24), Abseil (158/158, 12), and libarchive (132 requested,
+255 whole-program executions, 38). All have zero broken TUs and zero
+incomplete functions. The aggregate manifest SHA-256 is
+`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
+GitHub workflow run
+[`31370373875`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31370373875)
+independently accepted plan, one analyzer build, all 12 shards, and the
+aggregate referee at commit `856cdc73a4ce245eb70cdf73da2c35fcd02545e7`.
+Its campaign-wide analyzer SHA-256 is
+`146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
+its checksummed aggregate receipt SHA-256 is
+`08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
+Phase 8.1 remains active until protected main contains the merged result.
+
+The hardened factory contract has 12/12 Python tests. It covers early
+unavailable shard receipts, campaign-wide single-analyzer identity, semantic
+fingerprint recomputation, malformed report roots, placeholder digests,
+whole-program execution counts, checksum tampering, stale checkpoints,
+missing repetitions, and nondeterminism. The scan job allows 355 minutes so
+the runner's 330-minute project timeout retains 25 minutes to write and upload
+fail-closed evidence below the hosted 360-minute ceiling. Final local product
+gates are direct 1164/1164 and CTest 1166/1166, capability schema 2 / rules 14
+/ supported 7 / out-of-scope 5, ActionArgs 5/5, docs/profile/README/capability
+sync, frozen thesis `clean_fp=0` and `bug_caught=9/15` with 11 findings,
+self-scan clean and complete at 48/48, cJSON 54 (76 attempted, 35 analyzed,
+41 explicitly accepted broken fixtures), tinyxml2 9 (3/3), and the unchanged
+400-file/CWE Juliet floors.
+
+## Recovered product program — Phases 8–12
+
+The owner-approved program recovered from the former external development
+note is recorded here because `docs/PLAN.md` is intentionally fixed and the
+repository forbids new `PLAN-*.md` files. This section is the durable queue;
+each active slice still requires its own immutable boundary and RED-to-GREEN
+evidence above before implementation.
+
+- **Phase 8 — real-repository test factory.** PR work stays within 30 minutes:
+  unit/full CTest, bounded Juliet, cJSON, tinyxml2, and self-scan. Nightly
+  8–12-hour capacity covers libgit2, rtp2httpd, Abseil, and libarchive;
+  weekend 36–48-hour capacity later covers systemd, curl, Redis, and measured
+  larger projects; release-candidate 72-hour capacity later covers llama.cpp,
+  shadPS4, and selected TensorFlow Lite surfaces. Every project requires an
+  immutable commit, real compile database, exact requested-TU identity,
+  timeout, resumable checkpoint, checksummed artifacts, and three independent
+  identical semantic receipts. Broken/skipped TUs make the verdict explicitly
+  unavailable; they never become a partial green.
+- **Phase 9 — upstream validation.** Apply PLAN §6 Gates A, B, and C to current
+  upstream HEADs. Target at least five independent projects and ten accepted
+  fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
+  remain classified learning evidence rather than being hidden or promoted.
+- **Phase 10 — robustness and performance.** Fuzz configuration,
+  compile-database, JSON summary, and SARIF inputs; exercise ASAN/UBSAN and,
+  if parallel execution exists, TSAN; stress broken ASTs, templates, macros,
+  and CFGs; enforce per-TU timeout/memory budgets, cache correctness, and
+  resumable checkpoints. Exit only after 72 hours without crash/hang and
+  without an unexplained performance regression above 10%.
+- **Phase 11 — distribution and governance.** Freeze stable JSON/SARIF with a
+  migration policy; ship Baseline v2 with suppression reason and expiry;
+  complete SECURITY, contribution/issue templates, public roadmap, dependency
+  policy, SBOM, provenance/signing, troubleshooting, and offline operation
+  documentation. Distribution artifacts must produce the same verdicts as
+  source builds.
+- **Phase 12 — beta and v1.0.** Run three external projects for 30 days in
+  report-only mode, measure triage/suppression behavior, and permit optional
+  blocking only after a clean week. Freeze breaking CLI/schema changes and
+  publish the 1.0 checklist and support policy.
+
+The cross-phase v1 gates remain cumulative: every analyzable requested TU is
+processed or returns exit 2; 10/10 runs have deterministic fingerprints; no
+default rule has precision below 0.85 and total default precision is at least
+0.90; low-precision rules remain experimental; addressable default recall is
+at least 0.70; the clean corpus has zero false positives; at least 200 findings
+are triaged; at least five projects and ten upstream fixes are accepted; the
+72-hour stability gate passes; distribution parity holds; and three external
+pilots complete 30 days. No phase prose overrides measured evidence or the
+protected-main PROGRESS authority.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
@@ -600,10 +751,11 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-Phase 7 lifetime-v2 is delivered by PR #134. The separately bounded
-documentation/progress and Windows review-harness maintenance slice above is
-locally verified and awaiting protected-main merge; the next product stage
-starts only after that merge is mechanically observed.
+Phase 7 lifetime-v2 is delivered by PR #134 and the automation maintenance is
+delivered by PR #135. Phase 8.1 is active on
+`phase-realworld-test-factory` under the locked boundary above. Weekend and
+release-candidate factory tiers follow only after the nightly core receipts
+are repeatable.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
