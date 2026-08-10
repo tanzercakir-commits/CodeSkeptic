@@ -65,6 +65,14 @@ target_link_libraries(codeskeptic_tests
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)
 
+# Cross-host status/review automation is Python-only and deliberately runs on
+# every platform. In particular, its synthetic Windows compile-command paths
+# pin bugs that the POSIX-only end-to-end review fixture cannot exercise.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME StatusAutomationContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/StatusAutomationTest.py)
+
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
 # semantics (Baseline-v2 key parity / shift-immunity, rename map, gate
@@ -75,7 +83,6 @@ gtest_discover_tests(codeskeptic_tests)
 # POSIX. The 620 C++ unit tests above are the portable floor; this
 # flow stays pinned by the Linux/macOS lanes.
 if(NOT WIN32)
-    find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME ActionArgsParser
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/ActionArgsTest.py)

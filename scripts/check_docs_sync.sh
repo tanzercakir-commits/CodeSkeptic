@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Doc-hygiene guard (2026-07-30). Mechanically enforces the working
 # agreement so it does not rest on memory:
-#   1. the canonical planning files exist and are non-empty;
+#   1. the canonical planning/progress files exist and are non-empty;
 #   2. no scattered per-feature PLAN-*.md briefs (fold into PLAN.md);
 #   3. a src/ change ships with a changelog entry (progress is logged).
-#   6. TODO's state block agrees with git (generated, not remembered).
+#   6. append-only protected-main progress and TODO state agree with git.
 #   7. the executable real-world replay ledger is internally consistent.
 # Runs in the required build-and-test lane, so a miss blocks merge.
 #
-# --fix regenerates what is derivable (check 6) instead of only
+# --fix appends verified protected-main transitions and regenerates the
+# derivable TODO state view (check 6) instead of only
 # complaining about it: the guard alone catches forgetting but does not
 # undo it, and a generator alone drifts whenever nobody runs it. Both
 # together close the hole.
@@ -16,37 +17,8 @@ set -uo pipefail
 fail=0
 mode="${1:-check}"
 
-# The derivable half of TODO's state block: which main commit the work
-# sits on, and which phase branches are alive on the remote. Prints the
-# block body, or returns 1 when git cannot answer (no shared base).
-state_block() {
-    local b branches cur
-    b=$(git merge-base "$1" HEAD 2>/dev/null) || return 1
-    b=$(git rev-parse --short "$b" 2>/dev/null) || return 1
-    cur="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
-    # In flight means UNMERGED, not merely present: a phase branch left
-    # on the remote after its ff is a leftover, and listing it would
-    # manufacture exactly the false record this check exists to kill.
-    branches=$(git ls-remote --heads origin 'refs/heads/phase-*' 2>/dev/null \
-               | while read -r sha ref; do
-                     git merge-base --is-ancestor "$sha" "$1" 2>/dev/null \
-                         || printf '%s\n' "${ref#refs/heads/}"
-                 done)
-    case "$cur" in phase-*) branches=$(printf '%s\n%s\n' "$branches" "$cur") ;; esac
-    branches=$(printf '%s\n' "$branches" | grep -v '^$' | sort -u | tr '\n' ' ')
-    branches="${branches% }"
-    [ -z "$branches" ] && branches="yok"
-    printf 'base   = %s\nuçuşta = %s\n' "$b" "$branches"
-}
-
-# The body currently recorded between the markers, fences stripped.
-recorded_block() {
-    awk '/<!-- cs:state-begin/{f=1;next} /<!-- cs:state-end/{f=0} f' \
-        docs/TODO.md | grep -vE '^```$' | grep -v '^$'
-}
-
-# 1. Canonical trio.
-for f in docs/PLAN.md docs/TODO.md docs/devlog/changelog.md; do
+# 1. Canonical plan, compass, verified ledger, and detailed history.
+for f in docs/PLAN.md docs/TODO.md docs/PROGRESS.md docs/devlog/changelog.md; do
     if [ ! -s "$f" ]; then
         echo "FAIL: missing or empty canonical file: $f"
         fail=1
@@ -92,60 +64,37 @@ else
     echo "note: changelog-freshness check skipped (no shared base — local shallow clone)"
 fi
 
-# --fix: regenerate the derivable block and stop. Everything else in
-# TODO.md is judgment (priorities, open user decisions) and is never
-# touched — generating it would be fabricating a record, not keeping one.
+# --fix: append only transitions already reachable from protected main and
+# regenerate the marked TODO state view. Everything else in TODO.md remains
+# judgment and is never touched.
 if [ "$mode" = "--fix" ]; then
-    body=$(state_block "${base:-origin/main}") || {
-        echo "FAIL: --fix cannot derive the state block (no shared base)."
-        exit 1
-    }
-    awk -v body="$body" '
-        /<!-- cs:state-begin/ { print; print "```"; print body; print "```"; s=1; next }
-        /<!-- cs:state-end/   { s=0 }
-        !s { print }
-    ' docs/TODO.md > docs/TODO.md.tmp && mv docs/TODO.md.tmp docs/TODO.md
-    echo "fixed: docs/TODO.md state block regenerated"
-    printf '%s\n' "$body" | sed 's/^/  /'
+    python3 scripts/progress_status.py sync \
+        --base-ref "${base:-origin/main}" || exit 1
+    echo "fixed: verified progress appended and TODO state regenerated"
     exit 0
 fi
 
-# 6. TODO state block <-> git reality. Both facts in it — the main
-#    commit this work sits on, and the phase branches alive on the
-#    remote — are derivable, so they are GENERATED and verified here
-#    instead of remembered. The failure this closes was silent: the
-#    block read `main = 3ae3ecb` for five commits while listing two
-#    long-merged branches as in flight, and nothing could notice.
-#    Enforced on phase* branches, where the refresh belongs; on main the
-#    block records the round that just merged and has nothing to prove.
-cur_ref="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
+# 6. PROGRESS/TODO <-> protected-main reality. The ledger is append-only and
+#    may call a transition MERGED only after the commit is reachable from
+#    main. TODO's marked view binds the ledger digest, verified main, branch
+#    base, and live phase refs. Main cannot record its own merge commit in the
+#    same tree, so enforcement belongs to phase branches and PR head refs.
+cur_ref="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
 is_phase=0
 case "$cur_ref" in phase-*) is_phase=1 ;; esac
 if [ "$is_phase" = 0 ]; then
-    echo "state-block check n/a on '$cur_ref' (enforced on phase* branches)"
+    echo "progress/state check n/a on '$cur_ref' (enforced on phase* branches)"
 fi
 if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
-    if ! grep -q 'cs:state-begin' docs/TODO.md; then
-        echo "FAIL: docs/TODO.md has no <!-- cs:state-begin --> block to verify."
-        fail=1
-    elif want=$(state_block "$base"); then
-        if [ "$(recorded_block)" != "$want" ]; then
-            echo "FAIL: docs/TODO.md state block disagrees with git."
-            echo "  recorded:"; recorded_block | sed 's/^/    /'
-            echo "  actual:";   printf '%s\n' "$want" | sed 's/^/    /'
-            echo "      Refresh it: scripts/check_docs_sync.sh --fix"
-            fail=1
-        else
-            # Affirm on success too. A silent pass cannot be told apart
-            # from a check that never ran — the exact way this guard was
-            # able to report success from a shallow checkout for days.
-            echo "state-block verified: $(printf '%s' "$want" | tr '\n' ' ')"
-        fi
+    if python3 scripts/progress_status.py check --base-ref "$base"; then
+        :
     elif [ -n "${GITHUB_ACTIONS:-}" ]; then
-        echo "FAIL: state-block check could not resolve a base under CI."
+        echo "FAIL: verified progress/state could not be proven under CI."
         fail=1
     else
-        echo "note: state-block check skipped (git could not resolve a base)"
+        echo "FAIL: verified progress/state is stale or unavailable."
+        echo "      Refresh it: scripts/check_docs_sync.sh --fix"
+        fail=1
     fi
 fi
 
