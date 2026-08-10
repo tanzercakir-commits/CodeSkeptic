@@ -37,6 +37,23 @@ created or materially changed: functions considered 0; proposals 0; eligible
 review: none. No `cs: ai` proposal can become accepted intent. This contract
 will not change during implementation.
 
+Implementation receipt (branch verification, not completion authority): the
+new status tool bootstraps PROGRESS at protected-main Phase 7 and derives all
+MERGED commit/tree evidence from git. It atomically updates only the generated
+TODO state block, while read-only mode rejects a stale main cursor, a missing
+cursor, manual rewrites, non-ancestor history, and TODO mismatches. The five
+focused automation tests pass. Direct C++ tests pass 1164/1164 and CTest passes
+1165/1165 with `StatusAutomationContract`; the existing end-to-end diff-review
+fixture passes. A real strict `3aa85f9`-to-working-tree replay covers all 12
+changed C/C++ sources, reaches all fixpoints, and reports
+`new_errors=0`, `new_warnings=0`, `fixed=0`, `weakened=0`, `gate=pass`; native
+path normalization no longer lists those sources as unanalyzed. The remote
+docs gate resolves protected main at `47b03f4`, records only
+`phase-progress-automation` as in flight, and passes the capability and
+real-world-ledger checks. Product C++ and its quality floors are unchanged.
+The maintenance transition remains merge-pending until protected main
+contains it; no branch receipt is rendered as MERGED.
+
 ## 2026-08-10 — Phase 7 strict-review correction boundary
 
 The corrected Windows base/head semantic diff review passes its blocking and

@@ -12,8 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base   = 47b03f4
-uçuşta = phase-progress-automation
+base          = 47b03f4
+in_flight     = phase-progress-automation
+verified_main = 47b03f4
+progress      = sha256:65e44b23b57b417a4e07f7595e84f2ba8704ed8d1976225d279dba4eae745cf0
 ```
 <!-- cs:state-end -->
 
@@ -528,7 +530,7 @@ Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 double-free precision floors remain at least 0.95, clean corpora stay clean,
 and every local/CI referee passes without weakening an existing floor.
 
-## Documentation/progress automation maintenance — ACTIVE (2026-08-10)
+## Documentation/progress automation maintenance — VERIFIED, MERGE PENDING (2026-08-10)
 
 Phase 7 is merged through protected-main PR #134 at
 `47b03f4076f246c38a81fbc834693bed0f98ccc4`, tree
@@ -571,6 +573,23 @@ accepted intent. The new automation tests, existing diff-review flow, full
 suite, docs-sync, and a real branch/main replay are the referees; this contract
 will not change during implementation.
 
+Implementation stays inside the locked nine-file set. The status tool
+bootstraps the append-only ledger at protected-main Phase 7, derives commit
+and tree receipts from git, records live phase refs only as in-flight, and
+atomically repairs the marked TODO view. Five focused tests prove initial
+sync, stale-main detection, append-only advancement, missing-cursor/manual
+rewrite rejection, non-ancestor rejection, TODO repair, and mixed Windows
+path handling. The direct C++ suite passes 1164/1164 and CTest passes
+1165/1165 including `StatusAutomationContract`; the existing end-to-end
+review fixture passes. A real strict replay from `3aa85f9` analyzes all 12
+changed C/C++ sources, reaches every fixpoint, and reports zero new errors,
+warnings, or weakened contracts, without the former contradictory coverage
+list. The read-only docs gate resolves `origin/main` at `47b03f4`, appends no
+unmerged work, and passes capability, real-world ledger, and documentation
+checks. These are branch verification facts only; this slice becomes
+`MERGED` solely after protected main contains its squash commit and a later
+`sync` appends that git fact to PROGRESS.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
@@ -581,10 +600,10 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-Phase 7 lifetime-v2 is delivered by PR #134. The active work is the separately
-bounded documentation/progress and Windows review-harness maintenance slice
-above; the next product stage starts only after that slice is independently
-gated and merged.
+Phase 7 lifetime-v2 is delivered by PR #134. The separately bounded
+documentation/progress and Windows review-harness maintenance slice above is
+locally verified and awaiting protected-main merge; the next product stage
+starts only after that merge is mechanically observed.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
