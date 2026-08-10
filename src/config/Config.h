@@ -3,6 +3,7 @@
 
 #include "core/Diagnostic.h"
 
+#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -122,6 +123,10 @@ public:
     const std::set<std::string>& freeFunctions() const {
         return free_functions_;
     }
+    bool addAllocatorPairs(const std::string& list);
+    const std::map<std::string, std::set<std::string>>& allocatorPairs() const {
+        return allocator_pairs_;
+    }
 
     // Project untrusted-length sources (--untrusted-int-sources): the
     // RETURN of these functions is treated as a full-range untrusted
@@ -177,6 +182,7 @@ private:
     std::set<std::string> assert_macros_;
     std::set<std::string> negative_assert_macros_;
     std::set<std::string> alloc_functions_;
+    std::map<std::string, std::set<std::string>> allocator_pairs_;
     std::set<std::string> untrusted_int_sources_;
     std::set<std::string> free_functions_;
     std::set<std::string> owning_pointers_;

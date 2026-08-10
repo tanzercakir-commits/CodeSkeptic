@@ -1,5 +1,500 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7.5 conservative exceptional ownership
+
+Phase 7 now has an explicit, measured exceptional-ownership boundary. CFG
+cache keys include implicit-destructor and EH-edge options, and the shared
+dataflow engine exposes a compile-time analysis opt-in while leaving all
+default consumers unchanged. Clang 20 may emit an automatic-owner destructor
+block for a throw without connecting that block to the throw-to-handler path.
+CodeSkeptic therefore refuses to treat the orphan element as release evidence.
+
+An explicit `throw` degrades only allocations with a live exact standard
+smart owner to escape/unknown. This prevents a disconnected cleanup block from
+manufacturing a leak, UAF, or double-free. Raw allocations with no owner and
+allocations deliberately left live by `release()` remain leak-reportable;
+unreachable throws preserve normal destructor evidence. Summary and member
+boundaries remain unchanged and are now pinned: compatible cross-TU
+`Consumed` summaries can still prove UAF, `Transferred` cannot invent release,
+local member storage keeps a real leak visible, and global member storage
+escapes. No member, heap, or whole-project pointer identity was invented.
+
+The first compile RED proved that the cache lacked an EH option key. After
+plumbing, 7 of 12 semantic fixtures passed and 5 failed. CFG inspection then
+showed that the destructor block had no predecessor; the proposed exceptional
+release expectation was therefore ineligible under the locked contract. The
+conservative throw transition closed all five without granting false
+authority. Two precision fixtures pinned unreachable and conditional throws.
+The final Phase 7.5 matrix is 16/16, and direct and CTest suites pass 1164/1164.
+
+Interface gates remain schema 2 / rules 14 / supported 7 / out-of-scope 5 and
+ActionArgs 5/5. Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings;
+self-scan is clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings
+(76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+findings (3/3). The full unchanged 400-file/CWE Juliet replay passes every
+floor: CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416
+212/0, CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+`221d96bca0ed2c1f3e744af5685c38694f8f56791b430fdb070a8e1fa8ce5a39`.
+
+Contract-first shadow completion considered `CfgCache::get`, `runDataflow`,
+the exceptional-CFG opt-in trait, `classifyStmtEffects`,
+`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
+`analyzeFunction`: proposals 0, eligible 0, rejected 0, unsupported 7. No
+proposal was eligible. Independent RED and CFG inspection exposed the API gap
+and the disconnected-cleanup assumption problem. Candidate contracts requiring
+later human review: none. No `cs: ai` proposal became accepted intent, and
+native memory-verification parity remains deferred to executable A7 fixtures.
+The locked eleven-file boundary was preserved.
+
+## 2026-08-10 — Phase 7.5 exceptional cleanup and transfer boundary
+
+Phase 7.4 is sealed in commit `21277325e73b513d3da4d949fcd093ce23082078`
+with tree `b2921225f8a90d8aac2c8898496d6174f23fb9a8`, published in draft
+PR #134, and locally gated. The final Phase 7 slice is restricted to explicit
+exceptional cleanup for the exact automatic local standard owners already
+admitted in Phase 7.4, plus regression pins for the existing summary and
+member-transfer boundaries.
+
+The pre-implementation audit found that ownership summaries already separate
+`Owned`, `Borrowed`, `Consumed`, and `Transferred`. Memory lifetime consumes
+exact `Consumed` releases for compatible legacy allocations, keeps owned
+returns caller-owned, preserves borrowed visibility, and conservatively
+escapes transfers whose destination lifetime is outside the caller. Direct
+member/global stores likewise already separate local non-escape controls from
+outliving storage. No new summary schema or native member identity is needed
+or justified without executable A7 fixtures.
+
+The remaining executable gap is CFG construction: Phase 7.4 requests implicit
+automatic destructors but does not request exception-handling edges. The
+locked contract in `docs/TODO.md` admits cleanup only when an opt-in Clang CFG
+emits the existing `CFGAutomaticObjDtor` on an exceptional path. Last-owner
+release may then support UAF or double-free evidence. Owners outside the
+unwound scope, prior `release`, absent destructor evidence, temporary and
+constructor-failure cleanup, rethrow/catch ownership, coroutine cleanup, and
+interprocedural exception propagation remain non-authoritative.
+
+The exceptional CFG is separately keyed from ordinary and normal-dtor graphs,
+and only an explicitly opting-in analysis receives it. The exact file boundary
+is `src/engine/CfgCache.h`, `src/engine/CfgCache.cpp`,
+`src/engine/DataflowEngine.h`, `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/CfgCacheTest.cpp`, `tests/IntervalAnalysisTest.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `tests/InterproceduralTest.cpp`,
+`docs/usage.md`, `docs/TODO.md`, and this changelog. Summary persistence,
+grammar, capabilities, configuration, model authority, profiles, and quality
+floors remain unchanged.
+
+Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+the exceptional-CFG opt-in trait, `classifyStmtEffects`,
+`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
+`analyzeFunction`: proposals 0, eligible 0, rejected 0, unsupported 7. The
+current verifier cannot prove template dispatch, Clang EH identity, or native
+pointer/ownership/heap lifetime. Candidate contracts requiring later human
+review: none. No `cs: ai` proposal became accepted intent. Clang-backed RED
+fixtures are the implementation referee; native memory-verification parity
+remains deferred to executable A7 fixtures, and this record will not change
+during Phase 7.5.
+
+## 2026-08-10 — Phase 7.4 exact local standard smart-owner lifetimes
+
+CodeSkeptic now carries exact per-disjunct owner identity for direct automatic
+local `std::unique_ptr`, `std::shared_ptr`, and legacy `std::auto_ptr` objects.
+Compatible raw adoption, captured `get`/`release` aliases, reset, standard
+copy/move construction and assignment, destination replacement, and normal
+last-owner destruction update the existing allocation lifetime. This makes
+released allocations leak-reportable and supports UAF or double-free evidence
+after an exact reset, raw release, or automatic destructor.
+
+The shared CFG cache separately keys ordinary and implicit-destructor graphs.
+Only analyses declaring the optional CFG-element hook request the latter;
+statement-only consumers retain their original path. Configured project owner
+wrappers preserve adoption-only escape behavior. Custom deleters, exact custom
+allocator families, aliasing constructors, incompatible pointees, fields,
+owner exposure/references/lambdas, unknown methods or calls, conflicts, and
+indirect targets remain conservative and cannot manufacture release evidence.
+Exceptional cleanup remains Phase 7.5 work.
+
+The compile RED first established the missing option-keyed CFG API. After the
+engine hook was added, 10 of 17 initial semantic owner cases stayed RED. The
+owner-lifetime implementation closed them. Precision review then found three
+false authorities—owner address exposure, writable owner references, and a
+shared aliasing constructor—and conservative escape closed all three. A
+custom-deleter template with a single constructor argument exposed one final
+false authority; admitting only the implicit/default deleter shape closed it.
+The lambda-capture control was already conservative. The final Phase 7.4 plus
+legacy owner regression matrix passes 41/41, and direct and CTest suites pass
+1148/1148.
+
+Interface gates remain schema 2 / rules 14 / supported 7 / out-of-scope 5 and
+ActionArgs 5/5. Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings;
+self-scan is clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings
+(76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+findings (3/3). The unchanged 400-file/CWE Juliet replay passes every floor:
+CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416 212/0,
+CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+`19875c442be7e3f6bed6e50eba1f29374b685bc19275757a2c6370be7b9fd3d6`.
+
+Contract-first shadow completion considered `CfgCache::get`, `runDataflow`,
+`standardOwnerKind`, `ownerOperation`, `applyOwnerOperation`,
+`MemoryFlow::transferElement`, and `MemoryFlow::onCFGElement`: proposals 0,
+eligible 0, rejected 0, unsupported 7. Current verifier semantics cannot prove
+the template/CFG dispatch, Clang identity, native alias, ownership, or heap
+lifetime authority involved, so no proposal was eligible. Independent RED and
+precision fixtures exposed and closed the implementation/assumption problems.
+Candidate contracts requiring later human review: none. No `cs: ai` proposal
+became accepted intent, and native owned-memory parity remains deferred to
+executable A7 fixtures. The locked ten-file boundary was preserved.
+
+## 2026-08-10 — Phase 7.4 RAII lifetime boundary and contract record
+
+Phase 7.3 is sealed in commit `3aeb20e6926544056e3382f77e761c7a3f203479`
+and published in draft PR #134. The next independently measurable slice is
+restricted to exact local standard smart-owner lifetimes; allocator-family
+semantics and the prior raw alias/realloc slices are not reopened.
+
+The pre-implementation audit confirmed that the existing smart-pointer helper
+only converts a tracked raw allocation to `Escaped` at construction. It
+suppresses known adoption false positives but carries no owner identity and
+cannot model `release`, `reset`, copy/move, last-owner destruction, UAF, or
+double-free. The shared dataflow engine also deliberately visits only
+`CFGStmt`, so Clang automatic-object destructor elements are currently absent
+from every analysis transition.
+
+The locked contract is recorded separately in `docs/TODO.md`. Direct automatic
+local `std::unique_ptr`, `std::shared_ptr`, and `std::auto_ptr` objects may hold
+an exact per-disjunct raw allocation relation. Compatible direct construction,
+`reset`, `release`, `get`, standard copy/move, replacement, normal scope exit,
+and return cleanup update that relation. Exclusive owners transfer; shared
+copies retain a set; only the last exact reset/destructor proves release.
+Captured release/get results may form exact local raw aliases. Proven release
+may support later UAF/double-free, while a released live allocation remains
+leak-reportable.
+
+Custom allocator families never inherit an implicit deleter match. Custom
+deleters, conversions, aliasing constructors, fields/heap owners, exposure,
+references, lambdas, indirect/ambiguous targets, lookalikes, unsupported
+methods, and conflicts remain non-authoritative. Configured project wrappers
+retain their existing conservative adoption escape and must still be named by
+`--owning-pointers`; unconfigured wrappers and non-owning views do not suppress
+raw leaks. Exceptional cleanup remains Phase 7.5 work.
+
+Only an analysis exposing the optional CFG-element hook requests a separately
+cached implicit-destructor CFG; statement-only consumers retain the existing
+cache key and path. The exact file boundary is `src/engine/CfgCache.h`,
+`src/engine/CfgCache.cpp`, `src/engine/DataflowEngine.h`,
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/CfgCacheTest.cpp`,
+`tests/IntervalAnalysisTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+`docs/usage.md`, `docs/TODO.md`, and this changelog. Configuration,
+allocator-pair syntax, contract grammar, capabilities, accepted model
+channels, summary schema, profiles, and quality floors remain unchanged.
+
+Contract-first shadow pre-screen considered `CfgCache::get`, `runDataflow`,
+`standardOwnerKind`, `ownerOperation`, `applyOwnerOperation`,
+`MemoryFlow::transferElement`, and `MemoryFlow::onCFGElement`. Current verifier
+semantics cannot prove template/CFG event dispatch, Clang declaration
+identity, native pointer aliasing, smart ownership, or heap lifetime, so
+dogfood is not applicable: proposals 0, eligible 0, rejected 0, unsupported 7.
+Candidate contracts requiring later human review: none. No proof-bearing
+contract was invented and no `cs: ai` proposal became accepted intent.
+Executable A7 RED fixtures and ordinary tests are the referee; this contract
+record will not change during Phase 7.4.
+
+## 2026-08-09 — Phase 7.3 exact custom allocator families
+
+CodeSkeptic now accepts atomic, fail-closed custom allocation families through
+CLI `--allocator-pairs`, project `allocator_pairs`, and MCP
+`allocator_pairs`. Direct non-instance paired allocators carry an exact family
+per guarded disjunct. Only an admitted argument-zero deallocator closes that
+family and enables UAF or double-free evidence. Qualified configuration matches
+the exact qualified declaration; unqualified configuration retains identifier
+compatibility. Duplicate pairs are idempotent, an allocator may admit multiple
+deallocators, and each analyzer/MCP call clears the pair registry afterward.
+
+Mismatched paired or legacy frees, `delete`, and built-in `realloc` do not
+close an exact custom family, so a live allocation remains leak-reportable.
+Conflicting paths and summary-only, indirect, ambiguous, method-receiver, or
+otherwise non-exact release evidence cannot manufacture family authority;
+release-shaped uncertainty escapes conservatively. Explicitly paired wrapper
+names are the only wrapper authority. Legacy independent allocation/free lists
+remain family-agnostic, and summary schema, grammar, capabilities, profiles,
+and all quality floors are unchanged.
+
+The initial compile RED established the absent configuration API. After
+configuration, registry, and MCP plumbing, 8 of 14 focused cases passed and 6
+semantic cases remained RED: mismatched-family leak retention, no fabricated
+UAF/double-free after mismatch, qualified matching, built-in free/delete
+mismatch, conflicting families, and MCP behavior. The first semantic
+implementation closed all 14. Precision review added six cases and exposed a
+second RED: a paired source passed to built-in `realloc` produced two leaks
+instead of the required single old-allocation leak. Preserving the direct
+source owner before binding invalidation closed it. The final allocator-family
+matrix is 20/20; direct and CTest suites pass 1117/1117.
+
+Interface and documentation gates pass: `CapabilitiesCliTest.py` reports
+schema 2, rules 14, supported 7, and out-of-scope 5; `ActionArgsTest.py` is
+5/5; docs sync, 8/8 profiles, README 315/315, and capability sync are green.
+Frozen thesis remains `clean_fp=0`, `bug_caught=9/15`, 11 findings, and the
+self-scan is clean and complete at 48/48 translation units. Corpus results are
+cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly accepted broken
+fixtures) and tinyxml2 9 findings (3/3 analyzed).
+
+The full unchanged 400-file/CWE Juliet replay passes every floor. Rule-matched
+results are CWE476 140/0 (precision 1.000, hit rate 0.347), CWE401 105/15
+(precision 0.875, hit rate 0.253), CWE415 119/0 (precision 1.000, hit rate
+0.297), CWE416 212/0 (precision 1.000, hit rate 0.531), CWE369 43/0 (precision
+1.000, hit rate 0.108), and CWE190 23/0 (precision 1.000, hit rate 0.057). The
+tested Windows product SHA-256 is
+`db1f7ba8eea153edaec1b9e4e77df191d77eb1f56a12e199b2494cd8de13fc68`.
+
+Contract-first shadow completion considered `Config::addAllocatorPairs`,
+`setAllocatorPairs`, `pairedAllocatorFamily`, `isPairedDeallocatorCall`,
+`matchesAllocatorFamily`, `allocationFamilyOf`, and `releaseAuthority`:
+proposals 0, eligible 0, rejected 0, unsupported 7. Their semantics depend on
+string/container parsing, Clang declaration identity, and native pointer/heap
+lifetime outside the current verifier. No proposal exposed a problem because
+none was eligible; independent RED and precision-review tests exposed and
+closed the implementation and assumption problems above. Candidate contracts
+requiring later human review: none. No `cs: ai` proposal became accepted
+intent, and native owned-memory parity remains deferred to executable A7
+fixtures. The exact locked file set was preserved.
+
+## 2026-08-09 — Phase 7.3 allocator-family boundary and contract record
+
+Phase 7.2 is sealed in commit `a242b3c` and published in draft PR #134. The
+next independently measurable slice is restricted to opt-in exact custom
+allocator/deallocator families; the prior alias and realloc slices are not
+reopened.
+
+The locked pre-implementation contract is recorded separately in
+`docs/TODO.md`. New CLI, config, and MCP input uses comma-separated
+`allocator=deallocator` entries. Parsing is atomic and fail-closed; duplicate
+pairs are idempotent and one allocator may admit multiple exact deallocators.
+Qualified spellings match qualified direct non-instance callees, while
+unqualified spellings preserve the existing identifier convention. Paired
+names automatically join allocation and release recognition.
+
+Each direct paired allocation carries its exact family per disjunct. Only an
+admitted direct argument-zero deallocator proves release and enables later UAF
+or double-free evidence. A mismatched paired/legacy deallocator, `delete`, or
+built-in `realloc` cannot close that allocation, so a live allocation remains a
+leak. Conflicting family paths degrade to unknown. Summary-only ownership,
+summary-only consumption, unresolved or ambiguous indirect calls, instance
+methods, non-variable arguments, and unknown targets cannot create exact
+family authority; release-shaped uncertainty escapes instead of fabricating a
+release or leak. A wrapper receives authority only by explicit pairing. Legacy
+independent allocator/free lists retain their family-agnostic behavior, and
+all pair state is cleared between analyzer/MCP calls.
+
+The exact file boundary is `src/config/Config.h`, `src/config/Config.cpp`,
+`src/engine/AllocFunctions.h`, `src/engine/AllocFunctions.cpp`,
+`src/analyzer/StaticAnalyzer.cpp`, `src/server/McpServer.cpp`,
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/ConfigTest.cpp`,
+`tests/McpServerTest.cpp`, `tests/MemoryLeakRuleExTest.cpp`, `docs/usage.md`,
+`docs/integrations.md`, `docs/TODO.md`, and this changelog. Contract grammar,
+capability tiers, accepted model channels, summary schema, profiles, and
+quality floors remain unchanged.
+
+Contract-first shadow pre-screen considered `Config::addAllocatorPairs`,
+`setAllocatorPairs`, `pairedAllocatorFamily`, `isPairedDeallocatorCall`,
+`matchesAllocatorFamily`, `allocationFamilyOf`, and `releaseAuthority`.
+String/container parsing, Clang declaration identity, and native pointer/heap
+lifetime are unsupported by the current verifier, so dogfood is not
+applicable: proposals 0, eligible 0, rejected 0, unsupported 7. Candidate
+contracts requiring later human review: none. No proof-bearing contract was
+invented and no `cs: ai` proposal became accepted intent. Executable A7 RED
+fixtures and ordinary tests are the referee; this contract record will not
+change during Phase 7.3.
+
+## 2026-08-09 — Phase 7.2 realloc outcome lifetimes
+
+The memory-lifetime analysis now records an exact pending source/result
+relation for direct global-C or `std` `realloc`/`reallocarray` calls with local,
+same-pointer-type identities and proven nonzero requests. A proven null result
+preserves the original allocation; a proven non-null result transfers the
+lifetime to the result and invalidates the old owner. Proven-nonzero direct
+overwrite reports the possible failure-path leak, null input remains ordinary
+allocation, and `reallocarray` requires both multiplicands to be nonzero.
+
+Zero or unknown sizes, indirect and custom calls, methods and other namespaces,
+type-changing results, address exposure, and conflicting relations remain
+non-authoritative. They cannot manufacture release, transfer, UAF,
+double-free, or overwrite-leak evidence. Reassignment and exposure invalidate
+only the pending relation, while unresolved result/source alternatives are
+deduplicated at exit.
+
+Initial RED recorded four implementation gaps after one other-namespace test
+was corrected because its original leak expectation contradicted the existing
+generic escape semantics. The first full suite then exposed a Systemd
+copy-before-null regression: realloc invalidation had accidentally erased a
+normal pointer-value copy binding. Preserving that binding closed the
+regression. Precision review added an exact-result-alias guard RED; resolving
+the guard to its binding owner closed it. The final Phase 7.2 matrix has 20
+cases, the focused realloc/alias/Systemd replay is 24/24, and both the direct
+and CTest suites pass 1097/1097.
+
+The final 400-file/CWE Juliet replay passes every unchanged floor. Rule-matched
+results are CWE476 140/0 (precision 1.000, hit rate 0.347), CWE401 105/15
+(precision 0.875, hit rate 0.253), CWE415 119/0 (precision 1.000, hit rate
+0.297), CWE416 212/0 (precision 1.000, hit rate 0.531), CWE369 43/0 (precision
+1.000, hit rate 0.108), and CWE190 23/0 (precision 1.000, hit rate 0.057).
+Compared with the sealed Phase 7.1 baseline, realloc modeling adds 13 CWE401
+true positives and two false positives while holding precision above its 0.85
+floor; no quality floor changed.
+
+Final local gates are frozen thesis `clean_fp=0`, `bug_caught=9/15`, 11
+findings; clean and complete 48/48-TU self-scan; cJSON 54 findings (76
+enumerated, 35 analyzed, 41 explicitly accepted broken fixtures); and tinyxml2
+9 findings (3/3 analyzed). The tested Windows product SHA-256 is
+`4ccb8e52a53e1af0905830c2889bb9ffc1467960c17a44cf4ac8e76c423c656d`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, allocator registries, contract grammar, capability
+tiers, configuration, summary schemas, accepted model channels, and Juliet
+floors are unchanged.
+
+Contract-first shadow completion considered `reallocSite`, `reallocUpdates`,
+`collectReallocSites`, `invalidateReallocRelations`, `provesNonZero`,
+`provesNonZeroRequest`, and `applyNullCondition`. Their composite authority
+depends on native pointer identity and heap lifetime semantics that the current
+verifier cannot prove, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 7. No proposal exposed a problem because none was
+eligible. Independent RED, full-suite, and precision-review tests exposed the
+implementation and assumption problems above; all are closed. Candidate
+contracts requiring later human review: none. No `cs: ai` proposal became
+accepted intent, and native owned-memory verification parity remains deferred
+to executable A7 fixtures.
+
+## 2026-08-09 — Phase 7.2 realloc boundary and contract record
+
+Phase 7.1 is sealed in commit `1475adb8754c75174ef4057d62a1f8b5c543a605`
+with tree `5aac1b25da279bed85ab60332152020c7ba74e24`. The next independently
+measurable slice is restricted to exact `realloc`/`reallocarray`
+success/failure lifetime behavior; the prior slice is not reopened.
+
+The locked pre-implementation contract is recorded separately from production
+code in `docs/TODO.md`. Only direct global-C or `std` calls with exact local,
+same-pointer-type result/source identities may create a pending realloc
+relation. For a proven nonzero request, null preserves the original allocation
+and non-null transfers its lifetime to the result. Proven-nonzero direct
+overwrite reports the possible failure leak; null input remains ordinary
+allocation. `reallocarray` requires both size operands to be proven nonzero
+and preserves the source on overflow failure. Zero or unknown sizes, indirect
+or custom calls, methods and other namespaces, type changes, exposure, and
+conflicts cannot create release, transfer, UAF, double-free, or overwrite-leak
+evidence. Alternative unresolved result/source outcomes produce at most one
+exit leak unless later evidence separates them.
+
+The exact file boundary is `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+engines, allocator registries, contract grammar, capability tiers,
+configuration, summary schemas, accepted model channels, and quality floors
+remain unchanged. Contract-first shadow review considered seven critical
+semantic decisions. All depend on native pointer/heap lifetime semantics that
+the current verifier does not support, so dogfood is not applicable: proposals
+0, eligible 0, rejected 0, unsupported 7. Candidate contracts requiring later
+human review: none. No proof-bearing contract was invented and no `cs: ai`
+proposal became accepted intent. Executable A7 RED fixtures and ordinary tests
+are the referee; this contract record will not change during Phase 7.2.
+
+## 2026-08-09 — Phase 7.1 exact local alias lifetime
+
+The memory-lifetime analysis now carries an exact must-binding beside each
+allocation state in every guarded disjunct. A release through an unchanged
+local pointer copy updates the allocation owner, so later access or release
+through the owner, the alias, or a transitive exact alias reports UAF or
+double-free with the original allocation/free trace. Null failure edges refine
+the owner, conflicting bindings merge to unknown, and exit leaks no longer use
+flow-insensitive group suppression. Reusing an alias for a second allocation
+therefore exposes the first allocation leak instead of preserving the old
+accepted FN.
+
+Local pointer references and pointer value copies have separate binding
+semantics. `T*& ref = owner` stays attached to the pointer variable when
+`owner` later receives an allocation; `T* copy = owner` preserves only the
+value present at the copy. Direct reassignment and allocation overwrite only
+the affected binding. Address exposure, writable-reference calls,
+cast-changing copies, conflicting paths, fields, heap aliases, and unknown
+relations remain non-authoritative and cannot manufacture UAF/double-free
+evidence. A narrow same-source, proven-non-null compatibility bridge preserves
+the existing Juliet realloc good shapes; complete realloc success/failure,
+zero-size, null-input, and overwrite semantics remain owned by Phase 7.2.
+
+RED was recorded before implementation: six of the initial eight alias cases
+failed while both precision controls passed. Null-guard, address-exposure, and
+writable-reference controls were independently RED. The first full suite then
+found the Systemd copy-before-null escape regression. Precision review added
+cast-changing, reference-before-allocation, copy-before-allocation, and
+reference-storage-reassignment controls. The final Phase 7.1 matrix is 15/15;
+the adjacent local-reference and Systemd controls make the focused replay
+17/17.
+
+The first 400-file/CWE Juliet replay was deliberately kept red: CWE401 reached
+92 TP / 17 FP, precision 0.844, below the unchanged 0.85 floor. All four added
+FPs were variant-33 good sinks where a local `T*&` was incorrectly invalidated
+when its bound pointer variable received the allocation. Distinguishing
+reference-to-variable bindings from pointer-value copies removed exactly those
+four FPs without losing a TP. Final rule-matched results are CWE401 92/13
+(precision 0.876, hit rate 0.223), CWE415 119/0 (precision 1.000, hit rate
+0.297), and CWE416 212/0 (precision 1.000, hit rate 0.531). The unaffected
+rule-matched receipts are CWE476 140/0 (hit rate 0.347), CWE369 43/0 (0.108),
+and CWE190 23/0 (0.057). Every existing floor passes and no floor changed.
+
+Final local gates are direct suite 1077/1077, CTest 1077/1077, frozen thesis
+`clean_fp=0` and `bug_caught=9/15` with 11 findings, clean and complete 48/48-TU
+self-scan, cJSON 54 findings (76 enumerated, 35 analyzed, 41 explicitly
+accepted broken fixtures), and tinyxml2 9 findings (3/3 analyzed). The tested
+Windows product SHA-256 is
+`2a0a43114832761ea60617bc553393f4b6b7b15fd64cd5bcbdc0e0659f9ad197`. The exact
+slice file set remains `src/rules/MemoryLeakRule_Ex.cpp`,
+`tests/MemoryLeakRuleExTest.cpp`, `docs/TODO.md`, and this changelog. Shared
+dataflow/guard engines, contract grammar, capability tiers, configuration,
+summary schemas, accepted model channels, and Juliet floors are unchanged.
+
+Contract-first shadow completion considered the six critical binding, merge,
+root-resolution, release, dereference, and exit semantic units. Native pointer
+identity, reference storage, alias, and heap lifetime remain unsupported by the
+current verifier, so dogfood was not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proposal exposed a problem because none was
+eligible. Independent RED tests, the Systemd full-suite regression, and the
+Juliet floor exposed the implementation and assumption problems above; all are
+closed. Candidate contracts requiring later human review: none. No `cs: ai`
+proposal became accepted intent, and native owned-memory verification parity
+remains deferred to executable A7 fixtures.
+
+## 2026-08-09 — Phase 7.1 exact-alias boundary and contract record
+
+Phase 6 merged through fully green PR #133 as squash commit
+`3aa85f9ed773c2473683e5a41593208e8945a0d9`; its tree
+`12f62243ba39b3b7b49369f843f33af640619efb` exactly matches the gated branch
+head. Both feature-branch refs were removed after that equality check.
+
+The pre-implementation lifetime audit passed the existing 68-test focused
+memory/alias/path/custom-owner matrix and identified the first Phase 7 gap:
+local pointer copies are collected into whole-function alias components.
+Those components can suppress an exit leak through any member's free, but
+they deliberately cannot carry a free into UAF or double-free reporting and
+cannot invalidate a reused alias. The accepted
+`AliasReuse_FirstAllocationFN_Documented` fixture pins the resulting missed
+leak.
+
+The locked slice contract is recorded separately from production code in
+`docs/TODO.md`: only unchanged, exact, local pointer bindings within one
+guarded disjunct may transfer lifetime evidence; reassignment invalidates the
+overwritten binding, and conflicting/non-local/address-exposed/field/heap or
+unknown aliases cannot create a finding. The exact file boundary is
+`src/rules/MemoryLeakRule_Ex.cpp`, `tests/MemoryLeakRuleExTest.cpp`,
+`docs/TODO.md`, and this changelog. Shared engines, contract grammar,
+capability tiers, configuration, summary schemas, and accepted model channels
+remain outside the slice.
+
+Contract-first shadow review considered the six critical binding,
+root-resolution, merge, release, dereference, and exit decisions. All depend
+on native pointer identity, alias, and heap-lifetime semantics unsupported by
+the current verifier, so dogfood is not applicable: proposals 0, eligible 0,
+rejected 0, unsupported 6. No proof-bearing contract was invented and no
+`cs: ai` proposal became accepted intent. Executable A7 fixtures are the
+referee; this pre-implementation contract record will not change during the
+slice.
+
 ## 2026-08-09 — Phase 6.3 interprocedural allocator sinks and access evidence
 
 Function summaries now carry a versioned, exact integer-parameter-to-allocator-

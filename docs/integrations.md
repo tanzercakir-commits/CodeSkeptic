@@ -147,7 +147,8 @@ REVIEW_RESULT new_errors=1 new_warnings=0 fixed=1 weakened=1 gate=fail
 ```
 
 Both analyzer runs receive identical settings (arguments after `--` are
-forwarded to both — `--alloc-functions`, `--fatal-asserts`, or
+forwarded to both — `--allocator-pairs`, `--alloc-functions`,
+`--fatal-asserts`, or
 `--summary-in .codeskeptic-summaries` to review with whole-project
 knowledge, …); a delta between two differently-configured runs would
 not be a delta. Loaded summaries also compose through a controlled automatic
@@ -198,10 +199,12 @@ caveats.
 The `analyze` tool accepts `path` plus optional `build_path`,
 `functions` and `lines` — so an agent can scope the re-check to exactly
 the functions it just edited — and the project-idiom parameters
-(`fatal_asserts`, `alloc_functions`, `free_functions`) so the analysis
-sees custom assert handlers and allocator wrappers the same way the
-CLI flags do. Idiom registrations are per-call: nothing leaks into the
-next request of the long-lived server process.
+(`fatal_asserts`, `alloc_functions`, `free_functions`, `allocator_pairs`) so
+the analysis sees custom assert handlers and allocator wrappers the same way
+the CLI flags do. `allocator_pairs` uses comma-separated
+`allocator=deallocator` entries and rejects malformed values atomically. Idiom
+registrations are per-call: nothing leaks into the next request of the
+long-lived server process.
 
 The MCP payload exposes the same verdict contract as the CLI: `0` means
 complete evidence with no supported/blocking findings (experimental findings

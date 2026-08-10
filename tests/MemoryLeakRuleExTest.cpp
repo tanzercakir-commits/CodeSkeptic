@@ -765,6 +765,14 @@ public:
         setFreeFunctionNames({});
     }
 };
+
+class AllocatorPairScope {
+public:
+    explicit AllocatorPairScope(AllocatorPairMap pairs) {
+        setAllocatorPairs(std::move(pairs));
+    }
+    ~AllocatorPairScope() { setAllocatorPairs({}); }
+};
 } // namespace
 
 TEST(AllocFunctionsTest, WrapperLeak_VisibleWhenRegistered) {
@@ -822,6 +830,300 @@ TEST(AllocFunctionsTest, Unregistered_WrapperStaysInvisible) {
         }
     )");
     ASSERT_EQ(results.size(), 0);
+}
+
+// --- Exact custom allocator families (Phase 7.3) ---
+
+TEST(AllocatorPairTest, CorrectDirectDeallocatorClosesLeakAndEnablesUAF) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            pool_free(p);
+            *p = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AllocatorPairTest, CorrectDirectDeallocatorTwiceReportsDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free(p);
+            pool_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(AllocatorPairTest, CorrectDeallocatorThroughExactAliasClosesOwner) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void f() {
+            void* owner = pool_alloc(16);
+            void* alias = owner;
+            pool_free(alias);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, MismatchedDeallocatorLeavesAllocationLeaked) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            arena_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, MismatchDoesNotInventUAFOrDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            arena_free(p);
+            arena_free(p);
+            *p = 1;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, MismatchAfterCorrectReleaseDoesNotInventDoubleFree) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free(p);
+            arena_free(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, QualifiedFamiliesDoNotCrossNamespaces) {
+    AllocatorPairScope scope({{"alpha::make", {"alpha::drop"}},
+                              {"beta::make", {"beta::drop"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace alpha {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        namespace beta {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        void f() {
+            void* p = alpha::make(16);
+            beta::drop(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, UnqualifiedNamesRetainIdentifierCompatibility) {
+    AllocatorPairScope scope({{"make", {"drop"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace alpha {
+        void* make(unsigned long);
+        void drop(void*);
+        }
+        void f() {
+            void* p = alpha::make(16);
+            alpha::drop(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, OneFamilyMayAdmitMultipleDeallocators) {
+    AllocatorPairScope scope(
+        {{"pool_alloc", {"pool_free", "pool_free_sized"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free_sized(void*, unsigned long);
+        void f() {
+            void* p = pool_alloc(16);
+            pool_free_sized(p, 16);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, BuiltinFreeAndDeleteDoNotCloseCustomFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void free(void*);
+        void f() {
+            int* a = (int*)pool_alloc(sizeof(int));
+            int* b = (int*)pool_alloc(sizeof(int));
+            free(a);
+            delete b;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    for (const auto& result : results)
+        EXPECT_EQ(result.rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, BuiltinReallocCannotTransferCustomFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* realloc(void*, unsigned long);
+        void f() {
+            char* p = (char*)pool_alloc(16);
+            p = (char*)realloc(p, 32);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, InstanceMethodsDoNotGainPairAuthority) {
+    AllocatorPairScope scope({{"Pool::alloc", {"Pool::release"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Pool {
+            void* alloc(unsigned long);
+            void release(void*);
+        };
+        void f(Pool& pool) {
+            void* p = pool.alloc(16);
+            pool.release(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, StaticMethodsMayFormExactFamily) {
+    AllocatorPairScope scope({{"Pool::alloc", {"Pool::release"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Pool {
+            static void* alloc(unsigned long);
+            static void release(void*);
+        };
+        void f() {
+            void* p = Pool::alloc(16);
+            Pool::release(p);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, ConflictingFamiliesPreserveMismatchLeakPath) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}},
+                              {"arena_alloc", {"arena_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* arena_alloc(unsigned long);
+        void arena_free(void*);
+        void f(int choose) {
+            void* p;
+            if (choose)
+                p = pool_alloc(16);
+            else
+                p = arena_alloc(16);
+            pool_free(p);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AllocatorPairTest, ConsumedSummaryCannotInventExactFamilyRelease) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void release_wrapper(void* p) { pool_free(p); }
+        void f() {
+            int* p = (int*)pool_alloc(sizeof(int));
+            release_wrapper(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, ClosedIndirectSummaryStaysConservative) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void release_wrapper(void* p) { pool_free(p); }
+        void f() {
+            void (*release)(void*) = release_wrapper;
+            int* p = (int*)pool_alloc(sizeof(int));
+            release(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(AllocatorPairTest, SummaryOwnedReturnHasNoInventedFamily) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void* pool_alloc(unsigned long);
+        void pool_free(void*);
+        void* make_wrapper() { return pool_alloc(sizeof(int)); }
+        void f() {
+            int* p = (int*)make_wrapper();
+            pool_free(p);
+            *p = 1;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
 }
 
 // --- Address-of-member escape (libgit2 iterator / fprime font) ---
@@ -1119,12 +1421,9 @@ TEST(AliasEscapeTest, FreedThroughLocalReferenceAlias_NoLeak) {
     ASSERT_EQ(results.size(), 0);
 }
 
-TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
-    // DOCUMENTED accepted FN of the exit-time alias-free check:
-    // reusing the alias variable for a SECOND allocation and freeing
-    // only that one leaks the first — the flow-insensitive group
-    // cannot tell the two apart. This test pins the trade-off; if a
-    // future flow-sensitive alias model fixes it, flip the count to 1.
+TEST(AliasLifetimeV2Test, AliasReuse_FirstAllocationLeak_Reports) {
+    // Rebinding b must sever only b's exact relation to a. Freeing the
+    // second allocation cannot discharge the first allocation held by a.
     MemoryLeakRule_Ex rule;
     auto results = runRule(rule, R"(
         extern "C" void* malloc(unsigned long);
@@ -1136,7 +1435,245 @@ TEST(AliasEscapeTest, AliasReuse_FirstAllocationFN_Documented) {
             free(b);
         }
     )");
-    ASSERT_EQ(results.size(), 0);
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AliasLifetimeV2Test, FreeThroughAliasThenUseOwner_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(alias);
+            return *owner;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    ASSERT_EQ(results[0].notes.size(), 2u);
+    EXPECT_NE(results[0].notes[0].message.find("allocated"),
+              std::string::npos);
+    EXPECT_NE(results[0].notes[1].message.find("freed"),
+              std::string::npos);
+}
+
+TEST(AliasLifetimeV2Test, FreeOwnerThenUseAlias_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(owner);
+            return alias[0];
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AliasLifetimeV2Test, FreeThroughAliasThenFreeOwner_ReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(alias);
+            free(owner);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+    ASSERT_EQ(results[0].notes.size(), 2u);
+    EXPECT_NE(results[0].notes[0].message.find("allocated"),
+              std::string::npos);
+    EXPECT_NE(results[0].notes[1].message.find("freed"),
+              std::string::npos);
+}
+
+TEST(AliasLifetimeV2Test, FreeOwnerThenFreeAlias_ReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            free(owner);
+            free(alias);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(AliasLifetimeV2Test, TransitiveAliasFreeThenUseOwner_ReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* middle = owner;
+            int* alias = middle;
+            free(alias);
+            return *owner;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(AliasLifetimeV2Test, ReassignedAliasDoesNotPoisonOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int local = 7;
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            alias = &local;
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, BranchConflictingAliasRemainsPathExact) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f(int choose_local) {
+            int local = 0;
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            if (choose_local) alias = &local;
+            free(alias);
+            if (choose_local) free(owner);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, AliasNullGuardClearsOwnerFailurePath) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            if (!alias) return;
+            free(owner);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, AddressExposedAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void mutate(int**);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            mutate(&alias);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, WritableReferenceAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void mutate(int*&);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* alias = owner;
+            mutate(alias);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, CastChangingAliasCannotProveLaterUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            unsigned int* alias = reinterpret_cast<unsigned int*>(owner);
+            free(owner);
+            return *alias;
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, ReferenceBoundBeforeAllocationStillReleasesOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            int*& reference = owner;
+            owner = (int*)malloc(sizeof(int));
+            free(reference);
+        }
+    )");
+    EXPECT_EQ(results.size(), 0);
+}
+
+TEST(AliasLifetimeV2Test, PointerCopyBeforeAllocationDoesNotFollowOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            int* copy = owner;
+            owner = (int*)malloc(sizeof(int));
+            free(copy);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(AliasLifetimeV2Test, ReferenceFollowsReassignedStorageNotOldAllocation) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int local = 0;
+            int* owner = (int*)malloc(sizeof(int));
+            int*& reference = owner;
+            owner = &local;
+            free(reference);
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
 TEST(AliasEscapeTest, FreedThroughAlias_UnderGuard_NoLeak) {
@@ -1193,6 +1730,412 @@ TEST(AliasEscapeTest, ExitGuard_DoesNotDiluteFreedAlias) {
         }
     )");
     ASSERT_EQ(results.size(), 0);
+}
+
+// --- Phase 7.2: exact realloc success/failure lifetime ---
+
+TEST(ReallocLifetimeV2Test,
+     TemporaryFailurePreservesOriginal_SuccessTransfers) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (replacement == nullptr) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ProvenSuccessInvalidatesOriginal_ReportsUAF) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ExactResultAliasGuardProvesSuccess) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            int* checked = replacement;
+            if (!checked) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ProvenSuccessFreeOriginal_ReportsDoubleFree) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(owner);
+            free(replacement);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(ReallocLifetimeV2Test, UnresolvedTemporaryReportsOneAlternativeLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            (void)replacement;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test,
+     ReallocarrayFailurePreservesOriginal_SuccessTransfers) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)reallocarray(owner, 4, 16);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, DirectOverwriteNonzeroReportsFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, 16);
+            free(owner);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test, GuardedNonzeroDirectOverwriteReportsFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            if (size == 0) {
+                free(owner);
+                return;
+            }
+            owner = (int*)realloc(owner, size);
+            free(owner);
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ReallocLifetimeV2Test, UnknownSizeTemporaryDegradesWithoutLifetimeClaim) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, size);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, UnknownSizeDirectOverwriteDoesNotClaimFailureLeak) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f(unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, size);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ZeroSizeDirectOverwriteDoesNotInventSemantics) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            owner = (int*)realloc(owner, 0);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, NullInputBehavesAsAllocation) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = nullptr;
+            owner = (int*)realloc(owner, 16);
+            free(owner);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, StdReallocHasExactSuccessAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        namespace std {
+        void* realloc(void*, unsigned long);
+        }
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)std::realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ReallocarrayOverflowFailurePreservesOriginal) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        void f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)reallocarray(owner, ~0UL, 2);
+            if (!replacement) {
+                free(owner);
+                return;
+            }
+            free(replacement);
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, GuardedReallocarrayRequiresBothNonzeroOperands) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* reallocarray(void*, unsigned long, unsigned long);
+        extern "C" void free(void*);
+        int f(unsigned long count, unsigned long size) {
+            int* owner = (int*)malloc(sizeof(int));
+            if (count == 0) {
+                free(owner);
+                return 0;
+            }
+            if (size == 0) {
+                free(owner);
+                return 0;
+            }
+            int* replacement = (int*)reallocarray(owner, count, size);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  ASSERT_EQ(results.size(), 1);
+  EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, ZeroSizeTemporaryDoesNotInventSuccessRelease) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 0);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, TypeChangingResultDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            char* owner = (char*)malloc(16);
+            int* replacement = (int*)realloc(owner, 32);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, IndirectCallDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        int f() {
+            void* (*resize)(void*, unsigned long) = realloc;
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)resize(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
+}
+
+TEST(ReallocLifetimeV2Test, ExposedResultInvalidatesPendingRelation) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void* realloc(void*, unsigned long);
+        extern "C" void free(void*);
+        void mutate(int**);
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)realloc(owner, 16);
+            mutate(&replacement);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  for (const auto &result : results)
+    EXPECT_NE(result.rule_id, "use-after-free");
+}
+
+TEST(ReallocLifetimeV2Test, OtherNamespaceDoesNotGainReallocAuthority) {
+  MemoryLeakRule_Ex rule;
+  auto results = runRule(rule, R"(
+        extern "C" void* malloc(unsigned long);
+        extern "C" void free(void*);
+        namespace custom {
+        void* realloc(void*, unsigned long);
+        }
+        int f() {
+            int* owner = (int*)malloc(sizeof(int));
+            int* replacement = (int*)custom::realloc(owner, 16);
+            if (!replacement) {
+                free(owner);
+                return 0;
+            }
+            int value = *owner;
+            free(replacement);
+            return value;
+        }
+    )");
+  EXPECT_EQ(results.size(), 0);
 }
 
 // --- systemd FP hunt (2026-07-12): __attribute__((cleanup)) ---
@@ -1338,6 +2281,44 @@ namespace std {
    public:
     T* p_;
     explicit shared_ptr(T* p) : p_(p) {}
+  };
+}
+struct S { int x; };
+)";
+
+const std::string kStdSmartPtrLifetimes = R"(
+namespace std {
+  template <class T> T&& move(T& value);
+  template <class T> class unique_ptr {
+   public:
+    explicit unique_ptr(T* p = nullptr);
+    unique_ptr(unique_ptr&& other);
+    unique_ptr& operator=(unique_ptr&& other);
+    T* get() const;
+    T* release();
+    void reset(T* p = nullptr);
+    ~unique_ptr();
+  };
+  template <class T> class shared_ptr {
+   public:
+    explicit shared_ptr(T* p = nullptr);
+    shared_ptr(const shared_ptr& other);
+    shared_ptr(shared_ptr&& other);
+    shared_ptr& operator=(const shared_ptr& other);
+    shared_ptr& operator=(shared_ptr&& other);
+    T* get() const;
+    void reset(T* p = nullptr);
+    ~shared_ptr();
+  };
+  template <class T> class auto_ptr {
+   public:
+    explicit auto_ptr(T* p = nullptr);
+    auto_ptr(auto_ptr& other);
+    auto_ptr& operator=(auto_ptr& other);
+    T* get() const;
+    T* release();
+    void reset(T* p = nullptr);
+    ~auto_ptr();
   };
 }
 struct S { int x; };
@@ -1495,6 +2476,456 @@ TEST(OwningPointerTest, LambdaNotCapturingPtr_LeakStays) {
     ASSERT_EQ(results.size(), 1);
 }
 
+// --- Phase 7.4: exact local standard smart-owner lifetimes ---
+
+TEST(SmartOwnerLifetimeV2Test, UniqueDestructorThenRawUseReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueRawUseBeforeDestructorStaysClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, IgnoredUniqueReleaseLeavesLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.release();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(SmartOwnerLifetimeV2Test, CapturedReleaseAliasesRawAndDeleteIsClean) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            S* released = nullptr;
+            {
+                std::unique_ptr<S> owner(raw);
+                released = owner.release();
+            }
+            delete released;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, GetAliasObservesLastOwnerDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            S* view = nullptr;
+            {
+                std::unique_ptr<S> owner(raw);
+                view = owner.get();
+            }
+            return view->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueResetThenRawUseReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.reset();
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueResetReplacementFreesOnlyOldRaw) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* oldRaw = new S;
+            S* newRaw = new S;
+            std::unique_ptr<S> owner(oldRaw);
+            owner.reset(newRaw);
+            return oldRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ManualDeleteThenDestructorReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            delete raw;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ManualDeleteThenResetReportsDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            delete raw;
+            owner.reset();
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "double-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueMoveConstructionTransfersDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> first(raw);
+            { std::unique_ptr<S> second(std::move(first)); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, UniqueMoveAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::unique_ptr<S> source(sourceRaw);
+            std::unique_ptr<S> destination(replacedRaw);
+            destination = std::move(source);
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedCopyKeepsRawAliveUntilLastOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> outer(raw);
+            { std::shared_ptr<S> inner(outer); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedLastOwnerDestructionReportsUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            { std::shared_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedResetRetainsOtherExactOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> first(raw);
+            std::shared_ptr<S> second(first);
+            first.reset();
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, ConfiguredWrapperLifetimeStaysConservative) {
+    OwningPtrScope scope({"Ref"});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct S { int x; };
+        template <class T> struct Ref {
+            explicit Ref(T* value);
+            ~Ref();
+        };
+        int f() {
+            S* raw = new S;
+            { Ref<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, ExactCustomFamilyImplicitDeleterIsUnknown) {
+    AllocatorPairScope scope({{"pool_alloc", {"pool_free"}}});
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void* pool_alloc(unsigned long);
+        int f() {
+            S* raw = (S*)pool_alloc(sizeof(S));
+            { std::unique_ptr<S> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, IncompatiblePointeeAdoptionIsUnknown) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        struct Base { int x; };
+        struct Derived : Base {};
+        int f() {
+            Derived* raw = new Derived;
+            { std::unique_ptr<Base> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerAddressExposureIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void mutate(std::unique_ptr<S>*);
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                mutate(&owner);
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerReferenceMutationIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                std::unique_ptr<S>& alias = owner;
+                alias.release();
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, OwnerLambdaCaptureIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                auto cleanup = [&owner] { owner.release(); };
+                cleanup();
+            }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, CustomDeleterConstructorIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            unique_ptr(T*, D);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S, Deleter> owner(raw, Deleter{}); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, CustomDeleterTypeWithOneArgumentIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            explicit unique_ptr(T*);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            { std::unique_ptr<S, Deleter> owner(raw); }
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedAliasingConstructorIsConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T> class shared_ptr {
+           public:
+            explicit shared_ptr(T*);
+            template <class U> shared_ptr(const shared_ptr<U>&, T*);
+            ~shared_ptr();
+          };
+        }
+        struct Box { int value; };
+        int f() {
+            Box* raw = new Box;
+            {
+                std::shared_ptr<Box> base(raw);
+                std::shared_ptr<int> alias(base, &raw->value);
+            }
+            return raw->value;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedMoveConstructionTransfersLastOwner) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> first(raw);
+            { std::shared_ptr<S> second(std::move(first)); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedMoveAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::shared_ptr<S> source(sourceRaw);
+            std::shared_ptr<S> destination(replacedRaw);
+            destination = std::move(source);
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, SharedCopyAssignmentReleasesDestination) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* sourceRaw = new S;
+            S* replacedRaw = new S;
+            std::shared_ptr<S> source(sourceRaw);
+            std::shared_ptr<S> destination(replacedRaw);
+            destination = source;
+            return replacedRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, AutoPtrCopyTransfersDestruction) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::auto_ptr<S> first(raw);
+            { std::auto_ptr<S> second(first); }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ReleaseKeepsRawUseLiveAndReportsOnlyLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            owner.release();
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(SmartOwnerLifetimeV2Test, ResetThenReleaseReplacementSeparatesLifetimes) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* oldRaw = new S;
+            S* replacement = new S;
+            std::unique_ptr<S> owner(oldRaw);
+            owner.reset(replacement);
+            owner.release();
+            return oldRaw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 2u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+    EXPECT_EQ(results[1].rule_id, "memory-leak");
+}
+
 // Accepted real-world regression pin: tensorflow/tensorflow #123387,
 // fixed by merged PR #123994 (68a7e5821cbb2beb76eeebbbbdffda85a418b254).
 // TFLite rfft2d Rfft2dHelper allocates fft_input_output, then a
@@ -1577,6 +3008,200 @@ TEST(MemoryLeakRuleExTest, ImmutableTrueFlagLeak_StillReports) {
     )");
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+// --- Phase 7.5: exceptional cleanup and transfer boundaries ---
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedUniqueCleanupStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, OwnerOutsideTrySurvivesHandledThrow) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            try { throw 1; }
+            catch (...) { return raw->x; }
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, ReleaseBeforeThrowLeavesLiveLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                owner.release();
+                throw 1;
+            } catch (...) {}
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedDestructorCannotProveDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                delete raw;
+                throw 1;
+            } catch (...) {}
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     SharedExceptionalCleanupKeepsOuterOwnerAlive) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> outer(raw);
+            try {
+                std::shared_ptr<S> inner(outer);
+                throw 1;
+            } catch (...) { return raw->x; }
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedSharedCleanupStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            try {
+                std::shared_ptr<S> owner(raw);
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, CustomDeleterStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            unique_ptr(T*, D);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S, Deleter> owner(raw, Deleter{});
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     RawAllocationWithoutOwnerStillLeaksAfterHandledThrow) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* raw = new int(7);
+            try { throw 1; }
+            catch (...) {}
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     UnreachableThrowPreservesNormalDestructorEvidence) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                if (false) throw 1;
+            }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     ConditionalDisconnectedCleanupCannotManufactureUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f(bool fail) {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                if (fail) throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalTransferBoundaryTest, LocalMemberStoreKeepsLeakVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Box { int* value; };
+        void f() {
+            int* raw = new int(7);
+            Box local{};
+            local.value = raw;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalTransferBoundaryTest, GlobalMemberStoreEscapes) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Box { int* value; };
+        Box saved{};
+        int f() {
+            int* raw = new int(7);
+            saved.value = raw;
+            return *raw;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
 }
 
 TEST(MemoryLeakRuleExTest, MutatedFlag_NotConstantFolded) {
