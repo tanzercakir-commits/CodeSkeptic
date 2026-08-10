@@ -1,5 +1,42 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Verified progress and Windows review maintenance boundary
+
+Phase 7 is merged through protected-main PR #134 at
+`47b03f4076f246c38a81fbc834693bed0f98ccc4`, tree
+`d21f47b802f5a824626501d39425e98fb6509142`. The separate owner-requested
+automation boundary is now locked before implementation.
+
+The progress authority is git, not prose. A new append-only
+`docs/PROGRESS.md` ledger may record a transition as `MERGED` only when its
+commit is reachable from `origin/main`. Phase branches, local receipts, AI
+statements, and changelog text remain non-authoritative. A single status tool
+will append newly observed protected-main commits and regenerate TODO's marked
+state view; its read-only mode will fail on stale, malformed, rewritten, or
+non-ancestor progress and on a mismatched TODO block. Missing git facts fail
+closed in CI. The changelog remains the detailed rationale/evidence record.
+
+The same maintenance slice owns two Windows defects measured by the Phase 7
+strict diff referee. Compile-command remapping recognized forward slashes but
+not native backslashes, so base sources included head headers. After that was
+corrected temporarily, dependency paths from an older build tree were wrongly
+remapped into the base worktree. Finally, native relative paths failed to
+match Git's slash-separated changed-file list, yielding a contradictory
+coverage section. Permanent separator-tolerant source remapping, build-path
+protection, and slash-normalized relative paths are required, with synthetic
+Windows regressions plus the existing end-to-end review flow as referees.
+
+The exact file set is `docs/PROGRESS.md`, `docs/TODO.md`, this changelog,
+`CONTRIBUTING.md`, `scripts/progress_status.py`,
+`scripts/check_docs_sync.sh`, `scripts/review_report.py`,
+`tests/StatusAutomationTest.py`, and `tests/CMakeLists.txt`. No product C++,
+grammar, capability, workflow, profile, release, or floor changes are allowed.
+Contract-first shadow dogfood is not applicable because no C++ function is
+created or materially changed: functions considered 0; proposals 0; eligible
+0; rejected 0; unsupported 0. Candidate contracts requiring later human
+review: none. No `cs: ai` proposal can become accepted intent. This contract
+will not change during implementation.
+
 ## 2026-08-10 — Phase 7 strict-review correction boundary
 
 The corrected Windows base/head semantic diff review passes its blocking and
