@@ -861,7 +861,17 @@ upstream Linux recipe and dependency set were inspected, but configure/build
 and canonical TU identity are not yet qualified. The attempted local package
 setup did not install packages: it waited at a hidden `sudo` password prompt,
 and no package-manager mutation was claimed. A subsequent system-memory event
-required a host restart. TensorFlow Lite qualification has not started.
+required a host restart.
+
+The first hosted TensorFlow Lite observation in workflow run
+`31391276839` correctly returned `unavailable` before analysis. The pinned
+v2.21.0 standalone CMake entry point downloads TensorFlow v2.19.0 when
+`TENSORFLOW_SOURCE_DIR` is omitted, mixing v2.19-generated FlatBuffers 24
+headers with v2.21's FlatBuffers 25 dependency. The candidate recipe now binds
+`-DTENSORFLOW_SOURCE_DIR={source}` so the immutable v2.21.0 checkout is the
+only TensorFlow source. A RED-first contract test requires that exact binding
+once and rejects it for every other candidate. No finding or expectation was
+accepted from the failed observation; the corrected hosted rerun is pending.
 
 Resource constraint for the remaining qualification: do not run shadPS4 or
 TensorFlow Lite heavy builds locally. Local work is limited to low-memory,

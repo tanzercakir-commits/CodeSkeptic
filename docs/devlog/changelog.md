@@ -1,5 +1,25 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.3 TensorFlow Lite source-binding correction
+
+The first hosted TensorFlow Lite observation in workflow run `31391276839`
+failed closed before analysis. Its artifact proved that the v2.21.0 standalone
+CMake entry point still fetches TensorFlow v2.19.0 when
+`TENSORFLOW_SOURCE_DIR` is absent. That combined v2.19-generated FlatBuffers 24
+headers with v2.21's FlatBuffers 25 dependency and stopped the build at the
+generated-header compatibility assertion. The `unavailable` receipt supplied
+no semantic expectation.
+
+The observational recipe now passes
+`-DTENSORFLOW_SOURCE_DIR={source}`, retaining the immutable v2.21.0 project and
+full selected production surface while preventing the stale download. A
+RED-first test failed on the missing binding; the hardened validator now
+requires it exactly once for TensorFlow Lite and rejects the source placeholder
+for the other candidates. Qualification and adjacent factory tests pass
+locally; hosted observation remains the referee. No C++ function changed, so
+contract-first shadow dogfood is not applicable and no `cs: ai` proposal became
+accepted intent.
+
 ## 2026-08-10 — Phase 8.3 hosted qualification contract
 
 Locked the observational hosted-qualification boundary before implementation.
