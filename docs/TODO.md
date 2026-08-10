@@ -771,6 +771,19 @@ human review: none. No `cs: ai` proposal can become accepted intent. Native
 pointer, ownership, heap, alias, and lifetime parity remain deferred to
 executable A7 fixtures.
 
+**Pre-implementation boundary correction (2026-08-10).** The first official
+runner probe reproduced the exact same sorted 103-file Redis list but exposed
+that the preliminary PowerShell path/hash calculation, rather than the
+factory's canonical `translation_unit_digest`, supplied the recorded digest.
+The runner-derived SHA-256 is
+`289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844`;
+it supersedes only the Redis SHA literal above. The implementation changes
+were still uncommitted and acceptance was paused when this was found. curl,
+LVGL, and systemd official probes independently reproduced their locked TU
+counts and digests. The project pins, source lists, commands, file boundary,
+and all other authority remain unchanged. This is an exposed measurement-tool
+assumption problem, not accepted implementation drift.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

@@ -1,5 +1,19 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.2 pre-implementation boundary correction
+
+The first official Redis runner probe reproduced the same sorted 103-file
+surface but rejected the preliminary digest. Direct comparison proved the
+file lists identical; the preliminary PowerShell normalizer/hash calculation
+was the incorrect authority. The runner's canonical
+`translation_unit_digest` is
+`289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844`.
+It supersedes only the Redis SHA literal in the boundary below. Implementation
+changes were uncommitted and acceptance was paused before this correction;
+the project pin, recipe, source roots, 103-file count, file set, and every
+other boundary remain unchanged. Official curl, LVGL, and systemd probes
+reproduced their locked TU identities.
+
 ## 2026-08-10 — Phase 8.2 weekend factory boundary
 
 Protected main contains Phase 8.1 through PR #136 at
