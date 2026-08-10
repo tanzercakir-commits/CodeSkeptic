@@ -1,9 +1,9 @@
 name: Deterministic real-world campaign
 
-# Phase 8 nightly core factory. The manifest is the sole project authority;
+# Phase 8 nightly and weekend factory. The manifest is the sole project authority;
 # this workflow supplies orchestration only. One matrix cell is one independent
 # project repetition, so a failed project cannot erase another project's
-# evidence and no hosted job pretends to be a 12-hour process.
+# evidence and no hosted job pretends to span an aggregate campaign window.
 on:
   workflow_dispatch:
     inputs:
@@ -14,8 +14,10 @@ on:
         type: choice
         options:
           - nightly
+          - weekend
   schedule:
     - cron: "17 1 * * *"
+    - cron: "43 0 * * 0"
 
 permissions:
   contents: read
@@ -38,8 +40,16 @@ jobs:
         id: tier
         shell: bash
         run: |
-          tier="${{ github.event.inputs.tier || 'nightly' }}"
-          test "$tier" = nightly
+          if [ "${{ github.event_name }}" = schedule ] && \
+             [ "${{ github.event.schedule }}" = "43 0 * * 0" ]; then
+            tier=weekend
+          else
+            tier="${{ github.event.inputs.tier || 'nightly' }}"
+          fi
+          case "$tier" in
+            nightly|weekend) ;;
+            *) echo "unsupported campaign tier: $tier" >&2; exit 2 ;;
+          esac
           echo "value=$tier" >> "$GITHUB_OUTPUT"
 
       - name: Validate manifest and emit project-by-repetition matrix
@@ -95,7 +105,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang-20 cmake ninja-build libssl-dev libxml2-dev \
-            libbz2-dev liblzma-dev libzstd-dev zlib1g-dev
+            libbz2-dev liblzma-dev libzstd-dev zlib1g-dev \
+            meson bear gperf libcap-dev libmount-dev
 
       - name: Download the shared analyzer
         uses: actions/download-artifact@v4
