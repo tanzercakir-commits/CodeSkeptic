@@ -1,0 +1,105 @@
+{
+  "juliet": {
+    "CWE190_Integer_Overflow": {
+      "case_f1": 0.1,
+      "files": 1594,
+      "misses": {
+        "addressable": 323,
+        "model_gap": 474,
+        "out_of_scope": 713,
+        "total": 1510
+      },
+      "precision": 1.0,
+      "recall": 0.053,
+      "rfp": 0,
+      "rtp": 84,
+      "rule": "int-overflow"
+    },
+    "CWE369_Divide_by_Zero": {
+      "case_f1": 0.193,
+      "files": 824,
+      "misses": {
+        "addressable": 72,
+        "model_gap": 172,
+        "out_of_scope": 492,
+        "total": 736
+      },
+      "precision": 1.0,
+      "recall": 0.107,
+      "rfp": 0,
+      "rtp": 88,
+      "rule": "div-by-zero"
+    },
+    "CWE401_Memory_Leak": {
+      "case_f1": 0.389,
+      "files": 1600,
+      "misses": {
+        "addressable": 438,
+        "model_gap": 760,
+        "out_of_scope": 0,
+        "total": 1198
+      },
+      "precision": 0.862,
+      "recall": 0.251,
+      "rfp": 67,
+      "rtp": 417,
+      "rule": "memory-leak"
+    },
+    "CWE415_Double_Free": {
+      "case_f1": 0.465,
+      "files": 1402,
+      "misses": {
+        "addressable": 280,
+        "model_gap": 697,
+        "out_of_scope": 0,
+        "total": 977
+      },
+      "precision": 1.0,
+      "recall": 0.303,
+      "rfp": 0,
+      "rtp": 425,
+      "rule": "double-free"
+    },
+    "CWE416_Use_After_Free": {
+      "case_f1": 0.691,
+      "files": 447,
+      "misses": {
+        "addressable": 92,
+        "model_gap": 119,
+        "out_of_scope": 0,
+        "total": 211
+      },
+      "precision": 1.0,
+      "recall": 0.528,
+      "rfp": 0,
+      "rtp": 236,
+      "rule": "use-after-free"
+    },
+    "CWE476_NULL_Pointer_Dereference": {
+      "case_f1": 0.518,
+      "files": 464,
+      "misses": {
+        "addressable": 80,
+        "model_gap": 222,
+        "out_of_scope": 0,
+        "total": 302
+      },
+      "precision": 1.0,
+      "recall": 0.349,
+      "rfp": 0,
+      "rtp": 163,
+      "rule": "null-deref"
+    }
+  },
+  "performance": {
+    "elapsed_seconds": 555.7,
+    "peak_rss_kb": 137768
+  },
+  "reference": {
+    "analyzer_tree": "7decb6b09ac2ee3c09a03bb37eebf17df71e97d5",
+    "measured_at_utc": "2026-08-08T05:56:22Z",
+    "sample_limit_per_cwe": 400,
+    "workflow_run": 31242561307
+  },
+  "schema_version": 1
+}
