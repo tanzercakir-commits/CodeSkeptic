@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "projects": [
+    {
+      "id": "llama-cpp",
+      "label": "4dee52f8",
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "checkout": {
+        "submodules": "none"
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DGGML_NATIVE=OFF",
+            "-DLLAMA_BUILD_TESTS=OFF",
+            "-DLLAMA_BUILD_TOOLS=OFF",
+            "-DLLAMA_BUILD_EXAMPLES=OFF",
+            "-DLLAMA_BUILD_SERVER=OFF",
+            "-DLLAMA_BUILD_COMMON=OFF",
+            "-DLLAMA_BUILD_APP=OFF",
+            "-DLLAMA_BUILD_UI=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "llama",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src",
+          "ggml/src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src,{source}/ggml/src"
+      ]
+    },
+    {
+      "id": "shadps4",
+      "label": "v0.17.0",
+      "repository": "https://github.com/shadps4-emu/shadPS4.git",
+      "revision": "5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "checkout": {
+        "submodules": "recursive"
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DENABLE_TESTS=OFF",
+            "-DENABLE_DISCORD_RPC=OFF",
+            "-DENABLE_UPDATER=OFF",
+            "-DENABLE_SYSTEM_LIBRARIES=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "shadps4",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ]
+    },
+    {
+      "id": "tensorflow-lite",
+      "label": "v2.21.0",
+      "repository": "https://github.com/tensorflow/tensorflow.git",
+      "revision": "a481b10260dfdf833a1b16007eead49c1d7febf3",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "checkout": {
+        "submodules": "none"
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}/tensorflow/lite",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_CXX_STANDARD=17",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DTENSORFLOW_SOURCE_DIR={source}",
+            "-DTFLITE_ENABLE_XNNPACK=OFF",
+            "-DTFLITE_ENABLE_GPU=OFF",
+            "-DTFLITE_ENABLE_METAL=OFF",
+            "-DTFLITE_ENABLE_NNAPI=OFF",
+            "-DTFLITE_ENABLE_EXTERNAL_DELEGATE=OFF",
+            "-DTFLITE_ENABLE_LABEL_IMAGE=OFF",
+            "-DTFLITE_ENABLE_BENCHMARK_MODEL=OFF",
+            "-DTFLITE_KERNEL_TEST=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "tensorflow-lite",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "tensorflow/lite"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/tensorflow/lite"
+      ]
+    }
+  ]
+}

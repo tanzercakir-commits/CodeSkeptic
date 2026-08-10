@@ -1,5 +1,79 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.3 shadPS4 standard-library correction
+
+The first hosted shadPS4 observation in workflow run `31391276839` completed
+2,073 of 2,452 build steps and then failed closed before analysis. The proposed
+`-stdlib=libc++` compiler and linker flags selected Ubuntu's libc++ 18, whose
+C++23 library surface lacks the `std::jthread` and `std::stop_token` types used
+by the pinned shadPS4 sources. The upstream production Linux workflow uses
+clang with the default libstdc++.
+
+The observational recipe now removes only those two standard-library override
+flags. A RED-first test reproduced the invalid recipe and now prevents the
+libc++ override from returning. The pinned commit, 53 recursive submodules,
+production target, source roots, and fail-closed evidence requirements remain
+unchanged. Hosted observation is still the referee. No C++ function changed,
+so contract-first shadow dogfood is not applicable and no `cs: ai` proposal
+became accepted intent.
+
+## 2026-08-10 — Phase 8.3 TensorFlow Lite source-binding correction
+
+The first hosted TensorFlow Lite observation in workflow run `31391276839`
+failed closed before analysis. Its artifact proved that the v2.21.0 standalone
+CMake entry point still fetches TensorFlow v2.19.0 when
+`TENSORFLOW_SOURCE_DIR` is absent. That combined v2.19-generated FlatBuffers 24
+headers with v2.21's FlatBuffers 25 dependency and stopped the build at the
+generated-header compatibility assertion. The `unavailable` receipt supplied
+no semantic expectation.
+
+The observational recipe now passes
+`-DTENSORFLOW_SOURCE_DIR={source}`, retaining the immutable v2.21.0 project and
+full selected production surface while preventing the stale download. A
+RED-first test failed on the missing binding; the hardened validator now
+requires it exactly once for TensorFlow Lite and rejects the source placeholder
+for the other candidates. Qualification and adjacent factory tests pass
+locally; hosted observation remains the referee. No C++ function changed, so
+contract-first shadow dogfood is not applicable and no `cs: ai` proposal became
+accepted intent.
+
+## 2026-08-10 — Phase 8.3 hosted qualification contract
+
+Locked the observational hosted-qualification boundary before implementation.
+The dedicated candidate document, observer, workflow, and contract tests may
+measure only llama.cpp, shadPS4, and the selected production TensorFlow Lite
+library surface. Receipts are `observed` or fail-closed `unavailable`; they are
+not canonical expectations or campaign acceptance. The existing manifest,
+runner, expected ledger, production workflow, analyzer, grammar, and accepted
+contract semantics remain outside this boundary. No C++ function changes, so
+contract-first shadow dogfood is not applicable and no `cs: ai` proposal can
+become accepted intent.
+
+## 2026-08-10 — Phase 8.3 qualification checkpoint
+
+Phase 8.3 release-candidate qualification started without opening an
+implementation boundary. llama.cpp is pinned at
+`4dee52f82dc455a035e900fed6a40cb45cd7a454`; its low-parallelism production
+`llama` target completed from a Release clang-20 CMake/Ninja build. The
+factory's canonical source derivation selected 200 translation units below
+`src` and `ggml/src`, with SHA-256
+`e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783`.
+
+shadPS4 v0.17.0 is pinned at
+`5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa`; all 53 recursive submodules were
+fetched at their superproject gitlinks. Its build and TU identity remain
+unqualified. TensorFlow Lite has not started. A hidden local `sudo` prompt and
+subsequent host-memory exhaustion demonstrated that the two remaining heavy
+builds are not safe local work on this machine. They are moved to hosted
+qualification; local work is limited to sequential low-memory configure and
+identity probes. No factory implementation, expectation, accepted contract,
+or existing campaign tier changed in this checkpoint.
+
+Contract-first shadow dogfood is not applicable: no C++ function changed.
+Functions considered 0; proposals 0; eligible 0; rejected 0; unsupported 0.
+Candidate contracts requiring later human review: none, and no `cs: ai`
+proposal became accepted intent.
+
 ## 2026-08-10 — Phase 8.2 weekend factory implementation and qualification
 
 The canonical factory now has separate, non-overlapping nightly and weekend
