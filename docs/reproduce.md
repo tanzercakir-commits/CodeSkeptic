@@ -120,6 +120,14 @@ SHA-256
 `88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`
 and aggregate receipt SHA-256
 `9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
+Hosted weekend run
+[`31381555374`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31381555374)
+reproduced the same project semantics with aggregate receipt SHA-256
+`e781fbffa80f44b41a5bc97585c9385d950c5e6e8338d1bacf43c2a7fe111ec9`.
+The unchanged nightly tier was separately accepted by run
+[`31382838369`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31382838369),
+aggregate receipt SHA-256
+`2954b90c3fba14d6d76bab985949428bc6cd091a466cf321970ddbf160a478ce`.
 
 Receipts and their `.sha256` sidecars are uploaded per shard even when the
 verdict is unavailable; the aggregate receipt is a distinct artifact. Current

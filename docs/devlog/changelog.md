@@ -1,6 +1,6 @@
 # CodeSkeptic — Changelog
 
-## 2026-08-10 — Phase 8.2 weekend factory implementation and local qualification
+## 2026-08-10 — Phase 8.2 weekend factory implementation and qualification
 
 The canonical factory now has separate, non-overlapping nightly and weekend
 tiers. Its weekend manifest pins systemd, curl, Redis, and LVGL to the exact
@@ -34,7 +34,21 @@ zero broken TUs and zero incomplete functions. The aggregate manifest SHA-256
 is `88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`;
 the checksummed aggregate receipt SHA-256 is
 `9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
-Hosted publication remains pending.
+
+GitHub workflow run
+[`31381555374`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31381555374)
+independently rebuilt analyzer SHA-256
+`52f8520234e350ced20678a4f6356b0e96da3da6aa4d19be4e1f78046af54861`
+and accepted all twelve weekend shards. Its project semantic digests exactly
+match the local aggregate and its checksummed aggregate receipt SHA-256 is
+`e781fbffa80f44b41a5bc97585c9385d950c5e6e8338d1bacf43c2a7fe111ec9`.
+Separate nightly regression run
+[`31382838369`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31382838369)
+used the same hosted analyzer, accepted all twelve original shards without
+finding/fingerprint drift, and produced aggregate receipt SHA-256
+`2954b90c3fba14d6d76bab985949428bc6cd091a466cf321970ddbf160a478ce`.
+All ordinary PR checks are green and PR #137 has no review threads. Protected-
+main merge remains pending.
 
 No C++ function changed, so contract-first shadow dogfood is not applicable:
 functions considered 0, proposals 0, eligible 0, rejected 0, unsupported 0.
