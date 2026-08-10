@@ -31,3 +31,11 @@ Evidence: commit `e146a434f17e61813cceb175ea8791c9065a1b38`; tree `fc719f17f30e3
 Evidence: commit `3b1714e1e9e3997ab63507837c3a177c1bdefab1`; tree `0293f291d2a4a7876eaa734e6b23dd0a82779377`.
 
 <!-- cs:progress-cursor: 3b1714e1e9e3997ab63507837c3a177c1bdefab1 -->
+
+## 2026-08-10 — Phase 8.2: deterministic weekend real-world campaign (#137) — MERGED
+
++ Protected main contains this transition; no phase branch or prose
+  record is treated as completion authority.
+Evidence: commit `488377ad06f6d516faf57e902703208a2c0ddbcc`; tree `f0eb7874f2da904e56cd2b3daa58f506df7f71df`.
+
+<!-- cs:progress-cursor: 488377ad06f6d516faf57e902703208a2c0ddbcc -->

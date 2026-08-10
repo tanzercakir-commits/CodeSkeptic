@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = 3b1714e
-in_flight     = phase-realworld-weekend-factory
-verified_main = 3b1714e
-progress      = sha256:e4abb350fc0516a20cc450f8fd3dbfd9d84ebb647b60a399844ea9bbe49294ef
+base          = 488377a
+in_flight     = phase-realworld-release-candidate-factory
+verified_main = 488377a
+progress      = sha256:22651603fcce0fd1d3e8bd91bb7efb7a7ee2c1c600289e29ebf05bad841da345
 ```
 <!-- cs:state-end -->
 
@@ -833,6 +833,44 @@ runner exposed the Redis pre-hash assumption problem and it was corrected
 before implementation acceptance. Candidate contracts requiring later human
 review: none. No `cs: ai` proposal became accepted intent, and native
 owned-memory parity remains deferred to executable A7 fixtures.
+
+## Phase 8.3 — release-candidate real-repository capacity — QUALIFICATION IN PROGRESS (2026-08-10)
+
+The active branch is `phase-realworld-release-candidate-factory`. No Phase 8.3
+implementation boundary is locked yet: project commands, exact translation-unit
+identities, and hosted feasibility must be measured before implementation
+authority is opened. The intended tier remains exactly llama.cpp, shadPS4, and
+selected TensorFlow Lite production surfaces with three independent repetitions
+and a 4,320-minute aggregate capacity.
+
+The first qualified surface is llama.cpp at immutable commit
+`4dee52f82dc455a035e900fed6a40cb45cd7a454`. Its CMake/Ninja Release build uses
+clang-20, disables native CPU specialization and standalone tests, tools,
+examples, server, app, UI, and common utilities, then builds the production
+`llama` target with at most two jobs. The admitted roots are `src` and
+`ggml/src`, with `.c`, `.cc`, and `.cpp` sources and no fallback glob. The
+build completed, and the factory's own canonical derivation selected exactly
+200 translation units with SHA-256
+`e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783`.
+Finding, coverage, exit, and fingerprint expectations remain unclaimed.
+
+shadPS4 v0.17.0 is pinned to dereferenced tag commit
+`5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa`. Its 53 recursive, commit-pinned
+submodules were fetched successfully and match the superproject gitlinks. The
+upstream Linux recipe and dependency set were inspected, but configure/build
+and canonical TU identity are not yet qualified. The attempted local package
+setup did not install packages: it waited at a hidden `sudo` password prompt,
+and no package-manager mutation was claimed. A subsequent system-memory event
+required a host restart. TensorFlow Lite qualification has not started.
+
+Resource constraint for the remaining qualification: do not run shadPS4 or
+TensorFlow Lite heavy builds locally. Local work is limited to low-memory,
+sequential configure/identity probes; full builds, analyzer scans, repetitions,
+and determinism evidence belong on hosted runners. This checkpoint changes no
+factory code, accepted intent, quality floor, or existing nightly/weekend tier.
+Contract-first shadow dogfood is not applicable because no C++ function is
+created or materially changed: functions 0, proposals 0, eligible 0, rejected
+0, unsupported 0. No `cs: ai` proposal became accepted intent.
 
 ## Recovered product program — Phases 8–12
 
