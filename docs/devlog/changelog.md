@@ -1,5 +1,48 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.2 weekend factory implementation and local qualification
+
+The canonical factory now has separate, non-overlapping nightly and weekend
+tiers. Its weekend manifest pins systemd, curl, Redis, and LVGL to the exact
+commits, real build recipes, source identities, coverage, findings, verdicts,
+and fingerprint digests in the locked boundary. The validator admits Meson
+only as configure `setup` or build `compile -C` with strictly shaped options
+and targets. Bear is admitted only around native Make with the fixed compile-
+database output/source prefix, `-j{jobs}`, and simple variable assignments.
+Option-shaped Meson targets, alternative Bear/Make structures, shell control,
+and every other command remain rejected.
+
+The workflow selects the existing nightly tier from its daily cron and the
+weekend tier from one distinct weekly cron or explicit dispatch. Unknown tiers
+fail before matrix execution. Required Meson, Bear, gperf, capability, and
+mount development packages are installed without changing any ordinary PR
+gate or the existing per-shard time ceilings.
+
+RED first recorded four factory gaps across canonical membership, weekend
+window bounds, command shapes, and workflow orchestration. The implementation
+closes all four; 14/14 Python contract tests, the executable manifest ledger,
+bytecode compilation, YAML parsing, whitespace checks, and the full 1166/1166
+CTest suite pass. The first Redis runner probe also exposed the separately
+recorded preliminary digest assumption before implementation acceptance.
+
+One Linux analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`
+then produced twelve accepted receipts. Three independent repetitions agree
+for systemd at 390 requested / 815 analyzed and 0 findings, curl at 169/169
+and 59, Redis at 103/206 and 0, and LVGL at 311/311 and 16. Every shard has
+zero broken TUs and zero incomplete functions. The aggregate manifest SHA-256
+is `88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`;
+the checksummed aggregate receipt SHA-256 is
+`9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
+Hosted publication remains pending.
+
+No C++ function changed, so contract-first shadow dogfood is not applicable:
+functions considered 0, proposals 0, eligible 0, rejected 0, unsupported 0.
+No proposal exposed a problem; the independent runner exposed the pre-hash
+assumption. No candidate contract requires human review, no `cs: ai` proposal
+became accepted intent, and native owned-memory semantics remain deferred to
+executable A7 fixtures.
+
 ## 2026-08-10 — Phase 8.2 pre-implementation boundary correction
 
 The first official Redis runner probe reproduced the same sorted 103-file

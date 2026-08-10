@@ -784,6 +784,40 @@ counts and digests. The project pins, source lists, commands, file boundary,
 and all other authority remain unchanged. This is an exposed measurement-tool
 assumption problem, not accepted implementation drift.
 
+**Local implementation and three-repeat qualification complete; hosted
+publication pending.** The runner now admits only the locked Meson
+setup/compile and Bear/native-Make shapes, enforces the 36–48-hour weekend
+window, and leaves the existing CMake/nightly behavior unchanged. The Actions
+lane has separate daily-nightly and weekly-weekend selection, fails unknown
+tiers before matrix execution, and installs the measured build dependencies.
+The canonical manifest contains eight projects in two non-overlapping tiers.
+
+RED first produced four expected failures: absent weekend membership, missing
+weekend bounds, rejected Meson/Bear commands, and missing workflow selection
+and dependencies. The 14/14 hardened factory tests now pass, as do manifest
+ledger validation, Python bytecode compilation, workflow YAML parsing, and
+whitespace checks. The complete local CTest suite is 1166/1166. A strict
+target-token follow-up also rejects option-shaped Meson compile targets.
+
+One current Linux analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`
+produced twelve independently built accepted shard receipts. All three
+repetitions agree exactly for systemd (390 requested / 815 analyzed, 0
+findings, exit 0), curl (169/169, 59, exit 1), Redis (103/206, 0, exit 0), and
+LVGL (311/311, 16, exit 1). Every project has zero broken TUs and zero
+incomplete functions. The aggregate manifest SHA-256 is
+`88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`;
+the checksummed aggregate receipt SHA-256 is
+`9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
+
+Shadow completion considered no C++ function because the final file set has
+no C++: functions 0, proposals 0, eligible 0, rejected 0, unsupported 0. No
+proposal exposed a problem because none was applicable; the independent
+runner exposed the Redis pre-hash assumption problem and it was corrected
+before implementation acceptance. Candidate contracts requiring later human
+review: none. No `cs: ai` proposal became accepted intent, and native
+owned-memory parity remains deferred to executable A7 fixtures.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

@@ -225,6 +225,32 @@ value drifting. Historical measurements are not silently promoted into the
 current-engine authority. Publication CI reproduced the same manifest
 semantics with one campaign-wide analyzer digest before merge.
 
+### Phase 8.2 weekend capacity
+
+The weekend tier was locally qualified on 2026-08-10 with one Linux analyzer
+SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
+All twelve independently built receipts were accepted by the aggregate
+referee. Its manifest SHA-256 is
+`88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`
+and its checksummed receipt SHA-256 is
+`9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
+Hosted publication is still required before protected-main delivery.
+
+| Project | Requested / analyzed executions | Findings / exit | Fingerprint SHA-256 |
+|---|---:|---:|---|
+| systemd v256.17 | 390 / 815 | 0 / 0 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| curl 8.11.0 | 169 / 169 | 59 / 1 | `195b80888b1e4e788c67f4e6024f31e667767e50d66d3fc3d483e619b424f094` |
+| Redis 7.4.2 | 103 / 206 | 0 / 0 | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| LVGL 9.2.2 | 311 / 311 | 16 / 1 | `687bfeaa19046230afd60e116bb0d2fe73361d8b931161e33029bd79988ae808` |
+
+The requested identity is the unique sorted source list. Analyzed executions
+can be larger when a real compile database supplies more than one admitted
+command for a selected source; the manifest pins both facts rather than
+assuming a one-to-one relationship. Every weekend receipt has zero broken TUs
+and zero incomplete functions, and all three repetitions have identical
+semantic digests per project.
+
 Exit 1 is material evidence here: under the fail-closed contract it means a
 complete verdict with findings, whereas any broken requested TU or unavailable
 analysis would be exit 2. Historical table numbers remain historical and are
