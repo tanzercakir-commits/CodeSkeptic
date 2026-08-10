@@ -67,15 +67,16 @@ finding by its dataflow trace. `docs/evaluate.md` turns that into a
 one-hour protocol for *your* codebase — which is the measurement that
 should actually convince you.
 
-The CI replay is `.github/workflows/realworld.yml`, scheduled nightly and also
-available through `workflow_dispatch` with the pinned `nightly` tier. It builds
-CodeSkeptic once, then runs independent libgit2, rtp2httpd, Abseil, and
-libarchive project-by-repetition shards. Each project is checked out at an
-immutable commit, configured through its real build system, and analyzed from
-an exact source list derived from `compile_commands.json` plus only explicitly
-admitted fallback files. Exit 2, timeout, broken/incomplete/skipped coverage,
-TU drift, receipt tampering, a missing repetition, or semantic disagreement is
-a failure.
+The CI replay is `.github/workflows/realworld.yml`. Its daily cron selects the
+pinned `nightly` tier, its distinct weekly cron selects `weekend`, and either
+tier is available through `workflow_dispatch`. Nightly builds independent
+libgit2, rtp2httpd, Abseil, and libarchive shards; weekend builds systemd,
+curl, Redis, and LVGL shards. CodeSkeptic is built once for the campaign. Each
+project is checked out at an immutable commit, configured through its real
+build system, and analyzed from an exact source list derived from
+`compile_commands.json` plus only explicitly admitted fallback files. Exit 2,
+timeout, broken/incomplete/skipped coverage, TU drift, receipt tampering, a
+missing repetition, or semantic disagreement is a failure.
 
 `attempted_tus` is the exact requested source-list size. `analyzed_tus` is the
 analyzer execution count and can be larger only when an admitted mode such as
@@ -91,6 +92,7 @@ and inspect the deterministic matrix without cloning any project:
 ```bash
 python3 scripts/check_realworld_ledger.py
 python3 scripts/run_realworld_campaign.py plan --tier nightly
+python3 scripts/run_realworld_campaign.py plan --tier weekend
 ```
 
 One shard can be reproduced with the same built Linux analyzer:
@@ -111,6 +113,13 @@ python3 scripts/run_realworld_campaign.py aggregate \
   --tier nightly --receipts receipts \
   --output aggregate/receipt.json
 ```
+
+Use `--tier weekend` with the same aggregate command after the twelve weekend
+receipts exist. Phase 8.2 local qualification accepted all twelve with manifest
+SHA-256
+`88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`
+and aggregate receipt SHA-256
+`9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
 
 Receipts and their `.sha256` sidecars are uploaded per shard even when the
 verdict is unavailable; the aggregate receipt is a distinct artifact. Current

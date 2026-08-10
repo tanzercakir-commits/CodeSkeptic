@@ -1,5 +1,109 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.2 weekend factory implementation and local qualification
+
+The canonical factory now has separate, non-overlapping nightly and weekend
+tiers. Its weekend manifest pins systemd, curl, Redis, and LVGL to the exact
+commits, real build recipes, source identities, coverage, findings, verdicts,
+and fingerprint digests in the locked boundary. The validator admits Meson
+only as configure `setup` or build `compile -C` with strictly shaped options
+and targets. Bear is admitted only around native Make with the fixed compile-
+database output/source prefix, `-j{jobs}`, and simple variable assignments.
+Option-shaped Meson targets, alternative Bear/Make structures, shell control,
+and every other command remain rejected.
+
+The workflow selects the existing nightly tier from its daily cron and the
+weekend tier from one distinct weekly cron or explicit dispatch. Unknown tiers
+fail before matrix execution. Required Meson, Bear, gperf, capability, and
+mount development packages are installed without changing any ordinary PR
+gate or the existing per-shard time ceilings.
+
+RED first recorded four factory gaps across canonical membership, weekend
+window bounds, command shapes, and workflow orchestration. The implementation
+closes all four; 14/14 Python contract tests, the executable manifest ledger,
+bytecode compilation, YAML parsing, whitespace checks, and the full 1166/1166
+CTest suite pass. The first Redis runner probe also exposed the separately
+recorded preliminary digest assumption before implementation acceptance.
+
+One Linux analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`
+then produced twelve accepted receipts. Three independent repetitions agree
+for systemd at 390 requested / 815 analyzed and 0 findings, curl at 169/169
+and 59, Redis at 103/206 and 0, and LVGL at 311/311 and 16. Every shard has
+zero broken TUs and zero incomplete functions. The aggregate manifest SHA-256
+is `88e7dbe8d46b88bd95e88b83106096953e90fed425b39a68d68225a78279a255`;
+the checksummed aggregate receipt SHA-256 is
+`9bbc429187d5059d0f292677420ff79c7d2755bc001deb5e80addb109f68e498`.
+Hosted publication remains pending.
+
+No C++ function changed, so contract-first shadow dogfood is not applicable:
+functions considered 0, proposals 0, eligible 0, rejected 0, unsupported 0.
+No proposal exposed a problem; the independent runner exposed the pre-hash
+assumption. No candidate contract requires human review, no `cs: ai` proposal
+became accepted intent, and native owned-memory semantics remain deferred to
+executable A7 fixtures.
+
+## 2026-08-10 — Phase 8.2 pre-implementation boundary correction
+
+The first official Redis runner probe reproduced the same sorted 103-file
+surface but rejected the preliminary digest. Direct comparison proved the
+file lists identical; the preliminary PowerShell normalizer/hash calculation
+was the incorrect authority. The runner's canonical
+`translation_unit_digest` is
+`289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844`.
+It supersedes only the Redis SHA literal in the boundary below. Implementation
+changes were uncommitted and acceptance was paused before this correction;
+the project pin, recipe, source roots, 103-file count, file set, and every
+other boundary remain unchanged. Official curl, LVGL, and systemd probes
+reproduced their locked TU identities.
+
+## 2026-08-10 — Phase 8.2 weekend factory boundary
+
+Protected main contains Phase 8.1 through PR #136 at
+`3b1714e1e9e3997ab63507837c3a177c1bdefab1`, tree
+`0293f291d2a4a7876eaa734e6b23dd0a82779377`. The branch-opening status sync
+mechanically appended that merge to PROGRESS and regenerated TODO's state
+block before new implementation work.
+
+The separately locked weekend tier consists of systemd v256.17 at
+`009adf6c0e435376c80fbc11675d581e0a94d350`, curl 8.11.0 at
+`b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a`, Redis 7.4.2 at
+`a0a6f23d997b024689ba157916837f493a593a34`, and LVGL 9.2.2 at
+`7f07a129e8d77f4984fff8e623fd5be18ff42e74`. Exact minimal-build source
+identities measured before implementation are systemd 390
+(`5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c`),
+curl 169
+(`213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01`),
+Redis 103
+(`3b01da3958fa65529f859ca097ef6e471a8ec45f9976c31d833311559588aa1b`),
+and LVGL 311
+(`30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50`).
+Historical measurements from other revisions or build configurations are not
+interchangeable with these identities.
+
+The implementation may add only strict Meson setup/compile and Bear-wrapped
+native-Make command shapes to the existing token-array runner. It will add an
+exact 2,880-minute, three-repeat weekend manifest tier and a distinct weekly
+Actions selection while preserving the nightly tier and every existing
+fail-closed receipt rule. Finding and fingerprint expectations must be
+measured with the current analyzer and repeated three times; they are not
+inferred from historical documentation.
+
+The exact file set is `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`tests/RealworldCampaignTest.py`, `docs/benchmarks.md`, `docs/reproduce.md`,
+`docs/TODO.md`, `docs/PROGRESS.md`, and this changelog. No C++, grammar,
+accepted intent, capability, profile, schema, release, quality-floor, nightly
+project, or ordinary PR gate change is admitted. RED-first tests are the
+implementation referee and this pre-implementation boundary will not change.
+
+Contract-first shadow dogfood is not applicable because no C++ function is
+created or materially changed. Functions considered 0; proposals 0; eligible
+0; rejected 0; unsupported 0. No proposal exposed a problem, no candidate
+contract requires human review, and no `cs: ai` proposal can become accepted
+intent. Native owned-memory semantics remain deferred to executable A7
+fixtures.
+
 ## 2026-08-10 — Phase 8.1 factory implementation and local qualification
 
 The nightly factory now has one structured authority for four immutable

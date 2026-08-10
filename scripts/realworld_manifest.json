@@ -10,6 +10,16 @@
         "abseil",
         "libarchive"
       ]
+    },
+    "weekend": {
+      "window_minutes": 2880,
+      "repetitions": 3,
+      "projects": [
+        "systemd",
+        "curl",
+        "redis",
+        "lvgl"
+      ]
     }
   },
   "projects": [
@@ -273,6 +283,291 @@
         "findings": 38,
         "exit_code": 1,
         "fingerprint_sha256": "5db1b06b24804f3d7864131525ebdc2be500778f33e8c0021866cc4632bcf10a"
+      }
+    },
+    {
+      "id": "systemd",
+      "label": "v256.17",
+      "repository": "https://github.com/systemd/systemd.git",
+      "revision": "009adf6c0e435376c80fbc11675d581e0a94d350",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "meson",
+            "setup",
+            "{build}",
+            "{source}",
+            "--buildtype=release",
+            "-Dmode=release",
+            "-Dtests=false",
+            "-Dslow-tests=false",
+            "-Dinstall-tests=false",
+            "-Dfirstboot=false",
+            "-Dman=disabled",
+            "-Dhtml=disabled",
+            "-Dtranslations=false",
+            "-Dsysupdate=disabled",
+            "-Defi=false",
+            "-Dbootloader=disabled",
+            "-Dukify=disabled",
+            "-Dkernel-install=false",
+            "-Dbpf-framework=disabled",
+            "-Dseccomp=disabled",
+            "-Dselinux=disabled",
+            "-Dapparmor=disabled",
+            "-Dpolkit=disabled",
+            "-Daudit=disabled",
+            "-Dpam=disabled",
+            "-Dmicrohttpd=disabled",
+            "-Dlibcryptsetup=disabled",
+            "-Dlibcurl=disabled",
+            "-Dlibidn2=disabled",
+            "-Dqrencode=disabled",
+            "-Dopenssl=disabled",
+            "-Dp11kit=disabled",
+            "-Dtpm2=disabled",
+            "-Dxz=disabled",
+            "-Dlz4=disabled",
+            "-Dzstd=disabled"
+          ]
+        ],
+        "build": [
+          [
+            "meson",
+            "compile",
+            "-C",
+            "{build}",
+            "systemd:executable"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src/basic",
+          "src/core",
+          "src/shared"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src/basic,{source}/src/core,{source}/src/shared"
+      ],
+      "expected": {
+        "translation_units": 390,
+        "translation_unit_sha256": "5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c",
+        "attempted_tus": 390,
+        "analyzed_tus": 815,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 0,
+        "exit_code": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "curl",
+      "label": "8.11.0",
+      "repository": "https://github.com/curl/curl.git",
+      "revision": "b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a",
+      "timeout_minutes": 180,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DBUILD_CURL_EXE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DBUILD_TESTING=OFF",
+            "-DHTTP_ONLY=ON",
+            "-DCURL_USE_OPENSSL=OFF",
+            "-DCURL_USE_LIBPSL=OFF",
+            "-DCURL_USE_LIBSSH2=OFF",
+            "-DCURL_ZLIB=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "lib"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "Curl_cmalloc,Curl_ccalloc,Curl_crealloc,Curl_cstrdup,curl_malloc,curl_calloc",
+        "--free-functions",
+        "Curl_cfree,curl_free",
+        "--report-paths",
+        "{source}/lib"
+      ],
+      "expected": {
+        "translation_units": 169,
+        "translation_unit_sha256": "213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01",
+        "attempted_tus": 169,
+        "analyzed_tus": 169,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 59,
+        "exit_code": 1,
+        "fingerprint_sha256": "195b80888b1e4e788c67f4e6024f31e667767e50d66d3fc3d483e619b424f094"
+      }
+    },
+    {
+      "id": "redis",
+      "label": "7.4.2",
+      "repository": "https://github.com/redis/redis.git",
+      "revision": "a0a6f23d997b024689ba157916837f493a593a34",
+      "timeout_minutes": 240,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-E",
+            "make_directory",
+            "{build}"
+          ]
+        ],
+        "build": [
+          [
+            "bear",
+            "--output",
+            "{build}/compile_commands.json",
+            "--",
+            "make",
+            "-C",
+            "{source}",
+            "-j{jobs}",
+            "CC=clang-20",
+            "MALLOC=libc",
+            "BUILD_TLS=no",
+            "USE_SYSTEMD=no"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "zmalloc,zcalloc,zrealloc,ztrymalloc,zstrdup",
+        "--free-functions",
+        "zfree",
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 103,
+        "translation_unit_sha256": "289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844",
+        "attempted_tus": 103,
+        "analyzed_tus": 206,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 0,
+        "exit_code": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "lvgl",
+      "label": "v9.2.2",
+      "repository": "https://github.com/lvgl/lvgl.git",
+      "revision": "7f07a129e8d77f4984fff8e623fd5be18ff42e74",
+      "timeout_minutes": 240,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DLV_CONF_SKIP=ON",
+            "-DLV_CONF_BUILD_DISABLE_EXAMPLES=ON",
+            "-DLV_CONF_BUILD_DISABLE_DEMOS=ON"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 311,
+        "translation_unit_sha256": "30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50",
+        "attempted_tus": 311,
+        "analyzed_tus": 311,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 16,
+        "exit_code": 1,
+        "fingerprint_sha256": "687bfeaa19046230afd60e116bb0d2fe73361d8b931161e33029bd79988ae808"
       }
     }
   ]
