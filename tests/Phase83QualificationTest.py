@@ -45,6 +45,12 @@ class CandidateContractTest(unittest.TestCase):
             "a481b10260dfdf833a1b16007eead49c1d7febf3",
         )
         self.assertEqual(projects["shadps4"]["checkout"]["submodules"], "recursive")
+        self.assertFalse(
+            any(
+                "-stdlib=libc++" in token
+                for token in projects["shadps4"]["commands"]["configure"][0]
+            )
+        )
         self.assertEqual(projects["tensorflow-lite"]["sources"]["roots"], ["tensorflow/lite"])
         self.assertIn(
             "-DTENSORFLOW_SOURCE_DIR={source}",
