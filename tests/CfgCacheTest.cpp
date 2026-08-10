@@ -37,7 +37,11 @@ public:
         clang::CFG* ordinary = CfgCache::instance().get(visitor.target, ctx);
         clang::CFG* withDtors =
             CfgCache::instance().get(visitor.target, ctx, true);
+        clang::CFG* withExceptionalDtors =
+            CfgCache::instance().get(visitor.target, ctx, true, true);
         separateKeys = ordinary && withDtors && ordinary != withDtors;
+        separateExceptionalKey = withDtors && withExceptionalDtors &&
+                                 withDtors != withExceptionalDtors;
         if (!withDtors) return;
         for (const clang::CFGBlock* block : *withDtors) {
             if (!block) continue;
@@ -48,6 +52,7 @@ public:
     }
 
     bool separateKeys = false;
+    bool separateExceptionalKey = false;
     bool sawAutomaticDtor = false;
 };
 
@@ -97,4 +102,17 @@ TEST(CfgCacheTest, ImplicitDestructorCfgUsesSeparateCacheKey) {
     EXPECT_TRUE(results.empty());
     EXPECT_TRUE(rule.separateKeys);
     EXPECT_TRUE(rule.sawAutomaticDtor);
+}
+
+TEST(CfgCacheTest, ExceptionalDestructorCfgUsesSeparateCacheKey) {
+    ImplicitDtorProbeRule rule;
+    auto results = runRule(rule, R"(
+        struct Owner { ~Owner(); };
+        void f() {
+            try { Owner owner; throw 1; }
+            catch (...) {}
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+    EXPECT_TRUE(rule.separateExceptionalKey);
 }

@@ -3010,6 +3010,200 @@ TEST(MemoryLeakRuleExTest, ImmutableTrueFlagLeak_StillReports) {
     EXPECT_EQ(results[0].rule_id, "memory-leak");
 }
 
+// --- Phase 7.5: exceptional cleanup and transfer boundaries ---
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedUniqueCleanupStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, OwnerOutsideTrySurvivesHandledThrow) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::unique_ptr<S> owner(raw);
+            try { throw 1; }
+            catch (...) { return raw->x; }
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, ReleaseBeforeThrowLeavesLiveLeak) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                owner.release();
+                throw 1;
+            } catch (...) {}
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedDestructorCannotProveDoubleFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        void f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                delete raw;
+                throw 1;
+            } catch (...) {}
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     SharedExceptionalCleanupKeepsOuterOwnerAlive) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            std::shared_ptr<S> outer(raw);
+            try {
+                std::shared_ptr<S> inner(outer);
+                throw 1;
+            } catch (...) { return raw->x; }
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     DisconnectedSharedCleanupStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            try {
+                std::shared_ptr<S> owner(raw);
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test, CustomDeleterStaysConservative) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        namespace std {
+          template <class T, class D> class unique_ptr {
+           public:
+            unique_ptr(T*, D);
+            ~unique_ptr();
+          };
+        }
+        struct S { int x; };
+        struct Deleter { void operator()(S*) const; };
+        int f() {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S, Deleter> owner(raw, Deleter{});
+                throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     RawAllocationWithoutOwnerStillLeaksAfterHandledThrow) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        void f() {
+            int* raw = new int(7);
+            try { throw 1; }
+            catch (...) {}
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     UnreachableThrowPreservesNormalDestructorEvidence) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f() {
+            S* raw = new S;
+            {
+                std::unique_ptr<S> owner(raw);
+                if (false) throw 1;
+            }
+            return raw->x;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ExceptionalOwnerLifetimeV2Test,
+     ConditionalDisconnectedCleanupCannotManufactureUAF) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, kStdSmartPtrLifetimes + R"(
+        int f(bool fail) {
+            S* raw = new S;
+            try {
+                std::unique_ptr<S> owner(raw);
+                if (fail) throw 1;
+            } catch (...) {}
+            return raw->x;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
+TEST(ExceptionalTransferBoundaryTest, LocalMemberStoreKeepsLeakVisible) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Box { int* value; };
+        void f() {
+            int* raw = new int(7);
+            Box local{};
+            local.value = raw;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "memory-leak");
+}
+
+TEST(ExceptionalTransferBoundaryTest, GlobalMemberStoreEscapes) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRule(rule, R"(
+        struct Box { int* value; };
+        Box saved{};
+        int f() {
+            int* raw = new int(7);
+            saved.value = raw;
+            return *raw;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
 TEST(MemoryLeakRuleExTest, MutatedFlag_NotConstantFolded) {
     // The flag is written elsewhere in the TU — folding it would hide
     // a REAL leak. Mutation disqualifies; the leak must be reported.

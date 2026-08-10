@@ -14,7 +14,8 @@ namespace codeskeptic {
 
 // Per-function/options CFG cache: each requested graph is built once within
 // the TU. Statement-only consumers share the original graph; analyses that
-// explicitly request implicit destructors use a separate entry.
+// explicitly request implicit destructors or exception-handling edges use a
+// separate entry for each exact option pair.
 //
 // Build options (setAllAlwaysAdd) now live ONLY here — consumers must
 // see the same granularity (two-phase reporting and the top-node
@@ -36,7 +37,8 @@ public:
     // cannot be built. The returned pointer is valid until the next clear().
     clang::CFG* get(const clang::FunctionDecl* func,
                     clang::ASTContext& ctx,
-                    bool addImplicitDtors = false);
+                    bool addImplicitDtors = false,
+                    bool addEHEdges = false);
 
     void clear();
 
@@ -56,7 +58,8 @@ public:
 private:
     using FunctionCache =
         std::map<const clang::FunctionDecl*, std::unique_ptr<clang::CFG>>;
-    std::map<bool, FunctionCache> cache_;
+    using OptionsKey = std::pair<bool, bool>;
+    std::map<OptionsKey, FunctionCache> cache_;
     const clang::ASTContext* ctx_ = nullptr;
 };
 

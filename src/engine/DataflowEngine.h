@@ -70,6 +70,16 @@ struct HasOnCFGElement<A, std::void_t<decltype(
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
 template <typename A, typename = void>
+struct FollowsExceptionalControlFlow : std::false_type {};
+
+// Explicit opt-in: EH edges change the graph seen by an analysis. They do not
+// by themselves make a disconnected Clang cleanup element authoritative.
+template <typename A>
+struct FollowsExceptionalControlFlow<A, std::void_t<decltype(
+    A::kFollowExceptionalControlFlow)>>
+    : std::bool_constant<A::kFollowExceptionalControlFlow> {};
+
+template <typename A, typename = void>
 struct HasLatticeHeight : std::false_type {};
 
 template <typename A>
@@ -211,8 +221,11 @@ DataflowResult<Analysis> runDataflow(
     constexpr bool wantsImplicitDtors =
         detail::HasTransferElement<Analysis>::value ||
         detail::HasOnCFGElement<Analysis>::value;
+    constexpr bool wantsEHEdges =
+        detail::FollowsExceptionalControlFlow<Analysis>::value;
     clang::CFG* cfg =
-        CfgCache::instance().get(func, ctx, wantsImplicitDtors);
+        CfgCache::instance().get(func, ctx, wantsImplicitDtors,
+                                 wantsEHEdges);
     if (!cfg) {
         // A dependent function-template pattern has no concrete control
         // flow yet, and Clang's CFG builder rejects many such bodies

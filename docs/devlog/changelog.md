@@ -1,5 +1,51 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7.5 conservative exceptional ownership
+
+Phase 7 now has an explicit, measured exceptional-ownership boundary. CFG
+cache keys include implicit-destructor and EH-edge options, and the shared
+dataflow engine exposes a compile-time analysis opt-in while leaving all
+default consumers unchanged. Clang 20 may emit an automatic-owner destructor
+block for a throw without connecting that block to the throw-to-handler path.
+CodeSkeptic therefore refuses to treat the orphan element as release evidence.
+
+An explicit `throw` degrades only allocations with a live exact standard
+smart owner to escape/unknown. This prevents a disconnected cleanup block from
+manufacturing a leak, UAF, or double-free. Raw allocations with no owner and
+allocations deliberately left live by `release()` remain leak-reportable;
+unreachable throws preserve normal destructor evidence. Summary and member
+boundaries remain unchanged and are now pinned: compatible cross-TU
+`Consumed` summaries can still prove UAF, `Transferred` cannot invent release,
+local member storage keeps a real leak visible, and global member storage
+escapes. No member, heap, or whole-project pointer identity was invented.
+
+The first compile RED proved that the cache lacked an EH option key. After
+plumbing, 7 of 12 semantic fixtures passed and 5 failed. CFG inspection then
+showed that the destructor block had no predecessor; the proposed exceptional
+release expectation was therefore ineligible under the locked contract. The
+conservative throw transition closed all five without granting false
+authority. Two precision fixtures pinned unreachable and conditional throws.
+The final Phase 7.5 matrix is 16/16, and direct and CTest suites pass 1164/1164.
+
+Interface gates remain schema 2 / rules 14 / supported 7 / out-of-scope 5 and
+ActionArgs 5/5. Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings;
+self-scan is clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings
+(76 enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9
+findings (3/3). The full unchanged 400-file/CWE Juliet replay passes every
+floor: CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416
+212/0, CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
+`221d96bca0ed2c1f3e744af5685c38694f8f56791b430fdb070a8e1fa8ce5a39`.
+
+Contract-first shadow completion considered `CfgCache::get`, `runDataflow`,
+the exceptional-CFG opt-in trait, `classifyStmtEffects`,
+`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
+`analyzeFunction`: proposals 0, eligible 0, rejected 0, unsupported 7. No
+proposal was eligible. Independent RED and CFG inspection exposed the API gap
+and the disconnected-cleanup assumption problem. Candidate contracts requiring
+later human review: none. No `cs: ai` proposal became accepted intent, and
+native memory-verification parity remains deferred to executable A7 fixtures.
+The locked eleven-file boundary was preserved.
+
 ## 2026-08-10 — Phase 7.5 exceptional cleanup and transfer boundary
 
 Phase 7.4 is sealed in commit `21277325e73b513d3da4d949fcd093ce23082078`

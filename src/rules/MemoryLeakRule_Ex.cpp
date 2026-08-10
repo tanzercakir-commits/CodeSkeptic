@@ -1507,6 +1507,25 @@ void escapeOwner(const VarDecl* owner, VarState& state) {
     }
 }
 
+// Clang 20 can emit an automatic-dtor element for an unwound owner without
+// connecting that block to the throw-to-handler edge. Treating that orphan as
+// a release would manufacture UAF/double-free evidence; retaining Allocated
+// would manufacture a leak. Drop only allocations with an exact live smart
+// owner. Ownerless and explicitly released allocations stay leak-reportable.
+void escapeOwnersAtUnmodelledThrow(VarState& state) {
+    std::vector<const VarDecl*> roots;
+    for (const auto& [raw, lifetime] : state)
+        if (lifetime.smartOwnersKnown && !lifetime.smartOwners.empty())
+            roots.push_back(raw);
+    for (const VarDecl* raw : roots) {
+        invalidateReallocRelations(state, raw);
+        LifetimeState& lifetime = state[raw];
+        lifetime.allocation = AllocState::Escaped;
+        lifetime.smartOwners.clear();
+        lifetime.smartOwnersKnown = false;
+    }
+}
+
 void releaseOwner(const VarDecl* owner, bool freesLast,
                   VarState& state) {
     for (const VarDecl* raw : rootsOwnedBy(owner, state)) {
@@ -1846,6 +1865,9 @@ public:
         for (const VarDecl* owner : ownerEscapesAt(stmt))
             for (auto& disjunct : in)
                 escapeOwner(owner, disjunct.vars);
+        if (isa<CXXThrowExpr>(stmt))
+            for (auto& disjunct : in)
+                escapeOwnersAtUnmodelledThrow(disjunct.vars);
 
         // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);

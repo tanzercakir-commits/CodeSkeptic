@@ -126,6 +126,7 @@ Interval divisorInterval(const std::string& code) {
 
 struct DestructorElementAnalysis {
     using State = bool;
+    static constexpr bool kFollowExceptionalControlFlow = true;
     State initialState() const { return false; }
     State merge(State left, State right) const { return left || right; }
     State transfer(const Stmt*, State state, ASTContext&) const {
@@ -161,10 +162,9 @@ public:
         auto dataflow = codeskeptic::runDataflow(visitor.fn, ctx, analysis);
         out_.found = true;
         out_.converged = dataflow.converged;
-        for (const auto& [block, state] : dataflow.blockExitStates) {
-            (void)block;
-            out_.reachedExit = out_.reachedExit || state;
-        }
+        auto exit = dataflow.blockExitStates.find(dataflow.exitBlockID);
+        out_.reachedExit = exit != dataflow.blockExitStates.end() &&
+                           exit->second;
     }
 private:
     DestructorResult& out_;
@@ -192,6 +192,24 @@ TEST(DataflowEngineTest, OptionalElementHookReceivesAutomaticDestructor) {
     EXPECT_TRUE(out.found);
     EXPECT_TRUE(out.converged);
     EXPECT_TRUE(out.reachedExit);
+}
+
+TEST(DataflowEngineTest, ExceptionalOptInDoesNotInventDisconnectedCleanup) {
+    DestructorResult out;
+    clang::tooling::runToolOnCode(
+        std::make_unique<DestructorAction>(out), R"(
+            struct Owner { ~Owner(); };
+            void f() {
+                try { Owner owner; throw 1; }
+                catch (...) {}
+            }
+        )", "exceptional_destructor_element_test.cpp");
+    EXPECT_TRUE(out.found);
+    EXPECT_TRUE(out.converged);
+    // Clang 20 emits the automatic-dtor block, but it is disconnected from
+    // the throw-to-handler edge. The engine must not treat an unreachable
+    // cleanup element as evidence on the handler/exit path.
+    EXPECT_FALSE(out.reachedExit);
 }
 
 TEST(IntervalAnalysisTest, ConstantAssignment) {

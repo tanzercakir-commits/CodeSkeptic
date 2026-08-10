@@ -443,6 +443,51 @@ independently measurable RED-to-GREEN slices:
    the referee; this pre-implementation contract record will not change during
    the slice.
 
+   **Completed 2026-08-10.** CFG cache entries now include both the implicit-
+   destructor and EH-edge options, and analyses may explicitly opt into the EH
+   graph without changing any default consumer. The compile RED established
+   the missing four-argument cache API. After option plumbing, the initial 12
+   semantic fixtures had 7 passes and 5 failures: exceptional unique/shared
+   paths produced leaks instead of authoritative cleanup, manual delete plus
+   throw failed to produce the proposed double-free, an outer shared owner was
+   polluted by the missing inner cleanup, and the engine could not carry a
+   destructor state to the handler exit.
+
+   Direct CFG inspection corrected the assumption behind those expectations.
+   Clang 20 emitted the automatic-destructor block, but that block had no
+   predecessor and was disconnected from the throw-to-handler path. The
+   locked contract admits cleanup only when Clang emits it on the exceptional
+   path, so no release/UAF/double-free authority was added. Instead, an
+   explicit `throw` now degrades only allocations with a live exact smart
+   owner to escape/unknown. Ownerless allocations and allocations left live
+   by `release()` remain leak-reportable. Unreachable throws retain normal
+   destructor evidence, and conditional disconnected cleanup cannot
+   manufacture an all-path UAF claim.
+
+   Existing transfer semantics are pinned: a cross-TU `Consumed` summary
+   still proves UAF for a compatible legacy allocation, `Transferred` cannot
+   invent release, a direct local member store keeps a real leak visible, and
+   a global member store escapes. The final Phase 7.5 matrix is 16/16. Direct
+   and CTest suites pass 1164/1164; `CapabilitiesCliTest.py` remains schema 2 /
+   rules 14 / supported 7 / out-of-scope 5, and `ActionArgsTest.py` is 5/5.
+   Frozen thesis is `clean_fp=0`, `bug_caught=9/15`, 11 findings; self-scan is
+   clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings (76
+   enumerated, 35 analyzed, 41 accepted broken fixtures) and tinyxml2 9 (3/3).
+   The unchanged 400-file/CWE Juliet floors pass: CWE476 140/0, CWE401 105/15
+   (precision 0.875), CWE415 119/0, CWE416 212/0, CWE369 43/0, and CWE190
+   23/0. The tested Windows product SHA-256 is
+   `221d96bca0ed2c1f3e744af5685c38694f8f56791b430fdb070a8e1fa8ce5a39`.
+
+   Contract-first shadow completion considered the same seven functions:
+   proposals 0, eligible 0, rejected 0, unsupported 7. No proposal was
+   eligible, so none exposed an implementation problem. Independent compile
+   RED, semantic RED, CFG inspection, and precision fixtures exposed and
+   closed the cache gap and the disconnected-cleanup assumption problem.
+   Candidate contracts requiring later human review: none. No `cs: ai`
+   proposal became accepted intent. Member/heap/whole-project pointer identity
+   and native memory-verification parity remain deferred to executable A7
+   fixtures.
+
 Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 `memory-leak` precision remains at least 0.85 (target 0.90), supported UAF and
 double-free precision floors remain at least 0.95, clean corpora stay clean,

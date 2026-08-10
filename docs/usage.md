@@ -171,6 +171,14 @@ cannot manufacture a release. `--owning-pointers` wrappers retain their
 adoption-only escape behavior; the option does not grant native lifecycle
 proof to arbitrary project methods.
 
+Explicit `throw` paths are conservative. Clang 20 may emit an automatic-owner
+destructor block without connecting it to the throw-to-handler edge, so the
+analyzer drops a live exact smart-owner relation instead of inventing cleanup,
+UAF, double-free, or a leak. A raw allocation with no owner, or one left live
+by `release()`, remains leak-reportable. Exception objects, temporary or
+constructor-failure cleanup, rethrow/catch ownership, coroutine cleanup, and
+interprocedural exception propagation are not modeled as release authority.
+
 ## Suppressing findings
 
 Individual findings can be suppressed with source comments:

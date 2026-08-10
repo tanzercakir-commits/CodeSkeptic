@@ -18,7 +18,8 @@ CfgCache& CfgCache::instance() {
 
 clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
                           clang::ASTContext& ctx,
-                          bool addImplicitDtors) {
+                          bool addImplicitDtors,
+                          bool addEHEdges) {
     if (!func || !func->hasBody()) return nullptr;
 
     // Backup safety: if another TU's context arrives, the old keys
@@ -29,7 +30,7 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
     }
 
     const clang::FunctionDecl* key = func->getCanonicalDecl();
-    FunctionCache& selected = cache_[addImplicitDtors];
+    FunctionCache& selected = cache_[{addImplicitDtors, addEHEdges}];
     auto it = selected.find(key);
     if (it != selected.end()) {
         ++g_hits;
@@ -43,6 +44,7 @@ clang::CFG* CfgCache::get(const clang::FunctionDecl* func,
     // top node; no nested search inside a statement is needed.
     opts.setAllAlwaysAdd();
     opts.AddImplicitDtors = addImplicitDtors;
+    opts.AddEHEdges = addEHEdges;
     auto cfg = clang::CFG::buildCFG(func, func->getBody(), &ctx, opts);
     clang::CFG* raw = cfg.get();
     selected[key] = std::move(cfg);  // if the build failed, the nullptr
