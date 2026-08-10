@@ -49,6 +49,37 @@ struct HasOnStatement<A, std::void_t<decltype(
         std::declval<clang::ASTContext&>()))>> : std::true_type {};
 
 template <typename A, typename = void>
+struct HasTransferElement : std::false_type {};
+
+template <typename A>
+struct HasTransferElement<A, std::void_t<decltype(
+    std::declval<A>().transferElement(
+        std::declval<const clang::CFGElement&>(),
+        std::declval<const typename A::State&>(),
+        std::declval<clang::ASTContext&>()))>> : std::true_type {};
+
+template <typename A, typename = void>
+struct HasOnCFGElement : std::false_type {};
+
+template <typename A>
+struct HasOnCFGElement<A, std::void_t<decltype(
+    std::declval<A>().onCFGElement(
+        std::declval<const clang::CFGElement&>(),
+        std::declval<const typename A::State&>(),
+        std::declval<const typename A::State&>(),
+        std::declval<clang::ASTContext&>()))>> : std::true_type {};
+
+template <typename A, typename = void>
+struct FollowsExceptionalControlFlow : std::false_type {};
+
+// Explicit opt-in: EH edges change the graph seen by an analysis. They do not
+// by themselves make a disconnected Clang cleanup element authoritative.
+template <typename A>
+struct FollowsExceptionalControlFlow<A, std::void_t<decltype(
+    A::kFollowExceptionalControlFlow)>>
+    : std::bool_constant<A::kFollowExceptionalControlFlow> {};
+
+template <typename A, typename = void>
 struct HasLatticeHeight : std::false_type {};
 
 template <typename A>
@@ -187,7 +218,14 @@ DataflowResult<Analysis> runDataflow(
 
     // CFG comes from the shared cache (built once per function; build
     // options — including setAllAlwaysAdd — live in CfgCache)
-    clang::CFG* cfg = CfgCache::instance().get(func, ctx);
+    constexpr bool wantsImplicitDtors =
+        detail::HasTransferElement<Analysis>::value ||
+        detail::HasOnCFGElement<Analysis>::value;
+    constexpr bool wantsEHEdges =
+        detail::FollowsExceptionalControlFlow<Analysis>::value;
+    clang::CFG* cfg =
+        CfgCache::instance().get(func, ctx, wantsImplicitDtors,
+                                 wantsEHEdges);
     if (!cfg) {
         // A dependent function-template pattern has no concrete control
         // flow yet, and Clang's CFG builder rejects many such bodies
@@ -460,16 +498,20 @@ DataflowResult<Analysis> runDataflow(
         bool pathKilled = false;
         for (const clang::CFGElement& elem : *block) {
             auto cfgStmt = elem.getAs<clang::CFGStmt>();
-            if (!cfgStmt) continue;
-            const clang::Stmt* stmt = cfgStmt->getStmt();
-            if (!stmt) continue;
-            // A registered fatal call (--fatal-asserts) ends the path
-            // here: the block's exit state is never recorded, so
-            // successors treat this edge like one from an unreachable
-            // predecessor. Elements after the call are dead code.
-            if (isFatalCall(stmt)) { pathKilled = true; break; }
-            applyGuards(stmt, currentState);
-            currentState = analysis.transfer(stmt, currentState, ctx);
+            if (cfgStmt) {
+                const clang::Stmt* stmt = cfgStmt->getStmt();
+                if (!stmt) continue;
+                // A registered fatal call (--fatal-asserts) ends the path
+                // here: the block's exit state is never recorded, so
+                // successors treat this edge like one from an unreachable
+                // predecessor. Elements after the call are dead code.
+                if (isFatalCall(stmt)) { pathKilled = true; break; }
+                applyGuards(stmt, currentState);
+                currentState = analysis.transfer(stmt, currentState, ctx);
+            } else if constexpr (detail::HasTransferElement<Analysis>::value) {
+                currentState =
+                    analysis.transferElement(elem, currentState, ctx);
+            }
         }
         // Real [[noreturn]] calls (exit, abort, __assert_fail) get the
         // same treatment as registered fatal calls: Clang wires such
@@ -506,10 +548,11 @@ DataflowResult<Analysis> runDataflow(
     result.exitBlockID = cfg->getExit().getBlockID();
 
     // --- Phase 2: reporting pass ---
-    // Each block's entry state is recomputed from the converged exit
-    // states and the elements are walked once more, calling onStatement.
-    // This way reports always reflect the state at the fixpoint.
-    if constexpr (detail::HasOnStatement<Analysis>::value) {
+    // Each block's entry state is recomputed from the converged exit states
+    // and walked once more through whichever reporting hooks the analysis
+    // exposes. Reports therefore always reflect the fixpoint.
+    if constexpr (detail::HasOnStatement<Analysis>::value ||
+                  detail::HasOnCFGElement<Analysis>::value) {
         for (const clang::CFGBlock* block : *cfg) {
             if (!block) continue;
 
@@ -521,17 +564,31 @@ DataflowResult<Analysis> runDataflow(
             State currentState = entryState;
             for (const clang::CFGElement& elem : *block) {
                 auto cfgStmt = elem.getAs<clang::CFGStmt>();
-                if (!cfgStmt) continue;
-                const clang::Stmt* stmt = cfgStmt->getStmt();
-                if (!stmt) continue;
-                // Same cut as phase 1: nothing after a fatal call
-                // executes, so nothing there is reported either.
-                if (isFatalCall(stmt)) break;
+                if (cfgStmt) {
+                    const clang::Stmt* stmt = cfgStmt->getStmt();
+                    if (!stmt) continue;
+                    // Same cut as phase 1: nothing after a fatal call
+                    // executes, so nothing there is reported either.
+                    if (isFatalCall(stmt)) break;
 
-                applyGuards(stmt, currentState);
-                State before = currentState;
-                currentState = analysis.transfer(stmt, currentState, ctx);
-                analysis.onStatement(stmt, before, currentState, ctx);
+                    applyGuards(stmt, currentState);
+                    State before = currentState;
+                    currentState = analysis.transfer(stmt, currentState, ctx);
+                    if constexpr (detail::HasOnStatement<Analysis>::value)
+                        analysis.onStatement(stmt, before, currentState, ctx);
+                } else if constexpr (
+                    detail::HasTransferElement<Analysis>::value) {
+                    State before = currentState;
+                    currentState =
+                        analysis.transferElement(elem, currentState, ctx);
+                    if constexpr (detail::HasOnCFGElement<Analysis>::value)
+                        analysis.onCFGElement(elem, before, currentState,
+                                              ctx);
+                } else if constexpr (
+                    detail::HasOnCFGElement<Analysis>::value) {
+                    analysis.onCFGElement(elem, currentState, currentState,
+                                          ctx);
+                }
             }
         }
     }

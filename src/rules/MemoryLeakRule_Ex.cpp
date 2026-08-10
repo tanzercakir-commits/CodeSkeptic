@@ -49,6 +49,105 @@ AllocState mergeAllocStates(AllocState a, AllocState b) {
     return AllocState::Allocated;
 }
 
+// Per-disjunct pointer state. `binding` is a must-alias root: it is present
+// only while an exact local pointer copy remains unchanged on every path
+// represented by the disjunct. Allocation state stays attached to the
+// variable that acquired it; bindings merely let a release/access resolve
+// back to that owner. This deliberately does not model pointees, heap
+// objects, fields, casts, or may-alias relations.
+struct LifetimeState {
+    AllocState allocation = AllocState::None;
+    const VarDecl* binding = nullptr;
+    const VarDecl* reallocSource = nullptr;
+    std::string allocatorFamily;
+    bool allocatorFamilyKnown = true;
+    std::set<const VarDecl*> smartOwners;
+    bool smartOwnersKnown = true;
+    bool referenceBinding = false;
+
+    bool operator==(const LifetimeState& other) const {
+        return allocation == other.allocation && binding == other.binding &&
+               reallocSource == other.reallocSource &&
+               allocatorFamily == other.allocatorFamily &&
+               allocatorFamilyKnown == other.allocatorFamilyKnown &&
+               smartOwners == other.smartOwners &&
+               smartOwnersKnown == other.smartOwnersKnown &&
+               referenceBinding == other.referenceBinding;
+    }
+    bool operator!=(const LifetimeState& other) const {
+        return !(*this == other);
+    }
+    bool operator<(const LifetimeState& other) const {
+        if (allocation != other.allocation)
+            return static_cast<unsigned>(allocation) <
+                   static_cast<unsigned>(other.allocation);
+        if (binding != other.binding)
+            return std::less<const VarDecl*>{}(binding, other.binding);
+        if (reallocSource != other.reallocSource)
+            return std::less<const VarDecl*>{}(reallocSource,
+                                                other.reallocSource);
+        if (allocatorFamily != other.allocatorFamily)
+            return allocatorFamily < other.allocatorFamily;
+        if (allocatorFamilyKnown != other.allocatorFamilyKnown)
+            return allocatorFamilyKnown < other.allocatorFamilyKnown;
+        if (smartOwners != other.smartOwners) {
+            return std::lexicographical_compare(
+                smartOwners.begin(), smartOwners.end(),
+                other.smartOwners.begin(), other.smartOwners.end(),
+                std::less<const VarDecl*>{});
+        }
+        if (smartOwnersKnown != other.smartOwnersKnown)
+            return smartOwnersKnown < other.smartOwnersKnown;
+        return referenceBinding < other.referenceBinding;
+    }
+};
+
+LifetimeState mergeLifetimeStates(const LifetimeState& a,
+                                  const LifetimeState& b) {
+    LifetimeState result;
+    result.allocation = mergeAllocStates(a.allocation, b.allocation);
+    if (a.binding == b.binding &&
+        a.referenceBinding == b.referenceBinding) {
+        result.binding = a.binding;
+        result.referenceBinding = a.referenceBinding;
+    }
+    if (a.reallocSource == b.reallocSource)
+        result.reallocSource = a.reallocSource;
+    if (a.allocation == AllocState::None &&
+        b.allocation != AllocState::None) {
+        result.allocatorFamily = b.allocatorFamily;
+        result.allocatorFamilyKnown = b.allocatorFamilyKnown;
+    } else if (b.allocation == AllocState::None &&
+               a.allocation != AllocState::None) {
+        result.allocatorFamily = a.allocatorFamily;
+        result.allocatorFamilyKnown = a.allocatorFamilyKnown;
+    } else if (a.allocatorFamilyKnown && b.allocatorFamilyKnown &&
+               a.allocatorFamily == b.allocatorFamily) {
+        result.allocatorFamily = a.allocatorFamily;
+        result.allocatorFamilyKnown = true;
+    } else {
+        result.allocatorFamilyKnown = false;
+    }
+    if (a.allocation == AllocState::None &&
+        b.allocation != AllocState::None) {
+        result.smartOwners = b.smartOwners;
+        result.smartOwnersKnown = b.smartOwnersKnown;
+    } else if (b.allocation == AllocState::None &&
+               a.allocation != AllocState::None) {
+        result.smartOwners = a.smartOwners;
+        result.smartOwnersKnown = a.smartOwnersKnown;
+    } else if (a.smartOwnersKnown && b.smartOwnersKnown &&
+               a.smartOwners == b.smartOwners) {
+        result.smartOwners = a.smartOwners;
+        result.smartOwnersKnown = true;
+    } else {
+        result.smartOwnersKnown = false;
+        if (result.allocation == AllocState::Allocated)
+            result.allocation = AllocState::Escaped;
+    }
+    return result;
+}
+
 // --- Statement classification ---
 
 enum class StmtEffect { None, Allocates, Frees, Escapes };
@@ -103,6 +202,258 @@ const VarDecl* asVar(const Expr* expr) {
     return nullptr;
 }
 
+const VarDecl* asExactPointerVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    expr = expr->IgnoreParenImpCasts();
+    const auto* ref = dyn_cast<DeclRefExpr>(expr);
+    if (!ref) return nullptr;
+    const auto* var = dyn_cast<VarDecl>(ref->getDecl());
+    if (!var || !var->hasLocalStorage()) return nullptr;
+    QualType type = var->getType().getNonReferenceType();
+    return type->isPointerType() ? var : nullptr;
+}
+
+QualType pointerBindingType(const VarDecl* var) {
+    if (!var) return {};
+    QualType type = var->getType().getNonReferenceType();
+    return type->isPointerType()
+               ? type.getCanonicalType().getUnqualifiedType()
+               : QualType{};
+}
+
+bool sameExactPointerType(const VarDecl* lhs, const VarDecl* rhs) {
+    QualType left = pointerBindingType(lhs);
+    QualType right = pointerBindingType(rhs);
+    return !left.isNull() && !right.isNull() && left == right;
+}
+
+bool isStandardOwnerRawResult(const Expr* expr);
+
+struct BindingUpdate {
+    const VarDecl* lhs = nullptr;
+    const VarDecl* rhs = nullptr;
+    bool deferred = false;
+    bool throughReference = false;
+};
+
+std::vector<BindingUpdate> pointerBindingUpdates(const Stmt* stmt) {
+    std::vector<BindingUpdate> updates;
+    if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* decl : declStmt->decls()) {
+            const auto* lhs = dyn_cast<VarDecl>(decl);
+            if (!lhs || !lhs->hasLocalStorage() || !lhs->hasInit() ||
+                pointerBindingType(lhs).isNull())
+                continue;
+            if (isStandardOwnerRawResult(lhs->getInit())) continue;
+            const VarDecl* rhs = asExactPointerVar(lhs->getInit());
+            updates.push_back(
+                {lhs, sameExactPointerType(lhs, rhs) ? rhs : nullptr});
+        }
+        return updates;
+    }
+    const auto* assignment = dyn_cast<BinaryOperator>(stmt);
+    if (assignment && assignment->getOpcode() == BO_Assign) {
+        const VarDecl* lhs = asExactPointerVar(assignment->getLHS());
+        if (!lhs) return updates;
+        if (isStandardOwnerRawResult(assignment->getRHS())) return updates;
+        const VarDecl* rhs = asExactPointerVar(assignment->getRHS());
+        updates.push_back({lhs,
+                           sameExactPointerType(lhs, rhs) ? rhs : nullptr,
+                           false,
+                           lhs->getType()->isReferenceType()});
+        return updates;
+    }
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    if (!call) return updates;
+    std::set<const VarDecl*> invalidated;
+    auto addInvalidation = [&](const VarDecl* var) {
+        if (var && invalidated.insert(var).second)
+            updates.push_back({var, nullptr, true, false});
+    };
+    for (const Expr* argument : call->arguments()) {
+        const Expr* core = argument->IgnoreParenCasts();
+        const auto* address = dyn_cast<UnaryOperator>(core);
+        if (!address || address->getOpcode() != UO_AddrOf) continue;
+        addInvalidation(asExactPointerVar(address->getSubExpr()));
+    }
+    codeskeptic::forEachNonConstRefArg(
+        call, [&](const Expr* argument) {
+            addInvalidation(asExactPointerVar(argument));
+        });
+    return updates;
+}
+
+const CallExpr* coreCall(const Expr* expr) {
+    if (!expr) return nullptr;
+    const Expr* current = expr;
+    while (current) {
+        current = current->IgnoreParenImpCasts();
+        if (const auto* cast = dyn_cast<CastExpr>(current)) {
+            current = cast->getSubExpr();
+            continue;
+        }
+        if (const auto* cleanups = dyn_cast<ExprWithCleanups>(current)) {
+            current = cleanups->getSubExpr();
+            continue;
+        }
+        break;
+    }
+    return dyn_cast_or_null<CallExpr>(current);
+}
+
+struct AllocationFamily {
+    std::string name;
+    bool known = true;
+};
+
+const Expr* allocationExprFor(const Stmt* stmt, const VarDecl* var) {
+    if (!stmt || !var) return nullptr;
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* candidate = dyn_cast<VarDecl>(declaration);
+            if (candidate == var && candidate->hasInit())
+                return candidate->getInit();
+        }
+    }
+    if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
+        if (assignment->getOpcode() == BO_Assign &&
+            asVar(assignment->getLHS()) == var)
+            return assignment->getRHS();
+    }
+    return nullptr;
+}
+
+AllocationFamily allocationFamilyOf(const Expr* expr) {
+    const CallExpr* call = coreCall(expr);
+    if (!call) return {};
+    if (auto family = codeskeptic::pairedAllocatorFamily(call))
+        return {*family, true};
+
+    const auto* summary =
+        codeskeptic::SummaryRegistry::instance().lookup(call);
+    if (summary &&
+        summary->returnOwnership ==
+            codeskeptic::SummaryRegistry::ReturnOwnership::Owned &&
+        !codeskeptic::allocatorPairs().empty())
+        return {{}, false};
+    return {};
+}
+
+enum class ReleaseAuthority { Match, Mismatch, Unknown };
+
+ReleaseAuthority releaseAuthority(const Stmt* stmt,
+                                  const LifetimeState& lifetime) {
+    if (!lifetime.allocatorFamilyKnown)
+        return ReleaseAuthority::Unknown;
+    if (lifetime.allocatorFamily.empty())
+        return ReleaseAuthority::Match;
+    if (isa<CXXDeleteExpr>(stmt)) return ReleaseAuthority::Mismatch;
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    if (!call) return ReleaseAuthority::Unknown;
+    if (codeskeptic::matchesAllocatorFamily(lifetime.allocatorFamily, call))
+        return ReleaseAuthority::Match;
+
+    const llvm::StringRef name = calleeName(call->getDirectCallee());
+    const bool knownRelease =
+        name == "free" || isResourceReleaseName(name) ||
+        codeskeptic::isPairedDeallocatorCall(call) ||
+        (!name.empty() &&
+         codeskeptic::freeFunctionNames().count(name.str()) != 0);
+    return knownRelease ? ReleaseAuthority::Mismatch
+                        : ReleaseAuthority::Unknown;
+}
+
+struct ReallocSite {
+    const VarDecl* result = nullptr;
+    const VarDecl* source = nullptr;
+    const CallExpr* call = nullptr;
+};
+
+bool isAuthoritativeReallocCallee(const FunctionDecl* callee) {
+    const IdentifierInfo* id = callee ? callee->getIdentifier() : nullptr;
+    if (!id || (id->getName() != "realloc" &&
+                id->getName() != "reallocarray"))
+        return false;
+    const std::string qualified = callee->getQualifiedNameAsString();
+    return qualified == id->getName().str() ||
+           qualified == "std::" + id->getName().str();
+}
+
+ReallocSite reallocSite(const VarDecl* result, const Expr* expr) {
+    const CallExpr* call = coreCall(expr);
+    if (!call || call->getNumArgs() == 0) return {};
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (!isAuthoritativeReallocCallee(callee)) return {};
+    const llvm::StringRef name = calleeName(callee);
+    if ((name == "realloc" && call->getNumArgs() != 2) ||
+        (name == "reallocarray" && call->getNumArgs() != 3))
+        return {};
+    const VarDecl* source = asExactPointerVar(call->getArg(0));
+    if (!result || !source || !result->hasLocalStorage() ||
+        !sameExactPointerType(result, source))
+        return {};
+    return {result, source, call};
+}
+
+std::vector<ReallocSite> reallocUpdates(const Stmt* stmt) {
+    std::vector<ReallocSite> sites;
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* result = dyn_cast<VarDecl>(declaration);
+            ReallocSite site =
+                result && result->hasInit()
+                    ? reallocSite(result, result->getInit())
+                    : ReallocSite{};
+            if (site.call) sites.push_back(site);
+        }
+    } else if (const auto* assignment = dyn_cast<BinaryOperator>(stmt)) {
+        if (assignment->getOpcode() == BO_Assign) {
+            ReallocSite site = reallocSite(
+                asExactPointerVar(assignment->getLHS()),
+                assignment->getRHS());
+            if (site.call) sites.push_back(site);
+        }
+    }
+    return sites;
+}
+
+std::map<const CallExpr*, ReallocSite> collectReallocSites(
+        const FunctionDecl* function) {
+    if (!function) return {};
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        std::map<const CallExpr*, ReallocSite> sites;
+
+        void record(const VarDecl* result, const Expr* value) {
+            ReallocSite site = reallocSite(result, value);
+            if (!site.call) return;
+            auto [it, inserted] = sites.emplace(site.call, site);
+            if (!inserted &&
+                (it->second.result != site.result ||
+                 it->second.source != site.source))
+                it->second = {};
+        }
+
+        bool VisitVarDecl(VarDecl* declaration) {
+            if (declaration->hasInit())
+                record(declaration, declaration->getInit());
+            return true;
+        }
+
+        bool VisitBinaryOperator(BinaryOperator* assignment) {
+            if (assignment->getOpcode() == BO_Assign)
+                record(asExactPointerVar(assignment->getLHS()),
+                       assignment->getRHS());
+            return true;
+        }
+
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } visitor;
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return visitor.sites;
+}
+
 // `&var->member`, `&var.member`, `&var` (chained members/subscripts
 // included): taking the address of an object or of one of its members
 // keeps the WHOLE object reachable through the handed-out pointer —
@@ -139,56 +490,223 @@ const VarDecl* addrOfMemberBase(const Expr* expr) {
 // bytes — the raw pointer still leaks), which is exactly why a blanket
 // "constructed-from-a-pointer" rule would be wrong and this stays a
 // name allow-list.
+enum class StandardOwnerKind { None, Unique, Shared, Auto };
+
+StandardOwnerKind standardOwnerKind(QualType qt) {
+    const auto* record = qt->getAsCXXRecordDecl();
+    if (!record || !record->isInStdNamespace())
+        return StandardOwnerKind::None;
+    const llvm::StringRef name = record->getName();
+    if (name == "unique_ptr") return StandardOwnerKind::Unique;
+    if (name == "shared_ptr") return StandardOwnerKind::Shared;
+    if (name == "auto_ptr") return StandardOwnerKind::Auto;
+    return StandardOwnerKind::None;
+}
+
 bool isOwningSmartPointerType(QualType qt) {
     const auto* rec = qt->getAsCXXRecordDecl();
     if (!rec) return false;
     const llvm::StringRef name = rec->getName();
     if (name.empty()) return false;
-    if (rec->isInStdNamespace() &&
-        (name == "unique_ptr" || name == "shared_ptr" ||
-         name == "auto_ptr"))
+    if (standardOwnerKind(qt) != StandardOwnerKind::None)
         return true;
     return codeskeptic::owningPointerNames().count(name.str()) != 0;
 }
 
-// If `expr` (a return value or a variable initializer) is the
-// construction of an owning smart pointer that adopts a tracked raw
-// pointer, return that raw pointer. Peels the temporary-materialization
-// wrappers that sit between a `return`/init and the CXXConstructExpr:
-//   return std::unique_ptr<S>(p);   // A  (explicit ctor)
-//   Ref<S> f() { ... return p; }    // B  (implicit ctor, configured)
-//   std::unique_ptr<S> up(p);       // D  (adoption into a local)
-// The move/copy constructors take a smart-pointer argument, never a
-// tracked RAW pointer, so they never match — only genuine adoption of
-// a `new`-ed pointer does.
-const VarDecl* adoptedRawPointer(const Expr* expr,
-                                 const std::set<const VarDecl*>& tracked) {
+const CXXConstructExpr* owningConstructExpr(const Expr* expr) {
     if (!expr) return nullptr;
-    const Expr* e = expr;
-    while (e) {
-        e = e->IgnoreParenImpCasts();
-        if (const auto* ewc = dyn_cast<ExprWithCleanups>(e)) {
-            e = ewc->getSubExpr();
-        } else if (const auto* mte = dyn_cast<MaterializeTemporaryExpr>(e)) {
-            e = mte->getSubExpr();
-        } else if (const auto* bte = dyn_cast<CXXBindTemporaryExpr>(e)) {
-            e = bte->getSubExpr();
-        } else if (const auto* fce = dyn_cast<CXXFunctionalCastExpr>(e)) {
-            e = fce->getSubExpr();
+    const Expr* current = expr;
+    while (current) {
+        current = current->IgnoreParenImpCasts();
+        if (const auto* cleanups = dyn_cast<ExprWithCleanups>(current)) {
+            current = cleanups->getSubExpr();
+        } else if (const auto* materialized =
+                       dyn_cast<MaterializeTemporaryExpr>(current)) {
+            current = materialized->getSubExpr();
+        } else if (const auto* bound =
+                       dyn_cast<CXXBindTemporaryExpr>(current)) {
+            current = bound->getSubExpr();
+        } else if (const auto* cast =
+                       dyn_cast<CXXFunctionalCastExpr>(current)) {
+            current = cast->getSubExpr();
         } else {
             break;
         }
     }
-    const auto* ctor = dyn_cast_or_null<CXXConstructExpr>(e);
-    if (!ctor || !isOwningSmartPointerType(ctor->getType()))
-        return nullptr;
-    for (unsigned i = 0; i < ctor->getNumArgs(); ++i) {
-        const VarDecl* var = asVar(ctor->getArg(i));
-        if (var && tracked.count(var) &&
-            var->getType()->isPointerType())
-            return var;
+    return dyn_cast_or_null<CXXConstructExpr>(current);
+}
+
+QualType standardOwnerPointee(QualType ownerType, ASTContext& ctx) {
+    const auto* record = ownerType->getAsCXXRecordDecl();
+    const auto* specialization =
+        dyn_cast_or_null<ClassTemplateSpecializationDecl>(record);
+    if (!specialization || specialization->getTemplateArgs().size() == 0)
+        return {};
+    const TemplateArgument& argument =
+        specialization->getTemplateArgs().get(0);
+    if (argument.getKind() != TemplateArgument::Type) return {};
+    QualType result = argument.getAsType();
+    while (const ArrayType* array = ctx.getAsArrayType(result))
+        result = array->getElementType();
+    return result.getCanonicalType().getUnqualifiedType();
+}
+
+bool hasSupportedImplicitDeleter(QualType ownerType) {
+    if (standardOwnerKind(ownerType) != StandardOwnerKind::Unique)
+        return true;
+    const auto* record = ownerType->getAsCXXRecordDecl();
+    const auto* specialization =
+        dyn_cast_or_null<ClassTemplateSpecializationDecl>(record);
+    if (!specialization) return false;
+    const TemplateArgumentList& arguments =
+        specialization->getTemplateArgs();
+    if (arguments.size() <= 1) return true;
+    if (arguments.get(1).getKind() != TemplateArgument::Type) return false;
+    const auto* deleter =
+        arguments.get(1).getAsType()->getAsCXXRecordDecl();
+    return deleter && deleter->isInStdNamespace() &&
+           deleter->getName() == "default_delete";
+}
+
+bool compatibleOwnerPointee(const VarDecl* raw, QualType ownerType,
+                            ASTContext& ctx) {
+    if (!raw || !raw->getType()->isPointerType()) return false;
+    QualType ownerPointee = standardOwnerPointee(ownerType, ctx);
+    QualType rawPointee = raw->getType()->getPointeeType();
+    if (ownerPointee.isNull() || rawPointee.isNull()) return false;
+    rawPointee = rawPointee.getCanonicalType().getUnqualifiedType();
+    return rawPointee == ownerPointee;
+}
+
+struct AdoptionInfo {
+    const CXXConstructExpr* constructor = nullptr;
+    const VarDecl* raw = nullptr;
+    StandardOwnerKind standardKind = StandardOwnerKind::None;
+    bool compatible = false;
+    bool hasCustomDeleter = false;
+
+    bool exactStandard() const {
+        return raw && standardKind != StandardOwnerKind::None &&
+               compatible && !hasCustomDeleter;
     }
-    return nullptr;
+};
+
+AdoptionInfo adoptionInfo(const Expr* expr,
+                          const std::set<const VarDecl*>& tracked,
+                          ASTContext& ctx) {
+    AdoptionInfo result;
+    result.constructor = owningConstructExpr(expr);
+    if (!result.constructor ||
+        !isOwningSmartPointerType(result.constructor->getType()))
+        return result;
+    result.standardKind = standardOwnerKind(result.constructor->getType());
+    result.hasCustomDeleter =
+        !hasSupportedImplicitDeleter(result.constructor->getType());
+    for (unsigned i = 0; i < result.constructor->getNumArgs(); ++i) {
+        const VarDecl* candidate = asVar(result.constructor->getArg(i));
+        if (candidate && tracked.count(candidate) &&
+            candidate->getType()->isPointerType()) {
+            result.raw = candidate;
+            result.hasCustomDeleter = result.hasCustomDeleter || i != 0 ||
+                result.constructor->getNumArgs() != 1;
+            break;
+        }
+    }
+    result.compatible = result.raw &&
+        compatibleOwnerPointee(result.raw,
+                               result.constructor->getType(), ctx);
+    return result;
+}
+
+bool hasAutomaticStandardOwner(const CXXConstructExpr* constructor,
+                               ASTContext& ctx) {
+    if (!constructor) return false;
+    DynTypedNode current = DynTypedNode::create(*constructor);
+    for (unsigned depth = 0; depth < 8; ++depth) {
+        auto parents = ctx.getParents(current);
+        if (parents.size() != 1) return false;
+        const DynTypedNode& parent = parents[0];
+        if (const auto* declaration = parent.get<VarDecl>())
+            return declaration->hasLocalStorage() &&
+                   standardOwnerKind(declaration->getType()) !=
+                       StandardOwnerKind::None;
+        if (parent.get<ReturnStmt>() || parent.get<CompoundStmt>())
+            return false;
+        current = parent;
+    }
+    return false;
+}
+
+const VarDecl* standardOwnerVar(const Expr* expr) {
+    if (!expr) return nullptr;
+    const Expr* current = expr->IgnoreParenImpCasts();
+    if (const auto* call = dyn_cast<CallExpr>(current)) {
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (callee && callee->getQualifiedNameAsString() == "std::move" &&
+            call->getNumArgs() == 1)
+            return standardOwnerVar(call->getArg(0));
+    }
+    const auto* reference = dyn_cast<DeclRefExpr>(current);
+    const auto* owner =
+        reference ? dyn_cast<VarDecl>(reference->getDecl()) : nullptr;
+    if (!owner || !owner->hasLocalStorage() ||
+        standardOwnerKind(owner->getType()) == StandardOwnerKind::None)
+        return nullptr;
+    return owner;
+}
+
+bool isMoveOwnerExpr(const Expr* expr) {
+    if (!expr) return false;
+    const Expr* current = expr->IgnoreParenImpCasts();
+    if (const auto* call = dyn_cast<CallExpr>(current)) {
+        const FunctionDecl* callee = call->getDirectCallee();
+        if (callee && callee->getQualifiedNameAsString() == "std::move")
+            return true;
+    }
+    return current->isXValue();
+}
+
+enum class OwnerMethod { None, Get, Release, Reset, Assign };
+
+struct OwnerMemberCall {
+    const CallExpr* call = nullptr;
+    const VarDecl* owner = nullptr;
+    StandardOwnerKind kind = StandardOwnerKind::None;
+    OwnerMethod method = OwnerMethod::None;
+};
+
+OwnerMemberCall standardOwnerMemberCall(const CallExpr* call) {
+    OwnerMemberCall result;
+    if (!call) return result;
+    const auto* method =
+        dyn_cast_or_null<CXXMethodDecl>(call->getDirectCallee());
+    if (!method || method->isStatic()) return result;
+
+    const Expr* receiver = nullptr;
+    if (const auto* member = dyn_cast<CXXMemberCallExpr>(call))
+        receiver = member->getImplicitObjectArgument();
+    else if (isa<CXXOperatorCallExpr>(call) && call->getNumArgs() > 0)
+        receiver = call->getArg(0);
+    result.owner = standardOwnerVar(receiver);
+    if (!result.owner) return {};
+    result.kind = standardOwnerKind(result.owner->getType());
+    result.call = call;
+
+    if (method->getOverloadedOperator() == OO_Equal) {
+        result.method = OwnerMethod::Assign;
+        return result;
+    }
+    const llvm::StringRef name = calleeName(method);
+    if (name == "get") result.method = OwnerMethod::Get;
+    else if (name == "release") result.method = OwnerMethod::Release;
+    else if (name == "reset") result.method = OwnerMethod::Reset;
+    return result;
+}
+
+bool isStandardOwnerRawResult(const Expr* expr) {
+    const OwnerMemberCall member = standardOwnerMemberCall(coreCall(expr));
+    return member.method == OwnerMethod::Get ||
+           member.method == OwnerMethod::Release;
 }
 
 // Any tracked pointer CAPTURED by a lambda (`[&]{ Free(p); }`,
@@ -295,17 +813,22 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
             adoptExpr = e;
 
         std::vector<const VarDecl*> escaped;
-        if (const VarDecl* a = adoptedRawPointer(adoptExpr, tracked))
-            escaped.push_back(a);
+        auto collectAdoption = [&](const Expr* expression) {
+            AdoptionInfo adoption = adoptionInfo(expression, tracked, ctx);
+            if (!adoption.raw) return;
+            if (adoption.exactStandard() &&
+                hasAutomaticStandardOwner(adoption.constructor, ctx))
+                return;
+            escaped.push_back(adoption.raw);
+        };
+        collectAdoption(adoptExpr);
         collectLambdaCaptures(adoptExpr, tracked, escaped);
 
         if (const auto* declStmt = dyn_cast<DeclStmt>(stmt)) {
             for (const auto* decl : declStmt->decls()) {
                 const auto* vd = dyn_cast<VarDecl>(decl);
                 if (!vd || !vd->hasInit()) continue;
-                if (const VarDecl* a =
-                        adoptedRawPointer(vd->getInit(), tracked))
-                    escaped.push_back(a);
+                collectAdoption(vd->getInit());
                 collectLambdaCaptures(vd->getInit(), tracked, escaped);
             }
         }
@@ -445,10 +968,13 @@ StmtEffects classifyStmtEffects(const Stmt* stmt,
         return effects;
     }
     if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+        if (standardOwnerMemberCall(call).method != OwnerMethod::None)
+            return effects;
         const FunctionDecl* callee = call->getDirectCallee();
         const llvm::StringRef name = calleeName(callee);
         const bool isFreeByName =
             name == "free" || isResourceReleaseName(name) ||
+            codeskeptic::isPairedDeallocatorCall(call) ||
             (!name.empty() &&
              codeskeptic::freeFunctionNames().count(name.str()) != 0);
         const auto* summary =
@@ -587,7 +1113,8 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
     for (const auto& result : match(wrapper, *funcDecl, ctx)) {
         const auto* v = result.getNodeAs<VarDecl>("var");
         if (v && trackable(v) && v->hasInit() &&
-            isAllocExpr(v->getInit(), ctx))
+            (isAllocExpr(v->getInit(), ctx) ||
+             isStandardOwnerRawResult(v->getInit())))
             vars.insert(v);
     }
     for (const auto& result :
@@ -595,18 +1122,18 @@ std::vector<const VarDecl*> collectTrackedVars(const FunctionDecl* funcDecl,
         const auto* v = result.getNodeAs<VarDecl>("var");
         const auto* assign = result.getNodeAs<BinaryOperator>("assign");
         if (v && assign && trackable(v) &&
-            isAllocExpr(assign->getRHS(), ctx))
+            (isAllocExpr(assign->getRHS(), ctx) ||
+             isStandardOwnerRawResult(assign->getRHS())))
             vars.insert(v);
     }
     return {vars.begin(), vars.end()};
 }
 
-// Flow-insensitive alias groups over local-to-local pointer copies.
-// Every copy edge is collected BEFORE filtering for ownership, so a
-// tracked allocation can travel through multiple shadows or a local
-// pointer reference (Juliet variants 31/33). Only components connected
-// to a tracked owner are materialized.
-std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
+// Flow-insensitive inventory of local pointer-copy candidates. This pass
+// admits alias variables into the dataflow state; it conveys no lifetime
+// evidence. Exact bindings are created, invalidated, and merged separately
+// per guarded disjunct during transfer.
+std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasInventory(
         const FunctionDecl* funcDecl, ASTContext& ctx,
         const std::set<const VarDecl*>& tracked) {
     std::map<const VarDecl*, const VarDecl*> parent;  // union-find
@@ -681,19 +1208,552 @@ std::map<const VarDecl*, std::vector<const VarDecl*>> collectAliasGroups(
 
 // --- Branch condition refinement (assume edges) ---
 
-using VarState = std::map<const VarDecl*, AllocState>;
+using VarState = std::map<const VarDecl*, LifetimeState>;
+
+const VarDecl* resolveBinding(const VarDecl* var, const VarState& state) {
+    if (!var) return nullptr;
+    std::set<const VarDecl*> seen;
+    const VarDecl* current = var;
+    bool followedCopy = false;
+    while (current && seen.insert(current).second) {
+        auto it = state.find(current);
+        if (it == state.end()) return nullptr;
+        if (it->second.referenceBinding) {
+            if (!it->second.binding) return nullptr;
+            current = it->second.binding;
+            followedCopy = false;
+            continue;
+        }
+        if (!it->second.binding)
+            return followedCopy && it->second.allocation != AllocState::None
+                       ? current
+                       : nullptr;
+        if (it->second.binding == current) return current;
+        followedCopy = true;
+        current = it->second.binding;
+    }
+    return nullptr;
+}
+
+void invalidateReallocRelations(VarState& state,
+                                const VarDecl* changed) {
+    if (!changed) return;
+    for (auto& [var, lifetime] : state)
+        if (var == changed || lifetime.reallocSource == changed)
+            lifetime.reallocSource = nullptr;
+}
+
+void invalidateBindingDependents(VarState& state, const VarDecl* overwritten) {
+    if (!overwritten) return;
+    invalidateReallocRelations(state, overwritten);
+    for (auto& [var, lifetime] : state) {
+        // A local pointer reference aliases the variable itself, not the
+        // variable's current pointer value. Reassigning that variable must
+        // invalidate copied pointer values while leaving `T*& ref = owner`
+        // bound to `owner`.
+        if (var == overwritten || var->getType()->isReferenceType() ||
+            !lifetime.binding)
+            continue;
+        std::set<const VarDecl*> seen;
+        const VarDecl* current = var;
+        while (current && seen.insert(current).second) {
+            auto it = state.find(current);
+            if (it == state.end() || !it->second.binding) break;
+            if (it->second.binding == overwritten) {
+                lifetime.binding = nullptr;
+                break;
+            }
+            if (it->second.binding == current) break;
+            current = it->second.binding;
+        }
+    }
+}
+
+void applyBindingUpdate(VarState& state, const BindingUpdate& update) {
+    auto lhs = state.find(update.lhs);
+    if (lhs == state.end()) return;
+    if (update.rhs == update.lhs) return;
+    invalidateReallocRelations(state, update.lhs);
+    lhs = state.find(update.lhs);
+    if (update.throughReference) {
+        const VarDecl* overwritten = resolveBinding(update.lhs, state);
+        if (overwritten) {
+            state[overwritten].allocation = AllocState::Escaped;
+            state[overwritten].binding = nullptr;
+            state[overwritten].referenceBinding = false;
+        }
+        if (!update.lhs->getType()->isReferenceType())
+            state[update.lhs].binding = nullptr;
+        return;
+    }
+    const bool bindsVariable = update.lhs->getType()->isReferenceType();
+    const VarDecl* rhsRoot = bindsVariable
+                                 ? update.rhs
+                                 : resolveBinding(update.rhs, state);
+    if (bindsVariable && rhsRoot &&
+        rhsRoot->getType()->isReferenceType()) {
+        auto rhs = state.find(rhsRoot);
+        rhsRoot = rhs != state.end() ? rhs->second.binding : nullptr;
+    }
+    lhs = state.find(update.lhs);
+    lhs->second.binding = rhsRoot;
+    lhs->second.referenceBinding = bindsVariable && rhsRoot;
+}
+
+enum class OwnerOperationKind {
+    None,
+    Adopt,
+    EscapeRaw,
+    EscapeOwner,
+    Copy,
+    Move,
+    Reset,
+    Release,
+    Get,
+};
+
+struct OwnerOperation {
+    OwnerOperationKind kind = OwnerOperationKind::None;
+    const VarDecl* owner = nullptr;
+    const VarDecl* sourceOwner = nullptr;
+    const VarDecl* raw = nullptr;
+    const VarDecl* result = nullptr;
+    StandardOwnerKind ownerKind = StandardOwnerKind::None;
+    bool replaceOwner = false;
+    bool compatible = false;
+};
+
+using OwnerRawResultSites =
+    std::map<const CallExpr*, const VarDecl*>;
+
+OwnerRawResultSites collectOwnerRawResultSites(
+        const FunctionDecl* function) {
+    if (!function) return {};
+    struct Visitor : RecursiveASTVisitor<Visitor> {
+        OwnerRawResultSites sites;
+
+        void record(const VarDecl* result, const Expr* value) {
+            const CallExpr* call = coreCall(value);
+            const OwnerMemberCall member = standardOwnerMemberCall(call);
+            if (!result || !result->hasLocalStorage() ||
+                !result->getType()->isPointerType() ||
+                (member.method != OwnerMethod::Get &&
+                 member.method != OwnerMethod::Release))
+                return;
+            auto [found, inserted] = sites.emplace(call, result);
+            if (!inserted && found->second != result)
+                found->second = nullptr;
+        }
+
+        bool VisitVarDecl(VarDecl* declaration) {
+            if (declaration->hasInit())
+                record(declaration, declaration->getInit());
+            return true;
+        }
+
+        bool VisitBinaryOperator(BinaryOperator* assignment) {
+            if (assignment->getOpcode() == BO_Assign)
+                record(asExactPointerVar(assignment->getLHS()),
+                       assignment->getRHS());
+            return true;
+        }
+
+        bool TraverseLambdaExpr(LambdaExpr*) { return true; }
+    } visitor;
+    visitor.TraverseStmt(const_cast<Stmt*>(function->getBody()));
+    return visitor.sites;
+}
+
+OwnerOperation ownerConstruction(const VarDecl* owner,
+                                 const Expr* initializer,
+                                 const std::set<const VarDecl*>& tracked,
+                                 ASTContext& ctx) {
+    OwnerOperation result;
+    if (!owner || !owner->hasLocalStorage()) return result;
+    result.owner = owner;
+    result.ownerKind = standardOwnerKind(owner->getType());
+    if (result.ownerKind == StandardOwnerKind::None) return {};
+
+    const CXXConstructExpr* constructor =
+        owningConstructExpr(initializer);
+    if (!constructor) return {};
+    AdoptionInfo adoption = adoptionInfo(initializer, tracked, ctx);
+    if (adoption.raw) {
+        result.raw = adoption.raw;
+        result.compatible = adoption.exactStandard();
+        result.kind = result.compatible ? OwnerOperationKind::Adopt
+                                        : OwnerOperationKind::EscapeRaw;
+        return result;
+    }
+
+    if (constructor->getNumArgs() == 0) return {};
+    const Expr* sourceExpr = constructor->getArg(0);
+    result.sourceOwner = standardOwnerVar(sourceExpr);
+    if (!result.sourceOwner ||
+        standardOwnerKind(result.sourceOwner->getType()) != result.ownerKind)
+        return {};
+    if (constructor->getNumArgs() != 1) {
+        result.kind = OwnerOperationKind::EscapeOwner;
+        return result;
+    }
+    const bool transfers =
+        result.ownerKind == StandardOwnerKind::Auto ||
+        isMoveOwnerExpr(sourceExpr);
+    if (!transfers && result.ownerKind != StandardOwnerKind::Shared)
+        return {};
+    result.kind = transfers ? OwnerOperationKind::Move
+                            : OwnerOperationKind::Copy;
+    return result;
+}
+
+std::vector<OwnerOperation> ownerOperations(
+        const Stmt* stmt,
+        const std::set<const VarDecl*>& tracked,
+        const OwnerRawResultSites& resultSites,
+        ASTContext& ctx) {
+    std::vector<OwnerOperation> result;
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* owner = dyn_cast<VarDecl>(declaration);
+            if (!owner || !owner->hasInit()) continue;
+            OwnerOperation operation =
+                ownerConstruction(owner, owner->getInit(), tracked, ctx);
+            if (operation.kind != OwnerOperationKind::None)
+                result.push_back(operation);
+        }
+        return result;
+    }
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    const OwnerMemberCall member = standardOwnerMemberCall(call);
+    if (member.method == OwnerMethod::None) return result;
+
+    OwnerOperation operation;
+    operation.owner = member.owner;
+    operation.ownerKind = member.kind;
+    if (member.method == OwnerMethod::Get ||
+        member.method == OwnerMethod::Release) {
+        operation.kind = member.method == OwnerMethod::Get
+                             ? OwnerOperationKind::Get
+                             : OwnerOperationKind::Release;
+        auto site = resultSites.find(call);
+        if (site != resultSites.end()) operation.result = site->second;
+        result.push_back(operation);
+        return result;
+    }
+
+    if (member.method == OwnerMethod::Reset) {
+        operation.kind = OwnerOperationKind::Reset;
+        operation.replaceOwner = true;
+        if (call->getNumArgs() > 0) {
+            operation.raw = asExactPointerVar(call->getArg(0));
+            operation.compatible = operation.raw &&
+                tracked.count(operation.raw) &&
+                compatibleOwnerPointee(operation.raw,
+                                       member.owner->getType(), ctx);
+        }
+        result.push_back(operation);
+        return result;
+    }
+
+    if (member.method == OwnerMethod::Assign &&
+        call->getNumArgs() > 0) {
+        const Expr* sourceExpr = call->getArg(call->getNumArgs() - 1);
+        operation.sourceOwner = standardOwnerVar(sourceExpr);
+        operation.replaceOwner = true;
+        if (!operation.sourceOwner ||
+            standardOwnerKind(operation.sourceOwner->getType()) !=
+                operation.ownerKind)
+            return result;
+        const bool transfers =
+            operation.ownerKind == StandardOwnerKind::Auto ||
+            isMoveOwnerExpr(sourceExpr);
+        if (!transfers && operation.ownerKind != StandardOwnerKind::Shared)
+            return result;
+        operation.kind = transfers ? OwnerOperationKind::Move
+                                   : OwnerOperationKind::Copy;
+        result.push_back(operation);
+    }
+    return result;
+}
+
+const VarDecl* allocationRoot(const VarDecl* var,
+                              const VarState& state) {
+    const VarDecl* root = resolveBinding(var, state);
+    if (root) return root;
+    auto direct = state.find(var);
+    return direct != state.end() &&
+                   direct->second.allocation != AllocState::None
+               ? var
+               : nullptr;
+}
+
+std::vector<const VarDecl*> rootsOwnedBy(const VarDecl* owner,
+                                         const VarState& state) {
+    std::vector<const VarDecl*> result;
+    if (!owner) return result;
+    for (const auto& [raw, lifetime] : state)
+        if (lifetime.smartOwnersKnown &&
+            lifetime.smartOwners.count(owner) != 0)
+            result.push_back(raw);
+    return result;
+}
+
+void escapeOwner(const VarDecl* owner, VarState& state) {
+    for (const VarDecl* raw : rootsOwnedBy(owner, state)) {
+        LifetimeState& lifetime = state[raw];
+        lifetime.allocation = AllocState::Escaped;
+        lifetime.smartOwners.clear();
+        lifetime.smartOwnersKnown = false;
+        invalidateReallocRelations(state, raw);
+    }
+}
+
+// Clang 20 can emit an automatic-dtor element for an unwound owner without
+// connecting that block to the throw-to-handler edge. Treating that orphan as
+// a release would manufacture UAF/double-free evidence; retaining Allocated
+// would manufacture a leak. Drop only allocations with an exact live smart
+// owner. Ownerless and explicitly released allocations stay leak-reportable.
+void escapeOwnersAtUnmodelledThrow(VarState& state) {
+    std::vector<const VarDecl*> roots;
+    for (const auto& [raw, lifetime] : state)
+        if (lifetime.smartOwnersKnown && !lifetime.smartOwners.empty())
+            roots.push_back(raw);
+    for (const VarDecl* raw : roots) {
+        invalidateReallocRelations(state, raw);
+        LifetimeState& lifetime = state[raw];
+        lifetime.allocation = AllocState::Escaped;
+        lifetime.smartOwners.clear();
+        lifetime.smartOwnersKnown = false;
+    }
+}
+
+void releaseOwner(const VarDecl* owner, bool freesLast,
+                  VarState& state) {
+    for (const VarDecl* raw : rootsOwnedBy(owner, state)) {
+        LifetimeState& lifetime = state[raw];
+        lifetime.smartOwners.erase(owner);
+        if (freesLast && lifetime.smartOwners.empty() &&
+            lifetime.allocation == AllocState::Allocated)
+            lifetime.allocation = AllocState::Freed;
+    }
+}
+
+void adoptOwner(const OwnerOperation& operation, VarState& state) {
+    const VarDecl* root = allocationRoot(operation.raw, state);
+    if (!root) return;
+    LifetimeState& lifetime = state[root];
+    if (!operation.compatible || !lifetime.allocatorFamilyKnown ||
+        !lifetime.allocatorFamily.empty() ||
+        !lifetime.smartOwnersKnown || !lifetime.smartOwners.empty()) {
+        lifetime.allocation = AllocState::Escaped;
+        lifetime.smartOwners.clear();
+        lifetime.smartOwnersKnown = false;
+        return;
+    }
+    if (lifetime.allocation != AllocState::Allocated &&
+        lifetime.allocation != AllocState::Freed)
+        return;
+    lifetime.smartOwners.insert(operation.owner);
+}
+
+void bindOwnerResult(const OwnerOperation& operation,
+                     const VarDecl* root, VarState& state) {
+    if (!operation.result || !root ||
+        !compatibleOwnerPointee(operation.result,
+                               operation.owner->getType(),
+                               operation.owner->getASTContext()))
+        return;
+    auto target = state.find(operation.result);
+    if (target == state.end()) return;
+    invalidateBindingDependents(state, operation.result);
+    target = state.find(operation.result);
+    target->second.binding = root;
+    target->second.referenceBinding = false;
+}
+
+void applyOwnerOperation(const OwnerOperation& operation,
+                         VarState& state) {
+    switch (operation.kind) {
+        case OwnerOperationKind::Adopt:
+            adoptOwner(operation, state);
+            return;
+        case OwnerOperationKind::EscapeRaw: {
+            const VarDecl* root = allocationRoot(operation.raw, state);
+            if (root) {
+                state[root].allocation = AllocState::Escaped;
+                state[root].smartOwners.clear();
+                state[root].smartOwnersKnown = false;
+            }
+            return;
+        }
+        case OwnerOperationKind::EscapeOwner:
+            escapeOwner(operation.sourceOwner, state);
+            return;
+        case OwnerOperationKind::Reset:
+            releaseOwner(operation.owner, true, state);
+            if (operation.raw) {
+                if (operation.compatible)
+                    adoptOwner(operation, state);
+                else {
+                    const VarDecl* root = allocationRoot(operation.raw, state);
+                    if (root) state[root].allocation = AllocState::Escaped;
+                }
+            }
+            return;
+        case OwnerOperationKind::Release:
+        case OwnerOperationKind::Get: {
+            std::vector<const VarDecl*> roots =
+                rootsOwnedBy(operation.owner, state);
+            if (roots.size() != 1) {
+                if (!roots.empty()) escapeOwner(operation.owner, state);
+                return;
+            }
+            const VarDecl* root = roots.front();
+            if (operation.kind == OwnerOperationKind::Release)
+                releaseOwner(operation.owner, false, state);
+            bindOwnerResult(operation, root, state);
+            return;
+        }
+        case OwnerOperationKind::Copy:
+        case OwnerOperationKind::Move: {
+            if (operation.owner == operation.sourceOwner) return;
+            std::vector<const VarDecl*> sourceRoots =
+                rootsOwnedBy(operation.sourceOwner, state);
+            if (operation.replaceOwner)
+                releaseOwner(operation.owner, true, state);
+            if (sourceRoots.size() != 1) {
+                if (!sourceRoots.empty())
+                    escapeOwner(operation.sourceOwner, state);
+                return;
+            }
+            LifetimeState& lifetime = state[sourceRoots.front()];
+            if (operation.kind == OwnerOperationKind::Move)
+                lifetime.smartOwners.erase(operation.sourceOwner);
+            lifetime.smartOwners.insert(operation.owner);
+            return;
+        }
+        case OwnerOperationKind::None:
+            return;
+    }
+}
+
+const VarDecl* addressedStandardOwner(const Expr* expr) {
+    if (!expr) return nullptr;
+    const auto* address = dyn_cast<UnaryOperator>(
+        expr->IgnoreParenImpCasts());
+    if (!address || address->getOpcode() != UO_AddrOf) return nullptr;
+    return standardOwnerVar(address->getSubExpr());
+}
+
+std::set<const VarDecl*> ownerEscapesAt(const Stmt* stmt) {
+    std::set<const VarDecl*> result;
+    auto add = [&](const Expr* expr) {
+        if (const VarDecl* owner = standardOwnerVar(expr))
+            result.insert(owner);
+        if (const VarDecl* owner = addressedStandardOwner(expr))
+            result.insert(owner);
+    };
+
+    if (const auto* declarations = dyn_cast<DeclStmt>(stmt)) {
+        for (const Decl* declaration : declarations->decls()) {
+            const auto* variable = dyn_cast<VarDecl>(declaration);
+            if (!variable || !variable->hasInit()) continue;
+            if (variable->getType()->isReferenceType())
+                add(variable->getInit());
+            else if (variable->getType()->isPointerType())
+                add(variable->getInit());
+        }
+        return result;
+    }
+
+    if (const auto* returned = dyn_cast<ReturnStmt>(stmt)) {
+        add(returned->getRetValue());
+        return result;
+    }
+
+    if (const auto* lambda = dyn_cast<LambdaExpr>(stmt)) {
+        for (const LambdaCapture& capture : lambda->captures()) {
+            if (!capture.capturesVariable()) continue;
+            const auto* variable =
+                dyn_cast<VarDecl>(capture.getCapturedVar());
+            if (variable &&
+                standardOwnerKind(variable->getType()) !=
+                    StandardOwnerKind::None)
+                result.insert(variable);
+        }
+        return result;
+    }
+
+    const auto* call = dyn_cast<CallExpr>(stmt);
+    if (!call) return result;
+    const FunctionDecl* callee = call->getDirectCallee();
+    if (callee && callee->getQualifiedNameAsString() == "std::move")
+        return result;
+    if (standardOwnerMemberCall(call).method != OwnerMethod::None)
+        return result;
+    if (const auto* member = dyn_cast<CXXMemberCallExpr>(call))
+        add(member->getImplicitObjectArgument());
+    for (const Expr* argument : call->arguments()) add(argument);
+    return result;
+}
+
+bool provesNonZero(const Expr* expr,
+                   const codeskeptic::Guarded<VarState>& disjunct,
+                   ASTContext& ctx) {
+    if (!expr) return false;
+    Expr::EvalResult result;
+    if (expr->EvaluateAsInt(result, ctx) && result.Val.isInt())
+        return !result.Val.getInt().isZero();
+    const VarDecl* var = asVar(expr);
+    if (!var) return false;
+    auto it = disjunct.facts.find(
+        codeskeptic::FactKey{var, BO_EQ, 0, nullptr});
+    return it != disjunct.facts.end() && !it->second;
+}
+
+bool provesNonZeroRequest(
+        const ReallocSite& site,
+        const codeskeptic::Guarded<VarState>& disjunct,
+        ASTContext& ctx) {
+    if (!site.call) return false;
+    if (!provesNonZero(site.call->getArg(1), disjunct, ctx))
+        return false;
+    return calleeName(site.call->getDirectCallee()) != "reallocarray" ||
+           provesNonZero(site.call->getArg(2), disjunct, ctx);
+}
 
 // On an edge known to be null there is no "allocation": the malloc/new
 // failure path is NOT a leak (p = malloc; if (!p) return;).
 // The walk comes from the shared skeleton (engine/ConditionWalk.h); this
-// domain only cares about the null edge and ignores non-null knowledge.
+// Ordinary allocations only need the null edge. A pending exact realloc
+// relation also consumes the non-null edge: success invalidates the old
+// pointer value, while failure preserves it.
 void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
     codeskeptic::walkNullCondition(
         cond, isTrue, [&](const VarDecl* var, bool isNull) {
+            const VarDecl* guardedOwner = resolveBinding(var, state);
+            auto result = guardedOwner ? state.find(guardedOwner)
+                                       : state.find(var);
+            if (result != state.end() && result->second.reallocSource) {
+                const VarDecl* source = result->second.reallocSource;
+                result->second.reallocSource = nullptr;
+                if (isNull) {
+                    result->second.allocation = AllocState::None;
+                } else {
+                    auto old = state.find(source);
+                    if (old != state.end() &&
+                        old->second.allocation == AllocState::Allocated)
+                        old->second.allocation = AllocState::Freed;
+                }
+                return;
+            }
             if (!isNull) return;
-            auto it = state.find(var);
-            if (it != state.end() && it->second == AllocState::Allocated)
-                it->second = AllocState::None;
+            const VarDecl* owner = resolveBinding(var, state);
+            auto it = owner ? state.find(owner) : state.end();
+            if (it != state.end() &&
+                it->second.allocation == AllocState::Allocated)
+                it->second.allocation = AllocState::None;
         });
 }
 
@@ -709,7 +1769,7 @@ void applyNullCondition(const Expr* cond, bool isTrue, VarState& state) {
 using DisjunctState = codeskeptic::GuardedState<VarState>;
 
 VarState flattenState(const DisjunctState& state) {
-    return codeskeptic::flattenGuarded(state, mergeAllocStates);
+    return codeskeptic::flattenGuarded(state, mergeLifetimeStates);
 }
 
 // --- Analysis struct for DataflowEngine ---
@@ -722,28 +1782,30 @@ public:
                     std::set<const ValueDecl*> unkeyableDecls,
                     std::set<const ValueDecl*> stampableDecls,
                     std::string funcName,
-                    std::map<const VarDecl*, std::vector<const VarDecl*>>
-                        aliasGroups,
+                    std::map<const CallExpr*, ReallocSite> reallocSites,
+                    OwnerRawResultSites ownerRawResultSites,
                     codeskeptic::DiagnosticList& results)
         : trackedVars_(trackedVars),
           trackedSet_(trackedVars.begin(), trackedVars.end()),
           mutated_(std::move(unkeyableDecls)),
           stampable_(std::move(stampableDecls)),
-          aliasGroups_(std::move(aliasGroups)),
+          reallocSites_(std::move(reallocSites)),
+          ownerRawResultSites_(std::move(ownerRawResultSites)),
           funcName_(std::move(funcName)), results_(results) {
         codeskeptic::Guarded<VarState> init;
-        for (const auto* var : trackedVars_)
-            init.vars[var] = AllocState::None;
+        for (const auto* var : trackedVars_) {
+            init.vars[var] = LifetimeState{};
+            pointerFacts_.insert(var);
+        }
         initState_.push_back(std::move(init));
     }
 
     State initialState() const { return initState_; }
 
-    // The per-variable AllocState chain makes at most 3 transitions;
-    // the number of disjuncts multiplies the height (each disjunct can
-    // rise independently)
+    // Allocation, binding and pending-reallocation state can each climb
+    // independently; the guarded-disjunct count multiplies that bound.
     unsigned latticeHeight() const {
-        return (static_cast<unsigned>(trackedVars_.size()) * 3 + 1) *
+        return (static_cast<unsigned>(trackedVars_.size()) * 12 + 1) *
                    static_cast<unsigned>(codeskeptic::kMaxDisjuncts) + 4 + factBudget();
     }
 
@@ -751,17 +1813,20 @@ public:
     // never counted (v2b); bounded so pathological functions do not
     // explode the iteration cap.
     unsigned factBudget() const {
-        auto n = static_cast<unsigned>(stampable_.size());
+        auto n = static_cast<unsigned>(stampable_.size() +
+                                       pointerFacts_.size());
         return (n > 16 ? 16u : n) * 2 *
                static_cast<unsigned>(codeskeptic::kMaxDisjuncts);
     }
 
     // Engine convergence hook: collapse the disjuncts when a block is
     // revisited beyond any monotone explanation (see DataflowEngine).
-    void widen(State& s) const { codeskeptic::widenGuarded(s, mergeAllocStates); }
+    void widen(State& s) const {
+        codeskeptic::widenGuarded(s, mergeLifetimeStates);
+    }
 
     State merge(const State& a, const State& b) const {
-        return codeskeptic::mergeGuarded(a, b, mergeAllocStates);
+        return codeskeptic::mergeGuarded(a, b, mergeLifetimeStates);
     }
 
     // Pure state transition — produces no reports. Reporting lives in
@@ -771,50 +1836,177 @@ public:
         // Fact lifecycle first (v2b): see NullDerefRule — erase facts
         // on assigned locals, stamp integer-constant stores.
         State in = inRaw;
-        codeskeptic::applyStmtFacts(in, stmt, stampable_, mergeAllocStates);
+        codeskeptic::applyStmtFacts(in, stmt, stampable_, pointerFacts_,
+                                    mergeLifetimeStates);
+
+        const std::vector<BindingUpdate> bindings =
+            pointerBindingUpdates(stmt);
+        const std::vector<ReallocSite> reallocSites =
+            reallocUpdates(stmt);
+        const ReallocSite* callSite = nullptr;
+        if (const auto* call = dyn_cast<CallExpr>(stmt)) {
+            auto found = reallocSites_.find(call);
+            if (found != reallocSites_.end() && found->second.call)
+                callSite = &found->second;
+        }
+        auto applyBindings = [&](bool deferred) {
+            for (auto& disjunct : in) {
+                for (const BindingUpdate& binding : bindings) {
+                    if (binding.deferred != deferred) continue;
+                    applyBindingUpdate(disjunct.vars, binding);
+                }
+            }
+        };
+        applyBindings(false);
+
+        const std::vector<OwnerOperation> ownership = ownerOperations(
+            stmt, trackedSet_, ownerRawResultSites_, ctx);
+        for (auto& disjunct : in)
+            for (const OwnerOperation& operation : ownership)
+                applyOwnerOperation(operation, disjunct.vars);
+        for (const VarDecl* owner : ownerEscapesAt(stmt))
+            for (auto& disjunct : in)
+                escapeOwner(owner, disjunct.vars);
+        if (isa<CXXThrowExpr>(stmt))
+            for (auto& disjunct : in)
+                escapeOwnersAtUnmodelledThrow(disjunct.vars);
 
         // Effects are state-independent: classify once, apply to every disjunct
         StmtEffects effects = classifyStmtEffects(stmt, trackedSet_, ctx);
-        if (effects.empty()) return in;
+        if (effects.empty()) {
+            applyBindings(true);
+            return in;
+        }
 
         State out = in;
         for (auto& d : out) {
             for (const auto& [var, effect] : effects) {
+                if (effect == StmtEffect::Escapes && callSite &&
+                    callSite->source == var &&
+                    provesNonZeroRequest(*callSite, d, ctx))
+                    continue;
                 switch (effect) {
-                    case StmtEffect::Allocates:
-                        d.vars[var] = AllocState::Allocated; break;
-                    case StmtEffect::Frees:
-                        d.vars[var] = AllocState::Freed; break;
+                    case StmtEffect::Allocates: {
+                        const ReallocSite* update = nullptr;
+                        for (const ReallocSite& candidate : reallocSites)
+                            if (candidate.result == var) {
+                                update = &candidate;
+                                break;
+                            }
+                        const VarDecl* sourceOwner =
+                            update
+                                ? resolveBinding(update->source, d.vars)
+                                : nullptr;
+                        if (update && !sourceOwner) {
+                            auto directSource = d.vars.find(update->source);
+                            if (directSource != d.vars.end() &&
+                                directSource->second.allocation !=
+                                    AllocState::None)
+                                sourceOwner = update->source;
+                        }
+                        const bool provenRequest =
+                            update && provesNonZeroRequest(*update, d, ctx);
+                        const AllocationFamily family = allocationFamilyOf(
+                            allocationExprFor(stmt, var));
+                        auto source = sourceOwner
+                                          ? d.vars.find(sourceOwner)
+                                          : d.vars.end();
+                        const bool incompatibleRealloc =
+                            update && source != d.vars.end() &&
+                            source->second.allocation ==
+                                AllocState::Allocated &&
+                            (!source->second.allocatorFamilyKnown ||
+                             !source->second.allocatorFamily.empty());
+                        invalidateBindingDependents(d.vars, var);
+                        if (incompatibleRealloc) {
+                            d.vars[var].binding = nullptr;
+                            d.vars[var].reallocSource = nullptr;
+                            d.vars[var].allocatorFamily.clear();
+                            d.vars[var].allocatorFamilyKnown = false;
+                            d.vars[var].smartOwners.clear();
+                            d.vars[var].smartOwnersKnown = false;
+                            d.vars[var].referenceBinding = false;
+                            d.vars[var].allocation = AllocState::Escaped;
+                            break;
+                        }
+                        d.vars[var].binding = var;
+                        d.vars[var].reallocSource = nullptr;
+                        d.vars[var].allocatorFamily = family.name;
+                        d.vars[var].allocatorFamilyKnown = family.known;
+                        d.vars[var].smartOwners.clear();
+                        d.vars[var].smartOwnersKnown = true;
+                        d.vars[var].referenceBinding = false;
+                        d.vars[var].allocation = AllocState::Allocated;
+                        if (provenRequest && sourceOwner &&
+                            sourceOwner != var) {
+                            source = d.vars.find(sourceOwner);
+                            if (source != d.vars.end() &&
+                                source->second.allocation ==
+                                    AllocState::Allocated &&
+                                source->second.allocatorFamilyKnown &&
+                                source->second.allocatorFamily.empty())
+                                d.vars[var].reallocSource = sourceOwner;
+                        }
+                        break;
+                    }
+                    case StmtEffect::Frees: {
+                        const VarDecl* owner = resolveBinding(var, d.vars);
+                        if (!owner) break;
+                        LifetimeState& lifetime = d.vars[owner];
+                        const ReleaseAuthority authority =
+                            releaseAuthority(stmt, lifetime);
+                        if (authority == ReleaseAuthority::Match) {
+                            lifetime.allocation = AllocState::Freed;
+                        } else if (authority == ReleaseAuthority::Unknown) {
+                            invalidateReallocRelations(d.vars, owner);
+                            lifetime.allocation = AllocState::Escaped;
+                        }
+                        break;
+                    }
                     case StmtEffect::Escapes: {
-                        // An escape travels through local aliases:
-                        // `dup = git__strdup(s); result = dup;
-                        // return result;` hands the SAME allocation
-                        // out, so dup escapes too (the libgit2
-                        // realpath copy-then-return shape). Escape is
-                        // the safe direction to propagate — it only
-                        // silences reports. Frees stay per-variable:
-                        // flow-insensitive groups would fabricate
-                        // double-frees for `b = a; b = other;
-                        // free(b); free(a)`.
-                        d.vars[var] = AllocState::Escaped;
-                        auto group = aliasGroups_.find(var);
-                        if (group != aliasGroups_.end())
-                            for (const VarDecl* member : group->second)
-                                d.vars[member] = AllocState::Escaped;
+                        const VarDecl* owner = resolveBinding(var, d.vars);
+                        if (owner) {
+                            invalidateReallocRelations(d.vars, owner);
+                            d.vars[owner].allocation = AllocState::Escaped;
+                            d.vars[owner].smartOwners.clear();
+                            d.vars[owner].smartOwnersKnown = false;
+                        }
                         break;
                     }
                     case StmtEffect::None: break;
                 }
             }
         }
-        return out;
+        in = std::move(out);
+        applyBindings(true);
+        return in;
+    }
+
+    State transferElement(const CFGElement& element,
+                          const State& input,
+                          ASTContext&) const {
+        auto destructor = element.getAs<CFGAutomaticObjDtor>();
+        if (!destructor) return input;
+        const VarDecl* owner = destructor->getVarDecl();
+        if (!owner ||
+            standardOwnerKind(owner->getType()) == StandardOwnerKind::None)
+            return input;
+        State result = input;
+        for (auto& disjunct : result)
+            releaseOwner(owner, true, disjunct.vars);
+        return result;
     }
 
     void refineOnEdge(const Stmt* cond, bool isTrueBranch, State& state,
                       ASTContext& /*ctx*/) const {
         const auto* condExpr = dyn_cast<Expr>(cond);
-        codeskeptic::refineGuardedFacts(state, condExpr, isTrueBranch,
-                                       mutated_, mergeAllocStates);
+        codeskeptic::refineGuardedFactsWith(
+            state, condExpr, isTrueBranch, mutated_, pointerFacts_,
+            mergeLifetimeStates,
+            [](const codeskeptic::Guarded<VarState>&, const Expr*, bool) {
+                return false;
+            },
+            [](codeskeptic::Guarded<VarState>&, const Expr*, bool) {});
         for (auto& d : state)
             applyNullCondition(condExpr, isTrueBranch, d.vars);
     }
@@ -833,13 +2025,38 @@ public:
         // reporting pass's block order is not source order.
         for (const auto& [var, afterState] : after) {
             auto b = before.find(var);
-            if (b == before.end() || b->second == afterState) continue;
-            if (afterState == AllocState::Allocated)
+            if (b == before.end() ||
+                b->second.allocation == afterState.allocation)
+                continue;
+            if (afterState.allocation == AllocState::Allocated)
                 recordEvent(stmt, var, ctx,
                             codeskeptic::MsgId::TraceAllocatedHere);
-            else if (afterState == AllocState::Freed)
+            else if (afterState.allocation == AllocState::Freed)
                 recordEvent(stmt, var, ctx,
                             codeskeptic::MsgId::TraceFreedHere);
+        }
+
+        for (const OwnerOperation& operation : ownerOperations(
+                 stmt, trackedSet_, ownerRawResultSites_, ctx)) {
+            const bool releasesOld =
+                operation.kind == OwnerOperationKind::Reset ||
+                ((operation.kind == OwnerOperationKind::Copy ||
+                  operation.kind == OwnerOperationKind::Move) &&
+                 operation.replaceOwner);
+            if (!releasesOld) continue;
+            for (const auto& disjunct : beforeDisjuncts) {
+                for (const VarDecl* raw :
+                     rootsOwnedBy(operation.owner, disjunct.vars)) {
+                    const LifetimeState& lifetime =
+                        disjunct.vars.find(raw)->second;
+                    if (lifetime.allocation == AllocState::Freed &&
+                        lifetime.smartOwners.size() == 1)
+                        report(stmt, raw, ctx,
+                               codeskeptic::Severity::Error,
+                               "double-free",
+                               codeskeptic::MsgId::DoubleFree, raw);
+                }
+            }
         }
 
         for (const auto& [var, effect] :
@@ -848,25 +2065,98 @@ public:
             if (it == before.end()) continue;
 
             if (effect == StmtEffect::Allocates &&
-                it->second == AllocState::Allocated) {
-                report(stmt, var, ctx, codeskeptic::Severity::Warning,
-                       "memory-leak", codeskeptic::MsgId::LeakReassign);
-            } else if (effect == StmtEffect::Frees &&
-                       it->second == AllocState::Freed) {
+                it->second.allocation == AllocState::Allocated) {
+                bool reportOverwrite = true;
+                for (const ReallocSite& site : reallocUpdates(stmt)) {
+                    if (site.result != var) continue;
+                    bool sourceOverwriteOnly = true;
+                    bool provenFailureLeak = false;
+                    for (const auto& disjunct : beforeDisjuncts) {
+                        auto old = disjunct.vars.find(var);
+                        if (old == disjunct.vars.end() ||
+                            old->second.allocation != AllocState::Allocated)
+                            continue;
+                        const VarDecl* sourceOwner =
+                            resolveBinding(site.source, disjunct.vars);
+                        if (site.source != var && sourceOwner != var) {
+                            sourceOverwriteOnly = false;
+                            break;
+                        }
+                        if (provesNonZeroRequest(site, disjunct, ctx))
+                            provenFailureLeak = true;
+                    }
+                    if (sourceOverwriteOnly)
+                        reportOverwrite = provenFailureLeak;
+                    break;
+                }
+                if (reportOverwrite)
+                    report(stmt, var, ctx,
+                           codeskeptic::Severity::Warning,
+                           "memory-leak",
+                           codeskeptic::MsgId::LeakReassign);
+            } else if (effect == StmtEffect::Frees) {
+                const VarDecl* owner = resolveBinding(var, before);
+                auto ownerState = owner ? before.find(owner) : before.end();
+                if (ownerState == before.end() ||
+                    ownerState->second.allocation != AllocState::Freed ||
+                    releaseAuthority(stmt, ownerState->second) !=
+                        ReleaseAuthority::Match)
+                    continue;
                 // Under its own identity, like UAF: so the CWE415 mapping
                 // and the --disable-rule taxonomy can tell the finding
                 // kinds apart
                 report(stmt, var, ctx, codeskeptic::Severity::Error,
-                       "double-free", codeskeptic::MsgId::DoubleFree);
+                       "double-free", codeskeptic::MsgId::DoubleFree,
+                       owner);
             }
         }
 
         // Dereference of a pointer in the Freed state: use-after-free
         if (const VarDecl* var = derefTarget(stmt)) {
-            auto it = before.find(var);
-            if (it != before.end() && it->second == AllocState::Freed) {
+            const VarDecl* owner = resolveBinding(var, before);
+            auto it = owner ? before.find(owner) : before.end();
+            if (it != before.end() &&
+                it->second.allocation == AllocState::Freed) {
                 report(stmt, var, ctx, codeskeptic::Severity::Error,
-                       "use-after-free", codeskeptic::MsgId::UseAfterFree);
+                       "use-after-free", codeskeptic::MsgId::UseAfterFree,
+                       owner);
+            }
+        }
+    }
+
+    void onCFGElement(const CFGElement& element,
+                      const State& beforeDisjuncts,
+                      const State& afterDisjuncts,
+                      ASTContext& ctx) {
+        auto destructor = element.getAs<CFGAutomaticObjDtor>();
+        if (!destructor) return;
+        const VarDecl* owner = destructor->getVarDecl();
+        const Stmt* trigger = destructor->getTriggerStmt();
+        if (!owner || !trigger ||
+            standardOwnerKind(owner->getType()) == StandardOwnerKind::None)
+            return;
+
+        VarState before = flattenState(beforeDisjuncts);
+        VarState after = flattenState(afterDisjuncts);
+        for (const auto& [raw, afterState] : after) {
+            auto prior = before.find(raw);
+            if (prior != before.end() &&
+                prior->second.allocation != afterState.allocation &&
+                afterState.allocation == AllocState::Freed)
+                recordEvent(trigger, raw, ctx,
+                            codeskeptic::MsgId::TraceFreedHere);
+        }
+
+        for (const auto& disjunct : beforeDisjuncts) {
+            for (const VarDecl* raw : rootsOwnedBy(owner, disjunct.vars)) {
+                const LifetimeState& lifetime =
+                    disjunct.vars.find(raw)->second;
+                if (lifetime.allocation == AllocState::Freed &&
+                    lifetime.smartOwners.size() == 1)
+                    report(trigger, raw, ctx,
+                           codeskeptic::Severity::Error,
+                           "double-free",
+                           codeskeptic::MsgId::DoubleFree, raw);
             }
         }
     }
@@ -917,7 +2207,8 @@ private:
 
     void report(const Stmt* stmt, const VarDecl* var, ASTContext& ctx,
                 codeskeptic::Severity severity, const char* ruleId,
-                codeskeptic::MsgId msgId) {
+                codeskeptic::MsgId msgId,
+                const VarDecl* traceVar = nullptr) {
         const SourceManager& sm = ctx.getSourceManager();
         // Findings inside macros are bound to the use site (expansion);
         // otherwise the file name can end up empty (scratch buffer)
@@ -934,14 +2225,17 @@ private:
         diag.function = funcName_;
         diag.message = codeskeptic::msg(msgId, var->getNameAsString());
         results_.push_back(diag);
-        noteTargets_.emplace_back(results_.size() - 1, var);
+        noteTargets_.emplace_back(results_.size() - 1,
+                                  traceVar ? traceVar : var);
     }
 
     const std::vector<const VarDecl*>& trackedVars_;
     std::set<const VarDecl*> trackedSet_;
     std::set<const ValueDecl*> mutated_;
     std::set<const ValueDecl*> stampable_;
-    std::map<const VarDecl*, std::vector<const VarDecl*>> aliasGroups_;
+    std::set<const ValueDecl*> pointerFacts_;
+    std::map<const CallExpr*, ReallocSite> reallocSites_;
+    OwnerRawResultSites ownerRawResultSites_;
     std::string funcName_;
     codeskeptic::DiagnosticList& results_;
     State initState_;
@@ -1024,22 +2318,21 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     std::set<const VarDecl*> trackedSet(trackedVars.begin(),
                                         trackedVars.end());
-    auto aliasGroups = collectAliasGroups(funcDecl, ctx, trackedSet);
-    // Alias-connected variables join the tracked set: their state
-    // starts None (they never produce leak reports of their own), but
-    // an escape THROUGH them (`result = dup; return result;`) must be
-    // visible so it can propagate to the allocation they alias.
-    for (const auto& [var, members] : aliasGroups) {
+    auto aliasInventory = collectAliasInventory(funcDecl, ctx, trackedSet);
+    // Alias-connected variables join the tracked set with no binding. Their
+    // exact relation is established only when the corresponding statement is
+    // transferred on a concrete guarded disjunct.
+    for (const auto& [var, members] : aliasInventory) {
         (void)members;
         if (trackedSet.insert(var).second) trackedVars.push_back(var);
     }
-    // The exit-leak check below consults the groups too
-    const auto aliasGroupsCopy = aliasGroups;
     MemLeakAnalysis analysis(
         trackedVars, codeskeptic::collectUnkeyableDecls(funcDecl),
         codeskeptic::collectFactDecls(funcDecl),
         funcDecl->getQualifiedNameAsString(),
-        std::move(aliasGroups), results);
+        collectReallocSites(funcDecl),
+        collectOwnerRawResultSites(funcDecl),
+        results);
     auto dfResult = codeskeptic::runDataflow(funcDecl, ctx, analysis);
     if (!dfResult.converged)
         codeskeptic::CoverageReport::instance().recordDataflowFailure(
@@ -1054,42 +2347,29 @@ void analyzeFunction(const FunctionDecl* funcDecl,
 
     const VarState exitVars = flattenState(exitIt->second);
     for (const auto& [var, state] : exitVars) {
-        if (state == AllocState::Allocated) {
-            // Freed THROUGH a local alias? `tmpData = realloc(data, n);
-            // if (tmpData) data = tmpData; free(data);` frees the same
-            // allocation under the alias's name (the Juliet
-            // malloc_realloc good1 shape). Frees deliberately do not
-            // propagate through the flow-insensitive groups (that
-            // would fabricate double-frees) — but AT THE EXIT, a Freed
-            // group member means this allocation was released; only
-            // the leak REPORT is suppressed. Accepted FN: reusing an
-            // alias variable for a second allocation and leaking the
-            // first (pinned as documentation).
-            // The check runs PER DISJUNCT: flattening first would
-            // dissolve the alias's Freed into None on guarded paths
-            // (Freed ⊔ None = None) and hide exactly the correlation
-            // the disjuncts preserved. The variable leaks only if some
-            // disjunct holds it Allocated with NO group member Freed
-            // in that same disjunct.
-            auto group = aliasGroupsCopy.find(var);
+        if (state.allocation == AllocState::Allocated) {
+            // A release through an exact alias updates the owner during
+            // transfer. The exit check therefore needs no flow-insensitive
+            // group suppression: an allocation leaks when at least one live
+            // disjunct still carries its owner as Allocated.
             bool leaksSomewhere = false;
             for (const auto& d : exitIt->second) {
                 auto v = d.vars.find(var);
                 if (v == d.vars.end() ||
-                    v->second != AllocState::Allocated)
+                    v->second.allocation != AllocState::Allocated)
                     continue;
-                bool freedHere = false;
-                if (group != aliasGroupsCopy.end()) {
-                    for (const VarDecl* member : group->second) {
-                        auto m = d.vars.find(member);
-                        if (m != d.vars.end() &&
-                            m->second == AllocState::Freed) {
-                            freedHere = true;
-                            break;
-                        }
+                bool coveredByAlternative = false;
+                for (const auto& [resultVar, resultState] : d.vars) {
+                    if (resultVar != var &&
+                        resultState.allocation == AllocState::Allocated &&
+                        resultState.reallocSource == var) {
+                        coveredByAlternative = true;
+                        break;
                     }
                 }
-                if (!freedHere) { leaksSomewhere = true; break; }
+                if (coveredByAlternative) continue;
+                leaksSomewhere = true;
+                break;
             }
             if (!leaksSomewhere) continue;
             unsigned line = sm.getSpellingLineNumber(endLoc);

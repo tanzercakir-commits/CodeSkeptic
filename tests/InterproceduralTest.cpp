@@ -499,6 +499,42 @@ TEST(CrossTUTest, FreeWrapper_AcrossTU_DoubleFree) {
     EXPECT_EQ(results[0].rule_id, "double-free");
 }
 
+TEST(ExceptionalTransferSummaryTest,
+     ConsumedSummaryAcrossTUReportsUseAfterFree) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        extern "C" void free(void*);
+        void consume(int* p) { free(p); }
+    )", R"(
+        extern "C" void* malloc(unsigned long);
+        void consume(int*);
+        int f() {
+            int* raw = (int*)malloc(sizeof(int));
+            consume(raw);
+            return *raw;
+        }
+    )");
+    ASSERT_EQ(results.size(), 1u);
+    EXPECT_EQ(results[0].rule_id, "use-after-free");
+}
+
+TEST(ExceptionalTransferSummaryTest,
+     TransferredSummaryAcrossTUCannotInventRelease) {
+    MemoryLeakRule_Ex rule;
+    auto results = runRuleCrossTU(rule, R"(
+        int* saved;
+        void retain(int* p) { saved = p; }
+    )", R"(
+        void retain(int*);
+        int f() {
+            int* raw = new int(7);
+            retain(raw);
+            return *raw;
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
 TEST(CrossTUTest, ReadsOnlyCallee_AcrossTU_LeakVisible) {
     // A read-only helper in another file no longer HIDES the leak
     // (in single-TU mode it was Opaque -> Escapes -> silent)

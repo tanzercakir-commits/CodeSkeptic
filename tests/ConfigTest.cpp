@@ -63,6 +63,41 @@ TEST(ConfigTest, ConfigTrimsWhitespaceAndRejectsUnknownKeys) {
     EXPECT_FALSE(invalid.loadFromFile(invalidPath));
 }
 
+TEST(ConfigTest, AllocatorPairsParseAtomicallyFromCliAndConfig) {
+    Config cli;
+    ASSERT_TRUE(parse(cli,
+                      {"codeskeptic", "--allocator-pairs",
+                       "pool_alloc=pool_free,pool_alloc=pool_release",
+                       "x.cpp"}));
+    ASSERT_EQ(cli.allocatorPairs().count("pool_alloc"), 1u);
+    EXPECT_EQ(cli.allocatorPairs().at("pool_alloc").count("pool_free"), 1u);
+    EXPECT_EQ(cli.allocatorPairs().at("pool_alloc").count("pool_release"),
+              1u);
+
+    Config file;
+    const auto path = writeConfig(
+        "codeskeptic_allocator_pairs.conf",
+        "allocator_pairs = ns::make=ns::drop,ns::make=ns::release\n");
+    ASSERT_TRUE(file.loadFromFile(path));
+    ASSERT_EQ(file.allocatorPairs().count("ns::make"), 1u);
+    EXPECT_EQ(file.allocatorPairs().at("ns::make").size(), 2u);
+}
+
+TEST(ConfigTest, AllocatorPairsRejectMalformedValueWithoutPartialState) {
+    Config cli;
+    EXPECT_FALSE(parse(cli,
+                       {"codeskeptic", "--allocator-pairs",
+                        "pool_alloc=pool_free,missing_separator", "x.cpp"}));
+    EXPECT_TRUE(cli.allocatorPairs().empty());
+
+    Config file;
+    const auto path = writeConfig(
+        "codeskeptic_bad_allocator_pairs.conf",
+        "allocator_pairs = good_alloc=good_free,bad=entry=again\n");
+    EXPECT_FALSE(file.loadFromFile(path));
+    EXPECT_TRUE(file.allocatorPairs().empty());
+}
+
 TEST(ConfigTest, ConfigAndCliLayersCanCompleteOutputSelection) {
     Config config;
     const auto path = writeConfig("codeskeptic_layered.conf",
