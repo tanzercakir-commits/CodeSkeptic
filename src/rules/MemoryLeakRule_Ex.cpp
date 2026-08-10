@@ -421,6 +421,7 @@ std::vector<ReallocSite> reallocUpdates(const Stmt* stmt) {
 
 std::map<const CallExpr*, ReallocSite> collectReallocSites(
         const FunctionDecl* function) {
+    if (!function) return {};
     struct Visitor : RecursiveASTVisitor<Visitor> {
         std::map<const CallExpr*, ReallocSite> sites;
 
@@ -1327,6 +1328,7 @@ using OwnerRawResultSites =
 
 OwnerRawResultSites collectOwnerRawResultSites(
         const FunctionDecl* function) {
+    if (!function) return {};
     struct Visitor : RecursiveASTVisitor<Visitor> {
         OwnerRawResultSites sites;
 

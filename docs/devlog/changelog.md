@@ -20,6 +20,25 @@ outside the current verifier. Candidate contracts requiring human review:
 none. No `cs: ai` proposal can become accepted intent. The contract is locked
 before implementation and will not change during the correction.
 
+Both helpers now return an empty site map for a null function, with every
+non-null path unchanged. The corrected strict base/head semantic review covers
+all 12 changed C/C++ translation units and passes with `new_errors=0`,
+`new_warnings=0`, `weakened=0`; every analyzed function reaches a fixpoint.
+Direct and CTest suites remain 1164/1164. Self-scan is clean and complete at
+48/48 TUs, frozen thesis remains `clean_fp=0`, `bug_caught=9/15`, 11 findings,
+and corpus remains cJSON 54 (76 enumerated, 35 analyzed, 41 accepted broken
+fixtures) and tinyxml2 9 (3/3). Capability output remains schema 2 / rules 14 /
+supported 7 / out-of-scope 5, and ActionArgs remains 5/5. The final Windows
+product SHA-256 is
+`25e0a566990dedabf959a5c770079b362f5d462ae7af177cc81a8b2a9e9c120d`.
+
+The review also exposed two Windows-only harness defects: backslash paths in
+compile commands were not remapped to the base worktree, and native relative
+paths did not match Git's slash-separated coverage paths. Temporary
+referee-only corrections made the receipt trustworthy; the repository fix is
+queued in the separately declared documentation/automation maintenance
+follow-up rather than widening the completed Phase 7.5 implementation.
+
 ## 2026-08-10 — Phase 7.5 conservative exceptional ownership
 
 Phase 7 now has an explicit, measured exceptional-ownership boundary. CFG
@@ -54,17 +73,19 @@ self-scan is clean and complete at 48/48 TUs. Corpus remains cJSON 54 findings
 findings (3/3). The full unchanged 400-file/CWE Juliet replay passes every
 floor: CWE476 140/0, CWE401 105/15 (precision 0.875), CWE415 119/0, CWE416
 212/0, CWE369 43/0, and CWE190 23/0. The tested Windows product SHA-256 is
-`221d96bca0ed2c1f3e744af5685c38694f8f56791b430fdb070a8e1fa8ce5a39`.
+`25e0a566990dedabf959a5c770079b362f5d462ae7af177cc81a8b2a9e9c120d`.
 
 Contract-first shadow completion considered `CfgCache::get`, `runDataflow`,
 the exceptional-CFG opt-in trait, `classifyStmtEffects`,
-`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`, and
-`analyzeFunction`: proposals 0, eligible 0, rejected 0, unsupported 7. No
-proposal was eligible. Independent RED and CFG inspection exposed the API gap
-and the disconnected-cleanup assumption problem. Candidate contracts requiring
-later human review: none. No `cs: ai` proposal became accepted intent, and
-native memory-verification parity remains deferred to executable A7 fixtures.
-The locked eleven-file boundary was preserved.
+`MemLeakAnalysis::transferElement`, `MemLeakAnalysis::onCFGElement`,
+`analyzeFunction`, `collectReallocSites`, and `collectOwnerRawResultSites`:
+proposals 0, eligible 0, rejected 0, unsupported 9. No proposal was eligible.
+Independent RED, CFG inspection, and strict diff review exposed the API gap,
+the disconnected-cleanup assumption problem, and two internal null-boundary
+assumptions. Candidate contracts requiring later human review: none. No
+`cs: ai` proposal became accepted intent, and native memory-verification
+parity remains deferred to executable A7 fixtures. The locked eleven-file
+boundary was preserved.
 
 ## 2026-08-10 — Phase 7.5 exceptional cleanup and transfer boundary
 

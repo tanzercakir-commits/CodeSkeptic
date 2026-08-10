@@ -461,6 +461,22 @@ independently measurable RED-to-GREEN slices:
    the referees; this correction contract will not change during
    implementation.
 
+   **Review correction completed 2026-08-10.** Both helpers now return an
+   empty site map for a null function. The corrected strict base/head semantic
+   review covers all 12 changed C/C++ translation units and passes with
+   `new_errors=0`, `new_warnings=0`, `weakened=0`; every analyzed function
+   reaches a fixpoint. Direct and CTest suites remain 1164/1164. Self-scan is
+   clean and complete at 48/48 TUs, frozen thesis remains `clean_fp=0` and
+   `bug_caught=9/15` with 11 findings, corpus remains cJSON 54 (76 enumerated,
+   35 analyzed, 41 accepted broken fixtures) and tinyxml2 9 (3/3), capability
+   output remains schema 2 / rules 14 / supported 7 / out-of-scope 5, and
+   ActionArgs remains 5/5. The final Windows product SHA-256 is
+   `25e0a566990dedabf959a5c770079b362f5d462ae7af177cc81a8b2a9e9c120d`.
+   The review also exposed Windows path-remap and coverage-path honesty gaps in
+   the review harness; temporary referee-only corrections produced the receipt
+   above, while the repository fix remains in the separately declared
+   documentation/automation maintenance follow-up.
+
    **Completed 2026-08-10.** CFG cache entries now include both the implicit-
    destructor and EH-edge options, and analyses may explicitly opt into the EH
    graph without changing any default consumer. The compile RED established
@@ -494,13 +510,14 @@ independently measurable RED-to-GREEN slices:
    The unchanged 400-file/CWE Juliet floors pass: CWE476 140/0, CWE401 105/15
    (precision 0.875), CWE415 119/0, CWE416 212/0, CWE369 43/0, and CWE190
    23/0. The tested Windows product SHA-256 is
-   `221d96bca0ed2c1f3e744af5685c38694f8f56791b430fdb070a8e1fa8ce5a39`.
+   `25e0a566990dedabf959a5c770079b362f5d462ae7af177cc81a8b2a9e9c120d`.
 
-   Contract-first shadow completion considered the same seven functions:
-   proposals 0, eligible 0, rejected 0, unsupported 7. No proposal was
-   eligible, so none exposed an implementation problem. Independent compile
-   RED, semantic RED, CFG inspection, and precision fixtures exposed and
-   closed the cache gap and the disconnected-cleanup assumption problem.
+   Contract-first shadow completion considered the original seven functions
+   plus `collectReallocSites` and `collectOwnerRawResultSites`: proposals 0,
+   eligible 0, rejected 0, unsupported 9. No proposal was eligible.
+   Independent compile RED, semantic RED, CFG inspection, precision fixtures,
+   and strict diff review exposed and closed the cache gap, the disconnected-
+   cleanup assumption problem, and the two internal null-boundary assumptions.
    Candidate contracts requiring later human review: none. No `cs: ai`
    proposal became accepted intent. Member/heap/whole-project pointer identity
    and native memory-verification parity remain deferred to executable A7
