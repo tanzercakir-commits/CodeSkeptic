@@ -117,15 +117,120 @@ def accepted_receipt(
 
 
 class ManifestContractTest(unittest.TestCase):
-    def test_canonical_manifest_is_exact_nightly_core(self) -> None:
+    def test_canonical_manifest_is_exact_nightly_and_weekend_factory(self) -> None:
         manifest = campaign.load_manifest(MANIFEST)
         normalized = campaign.validate_manifest(manifest)
         self.assertEqual(
             {project["id"] for project in normalized["projects"]},
-            {"libgit2", "rtp2httpd", "abseil", "libarchive"},
+            {
+                "libgit2",
+                "rtp2httpd",
+                "abseil",
+                "libarchive",
+                "systemd",
+                "curl",
+                "redis",
+                "lvgl",
+            },
+        )
+        self.assertEqual(
+            normalized["campaigns"]["nightly"]["projects"],
+            ["libgit2", "rtp2httpd", "abseil", "libarchive"],
+        )
+        self.assertEqual(
+            normalized["campaigns"]["weekend"]["projects"],
+            ["systemd", "curl", "redis", "lvgl"],
         )
         self.assertEqual(normalized["campaigns"]["nightly"]["repetitions"], 3)
         self.assertLessEqual(normalized["campaigns"]["nightly"]["window_minutes"], 720)
+        self.assertEqual(normalized["campaigns"]["weekend"]["repetitions"], 3)
+        self.assertEqual(normalized["campaigns"]["weekend"]["window_minutes"], 2880)
+        self.assertEqual(
+            {
+                project["id"]: (
+                    project["revision"],
+                    project["expected"]["translation_units"],
+                    project["expected"]["translation_unit_sha256"],
+                )
+                for project in normalized["projects"]
+                if project["id"] in {"systemd", "curl", "redis", "lvgl"}
+            },
+            {
+                "systemd": (
+                    "009adf6c0e435376c80fbc11675d581e0a94d350",
+                    390,
+                    "5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c",
+                ),
+                "curl": (
+                    "b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a",
+                    169,
+                    "213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01",
+                ),
+                "redis": (
+                    "a0a6f23d997b024689ba157916837f493a593a34",
+                    103,
+                    "289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844",
+                ),
+                "lvgl": (
+                    "7f07a129e8d77f4984fff8e623fd5be18ff42e74",
+                    311,
+                    "30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50",
+                ),
+            },
+        )
+        self.assertEqual(
+            {
+                project["id"]: (
+                    project["expected"]["attempted_tus"],
+                    project["expected"]["analyzed_tus"],
+                    project["expected"]["broken_tus"],
+                    project["expected"]["incomplete_functions"],
+                    project["expected"]["findings"],
+                    project["expected"]["exit_code"],
+                    project["expected"]["fingerprint_sha256"],
+                )
+                for project in normalized["projects"]
+                if project["id"] in {"systemd", "curl", "redis", "lvgl"}
+            },
+            {
+                "systemd": (
+                    390,
+                    815,
+                    0,
+                    0,
+                    0,
+                    0,
+                    "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                ),
+                "curl": (
+                    169,
+                    169,
+                    0,
+                    0,
+                    59,
+                    1,
+                    "195b80888b1e4e788c67f4e6024f31e667767e50d66d3fc3d483e619b424f094",
+                ),
+                "redis": (
+                    103,
+                    206,
+                    0,
+                    0,
+                    0,
+                    0,
+                    "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                ),
+                "lvgl": (
+                    311,
+                    311,
+                    0,
+                    0,
+                    16,
+                    1,
+                    "687bfeaa19046230afd60e116bb0d2fe73361d8b931161e33029bd79988ae808",
+                ),
+            },
+        )
 
     def test_mutable_revision_duplicate_and_unsafe_command_fail(self) -> None:
         manifest = fixture_manifest()
@@ -164,6 +269,83 @@ class ManifestContractTest(unittest.TestCase):
             },
         )
         self.assertTrue(all(item["timeout_minutes"] <= 330 for item in matrix["include"]))
+
+    def test_weekend_window_is_between_36_and_48_hours(self) -> None:
+        manifest = fixture_manifest()
+        manifest["campaigns"]["weekend"] = {
+            "window_minutes": 2159,
+            "repetitions": 3,
+            "projects": ["alpha"],
+        }
+        with self.assertRaisesRegex(campaign.ManifestError, "weekend campaign window"):
+            campaign.validate_manifest(manifest)
+
+        manifest["campaigns"]["weekend"]["window_minutes"] = 2881
+        with self.assertRaisesRegex(campaign.ManifestError, "weekend campaign window"):
+            campaign.validate_manifest(manifest)
+
+        manifest["campaigns"]["weekend"]["window_minutes"] = 2880
+        campaign.validate_manifest(manifest)
+
+    def test_meson_and_bear_adapters_are_strictly_shaped(self) -> None:
+        manifest = fixture_manifest()
+        project = manifest["projects"][0]
+        project["commands"] = {
+            "configure": [
+                [
+                    "meson",
+                    "setup",
+                    "{build}",
+                    "{source}",
+                    "--buildtype=release",
+                ]
+            ],
+            "build": [["meson", "compile", "-C", "{build}", "app:executable"]],
+        }
+        campaign.validate_manifest(manifest)
+
+        project["commands"]["configure"] = [["meson", "introspect", "{build}"]]
+        with self.assertRaisesRegex(campaign.ManifestError, "meson configure shape"):
+            campaign.validate_manifest(manifest)
+
+        project["commands"] = {
+            "configure": [["meson", "setup", "{build}", "{source}"]],
+            "build": [["meson", "compile", "-C", "{build}", "--clean"]],
+        }
+        with self.assertRaisesRegex(campaign.ManifestError, "meson build shape"):
+            campaign.validate_manifest(manifest)
+
+        manifest = fixture_manifest()
+        project = manifest["projects"][0]
+        project["commands"]["build"] = [
+            [
+                "bear",
+                "--output",
+                "{build}/compile_commands.json",
+                "--",
+                "make",
+                "-C",
+                "{source}",
+                "-j{jobs}",
+                "CC=clang-20",
+                "MALLOC=libc",
+            ]
+        ]
+        campaign.validate_manifest(manifest)
+
+        project["commands"]["build"] = [
+            [
+                "bear",
+                "--output",
+                "{build}/compile_commands.json",
+                "--",
+                "make",
+                "-f",
+                "Injected.mk",
+            ]
+        ]
+        with self.assertRaisesRegex(campaign.ManifestError, "bear build shape"):
+            campaign.validate_manifest(manifest)
 
 
 class EvidenceContractTest(unittest.TestCase):
@@ -384,6 +566,12 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("timeout-minutes: 30", juliet)
         self.assertIn("workflow_dispatch:", realworld)
         self.assertIn("schedule:", realworld)
+        self.assertIn('cron: "17 1 * * *"', realworld)
+        self.assertIn("- weekend", realworld)
+        self.assertIn('cron: "43 0 * * 0"', realworld)
+        self.assertIn("github.event.schedule", realworld)
+        for dependency in ("meson", "bear", "gperf", "libcap-dev", "libmount-dev"):
+            self.assertIn(dependency, realworld)
         self.assertIn("fail-fast: false", realworld)
         self.assertIn("matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}", realworld)
         self.assertIn("timeout-minutes: 355", realworld)

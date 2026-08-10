@@ -24,8 +24,14 @@ SHA40 = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 PROJECT_ID = re.compile(r"[a-z0-9][a-z0-9-]*")
 FINGERPRINT = re.compile(r"csf1-[0-9a-f]{16}")
-ALLOWED_COMMANDS = {"cmake"}
+ALLOWED_COMMANDS = {"bear", "cmake", "meson"}
 ALLOWED_PLACEHOLDERS = {"source", "build", "jobs"}
+MESON_OPTION = re.compile(
+    r"(?:--buildtype=(?:debug|release|debugoptimized|minsize)|"
+    r"-D[A-Za-z0-9_-]+=[A-Za-z0-9_.+-]+)"
+)
+MESON_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
+MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=[A-Za-z0-9_.+-]+")
 REQUIRED_EXPECTED = {
     "translation_units",
     "translation_unit_sha256",
@@ -125,7 +131,54 @@ def _placeholders(token: str, field: str) -> None:
         raise ManifestError(f"{field} has unsupported placeholder {sorted(unknown)[0]!r}")
 
 
-def _validate_tokens(tokens: Any, field: str, *, command: bool) -> list[str]:
+def _validate_command_shape(tokens: list[str], field: str, group: str) -> None:
+    executable = tokens[0]
+    if executable == "cmake":
+        return
+    if executable == "meson":
+        if group == "configure":
+            if (
+                len(tokens) < 4
+                or tokens[:4] != ["meson", "setup", "{build}", "{source}"]
+                or any(not MESON_OPTION.fullmatch(token) for token in tokens[4:])
+            ):
+                raise ManifestError(f"{field} has an invalid meson configure shape")
+            return
+        if (
+            group != "build"
+            or len(tokens) < 4
+            or tokens[:4] != ["meson", "compile", "-C", "{build}"]
+            or any(not MESON_TARGET.fullmatch(token) for token in tokens[4:])
+        ):
+            raise ManifestError(f"{field} has an invalid meson build shape")
+        return
+    if executable == "bear":
+        prefix = [
+            "bear",
+            "--output",
+            "{build}/compile_commands.json",
+            "--",
+            "make",
+            "-C",
+            "{source}",
+        ]
+        if (
+            group != "build"
+            or tokens[: len(prefix)] != prefix
+            or len(tokens) <= len(prefix)
+            or any(
+                token != "-j{jobs}" and not MAKE_ASSIGNMENT.fullmatch(token)
+                for token in tokens[len(prefix) :]
+            )
+        ):
+            raise ManifestError(f"{field} has an invalid bear build shape")
+        return
+    raise ManifestError(f"{field} command executable {executable!r} is not admitted")
+
+
+def _validate_tokens(
+    tokens: Any, field: str, *, command: bool, command_group: str = ""
+) -> list[str]:
     if not isinstance(tokens, list) or not tokens:
         raise ManifestError(f"{field} must be a nonempty token array")
     if any(not isinstance(token, str) or not token or "\x00" in token or "\n" in token for token in tokens):
@@ -136,6 +189,8 @@ def _validate_tokens(tokens: Any, field: str, *, command: bool) -> list[str]:
         )
     for token in tokens:
         _placeholders(token, field)
+    if command:
+        _validate_command_shape(tokens, field, command_group)
     return list(tokens)
 
 
@@ -178,7 +233,12 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
         if not isinstance(rows, list) or not rows:
             raise ManifestError(f"project {project_id} commands.{group} must be nonempty")
         commands[group] = [
-            _validate_tokens(row, f"project {project_id} commands.{group}[{row_index}]", command=True)
+            _validate_tokens(
+                row,
+                f"project {project_id} commands.{group}[{row_index}]",
+                command=True,
+                command_group=group,
+            )
             for row_index, row in enumerate(rows)
         ]
 
@@ -298,6 +358,8 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
             raise ManifestError(f"campaign {name} references unknown project {unknown[0]}")
         if name == "nightly" and window > 720:
             raise ManifestError("nightly campaign window exceeds 12 hours")
+        if name == "weekend" and not 2160 <= window <= 2880:
+            raise ManifestError("weekend campaign window must be 36..48 hours")
         campaigns[name] = {
             "window_minutes": window,
             "repetitions": repetitions,
