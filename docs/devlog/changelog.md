@@ -1,5 +1,52 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.1 deterministic real-repository factory boundary
+
+Protected main contains the progress/review automation maintenance through PR
+#135 at `e146a434f17e61813cceb175ea8791c9065a1b38`, tree
+`fc719f17f30e32bac49d80dac5f80b4002e9f32b`. Running the documented sync on
+the new Phase 8 branch appended that protected-main transition to PROGRESS and
+regenerated TODO automatically, proving the owner-requested workflow before
+new product work began.
+
+The first Phase 8 boundary is the nightly core real-repository factory for
+libgit2, rtp2httpd, Abseil, and libarchive. A canonical manifest will bind each
+project to an immutable commit, controlled build recipe, exact translation-
+unit count and digest, expected coverage/finding/verdict tuple, timeout, and
+three independent repetitions. A validator/planner, single-shard runner, and
+separate aggregate referee will keep input eligibility, execution evidence,
+and deterministic acceptance distinct. Coverage gaps, unavailable verdicts,
+stale checkpoints, tampered receipts, missing repetitions, or semantic drift
+must fail closed with exit 2. Each shard keeps its own artifact; checksummed
+checkpoints are reusable only when every project/analyzer/manifest/recipe/TU
+identity matches.
+
+The Actions lane will build the analyzer once, fan out project-by-repetition
+shards, upload evidence even on failure, and aggregate independently. The
+nightly campaign may occupy a 12-hour aggregate window, but no hosted shard
+claims a duration beyond the platform job ceiling. Existing PR unit, CTest,
+cJSON, tinyxml2, self-scan, and Juliet work receives an explicit 30-minute job
+ceiling. Weekend and release-candidate tiers are deliberately excluded until
+their own pins and measured expectations are locked.
+
+The exact file set is `.github/workflows/ci.yml`,
+`.github/workflows/juliet.yml`, `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`scripts/check_realworld_ledger.py`, `scripts/realworld_expected.txt`,
+`tests/RealworldCampaignTest.py`, `tests/RealworldLedgerTest.py`,
+`tests/CMakeLists.txt`, `docs/benchmarks.md`, `docs/reproduce.md`,
+`docs/TODO.md`, `docs/PROGRESS.md`, and this changelog. No product C++,
+contract grammar, capability, profile, schema, release, or quality-floor
+change is admitted. The contract is separate from implementation and will not
+change during this slice.
+
+Contract-first shadow dogfood is not applicable: no C++ function is created or
+materially changed. Functions considered 0; proposals 0; eligible 0; rejected
+0; unsupported 0. No proposal exposed a problem, there are no candidate
+contracts for later human review, and no `cs: ai` proposal can become accepted
+intent. Native owned-memory semantics remain deferred to executable A7
+fixtures.
+
 ## 2026-08-10 — Verified progress and Windows review maintenance boundary
 
 Phase 7 is merged through protected-main PR #134 at

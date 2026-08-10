@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = 47b03f4
-in_flight     = phase-progress-automation
-verified_main = 47b03f4
-progress      = sha256:65e44b23b57b417a4e07f7595e84f2ba8704ed8d1976225d279dba4eae745cf0
+base          = e146a43
+in_flight     = phase-realworld-test-factory
+verified_main = e146a43
+progress      = sha256:f912666b0c80a64febd031a30043cb60bcafb49f8070fef4287b224807297e1d
 ```
 <!-- cs:state-end -->
 
@@ -530,7 +530,7 @@ Phase 7 exits only when addressable UAF/double-free/leak recall rises,
 double-free precision floors remain at least 0.95, clean corpora stay clean,
 and every local/CI referee passes without weakening an existing floor.
 
-## Documentation/progress automation maintenance — VERIFIED, MERGE PENDING (2026-08-10)
+## Documentation/progress automation maintenance — MERGED (2026-08-10)
 
 Phase 7 is merged through protected-main PR #134 at
 `47b03f4076f246c38a81fbc834693bed0f98ccc4`, tree
@@ -590,6 +590,76 @@ checks. These are branch verification facts only; this slice becomes
 `MERGED` solely after protected main contains its squash commit and a later
 `sync` appends that git fact to PROGRESS.
 
+Protected main now contains the maintenance squash as PR #135 commit
+`e146a434f17e61813cceb175ea8791c9065a1b38`, tree
+`fc719f17f30e32bac49d80dac5f80b4002e9f32b`. The first Phase 8 branch sync
+mechanically appended that transition to `docs/PROGRESS.md` and regenerated
+the state block above; no manual completion statement supplied authority.
+
+## Phase 8.1 — deterministic real-repository test factory — BOUNDARY LOCKED (2026-08-10)
+
+Phase 8 starts with the nightly core factory: libgit2, rtp2httpd, Abseil, and
+libarchive. Each project is defined once in a canonical machine-readable
+manifest with its immutable 40-hex commit, repository URL, controlled
+configure/build recipe, source selection, exact sorted translation-unit count
+and SHA-256, expected analyzer coverage, expected finding/verdict tuple,
+per-shard timeout, and three required independent repetitions. Mutable refs,
+implicit current HEAD, partial translation-unit success, and an unclassified
+verdict are invalid campaign inputs.
+
+The runner has three separate authorities. `plan` validates the manifest and
+emits a project-by-repetition matrix without executing projects. `run` checks
+out one exact revision, produces a real compile database, derives and hashes
+the exact translation-unit list, executes one analyzer process under its time
+and memory boundary, and writes a receipt even when the verdict is
+unavailable. `aggregate` verifies receipt and artifact checksums and accepts a
+project only when all three independent receipts have identical semantic
+coverage, finding fingerprints, and exit classification. Duration and host
+metadata are evidence but are not part of semantic equality. Missing,
+malformed, timed-out, stale, checksum-mismatched, broken, incomplete, skipped,
+or solver-error evidence fails closed with exit 2.
+
+Checkpoints are optimization evidence, never truth. A checkpoint may be
+resumed only when its schema, manifest digest, project commit, analyzer digest,
+recipe digest, translation-unit digest, and repetition identity all match the
+requested shard; otherwise the project is rerun. Receipts carry SHA-256
+sidecars, aggregation is order-independent, and one project failure cannot
+erase the other project artifacts. GitHub Actions builds the analyzer once,
+fans out the matrix into independent shards, always uploads each shard's
+evidence, and gates the campaign in a separate aggregate job. The nightly
+campaign has an honest aggregate window of at most 12 hours while each hosted
+runner shard stays below the platform job limit. Later weekend and release-
+candidate tiers will be separately bounded with measured pins and expectations
+instead of being fabricated in this slice.
+
+The ordinary PR contract remains fast and explicit: unit/full CTest, cJSON,
+tinyxml2, self-scan, and the bounded Juliet PR sample each have a 30-minute job
+ceiling. No floor, test, corpus expectation, or hook is weakened. RED-first
+tests must reject mutable pins, duplicate identities, unsafe command shapes,
+translation-unit drift, incomplete coverage, unavailable verdicts, stale
+checkpoints, receipt tampering, missing repetitions, and nondeterministic
+results, and must statically verify the workflow budget/sharding contract.
+
+The exact Phase 8.1 file set is `.github/workflows/ci.yml`,
+`.github/workflows/juliet.yml`, `.github/workflows/realworld.yml`,
+`scripts/realworld_manifest.json`, `scripts/run_realworld_campaign.py`,
+`scripts/check_realworld_ledger.py`, `scripts/realworld_expected.txt`,
+`tests/RealworldCampaignTest.py`, `tests/RealworldLedgerTest.py`,
+`tests/CMakeLists.txt`, `docs/benchmarks.md`, `docs/reproduce.md`, this TODO,
+`docs/PROGRESS.md`, and `docs/devlog/changelog.md`. Product/runtime C++,
+contract grammar, accepted contract intent, capability tiers, profiles,
+summary schemas, release configuration, and all quality floors remain
+unchanged. This development contract is stored separately from implementation
+and will not change during the slice.
+
+Contract-first shadow dogfood is not applicable because Phase 8.1 creates or
+materially changes no C++ function. Functions considered 0; proposals 0;
+eligible 0; rejected 0; unsupported 0. No proposal exposed an implementation
+or assumption problem. Candidate contracts requiring later human review:
+none. No `cs: ai` proposal can become accepted intent. Native pointer,
+ownership, heap, alias, and lifetime parity remain deferred to executable A7
+fixtures.
+
 ## Açık kullanıcı kararları
 
 Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
@@ -600,10 +670,11 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 
-Phase 7 lifetime-v2 is delivered by PR #134. The separately bounded
-documentation/progress and Windows review-harness maintenance slice above is
-locally verified and awaiting protected-main merge; the next product stage
-starts only after that merge is mechanically observed.
+Phase 7 lifetime-v2 is delivered by PR #134 and the automation maintenance is
+delivered by PR #135. Phase 8.1 is active on
+`phase-realworld-test-factory` under the locked boundary above. Weekend and
+release-candidate factory tiers follow only after the nightly core receipts
+are repeatable.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 
