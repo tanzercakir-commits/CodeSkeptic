@@ -46,6 +46,10 @@ class CandidateContractTest(unittest.TestCase):
         )
         self.assertEqual(projects["shadps4"]["checkout"]["submodules"], "recursive")
         self.assertEqual(projects["tensorflow-lite"]["sources"]["roots"], ["tensorflow/lite"])
+        self.assertIn(
+            "-DTENSORFLOW_SOURCE_DIR={source}",
+            projects["tensorflow-lite"]["commands"]["configure"][0],
+        )
         self.assertIn("-DTFLITE_ENABLE_XNNPACK=OFF", projects["tensorflow-lite"]["commands"]["configure"][0])
         self.assertTrue(
             all(project["sources"]["fallback_globs"] == [] for project in projects.values())
@@ -77,6 +81,20 @@ class CandidateContractTest(unittest.TestCase):
         raw = qualification._load_document(DOCUMENT)
         raw["projects"][0]["checkout"]["submodules"] = "recursive"
         with self.assertRaisesRegex(campaign.ManifestError, "only for shadps4"):
+            qualification.validate_candidates(raw)
+
+        raw = qualification._load_document(DOCUMENT)
+        raw["projects"][2]["commands"]["configure"][0].remove(
+            "-DTENSORFLOW_SOURCE_DIR={source}"
+        )
+        with self.assertRaisesRegex(campaign.ManifestError, "must bind the pinned"):
+            qualification.validate_candidates(raw)
+
+        raw = qualification._load_document(DOCUMENT)
+        raw["projects"][0]["commands"]["configure"][0].append(
+            "-DTENSORFLOW_SOURCE_DIR={source}"
+        )
+        with self.assertRaisesRegex(campaign.ManifestError, "configure shape"):
             qualification.validate_candidates(raw)
 
     def test_plan_is_one_bounded_observation_per_candidate(self) -> None:
