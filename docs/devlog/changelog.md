@@ -1,5 +1,22 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 8.3 shadPS4 standard-library correction
+
+The first hosted shadPS4 observation in workflow run `31391276839` completed
+2,073 of 2,452 build steps and then failed closed before analysis. The proposed
+`-stdlib=libc++` compiler and linker flags selected Ubuntu's libc++ 18, whose
+C++23 library surface lacks the `std::jthread` and `std::stop_token` types used
+by the pinned shadPS4 sources. The upstream production Linux workflow uses
+clang with the default libstdc++.
+
+The observational recipe now removes only those two standard-library override
+flags. A RED-first test reproduced the invalid recipe and now prevents the
+libc++ override from returning. The pinned commit, 53 recursive submodules,
+production target, source roots, and fail-closed evidence requirements remain
+unchanged. Hosted observation is still the referee. No C++ function changed,
+so contract-first shadow dogfood is not applicable and no `cs: ai` proposal
+became accepted intent.
+
 ## 2026-08-10 — Phase 8.3 TensorFlow Lite source-binding correction
 
 The first hosted TensorFlow Lite observation in workflow run `31391276839`

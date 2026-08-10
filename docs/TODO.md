@@ -873,6 +873,16 @@ only TensorFlow source. A RED-first contract test requires that exact binding
 once and rejects it for every other candidate. No finding or expectation was
 accepted from the failed observation; the corrected hosted rerun is pending.
 
+The same first hosted run returned shadPS4 `unavailable` before analysis after
+2,073 of 2,452 Ninja steps. The proposed `-stdlib=libc++` flags selected
+Ubuntu's libc++ 18, which does not provide the C++23 `std::jthread` and
+`std::stop_token` surface required by this pin. The pinned upstream production
+Linux workflow uses clang with the default libstdc++ instead. The observational
+recipe now removes only those two libc++ compiler/linker flags; a RED-first
+test forbids their return. The recursive submodule identity, immutable project
+revision, production target, source roots, and all acceptance requirements are
+unchanged. The corrected hosted rerun remains the referee.
+
 Resource constraint for the remaining qualification: do not run shadPS4 or
 TensorFlow Lite heavy builds locally. Local work is limited to low-memory,
 sequential configure/identity probes; full builds, analyzer scans, repetitions,
