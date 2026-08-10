@@ -197,11 +197,19 @@ evidence commit is
 
 Phase 8 adds Abseil `5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a`
 and libarchive `27cbc7827172698143e440801fc0ba39ccb4f1f5` to
-the nightly core. The pre-publication Linux qualification used analyzer
-SHA-256 `e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
-All twelve receipts (four projects times three independent repetitions) were
-accepted by the separate aggregate referee with manifest SHA-256
-`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
+the nightly core. GitHub workflow run
+[`31370373875`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31370373875)
+independently accepted all twelve receipts (four projects times three
+repetitions) at commit `856cdc73a4ce245eb70cdf73da2c35fcd02545e7`.
+The hosted campaign used analyzer SHA-256
+`146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3`,
+manifest SHA-256
+`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`,
+and aggregate receipt SHA-256
+`08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
+An earlier local Linux qualification used analyzer SHA-256
+`e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`
+and produced the same project semantics and fingerprint identities.
 
 | Project | Requested / analyzed executions | Findings | Fingerprint SHA-256 |
 |---|---:|---:|---|
@@ -214,8 +222,8 @@ The libarchive ratio is intentional: 132 exact requested source files produce
 255 analysis executions in whole-program mode. The manifest pins both values,
 requires zero broken TUs and zero incomplete functions, and rejects either
 value drifting. Historical measurements are not silently promoted into the
-current-engine authority. Publication CI must independently reproduce the
-same manifest semantics with one analyzer digest before the branch is merged.
+current-engine authority. Publication CI reproduced the same manifest
+semantics with one campaign-wide analyzer digest before merge.
 
 Exit 1 is material evidence here: under the fail-closed contract it means a
 complete verdict with findings, whereas any broken requested TU or unavailable

@@ -660,7 +660,7 @@ none. No `cs: ai` proposal can become accepted intent. Native pointer,
 ownership, heap, alias, and lifetime parity remain deferred to executable A7
 fixtures.
 
-**Local qualification complete; publication evidence pending.** The Linux
+**Local and GitHub qualification complete; protected-main merge pending.** The Linux
 referee accepted all twelve receipts from analyzer SHA-256
 `e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
 The three independent repetitions agree for libgit2 (167/167, 39 findings),
@@ -668,8 +668,15 @@ rtp2httpd (38/38, 24), Abseil (158/158, 12), and libarchive (132 requested,
 255 whole-program executions, 38). All have zero broken TUs and zero
 incomplete functions. The aggregate manifest SHA-256 is
 `f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
-Phase 8.1 remains active until the publication workflow independently
-reproduces the receipts and protected main contains the merged result.
+GitHub workflow run
+[`31370373875`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31370373875)
+independently accepted plan, one analyzer build, all 12 shards, and the
+aggregate referee at commit `856cdc73a4ce245eb70cdf73da2c35fcd02545e7`.
+Its campaign-wide analyzer SHA-256 is
+`146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
+its checksummed aggregate receipt SHA-256 is
+`08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
+Phase 8.1 remains active until protected main contains the merged result.
 
 The hardened factory contract has 12/12 Python tests. It covers early
 unavailable shard receipts, campaign-wide single-analyzer identity, semantic

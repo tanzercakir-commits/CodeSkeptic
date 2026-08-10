@@ -45,7 +45,15 @@ Per-project results are libgit2 167/167 and 39 findings, rtp2httpd 38/38 and
 24, Abseil 158/158 and 12, and libarchive 132 requested / 255 analyzed and 38;
 all have zero broken TUs, zero incomplete functions, exit 1, and identical
 fingerprint identities across three repetitions. Remote publication evidence
-and protected-main merge remain pending.
+was then independently reproduced by GitHub workflow run
+[`31370373875`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31370373875)
+at commit `856cdc73a4ce245eb70cdf73da2c35fcd02545e7`: plan, one analyzer
+build, all twelve shards, and the aggregate referee passed. The hosted
+campaign-wide analyzer SHA-256 is
+`146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
+the checksummed aggregate receipt SHA-256 is
+`08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
+Protected-main merge remains pending.
 
 Local release gates are green: the deterministic factory suite passes 12/12,
 the full NMake/CTest suite passes 1166/1166, the direct C++ suite passes

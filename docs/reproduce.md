@@ -116,6 +116,10 @@ Receipts and their `.sha256` sidecars are uploaded per shard even when the
 verdict is unavailable; the aggregate receipt is a distinct artifact. Current
 immutable receipts and the interpretation contract are recorded in
 [benchmarks.md](benchmarks.md#current-engine-real-world-replay-ledger).
+The first accepted hosted factory evidence is GitHub workflow run
+[`31370373875`](https://github.com/tanzercakir-commits/CodeSkeptic/actions/runs/31370373875);
+its aggregate receipt SHA-256 is
+`08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
 
 ## What the guards mean
 
