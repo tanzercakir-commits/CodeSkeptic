@@ -15,3 +15,11 @@
 Evidence: commit `47b03f4076f246c38a81fbc834693bed0f98ccc4`; tree `d21f47b802f5a824626501d39425e98fb6509142`.
 
 <!-- cs:progress-cursor: 47b03f4076f246c38a81fbc834693bed0f98ccc4 -->
+
+## 2026-08-10 — Automate verified progress and harden Windows diff review (#135) — MERGED
+
++ Protected main contains this transition; no phase branch or prose
+  record is treated as completion authority.
+Evidence: commit `e146a434f17e61813cceb175ea8791c9065a1b38`; tree `fc719f17f30e32bac49d80dac5f80b4002e9f32b`.
+
+<!-- cs:progress-cursor: e146a434f17e61813cceb175ea8791c9065a1b38 -->

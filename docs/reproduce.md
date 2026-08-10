@@ -67,15 +67,54 @@ finding by its dataflow trace. `docs/evaluate.md` turns that into a
 one-hour protocol for *your* codebase — which is the measurement that
 should actually convince you.
 
-The CI-sized replay is `.github/workflows/realworld.yml`, triggered by
-moving the dedicated `realworld-scan` branch. It builds pinned libgit2
-and rtp2httpd revisions, derives an explicit source list from each real
-`compile_commands.json`, and treats exit 2 or any TU/count drift as a
-failure. Results and tail logs are mirrored to
-`refs/ci-logs/<commit>/realworld` for independent readback.
-The exact revisions and expected verdicts come from the single executable
-ledger, [`scripts/realworld_expected.txt`](../scripts/realworld_expected.txt);
-the current immutable receipt and replay command contract are recorded in
+The CI replay is `.github/workflows/realworld.yml`, scheduled nightly and also
+available through `workflow_dispatch` with the pinned `nightly` tier. It builds
+CodeSkeptic once, then runs independent libgit2, rtp2httpd, Abseil, and
+libarchive project-by-repetition shards. Each project is checked out at an
+immutable commit, configured through its real build system, and analyzed from
+an exact source list derived from `compile_commands.json` plus only explicitly
+admitted fallback files. Exit 2, timeout, broken/incomplete/skipped coverage,
+TU drift, receipt tampering, a missing repetition, or semantic disagreement is
+a failure.
+
+`attempted_tus` is the exact requested source-list size. `analyzed_tus` is the
+analyzer execution count and can be larger only when an admitted mode such as
+`--whole-program` performs additional executions. It must never be smaller
+than `attempted_tus`; both values are pinned per project, while any broken TU
+or incomplete function remains an unavailable verdict.
+
+The single executable authority is
+[`scripts/realworld_manifest.json`](../scripts/realworld_manifest.json); the
+legacy `realworld_expected.txt` path is only a compatibility pointer. Validate
+and inspect the deterministic matrix without cloning any project:
+
+```bash
+python3 scripts/check_realworld_ledger.py
+python3 scripts/run_realworld_campaign.py plan --tier nightly
+```
+
+One shard can be reproduced with the same built Linux analyzer:
+
+```bash
+python3 scripts/run_realworld_campaign.py run \
+  --project libgit2 --repetition 1 \
+  --analyzer ./build/src/codeskeptic \
+  --workspace realworld-work \
+  --output receipts/libgit2/repeat-1/receipt.json \
+  --checkpoint checkpoints/libgit2/repeat-1/receipt.json
+```
+
+After all three receipts for every project exist, run the separate referee:
+
+```bash
+python3 scripts/run_realworld_campaign.py aggregate \
+  --tier nightly --receipts receipts \
+  --output aggregate/receipt.json
+```
+
+Receipts and their `.sha256` sidecars are uploaded per shard even when the
+verdict is unavailable; the aggregate receipt is a distinct artifact. Current
+immutable receipts and the interpretation contract are recorded in
 [benchmarks.md](benchmarks.md#current-engine-real-world-replay-ledger).
 
 ## What the guards mean

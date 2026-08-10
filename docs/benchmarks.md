@@ -172,13 +172,15 @@ recall 0.095. The guard file comments carry each move's rationale.
 
 ## Current-engine real-world replay ledger
 
-The canonical executable expectations live in
-[`scripts/realworld_expected.txt`](../scripts/realworld_expected.txt).
-The real-world workflow reads that file for project revisions, translation-unit
-surfaces, finding counts and exit codes; those values are not duplicated in
-workflow shell. A deliberate semantic change therefore updates one ledger in
-the same reviewed change, while an unexplained surface/count/verdict drift is
-red.
+The canonical executable expectations live in the structured
+[`scripts/realworld_manifest.json`](../scripts/realworld_manifest.json).
+The real-world workflow does not duplicate project recipes or values in shell.
+For each project the manifest pins the immutable commit, controlled configure
+and build token arrays, exact sorted translation-unit count and SHA-256,
+coverage, finding count, exit classification, finding-fingerprint SHA-256,
+timeout, memory ceiling, and repetition policy. A deliberate semantic change
+therefore updates one reviewed authority, while an unexplained input,
+surface, finding-identity, coverage, or verdict drift is red.
 
 The current receipt was measured on 2026-08-08 UTC with analyzer tree
 [`125a915a458e108b631d48b1dfdd92cd49089c6b`](https://github.com/tanzercakir-commits/CodeSkeptic/commit/125a915a458e108b631d48b1dfdd92cd49089c6b)
@@ -193,10 +195,41 @@ evidence commit is
 | libgit2 (`v1.9.0`) | `338e6fb681369ff0537719095e22ce9dc602dbf0` | 167/167, exit 1 | 34 | 11 confirmed OOM-path leaks; no full 34-finding partition claimed here |
 | rtp2httpd | `a7a1e568d46ee3176f8a3e94e0f88f131ebd444e` | 38/38, exit 1 | 4 | 4 actionable findings + 0 context false positives |
 
+Phase 8 adds Abseil `5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a`
+and libarchive `27cbc7827172698143e440801fc0ba39ccb4f1f5` to
+the nightly core. The pre-publication Linux qualification used analyzer
+SHA-256 `e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
+All twelve receipts (four projects times three independent repetitions) were
+accepted by the separate aggregate referee with manifest SHA-256
+`f8cae660758d1df9aeb0c931fa4a13028ffe8dd18d3645b12f220d601b765c36`.
+
+| Project | Requested / analyzed executions | Findings | Fingerprint SHA-256 |
+|---|---:|---:|---|
+| libgit2 | 167 / 167 | 39 | `34874313efb0f492f08b77d9ab17d7ac4fe478dec41fa57fe563675334635cd3` |
+| rtp2httpd | 38 / 38 | 24 | `12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f` |
+| Abseil | 158 / 158 | 12 | `3c022eaaac3da402b3076efcb7960e8d67eaa612c3e6c1b822e77c67f1a4157f` |
+| libarchive | 132 / 255 | 38 | `5db1b06b24804f3d7864131525ebdc2be500778f33e8c0021866cc4632bcf10a` |
+
+The libarchive ratio is intentional: 132 exact requested source files produce
+255 analysis executions in whole-program mode. The manifest pins both values,
+requires zero broken TUs and zero incomplete functions, and rejects either
+value drifting. Historical measurements are not silently promoted into the
+current-engine authority. Publication CI must independently reproduce the
+same manifest semantics with one analyzer digest before the branch is merged.
+
 Exit 1 is material evidence here: under the fail-closed contract it means a
 complete verdict with findings, whereas any broken requested TU or unavailable
 analysis would be exit 2. Historical table numbers remain historical and are
 never substituted for this current-engine replay.
+
+The workflow builds CodeSkeptic once, then fans out one job per project and
+repetition with `fail-fast: false`. Every shard writes a checksummed receipt,
+including an explicit unavailable receipt on analyzer or evidence failure. A
+separate aggregate referee verifies checksums, identities, exact coverage, and
+three-way semantic equality; duration and host metadata do not weaken or alter
+that equality. A checkpoint is reused only when its manifest, project,
+revision, recipe, analyzer, translation-unit, and repetition identities all
+match.
 
 ## Reading the real-world scan numbers
 
