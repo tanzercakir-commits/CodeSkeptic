@@ -1,5 +1,25 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-10 — Phase 7 strict-review correction boundary
+
+The corrected Windows base/head semantic diff review passes its blocking and
+contract gates, but reports two new experimental assumption findings:
+`collectReallocSites` and `collectOwnerRawResultSites` dereference their
+internal `FunctionDecl*` parameters without a local null boundary. Quality
+policy treats these report-only findings as review work rather than leaving
+them behind.
+
+The locked correction is deliberately narrower than the existing Phase 7.5
+boundary. A null function returns an empty site map; every non-null path keeps
+its current behavior. No allocator-family, alias, owner, cleanup, summary, or
+native pointer authority changes. The exact file set is
+`src/rules/MemoryLeakRule_Ex.cpp`, `docs/TODO.md`, and this changelog.
+Contract-first shadow pre-screen considered the two helpers: proposals 0,
+eligible 0, rejected 0, unsupported 2 because native pointer nullability is
+outside the current verifier. Candidate contracts requiring human review:
+none. No `cs: ai` proposal can become accepted intent. The contract is locked
+before implementation and will not change during the correction.
+
 ## 2026-08-10 — Phase 7.5 conservative exceptional ownership
 
 Phase 7 now has an explicit, measured exceptional-ownership boundary. CFG

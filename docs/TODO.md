@@ -443,6 +443,24 @@ independently measurable RED-to-GREEN slices:
    the referee; this pre-implementation contract record will not change during
    the slice.
 
+   **Review-correction contract locked 2026-08-10.** The strict base/head
+   semantic review exposed two new experimental assumption findings in
+   `collectReallocSites` and `collectOwnerRawResultSites`: each internal
+   `FunctionDecl*` parameter was dereferenced without a local null boundary.
+   Before implementation, the correction is restricted to returning an empty
+   site map for a null function and preserving all behavior for a non-null
+   function. It grants no allocator, alias, ownership, cleanup, or proof
+   authority. The exact correction file set is
+   `src/rules/MemoryLeakRule_Ex.cpp`, this TODO, and
+   `docs/devlog/changelog.md`, all already inside the locked Phase 7.5
+   boundary. Contract-first shadow pre-screen considered the two helpers:
+   proposals 0, eligible 0, rejected 0, unsupported 2 because native pointer
+   nullability is outside the current verifier. Candidate contracts requiring
+   human review: none. No `cs: ai` proposal can become accepted intent. The
+   corrected strict diff review, full suite, and existing product floors are
+   the referees; this correction contract will not change during
+   implementation.
+
    **Completed 2026-08-10.** CFG cache entries now include both the implicit-
    destructor and EH-edge options, and analyses may explicitly opt into the EH
    graph without changing any default consumer. The compile RED established
