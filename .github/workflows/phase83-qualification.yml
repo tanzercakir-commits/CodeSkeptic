@@ -78,7 +78,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang-20 cmake ninja-build libc++-dev libc++abi-dev \
+            clang-20 cmake ninja-build libc++-20-dev libc++abi-20-dev \
             libx11-dev libxext-dev libwayland-dev libdecor-0-dev \
             libxkbcommon-dev libxcursor-dev libxi-dev libxss-dev \
             libxtst-dev libxrandr-dev libxfixes-dev libudev-dev uuid-dev

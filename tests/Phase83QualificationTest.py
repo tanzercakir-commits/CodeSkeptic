@@ -45,12 +45,9 @@ class CandidateContractTest(unittest.TestCase):
             "a481b10260dfdf833a1b16007eead49c1d7febf3",
         )
         self.assertEqual(projects["shadps4"]["checkout"]["submodules"], "recursive")
-        self.assertFalse(
-            any(
-                "-stdlib=libc++" in token
-                for token in projects["shadps4"]["commands"]["configure"][0]
-            )
-        )
+        shadps4_configure = projects["shadps4"]["commands"]["configure"][0]
+        self.assertIn("-DCMAKE_CXX_FLAGS=-stdlib=libc++", shadps4_configure)
+        self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++", shadps4_configure)
         self.assertEqual(projects["tensorflow-lite"]["sources"]["roots"], ["tensorflow/lite"])
         self.assertIn(
             "-DTENSORFLOW_SOURCE_DIR={source}",
@@ -133,6 +130,49 @@ class CandidateContractTest(unittest.TestCase):
         with self.assertRaisesRegex(campaign.EvidenceError, "empty"):
             qualification.parse_submodule_status("")
 
+    def test_target_commands_exclude_configured_non_target_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            build = root / "build"
+            production = source / "src" / "production.cc"
+            configured_only = source / "src" / "configured_only.cc"
+            dependency = source / "third_party" / "dependency.cc"
+            external = root / "external.cc"
+            files = [configured_only, production]
+            relative_files = [
+                "src/configured_only.cc",
+                "src/production.cc",
+            ]
+            commands = (
+                f"clang++ -c {production} -o production.cc.o\n"
+                f"clang++ -c {dependency} -o dependency.cc.o\n"
+                "ar qc libproduction.a production.cc.o dependency.cc.o\n"
+            )
+            selected, relative = qualification.filter_target_translation_units(
+                commands, source, build, files, relative_files
+            )
+            self.assertEqual(selected, [production])
+            self.assertEqual(relative, ["src/production.cc"])
+
+            with self.assertRaisesRegex(campaign.EvidenceError, "target closure"):
+                qualification.filter_target_translation_units(
+                    "clang++ -c malformed.cc -o malformed.cc.o\n",
+                    source,
+                    build,
+                    files,
+                    relative_files,
+                )
+
+            with self.assertRaisesRegex(campaign.EvidenceError, "source tree"):
+                qualification.filter_target_translation_units(
+                    f"clang++ -c {external} -o external.cc.o\n",
+                    source,
+                    build,
+                    [external],
+                    ["../external.cc"],
+                )
+
     def test_run_failure_writes_unavailable_receipt_and_checksum(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -171,6 +211,8 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("max-parallel: 3", workflow)
         self.assertIn("if: always()", workflow)
         self.assertIn("phase83_qualification.py run", workflow)
+        self.assertIn("libc++-20-dev libc++abi-20-dev", workflow)
+        self.assertNotIn("libc++-dev libc++abi-dev", workflow)
         self.assertNotIn("pull_request_target", workflow)
         self.assertNotIn("continue-on-error", workflow)
 
