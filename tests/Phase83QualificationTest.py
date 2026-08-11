@@ -46,8 +46,16 @@ class CandidateContractTest(unittest.TestCase):
         )
         self.assertEqual(projects["shadps4"]["checkout"]["submodules"], "recursive")
         shadps4_configure = projects["shadps4"]["commands"]["configure"][0]
-        self.assertIn("-DCMAKE_CXX_FLAGS=-stdlib=libc++", shadps4_configure)
-        self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++", shadps4_configure)
+        self.assertIn("-DCMAKE_C_COMPILER=clang-19", shadps4_configure)
+        self.assertIn("-DCMAKE_CXX_COMPILER=clang++-19", shadps4_configure)
+        self.assertIn(
+            "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON", shadps4_configure
+        )
+        self.assertIn("-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=mold", shadps4_configure)
+        self.assertIn("-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=mold", shadps4_configure)
+        self.assertFalse(any("-stdlib=libc++" in arg for arg in shadps4_configure))
+        self.assertNotIn("-DENABLE_DISCORD_RPC=OFF", shadps4_configure)
+        self.assertNotIn("-DENABLE_UPDATER=OFF", shadps4_configure)
         self.assertEqual(projects["tensorflow-lite"]["sources"]["roots"], ["tensorflow/lite"])
         self.assertIn(
             "-DTENSORFLOW_SOURCE_DIR={source}",
@@ -211,8 +219,9 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("max-parallel: 3", workflow)
         self.assertIn("if: always()", workflow)
         self.assertIn("phase83_qualification.py run", workflow)
-        self.assertIn("libc++-20-dev libc++abi-20-dev", workflow)
-        self.assertNotIn("libc++-dev libc++abi-dev", workflow)
+        self.assertIn("clang-19 clang-20 cmake ninja-build mold build-essential", workflow)
+        self.assertIn("libpulse-dev libopenal-dev", workflow)
+        self.assertNotIn("libc++", workflow)
         self.assertNotIn("pull_request_target", workflow)
         self.assertNotIn("continue-on-error", workflow)
 

@@ -30,15 +30,20 @@ blocking findings and normal exit 1. Its fingerprint digest is
 and report SHA-256 is
 `717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
 
-The latest shadPS4 hosted build showed that Clang 20 with GCC 14's default
-libstdc++ is not a valid recipe for the pinned sources. A disposable Ubuntu
-probe established that versioned libc++ 20 provides the required C++23
-`std::jthread` and `std::stop_token` surface. The workflow now installs
-`libc++-20-dev` and `libc++abi-20-dev`, while the candidate restores
-`-stdlib=libc++` for compilation and executable linking. The three-candidate
-hosted rerun remains the referee; no canonical expectation, production factory
-membership, or accepted contract intent changed. No C++ production function
-changed, so the contract-first shadow counts are all zero.
+The first shadPS4 hosted build showed that Clang 20 with GCC 14's default
+libstdc++ is not a valid recipe for the pinned sources. A narrow disposable
+Ubuntu probe established only that libc++ 20 exposes the required C++23
+`std::jthread` and `std::stop_token` surface (`_LIBCPP_VERSION=200100`). The
+complete libc++ rerun reached step 2,181 of 2,452 and then disproved that recipe
+because the packaged library does not expose `std::chrono::current_zone()`.
+The immutable upstream production workflow is the stronger recipe authority:
+Ubuntu 24.04, Clang 19 with the default libstdc++, and mold. RED-first contract
+assertions now pin those shadPS4 compiler and linker choices, preserve its
+upstream-enabled Discord/updater surface, and enable Release IPO; llama.cpp
+and TensorFlow Lite remain on Clang 20. The three-candidate hosted rerun
+remains the referee; no canonical expectation, production factory membership,
+or accepted contract intent changed. No C++ production function changed, so
+the contract-first shadow counts are all zero.
 
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
