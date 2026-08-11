@@ -944,8 +944,16 @@ reached step 433 of 2,554, where CMake's C++23 dependency scan proved the
 runner package set lacked `clang-scan-deps-19`; the checksummed unavailable
 receipt records build exit 127. The workflow now installs the matching
 `clang-tools-19` package rather than weakening IPO or the production surface.
-The next hosted run remains the authority for the full build, translation-unit
-identity, and analyzer receipt.
+That corrected hosted run completed all 2,554 build steps, then exposed a
+qualification-parser defect: CMake's Clang dependency-scanner commands place
+the admitted source path before `-c`, while the observer required it after
+`-c`. The checksummed unavailable receipt therefore records an invalid target
+closure even though the build succeeded. A RED-first regression now preserves
+that real command form, and target selection matches tokens position-
+independently against the already validated compile-database surface while
+still rejecting ambiguous matches and empty closure intersections. The next
+hosted run remains the authority for the translation-unit identity and analyzer
+receipt.
 
 No C++ production function changes in this qualification branch: functions 0,
 proposals 0, eligible 0, rejected 0, unsupported 0. No `cs: ai` proposal became

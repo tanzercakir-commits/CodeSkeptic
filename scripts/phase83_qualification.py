@@ -380,19 +380,25 @@ def filter_target_translation_units(
         compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
         if not compile_indexes:
             continue
-        if len(compile_indexes) != 1 or compile_indexes[0] + 1 >= len(tokens):
+        if len(compile_indexes) != 1:
             raise campaign.EvidenceError(
                 "Ninja target closure contains an ambiguous compile command"
             )
-        source_token = tokens[compile_indexes[0] + 1]
-        if source_token.startswith("-"):
+        command_sources: set[Path] = set()
+        for token in tokens:
+            if token.startswith("-"):
+                continue
+            path = Path(token)
+            if not path.is_absolute():
+                path = build / path
+            resolved = path.resolve()
+            if resolved in admitted:
+                command_sources.add(resolved)
+        if len(command_sources) > 1:
             raise campaign.EvidenceError(
-                "Ninja target closure contains an invalid compile source"
+                "Ninja target closure contains an ambiguous compile source"
             )
-        path = Path(source_token)
-        if not path.is_absolute():
-            path = build / path
-        target_sources.add(path.resolve())
+        target_sources.update(command_sources)
 
     selected = sorted(
         (relative, path)

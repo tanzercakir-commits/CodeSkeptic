@@ -163,6 +163,16 @@ class CandidateContractTest(unittest.TestCase):
             self.assertEqual(selected, [production])
             self.assertEqual(relative, ["src/production.cc"])
 
+            scan_deps_commands = (
+                '"/usr/bin/clang-scan-deps-19" -format=p1689 -- '
+                f"clang++ {production.as_posix()} -c -o production.cc.o\n"
+            )
+            selected, relative = qualification.filter_target_translation_units(
+                scan_deps_commands, source, build, files, relative_files
+            )
+            self.assertEqual(selected, [production])
+            self.assertEqual(relative, ["src/production.cc"])
+
             with self.assertRaisesRegex(campaign.EvidenceError, "target closure"):
                 qualification.filter_target_translation_units(
                     "clang++ -c malformed.cc -o malformed.cc.o\n",
