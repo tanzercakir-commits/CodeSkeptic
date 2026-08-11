@@ -928,15 +928,18 @@ sources and reject paths outside the pinned source tree.
 
 shadPS4 remains pinned at
 `5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa` with 53 recursive gitlinks. The
-latest hosted build using Clang 20 with GCC 14's default libstdc++ stopped at
-2,088 of 2,452 steps on an upstream library-compatibility boundary. The pinned
-upstream workflows use Clang 19 with the default library for production and
-also exercise clang with libc++. A disposable Ubuntu probe installed the
-version-matched `libc++-20-dev` and `libc++abi-20-dev` packages; Clang 20 then
-compiled a C++23 `std::jthread`/`std::stop_token` check and exposed libc++
-version 20.01 with the expected feature macro. The observational recipe now
-pins those packages and restores `-stdlib=libc++` to compile and executable
-link flags. The next hosted run remains the authority for the full build,
+first hosted build using Clang 20 with GCC 14's default libstdc++ stopped at
+2,088 of 2,452 steps on a compiler/library compatibility boundary. A narrow
+libc++ 20 probe established only the required `std::jthread`/`std::stop_token`
+surface (`_LIBCPP_VERSION=200100`); it did not prove the complete project
+recipe. The full libc++ rerun reached step 2,181 but then proved that this
+packaged library does not provide the `std::chrono::current_zone()` surface
+used by the pinned source. The immutable upstream production workflow is the
+stronger authority: it builds on Ubuntu 24.04 with Clang 19, the default
+libstdc++, and mold. RED-first contract assertions now pin that exact compiler
+and linker choice, preserve the upstream-enabled Discord/updater surface, and
+enable Release IPO for shadPS4 while llama.cpp and TensorFlow Lite remain on
+Clang 20. The next hosted run remains the authority for the full build,
 translation-unit identity, and analyzer receipt.
 
 No C++ production function changes in this qualification branch: functions 0,
