@@ -40,10 +40,14 @@ The immutable upstream production workflow is the stronger recipe authority:
 Ubuntu 24.04, Clang 19 with the default libstdc++, and mold. RED-first contract
 assertions now pin those shadPS4 compiler and linker choices, preserve its
 upstream-enabled Discord/updater surface, and enable Release IPO; llama.cpp
-and TensorFlow Lite remain on Clang 20. The three-candidate hosted rerun
-remains the referee; no canonical expectation, production factory membership,
-or accepted contract intent changed. No C++ production function changed, so
-the contract-first shadow counts are all zero.
+and TensorFlow Lite remain on Clang 20. The first production-shaped rerun
+configured successfully and reached step 433 of 2,554, where CMake's C++23
+dependency scan invoked the absent `clang-scan-deps-19` binary and stopped with
+exit 127. The matching `clang-tools-19` package is now pinned instead of
+disabling IPO or narrowing the production surface. The three-candidate hosted
+rerun remains the referee; no canonical expectation, production factory
+membership, or accepted contract intent changed. No C++ production function
+changed, so the contract-first shadow counts are all zero.
 
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 

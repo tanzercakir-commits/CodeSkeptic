@@ -78,7 +78,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang-19 clang-20 cmake ninja-build mold build-essential \
+            clang-19 clang-tools-19 clang-20 cmake ninja-build mold build-essential \
             libx11-dev libxext-dev libwayland-dev libdecor-0-dev \
             libxkbcommon-dev libxcursor-dev libxi-dev libxss-dev \
             libxtst-dev libxrandr-dev libxfixes-dev libudev-dev uuid-dev \

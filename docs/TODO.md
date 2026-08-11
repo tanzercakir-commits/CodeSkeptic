@@ -939,8 +939,13 @@ stronger authority: it builds on Ubuntu 24.04 with Clang 19, the default
 libstdc++, and mold. RED-first contract assertions now pin that exact compiler
 and linker choice, preserve the upstream-enabled Discord/updater surface, and
 enable Release IPO for shadPS4 while llama.cpp and TensorFlow Lite remain on
-Clang 20. The next hosted run remains the authority for the full build,
-translation-unit identity, and analyzer receipt.
+Clang 20. The first full production-shaped rerun configured successfully and
+reached step 433 of 2,554, where CMake's C++23 dependency scan proved the
+runner package set lacked `clang-scan-deps-19`; the checksummed unavailable
+receipt records build exit 127. The workflow now installs the matching
+`clang-tools-19` package rather than weakening IPO or the production surface.
+The next hosted run remains the authority for the full build, translation-unit
+identity, and analyzer receipt.
 
 No C++ production function changes in this qualification branch: functions 0,
 proposals 0, eligible 0, rejected 0, unsupported 0. No `cs: ai` proposal became
