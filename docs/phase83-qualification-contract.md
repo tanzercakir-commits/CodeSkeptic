@@ -40,8 +40,10 @@ qualification is complete and the Phase 8.3 implementation boundary is locked.
    command substitution, environment placeholder, or executable outside the
    existing CMake command family is admitted.
 3. Paths and source roots are repository-relative and cannot escape their
-   declared roots. Translation units come only from the real compile database;
-   there is no fallback glob.
+   declared roots. Translation units are the exact intersection of the real
+   compile database and the named Ninja production target's command closure;
+   configured-but-unbuilt sources and dependency sources are excluded. There
+   is no fallback glob.
 4. shadPS4 alone may request recursive submodules. Every recursive submodule
    must be initialized at the superproject-pinned gitlink revision. The receipt
    records a canonical path/revision list, count, and SHA-256 identity. Checkout
