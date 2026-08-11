@@ -145,8 +145,8 @@ class CandidateContractTest(unittest.TestCase):
                 "src/production.cc",
             ]
             commands = (
-                f"clang++ -c {production} -o production.cc.o\n"
-                f"clang++ -c {dependency} -o dependency.cc.o\n"
+                f"clang++ -c {production.as_posix()} -o production.cc.o\n"
+                f"clang++ -c {dependency.as_posix()} -o dependency.cc.o\n"
                 "ar qc libproduction.a production.cc.o dependency.cc.o\n"
             )
             selected, relative = qualification.filter_target_translation_units(
@@ -166,7 +166,7 @@ class CandidateContractTest(unittest.TestCase):
 
             with self.assertRaisesRegex(campaign.EvidenceError, "source tree"):
                 qualification.filter_target_translation_units(
-                    f"clang++ -c {external} -o external.cc.o\n",
+                    f"clang++ -c {external.as_posix()} -o external.cc.o\n",
                     source,
                     build,
                     [external],
