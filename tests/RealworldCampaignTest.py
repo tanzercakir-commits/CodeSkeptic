@@ -741,5 +741,16 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("-DClang_DIR=${{ steps.llvm.outputs.root }}/lib/cmake/clang", workflow)
 
 
+    def test_release_candidate_installs_qualified_linker(self):
+        workflow = (ROOT / ".github/workflows/realworld.yml").read_text(
+            encoding="utf-8"
+        )
+        package_lines = [
+            line for line in workflow.splitlines() if "clang-19" in line
+        ]
+        self.assertEqual(len(package_lines), 1)
+        self.assertIn("mold", package_lines[0].split())
+
+
 if __name__ == "__main__":
     unittest.main()

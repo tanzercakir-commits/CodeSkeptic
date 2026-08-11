@@ -122,7 +122,7 @@ jobs:
         run: |
           compiler_packages=(clang-20)
           if [ "${{ needs.plan.outputs.tier }}" = release-candidate ]; then
-            compiler_packages+=(clang-19)
+            compiler_packages+=(clang-19) mold
           fi
           sudo apt-get update
           sudo apt-get install -y \
