@@ -1,5 +1,58 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
+
+Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's
+505-step build and selected 269 production translation units, but the analyzer
+crashed on `tensorflow/lite/core/acceleration/configuration/delegate_registry.cc`.
+Clang 20 with GCC 14 libstdc++ reproduces the failure on that single TU with
+exit 139. GDB traced more than 838,000 recursive frames through Clang constant
+evaluation to `edgeInfeasibleByFlags`; instrumentation identified a non-flag
+member equality in libstdc++ 14 `bits/unicode.h` as the last evaluated
+expression. A standalone five-line C++20 `<format>` source also returns exit
+139, separating the product bug from TFLite and the qualification factory.
+
+The immutable-flag engine promises to evaluate the constant side of only a
+known `flag ==/!= constant` comparison. The existing implementation violated
+that boundary by calling `EvaluateAsInt` on one side of every equality before
+proving the other side was an immutable flag. RED is pinned by the focused
+`ImmutableFlagsTest.FormatHeaderEqualityDoesNotEvaluateNonFlagOperands`, which
+crashes the unmodified GCC14 test process with exit 139. This branch is limited
+to gating that evaluation behind flag recognition, preserving both operand
+orders and equality operators, the focused test-helper wiring, and required
+documentation automation. PR #138 remains qualification-only; no campaign
+recipe or expected result changes here.
+
+The implementation now performs flag recognition before any constant
+evaluation. It tries both operand directions only through that gate, retaining
+`==` and `!=` pruning without sending unrelated standard-library expressions
+to Clang's evaluator. The standalone `<format>` regression is GREEN in 614 ms,
+an explicit four-shape equality/inequality regression is GREEN, and the related
+immutable-flag behavior set is 14/14 GREEN. The full CTest suite is 1175/1175
+GREEN and the direct single-process suite is 1166/1166 GREEN. Self-scan is
+clean and complete at 48/48 TUs; its JSON receipt SHA-256 is
+`53ddcd60f2fee8cbf6d7538c61bdbcec162ea2cba43562bee3911aefa941cc47`.
+The frozen thesis gate remains `clean_fp=0`, `bug_caught=9/15`, and 11 total
+findings. The real-corpus referee remains exactly on its pins: cJSON 54
+findings (76 enumerated, 35 analyzed, 41 explicitly accepted broken fixtures)
+and tinyxml2 9 findings (3/3 analyzed).
+
+Analyzer SHA-256
+`2ad4991268a3a9921e9d8095b1f0cd1767893701427627425a624460da9bd0a2`
+then completed the exact GCC14 TFLite TU with 1/1 analyzed, zero broken TUs,
+zero incomplete functions, and one supported blocking `memory-leak` finding
+at `TfLiteTensorVariantRealloc` (`csf1-a845db511c25bcc3`). Exit 1 is the normal
+findings verdict, not a tool failure. The complete JSON receipt SHA-256 is
+`fce1be0c540059ebd2f4b7c10a8abaf428677de48b308ac0cb7185717dfc1187`.
+
+Contract-first shadow completion considered the one materially changed
+production function, `edgeInfeasibleByFlags`: proposals 0, eligible 0,
+rejected 0, unsupported 1. Conditional evaluator call order over Clang AST
+state is outside the current contract grammar and referee, so no proof-bearing
+annotation was invented. No candidate requires later human review and no
+`cs: ai` proposal became accepted intent. Executable RED/GREEN fixtures remain
+the authority for this boundary.
+
 ## 2026-08-10 — Phase 8.2 weekend factory implementation and qualification
 
 The canonical factory now has separate, non-overlapping nightly and weekend

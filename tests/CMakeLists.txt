@@ -33,6 +33,7 @@ add_executable(codeskeptic_tests
     CfgCacheTest.cpp
     IntervalTest.cpp
     IntervalAnalysisTest.cpp
+    ImmutableFlagsTest.cpp
     ParamIntervalsTest.cpp
     CoverageReportTest.cpp
     AssumptionRuleTest.cpp
