@@ -13,7 +13,7 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 <!-- cs:state-begin -->
 ```
 base          = 488377a
-in_flight     = phase-tflite-gcc14-immutable-flag-hardening
+in_flight     = phase-realworld-release-candidate-factory phase-tflite-gcc14-immutable-flag-hardening
 verified_main = 488377a
 progress      = sha256:22651603fcce0fd1d3e8bd91bb7efb7a7ee2c1c600289e29ebf05bad841da345
 ```
