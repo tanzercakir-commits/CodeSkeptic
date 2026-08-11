@@ -1007,6 +1007,14 @@ analyzed, `199` broken), so the run was cancelled. The workflow now installs
 `clang-19` on release-candidate shards while retaining `clang-20` for the
 nightly and weekend tiers; no partial receipt is accepted as evidence.
 
+**Hosted attempt 2 (run `31525147338`):** installing only `clang-19` supplied
+the analyzer resources but removed the `clang-20` executable pinned by all
+three qualified source-build recipes; TensorFlow Lite therefore failed during
+configure. The run was cancelled. Release-candidate shards now install both
+packages: `clang-20` preserves the immutable candidate build commands and
+`clang-19` supplies the shared analyzer runtime resources. Existing tiers
+continue to install only `clang-20`.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
+
+- Run `31525147338` showed that replacing the shard compiler with `clang-19` broke the immutable candidate recipes, which explicitly configure their source builds with `clang-20`.
+- Cancelled the invalid run after TensorFlow Lite configure receipts proved the missing executable; no partial result was admitted.
+- Release-candidate shards now install both `clang-20` for candidate builds and `clang-19` for analyzer resources; nightly and weekend shards remain unchanged.
+- Updated the workflow contract to pin the two-package release behavior.
+
 ## 2026-08-11 — Phase 8.4 hosted shard toolchain correction
 
 - Run `31523815926` proved the plan and shared LLVM 19 analyzer stages, then produced unavailable llama.cpp receipts with `199` broken TUs because shard images lacked the matching Clang resource headers.
