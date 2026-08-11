@@ -76,6 +76,9 @@ add_test(NAME StatusAutomationContract
 add_test(NAME RealworldCampaignContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/RealworldCampaignTest.py)
+add_test(NAME Phase83QualificationContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/Phase83QualificationTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
