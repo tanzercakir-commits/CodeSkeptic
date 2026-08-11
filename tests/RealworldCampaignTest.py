@@ -733,7 +733,7 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("version=19", workflow)
         self.assertIn("version=20", workflow)
         self.assertIn("compiler_packages=(clang-20)", workflow)
-        self.assertIn("compiler_packages+=(clang-19 mold)", workflow)
+        self.assertIn("compiler_packages+=(clang-19 mold", workflow)
         self.assertIn('"${compiler_packages[@]}" cmake ninja-build', workflow)
         self.assertIn("llvm-${{ steps.llvm.outputs.version }}-dev", workflow)
         self.assertIn("clang-${{ steps.llvm.outputs.version }}", workflow)
@@ -749,7 +749,29 @@ class WorkflowContractTest(unittest.TestCase):
             line for line in workflow.splitlines() if "clang-19" in line
         ]
         self.assertEqual(len(package_lines), 1)
-        self.assertIn("compiler_packages+=(clang-19 mold)", package_lines[0])
+        packages = package_lines[0].split("(", 1)[1].split(")", 1)[0].split()
+        required = {
+            "clang-19",
+            "mold",
+            "libasound2-dev",
+            "libdecor-0-dev",
+            "libgles2-mesa-dev",
+            "libglfw3-dev",
+            "libopenal-dev",
+            "libpulse-dev",
+            "libudev-dev",
+            "libwayland-dev",
+            "libx11-dev",
+            "libxcursor-dev",
+            "libxext-dev",
+            "libxfixes-dev",
+            "libxi-dev",
+            "libxkbcommon-dev",
+            "libxrandr-dev",
+            "libxss-dev",
+            "libxtst-dev",
+        }
+        self.assertTrue(required.issubset(packages))
 
 
 if __name__ == "__main__":

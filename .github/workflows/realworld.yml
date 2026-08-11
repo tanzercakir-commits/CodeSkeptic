@@ -122,7 +122,7 @@ jobs:
         run: |
           compiler_packages=(clang-20)
           if [ "${{ needs.plan.outputs.tier }}" = release-candidate ]; then
-            compiler_packages+=(clang-19 mold)
+            compiler_packages+=(clang-19 mold libasound2-dev libdecor-0-dev libgles2-mesa-dev libglfw3-dev libopenal-dev libpulse-dev libudev-dev libwayland-dev libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxi-dev libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev)
           fi
           sudo apt-get update
           sudo apt-get install -y \
