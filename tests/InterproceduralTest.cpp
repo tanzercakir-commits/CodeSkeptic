@@ -1030,6 +1030,25 @@ TEST(InterprocZeroTest, BadSourceLiteral_UnguardedDiv_Warning) {
     EXPECT_EQ(results[0].severity, Severity::Warning);
 }
 
+TEST(InterprocZeroTest, UnnamedEnumReturnIsConservative) {
+    DivByZeroRule rule;
+    auto results = runRule(rule, R"(
+        template <class T>
+        struct Stepper {
+            enum { advance, finish };
+            int step(bool done) {
+                if (done) return finish;
+                return advance;
+            }
+        };
+        int instantiate(bool done) {
+            Stepper<int> stepper;
+            return stepper.step(done);
+        }
+    )");
+    EXPECT_TRUE(results.empty());
+}
+
 TEST(InterprocZeroTest, JulietShape_VarFlowSource_Warning) {
     // Juliet CWE369 flow-variant source: the local is 0 first, the
     // return uses that variable — structural evaluation used to leave
