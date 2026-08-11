@@ -752,6 +752,7 @@ class WorkflowContractTest(unittest.TestCase):
         packages = package_lines[0].split("(", 1)[1].split(")", 1)[0].split()
         required = {
             "clang-19",
+            "clang-tools-19",
             "mold",
             "libasound2-dev",
             "libdecor-0-dev",
