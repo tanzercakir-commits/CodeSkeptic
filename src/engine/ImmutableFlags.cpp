@@ -217,16 +217,20 @@ bool edgeInfeasibleByFlags(const Stmt* leafCond, bool edgeIsTrue,
     if (const auto* bin = dyn_cast<BinaryOperator>(stripped)) {
         if (bin->getOpcode() != BO_EQ && bin->getOpcode() != BO_NE)
             return false;
-        std::optional<int64_t> fv = flagValue(bin->getLHS());
-        std::optional<int64_t> cv = litValue(bin->getRHS());
-        if (!fv || !cv) {
-            fv = flagValue(bin->getRHS());
-            cv = litValue(bin->getLHS());
-        }
-        if (!fv || !cv) return false;
-        const bool truth =
-            (bin->getOpcode() == BO_EQ) ? (*fv == *cv) : (*fv != *cv);
-        return truth != edgeIsTrue;
+        auto comparisonTruth = [&](const Expr* flagExpr,
+                                   const Expr* constantExpr)
+            -> std::optional<bool> {
+            const std::optional<int64_t> fv = flagValue(flagExpr);
+            if (!fv) return std::nullopt;
+            const std::optional<int64_t> cv = litValue(constantExpr);
+            if (!cv) return std::nullopt;
+            return bin->getOpcode() == BO_EQ ? *fv == *cv : *fv != *cv;
+        };
+        if (auto truth = comparisonTruth(bin->getLHS(), bin->getRHS()))
+            return *truth != edgeIsTrue;
+        if (auto truth = comparisonTruth(bin->getRHS(), bin->getLHS()))
+            return *truth != edgeIsTrue;
+        return false;
     }
     return false;
 }

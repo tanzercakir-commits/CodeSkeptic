@@ -5,12 +5,18 @@
 #include "core/Rule.h"
 
 #include <string>
+#include <vector>
 
 namespace codeskeptic {
 namespace testing {
 
 DiagnosticList runRule(Rule& rule, const std::string& code,
                        const std::string& filename = "test.cpp");
+
+DiagnosticList runRuleWithArgs(
+    Rule& rule, const std::string& code,
+    const std::vector<std::string>& extraArgs,
+    const std::string& filename = "test.cpp");
 
 // Test counterpart of whole-program mode: summaries are first
 // harvested from calleeTU (into the cross-TU store), then the rule is
