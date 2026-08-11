@@ -8,6 +8,7 @@ import copy
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -313,6 +314,98 @@ def _capture_git(
     return result.stdout
 
 
+def _capture_logged_command(
+    command: list[str],
+    cwd: Path,
+    deadline: float,
+    memory_mb: int,
+    log_path: Path,
+    evidence_name: str,
+) -> str:
+    remaining = max(0.0, deadline - time.monotonic())
+    if remaining <= 0:
+        raise campaign.EvidenceError("qualification timed out")
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=remaining,
+            preexec_fn=campaign._memory_preexec(memory_mb),
+        )
+    except subprocess.TimeoutExpired as error:
+        raise campaign.EvidenceError("qualification timed out") from error
+    with log_path.open("a", encoding="utf-8", newline="\n") as log:
+        log.write(f"COMMAND cwd={cwd.as_posix()} argv={json.dumps(command)}\n")
+        log.write(result.stdout)
+        log.write(result.stderr)
+        log.write(f"EXIT {result.returncode}\n")
+    if result.returncode != 0:
+        raise campaign.EvidenceError(
+            f"{evidence_name} command failed with exit {result.returncode}"
+        )
+    return result.stdout
+
+
+def filter_target_translation_units(
+    command_output: str,
+    source: Path,
+    build: Path,
+    files: list[Path],
+    relative_files: list[str],
+) -> tuple[list[Path], list[str]]:
+    if len(files) != len(relative_files):
+        raise campaign.EvidenceError("translation-unit identity is malformed")
+    source_root = source.resolve()
+    for path in files:
+        resolved = path.resolve()
+        if resolved != source_root and source_root not in resolved.parents:
+            raise campaign.EvidenceError(
+                "translation-unit identity escapes the pinned source tree"
+            )
+    admitted = {
+        path.resolve(): (path, relative)
+        for path, relative in zip(files, relative_files, strict=True)
+    }
+    target_sources: set[Path] = set()
+    for line in command_output.splitlines():
+        try:
+            tokens = shlex.split(line)
+        except ValueError as error:
+            raise campaign.EvidenceError(
+                f"Ninja target closure contains an invalid command: {error}"
+            ) from error
+        compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
+        if not compile_indexes:
+            continue
+        if len(compile_indexes) != 1 or compile_indexes[0] + 1 >= len(tokens):
+            raise campaign.EvidenceError(
+                "Ninja target closure contains an ambiguous compile command"
+            )
+        source_token = tokens[compile_indexes[0] + 1]
+        if source_token.startswith("-"):
+            raise campaign.EvidenceError(
+                "Ninja target closure contains an invalid compile source"
+            )
+        path = Path(source_token)
+        if not path.is_absolute():
+            path = build / path
+        target_sources.add(path.resolve())
+
+    selected = sorted(
+        (relative, path)
+        for resolved, (path, relative) in admitted.items()
+        if resolved in target_sources
+    )
+    if not selected:
+        raise campaign.EvidenceError(
+            "Ninja target closure selected no admitted translation units"
+        )
+    return [path for _, path in selected], [relative for relative, _ in selected]
+
+
 def parse_submodule_status(output: str) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for line in output.splitlines():
@@ -504,6 +597,23 @@ def run_observation(
     )
     files, relative_files = campaign._derive_translation_units(
         project, project_root, build, compile_database
+    )
+    target_commands = ""
+    for command in project["commands"]["build"]:
+        target_commands += _capture_logged_command(
+            ["ninja", "-C", str(build), "-t", "commands", command[4]],
+            project_root,
+            deadline,
+            project["memory_mb"],
+            log_path,
+            "Ninja target closure",
+        )
+    files, relative_files = filter_target_translation_units(
+        target_commands,
+        project_root,
+        build,
+        files,
+        relative_files,
     )
     tu_sha = campaign.translation_unit_digest(relative_files)
     (output.parent / "translation-units.txt").write_text(
