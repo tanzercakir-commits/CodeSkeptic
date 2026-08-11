@@ -1180,13 +1180,9 @@ def run_shard(
                 log_path,
                 None,
             )
-            relative_files = [
-                path.resolve().relative_to(project_root.resolve()).as_posix()
-                for path in file_list
-            ]
-            file_list, _ = filter_target_translation_units(
-                target_commands, project_root, build, file_list, relative_files
-            )
+        files, relative_files = filter_target_translation_units(
+            target_commands, project_root, build, files, relative_files
+        )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(
