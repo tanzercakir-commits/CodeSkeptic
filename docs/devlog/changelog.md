@@ -37,10 +37,16 @@ and TensorFlow Lite remain on Clang 20. The first production-shaped rerun
 configured successfully and reached step 433 of 2,554, where CMake's C++23
 dependency scan invoked the absent `clang-scan-deps-19` binary and stopped with
 exit 127. The matching `clang-tools-19` package is now pinned instead of
-disabling IPO or narrowing the production surface. The three-candidate hosted
-rerun remains the referee; no canonical expectation, production factory
-membership, or accepted contract intent changed. No C++ production function
-changed, so the contract-first shadow counts are all zero.
+disabling IPO or narrowing the production surface. The corrected hosted run
+then completed all 2,554 build steps and exposed an observer-only parsing
+defect: CMake's Clang dependency-scanner form places its source path before
+`-c`. A RED-first regression preserves that real command shape. Target closure
+selection now matches command tokens position-independently against the
+already validated compile-database surface, while ambiguous matches and an
+empty intersection still fail closed. The three-candidate hosted rerun remains
+the referee; no canonical expectation, production factory membership, or
+accepted contract intent changed. No C++ production function changed, so the
+contract-first shadow counts are all zero.
 
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
