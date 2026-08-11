@@ -971,7 +971,7 @@ documented admitted extra-execution case); ShadPS4 `5a4373c80e32` requested/exec
 `382/382`, 66 findings. All three completed with the findings-only semantic exit
 and immutable artifacts keyed to the same CodeSkeptic head.
 
-## Phase 8.4 — release-candidate factory promotion — BOUNDARY LOCKED (2026-08-11)
+## Phase 8.4 — release-candidate factory promotion — LOCAL GREEN; HOSTED AGGREGATE PENDING (2026-08-11)
 
 **Boundary:** promote only the three recipes qualified at CodeSkeptic head
 `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`: llama.cpp `4dee52f82dc4`,
@@ -992,6 +992,13 @@ tier exits `2` because the campaign is absent. The implementation gate is a
 `0` plan with exactly nine shards, the campaign and qualification contract
 tests, full CTest, document automation, then a hosted aggregate receipt for
 all nine shards.
+
+**Local GREEN evidence:** the accepted manifest now has 11 projects and three
+campaigns. `release-candidate` planning exits `0` with exactly nine shards
+(three projects by three repetitions); campaign and qualification contract
+tests pass; the LLVM 19 Release build completes `100/100`; and full CTest
+passes `1177/1177`. Hosted completion still requires the aggregate receipt
+from all nine shards and remains unavailable until that evidence exists.
 
 ## Recovered product program — Phases 8–12
 

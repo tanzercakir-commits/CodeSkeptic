@@ -20,6 +20,15 @@
         "redis",
         "lvgl"
       ]
+    },
+    "release-candidate": {
+      "window_minutes": 4320,
+      "repetitions": 3,
+      "projects": [
+        "llama-cpp",
+        "tensorflow-lite",
+        "shadps4"
+      ]
     }
   },
   "projects": [
@@ -568,6 +577,237 @@
         "findings": 16,
         "exit_code": 1,
         "fingerprint_sha256": "687bfeaa19046230afd60e116bb0d2fe73361d8b931161e33029bd79988ae808"
+      }
+    },
+    {
+      "id": "llama-cpp",
+      "label": "4dee52f8",
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454",
+      "checkout": {
+        "submodules": "none",
+        "expected_count": 0,
+        "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src",
+          "ggml/src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DGGML_NATIVE=OFF",
+            "-DLLAMA_BUILD_TESTS=OFF",
+            "-DLLAMA_BUILD_TOOLS=OFF",
+            "-DLLAMA_BUILD_EXAMPLES=OFF",
+            "-DLLAMA_BUILD_SERVER=OFF",
+            "-DLLAMA_BUILD_COMMON=OFF",
+            "-DLLAMA_BUILD_APP=OFF",
+            "-DLLAMA_BUILD_UI=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "llama",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src,{source}/ggml/src"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+        "translation_units": 200,
+        "translation_unit_sha256": "e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783",
+        "attempted_tus": 200,
+        "analyzed_tus": 200,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 40,
+        "exit_code": 1,
+        "fingerprint_sha256": "842c6903f3d506cff9b5a5723de8dc10701b294c12ce59be032f368d3eacc4b4"
+      }
+    },
+    {
+      "id": "tensorflow-lite",
+      "label": "v2.21.0",
+      "repository": "https://github.com/tensorflow/tensorflow.git",
+      "revision": "a481b10260dfdf833a1b16007eead49c1d7febf3",
+      "checkout": {
+        "submodules": "none",
+        "expected_count": 0,
+        "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "tensorflow/lite"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}/tensorflow/lite",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_CXX_STANDARD=17",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DTENSORFLOW_SOURCE_DIR={source}",
+            "-DTFLITE_ENABLE_XNNPACK=OFF",
+            "-DTFLITE_ENABLE_GPU=OFF",
+            "-DTFLITE_ENABLE_METAL=OFF",
+            "-DTFLITE_ENABLE_NNAPI=OFF",
+            "-DTFLITE_ENABLE_EXTERNAL_DELEGATE=OFF",
+            "-DTFLITE_ENABLE_LABEL_IMAGE=OFF",
+            "-DTFLITE_ENABLE_BENCHMARK_MODEL=OFF",
+            "-DTFLITE_KERNEL_TEST=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "tensorflow-lite",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/tensorflow/lite"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+        "translation_units": 241,
+        "translation_unit_sha256": "2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f",
+        "attempted_tus": 241,
+        "analyzed_tus": 245,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 73,
+        "exit_code": 1,
+        "fingerprint_sha256": "6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a"
+      }
+    },
+    {
+      "id": "shadps4",
+      "label": "v0.17.0",
+      "repository": "https://github.com/shadps4-emu/shadPS4.git",
+      "revision": "5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa",
+      "checkout": {
+        "submodules": "recursive",
+        "expected_count": 53,
+        "expected_sha256": "9f779c183535a2af8148a3b7bfc69b4733cf947d036d98b49e740dbe7ea7c54c"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-19",
+            "-DCMAKE_CXX_COMPILER=clang++-19",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON",
+            "-DENABLE_TESTS=OFF",
+            "-DENABLE_SYSTEM_LIBRARIES=OFF",
+            "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=mold",
+            "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=mold"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "shadps4",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+        "translation_units": 382,
+        "translation_unit_sha256": "890628723d3db1645429d4fc2f134ecbdac32cd8e322e8dddf09f0d8835c24e9",
+        "attempted_tus": 382,
+        "analyzed_tus": 382,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 66,
+        "exit_code": 1,
+        "fingerprint_sha256": "0b14abf3eb69012ee95678b7a3c4198bd440a761757df8cbad482374d767fd74"
       }
     }
   ]

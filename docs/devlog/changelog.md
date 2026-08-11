@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.4 factory promotion implementation and local qualification
+
+- Promoted the three exact Phase 8.3 recipes into an 11-project manifest and added a manual 72-hour release-candidate campaign with three repetitions per project.
+- Extended factory checkout identity with pinned recursive submodule count and checksum evidence; ShadPS4 requires the qualified 53-entry identity before build.
+- Extended the shared-analyzer workflow to select LLVM 19 for the release-candidate tier, retain LLVM 20 for existing tiers, and preserve aggregate equality across all three receipts.
+- Verified RED `2` to GREEN `0` with a nine-shard plan, both campaign contract suites, an LLVM 19 Release build at `100/100`, and full CTest at `1177/1177`; hosted aggregation remains pending.
+
 ## 2026-08-11 — Phase 8.4 release-candidate factory boundary
 
 - Locked promotion to the three exact Phase 8.3 candidate recipes and their immutable coverage and fingerprint expectations.

@@ -1,6 +1,6 @@
 name: Deterministic real-world campaign
 
-# Phase 8 nightly and weekend factory. The manifest is the sole project authority;
+# Phase 8 nightly, weekend, and release-candidate factory. The manifest is the sole project authority;
 # this workflow supplies orchestration only. One matrix cell is one independent
 # project repetition, so a failed project cannot erase another project's
 # evidence and no hosted job pretends to span an aggregate campaign window.
@@ -15,6 +15,7 @@ on:
         options:
           - nightly
           - weekend
+          - release-candidate
   schedule:
     - cron: "17 1 * * *"
     - cron: "43 0 * * 0"
@@ -47,7 +48,7 @@ jobs:
             tier="${{ github.event.inputs.tier || 'nightly' }}"
           fi
           case "$tier" in
-            nightly|weekend) ;;
+            nightly|weekend|release-candidate) ;;
             *) echo "unsupported campaign tier: $tier" >&2; exit 2 ;;
           esac
           echo "value=$tier" >> "$GITHUB_OUTPUT"
@@ -61,22 +62,39 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   build-analyzer:
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM 20 and build tools
+      - name: Select the analyzer toolchain
+        id: llvm
+        shell: bash
+        run: |
+          if [ "${{ needs.plan.outputs.tier }}" = release-candidate ]; then
+            version=19
+          else
+            version=20
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "root=/usr/lib/llvm-$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install the selected LLVM and build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
-            clang-20 ninja-build
+            llvm-${{ steps.llvm.outputs.version }}-dev \
+            libclang-${{ steps.llvm.outputs.version }}-dev \
+            clang-${{ steps.llvm.outputs.version }} \
+            libzstd-dev zlib1g-dev ninja-build
 
       - name: Build one analyzer for every shard
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCMAKE_PREFIX_PATH=${{ steps.llvm.outputs.root }} \
+            -DLLVM_DIR=${{ steps.llvm.outputs.root }}/lib/cmake/llvm \
+            -DClang_DIR=${{ steps.llvm.outputs.root }}/lib/cmake/clang \
             -DCODESKEPTIC_BUILD_TESTS=OFF
           cmake --build build --parallel 2
           sha256sum build/src/codeskeptic
