@@ -1,5 +1,95 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
+
+- Run `31525147338` showed that replacing the shard compiler with `clang-19` broke the immutable candidate recipes, which explicitly configure their source builds with `clang-20`.
+- Cancelled the invalid run after TensorFlow Lite configure receipts proved the missing executable; no partial result was admitted.
+- Release-candidate shards now install both `clang-20` for candidate builds and `clang-19` for analyzer resources; nightly and weekend shards remain unchanged.
+- Updated the workflow contract to pin the two-package release behavior.
+
+## 2026-08-11 — Phase 8.4 hosted shard toolchain correction
+
+- Run `31523815926` proved the plan and shared LLVM 19 analyzer stages, then produced unavailable llama.cpp receipts with `199` broken TUs because shard images lacked the matching Clang resource headers.
+- Cancelled the invalid run; its partial artifacts remain classified as unavailable and are not promotion evidence.
+- Added tier-aware shard packages: release-candidate jobs install `clang-19`, while nightly and weekend jobs retain `clang-20` and their existing expectations.
+- Extended the workflow contract test to pin both analyzer-build and shard-runtime toolchain selection.
+
+## 2026-08-11 — Phase 8.4 factory promotion implementation and local qualification
+
+- Promoted the three exact Phase 8.3 recipes into an 11-project manifest and added a manual 72-hour release-candidate campaign with three repetitions per project.
+- Extended factory checkout identity with pinned recursive submodule count and checksum evidence; ShadPS4 requires the qualified 53-entry identity before build.
+- Extended the shared-analyzer workflow to select LLVM 19 for the release-candidate tier, retain LLVM 20 for existing tiers, and preserve aggregate equality across all three receipts.
+- Verified RED `2` to GREEN `0` with a nine-shard plan, both campaign contract suites, an LLVM 19 Release build at `100/100`, and full CTest at `1177/1177`; hosted aggregation remains pending.
+
+## 2026-08-11 — Phase 8.4 release-candidate factory boundary
+
+- Locked promotion to the three exact Phase 8.3 candidate recipes and their immutable coverage and fingerprint expectations.
+- Required a manual 72-hour campaign with three repetitions per project, one shared analyzer artifact, and aggregate equality across all receipts.
+- Required ShadPS4's recursive 53-entry submodule identity to match its qualified checksum before the build begins.
+- Recorded the pre-implementation RED: boundary head `0759dca` rejects the absent release-candidate tier with exit `2`; GREEN requires a nine-shard plan and hosted aggregation.
+
+## 2026-08-11 — Phase 8.3 exact qualification closed
+
+- Rebased the release-candidate factory onto the fixed-width summary guard and aligned the shared analyzer build with LLVM 19.
+- Closed hosted run `31515185143` at head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6` using one immutable analyzer artifact across all candidates.
+- Qualified llama.cpp at `200/200` executions with 40 findings, TensorFlow Lite at `241` requested and `245` admitted executions with 73 findings, and ShadPS4 at `382/382` with 66 findings.
+- Every receipt reports zero broken translation units, zero incomplete functions, and a findings-only semantic exit.
+
+## 2026-08-11 — Fixed-width summary guard
+
+- Limited zero-passthrough width reasoning to fixed builtin integer types.
+- Kept dependent, enum, incomplete, and other uncertain-width types conservative.
+- Added a regression case from the real template pattern that exposed the invalid width query.
+- Verified the focused regression and full local suites with LLVM 20 and LLVM 19; the exact Shad candidate completed 382/382 translation units with LLVM 19.
+
+## 2026-08-11 — Phase 8.3 production-target qualification correction
+
+Rebased the observational release-candidate lane onto protected-main commit
+`7dfd37596414c9512316093ff4fb6b039673f55f`, which contains the GCC14
+immutable-flag correction from PR #139. The qualification contract now requires
+translation units to belong both to the real compile database and to the named
+Ninja production target's command closure. RED-first tests exclude
+configured-only sources, dependency sources, malformed closures, and paths
+outside the pinned source tree.
+
+This corrects the TensorFlow Lite surface without accepting expectations. Its
+505-step hosted build configured 269 unique project source paths, but ten were
+not members of the production library target and required generated or Python
+binding headers absent from that build. The exact `tensorflow-lite` target is
+241 unique translation units with digest
+`2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f`.
+A full local observation completed with coverage fields 241 attempted, 245
+analyzed, zero broken, and zero incomplete functions, plus 73 supported
+blocking findings and normal exit 1. Its fingerprint digest is
+`6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a`
+and report SHA-256 is
+`717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
+
+The first shadPS4 hosted build showed that Clang 20 with GCC 14's default
+libstdc++ is not a valid recipe for the pinned sources. A narrow disposable
+Ubuntu probe established only that libc++ 20 exposes the required C++23
+`std::jthread` and `std::stop_token` surface (`_LIBCPP_VERSION=200100`). The
+complete libc++ rerun reached step 2,181 of 2,452 and then disproved that recipe
+because the packaged library does not expose `std::chrono::current_zone()`.
+The immutable upstream production workflow is the stronger recipe authority:
+Ubuntu 24.04, Clang 19 with the default libstdc++, and mold. RED-first contract
+assertions now pin those shadPS4 compiler and linker choices, preserve its
+upstream-enabled Discord/updater surface, and enable Release IPO; llama.cpp
+and TensorFlow Lite remain on Clang 20. The first production-shaped rerun
+configured successfully and reached step 433 of 2,554, where CMake's C++23
+dependency scan invoked the absent `clang-scan-deps-19` binary and stopped with
+exit 127. The matching `clang-tools-19` package is now pinned instead of
+disabling IPO or narrowing the production surface. The corrected hosted run
+then completed all 2,554 build steps and exposed an observer-only parsing
+defect: CMake's Clang dependency-scanner form places its source path before
+`-c`. A RED-first regression preserves that real command shape. Target closure
+selection now matches command tokens position-independently against the
+already validated compile-database surface, while ambiguous matches and an
+empty intersection still fail closed. The three-candidate hosted rerun remains
+the referee; no canonical expectation, production factory membership, or
+accepted contract intent changed. No C++ production function changed, so the
+contract-first shadow counts are all zero.
+
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
 Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's

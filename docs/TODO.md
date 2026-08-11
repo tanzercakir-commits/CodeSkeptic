@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = 488377a
-in_flight     = phase-realworld-release-candidate-factory phase-tflite-gcc14-immutable-flag-hardening
-verified_main = 488377a
-progress      = sha256:22651603fcce0fd1d3e8bd91bb7efb7a7ee2c1c600289e29ebf05bad841da345
+base          = 7dfd375
+in_flight     = phase-realworld-release-candidate-factory
+verified_main = 7dfd375
+progress      = sha256:ad383b5215239a8324b155328f694bbba8b3f7e8a9dd90e5127b9238d7fec952
 ```
 <!-- cs:state-end -->
 
@@ -887,6 +887,133 @@ or verify. No proposal exposed another implementation or assumption problem;
 the independent hosted run and executable GCC14 RED fixture exposed and now
 close the defect. Candidate contracts requiring later human review: none. No
 `cs: ai` proposal became accepted intent.
+
+## Phase 8.3 — release-candidate real-repository capacity — QUALIFIED (2026-08-11)
+
+The active branch is `phase-realworld-release-candidate-factory`. Its
+observational boundary is locked in `docs/phase83-qualification-contract.md`:
+the only candidates are llama.cpp, shadPS4, and the selected TensorFlow Lite
+production library target at immutable commits. Qualification receipts cannot
+become canonical expectations or accepted campaign intent. Production still
+requires a later locked expectation boundary and three independent identical
+semantic receipts.
+
+llama.cpp remains pinned at
+`4dee52f82dc455a035e900fed6a40cb45cd7a454`. Its low-parallelism Release
+clang-20 CMake/Ninja `llama` target builds successfully. The admitted `src` and
+`ggml/src` surface contains 200 compile-database translation units with digest
+`e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783`.
+Finding, coverage, exit, and fingerprint expectations remain unclaimed.
+
+TensorFlow Lite remains pinned at
+`a481b10260dfdf833a1b16007eead49c1d7febf3`, with its own source bound through
+`TENSORFLOW_SOURCE_DIR`. The hosted build completed 505 Ninja steps. The broad
+compile-database selector exposed 269 unique project paths but included ten
+configured-only sources whose generated or Python binding headers do not exist
+for the production library target; its 76 findings and incomplete exit are not
+acceptance evidence. The exact `tensorflow-lite` Ninja target closure contains
+241 unique translation units with digest
+`2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f`.
+After protected-main PR #139, a full local observation of that target completed
+with coverage fields 241 attempted, 245 analyzed, zero broken, and zero
+incomplete functions; it reported 73 supported blocking findings with normal
+exit 1. The ordered fingerprint digest is
+`6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a`;
+the JSON report SHA-256 is
+`717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
+These values are observations only. The observer now derives the production
+target closure from Ninja and intersects it with the admitted compile-database
+surface before analysis; RED-first tests exclude configured-only and dependency
+sources and reject paths outside the pinned source tree.
+
+shadPS4 remains pinned at
+`5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa` with 53 recursive gitlinks. The
+first hosted build using Clang 20 with GCC 14's default libstdc++ stopped at
+2,088 of 2,452 steps on a compiler/library compatibility boundary. A narrow
+libc++ 20 probe established only the required `std::jthread`/`std::stop_token`
+surface (`_LIBCPP_VERSION=200100`); it did not prove the complete project
+recipe. The full libc++ rerun reached step 2,181 but then proved that this
+packaged library does not provide the `std::chrono::current_zone()` surface
+used by the pinned source. The immutable upstream production workflow is the
+stronger authority: it builds on Ubuntu 24.04 with Clang 19, the default
+libstdc++, and mold. RED-first contract assertions now pin that exact compiler
+and linker choice, preserve the upstream-enabled Discord/updater surface, and
+enable Release IPO for shadPS4 while llama.cpp and TensorFlow Lite remain on
+Clang 20. The first full production-shaped rerun configured successfully and
+reached step 433 of 2,554, where CMake's C++23 dependency scan proved the
+runner package set lacked `clang-scan-deps-19`; the checksummed unavailable
+receipt records build exit 127. The workflow now installs the matching
+`clang-tools-19` package rather than weakening IPO or the production surface.
+That corrected hosted run completed all 2,554 build steps, then exposed a
+qualification-parser defect: CMake's Clang dependency-scanner commands place
+the admitted source path before `-c`, while the observer required it after
+`-c`. The checksummed unavailable receipt therefore records an invalid target
+closure even though the build succeeded. A RED-first regression now preserves
+that real command form, and target selection matches tokens position-
+independently against the already validated compile-database surface while
+still rejecting ambiguous matches and empty closure intersections. The next
+hosted run remains the authority for the translation-unit identity and analyzer
+receipt.
+
+No C++ production function changes in this qualification branch: functions 0,
+proposals 0, eligible 0, rejected 0, unsupported 0. No `cs: ai` proposal became
+accepted intent. The next gate is the corrected three-candidate hosted
+observation; only complete candidate surfaces can proceed to locked
+expectations and the required three repetitions.
+
+**Qualification closeout (2026-08-11):** head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`
+passed run `31515185143` with one shared analyzer artifact
+(`sha256:155f50b04c83ea7ebbcc2a5846482350468bdb3e62a9fe3b117a18ececc67e25`).
+Pinned candidate receipts are complete with zero broken TUs and zero incomplete
+functions: llama.cpp `4dee52f82dc4` requested/executed `200/200`, 40 findings;
+TensorFlow Lite `a481b10260df` requested/executed `241/245`, 73 findings (the
+documented admitted extra-execution case); ShadPS4 `5a4373c80e32` requested/executed
+`382/382`, 66 findings. All three completed with the findings-only semantic exit
+and immutable artifacts keyed to the same CodeSkeptic head.
+
+## Phase 8.4 — release-candidate factory promotion — LOCAL GREEN; HOSTED AGGREGATE PENDING (2026-08-11)
+
+**Boundary:** promote only the three recipes qualified at CodeSkeptic head
+`ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`: llama.cpp `4dee52f82dc4`,
+TensorFlow Lite `a481b10260df`, and ShadPS4 `5a4373c80e32`. The accepted
+factory remains manifest-driven; candidate commands, source selection,
+expected coverage, and semantic fingerprints must equal the immutable
+qualification receipts rather than being rewritten during promotion.
+
+**Factory gate:** add one manual 72-hour `release-candidate` tier with exactly
+three repetitions per project. A single analyzer artifact serves every shard
+in a run. Aggregation accepts a project only when all three checksummed
+receipts have identical identity and semantic evidence, zero broken TUs, zero
+incomplete functions, and the pinned findings-only verdict. ShadPS4 must also
+verify its recursive 53-entry submodule identity and checksum before build.
+
+**RED evidence:** at boundary head `0759dca`, planning the release-candidate
+tier exits `2` because the campaign is absent. The implementation gate is a
+`0` plan with exactly nine shards, the campaign and qualification contract
+tests, full CTest, document automation, then a hosted aggregate receipt for
+all nine shards.
+
+**Local GREEN evidence:** the accepted manifest now has 11 projects and three
+campaigns. `release-candidate` planning exits `0` with exactly nine shards
+(three projects by three repetitions); campaign and qualification contract
+tests pass; the LLVM 19 Release build completes `100/100`; and full CTest
+passes `1177/1177`. Hosted completion still requires the aggregate receipt
+from all nine shards and remains unavailable until that evidence exists.
+
+**Hosted attempt 1 (run `31523815926`):** plan and the shared LLVM 19 analyzer
+passed, but release-candidate shard images lacked the matching Clang resource
+headers. The first llama.cpp receipts were unavailable (`200` attempted, `1`
+analyzed, `199` broken), so the run was cancelled. The workflow now installs
+`clang-19` on release-candidate shards while retaining `clang-20` for the
+nightly and weekend tiers; no partial receipt is accepted as evidence.
+
+**Hosted attempt 2 (run `31525147338`):** installing only `clang-19` supplied
+the analyzer resources but removed the `clang-20` executable pinned by all
+three qualified source-build recipes; TensorFlow Lite therefore failed during
+configure. The run was cancelled. Release-candidate shards now install both
+packages: `clang-20` preserves the immutable candidate build commands and
+`clang-19` supplies the shared analyzer runtime resources. Existing tiers
+continue to install only `clang-20`.
 
 ## Recovered product program — Phases 8–12
 
