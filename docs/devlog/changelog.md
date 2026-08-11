@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Fixed-width summary guard
+
+- Limited zero-passthrough width reasoning to fixed builtin integer types.
+- Kept dependent, enum, incomplete, and other uncertain-width types conservative.
+- Added a regression case from the real template pattern that exposed the invalid width query.
+- Verified the focused regression and full local suites with LLVM 20 and LLVM 19; the exact Shad candidate completed 382/382 translation units with LLVM 19.
+
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
 Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's
