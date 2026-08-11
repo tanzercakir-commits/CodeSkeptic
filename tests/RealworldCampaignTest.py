@@ -733,7 +733,7 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("version=19", workflow)
         self.assertIn("version=20", workflow)
         self.assertIn("compiler_packages=(clang-20)", workflow)
-        self.assertIn("compiler_packages+=(clang-19)", workflow)
+        self.assertIn("compiler_packages+=(clang-19 mold)", workflow)
         self.assertIn('"${compiler_packages[@]}" cmake ninja-build', workflow)
         self.assertIn("llvm-${{ steps.llvm.outputs.version }}-dev", workflow)
         self.assertIn("clang-${{ steps.llvm.outputs.version }}", workflow)
@@ -749,7 +749,7 @@ class WorkflowContractTest(unittest.TestCase):
             line for line in workflow.splitlines() if "clang-19" in line
         ]
         self.assertEqual(len(package_lines), 1)
-        self.assertIn("mold", package_lines[0].split())
+        self.assertIn("compiler_packages+=(clang-19 mold)", package_lines[0])
 
 
 if __name__ == "__main__":
