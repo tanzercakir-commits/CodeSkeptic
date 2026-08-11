@@ -1139,14 +1139,22 @@ ReturnNullness computeReturnNullness(const FunctionDecl* func,
 // widening conversions (any signedness) preserve zeroness exactly.
 enum class PtRes { NonZero, Passthrough, Blocked };
 
+bool hasFixedIntegerWidth(QualType type) {
+    if (type.isNull()) return false;
+    const auto* builtin = type->getAs<BuiltinType>();
+    return builtin && builtin->isInteger() &&
+           builtin->getKind() != BuiltinType::Bool;
+}
+
 PtRes resolveZeroReturn(const Expr* e, const FunctionDecl* func,
                         const std::set<const VarDecl*>& unwritten,
                         const SummaryTable& previous, ASTContext& ctx,
                         unsigned targetWidth, int* pt) {
     if (!e) return PtRes::Blocked;
     e = e->IgnoreParens();
-    if (!e->getType()->isIntegerType()) return PtRes::Blocked;
-    if (ctx.getIntWidth(e->getType()) > targetWidth) return PtRes::Blocked;
+    const QualType exprType = e->getType();
+    if (!hasFixedIntegerWidth(exprType)) return PtRes::Blocked;
+    if (ctx.getIntWidth(exprType) > targetWidth) return PtRes::Blocked;
 
     if (const auto* lit = dyn_cast<IntegerLiteral>(e))
         return lit->getValue() == 0 ? PtRes::Blocked : PtRes::NonZero;
@@ -1195,7 +1203,7 @@ PtRes resolveZeroReturn(const Expr* e, const FunctionDecl* func,
                         ->getParamDecl(
                             static_cast<unsigned>(summary->zeroFromParam))
                         ->getType();
-                if (!pt_ty->isIntegerType()) return PtRes::Blocked;
+                if (!hasFixedIntegerWidth(pt_ty)) return PtRes::Blocked;
                 argTarget = ctx.getIntWidth(pt_ty);
             }
             return resolveZeroReturn(call->getArg(summary->zeroFromParam),
@@ -1216,8 +1224,7 @@ ReturnZeroness computeReturnZeroness(const FunctionDecl* func,
     // meaningless anyway
     *zeroFromParam = -1;
     QualType retType = func->getReturnType();
-    if (!retType->isIntegerType() || retType->isBooleanType())
-        return ReturnZeroness::Unknown;
+    if (!hasFixedIntegerWidth(retType)) return ReturnZeroness::Unknown;
 
     AggregateFlags flags = computeReturnFlow<zstateOf, applyZeroCond>(
         func, ctx, previous, [](QualType t) {
