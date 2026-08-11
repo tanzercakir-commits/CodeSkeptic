@@ -1008,6 +1008,7 @@ analyzed, `199` broken), so the run was cancelled. The workflow now installs
 nightly and weekend tiers; no partial receipt is accepted as evidence.
 
 **Hosted attempt 2 (run `31525147338`):** installing only `clang-19` supplied
+- Hosted factory attempt 3: run `31525916462` at `6f0453b741aee8a6f09489915cb6476b48a6c7ee` reached the nine-shard fanout with both required compiler packages. Two TensorFlow Lite repetitions deterministically produced 269 configured translation units: the qualified 241 plus 28 non-target tools, profiling, Python, and example units. The run was cancelled because the aggregate gate could no longer pass. The campaign runner now reuses the Phase 8.3 Ninja target-closure filter; the downloaded attempt receipt was reduced back to the exact qualified 241/241 relative identities locally. Hosted aggregate rerun is pending.
 the analyzer resources but removed the `clang-20` executable pinned by all
 three qualified source-build recipes; TensorFlow Lite therefore failed during
 configure. The run was cancelled. Release-candidate shards now install both

@@ -8,7 +8,6 @@ import copy
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -349,67 +348,7 @@ def _capture_logged_command(
     return result.stdout
 
 
-def filter_target_translation_units(
-    command_output: str,
-    source: Path,
-    build: Path,
-    files: list[Path],
-    relative_files: list[str],
-) -> tuple[list[Path], list[str]]:
-    if len(files) != len(relative_files):
-        raise campaign.EvidenceError("translation-unit identity is malformed")
-    source_root = source.resolve()
-    for path in files:
-        resolved = path.resolve()
-        if resolved != source_root and source_root not in resolved.parents:
-            raise campaign.EvidenceError(
-                "translation-unit identity escapes the pinned source tree"
-            )
-    admitted = {
-        path.resolve(): (path, relative)
-        for path, relative in zip(files, relative_files, strict=True)
-    }
-    target_sources: set[Path] = set()
-    for line in command_output.splitlines():
-        try:
-            tokens = shlex.split(line)
-        except ValueError as error:
-            raise campaign.EvidenceError(
-                f"Ninja target closure contains an invalid command: {error}"
-            ) from error
-        compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
-        if not compile_indexes:
-            continue
-        if len(compile_indexes) != 1:
-            raise campaign.EvidenceError(
-                "Ninja target closure contains an ambiguous compile command"
-            )
-        command_sources: set[Path] = set()
-        for token in tokens:
-            if token.startswith("-"):
-                continue
-            path = Path(token)
-            if not path.is_absolute():
-                path = build / path
-            resolved = path.resolve()
-            if resolved in admitted:
-                command_sources.add(resolved)
-        if len(command_sources) > 1:
-            raise campaign.EvidenceError(
-                "Ninja target closure contains an ambiguous compile source"
-            )
-        target_sources.update(command_sources)
-
-    selected = sorted(
-        (relative, path)
-        for resolved, (path, relative) in admitted.items()
-        if resolved in target_sources
-    )
-    if not selected:
-        raise campaign.EvidenceError(
-            "Ninja target closure selected no admitted translation units"
-        )
-    return [path for _, path in selected], [relative for relative, _ in selected]
+filter_target_translation_units = campaign.filter_target_translation_units
 
 
 def parse_submodule_status(output: str) -> list[dict[str, str]]:

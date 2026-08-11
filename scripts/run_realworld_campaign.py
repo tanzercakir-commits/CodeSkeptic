@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -993,6 +994,69 @@ def _derive_translation_units(
     return [selected[path] for path in relative_paths], relative_paths
 
 
+def filter_target_translation_units(
+    command_output: str,
+    source: Path,
+    build: Path,
+    files: list[Path],
+    relative_files: list[str],
+) -> tuple[list[Path], list[str]]:
+    if len(files) != len(relative_files):
+        raise EvidenceError("translation-unit identity is malformed")
+    source_root = source.resolve()
+    for path in files:
+        resolved = path.resolve()
+        if resolved != source_root and source_root not in resolved.parents:
+            raise EvidenceError(
+                "translation-unit identity escapes the pinned source tree"
+            )
+    admitted = {
+        path.resolve(): (path, relative)
+        for path, relative in zip(files, relative_files, strict=True)
+    }
+    target_sources: set[Path] = set()
+    for line in command_output.splitlines():
+        try:
+            tokens = shlex.split(line)
+        except ValueError as error:
+            raise EvidenceError(
+                f"Ninja target closure contains an invalid command: {error}"
+            ) from error
+        compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
+        if not compile_indexes:
+            continue
+        if len(compile_indexes) != 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile command"
+            )
+        command_sources: set[Path] = set()
+        for token in tokens:
+            if token.startswith("-"):
+                continue
+            path = Path(token)
+            if not path.is_absolute():
+                path = build / path
+            resolved = path.resolve()
+            if resolved in admitted:
+                command_sources.add(resolved)
+        if len(command_sources) > 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile source"
+            )
+        target_sources.update(command_sources)
+
+    selected = sorted(
+        (relative, path)
+        for resolved, (path, relative) in admitted.items()
+        if resolved in target_sources
+    )
+    if not selected:
+        raise EvidenceError(
+            "Ninja target closure selected no admitted translation units"
+        )
+    return [path for _, path in selected], [relative for relative, _ in selected]
+
+
 def run_shard(
     manifest: dict[str, Any],
     project_id: str,
@@ -1097,6 +1161,32 @@ def run_shard(
         files, relative_files = _derive_translation_units(
             project, project_root, build, compile_database
         )
+        ninja_target = None
+        for build_command in project["commands"]["build"]:
+            expanded_build_command = _expand(build_command, values)
+            if "--target" not in expanded_build_command:
+                continue
+            target_index = expanded_build_command.index("--target")
+            if target_index + 1 >= len(expanded_build_command):
+                raise EvidenceError("build target is missing")
+            ninja_target = expanded_build_command[target_index + 1]
+            break
+        if ninja_target is not None:
+            target_commands = _capture_git(
+                ["ninja", "-C", str(build), "-t", "commands", ninja_target],
+                project_root,
+                deadline,
+                project["memory_mb"],
+                log_path,
+                None,
+            )
+            relative_files = [
+                path.resolve().relative_to(project_root.resolve()).as_posix()
+                for path in file_list
+            ]
+            file_list, _ = filter_target_translation_units(
+                target_commands, project_root, build, file_list, relative_files
+            )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(

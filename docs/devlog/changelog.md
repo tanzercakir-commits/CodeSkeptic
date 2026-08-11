@@ -3,6 +3,7 @@
 ## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
 
 - Run `31525147338` showed that replacing the shard compiler with `clang-19` broke the immutable candidate recipes, which explicitly configure their source builds with `clang-20`.
+- Phase 8.4 hosted factory attempt 3 (`31525916462`, head `6f0453b741aee8a6f09489915cb6476b48a6c7ee`) confirmed both compiler packages were available and exposed a deterministic target-selection mismatch: TensorFlow Lite repeated 269 units rather than the qualified 241. The 28 additions were exclusively non-target tools, profiling, Python, and example units. Cancelled the unwinnable run, moved the proven Phase 8.3 Ninja target-closure filter into the shared campaign runner, and verified against the downloaded artifact that it restores the exact 241/241 relative identity set. Hosted rerun remains pending.
 - Cancelled the invalid run after TensorFlow Lite configure receipts proved the missing executable; no partial result was admitted.
 - Release-candidate shards now install both `clang-20` for candidate builds and `clang-19` for analyzer resources; nightly and weekend shards remain unchanged.
 - Updated the workflow contract to pin the two-package release behavior.
