@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.3 exact qualification closed
+
+- Rebased the release-candidate factory onto the fixed-width summary guard and aligned the shared analyzer build with LLVM 19.
+- Closed hosted run `31515185143` at head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6` using one immutable analyzer artifact across all candidates.
+- Qualified llama.cpp at `200/200` executions with 40 findings, TensorFlow Lite at `241` requested and `245` admitted executions with 73 findings, and ShadPS4 at `382/382` with 66 findings.
+- Every receipt reports zero broken translation units, zero incomplete functions, and a findings-only semantic exit.
+
 ## 2026-08-11 — Fixed-width summary guard
 
 - Limited zero-passthrough width reasoning to fixed builtin integer types.

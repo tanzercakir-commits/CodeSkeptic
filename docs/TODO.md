@@ -888,7 +888,7 @@ the independent hosted run and executable GCC14 RED fixture exposed and now
 close the defect. Candidate contracts requiring later human review: none. No
 `cs: ai` proposal became accepted intent.
 
-## Phase 8.3 — release-candidate real-repository capacity — QUALIFICATION IN PROGRESS (2026-08-11)
+## Phase 8.3 — release-candidate real-repository capacity — QUALIFIED (2026-08-11)
 
 The active branch is `phase-realworld-release-candidate-factory`. Its
 observational boundary is locked in `docs/phase83-qualification-contract.md`:
@@ -960,6 +960,16 @@ proposals 0, eligible 0, rejected 0, unsupported 0. No `cs: ai` proposal became
 accepted intent. The next gate is the corrected three-candidate hosted
 observation; only complete candidate surfaces can proceed to locked
 expectations and the required three repetitions.
+
+**Qualification closeout (2026-08-11):** head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`
+passed run `31515185143` with one shared analyzer artifact
+(`sha256:155f50b04c83ea7ebbcc2a5846482350468bdb3e62a9fe3b117a18ececc67e25`).
+Pinned candidate receipts are complete with zero broken TUs and zero incomplete
+functions: llama.cpp `4dee52f82dc4` requested/executed `200/200`, 40 findings;
+TensorFlow Lite `a481b10260df` requested/executed `241/245`, 73 findings (the
+documented admitted extra-execution case); ShadPS4 `5a4373c80e32` requested/executed
+`382/382`, 66 findings. All three completed with the findings-only semantic exit
+and immutable artifacts keyed to the same CodeSkeptic head.
 
 ## Recovered product program — Phases 8–12
 
