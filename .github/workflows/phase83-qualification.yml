@@ -50,7 +50,7 @@ jobs:
       - name: Build the shared analyzer
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-19 \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-19 -DLLVM_DIR=/usr/lib/llvm-19/lib/cmake/llvm -DClang_DIR=/usr/lib/llvm-19/lib/cmake/clang \
             -DCODESKEPTIC_BUILD_TESTS=OFF
           cmake --build build --parallel 2
           sha256sum build/src/codeskeptic
