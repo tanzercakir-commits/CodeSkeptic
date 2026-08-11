@@ -1,0 +1,111 @@
+name: Phase 8.3 hosted qualification
+
+# Observational only: this workflow cannot create accepted campaign intent.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase-realworld-release-candidate-factory
+    paths:
+      - .github/workflows/phase83-qualification.yml
+      - scripts/phase83_qualification.py
+      - scripts/phase83_candidates.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase83-qualification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate observational candidates
+        id: matrix
+        shell: bash
+        run: |
+          matrix=$(python3 scripts/phase83_qualification.py plan)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build-analyzer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 20 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            clang-20 ninja-build
+
+      - name: Build the shared analyzer
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          cmake --build build --parallel 2
+          sha256sum build/src/codeskeptic
+
+      - name: Publish immutable analyzer input
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase83-analyzer-${{ github.sha }}
+          path: build/src/codeskeptic
+          if-no-files-found: error
+          retention-days: 14
+
+  observe:
+    needs: [plan, build-analyzer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install candidate build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-19 clang-20 cmake ninja-build mold build-essential \
+            libx11-dev libxext-dev libwayland-dev libdecor-0-dev \
+            libxkbcommon-dev libxcursor-dev libxi-dev libxss-dev \
+            libxtst-dev libxrandr-dev libxfixes-dev libudev-dev uuid-dev \
+            libglfw3-dev libgles2-mesa-dev libfuse2 libasound2-dev \
+            libpulse-dev libopenal-dev
+
+      - name: Download the shared analyzer
+        uses: actions/download-artifact@v4
+        with:
+          name: phase83-analyzer-${{ github.sha }}
+          path: analyzer
+
+      - name: Observe one candidate without accepting intent
+        shell: bash
+        run: |
+          chmod +x analyzer/codeskeptic
+          python3 scripts/phase83_qualification.py run \
+            --project "${{ matrix.project }}" \
+            --analyzer analyzer/codeskeptic \
+            --workspace candidate-work \
+            --output "evidence/${{ matrix.project }}/receipt.json"
+
+      - name: Upload observation or unavailable evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase83-qualification-${{ matrix.project }}-${{ github.sha }}
+          path: evidence/${{ matrix.project }}
+          if-no-files-found: error
+          retention-days: 30
