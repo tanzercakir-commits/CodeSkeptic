@@ -1,5 +1,67 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.3 exact qualification closed
+
+- Rebased the release-candidate factory onto the fixed-width summary guard and aligned the shared analyzer build with LLVM 19.
+- Closed hosted run `31515185143` at head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6` using one immutable analyzer artifact across all candidates.
+- Qualified llama.cpp at `200/200` executions with 40 findings, TensorFlow Lite at `241` requested and `245` admitted executions with 73 findings, and ShadPS4 at `382/382` with 66 findings.
+- Every receipt reports zero broken translation units, zero incomplete functions, and a findings-only semantic exit.
+
+## 2026-08-11 — Fixed-width summary guard
+
+- Limited zero-passthrough width reasoning to fixed builtin integer types.
+- Kept dependent, enum, incomplete, and other uncertain-width types conservative.
+- Added a regression case from the real template pattern that exposed the invalid width query.
+- Verified the focused regression and full local suites with LLVM 20 and LLVM 19; the exact Shad candidate completed 382/382 translation units with LLVM 19.
+
+## 2026-08-11 — Phase 8.3 production-target qualification correction
+
+Rebased the observational release-candidate lane onto protected-main commit
+`7dfd37596414c9512316093ff4fb6b039673f55f`, which contains the GCC14
+immutable-flag correction from PR #139. The qualification contract now requires
+translation units to belong both to the real compile database and to the named
+Ninja production target's command closure. RED-first tests exclude
+configured-only sources, dependency sources, malformed closures, and paths
+outside the pinned source tree.
+
+This corrects the TensorFlow Lite surface without accepting expectations. Its
+505-step hosted build configured 269 unique project source paths, but ten were
+not members of the production library target and required generated or Python
+binding headers absent from that build. The exact `tensorflow-lite` target is
+241 unique translation units with digest
+`2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f`.
+A full local observation completed with coverage fields 241 attempted, 245
+analyzed, zero broken, and zero incomplete functions, plus 73 supported
+blocking findings and normal exit 1. Its fingerprint digest is
+`6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a`
+and report SHA-256 is
+`717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
+
+The first shadPS4 hosted build showed that Clang 20 with GCC 14's default
+libstdc++ is not a valid recipe for the pinned sources. A narrow disposable
+Ubuntu probe established only that libc++ 20 exposes the required C++23
+`std::jthread` and `std::stop_token` surface (`_LIBCPP_VERSION=200100`). The
+complete libc++ rerun reached step 2,181 of 2,452 and then disproved that recipe
+because the packaged library does not expose `std::chrono::current_zone()`.
+The immutable upstream production workflow is the stronger recipe authority:
+Ubuntu 24.04, Clang 19 with the default libstdc++, and mold. RED-first contract
+assertions now pin those shadPS4 compiler and linker choices, preserve its
+upstream-enabled Discord/updater surface, and enable Release IPO; llama.cpp
+and TensorFlow Lite remain on Clang 20. The first production-shaped rerun
+configured successfully and reached step 433 of 2,554, where CMake's C++23
+dependency scan invoked the absent `clang-scan-deps-19` binary and stopped with
+exit 127. The matching `clang-tools-19` package is now pinned instead of
+disabling IPO or narrowing the production surface. The corrected hosted run
+then completed all 2,554 build steps and exposed an observer-only parsing
+defect: CMake's Clang dependency-scanner form places its source path before
+`-c`. A RED-first regression preserves that real command shape. Target closure
+selection now matches command tokens position-independently against the
+already validated compile-database surface, while ambiguous matches and an
+empty intersection still fail closed. The three-candidate hosted rerun remains
+the referee; no canonical expectation, production factory membership, or
+accepted contract intent changed. No C++ production function changed, so the
+contract-first shadow counts are all zero.
+
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
 Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's
