@@ -44,13 +44,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            llvm-19-dev libclang-19-dev libzstd-dev zlib1g-dev \
             clang-20 ninja-build
 
       - name: Build the shared analyzer
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-19 \
             -DCODESKEPTIC_BUILD_TESTS=OFF
           cmake --build build --parallel 2
           sha256sum build/src/codeskeptic
