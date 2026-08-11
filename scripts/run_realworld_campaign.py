@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -242,6 +243,42 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
             for row_index, row in enumerate(rows)
         ]
 
+    checkout = project.get(
+        "checkout",
+        {
+            "submodules": "none",
+            "expected_count": 0,
+            "expected_sha256": digest_json([]),
+        },
+    )
+    if not isinstance(checkout, dict) or set(checkout) != {
+        "submodules",
+        "expected_count",
+        "expected_sha256",
+    }:
+        raise ManifestError(f"project {project_id} checkout fields are invalid")
+    if checkout["submodules"] not in ("none", "recursive"):
+        raise ManifestError(f"project {project_id} checkout mode is invalid")
+    _require_int(
+        checkout["expected_count"],
+        f"project {project_id} checkout.expected_count",
+        0,
+    )
+    if (
+        not isinstance(checkout["expected_sha256"], str)
+        or not SHA256.fullmatch(checkout["expected_sha256"])
+    ):
+        raise ManifestError(
+            f"project {project_id} checkout.expected_sha256 must be SHA-256"
+        )
+    if checkout["submodules"] == "none" and (
+        checkout["expected_count"] != 0
+        or checkout["expected_sha256"] != digest_json([])
+    ):
+        raise ManifestError(f"project {project_id} empty checkout identity is invalid")
+    if checkout["submodules"] == "recursive" and checkout["expected_count"] < 1:
+        raise ManifestError(f"project {project_id} recursive checkout identity is empty")
+
     copies = project.get("copies")
     if not isinstance(copies, list):
         raise ManifestError(f"project {project_id} copies must be an array")
@@ -402,13 +439,17 @@ def receipt_identity(
     repetition: int,
     analyzer_sha256: str,
     translation_unit_sha256: str,
+    submodules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if submodules is None:
+        submodules = _expected_submodules(project)
     return {
         "manifest_sha256": digest_json(manifest),
         "project_revision": project["revision"],
         "recipe_sha256": digest_json(project_recipe(project)),
         "analyzer_sha256": analyzer_sha256,
         "translation_unit_sha256": translation_unit_sha256,
+        "submodules": copy.deepcopy(submodules),
         "repetition": repetition,
     }
 
@@ -724,6 +765,7 @@ def _run_command(
     deadline: float,
     memory_mb: int,
     log_path: Path,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     remaining = max(0.0, deadline - time.monotonic())
     if remaining <= 0:
@@ -741,11 +783,173 @@ def _run_command(
                 text=True,
                 timeout=remaining,
                 preexec_fn=_memory_preexec(memory_mb),
+                env=env,
             )
         except subprocess.TimeoutExpired as error:
             raise EvidenceError("project shard timed out") from error
         log.write(f"EXIT {result.returncode}\n")
     return result
+
+
+def _expected_submodules(project: dict[str, Any]) -> dict[str, Any]:
+    checkout = project.get(
+        "checkout",
+        {
+            "submodules": "none",
+            "expected_count": 0,
+            "expected_sha256": digest_json([]),
+        },
+    )
+    return {
+        "mode": checkout["submodules"],
+        "count": checkout["expected_count"],
+        "sha256": checkout["expected_sha256"],
+    }
+
+
+def _capture_git(
+    command: list[str],
+    cwd: Path,
+    deadline: float,
+    memory_mb: int,
+    log_path: Path,
+    env: dict[str, str],
+) -> str:
+    remaining = max(0.0, deadline - time.monotonic())
+    if remaining <= 0:
+        raise EvidenceError("project shard timed out")
+    with log_path.open("a", encoding="utf-8", newline="\n") as log:
+        log.write(f"COMMAND cwd={cwd.as_posix()} argv={json.dumps(command)}\n")
+        log.flush()
+        try:
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=remaining,
+                preexec_fn=_memory_preexec(memory_mb),
+                env=env,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise EvidenceError("project shard timed out") from error
+        log.write(result.stdout)
+        log.write(f"EXIT {result.returncode}\n")
+    if result.returncode != 0:
+        raise EvidenceError(f"git command failed with exit {result.returncode}")
+    return result.stdout
+
+
+def _parse_submodule_status(output: str) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    pattern = re.compile(r" ([0-9a-f]{40}) (.+?)(?: \([^\r\n]*\))?$")
+    for line in output.splitlines():
+        match = pattern.fullmatch(line)
+        if match is None:
+            raise EvidenceError(
+                "recursive submodule is uninitialized, drifted, conflicted, or malformed"
+            )
+        revision, path = match.groups()
+        entries.append(
+            {"path": _require_relative(path, "submodule path"), "revision": revision}
+        )
+    entries.sort(key=lambda entry: entry["path"])
+    if not entries or len({entry["path"] for entry in entries}) != len(entries):
+        raise EvidenceError("recursive submodule identity is empty or duplicated")
+    return entries
+
+
+def _submodule_identity(
+    project: dict[str, Any],
+    project_root: Path,
+    deadline: float,
+    log_path: Path,
+) -> dict[str, Any]:
+    expected = _expected_submodules(project)
+    mode = expected["mode"]
+    git_env = os.environ.copy()
+    git_env["GIT_ALLOW_PROTOCOL"] = "https"
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+    stage = _capture_git(
+        ["git", "ls-files", "--stage"],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    gitlinks = [line for line in stage.splitlines() if line.startswith("160000 ")]
+    if mode == "none":
+        if gitlinks:
+            raise EvidenceError("project has undeclared gitlink submodules")
+        return expected
+
+    for command in (
+        ["git", "-c", "protocol.file.allow=never", "submodule", "sync", "--recursive"],
+        [
+            "git",
+            "-c",
+            "protocol.file.allow=never",
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            "--depth",
+            "1",
+            "--jobs",
+            "2",
+        ],
+    ):
+        result = _run_command(
+            command,
+            project_root,
+            deadline,
+            project["memory_mb"],
+            log_path,
+            env=git_env,
+        )
+        if result.returncode != 0:
+            raise EvidenceError(
+                f"recursive submodule checkout failed with exit {result.returncode}"
+            )
+
+    status = _capture_git(
+        ["git", "submodule", "status", "--recursive"],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    entries = _parse_submodule_status(status)
+
+    clean = _capture_git(
+        [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=no",
+            "--ignore-submodules=none",
+        ],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    if clean:
+        raise EvidenceError("recursive submodule checkout is not clean")
+
+    actual = {
+        "mode": mode,
+        "count": len(entries),
+        "sha256": digest_json(entries),
+    }
+    if actual != expected:
+        raise EvidenceError("recursive submodule identity does not match the manifest")
+    return actual
 
 
 def _derive_translation_units(
@@ -790,6 +994,69 @@ def _derive_translation_units(
     return [selected[path] for path in relative_paths], relative_paths
 
 
+def filter_target_translation_units(
+    command_output: str,
+    source: Path,
+    build: Path,
+    files: list[Path],
+    relative_files: list[str],
+) -> tuple[list[Path], list[str]]:
+    if len(files) != len(relative_files):
+        raise EvidenceError("translation-unit identity is malformed")
+    source_root = source.resolve()
+    for path in files:
+        resolved = path.resolve()
+        if resolved != source_root and source_root not in resolved.parents:
+            raise EvidenceError(
+                "translation-unit identity escapes the pinned source tree"
+            )
+    admitted = {
+        path.resolve(): (path, relative)
+        for path, relative in zip(files, relative_files, strict=True)
+    }
+    target_sources: set[Path] = set()
+    for line in command_output.splitlines():
+        try:
+            tokens = shlex.split(line)
+        except ValueError as error:
+            raise EvidenceError(
+                f"Ninja target closure contains an invalid command: {error}"
+            ) from error
+        compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
+        if not compile_indexes:
+            continue
+        if len(compile_indexes) != 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile command"
+            )
+        command_sources: set[Path] = set()
+        for token in tokens:
+            if token.startswith("-"):
+                continue
+            path = Path(token)
+            if not path.is_absolute():
+                path = build / path
+            resolved = path.resolve()
+            if resolved in admitted:
+                command_sources.add(resolved)
+        if len(command_sources) > 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile source"
+            )
+        target_sources.update(command_sources)
+
+    selected = sorted(
+        (relative, path)
+        for resolved, (path, relative) in admitted.items()
+        if resolved in target_sources
+    )
+    if not selected:
+        raise EvidenceError(
+            "Ninja target closure selected no admitted translation units"
+        )
+    return [path for _, path in selected], [relative for relative, _ in selected]
+
+
 def run_shard(
     manifest: dict[str, Any],
     project_id: str,
@@ -807,12 +1074,14 @@ def run_shard(
     if not analyzer.is_file():
         raise EvidenceError(f"analyzer unavailable: {analyzer}")
     analyzer_sha = file_digest(analyzer)
+    expected_submodules = _expected_submodules(project)
     expected_identity = receipt_identity(
         manifest,
         project,
         repetition,
         analyzer_sha,
         project["expected"]["translation_unit_sha256"],
+        expected_submodules,
     )
     started = time.monotonic()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -829,6 +1098,7 @@ def run_shard(
 
     semantic: dict[str, Any] | None = None
     actual_tu_sha = project["expected"]["translation_unit_sha256"]
+    actual_submodules = expected_submodules
     failures: list[str] = []
     log_path = output.parent / "commands.log"
     if log_path.exists():
@@ -862,6 +1132,13 @@ def run_shard(
             raise EvidenceError(
                 f"checkout revision mismatch {resolved_revision} != {project['revision']}"
             )
+        actual_submodules = _submodule_identity(
+            project,
+            project_root,
+            deadline,
+            log_path,
+        )
+
         for operation in project["copies"]:
             source_file = _inside(repository_root, repository_root / operation["from"], "copy source")
             destination = _inside(project_root, project_root / operation["to"], "copy destination")
@@ -884,6 +1161,32 @@ def run_shard(
         files, relative_files = _derive_translation_units(
             project, project_root, build, compile_database
         )
+        ninja_target = None
+        for build_command in project["commands"]["build"]:
+            expanded_build_command = _expand(build_command, values)
+            if "--target" not in expanded_build_command:
+                continue
+            target_index = expanded_build_command.index("--target")
+            if target_index + 1 >= len(expanded_build_command):
+                raise EvidenceError("build target is missing")
+            ninja_target = expanded_build_command[target_index + 1]
+            break
+        if ninja_target is not None:
+            target_commands = _capture_git(
+                ["ninja", "-C", str(build), "-t", "commands", ninja_target],
+                project_root,
+                deadline,
+                project["memory_mb"],
+                log_path,
+                None,
+            )
+            relative_files = [
+                path.resolve().relative_to(project_root.resolve()).as_posix()
+                for path in file_list
+            ]
+            file_list, _ = filter_target_translation_units(
+                target_commands, project_root, build, file_list, relative_files
+            )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(
@@ -932,7 +1235,12 @@ def run_shard(
         failures.append(str(error))
 
     identity = receipt_identity(
-        manifest, project, repetition, analyzer_sha, actual_tu_sha
+        manifest,
+        project,
+        repetition,
+        analyzer_sha,
+        actual_tu_sha,
+        actual_submodules,
     )
     accepted = not failures and semantic is not None
     receipt = {
