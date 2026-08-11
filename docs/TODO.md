@@ -12,10 +12,10 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 
 <!-- cs:state-begin -->
 ```
-base          = 3b1714e
-in_flight     = phase-realworld-weekend-factory
-verified_main = 3b1714e
-progress      = sha256:e4abb350fc0516a20cc450f8fd3dbfd9d84ebb647b60a399844ea9bbe49294ef
+base          = 488377a
+in_flight     = phase-tflite-gcc14-immutable-flag-hardening
+verified_main = 488377a
+progress      = sha256:22651603fcce0fd1d3e8bd91bb7efb7a7ee2c1c600289e29ebf05bad841da345
 ```
 <!-- cs:state-end -->
 
@@ -833,6 +833,60 @@ runner exposed the Redis pre-hash assumption problem and it was corrected
 before implementation acceptance. Candidate contracts requiring later human
 review: none. No `cs: ai` proposal became accepted intent, and native
 owned-memory parity remains deferred to executable A7 fixtures.
+
+## Phase 8.3 qualification-discovered GCC14 hardening — BOUNDARY LOCKED (2026-08-11)
+
+The hosted TensorFlow Lite qualification run completed its 505-step build and
+selected 269 production translation units, then the analyzer crashed while
+summarizing `delegate_registry.cc`. Local reproduction on the exact pinned TU
+and Clang 20 with GCC 14 libstdc++ returned exit 139. GDB proved unbounded
+recursion below
+`Expr::EvaluateAsInt` from `edgeInfeasibleByFlags`; the last evaluated
+non-flag equality was in libstdc++ 14 `bits/unicode.h`. A five-line C++20
+`<format>` fixture independently reproduces the same exit 139, so the product
+defect is isolated from the release-candidate factory and TFLite itself.
+
+This separate main-based branch may change only
+`src/engine/ImmutableFlags.cpp`, the focused immutable-flag regression and
+test-helper wiring, this TODO, mechanically synchronized `docs/PROGRESS.md`,
+and `docs/devlog/changelog.md`. The implementation must first prove that the
+new `<format>` regression is RED, then prevent integer evaluation unless the
+opposite equality operand is a known immutable flag. Both operand orders and
+both equality operators must retain their existing pruning semantics. GREEN
+requires the focused regression, existing immutable-flag tests, the exact
+GCC14 TFLite TU, the full CTest suite, document sync, and whitespace checks.
+No release-candidate recipe, qualification expectation, rule finding policy,
+contract grammar, accepted contract intent, capability tier, schema, or
+release configuration may change in this branch. PR #138 remains
+qualification-only.
+
+**Local implementation and product gates complete.** The focused GCC14 test
+first crashed the unmodified test process with exit 139. The implementation
+now recognizes an immutable flag before evaluating the opposite operand and
+the same test passes in 614 ms. A second executable regression pins `==` and
+`!=` with the flag on either side. The related behavior set is 14/14 GREEN and
+the full CTest suite is 1175/1175 GREEN; the direct single-process suite is
+1166/1166 GREEN. Self-scan is clean and complete at 48/48 TUs with receipt
+SHA-256
+`53ddcd60f2fee8cbf6d7538c61bdbcec162ea2cba43562bee3911aefa941cc47`.
+The frozen thesis gate remains `clean_fp=0`, `bug_caught=9/15`, and 11 total
+findings. Real-corpus pins remain cJSON 54 findings (76 enumerated, 35
+analyzed, 41 explicitly accepted broken fixtures) and tinyxml2 9 findings
+(3/3 analyzed). Analyzer SHA-256
+`2ad4991268a3a9921e9d8095b1f0cd1767893701427627425a624460da9bd0a2`
+completed the exact GCC14 TFLite TU: 1/1 analyzed, zero broken TUs, zero
+incomplete functions, and one supported blocking `memory-leak` finding
+(`csf1-a845db511c25bcc3`) with normal exit 1. The complete JSON receipt SHA-256
+is `fce1be0c540059ebd2f4b7c10a8abaf428677de48b308ac0cb7185717dfc1187`.
+
+Contract-first shadow completion considered the one materially changed
+production function, `edgeInfeasibleByFlags`: proposals 0, eligible 0,
+rejected 0, unsupported 1. Its promise is conditional evaluation order over
+Clang AST state, which the current contract grammar and referee cannot express
+or verify. No proposal exposed another implementation or assumption problem;
+the independent hosted run and executable GCC14 RED fixture exposed and now
+close the defect. Candidate contracts requiring later human review: none. No
+`cs: ai` proposal became accepted intent.
 
 ## Recovered product program — Phases 8–12
 

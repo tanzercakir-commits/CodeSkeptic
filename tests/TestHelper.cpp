@@ -93,9 +93,11 @@ namespace testing {
 // them a snippet's #include <stdlib.h> fails on macOS, the TU breaks,
 // and finding-expecting tests fail while clean-expecting ones pass
 // vacuously.
-static std::vector<std::string> testArgs() {
+static std::vector<std::string>
+testArgs(const std::vector<std::string>& extraArgs = {}) {
     std::vector<std::string> args = {"-fparse-all-comments"};
     for (auto& a : platformExtraArgs()) args.push_back(a);
+    args.insert(args.end(), extraArgs.begin(), extraArgs.end());
     return args;
 }
 
@@ -106,6 +108,19 @@ DiagnosticList runRule(Rule& rule, const std::string& code,
         std::make_unique<TestAction>(rule, results),
         code,
         testArgs(),
+        filename);
+    return results;
+}
+
+DiagnosticList runRuleWithArgs(
+    Rule& rule, const std::string& code,
+    const std::vector<std::string>& extraArgs,
+    const std::string& filename) {
+    DiagnosticList results;
+    clang::tooling::runToolOnCodeWithArgs(
+        std::make_unique<TestAction>(rule, results),
+        code,
+        testArgs(extraArgs),
         filename);
     return results;
 }
