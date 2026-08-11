@@ -39,3 +39,11 @@ Evidence: commit `3b1714e1e9e3997ab63507837c3a177c1bdefab1`; tree `0293f291d2a4a
 Evidence: commit `488377ad06f6d516faf57e902703208a2c0ddbcc`; tree `f0eb7874f2da904e56cd2b3daa58f506df7f71df`.
 
 <!-- cs:progress-cursor: 488377ad06f6d516faf57e902703208a2c0ddbcc -->
+
+## 2026-08-11 — Harden immutable flag equality evaluation on GCC14 (#139) — MERGED
+
++ Protected main contains this transition; no phase branch or prose
+  record is treated as completion authority.
+Evidence: commit `7dfd37596414c9512316093ff4fb6b039673f55f`; tree `de90d8425401fa3405fed7bd0a100c7a9efe0990`.
+
+<!-- cs:progress-cursor: 7dfd37596414c9512316093ff4fb6b039673f55f -->
