@@ -1,5 +1,38 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.3 production-target qualification correction
+
+Rebased the observational release-candidate lane onto protected-main commit
+`7dfd37596414c9512316093ff4fb6b039673f55f`, which contains the GCC14
+immutable-flag correction from PR #139. The qualification contract now requires
+translation units to belong both to the real compile database and to the named
+Ninja production target's command closure. RED-first tests exclude
+configured-only sources, dependency sources, malformed closures, and paths
+outside the pinned source tree.
+
+This corrects the TensorFlow Lite surface without accepting expectations. Its
+505-step hosted build configured 269 unique project source paths, but ten were
+not members of the production library target and required generated or Python
+binding headers absent from that build. The exact `tensorflow-lite` target is
+241 unique translation units with digest
+`2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f`.
+A full local observation completed with coverage fields 241 attempted, 245
+analyzed, zero broken, and zero incomplete functions, plus 73 supported
+blocking findings and normal exit 1. Its fingerprint digest is
+`6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a`
+and report SHA-256 is
+`717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
+
+The latest shadPS4 hosted build showed that Clang 20 with GCC 14's default
+libstdc++ is not a valid recipe for the pinned sources. A disposable Ubuntu
+probe established that versioned libc++ 20 provides the required C++23
+`std::jthread` and `std::stop_token` surface. The workflow now installs
+`libc++-20-dev` and `libc++abi-20-dev`, while the candidate restores
+`-stdlib=libc++` for compilation and executable linking. The three-candidate
+hosted rerun remains the referee; no canonical expectation, production factory
+membership, or accepted contract intent changed. No C++ production function
+changed, so the contract-first shadow counts are all zero.
+
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
 Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's
