@@ -219,7 +219,10 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("max-parallel: 3", workflow)
         self.assertIn("if: always()", workflow)
         self.assertIn("phase83_qualification.py run", workflow)
-        self.assertIn("clang-19 clang-20 cmake ninja-build mold build-essential", workflow)
+        self.assertIn(
+            "clang-19 clang-tools-19 clang-20 cmake ninja-build mold build-essential",
+            workflow,
+        )
         self.assertIn("libpulse-dev libopenal-dev", workflow)
         self.assertNotIn("libc++", workflow)
         self.assertNotIn("pull_request_target", workflow)
