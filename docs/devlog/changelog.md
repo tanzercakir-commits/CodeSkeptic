@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.4 hosted shard toolchain correction
+
+- Run `31523815926` proved the plan and shared LLVM 19 analyzer stages, then produced unavailable llama.cpp receipts with `199` broken TUs because shard images lacked the matching Clang resource headers.
+- Cancelled the invalid run; its partial artifacts remain classified as unavailable and are not promotion evidence.
+- Added tier-aware shard packages: release-candidate jobs install `clang-19`, while nightly and weekend jobs retain `clang-20` and their existing expectations.
+- Extended the workflow contract test to pin both analyzer-build and shard-runtime toolchain selection.
+
 ## 2026-08-11 — Phase 8.4 factory promotion implementation and local qualification
 
 - Promoted the three exact Phase 8.3 recipes into an 11-project manifest and added a manual 72-hour release-candidate campaign with three repetitions per project.

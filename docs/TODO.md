@@ -1000,6 +1000,13 @@ tests pass; the LLVM 19 Release build completes `100/100`; and full CTest
 passes `1177/1177`. Hosted completion still requires the aggregate receipt
 from all nine shards and remains unavailable until that evidence exists.
 
+**Hosted attempt 1 (run `31523815926`):** plan and the shared LLVM 19 analyzer
+passed, but release-candidate shard images lacked the matching Clang resource
+headers. The first llama.cpp receipts were unavailable (`200` attempted, `1`
+analyzed, `199` broken), so the run was cancelled. The workflow now installs
+`clang-19` on release-candidate shards while retaining `clang-20` for the
+nightly and weekend tiers; no partial receipt is accepted as evidence.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

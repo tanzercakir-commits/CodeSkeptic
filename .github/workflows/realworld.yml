@@ -120,9 +120,13 @@ jobs:
 
       - name: Install project build dependencies
         run: |
+          compiler=clang-20
+          if [ "${{ needs.plan.outputs.tier }}" = release-candidate ]; then
+            compiler=clang-19
+          fi
           sudo apt-get update
           sudo apt-get install -y \
-            clang-20 cmake ninja-build libssl-dev libxml2-dev \
+            "$compiler" cmake ninja-build libssl-dev libxml2-dev \
             libbz2-dev liblzma-dev libzstd-dev zlib1g-dev \
             meson bear gperf libcap-dev libmount-dev
 
