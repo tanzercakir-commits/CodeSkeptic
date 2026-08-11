@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-11 — Phase 8.4 release-candidate factory boundary
+
+- Locked promotion to the three exact Phase 8.3 candidate recipes and their immutable coverage and fingerprint expectations.
+- Required a manual 72-hour campaign with three repetitions per project, one shared analyzer artifact, and aggregate equality across all receipts.
+- Required ShadPS4's recursive 53-entry submodule identity to match its qualified checksum before the build begins.
+- Recorded the pre-implementation RED: boundary head `0759dca` rejects the absent release-candidate tier with exit `2`; GREEN requires a nine-shard plan and hosted aggregation.
+
 ## 2026-08-11 — Phase 8.3 exact qualification closed
 
 - Rebased the release-candidate factory onto the fixed-width summary guard and aligned the shared analyzer build with LLVM 19.

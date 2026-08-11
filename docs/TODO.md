@@ -971,6 +971,28 @@ documented admitted extra-execution case); ShadPS4 `5a4373c80e32` requested/exec
 `382/382`, 66 findings. All three completed with the findings-only semantic exit
 and immutable artifacts keyed to the same CodeSkeptic head.
 
+## Phase 8.4 — release-candidate factory promotion — BOUNDARY LOCKED (2026-08-11)
+
+**Boundary:** promote only the three recipes qualified at CodeSkeptic head
+`ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`: llama.cpp `4dee52f82dc4`,
+TensorFlow Lite `a481b10260df`, and ShadPS4 `5a4373c80e32`. The accepted
+factory remains manifest-driven; candidate commands, source selection,
+expected coverage, and semantic fingerprints must equal the immutable
+qualification receipts rather than being rewritten during promotion.
+
+**Factory gate:** add one manual 72-hour `release-candidate` tier with exactly
+three repetitions per project. A single analyzer artifact serves every shard
+in a run. Aggregation accepts a project only when all three checksummed
+receipts have identical identity and semantic evidence, zero broken TUs, zero
+incomplete functions, and the pinned findings-only verdict. ShadPS4 must also
+verify its recursive 53-entry submodule identity and checksum before build.
+
+**RED evidence:** at boundary head `0759dca`, planning the release-candidate
+tier exits `2` because the campaign is absent. The implementation gate is a
+`0` plan with exactly nine shards, the campaign and qualification contract
+tests, full CTest, document automation, then a hosted aggregate receipt for
+all nine shards.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development
