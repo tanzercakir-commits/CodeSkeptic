@@ -1183,3 +1183,4 @@ are repeatable.
 Yeni PLAN-*.md AÇMA. Her iş: changelog'a giriş + bu TODO güncellenir +
 PLAN sabit. Ölçüm makbuzları changelog'a yazılır (ayrı dated dosya değil).
 Bu kural artık CI ile zorunlu: scripts/check_docs_sync.sh (build-and-test).
+- Phase 9 current-head qualification: Abseil completed 3 fresh accepted repetitions at 159/159 translation units, with 0 broken units, 0 incomplete functions, and 13 stable findings. The accepted-upstream ledger remains unchanged at 3 fixes across 2 independent projects.
