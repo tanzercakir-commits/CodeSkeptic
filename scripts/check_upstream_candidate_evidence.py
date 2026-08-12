@@ -88,8 +88,12 @@ def validate_document_summary(
     changelog_text: str,
 ) -> None:
     display = DISPLAY_NAMES.get(project_id, project_id)
+    coverage_token = (
+        f"{snapshot.get('attempted_tus', snapshot['translation_units'])}/"
+        f"{snapshot.get('analyzed_tus', snapshot['translation_units'])}"
+    )
     shared_tokens = (
-        f"{snapshot['translation_units']}/{snapshot['translation_units']}",
+        coverage_token,
         "0 broken",
         "0 incomplete",
         f"{snapshot['findings']} stable findings",
@@ -113,7 +117,8 @@ def validate_document_summary(
         )
         require(
             repetition_token in matches[0]
-            and all(token in matches[0] for token in shared_tokens),
+            and all(token in matches[0] for token in shared_tokens)
+            and re.search(rf"(?<!\d){re.escape(coverage_token)}(?!\d)", matches[0]) is not None,
             f"{project_id}: {label} summary differs from retained evidence",
         )
 
@@ -149,7 +154,7 @@ def validate_project(
         )
     for key in ("attempted_tus", "analyzed_tus"):
         require(
-            expected.get(key) == snapshot.get("translation_units"),
+            expected.get(key) == snapshot.get(key, snapshot.get("translation_units")),
             f"{project_id}: retained {key} differs from frozen coverage",
         )
     for key in ("broken_tus", "incomplete_functions"):

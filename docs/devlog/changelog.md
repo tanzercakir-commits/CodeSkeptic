@@ -4,6 +4,11 @@
 - 2026-08-12: Başlık kaydı yalnız ait olduğu kabul grubunda birim ve bulgu özetlerini yeniliyor.
 - 2026-08-12: İkinci proje güncel başlığı üç kararlı tekrarda 201/201 birim, 0 eksik ve 41 bulgu ile doğrulandı.
 
+## 2026-08-13 — Phase 9 distinct candidate coverage
+
+- Preserved separate attempted and analyzed translation-unit counts across retained snapshots, manifests, receipts, and canonical document summaries; recipes that expand whole-program analysis are no longer forced into a false equal-count model.
+- Added exact numeric-boundary checks so the canonical TODO and changelog summaries reject prefixed, suffixed, or otherwise drifted coverage counts.
+
 ## 2026-08-12 — Phase 9 first current-head execution
 
 - Fixed two shared-runner defects exposed by a project recipe without Ninja target closure: the optional command output is initialized as text, and target filtering runs only when target evidence exists.

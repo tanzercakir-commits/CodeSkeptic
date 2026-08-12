@@ -225,6 +225,47 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
                 ),
             )
 
+    def test_distinct_analyzed_count_is_preserved(self):
+        heads = copy.deepcopy(self.heads)
+        project = self.tensorflow(heads)
+        project["analyzed_tus"] = 255
+
+        def update_manifest(manifest):
+            retained = next(
+                item for item in manifest["projects"] if item["id"] == "tensorflow-lite"
+            )
+            retained["expected"]["analyzed_tus"] = 255
+
+        self.mutate_manifest(heads, update_manifest)
+        self.mutate_receipts(
+            heads,
+            lambda receipt, _repetition: receipt["semantic"]["coverage"].__setitem__(
+                "analyzed_tus", 255
+            ),
+        )
+        todo = self.todo.replace("240/240", "240/255")
+        changelog = self.changelog.replace("240/240", "240/255")
+        self.validate(heads, todo=todo, changelog=changelog)
+
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads, todo=todo.replace("240/255", "240/254"), changelog=changelog)
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads, todo=todo, changelog=changelog.replace("240/255", "240/254"))
+        for drift in ("1240/255", "240/2550"):
+            with self.assertRaises(MODULE.EvidenceError):
+                self.validate(heads, todo=todo.replace("240/255", drift), changelog=changelog)
+            with self.assertRaises(MODULE.EvidenceError):
+                self.validate(heads, todo=todo, changelog=changelog.replace("240/255", drift))
+
+        project["attempted_tus"] = 239
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads, todo=todo, changelog=changelog)
+        del project["attempted_tus"]
+
+        project["analyzed_tus"] = 254
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads, todo=todo, changelog=changelog)
+
     def test_campaign_membership_drift_fails_closed(self):
         changed = copy.deepcopy(self.heads)
 
