@@ -1,0 +1,50 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1173: UpstreamCandidateEvidenceContract
+1/1 Test #1173: UpstreamCandidateEvidenceContract ...***Failed    0.37 sec
+..........E....
+======================================================================
+ERROR: test_retained_receipts_match_snapshot_and_docs (__main__.UpstreamCandidateEvidenceTest.test_retained_receipts_match_snapshot_and_docs)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\UpstreamCandidateEvidenceTest.py", line 83, in test_retained_receipts_match_snapshot_and_docs
+    self.assertEqual(self.validate(), 1)
+                     ~~~~~~~~~~~~~^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\UpstreamCandidateEvidenceTest.py", line 38, in validate
+    return MODULE.validate(
+           ~~~~~~~~~~~~~~~^
+        self.root,
+        ^^^^^^^^^^
+    ...<3 lines>...
+        changelog if changelog is not None else self.changelog,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\check_upstream_candidate_evidence.py", line 204, in validate
+    validate_project(root, snapshot, todo_text, changelog_text)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\check_upstream_candidate_evidence.py", line 172, in validate_project
+    require(
+    ~~~~~~~^
+        file_digest(receipt_path) == expected_sha256,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        f"{project_id}: retained receipt {repetition} checksum differs",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\check_upstream_candidate_evidence.py", line 34, in require
+    raise EvidenceError(message)
+check_upstream_candidate_evidence.EvidenceError: tensorflow-lite: retained receipt 1 checksum differs
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.249s
+
+FAILED (errors=1)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.41 sec
+
+The following tests FAILED:
+	1173 - UpstreamCandidateEvidenceContract (Failed)
+Errors while running CTest
