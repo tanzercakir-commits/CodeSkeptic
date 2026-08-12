@@ -660,7 +660,7 @@ none. No `cs: ai` proposal can become accepted intent. Native pointer,
 ownership, heap, alias, and lifetime parity remain deferred to executable A7
 fixtures.
 
-**Local and GitHub qualification complete; protected-main merge pending.** The Linux
+**Delivered through protected-main PR #136.** The Linux
 referee accepted all twelve receipts from analyzer SHA-256
 `e5f2031e0da767f636450e702b6487134256fd7da8bb03f3d5fd3eda888d562c`.
 The three independent repetitions agree for libgit2 (167/167, 39 findings),
@@ -784,8 +784,7 @@ counts and digests. The project pins, source lists, commands, file boundary,
 and all other authority remain unchanged. This is an exposed measurement-tool
 assumption problem, not accepted implementation drift.
 
-**Local and hosted three-repeat qualification complete; protected-main merge
-pending.** The runner now admits only the locked Meson
+**Delivered through protected-main PR #137.** The runner now admits only the locked Meson
 setup/compile and Bear/native-Make shapes, enforces the 36–48-hour weekend
 window, and leaves the existing CMake/nightly behavior unchanged. The Actions
 lane has separate daily-nightly and weekly-weekend selection, fails unknown
@@ -824,7 +823,9 @@ preserved every project finding/fingerprint expectation, and produced
 aggregate receipt SHA-256
 `2954b90c3fba14d6d76bab985949428bc6cd091a466cf321970ddbf160a478ce`.
 PR #137's Linux, Windows-native, quickstart, structure, base-head, and bounded
-Juliet checks are green; there are no reviews or unresolved threads.
+Juliet checks are green; there are no reviews or unresolved threads. Protected-
+main delivery completed at squash commit
+`488377ad06f6d516faf57e902703208a2c0ddbcc`.
 
 Shadow completion considered no C++ function because the final file set has
 no C++: functions 0, proposals 0, eligible 0, rejected 0, unsupported 0. No
@@ -1003,6 +1004,14 @@ receipts and the aggregate receipt. Every project has three identical semantic
 receipts, all nine use one analyzer identity, and no receipt has a broken TU,
 an incomplete function, or a failure entry.
 
+The accepted aggregate is pinned unambiguously to artifact ID `9123466154`,
+artifact digest
+`sha256:4fe8b5450c497aff60a33f815f4ec4d4d8c3f34bb1b0994a1e98e2683520295c`,
+and receipt SHA-256
+`684b868c9ec86da57b279c3bc5db81482ec8578990649e7aefef5767f84dfbf5`.
+The earlier same-name artifact ID `9121649494` is unavailable evidence and
+must not be selected by name alone.
+
 **Hosted attempt 1 (run `31523815926`):** plan and the shared LLVM 19 analyzer
 passed, but release-candidate shard images lacked the matching Clang resource
 headers. The first llama.cpp receipts were unavailable (`200` attempted, `1`
@@ -1173,10 +1182,11 @@ merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 ## Backlog (öncelik sırası)
 
 Phase 7 lifetime-v2 is delivered by PR #134 and the automation maintenance is
-delivered by PR #135. Phase 8.1 is active on
-`phase-realworld-test-factory` under the locked boundary above. Weekend and
-release-candidate factory tiers follow only after the nightly core receipts
-are repeatable.
+delivered by PR #135. Phase 8.1 and Phase 8.2 are delivered by protected-main
+PRs #136 and #137. The Phase 8.3 observation and Phase 8.4 release-candidate
+factory are technically qualified on `phase-realworld-release-candidate-factory`;
+PR #138 remains open and draft, so the whole Phase 8 is not yet a protected-
+main completion.
 
 ## Not — dosya disiplini (2026-07-30 kararı)
 

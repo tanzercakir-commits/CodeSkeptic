@@ -37,6 +37,7 @@
 - Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
 - All three repetitions are identical per project: llama.cpp `200/200` with 40 findings, ShadPS4 `382/382` with 66 findings, and TensorFlow Lite `241` requested / `245` analyzed with 73 findings.
 - All nine receipts use one analyzer identity; broken TUs, incomplete functions, and failure entries total zero. The aggregate is accepted and its checksum verifies.
+- The accepted aggregate is uniquely pinned to artifact ID `9123466154`, artifact digest `sha256:4fe8b5450c497aff60a33f815f4ec4d4d8c3f34bb1b0994a1e98e2683520295c`, and receipt SHA-256 `684b868c9ec86da57b279c3bc5db81482ec8578990649e7aefef5767f84dfbf5`; same-name artifact ID `9121649494` is unavailable evidence.
 - Phase 8.4 is qualified; partial receipts from attempts 1–8 remain classified as unavailable evidence.
 
 ## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
@@ -64,7 +65,7 @@
 - Promoted the three exact Phase 8.3 recipes into an 11-project manifest and added a manual 72-hour release-candidate campaign with three repetitions per project.
 - Extended factory checkout identity with pinned recursive submodule count and checksum evidence; ShadPS4 requires the qualified 53-entry identity before build.
 - Extended the shared-analyzer workflow to select LLVM 19 for the release-candidate tier, retain LLVM 20 for existing tiers, and preserve aggregate equality across all three receipts.
-- Verified RED `2` to GREEN `0` with a nine-shard plan, both campaign contract suites, an LLVM 19 Release build at `100/100`, and full CTest at `1177/1177`; hosted aggregation remains pending.
+- Verified RED `2` to GREEN `0` with a nine-shard plan, both campaign contract suites, an LLVM 19 Release build at `100/100`, and full CTest at `1177/1177`; the later accepted hosted aggregation is recorded above.
 
 ## 2026-08-11 — Phase 8.4 release-candidate factory boundary
 
@@ -236,7 +237,8 @@ used the same hosted analyzer, accepted all twelve original shards without
 finding/fingerprint drift, and produced aggregate receipt SHA-256
 `2954b90c3fba14d6d76bab985949428bc6cd091a466cf321970ddbf160a478ce`.
 All ordinary PR checks are green and PR #137 has no review threads. Protected-
-main merge remains pending.
+main delivery later completed at squash commit
+`488377ad06f6d516faf57e902703208a2c0ddbcc`.
 
 No C++ function changed, so contract-first shadow dogfood is not applicable:
 functions considered 0, proposals 0, eligible 0, rejected 0, unsupported 0.
@@ -359,7 +361,8 @@ campaign-wide analyzer SHA-256 is
 `146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
 the checksummed aggregate receipt SHA-256 is
 `08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
-Protected-main merge remains pending.
+Protected-main delivery later completed through PR #136 at squash commit
+`3b1714e1e9e3997ab63507837c3a177c1bdefab1`.
 
 Local release gates are green: the deterministic factory suite passes 12/12,
 the full NMake/CTest suite passes 1166/1166, the direct C++ suite passes
@@ -427,8 +430,9 @@ desktop path. Its recovered Phase 8–12 program is now recorded as the durable
 queue in `docs/TODO.md`: real-repository factory, upstream validation,
 robustness/performance, distribution/governance, and external beta/v1.0. This
 does not alter the fixed `docs/PLAN.md` or create a forbidden parallel plan;
-only Phase 8.1 is active, and later phases still require their own locked
-boundaries before implementation.
+Phase 8.1 was the next active slice at recovery time. It and Phase 8.2 are now
+delivered through protected main; Phase 8.3 and Phase 8.4 are qualified on the
+still-open PR #138 branch.
 
 ## 2026-08-10 — Verified progress and Windows review maintenance boundary
 
