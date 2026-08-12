@@ -21,13 +21,32 @@ WORK="${2:-corpus-work}"
 mkdir -p "$WORK"
 cd "$WORK"
 
-fetch() { # <dir> <url>
+fetch() {
     local dir="$1" url="$2"
-    if [ ! -d "$dir" ]; then
-        echo "[corpus] fetching $dir ..."
-        curl -sL --retry 3 "$url" -o "$dir.tgz"
-        mkdir "$dir"
-        tar xzf "$dir.tgz" -C "$dir" --strip-components=1
+    local archive="${dir}.tgz" staging="${dir}.extract"
+    if [[ ! -f "${dir}.ready" ]]; then
+        echo "[corpus] fetching $(basename "$dir")"
+        local attempt valid=false
+        for attempt in 1 2 3; do
+            rm -f "$archive"
+            if curl --fail --show-error --location --retry 3 --retry-all-errors \
+                    --retry-delay 2 --output "$archive" "$url" \
+                    && tar -tzf "$archive" >/dev/null 2>&1; then
+                valid=true
+                break
+            fi
+            sleep $((attempt * 2))
+        done
+        if [[ "$valid" != true ]]; then
+            echo "[corpus] download validation failed: $(basename "$dir")" >&2
+            return 1
+        fi
+        rm -rf "$staging"
+        mkdir -p "$staging"
+        tar -xzf "$archive" -C "$staging" --strip-components=1
+        rm -rf "$dir"
+        mv "$staging" "$dir"
+        touch "${dir}.ready"
     fi
 }
 
