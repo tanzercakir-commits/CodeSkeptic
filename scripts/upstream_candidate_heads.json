@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "batches": [
+    {
+      "id": "2026-08-12-a",
+      "checked_at": "2026-08-12",
+      "projects": [
+        {
+          "id": "rtp2httpd",
+          "repository": "https://github.com/stackia/rtp2httpd.git",
+          "default_branch": "main",
+          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
+          "translation_units": 38,
+          "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 24,
+          "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
+        },
+        {
+          "id": "llama-cpp",
+          "repository": "https://github.com/ggml-org/llama.cpp.git",
+          "default_branch": "master",
+          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4",
+          "translation_units": 201,
+          "translation_unit_sha256": "d95ff4df0c1fcfee3980fbe17d1fc9e59d150b4db6bf7a7d6c2f9528505d4cfb",
+          "coverage_batch_id": "/tmp/codeskeptic-phase9-phase84-split/9123466154/receipt.json",
+          "findings": 41,
+          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6"
+        },
+        {
+          "id": "libgit2",
+          "repository": "https://github.com/libgit2/libgit2.git",
+          "default_branch": "main",
+          "head": "95ff8c2baceb270469657663ded9934d5faf5627",
+          "translation_units": 168,
+          "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 42,
+          "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
+        }
+      ]
+    }
+  ]
+}
