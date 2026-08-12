@@ -97,12 +97,30 @@
           "id": "tensorflow-lite",
           "repository": "https://github.com/tensorflow/tensorflow.git",
           "default_branch": "master",
-          "head": "e698a01b51d2f5f15144851c66ddabb44904a778",
+          "head": "e698a01bd742f4ebb2a85d87b4cbe83be17f807d",
           "translation_units": 240,
           "translation_unit_sha256": "037dcdd6c1bbda9e8a9be04e069874eb5f34b487c201f78017fdc9afd91afb11",
           "coverage_batch_id": "2026-08-12-a",
           "findings": 74,
-          "fingerprint_sha256": "cadfdc855b0b6af6bd1e43063b8b40598625906947ea6bf1820413f31f10aa91"
+          "fingerprint_sha256": "cadfdc855b0b6af6bd1e43063b8b40598625906947ea6bf1820413f31f10aa91",
+          "receipt_evidence": {
+            "campaign": "release-candidate",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/manifest.json",
+            "receipts": [
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-1/receipt.json",
+                "sha256": "192ed92dbb73d1a4e64bfeed3359fa997353c1207bf604bf964986fb227ff5be"
+              },
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-2/receipt.json",
+                "sha256": "3fb03908f2af05505d25757dc9085ecca87a4eb9752b7933c0a12bf6f98fd2b1"
+              },
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-3/receipt.json",
+                "sha256": "b6294489bb391d98a946bd828d2b1167cb2a98ad04c79fdadfd0e82009ff5cee"
+              }
+            ]
+          }
         }
       ]
     }

@@ -6,9 +6,14 @@ on:
       - "scripts/upstream_validation_ledger.json"
       - "scripts/check_upstream_validation.py"
       - "scripts/upstream_candidate_heads.json"
+      - "scripts/upstream_candidate_receipts/**"
+      - "scripts/check_upstream_candidate_evidence.py"
       - "scripts/materialize_upstream_candidates.py"
+      - "docs/TODO.md"
+      - "docs/devlog/changelog.md"
       - "tests/UpstreamValidationTest.py"
       - "tests/UpstreamCandidateManifestTest.py"
+      - "tests/UpstreamCandidateEvidenceTest.py"
       - "tests/CMakeLists.txt"
       - ".github/workflows/upstream-validation.yml"
 
@@ -42,3 +47,7 @@ jobs:
         run: python3 proposed/tests/UpstreamValidationTest.py
       - name: Run candidate manifest contract tests
         run: python3 proposed/tests/UpstreamCandidateManifestTest.py
+      - name: Check retained candidate evidence
+        run: python3 proposed/scripts/check_upstream_candidate_evidence.py
+      - name: Run retained evidence contract tests
+        run: python3 proposed/tests/UpstreamCandidateEvidenceTest.py

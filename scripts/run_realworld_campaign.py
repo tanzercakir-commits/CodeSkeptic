@@ -661,6 +661,83 @@ def semantic_from_report(
     return semantic
 
 
+def validate_receipt_group(
+    manifest: dict[str, Any],
+    tier: str,
+    project_id: str,
+    receipts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Validate one project's full repetition set with the campaign referee."""
+    campaign = manifest["campaigns"].get(tier)
+    if campaign is None:
+        raise ManifestError(f"unknown campaign {tier}")
+    if project_id not in campaign["projects"]:
+        raise EvidenceError(f"project {project_id} is not in campaign {tier}")
+    repetitions = campaign["repetitions"]
+    if len(receipts) != repetitions:
+        raise EvidenceError(
+            f"project {project_id} requires {repetitions} repetitions"
+        )
+
+    project = project_by_id(manifest, project_id)
+    for repetition, receipt in enumerate(receipts, 1):
+        if (
+            receipt.get("status") != "accepted"
+            or receipt.get("project") != project_id
+            or receipt.get("repetition") != repetition
+            or receipt.get("failures") != []
+        ):
+            raise EvidenceError(
+                f"project {project_id} repetition {repetition} is unavailable"
+            )
+
+    semantic_digests = {
+        digest_json(receipt.get("semantic")) for receipt in receipts
+    }
+    if len(semantic_digests) != 1:
+        raise EvidenceError(f"project {project_id} repetitions are nondeterministic")
+    analyzer_digests = {
+        receipt.get("identity", {}).get("analyzer_sha256")
+        for receipt in receipts
+        if isinstance(receipt.get("identity"), dict)
+    }
+    if len(analyzer_digests) != 1:
+        raise EvidenceError(
+            f"project {project_id} analyzer identity is nondeterministic"
+        )
+    analyzer_digest = next(iter(analyzer_digests))
+    if not isinstance(analyzer_digest, str) or not SHA256.fullmatch(
+        analyzer_digest
+    ):
+        raise EvidenceError(f"project {project_id} analyzer identity is malformed")
+
+    for repetition, receipt in enumerate(receipts, 1):
+        identity = receipt.get("identity")
+        expected_identity = receipt_identity(
+            manifest,
+            project,
+            repetition,
+            analyzer_digest,
+            project["expected"]["translation_unit_sha256"],
+        )
+        if not checkpoint_matches(receipt, expected_identity):
+            raise EvidenceError(
+                f"project {project_id} repetition {repetition} identity mismatch"
+            )
+        semantic = receipt.get("semantic")
+        _validate_semantic(project, semantic)
+    semantic = receipts[0]["semantic"]
+    return {
+        "repetitions": len(receipts),
+        "semantic_sha256": next(iter(semantic_digests)),
+        "analyzer_sha256": analyzer_digest,
+        "translation_unit_sha256": semantic["translation_units"]["sha256"],
+        "findings": semantic["findings"],
+        "exit_code": semantic["exit_code"],
+        "fingerprint_sha256": semantic["fingerprint_sha256"],
+    }
+
+
 def aggregate_receipts(
     manifest: dict[str, Any], tier: str, receipt_root: Path
 ) -> dict[str, Any]:
@@ -692,42 +769,14 @@ def aggregate_receipts(
                 raise EvidenceError(f"project {project_id} repetition {repetition} is unavailable")
             receipts.append(receipt)
 
-        semantic_digests = {digest_json(receipt.get("semantic")) for receipt in receipts}
-        if len(semantic_digests) != 1:
-            raise EvidenceError(f"project {project_id} repetitions are nondeterministic")
-        analyzer_digests = {
-            receipt.get("identity", {}).get("analyzer_sha256") for receipt in receipts
-        }
-        if len(analyzer_digests) != 1 or None in analyzer_digests:
-            raise EvidenceError(f"project {project_id} analyzer identity is nondeterministic")
-        analyzer_digest = next(iter(analyzer_digests))
-        if not isinstance(analyzer_digest, str) or not SHA256.fullmatch(analyzer_digest):
-            raise EvidenceError(f"project {project_id} analyzer identity is malformed")
+        project_summary = validate_receipt_group(
+            manifest, tier, project_id, receipts
+        )
+        analyzer_digest = project_summary["analyzer_sha256"]
         campaign_analyzer_digests.add(analyzer_digest)
         if len(campaign_analyzer_digests) != 1:
             raise EvidenceError("campaign analyzer identity is nondeterministic")
-        for repetition, receipt in enumerate(receipts, 1):
-            identity = receipt.get("identity")
-            expected_identity = receipt_identity(
-                manifest,
-                project,
-                repetition,
-                identity.get("analyzer_sha256", "") if isinstance(identity, dict) else "",
-                project["expected"]["translation_unit_sha256"],
-            )
-            if not checkpoint_matches(receipt, expected_identity):
-                raise EvidenceError(f"project {project_id} repetition {repetition} identity mismatch")
-        semantic = receipts[0]["semantic"]
-        _validate_semantic(project, semantic)
-        summary["projects"][project_id] = {
-            "repetitions": len(receipts),
-            "semantic_sha256": next(iter(semantic_digests)),
-            "analyzer_sha256": analyzer_digest,
-            "translation_unit_sha256": semantic["translation_units"]["sha256"],
-            "findings": semantic["findings"],
-            "exit_code": semantic["exit_code"],
-            "fingerprint_sha256": semantic["fingerprint_sha256"],
-        }
+        summary["projects"][project_id] = project_summary
     return summary
 
 
