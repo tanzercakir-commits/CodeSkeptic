@@ -1,5 +1,26 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 9 frozen current-head candidate batch
+
+- Counted 260 findings across seven projects from accepted, checksummed Phase 8 receipts and froze the first low-drift current-head batch for rtp2httpd, llama.cpp, and libgit2.
+- Added a deterministic materializer that reuses qualified recipes while replacing only immutable project revisions; repository drift, unknown or duplicate projects, malformed dates, and malformed commit identities fail closed.
+- Preserved the three-repeat campaign invariant and produced a planner-accepted nine-shard matrix. The batch is discovery-only and cannot bypass Gates A, B, or C.
+- Passed 4 candidate-manifest tests, 10 ledger tests, Python syntax, JSON/YAML parsing, and diff checks.
+
+## 2026-08-12 — Phase 9 append-only validation ledger
+
+- Added a schema-checked Phase 9 ledger with the three reverified accepted records and the fixed `10` fixes / `5` projects target.
+- Added a fail-closed validator for all accepted Gate A/B/C evidence, merged identities, current default-branch ancestry records, unique IDs, and durable non-accepted classifications.
+- Added an optional previous-ledger comparison that permits only an unchanged prefix plus appended records; mutation, deletion, and reordering are rejected. A dedicated PR job compares the proposed ledger with the target tree.
+- Passed 10 focused tests, Python syntax, JSON parsing, document automation, and diff checks. Gate C supports general report/fix references without assuming one hosting platform, and recorded dates have checked ISO forms. The measured completion gate correctly remains incomplete at `3/10` and `2/5`.
+
+## 2026-08-12 — Phase 9 upstream validation boundary
+
+- Locked Phase 9 to PLAN section 6 Gates A, B, and C on current default-branch heads, with a hard completion target of ten accepted fixes across five independent projects.
+- Reverified three existing accepted fixes across two projects: shadPS4 PRs `#4702` and `#4703` remain in current `main`, and TensorFlow PR `#123994` remains in current `master`.
+- Established the measured RED baseline at `3/10` fixes and `2/5` projects; rejected, duplicate, stale, non-triggerable, and false-positive candidates remain durable non-counting evidence.
+- Restricted the first implementation slice to a schema-checked append-only ledger and fail-closed validator before any new candidate is reported.
+
 ## 2026-08-12 — Phase 8.4 release-candidate factory qualified
 
 - Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
