@@ -37,6 +37,17 @@
           "coverage_batch_id": "2026-08-12-a",
           "findings": 42,
           "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
+        },
+        {
+          "id": "lvgl",
+          "repository": "https://github.com/lvgl/lvgl.git",
+          "default_branch": "master",
+          "head": "940c86ae3ade38de8c28b9096a87848d82c6ac36",
+          "translation_units": 470,
+          "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 19,
+          "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
         }
       ]
     }

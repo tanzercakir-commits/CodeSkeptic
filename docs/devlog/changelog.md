@@ -5005,6 +5005,7 @@ dataflow trace described. The maintainers added the missing
 - 2026-08-12: Qualified the current libgit2 head across three fresh repetitions: all accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
 - 2026-08-12: Submitted rtp2httpd PR #709 and marked it ready for upstream review for the first newly triaged current-head candidate. The project builds, its executable smoke check passes, the focused independent path no longer reproduces, and duplicate search found no open match. Phase 9 acceptance remains unchanged pending upstream review.
 - 2026-08-12: Submitted libgit2 PR #7345 and marked it ready for upstream review for the independently corroborated missing-mode path. The full project and test targets build, the local test partition passes, focused analysis is clean at 1/1, and no narrowed duplicate match was found. Phase 9 acceptance remains unchanged pending upstream review.
+- 2026-08-12: Qualified the current lvgl head across three fresh repetitions: all accepted at 470/470 translation units, 0 broken, 0 incomplete, and 19 deterministic findings. Added a minimal frozen configuration profile required by the current build. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
 - CLI smoke: baseline written, 2 lines added at the top of the file,
   re-analysis "1 known finding(s) filtered by baseline → Clean"
 

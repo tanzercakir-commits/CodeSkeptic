@@ -1130,6 +1130,7 @@ evidence above before implementation.
 - [x] libgit2 current-head candidate qualification: three fresh repetitions accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
 - [ ] rtp2httpd allocation-result hardening submitted as PR #709 and marked ready for upstream review; build and executable smoke checks pass and the independently reproduced path is gone. Await upstream acceptance before changing the Phase 9 ledger.
 - [ ] libgit2 missing-mode output guard submitted as PR #7345 and marked ready for upstream review; full build and local tests pass, focused analysis is clean at 1/1, and the independent path is gone. Await upstream acceptance before changing the Phase 9 ledger.
+- [x] lvgl current-head candidate qualification: three fresh repetitions accepted at 470/470 translation units, 0 broken, 0 incomplete, and 19 deterministic findings; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
 - Faz 9 kabul sayacı değişmedi; bu çalışma aday doğrulamasıdır, yukarı akış kabulü değildir.
   upstream HEADs. Target at least five independent projects and ten accepted
   fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
