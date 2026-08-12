@@ -13,6 +13,7 @@ SCRIPT = ROOT / "scripts" / "check_upstream_candidate_evidence.py"
 HEADS = ROOT / "scripts" / "upstream_candidate_heads.json"
 TODO = ROOT / "docs" / "TODO.md"
 CHANGELOG = ROOT / "docs" / "devlog" / "changelog.md"
+ATTRIBUTES = ROOT / ".gitattributes"
 
 SPEC = importlib.util.spec_from_file_location("check_upstream_candidate_evidence", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -81,6 +82,10 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
 
     def test_retained_receipts_match_snapshot_and_docs(self):
         self.assertEqual(self.validate(), 1)
+
+    def test_retained_receipt_bytes_are_platform_invariant(self):
+        attributes = ATTRIBUTES.read_text(encoding="utf-8").splitlines()
+        self.assertIn("scripts/upstream_candidate_receipts/** -text", attributes)
 
     def test_transcribed_revision_fails_closed(self):
         changed = copy.deepcopy(self.heads)
