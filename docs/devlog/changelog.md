@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 9 frozen current-head candidate batch
+
+- Counted 260 findings across seven projects from accepted, checksummed Phase 8 receipts and froze the first low-drift current-head batch for rtp2httpd, llama.cpp, and libgit2.
+- Added a deterministic materializer that reuses qualified recipes while replacing only immutable project revisions; repository drift, unknown or duplicate projects, malformed dates, and malformed commit identities fail closed.
+- Preserved the three-repeat campaign invariant and produced a planner-accepted nine-shard matrix. The batch is discovery-only and cannot bypass Gates A, B, or C.
+- Passed 4 candidate-manifest tests, 10 ledger tests, Python syntax, JSON/YAML parsing, and diff checks.
+
 ## 2026-08-12 — Phase 9 append-only validation ledger
 
 - Added a schema-checked Phase 9 ledger with the three reverified accepted records and the fixed `10` fixes / `5` projects target.

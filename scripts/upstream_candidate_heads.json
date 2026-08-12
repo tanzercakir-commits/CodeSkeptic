@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "batches": [
+    {
+      "id": "2026-08-12-a",
+      "checked_at": "2026-08-12",
+      "projects": [
+        {
+          "id": "rtp2httpd",
+          "repository": "https://github.com/stackia/rtp2httpd.git",
+          "default_branch": "main",
+          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7"
+        },
+        {
+          "id": "llama-cpp",
+          "repository": "https://github.com/ggml-org/llama.cpp.git",
+          "default_branch": "master",
+          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4"
+        },
+        {
+          "id": "libgit2",
+          "repository": "https://github.com/libgit2/libgit2.git",
+          "default_branch": "main",
+          "head": "95ff8c2baceb270469657663ded9934d5faf5627"
+        }
+      ]
+    }
+  ]
+}

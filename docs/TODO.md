@@ -1081,6 +1081,18 @@ fix references rather than assuming one hosting platform, and recorded dates
 have checked ISO forms. Ten focused tests, Python syntax, JSON parsing,
 document automation, and diff checks pass. No new candidate was reported.
 
+**Slice 9.2 candidate snapshot GREEN:** accepted Phase 8 receipts expose 260
+findings across seven independent projects, so the candidate pool is larger
+than the Phase 9 project target. The first current-head batch freezes three
+low-drift heads verified on 2026-08-12: rtp2httpd (11 commits beyond its Phase
+8 pin), llama.cpp (28), and libgit2 (538). A deterministic materializer copies
+only those projects' qualified recipes, replaces only their immutable
+revisions, rejects repository drift, unknown or duplicate projects, malformed
+dates or commits, and produces a planner-accepted nine-shard campaign. Four
+focused tests plus the ten ledger tests pass. This snapshot authorizes local
+candidate discovery only; no finding becomes accepted or externally reported
+without the Phase 9 Gates A, B, and C.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

@@ -82,6 +82,9 @@ add_test(NAME Phase83QualificationContract
 add_test(NAME UpstreamValidationContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/UpstreamValidationTest.py)
+add_test(NAME UpstreamCandidateManifestContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/UpstreamCandidateManifestTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta

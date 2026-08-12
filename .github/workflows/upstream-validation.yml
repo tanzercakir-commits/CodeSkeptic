@@ -5,7 +5,10 @@ on:
     paths:
       - "scripts/upstream_validation_ledger.json"
       - "scripts/check_upstream_validation.py"
+      - "scripts/upstream_candidate_heads.json"
+      - "scripts/materialize_upstream_candidates.py"
       - "tests/UpstreamValidationTest.py"
+      - "tests/UpstreamCandidateManifestTest.py"
       - "tests/CMakeLists.txt"
       - ".github/workflows/upstream-validation.yml"
 
@@ -37,3 +40,5 @@ jobs:
           --previous-if-exists target/scripts/upstream_validation_ledger.json
       - name: Run ledger contract tests
         run: python3 proposed/tests/UpstreamValidationTest.py
+      - name: Run candidate manifest contract tests
+        run: python3 proposed/tests/UpstreamCandidateManifestTest.py
