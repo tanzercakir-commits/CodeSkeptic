@@ -1128,6 +1128,7 @@ evidence above before implementation.
 - Güncel başlık kaydı kapsam grubuyla sınırlı; birim sayısı, incelenen sayısı ve bulgu özeti birlikte yenileniyor.
 - İkinci proje güncel başlığı üç tekrarda da kabul edildi: 201/201, eksik 0, bulgu 41.
 - [x] libgit2 current-head candidate qualification: three fresh repetitions accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
+- [ ] rtp2httpd allocation-result hardening submitted as draft PR #709; build and executable smoke checks pass and the independently reproduced path is gone. Await upstream acceptance before changing the Phase 9 ledger.
 - Faz 9 kabul sayacı değişmedi; bu çalışma aday doğrulamasıdır, yukarı akış kabulü değildir.
   upstream HEADs. Target at least five independent projects and ten accepted
   fixes. Rejected, duplicate, non-triggerable, and false-positive candidates

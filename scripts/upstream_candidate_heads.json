@@ -9,7 +9,12 @@
           "id": "rtp2httpd",
           "repository": "https://github.com/stackia/rtp2httpd.git",
           "default_branch": "main",
-          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7"
+          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
+          "translation_units": 38,
+          "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 24,
+          "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
         },
         {
           "id": "llama-cpp",
