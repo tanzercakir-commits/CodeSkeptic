@@ -23,6 +23,10 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <clang/AST/ASTContext.h>
+#include <clang/Basic/SourceManager.h>
+#include <string>
+#include <unordered_set>
 
 namespace codeskeptic {
 
@@ -264,9 +268,17 @@ AnalysisResult StaticAnalyzer::run() {
     SourceManager::clearBrokenTUs();
     SourceManager::setAttemptedTUCount(source_mgr_->fileCount());
 
+    std::unordered_set<std::string> analyzed_files;
     const int analysis_result = source_mgr_->processAll(
-        [this, &result](clang::ASTContext& ctx) {
-        ++result.analyzed_tus;
+        [this, &result, &analyzed_files](clang::ASTContext& ctx) {
+        const auto& source_manager = ctx.getSourceManager();
+        const auto main_file = source_manager.getMainFileID();
+        const auto main_path = source_manager
+                                   .getFilename(source_manager.getLocForStartOfFile(main_file))
+                                   .str();
+        if (analyzed_files.insert(main_path).second) {
+            ++result.analyzed_tus;
+        }
         auto findings = engine_.runAll(ctx);
         diagnostics_.insert(diagnostics_.end(), findings.begin(), findings.end());
     });
