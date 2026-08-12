@@ -1068,6 +1068,19 @@ all non-accepted classifications, and fail closed when ancestry or required
 Gate A/B/C evidence is missing. No candidate reporting begins until those
 local ledger gates pass.
 
+**Slice 9.1 local GREEN:** the schema-checked ledger imports the three proven
+records and reports the measured incomplete state as `3/10` accepted fixes
+across `2/5` projects. Its validator requires every accepted Gate A/B/C field,
+merged-change identity, current default-branch ancestry evidence, unique IDs,
+and the fixed cumulative target. Optional previous-ledger comparison permits
+only an unchanged prefix plus appended records; mutation, deletion, and
+reordering fail closed. A dedicated PR job compares proposed and target-tree
+ledgers; the first addition permits a missing target ledger, while later
+changes must retain the exact existing prefix. Gate C uses general report and
+fix references rather than assuming one hosting platform, and recorded dates
+have checked ISO forms. Ten focused tests, Python syntax, JSON parsing,
+document automation, and diff checks pass. No new candidate was reported.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development

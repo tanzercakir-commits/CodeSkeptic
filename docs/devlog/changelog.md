@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 9 append-only validation ledger
+
+- Added a schema-checked Phase 9 ledger with the three reverified accepted records and the fixed `10` fixes / `5` projects target.
+- Added a fail-closed validator for all accepted Gate A/B/C evidence, merged identities, current default-branch ancestry records, unique IDs, and durable non-accepted classifications.
+- Added an optional previous-ledger comparison that permits only an unchanged prefix plus appended records; mutation, deletion, and reordering are rejected. A dedicated PR job compares the proposed ledger with the target tree.
+- Passed 10 focused tests, Python syntax, JSON parsing, document automation, and diff checks. Gate C supports general report/fix references without assuming one hosting platform, and recorded dates have checked ISO forms. The measured completion gate correctly remains incomplete at `3/10` and `2/5`.
+
 ## 2026-08-12 — Phase 9 upstream validation boundary
 
 - Locked Phase 9 to PLAN section 6 Gates A, B, and C on current default-branch heads, with a hard completion target of ten accepted fixes across five independent projects.

@@ -1,0 +1,39 @@
+name: upstream-validation
+
+on:
+  pull_request:
+    paths:
+      - "scripts/upstream_validation_ledger.json"
+      - "scripts/check_upstream_validation.py"
+      - "tests/UpstreamValidationTest.py"
+      - "tests/CMakeLists.txt"
+      - ".github/workflows/upstream-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ledger:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout proposed tree
+        uses: actions/checkout@v4
+        with:
+          path: proposed
+      - name: Checkout target tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: target
+      - name: Validate ledger and append-only history
+        run: >-
+          python3 proposed/scripts/check_upstream_validation.py
+          --ledger proposed/scripts/upstream_validation_ledger.json
+          --previous-if-exists target/scripts/upstream_validation_ledger.json
+      - name: Run ledger contract tests
+        run: python3 proposed/tests/UpstreamValidationTest.py
