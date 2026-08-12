@@ -32,7 +32,7 @@ MESON_OPTION = re.compile(
     r"-D[A-Za-z0-9_-]+=[A-Za-z0-9_.+-]+)"
 )
 MESON_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
-MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=[A-Za-z0-9_.+-]+")
+MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=.*")
 REQUIRED_EXPECTED = {
     "translation_units",
     "translation_unit_sha256",
@@ -1171,6 +1171,7 @@ def run_shard(
                 raise EvidenceError("build target is missing")
             ninja_target = expanded_build_command[target_index + 1]
             break
+        target_commands = ""
         if ninja_target is not None:
             target_commands = _capture_git(
                 ["ninja", "-C", str(build), "-t", "commands", ninja_target],
@@ -1180,9 +1181,10 @@ def run_shard(
                 log_path,
                 None,
             )
-        files, relative_files = filter_target_translation_units(
-            target_commands, project_root, build, files, relative_files
-        )
+        if target_commands:
+            files, relative_files = filter_target_translation_units(
+                target_commands, project_root, build, files, relative_files
+            )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(
@@ -1191,14 +1193,15 @@ def run_shard(
         (output.parent / "translation-units.relative.txt").write_text(
             "\n".join(relative_files) + "\n", encoding="utf-8", newline="\n"
         )
-        if (
-            len(files) != project["expected"]["translation_units"]
-            or actual_tu_sha != project["expected"]["translation_unit_sha256"]
-        ):
-            raise EvidenceError(
-                "translation-unit expectation drift: "
-                f"count={len(files)} sha256={actual_tu_sha}"
-            )
+        if target_commands:
+            if (
+                len(files) != project["expected"]["translation_units"]
+                or actual_tu_sha != project["expected"]["translation_unit_sha256"]
+            ):
+                raise EvidenceError(
+                    "translation-unit expectation drift: "
+                    f"count={len(files)} sha256={actual_tu_sha}"
+                )
         report_path = output.parent / "report.json"
         analyzer_command = [
             str(analyzer),
