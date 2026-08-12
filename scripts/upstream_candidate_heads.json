@@ -26,7 +26,12 @@
           "id": "libgit2",
           "repository": "https://github.com/libgit2/libgit2.git",
           "default_branch": "main",
-          "head": "95ff8c2baceb270469657663ded9934d5faf5627"
+          "head": "95ff8c2baceb270469657663ded9934d5faf5627",
+          "translation_units": 168,
+          "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 42,
+          "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
         }
       ]
     }

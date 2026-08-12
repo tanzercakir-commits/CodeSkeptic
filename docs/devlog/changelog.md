@@ -5002,6 +5002,7 @@ dataflow trace described. The maintainers added the missing
 - 201/201 tests (ctest + single-process; +6: line shift, indentation,
   changed line reappears, identical-line counter, v1 compatibility,
   header)
+- 2026-08-12: Qualified the current libgit2 head across three fresh repetitions: all accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
 - CLI smoke: baseline written, 2 lines added at the top of the file,
   re-analysis "1 known finding(s) filtered by baseline → Clean"
 

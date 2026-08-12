@@ -1127,6 +1127,7 @@ evidence above before implementation.
 - Güncel aday paketi kapsam yenilemesi doğrulandı: varsayılan tariflerde boş hedef bilgisi eski kapsam kapısını çalıştırmıyor.
 - Güncel başlık kaydı kapsam grubuyla sınırlı; birim sayısı, incelenen sayısı ve bulgu özeti birlikte yenileniyor.
 - İkinci proje güncel başlığı üç tekrarda da kabul edildi: 201/201, eksik 0, bulgu 41.
+- [x] libgit2 current-head candidate qualification: three fresh repetitions accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
 - Faz 9 kabul sayacı değişmedi; bu çalışma aday doğrulamasıdır, yukarı akış kabulü değildir.
   upstream HEADs. Target at least five independent projects and ten accepted
   fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
