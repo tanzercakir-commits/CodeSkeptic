@@ -13,7 +13,7 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-realworld-release-candidate-factory
+in_flight     = phase-realworld-release-candidate-factory phase-upstream-validation
 verified_main = 7dfd375
 progress      = sha256:ad383b5215239a8324b155328f694bbba8b3f7e8a9dd90e5127b9238d7fec952
 ```
@@ -1039,6 +1039,72 @@ The aggregate status is `accepted`, its checksum verifies, and all nine
 receipts share analyzer SHA-256
 `12e7409ef03aba54ac166898aaefb64f8ef7373adad89fe676162c4d95fc5f39`.
 
+## Phase 9.0 — upstream validation boundary — BOUNDARY LOCKED (2026-08-12)
+
+**Boundary:** apply PLAN section 6 Gates A, B, and C to current default-branch
+heads. Completion requires at least ten accepted fixes across at least five
+independent projects. An accepted fix must retain the observed affected head,
+the four Gate A proofs, the Gate B channel/value decision, the Gate C report
+or patch identity, the merged change identity, and proof that the merged
+change remains in the current default-branch history.
+
+**Classification gate:** rejected, duplicate, non-triggerable, stale, and
+false-positive candidates remain durable learning records. They do not count
+toward the acceptance target, cannot be silently removed, and cannot be
+promoted by tool output alone. One candidate represents one defect and every
+external action is preceded by a fresh current-head and duplicate check.
+
+**Verified baseline:** three accepted fixes across two projects are currently
+proven. shadPS4 PRs `#4702` and `#4703` are merged and their merge commits are
+ancestors of current `main`; TensorFlow PR `#123994` is merged and its merge
+commit is an ancestor of current `master`. The remaining measured gap is seven
+accepted fixes and three independent projects.
+
+**RED evidence:** the repository has no machine-readable Phase 9 candidate
+ledger or validator, and the cumulative exit gate is objectively unmet at
+`3/10` accepted fixes and `2/5` projects. The first GREEN slice must add a
+schema-checked append-only ledger, import the three proven records, preserve
+all non-accepted classifications, and fail closed when ancestry or required
+Gate A/B/C evidence is missing. No candidate reporting begins until those
+local ledger gates pass.
+
+**Slice 9.1 local GREEN:** the schema-checked ledger imports the three proven
+records and reports the measured incomplete state as `3/10` accepted fixes
+across `2/5` projects. Its validator requires every accepted Gate A/B/C field,
+merged-change identity, current default-branch ancestry evidence, unique IDs,
+and the fixed cumulative target. Optional previous-ledger comparison permits
+only an unchanged prefix plus appended records; mutation, deletion, and
+reordering fail closed. A dedicated PR job compares proposed and target-tree
+ledgers; the first addition permits a missing target ledger, while later
+changes must retain the exact existing prefix. Gate C uses general report and
+fix references rather than assuming one hosting platform, and recorded dates
+have checked ISO forms. Ten focused tests, Python syntax, JSON parsing,
+document automation, and diff checks pass. No new candidate was reported.
+
+**Slice 9.2 candidate snapshot GREEN:** accepted Phase 8 receipts expose 260
+findings across seven independent projects, so the candidate pool is larger
+than the Phase 9 project target. The first current-head batch freezes three
+low-drift heads verified on 2026-08-12: rtp2httpd (11 commits beyond its Phase
+8 pin), llama.cpp (28), and libgit2 (538). A deterministic materializer copies
+only those projects' qualified recipes, replaces only their immutable
+revisions, rejects repository drift, unknown or duplicate projects, malformed
+dates or commits, and produces a planner-accepted nine-shard campaign. Four
+focused tests plus the ten ledger tests pass. This snapshot authorizes local
+candidate discovery only; no finding becomes accepted or externally reported
+without the Phase 9 Gates A, B, and C.
+
+**Slice 9.2 current-head execution GREEN:** the first local rtp2httpd run
+exposed two default-recipe defects in the shared runner: optional Ninja target
+output had no default value, then an empty value still invoked target filtering
+and removed every translation unit. The runner now initializes the optional
+text and applies target filtering only when target evidence exists; focused
+contracts pin both paths. With the Fedora LLVM 19 runtime and resource headers
+isolated under `/tmp`, current rtp2httpd head
+`e49df993ca2629bb116a29a87ce2afff24d97ef7` produced an accepted `38/38`
+receipt, zero broken TUs, zero incomplete functions, and 24 findings. All
+19 unique fingerprints exactly match the accepted Phase 8 pin: removed 0,
+added 0. This is candidate-discovery evidence, not an accepted-fix count.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development
@@ -1058,6 +1124,13 @@ evidence above before implementation.
   identical semantic receipts. Broken/skipped TUs make the verdict explicitly
   unavailable; they never become a partial green.
 - **Phase 9 — upstream validation.** Apply PLAN §6 Gates A, B, and C to current
+- Güncel aday paketi kapsam yenilemesi doğrulandı: varsayılan tariflerde boş hedef bilgisi eski kapsam kapısını çalıştırmıyor.
+- Güncel başlık kaydı kapsam grubuyla sınırlı; birim sayısı, incelenen sayısı ve bulgu özeti birlikte yenileniyor.
+- İkinci proje güncel başlığı üç tekrarda da kabul edildi: 201/201, eksik 0, bulgu 41.
+- [x] libgit2 current-head candidate qualification: three fresh repetitions accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
+- [ ] rtp2httpd allocation-result hardening submitted as PR #709 and marked ready for upstream review; build and executable smoke checks pass and the independently reproduced path is gone. Await upstream acceptance before changing the Phase 9 ledger.
+- [ ] libgit2 missing-mode output guard submitted as PR #7345 and marked ready for upstream review; full build and local tests pass, focused analysis is clean at 1/1, and the independent path is gone. Await upstream acceptance before changing the Phase 9 ledger.
+- Faz 9 kabul sayacı değişmedi; bu çalışma aday doğrulamasıdır, yukarı akış kabulü değildir.
   upstream HEADs. Target at least five independent projects and ten accepted
   fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
   remain classified learning evidence rather than being hidden or promoted.
