@@ -13,7 +13,7 @@ git gerçeğiyle karşılaştırır, bu yüzden bayatlayamaz.
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-realworld-release-candidate-factory
+in_flight     = phase-realworld-release-candidate-factory phase-upstream-validation
 verified_main = 7dfd375
 progress      = sha256:ad383b5215239a8324b155328f694bbba8b3f7e8a9dd90e5127b9238d7fec952
 ```
