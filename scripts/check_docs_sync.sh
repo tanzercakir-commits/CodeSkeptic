@@ -162,5 +162,12 @@ if ! python3 scripts/check_realworld_ledger.py; then
     fail=1
 fi
 
+# 8. Current-head candidate summaries are derived evidence. When retained
+# receipts exist, bind their checksums, exact manifest, frozen revision,
+# semantic result, and canonical summaries so a transcription cannot pass CI.
+if ! python3 scripts/check_upstream_candidate_evidence.py; then
+    fail=1
+fi
+
 [ "$fail" -eq 0 ] && echo "ok: docs in sync (canonical files, no scatter, changelog fresh, rules listed, versions pinned)"
 exit "$fail"
