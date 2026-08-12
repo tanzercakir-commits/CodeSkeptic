@@ -38,50 +38,61 @@
           "findings": 42,
           "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
         },
-      {
-        "id": "lvgl",
-        "repository": "https://github.com/lvgl/lvgl.git",
-        "default_branch": "master",
-        "head": "940c86ae3ade38de8c28b9096a87848d82c6ac36",
-        "translation_units": 470,
-        "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
-        "coverage_batch_id": "2026-08-12-a",
-        "findings": 19,
-        "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
-      },
-      {
-        "id": "abseil",
-        "repository": "https://github.com/abseil/abseil-cpp.git",
-        "default_branch": "master",
-        "head": "43e07c386b832bb4d1d29af61b7c45b59a54a38d",
-        "translation_units": 159,
-        "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61",
-        "coverage_batch_id": "2026-08-12-a",
-        "findings": 13,
-        "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff"
-      },
-      {
-        "id": "systemd",
-        "repository": "https://github.com/systemd/systemd.git",
-        "default_branch": "main",
-        "head": "3ae53ab8f6401f997ee5574982b64b23838666e3",
-        "translation_units": 496,
-        "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
-        "coverage_batch_id": "2026-08-12-a",
-        "findings": 0,
-        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-      },
-      {
-        "id": "curl",
-        "repository": "https://github.com/curl/curl.git",
-        "default_branch": "master",
-        "head": "1a17959fc7a80864c9c9b37097856bdb4a465cf8",
-        "translation_units": 195,
-        "translation_unit_sha256": "5750a25ebe9c906284906187a22336c118c05b16b4c6e3fe9722ec8e6cbd7f86",
-        "coverage_batch_id": "2026-08-12-a",
-        "findings": 62,
-        "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57"
-      }
+        {
+          "id": "lvgl",
+          "repository": "https://github.com/lvgl/lvgl.git",
+          "default_branch": "master",
+          "head": "940c86ae3ade38de8c28b9096a87848d82c6ac36",
+          "translation_units": 470,
+          "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 19,
+          "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
+        },
+        {
+          "id": "abseil",
+          "repository": "https://github.com/abseil/abseil-cpp.git",
+          "default_branch": "master",
+          "head": "43e07c386b832bb4d1d29af61b7c45b59a54a38d",
+          "translation_units": 159,
+          "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 13,
+          "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff"
+        },
+        {
+          "id": "systemd",
+          "repository": "https://github.com/systemd/systemd.git",
+          "default_branch": "main",
+          "head": "3ae53ab8f6401f997ee5574982b64b23838666e3",
+          "translation_units": 496,
+          "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "id": "curl",
+          "repository": "https://github.com/curl/curl.git",
+          "default_branch": "master",
+          "head": "1a17959fc7a80864c9c9b37097856bdb4a465cf8",
+          "translation_units": 195,
+          "translation_unit_sha256": "5750a25ebe9c906284906187a22336c118c05b16b4c6e3fe9722ec8e6cbd7f86",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 62,
+          "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57"
+        },
+        {
+          "id": "redis",
+          "repository": "https://github.com/redis/redis.git",
+          "default_branch": "unstable",
+          "head": "c3f78e4b850915ace818cc51bff8a0cbf1317d94",
+          "translation_units": 122,
+          "translation_unit_sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
       ]
     }
   ]
