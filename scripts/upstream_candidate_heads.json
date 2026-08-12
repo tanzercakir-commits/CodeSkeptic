@@ -70,6 +70,17 @@
         "coverage_batch_id": "2026-08-12-a",
         "findings": 0,
         "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "id": "curl",
+        "repository": "https://github.com/curl/curl.git",
+        "default_branch": "master",
+        "head": "1a17959fc7a80864c9c9b37097856bdb4a465cf8",
+        "translation_units": 195,
+        "translation_unit_sha256": "5750a25ebe9c906284906187a22336c118c05b16b4c6e3fe9722ec8e6cbd7f86",
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 62,
+        "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57"
       }
       ]
     }
