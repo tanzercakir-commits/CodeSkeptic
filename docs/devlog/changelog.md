@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 9 upstream validation boundary
+
+- Locked Phase 9 to PLAN section 6 Gates A, B, and C on current default-branch heads, with a hard completion target of ten accepted fixes across five independent projects.
+- Reverified three existing accepted fixes across two projects: shadPS4 PRs `#4702` and `#4703` remain in current `main`, and TensorFlow PR `#123994` remains in current `master`.
+- Established the measured RED baseline at `3/10` fixes and `2/5` projects; rejected, duplicate, stale, non-triggerable, and false-positive candidates remain durable non-counting evidence.
+- Restricted the first implementation slice to a schema-checked append-only ledger and fail-closed validator before any new candidate is reported.
+
 ## 2026-08-12 — Phase 8.4 release-candidate factory qualified
 
 - Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
