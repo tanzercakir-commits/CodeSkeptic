@@ -971,7 +971,7 @@ documented admitted extra-execution case); ShadPS4 `5a4373c80e32` requested/exec
 `382/382`, 66 findings. All three completed with the findings-only semantic exit
 and immutable artifacts keyed to the same CodeSkeptic head.
 
-## Phase 8.4 — release-candidate factory promotion — LOCAL GREEN; HOSTED AGGREGATE PENDING (2026-08-11)
+## Phase 8.4 — release-candidate factory promotion — QUALIFIED (2026-08-12)
 
 **Boundary:** promote only the three recipes qualified at CodeSkeptic head
 `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6`: llama.cpp `4dee52f82dc4`,
@@ -993,12 +993,15 @@ tier exits `2` because the campaign is absent. The implementation gate is a
 tests, full CTest, document automation, then a hosted aggregate receipt for
 all nine shards.
 
-**Local GREEN evidence:** the accepted manifest now has 11 projects and three
+**Local and hosted GREEN evidence:** the accepted manifest now has 11 projects and three
 campaigns. `release-candidate` planning exits `0` with exactly nine shards
 (three projects by three repetitions); campaign and qualification contract
 tests pass; the LLVM 19 Release build completes `100/100`; and full CTest
-passes `1177/1177`. Hosted completion still requires the aggregate receipt
-from all nine shards and remains unavailable until that evidence exists.
+passes `1177/1177`. Hosted run `31536531313` at
+`21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed
+receipts and the aggregate receipt. Every project has three identical semantic
+receipts, all nine use one analyzer identity, and no receipt has a broken TU,
+an incomplete function, or a failure entry.
 
 **Hosted attempt 1 (run `31523815926`):** plan and the shared LLVM 19 analyzer
 passed, but release-candidate shard images lacked the matching Clang resource
@@ -1008,18 +1011,33 @@ analyzed, `199` broken), so the run was cancelled. The workflow now installs
 nightly and weekend tiers; no partial receipt is accepted as evidence.
 
 **Hosted attempt 2 (run `31525147338`):** installing only `clang-19` supplied
-- Hosted factory attempt 3: run `31525916462` at `6f0453b741aee8a6f09489915cb6476b48a6c7ee` reached the nine-shard fanout with both required compiler packages. Two TensorFlow Lite repetitions deterministically produced 269 configured translation units: the qualified 241 plus 28 non-target tools, profiling, Python, and example units. The run was cancelled because the aggregate gate could no longer pass. The campaign runner now reuses the Phase 8.3 Ninja target-closure filter; the downloaded attempt receipt was reduced back to the exact qualified 241/241 relative identities locally. Hosted aggregate rerun is pending.
-- Hosted factory attempt 4: run `31528519780` at `4bc34a99338d9df0ba7ad045315d6eb0ce2b7cd3` exercised the new target-closure path. All logged Llama commands completed with exit 0, but all three repetitions then hit the same local binding error because the integration referenced `file_list` before its later sidecar assignment instead of the existing `files` collection. The unwinnable run was cancelled. The binding now consumes and returns the established `files` plus `relative_files` pair; syntax, 23 focused tests, structural binding verification, and diff checks pass. Hosted rerun is pending.
-- Hosted factory attempt 5: run `31529684488` at `43d40d136731d753f9da7625940d08d154d638e2` proved the binding repair: all three Llama repetitions were accepted with identical shared-analyzer and semantic evidence at 200/200, broken 0, incomplete 0, findings 40. All three Shad repetitions stopped during configure because the factory image lacked `mold`, which the qualified Phase 8.3 image installed. The release-candidate package step now restores `mold` and a regression gate pins its presence. The three TensorFlow repetitions from this run remain active while the next rerun is prepared.
-- Hosted factory attempt 6: run `31531567925` at `b1b8d83e9cd7d66a5f83f81388aa54f9f8bc603a` failed all nine shards immediately because `mold` had been appended after the Bash package-array expression and was executed as a command before installation. The package is now inside the release-only array as `compiler_packages+=(clang-19 mold)`. Both the existing LLVM-tier assertion and the dedicated linker assertion pin the exact array form; 17 factory tests pass.
-- Hosted factory attempt 7: run `31532850193` at `4fb651d38c83713492abe7d21b7c52975c48a751` proved the corrected package-array execution and again accepted all three Llama repetitions. Shad advanced past the linker check but configure still failed because the factory image omitted the X11, Wayland, audio, input, and OpenGL development packages present in the qualified Phase 8.3 image. The full 19-token release-only package set, including `clang-19`, `mold`, and the exact Phase 8.3 Shad dependencies, is now pinned as a tested subset. The unwinnable run was cancelled; 17 factory tests pass.
-- Hosted factory attempt 8: run `31534556897` at `703dfa16fff0ffc7d5549e0a3170b0d5c9d6cfff` again accepted all three Llama repetitions and proved the full Shad system dependency set by advancing through configure. Shad then reached compilation and failed with exit 127 because CMake selected `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS-NOTFOUND`; the factory image omitted `clang-tools-19`, which the qualified Phase 8.3 image installed. `clang-tools-19` is now part of the tested release-only package subset. The unwinnable run was cancelled; 17 factory tests pass.
 the analyzer resources but removed the `clang-20` executable pinned by all
 three qualified source-build recipes; TensorFlow Lite therefore failed during
 configure. The run was cancelled. Release-candidate shards now install both
 packages: `clang-20` preserves the immutable candidate build commands and
 `clang-19` supplies the shared analyzer runtime resources. Existing tiers
 continue to install only `clang-20`.
+
+**Hosted attempts 3–8:** runs `31525916462`, `31528519780`, `31529684488`,
+`31531567925`, `31532850193`, and `31534556897` successively exposed and
+closed the qualified target-closure, binding, linker, Shad system-package,
+package-array, and `clang-tools-19` environment gaps. Each unwinnable run was
+cancelled; partial receipts remained unavailable. Focused campaign tests pass
+`17/17`, qualification tests pass `7/7`, syntax and diff checks pass, and the
+release-only package subset is pinned without changing nightly or weekend
+shards.
+
+**Hosted attempt 9 (run `31536531313`):** the plan, shared analyzer, all three
+Llama receipts, all three TensorFlow Lite receipts, and Shad repeats 2 and 3
+passed on the first attempt. Shad repeat 1 stopped before project work during
+runner checkout; a failed-only rerun preserved the ten successful jobs, then
+accepted Shad repeat 1 and the aggregate. Final evidence is Llama `200/200`
+with 40 findings, Shad `382/382` with 66 findings, and TensorFlow Lite
+`241` requested / `245` analyzed with 73 findings. All three repetitions per
+project are semantically identical; broken and incomplete totals are zero.
+The aggregate status is `accepted`, its checksum verifies, and all nine
+receipts share analyzer SHA-256
+`12e7409ef03aba54ac166898aaefb64f8ef7373adad89fe676162c4d95fc5f39`.
 
 ## Recovered product program — Phases 8–12
 

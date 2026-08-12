@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 8.4 release-candidate factory qualified
+
+- Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
+- All three repetitions are identical per project: llama.cpp `200/200` with 40 findings, ShadPS4 `382/382` with 66 findings, and TensorFlow Lite `241` requested / `245` analyzed with 73 findings.
+- All nine receipts use one analyzer identity; broken TUs, incomplete functions, and failure entries total zero. The aggregate is accepted and its checksum verifies.
+- Phase 8.4 is qualified; partial receipts from attempts 1–8 remain classified as unavailable evidence.
+
 ## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
 
 - Run `31525147338` showed that replacing the shard compiler with `clang-19` broke the immutable candidate recipes, which explicitly configure their source builds with `clang-20`.
