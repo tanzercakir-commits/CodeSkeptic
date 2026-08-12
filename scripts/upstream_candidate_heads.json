@@ -59,6 +59,17 @@
         "coverage_batch_id": "2026-08-12-a",
         "findings": 13,
         "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff"
+      },
+      {
+        "id": "systemd",
+        "repository": "https://github.com/systemd/systemd.git",
+        "default_branch": "main",
+        "head": "3ae53ab8f6401f997ee5574982b64b23838666e3",
+        "translation_units": 496,
+        "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
       }
       ]
     }

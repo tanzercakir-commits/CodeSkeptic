@@ -5953,3 +5953,4 @@ detection. The matcher is precise, no filter needed.
   `build_path_` (relative-path safety).
 - CMake: `LANGUAGES CXX` → `LANGUAGES C CXX` (for LLVM's C check macro).
 - Qualified the current Abseil head with 3/3 accepted repetitions: 159/159 translation units, 0 broken units, 0 incomplete functions, and 13 stable findings. The Fedora run used the analyzer-aligned compiler and resource directory; this adds candidate evidence only and leaves the accepted-upstream ledger at 3 fixes across 2 projects.
+- Qualified the current systemd head with 3/3 accepted repetitions: 496/496 translation units, 0 broken units, 0 incomplete functions, and 0 findings. The run used an isolated Meson/Jinja/gperf tool environment and analyzer-aligned compiler flags; this adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
