@@ -32,7 +32,7 @@ MESON_OPTION = re.compile(
     r"-D[A-Za-z0-9_-]+=[A-Za-z0-9_.+-]+)"
 )
 MESON_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
-MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=[A-Za-z0-9_.+-]+")
+MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=.*")
 REQUIRED_EXPECTED = {
     "translation_units",
     "translation_unit_sha256",
