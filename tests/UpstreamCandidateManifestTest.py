@@ -81,7 +81,7 @@ class UpstreamCandidateManifestTest(unittest.TestCase):
             )
         self.assertEqual(plan.returncode, 0, plan.stderr)
         shards = json.loads(plan.stdout)
-        self.assertEqual(len(shards["include"]), 24)
+        self.assertEqual(len(shards["include"]), 27)
 
     def test_runner_initializes_optional_target_commands(self):
         tree = ast.parse(RUNNER.read_text(encoding="utf-8"))
