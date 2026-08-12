@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "batches": [
+    {
+      "id": "2026-08-12-a",
+      "checked_at": "2026-08-12",
+      "projects": [
+        {
+          "id": "rtp2httpd",
+          "repository": "https://github.com/stackia/rtp2httpd.git",
+          "default_branch": "main",
+          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
+          "translation_units": 38,
+          "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 24,
+          "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
+        },
+        {
+          "id": "llama-cpp",
+          "repository": "https://github.com/ggml-org/llama.cpp.git",
+          "default_branch": "master",
+          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4",
+          "translation_units": 201,
+          "translation_unit_sha256": "d95ff4df0c1fcfee3980fbe17d1fc9e59d150b4db6bf7a7d6c2f9528505d4cfb",
+          "coverage_batch_id": "/tmp/codeskeptic-phase9-phase84-split/9123466154/receipt.json",
+          "findings": 41,
+          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6"
+        },
+        {
+          "id": "libgit2",
+          "repository": "https://github.com/libgit2/libgit2.git",
+          "default_branch": "main",
+          "head": "95ff8c2baceb270469657663ded9934d5faf5627",
+          "translation_units": 168,
+          "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 42,
+          "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
+        },
+        {
+          "id": "lvgl",
+          "repository": "https://github.com/lvgl/lvgl.git",
+          "default_branch": "master",
+          "head": "940c86ae3ade38de8c28b9096a87848d82c6ac36",
+          "translation_units": 470,
+          "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 19,
+          "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
+        },
+        {
+          "id": "abseil",
+          "repository": "https://github.com/abseil/abseil-cpp.git",
+          "default_branch": "master",
+          "head": "43e07c386b832bb4d1d29af61b7c45b59a54a38d",
+          "translation_units": 159,
+          "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 13,
+          "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff"
+        },
+        {
+          "id": "systemd",
+          "repository": "https://github.com/systemd/systemd.git",
+          "default_branch": "main",
+          "head": "3ae53ab8f6401f997ee5574982b64b23838666e3",
+          "translation_units": 496,
+          "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "id": "curl",
+          "repository": "https://github.com/curl/curl.git",
+          "default_branch": "master",
+          "head": "1a17959fc7a80864c9c9b37097856bdb4a465cf8",
+          "translation_units": 195,
+          "translation_unit_sha256": "5750a25ebe9c906284906187a22336c118c05b16b4c6e3fe9722ec8e6cbd7f86",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 62,
+          "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57"
+        },
+        {
+          "id": "redis",
+          "repository": "https://github.com/redis/redis.git",
+          "default_branch": "unstable",
+          "head": "c3f78e4b850915ace818cc51bff8a0cbf1317d94",
+          "translation_units": 122,
+          "translation_unit_sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      ]
+    }
+  ]
+}
