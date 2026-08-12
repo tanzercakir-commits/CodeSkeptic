@@ -472,6 +472,7 @@ class ManifestContractTest(unittest.TestCase):
                 "-j{jobs}",
                 "CC=clang-20",
                 "MALLOC=libc",
+                "CFLAGS=-resource-dir=/opt/llvm/lib/clang/19",
             ]
         ]
         campaign.validate_manifest(manifest)
