@@ -1,3 +1,4 @@
+import ast
 import copy
 import importlib.util
 import json
@@ -81,6 +82,92 @@ class UpstreamCandidateManifestTest(unittest.TestCase):
         self.assertEqual(plan.returncode, 0, plan.stderr)
         shards = json.loads(plan.stdout)
         self.assertEqual(len(shards["include"]), 9)
+
+    def test_runner_initializes_optional_target_commands(self):
+        tree = ast.parse(RUNNER.read_text(encoding="utf-8"))
+        functions = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and any(
+                isinstance(item, ast.Name) and item.id == "target_commands"
+                for item in ast.walk(node)
+            )
+        ]
+        self.assertEqual(len(functions), 1)
+        function = functions[0]
+        parents = {
+            child: parent
+            for parent in ast.walk(function)
+            for child in ast.iter_child_nodes(parent)
+        }
+        unconditional_stores = []
+        for node in ast.walk(function):
+            if not (
+                isinstance(node, ast.Name)
+                and node.id == "target_commands"
+                and isinstance(node.ctx, ast.Store)
+            ):
+                continue
+            ancestor = parents.get(node)
+            conditional = False
+            while ancestor is not None and ancestor is not function:
+                conditional = conditional or isinstance(ancestor, ast.If)
+                ancestor = parents.get(ancestor)
+            if not conditional:
+                unconditional_stores.append(node)
+        loads = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.Name)
+            and node.id == "target_commands"
+            and isinstance(node.ctx, ast.Load)
+        ]
+        self.assertTrue(unconditional_stores)
+        self.assertTrue(loads)
+        initializers = []
+        for node in unconditional_stores:
+            ancestor = parents.get(node)
+            while ancestor is not None and not isinstance(ancestor, ast.Assign):
+                ancestor = parents.get(ancestor)
+            if isinstance(ancestor, ast.Assign):
+                initializers.append(ancestor.value)
+        self.assertTrue(
+            any(
+                isinstance(value, ast.Constant) and value.value == ""
+                for value in initializers
+            )
+        )
+        self.assertLess(
+            min(node.lineno for node in unconditional_stores),
+            min(node.lineno for node in loads),
+        )
+        filter_calls = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "filter_target_translation_units"
+            and any(
+                isinstance(argument, ast.Name)
+                and argument.id == "target_commands"
+                for argument in node.args
+            )
+        ]
+        self.assertEqual(len(filter_calls), 1)
+        ancestor = parents.get(filter_calls[0])
+        guards = []
+        while ancestor is not None and ancestor is not function:
+            if isinstance(ancestor, ast.If):
+                guards.append(ancestor)
+            ancestor = parents.get(ancestor)
+        self.assertTrue(
+            any(
+                isinstance(guard.test, ast.Name)
+                and guard.test.id == "target_commands"
+                for guard in guards
+            )
+        )
 
 
 if __name__ == "__main__":

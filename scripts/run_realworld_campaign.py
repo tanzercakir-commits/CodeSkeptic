@@ -1171,6 +1171,7 @@ def run_shard(
                 raise EvidenceError("build target is missing")
             ninja_target = expanded_build_command[target_index + 1]
             break
+        target_commands = ""
         if ninja_target is not None:
             target_commands = _capture_git(
                 ["ninja", "-C", str(build), "-t", "commands", ninja_target],
@@ -1180,9 +1181,10 @@ def run_shard(
                 log_path,
                 None,
             )
-        files, relative_files = filter_target_translation_units(
-            target_commands, project_root, build, files, relative_files
-        )
+        if target_commands:
+            files, relative_files = filter_target_translation_units(
+                target_commands, project_root, build, files, relative_files
+            )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(

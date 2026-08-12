@@ -1,5 +1,12 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-12 — Phase 9 first current-head execution
+
+- Fixed two shared-runner defects exposed by a project recipe without Ninja target closure: the optional command output is initialized as text, and target filtering runs only when target evidence exists.
+- Added structural regression coverage for both the default and target-restricted paths; existing release-candidate behavior remains pinned.
+- Ran current rtp2httpd head `e49df993ca2629bb116a29a87ce2afff24d97ef7` locally with an isolated Fedora LLVM 19 runtime: accepted `38/38`, broken 0, incomplete 0, findings 24.
+- Compared against the accepted Phase 8 receipt: all 19 unique fingerprints are unchanged, with zero additions and zero removals. The result remains discovery evidence until individual candidates pass Gates A, B, and C.
+
 ## 2026-08-12 — Phase 9 frozen current-head candidate batch
 
 - Counted 260 findings across seven projects from accepted, checksummed Phase 8 receipts and froze the first low-drift current-head batch for rtp2httpd, llama.cpp, and libgit2.

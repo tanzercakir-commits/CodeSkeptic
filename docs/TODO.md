@@ -1093,6 +1093,18 @@ focused tests plus the ten ledger tests pass. This snapshot authorizes local
 candidate discovery only; no finding becomes accepted or externally reported
 without the Phase 9 Gates A, B, and C.
 
+**Slice 9.2 current-head execution GREEN:** the first local rtp2httpd run
+exposed two default-recipe defects in the shared runner: optional Ninja target
+output had no default value, then an empty value still invoked target filtering
+and removed every translation unit. The runner now initializes the optional
+text and applies target filtering only when target evidence exists; focused
+contracts pin both paths. With the Fedora LLVM 19 runtime and resource headers
+isolated under `/tmp`, current rtp2httpd head
+`e49df993ca2629bb116a29a87ce2afff24d97ef7` produced an accepted `38/38`
+receipt, zero broken TUs, zero incomplete functions, and 24 findings. All
+19 unique fingerprints exactly match the accepted Phase 8 pin: removed 0,
+added 0. This is candidate-discovery evidence, not an accepted-fix count.
+
 ## Recovered product program — Phases 8–12
 
 The owner-approved program recovered from the former external development
