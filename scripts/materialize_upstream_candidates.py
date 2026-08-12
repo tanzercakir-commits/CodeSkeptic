@@ -94,6 +94,28 @@ def materialize(base, heads, batch_id):
             f"{project_id}: repository differs from base manifest",
         )
         project["revision"] = snapshot["head"]
+        for expected_key in ("translation_units", "translation_unit_sha256"):
+            if (
+                snapshot.get("coverage_batch_id") == batch_id
+                and expected_key in snapshot
+                and expected_key in project.get("expected", {})
+                and project["expected"][expected_key]
+            ):
+                project["expected"][expected_key] = snapshot[expected_key]
+                if expected_key == "translation_units":
+                    for coverage_key in ("attempted_tus", "analyzed_tus"):
+                        if coverage_key in project["expected"]:
+                            project["expected"][coverage_key] = snapshot[expected_key]
+        if (
+            snapshot.get("coverage_batch_id") == batch_id
+            and snapshot.get("fingerprint_sha256")
+            and project.get("expected", {}).get("fingerprint_sha256")
+        ):
+            project["expected"]["fingerprint_sha256"] = snapshot["fingerprint_sha256"]
+            project["expected"]["findings"] = snapshot.get(
+                "findings",
+                project["expected"]["findings"],
+            )
         selected.append(project)
 
     return {

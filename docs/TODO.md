@@ -1124,6 +1124,10 @@ evidence above before implementation.
   identical semantic receipts. Broken/skipped TUs make the verdict explicitly
   unavailable; they never become a partial green.
 - **Phase 9 — upstream validation.** Apply PLAN §6 Gates A, B, and C to current
+- Güncel aday paketi kapsam yenilemesi doğrulandı: varsayılan tariflerde boş hedef bilgisi eski kapsam kapısını çalıştırmıyor.
+- Güncel başlık kaydı kapsam grubuyla sınırlı; birim sayısı, incelenen sayısı ve bulgu özeti birlikte yenileniyor.
+- İkinci proje güncel başlığı üç tekrarda da kabul edildi: 201/201, eksik 0, bulgu 41.
+- Faz 9 kabul sayacı değişmedi; bu çalışma aday doğrulamasıdır, yukarı akış kabulü değildir.
   upstream HEADs. Target at least five independent projects and ten accepted
   fixes. Rejected, duplicate, non-triggerable, and false-positive candidates
   remain classified learning evidence rather than being hidden or promoted.

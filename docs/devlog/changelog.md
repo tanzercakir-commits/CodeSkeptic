@@ -1,5 +1,9 @@
 # CodeSkeptic — Changelog
 
+- 2026-08-12: Güncel başlık adaylarında varsayılan tariflerin boş hedef bilgisini destekleyen kapsam kapısı eklendi.
+- 2026-08-12: Başlık kaydı yalnız ait olduğu kabul grubunda birim ve bulgu özetlerini yeniliyor.
+- 2026-08-12: İkinci proje güncel başlığı üç kararlı tekrarda 201/201 birim, 0 eksik ve 41 bulgu ile doğrulandı.
+
 ## 2026-08-12 — Phase 9 first current-head execution
 
 - Fixed two shared-runner defects exposed by a project recipe without Ninja target closure: the optional command output is initialized as text, and target filtering runs only when target evidence exists.

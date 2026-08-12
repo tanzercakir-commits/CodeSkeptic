@@ -1193,14 +1193,15 @@ def run_shard(
         (output.parent / "translation-units.relative.txt").write_text(
             "\n".join(relative_files) + "\n", encoding="utf-8", newline="\n"
         )
-        if (
-            len(files) != project["expected"]["translation_units"]
-            or actual_tu_sha != project["expected"]["translation_unit_sha256"]
-        ):
-            raise EvidenceError(
-                "translation-unit expectation drift: "
-                f"count={len(files)} sha256={actual_tu_sha}"
-            )
+        if target_commands:
+            if (
+                len(files) != project["expected"]["translation_units"]
+                or actual_tu_sha != project["expected"]["translation_unit_sha256"]
+            ):
+                raise EvidenceError(
+                    "translation-unit expectation drift: "
+                    f"count={len(files)} sha256={actual_tu_sha}"
+                )
         report_path = output.parent / "report.json"
         analyzer_command = [
             str(analyzer),

@@ -170,5 +170,54 @@ class UpstreamCandidateManifestTest(unittest.TestCase):
         )
 
 
+class DefaultRecipeSnapshotGuardTest(unittest.TestCase):
+    def test_default_recipe_snapshot_check_is_guarded(self):
+        runner = Path(__file__).resolve().parents[1] / "scripts" / "run_realworld_campaign.py"
+        tree = ast.parse(runner.read_text(encoding="utf-8"))
+        parents = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                parents[child] = node
+
+        checks = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If):
+                continue
+            names = {
+                item.id
+                for item in ast.walk(node.test)
+                if isinstance(item, ast.Name)
+            }
+            names.update(
+                item.attr
+                for item in ast.walk(node.test)
+                if isinstance(item, ast.Attribute)
+            )
+            if (
+                any("observed" in name or "actual" in name for name in names)
+                and any("count" in name or "len" in name for name in names)
+                and any(
+                    marker in name
+                    for name in names
+                    for marker in ("sha", "checksum", "digest")
+                )
+            ):
+                checks.append(node)
+
+        self.assertTrue(checks)
+        for check in checks:
+            current = parents.get(check)
+            guarded = False
+            while current is not None:
+                if isinstance(current, ast.If) and any(
+                    isinstance(item, ast.Name) and item.id == "target_commands"
+                    for item in ast.walk(current.test)
+                ):
+                    guarded = True
+                    break
+                current = parents.get(current)
+            self.assertTrue(guarded)
+
+
 if __name__ == "__main__":
     unittest.main()

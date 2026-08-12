@@ -15,7 +15,12 @@
           "id": "llama-cpp",
           "repository": "https://github.com/ggml-org/llama.cpp.git",
           "default_branch": "master",
-          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4"
+          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4",
+          "translation_units": 201,
+          "translation_unit_sha256": "d95ff4df0c1fcfee3980fbe17d1fc9e59d150b4db6bf7a7d6c2f9528505d4cfb",
+          "coverage_batch_id": "/tmp/codeskeptic-phase9-phase84-split/9123466154/receipt.json",
+          "findings": 41,
+          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6"
         },
         {
           "id": "libgit2",
