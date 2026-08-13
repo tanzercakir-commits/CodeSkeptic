@@ -1,8 +1,15 @@
 # CodeSkeptic — Changelog
 
-- 2026-08-12: Güncel başlık adaylarında varsayılan tariflerin boş hedef bilgisini destekleyen kapsam kapısı eklendi.
-- 2026-08-12: Başlık kaydı yalnız ait olduğu kabul grubunda birim ve bulgu özetlerini yeniliyor.
-- 2026-08-12: İkinci proje güncel başlığı üç kararlı tekrarda 201/201 birim, 0 eksik ve 41 bulgu ile doğrulandı.
+## 2026-08-13 — Phase 9 documentation structure recovery
+
+- Moved all eleven canonical current-head qualification summaries into the
+  Phase 9 evidence slice instead of leaving them after the file-discipline
+  footer or inside the recovered-program roadmap.
+- Restored the uninterrupted Phase 9 roadmap item, removed duplicate scratch
+  notes, and consolidated the two pending upstream submissions under the
+  measured `3/10` fixes across `2/5` projects state.
+- This recovery changes no retained receipt, manifest, candidate identity,
+  analyzer result, accepted-fix ledger entry, product code, or quality floor.
 
 ## 2026-08-13 — Phase 9 distinct candidate coverage
 
