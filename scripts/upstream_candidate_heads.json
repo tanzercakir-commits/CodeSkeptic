@@ -67,17 +67,26 @@
           "findings": 19,
           "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
         },
-        {
-          "id": "abseil",
+      {
+        "id": "abseil",
           "repository": "https://github.com/abseil/abseil-cpp.git",
           "default_branch": "master",
-          "head": "43e07c386b832bb4d1d29af61b7c45b59a54a38d",
+        "head": "ee41bbdf12162c2beebd9347d7653380c8170c0a",
           "translation_units": 159,
           "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61",
           "coverage_batch_id": "2026-08-12-a",
           "findings": 13,
-          "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff"
-        },
+        "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-1/receipt.json", "sha256": "7890af340e9e02bf00fc3918cdca222c9ee0208b419898bb7c83eee649037607"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-2/receipt.json", "sha256": "03a01898e397a8a7aad8b76922e20c20031050d6cea5a7628f441554a1b1b8b1"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-3/receipt.json", "sha256": "a87da9c28bf5921feba27b7ccbcc43d4e00a74fcb3eabfdc13be9130793e7353"}
+          ]
+        }
+      },
         {
           "id": "systemd",
           "repository": "https://github.com/systemd/systemd.git",

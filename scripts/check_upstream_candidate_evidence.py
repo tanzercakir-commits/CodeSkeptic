@@ -14,7 +14,11 @@ from typing import Any
 
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-DISPLAY_NAMES = {"shadps4": "shadPS4", "tensorflow-lite": "TensorFlow Lite"}
+DISPLAY_NAMES = {
+    "abseil": "Abseil",
+    "shadps4": "shadPS4",
+    "tensorflow-lite": "TensorFlow Lite",
+}
 RUNNER_PATH = Path(__file__).with_name("run_realworld_campaign.py")
 RUNNER_SPEC = importlib.util.spec_from_file_location(
     "retained_evidence_campaign_runner", RUNNER_PATH
