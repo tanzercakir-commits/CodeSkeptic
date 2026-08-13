@@ -78,12 +78,21 @@
           "id": "lvgl",
           "repository": "https://github.com/lvgl/lvgl.git",
           "default_branch": "master",
-          "head": "940c86ae3ade38de8c28b9096a87848d82c6ac36",
+          "head": "34d30b0f1b1e3afae119e2ba3987a988deb1a2ea",
           "translation_units": 470,
           "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
           "coverage_batch_id": "2026-08-12-a",
-          "findings": 19,
-          "fingerprint_sha256": "c78843e3cba40df6a54fb523f2e540f24d85ff98ffd9ff1979a9e6e2c0bbcd90"
+          "findings": 13,
+          "fingerprint_sha256": "67bd7bb56cad473321bbd817f8b537ae24d9190e66a36805be70a47631bd44ef",
+          "receipt_evidence": {
+            "campaign": "upstream-candidates",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/manifest.json",
+            "receipts": [
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-1/receipt.json", "sha256": "60127188c831458859190ee5a1aeba1c3a8afe5410573d8c7e1ee213f49826be"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-2/receipt.json", "sha256": "b194f3f528b217fadc212435f77ed79290c205c06ee3c745b96642d5ffc1ff8d"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-3/receipt.json", "sha256": "83feb7e2316e0f04ae61e58924e72603ca34878849bc055a61d8a5136cd4a74f"}
+            ]
+          }
         },
       {
         "id": "abseil",

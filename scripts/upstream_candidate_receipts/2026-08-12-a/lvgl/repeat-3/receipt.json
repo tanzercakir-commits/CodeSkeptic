@@ -1,0 +1,54 @@
+{
+  "execution": {
+    "duration_seconds": 93.743,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "9433623ddc2a1f1bdb9641361d89b8fe52fbb6158cbbad41804a6db02d3cffb7",
+    "project_revision": "34d30b0f1b1e3afae119e2ba3987a988deb1a2ea",
+    "recipe_sha256": "c61435c18b0f9032d13ffae8624e66014e1a9414ec8b818dc007301cb0c8d66f",
+    "repetition": 3,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b"
+  },
+  "project": "lvgl",
+  "repetition": 3,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 470,
+      "attempted_tus": 470,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 1,
+    "findings": 13,
+    "fingerprint_sha256": "67bd7bb56cad473321bbd817f8b537ae24d9190e66a36805be70a47631bd44ef",
+    "fingerprints": [
+      "csf1-1997677a660a2884",
+      "csf1-319676de34a6f640",
+      "csf1-40125ae97236e055",
+      "csf1-75a9e075410e01b5",
+      "csf1-82535a128423db4f",
+      "csf1-9defc27f3328252c",
+      "csf1-a523e1401cad8678",
+      "csf1-ada0c4b8b17aa8c4",
+      "csf1-b316443c0a6e58b8",
+      "csf1-c4ec2702c7e86fb5",
+      "csf1-ebbb10420d2e38b0",
+      "csf1-fab07983f49eca4a",
+      "csf1-fab07983f49eca4a"
+    ],
+    "translation_units": {
+      "count": 470,
+      "sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b"
+    }
+  },
+  "status": "accepted"
+}

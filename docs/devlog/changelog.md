@@ -6,6 +6,7 @@
 
 ## 2026-08-13 — Phase 9 distinct candidate coverage
 
+- Phase 9 current-head qualification: lvgl qualified with 3/3 accepted repetitions at 470/470 translation units, with 0 broken units, 0 incomplete functions, and 13 stable findings. The live-head manifest, Kconfig profile, LLVM19 recipe, and three fresh raw receipts are retained and cross-checked automatically. This does not change the accepted upstream ledger.
 - Phase 9 current-head qualification: llama-cpp qualified with 3/3 accepted repetitions at 201/201 translation units, with 0 broken units, 0 incomplete functions, and 41 stable findings. The live-head manifest, LLVM19 recipe, and three fresh raw receipts are retained and cross-checked automatically. This does not change the accepted upstream ledger.
 - Preserved separate attempted and analyzed translation-unit counts across retained snapshots, manifests, receipts, and canonical document summaries; recipes that expand whole-program analysis are no longer forced into a false equal-count model.
 - Added exact numeric-boundary checks so the canonical TODO and changelog summaries reject prefixed, suffixed, or otherwise drifted coverage counts.
