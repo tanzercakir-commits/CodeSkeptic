@@ -38,12 +38,21 @@
           "id": "llama-cpp",
           "repository": "https://github.com/ggml-org/llama.cpp.git",
           "default_branch": "master",
-          "head": "0b1bad14ff204627636aeb1de22ddcd5acb859d4",
+          "head": "8e7f22b67ef4667b4ddd50230771287f328cfb3f",
           "translation_units": 201,
           "translation_unit_sha256": "d95ff4df0c1fcfee3980fbe17d1fc9e59d150b4db6bf7a7d6c2f9528505d4cfb",
-          "coverage_batch_id": "/tmp/codeskeptic-phase9-phase84-split/9123466154/receipt.json",
+          "coverage_batch_id": "2026-08-12-a",
           "findings": 41,
-          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6"
+          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6",
+          "receipt_evidence": {
+            "campaign": "upstream-candidates",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/manifest.json",
+            "receipts": [
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-1/receipt.json", "sha256": "7074944711649d0d09b8baf9684011c24533eb697e5dbeea67da65219f8047e8"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-2/receipt.json", "sha256": "01ac307b8796cf8d7205a00f8ef5e209296098209b66d3100023065bd8304c91"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-3/receipt.json", "sha256": "ddf65b67733d4a9fb7832c6f22b43451cc1d823ef36a85817aaed776ae9d41e3"}
+            ]
+          }
         },
       {
         "id": "libgit2",

@@ -81,7 +81,7 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
         )
 
     def test_retained_receipts_match_snapshot_and_docs(self):
-        self.assertEqual(self.validate(), 8)
+        self.assertEqual(self.validate(), 9)
 
     def test_retained_receipt_bytes_are_platform_invariant(self):
         attributes = ATTRIBUTES.read_text(encoding="utf-8").splitlines()
@@ -96,6 +96,12 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
     def test_transcribed_finding_count_fails_closed(self):
         changed = copy.deepcopy(self.heads)
         self.tensorflow(changed)["findings"] = 0
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads=changed)
+
+    def test_coverage_batch_drift_fails_closed(self):
+        changed = copy.deepcopy(self.heads)
+        self.tensorflow(changed)["coverage_batch_id"] = "arbitrary-drift"
         with self.assertRaises(MODULE.EvidenceError):
             self.validate(heads=changed)
 

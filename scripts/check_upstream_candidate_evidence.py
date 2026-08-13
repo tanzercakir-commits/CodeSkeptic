@@ -131,11 +131,16 @@ def validate_document_summary(
 def validate_project(
     root: Path,
     snapshot: dict[str, Any],
+    batch_id: str,
     todo_text: str,
     changelog_text: str,
 ) -> None:
     project_id = snapshot.get("id")
     require(isinstance(project_id, str) and project_id, "candidate id is required")
+    require(
+        snapshot.get("coverage_batch_id") == batch_id,
+        f"{project_id}: coverage batch differs from selected candidate batch",
+    )
     evidence = snapshot.get("receipt_evidence")
     require(isinstance(evidence, dict), f"{project_id}: receipt evidence is required")
 
@@ -211,7 +216,7 @@ def validate(
     retained = [item for item in projects if isinstance(item, dict) and "receipt_evidence" in item]
     require(retained, "candidate batch must retain at least one receipt-backed qualification")
     for snapshot in retained:
-        validate_project(root, snapshot, todo_text, changelog_text)
+        validate_project(root, snapshot, batch_id, todo_text, changelog_text)
     return len(retained)
 
 
