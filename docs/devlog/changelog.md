@@ -1,5 +1,23 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-13 — Owner-controlled upstream reporting restored
+
+- Corrected the over-broad execution-authority wording: continuous authority
+  remains for CodeSkeptic push, PR, intermediate merge, and release/tag work,
+  but no longer claims to cover any upstream action.
+- Made target-specific owner approval mandatory before upstream issues, PRs,
+  comments, forks, or maintainer contact. The default reporting route is now
+  issue-first; a direct PR requires separate approval. Maintainer-confirmed or
+  accepted issues may enter the public showcase, while the accepted-fix ledger
+  still counts only merged fixes.
+- Required owner notice and explicit go-ahead before the final `main` merge
+  after the complete product program.
+- Closed rtp2httpd PR #709 and libgit2 PR #7345 unmerged at the owner's request.
+  The former remains internal candidate evidence; the latter is also retained
+  as unproven because its description and changed path did not match and the
+  reported state correlation was not demonstrated as triggerable. Neither PR
+  changes the Phase 9 ledger (`3/10` fixes across `2/5` projects).
+
 ## 2026-08-13 — Phase 9 documentation structure recovery
 
 - Moved all eleven canonical current-head qualification summaries into the

@@ -1063,6 +1063,16 @@ toward the acceptance target, cannot be silently removed, and cannot be
 promoted by tool output alone. One candidate represents one defect and every
 external action is preceded by a fresh current-head and duplicate check.
 
+**Owner approval boundary (corrected 2026-08-13):** every upstream issue, PR,
+comment, fork, or maintainer contact requires target-specific owner approval.
+The default reporting path is issue-first; a direct PR requires separate
+approval even when Gates A, B, and C pass. A maintainer-confirmed or accepted
+issue may enter the public showcase, while only a merged fix may increment the
+Phase 9 accepted-fix ledger. Internal CodeSkeptic push, PR, intermediate merge,
+and release work retains continuous execution authority. The final `main`
+merge after the complete product program requires owner notice and explicit
+go-ahead.
+
 **Verified baseline:** three accepted fixes across two projects are currently
 proven. shadPS4 PRs `#4702` and `#4703` are merged and their merge commits are
 ancestors of current `main`; TensorFlow PR `#123994` is merged and its merge
@@ -1131,11 +1141,15 @@ it does not change the separately governed accepted-upstream ledger.
 - Phase 9 current-head qualification: libgit2 completed 3 fresh accepted repetitions at 168/168 translation units, with 0 broken units, 0 incomplete functions, and 42 stable findings. The live-head manifest and three checksummed receipts are retained and cross-checked automatically; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
 - Phase 9 current-head qualification: lvgl completed 3 fresh accepted repetitions at 470/470 translation units, with 0 broken units, 0 incomplete functions, and 13 stable findings. The exact manifest and three checksummed receipts are retained and cross-checked automatically; the Phase 9 accepted-fix ledger remains 3 fixes across 2 projects.
 
-**Upstream submissions pending:** rtp2httpd PR #709 and libgit2 PR #7345
-remain open and ready for upstream review. Their local build, smoke, test, and
-focused-analysis evidence is retained, but neither changes the Phase 9 ledger
-until the respective upstream project accepts the fix. The measured completion
-state therefore remains `3/10` accepted fixes across `2/5` projects.
+**Upstream submissions withdrawn (2026-08-13):** rtp2httpd PR #709 and
+libgit2 PR #7345 were closed unmerged at the owner's request because they were
+opened without target-specific upstream approval. The rtp2httpd candidate
+remains internal evidence and may return only through the owner-approved,
+issue-first path. The libgit2 submission is additionally held as unproven:
+its description did not match the changed `mwindow.c` path and the reported
+state correlation was not demonstrated as a triggerable defect. Neither PR
+changes the ledger; measured completion remains `3/10` accepted fixes across
+`2/5` projects.
 
 ## Recovered product program — Phases 8–12
 
@@ -1188,11 +1202,14 @@ protected-main PROGRESS authority.
 
 ## Açık kullanıcı kararları
 
-Yok. Kullanıcı 2026-08-08'de ürün programı tamamlanana kadar dış etkili
-işlemler için sürekli yürütme yetkisi verdi; tekrar onay beklenmeyecek. Güncel
-CI makbuzları PR açıklamasında tutulur, bu TODO geçici run durumlarını
-kopyalamaz. PR #119'un yönetici bypass'ı tamamlandı; TensorFlow PR #123994
-merge edildi, issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
+Genel yürütme sınırı nettir: CodeSkeptic içi push, PR, ara merge ve release
+işleri yeniden onay beklemez. Her upstream adayı issue/PR/yorum/fork/maintainer
+teması öncesinde kullanıcıya sunulur ve hedefe özel açık onay bekler; doğrudan
+PR varsayılan değildir. Ürün programı tamamlandığında son `main` merge'i de
+kullanıcıya haber verilmeden ve açık devam onayı alınmadan yapılmaz. Güncel CI
+makbuzları PR açıklamasında tutulur, bu TODO geçici run durumlarını kopyalamaz.
+PR #119'un yönetici bypass'ı tamamlandı; TensorFlow PR #123994 merge edildi,
+issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 

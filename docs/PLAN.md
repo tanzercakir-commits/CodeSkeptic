@@ -110,11 +110,17 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 - `main` GitHub ruleset ile korunuyor: DOĞRUDAN push reddedilir
   (deneyip gördük). Dalın zorunlu kapıları yeşil olmadan merge edilmez;
   ruleset kalite kapısıdır ve gevşetilmez.
-- **Sürekli yürütme yetkisi (2026-08-08):** kullanıcı, ürün programı
-  tamamlanana kadar push, draft/ready PR, merge, release/tag ve gerekli
-  upstream işlemleri için yeniden onay bekleme şartını kaldırdı. Her dış
-  etkiden önce hedef ref/SHA, CI ve kapsam yine doğrulanır; bu yetki kalite
-  kapılarını atlama veya `main`e doğrudan çalışma izni değildir.
+- **Sürekli yürütme yetkisi (2026-08-08; kapsamı 2026-08-13'te
+  düzeltildi):** kullanıcı, CodeSkeptic çalışma deposundaki push,
+  draft/ready PR, ara merge ve release/tag işlemleri için yeniden onay
+  bekleme şartını kaldırdı. Her işlemden önce hedef ref/SHA, CI ve kapsam
+  yine doğrulanır; bu yetki kalite kapılarını atlama veya `main`e doğrudan
+  çalışma izni değildir ve hiçbir upstream işlemi kapsamaz.
+- **Upstream ve son teslim onayı (2026-08-13):** upstream issue, PR, yorum,
+  fork veya maintainer teması öncesinde aday kullanıcıya sunulur ve hedefe
+  özel açık onay beklenir. Varsayılan sunum issue-first'tür; doğrudan PR ayrı
+  onay gerektirir. Ürün programı tamamen bittiğinde son `main` merge'i
+  öncesinde kullanıcı bilgilendirilir ve açık devam onayı beklenir.
 - Yanıtlar **Türkçe**, teknik jargon parantez içinde, plan/şema/tree ile.
 - Her zaman dürüst; max efor gerekiyorsa önceden söyle; model düştüğünü
   içeriden teyit EDEMEM — kullanıcının ekranı asıl sinyaldir.
@@ -125,7 +131,8 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 2. Uygula → yeşil
 3. Push ÖNCESİ yerel kapılar: full suite + thesis (clean_fp=0) + corpus
 4. phase-* dala push → CI 6 hat (build-and-test·juliet·docker·windows·docs×2)
-5. Zorunlu kapılar yeşil → exact head/tree doğrula → sürekli yetkiyle merge et → temizle
+5. Zorunlu kapılar yeşil → exact head/tree doğrula → ara merge'i sürekli yetkiyle tamamla → temizle
+   (ürün programının son `main` merge'inde kullanıcı onayını bekle)
 6. Her adımı changelog'a yaz; TODO'yu güncelle; PLAN sabit kalır
 ```
 
@@ -149,6 +156,12 @@ halka açık tracker değil).
 
 **Gate C — sunum:** repro önce (file:line + minimal akış + "static
 dataflow ile bulundu") · 1 issue = 1 kusur · mütevazı fix önerisi.
+
+Varsayılan ilk dış sunum issue'dur; doğrudan upstream PR ancak ayrı kullanıcı
+onayıyla açılır. Maintainer'ın kusuru kabul veya teyit ettiği issue vitrin
+adayıdır. Phase 9 kabul-fix ledger'ı ise aşağıdaki mevcut ölçütü korur ve
+yalnızca upstream'e merge edilmiş düzeltmeleri sayar. Gate A/B/C'yi geçen bir
+aday dahi kullanıcıdan hedefe özel upstream onayı alınmadan dışarı gönderilmez.
 
 **Ledger:**
 | Aday | Gate A | Sonuç |
