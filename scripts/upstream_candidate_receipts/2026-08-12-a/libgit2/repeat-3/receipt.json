@@ -1,0 +1,83 @@
+{
+  "execution": {
+    "duration_seconds": 82.982,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "53caa2577f7bde70c0c3c44af06602f6f03b3ddf44110181be84dea195623214",
+    "project_revision": "b0057d0fabe546a76a27557b9bb519ea0686fc25",
+    "recipe_sha256": "1af4f9ea223f8cfda5c922372b7e14feee42434e9dea191da11d8fd29bbb86df",
+    "repetition": 3,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922"
+  },
+  "project": "libgit2",
+  "repetition": 3,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 168,
+      "attempted_tus": 168,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 1,
+    "findings": 42,
+    "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2",
+    "fingerprints": [
+      "csf1-03bf4c02661cb555",
+      "csf1-0908f76e6be25a0f",
+      "csf1-11a7e1d4476ea3f2",
+      "csf1-150f24da8ebaf9e6",
+      "csf1-1c8c723a4d68233e",
+      "csf1-38cd31c4313773ff",
+      "csf1-395852e688363fa5",
+      "csf1-40e8f4940b238d39",
+      "csf1-428e50ab2c0d2c4c",
+      "csf1-4351230de50ad2df",
+      "csf1-43ae20aa970e8693",
+      "csf1-4a72e398e5907148",
+      "csf1-5d1c56bc84c56982",
+      "csf1-5db14f45fff4c94d",
+      "csf1-5df317a0599c99e6",
+      "csf1-667c50ff92a1b90e",
+      "csf1-6d6cba03680a70ca",
+      "csf1-6edd65a08614a35a",
+      "csf1-76abcd0e430b1b91",
+      "csf1-7e34ca22ba5c8cb8",
+      "csf1-8d4d4174e9de2c20",
+      "csf1-90198569b10dd2bc",
+      "csf1-90198569b10dd2bc",
+      "csf1-90198569b10dd2bc",
+      "csf1-990d29830f00cbcf",
+      "csf1-990d29830f00cbcf",
+      "csf1-9e4abe3d538f6ec0",
+      "csf1-9f9b6830cb7a3b12",
+      "csf1-9f9b6830cb7a3b12",
+      "csf1-aa1111d6f7e2546d",
+      "csf1-aa1111d6f7e2546d",
+      "csf1-b6e98126e3f6a9dc",
+      "csf1-c7d64f83ee6ee702",
+      "csf1-cd70ee6a9d11cd2c",
+      "csf1-d1ea650c1fee5067",
+      "csf1-d681978fdf66722b",
+      "csf1-e3ef0a7e54e5a205",
+      "csf1-e8fa6de376c17afe",
+      "csf1-f01d5a3b87cfce79",
+      "csf1-f1e4060e68838c38",
+      "csf1-f2102cd3256c401c",
+      "csf1-f91aff446486ca53"
+    ],
+    "translation_units": {
+      "count": 168,
+      "sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922"
+    }
+  },
+  "status": "accepted"
+}

@@ -81,7 +81,7 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
         )
 
     def test_retained_receipts_match_snapshot_and_docs(self):
-        self.assertEqual(self.validate(), 6)
+        self.assertEqual(self.validate(), 7)
 
     def test_retained_receipt_bytes_are_platform_invariant(self):
         attributes = ATTRIBUTES.read_text(encoding="utf-8").splitlines()

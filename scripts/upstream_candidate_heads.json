@@ -45,17 +45,26 @@
           "findings": 41,
           "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6"
         },
-        {
-          "id": "libgit2",
+      {
+        "id": "libgit2",
           "repository": "https://github.com/libgit2/libgit2.git",
           "default_branch": "main",
-          "head": "95ff8c2baceb270469657663ded9934d5faf5627",
+        "head": "b0057d0fabe546a76a27557b9bb519ea0686fc25",
           "translation_units": 168,
           "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922",
           "coverage_batch_id": "2026-08-12-a",
           "findings": 42,
-          "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2"
-        },
+        "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-1/receipt.json", "sha256": "9655b6d69cc1cab06cb2126f1fcc17bffd1fa3b4daa8fe686dd4ca5d91a766b7"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-2/receipt.json", "sha256": "720a8e7a68586c3a1362428591ba00a892a0376e64705a6204b1a8fb767b3a62"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-3/receipt.json", "sha256": "2d1979fef3e9cea64b5cf4ca171ad3ece15e686f59e452801e63fdf8a296faa1"}
+          ]
+        }
+      },
         {
           "id": "lvgl",
           "repository": "https://github.com/lvgl/lvgl.git",
