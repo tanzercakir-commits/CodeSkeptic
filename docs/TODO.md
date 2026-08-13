@@ -1063,15 +1063,18 @@ toward the acceptance target, cannot be silently removed, and cannot be
 promoted by tool output alone. One candidate represents one defect and every
 external action is preceded by a fresh current-head and duplicate check.
 
-**Owner approval boundary (corrected 2026-08-13):** every upstream issue, PR,
-comment, fork, or maintainer contact requires target-specific owner approval.
-The default reporting path is issue-first; a direct PR requires separate
-approval even when Gates A, B, and C pass. A maintainer-confirmed or accepted
-issue may enter the public showcase, while only a merged fix may increment the
-Phase 9 accepted-fix ledger. Internal CodeSkeptic push, PR, intermediate merge,
-and release work retains continuous execution authority. The final `main`
-merge after the complete product program requires owner notice and explicit
-go-ahead.
+**Owner approval boundary (corrected 2026-08-13):** every qualified candidate
+is retained internally with its trigger path, CWE, current-HEAD proof,
+duplicate search, severity, and proposed issue text. Candidates do not prompt
+the owner one by one and cause no upstream issue, PR, comment, fork, or
+maintainer contact while the product program is active. At program completion,
+the complete candidate set is presented once; only owner-selected targets may
+proceed with target-specific approval. The default route is issue-first and a
+direct PR requires separate approval. A maintainer-confirmed or accepted issue
+may enter the public showcase, while only a merged fix may increment the Phase
+9 accepted-fix ledger. Internal CodeSkeptic push, PR, intermediate merge, and
+release work retains continuous execution authority. The final `main` merge
+requires owner notice and explicit go-ahead.
 
 **Verified baseline:** three accepted fixes across two projects are currently
 proven. shadPS4 PRs `#4702` and `#4703` are merged and their merge commits are
@@ -1203,13 +1206,15 @@ protected-main PROGRESS authority.
 ## Açık kullanıcı kararları
 
 Genel yürütme sınırı nettir: CodeSkeptic içi push, PR, ara merge ve release
-işleri yeniden onay beklemez. Her upstream adayı issue/PR/yorum/fork/maintainer
-teması öncesinde kullanıcıya sunulur ve hedefe özel açık onay bekler; doğrudan
-PR varsayılan değildir. Ürün programı tamamlandığında son `main` merge'i de
-kullanıcıya haber verilmeden ve açık devam onayı alınmadan yapılmaz. Güncel CI
-makbuzları PR açıklamasında tutulur, bu TODO geçici run durumlarını kopyalamaz.
-PR #119'un yönetici bypass'ı tamamlandı; TensorFlow PR #123994 merge edildi,
-issue #123387 kapandı ve PLAN §6 ledger'ı güncellendi.
+işleri yeniden onay beklemez. Upstream adayları program boyunca kanıt ve taslak
+issue metinleriyle içeride biriktirilir; kullanıcı tek tek kesilmez ve dış
+işlem yapılmaz. Program tamamlandığında tüm adaylar tek paket halinde sunulur;
+yalnızca kullanıcının seçtiği hedefler açık onaydan sonra issue-first akışına
+girer, doğrudan PR ayrıca onay gerektirir. Son `main` merge'i de kullanıcıya
+haber verilmeden ve açık devam onayı alınmadan yapılmaz. Güncel CI makbuzları
+PR açıklamasında tutulur, bu TODO geçici run durumlarını kopyalamaz. PR #119'un
+yönetici bypass'ı tamamlandı; TensorFlow PR #123994 merge edildi, issue #123387
+kapandı ve PLAN §6 ledger'ı güncellendi.
 
 ## Backlog (öncelik sırası)
 

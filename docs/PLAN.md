@@ -116,11 +116,14 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
   bekleme şartını kaldırdı. Her işlemden önce hedef ref/SHA, CI ve kapsam
   yine doğrulanır; bu yetki kalite kapılarını atlama veya `main`e doğrudan
   çalışma izni değildir ve hiçbir upstream işlemi kapsamaz.
-- **Upstream ve son teslim onayı (2026-08-13):** upstream issue, PR, yorum,
-  fork veya maintainer teması öncesinde aday kullanıcıya sunulur ve hedefe
-  özel açık onay beklenir. Varsayılan sunum issue-first'tür; doğrudan PR ayrı
-  onay gerektirir. Ürün programı tamamen bittiğinde son `main` merge'i
-  öncesinde kullanıcı bilgilendirilir ve açık devam onayı beklenir.
+- **Upstream ve son teslim onayı (2026-08-13):** ürün programı sürerken her
+  aday; tetikleme yolu, CWE, güncel HEAD, duplikat taraması, önem ve taslak
+  issue metniyle içeride dosyalanır. Tek tek kullanıcıya sorulmaz ve hiçbir
+  upstream issue, PR, yorum, fork veya maintainer teması yapılmaz. Program
+  tamamen bittiğinde aday dosyalarının tamamı tek paket halinde kullanıcıya
+  sunulur; yalnızca kullanıcının seçtiği hedefler için açık onaydan sonra
+  issue-first akışı başlar, doğrudan PR ayrıca onay gerektirir. Son `main`
+  merge'i öncesinde de kullanıcı bilgilendirilir ve açık devam onayı beklenir.
 - Yanıtlar **Türkçe**, teknik jargon parantez içinde, plan/şema/tree ile.
 - Her zaman dürüst; max efor gerekiyorsa önceden söyle; model düştüğünü
   içeriden teyit EDEMEM — kullanıcının ekranı asıl sinyaldir.
@@ -160,8 +163,10 @@ dataflow ile bulundu") · 1 issue = 1 kusur · mütevazı fix önerisi.
 Varsayılan ilk dış sunum issue'dur; doğrudan upstream PR ancak ayrı kullanıcı
 onayıyla açılır. Maintainer'ın kusuru kabul veya teyit ettiği issue vitrin
 adayıdır. Phase 9 kabul-fix ledger'ı ise aşağıdaki mevcut ölçütü korur ve
-yalnızca upstream'e merge edilmiş düzeltmeleri sayar. Gate A/B/C'yi geçen bir
-aday dahi kullanıcıdan hedefe özel upstream onayı alınmadan dışarı gönderilmez.
+yalnızca upstream'e merge edilmiş düzeltmeleri sayar. Gate A/B/C'yi geçen
+adaylar program boyunca içeride biriktirilir; kullanıcı tek tek kesilmez.
+Program sonundaki toplu incelemede hedefe özel onay alınmayan hiçbir aday
+dışarı gönderilmez.
 
 **Ledger:**
 | Aday | Gate A | Sonuç |

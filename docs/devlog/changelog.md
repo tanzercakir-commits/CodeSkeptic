@@ -1,5 +1,18 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-13 — Upstream candidates moved to end-of-program batch review
+
+- Replaced per-candidate owner prompts with uninterrupted internal collection.
+  Every candidate dossier retains the trigger path, CWE, current-head proof,
+  duplicate search, severity, and proposed issue text.
+- Prohibited upstream issues, PRs, comments, forks, and maintainer contact
+  during the active product program. The complete candidate set is presented
+  once at program completion; only owner-selected targets may proceed after
+  target-specific approval.
+- Preserved issue-first reporting, separate approval for direct PRs, showcase
+  eligibility after maintainer confirmation or acceptance, and explicit owner
+  approval before the complete program's final `main` merge.
+
 ## 2026-08-13 — Owner-controlled upstream reporting restored
 
 - Corrected the over-broad execution-authority wording: continuous authority
