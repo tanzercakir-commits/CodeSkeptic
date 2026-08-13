@@ -1,0 +1,297 @@
+ive ..........................................   Passed    0.02 sec
+          Start 1055: ExceptionalTransferSummaryTest.ConsumedSummaryAcrossTUReportsUseAfterFree
+1055/1200 Test #1055: ExceptionalTransferSummaryTest.ConsumedSummaryAcrossTUReportsUseAfterFree .............   Passed    0.02 sec
+          Start 1056: ExceptionalTransferSummaryTest.TransferredSummaryAcrossTUCannotInventRelease
+1056/1200 Test #1056: ExceptionalTransferSummaryTest.TransferredSummaryAcrossTUCannotInventRelease ..........   Passed    0.02 sec
+          Start 1057: ReturnFlowTest.InitNullThenSet_NeverNull_Silent
+1057/1200 Test #1057: ReturnFlowTest.InitNullThenSet_NeverNull_Silent .......................................   Passed    0.02 sec
+          Start 1058: ReturnFlowTest.MaybeNullVarFlow_Warning
+1058/1200 Test #1058: ReturnFlowTest.MaybeNullVarFlow_Warning ...............................................   Passed    0.02 sec
+          Start 1059: ReturnFlowTest.GuardedFallthrough_NeverNull_Silent
+1059/1200 Test #1059: ReturnFlowTest.GuardedFallthrough_NeverNull_Silent ....................................   Passed    0.02 sec
+          Start 1060: ReturnFlowTest.DefiniteNullVar_Warning
+1060/1200 Test #1060: ReturnFlowTest.DefiniteNullVar_Warning ................................................   Passed    0.02 sec
+          Start 1061: ReturnFlowTest.ParamPassthrough_StaysUnknown_Silent
+1061/1200 Test #1061: ReturnFlowTest.ParamPassthrough_StaysUnknown_Silent ...................................   Passed    0.02 sec
+          Start 1062: ReturnFlowTest.ChainThroughVariable_Warning
+1062/1200 Test #1062: ReturnFlowTest.ChainThroughVariable_Warning ...........................................   Passed    0.02 sec
+          Start 1063: ReturnFlowTest.JulietBadSourceShape_ParamReassignedNull_Warning
+1063/1200 Test #1063: ReturnFlowTest.JulietBadSourceShape_ParamReassignedNull_Warning .......................   Passed    0.02 sec
+          Start 1064: ReturnFlowTest.CrossTU_VarFlowMaybeNull_Warning
+1064/1200 Test #1064: ReturnFlowTest.CrossTU_VarFlowMaybeNull_Warning .......................................   Passed    0.02 sec
+          Start 1065: SummaryPersistTest.FileFormat_RoundTripDeterministic
+1065/1200 Test #1065: SummaryPersistTest.FileFormat_RoundTripDeterministic ..................................   Passed    0.02 sec
+          Start 1066: SummaryPersistTest.OldV1File_AcceptedZeronessUnknown
+1066/1200 Test #1066: SummaryPersistTest.OldV1File_AcceptedZeronessUnknown ..................................   Passed    0.02 sec
+          Start 1067: SummaryPersistTest.ConflictingLoad_MergesConservative
+1067/1200 Test #1067: SummaryPersistTest.ConflictingLoad_MergesConservative .................................   Passed    0.02 sec
+          Start 1068: SummaryPersistTest.CorruptFile_RejectedWhole
+1068/1200 Test #1068: SummaryPersistTest.CorruptFile_RejectedWhole ..........................................   Passed    0.02 sec
+          Start 1069: SummaryPersistTest.MissingFile_ReturnsFalse
+1069/1200 Test #1069: SummaryPersistTest.MissingFile_ReturnsFalse ...........................................   Passed    0.02 sec
+          Start 1070: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding
+1070/1200 Test #1070: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding ...........................   Passed    0.03 sec
+          Start 1071: SummaryPersistTest.StaleSummary_WarnsButStillWorks
+1071/1200 Test #1071: SummaryPersistTest.StaleSummary_WarnsButStillWorks ....................................   Passed    0.03 sec
+          Start 1072: SummaryPersistTest.V4File_ZeroFromParamParses
+1072/1200 Test #1072: SummaryPersistTest.V4File_ZeroFromParamParses .........................................   Passed    0.02 sec
+          Start 1073: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected
+1073/1200 Test #1073: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected ..........................   Passed    0.02 sec
+          Start 1074: SummaryPersistTest.TextParserRejectsWholesaleWithoutChangingOutput
+1074/1200 Test #1074: SummaryPersistTest.TextParserRejectsWholesaleWithoutChangingOutput ....................   Passed    0.02 sec
+          Start 1075: SummaryPersistTest.TextParserAcceptsCrLfButRejectsBareCarriageReturn
+1075/1200 Test #1075: SummaryPersistTest.TextParserAcceptsCrLfButRejectsBareCarriageReturn ..................   Passed    0.02 sec
+          Start 1076: SummaryPersistTest.RejectsNonCanonicalArityAndOutOfRangeIndexes
+1076/1200 Test #1076: SummaryPersistTest.RejectsNonCanonicalArityAndOutOfRangeIndexes .......................   Passed    0.02 sec
+          Start 1077: SummaryPersistTest.NonRegularSummaryInputFailsClosed
+1077/1200 Test #1077: SummaryPersistTest.NonRegularSummaryInputFailsClosed ..................................   Passed    0.02 sec
+          Start 1078: SummaryPersistTest.V3File_NullCondStillParses
+1078/1200 Test #1078: SummaryPersistTest.V3File_NullCondStillParses .........................................   Passed    0.02 sec
+          Start 1079: SummaryPersistTest.V5File_NullFromParamParses
+1079/1200 Test #1079: SummaryPersistTest.V5File_NullFromParamParses .........................................   Passed    0.02 sec
+          Start 1080: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected
+1080/1200 Test #1080: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected ..........................   Passed    0.02 sec
+          Start 1081: SummaryPersistTest.V6File_AlwaysZeroParsesAndUpgradesToV11
+1081/1200 Test #1081: SummaryPersistTest.V6File_AlwaysZeroParsesAndUpgradesToV11 ............................   Passed    0.02 sec
+          Start 1082: SummaryPersistTest.V5File_AlwaysZeroEncodingRejected
+1082/1200 Test #1082: SummaryPersistTest.V5File_AlwaysZeroEncodingRejected ..................................   Passed    0.02 sec
+          Start 1083: SummaryPersistTest.V4File_ZeroFromParamStillParses
+1083/1200 Test #1083: SummaryPersistTest.V4File_ZeroFromParamStillParses ....................................   Passed    0.02 sec
+          Start 1084: InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning
+1084/1200 Test #1084: InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning ...............................   Passed    0.02 sec
+          Start 1085: InterprocZeroTest.UnnamedEnumReturnIsConservative
+1085/1200 Test #1085: InterprocZeroTest.UnnamedEnumReturnIsConservative .....................................   Passed    0.02 sec
+          Start 1086: InterprocZeroTest.JulietShape_VarFlowSource_Warning
+1086/1200 Test #1086: InterprocZeroTest.JulietShape_VarFlowSource_Warning ...................................   Passed    0.02 sec
+          Start 1087: InterprocZeroTest.GuardedUse_Silent
+1087/1200 Test #1087: InterprocZeroTest.GuardedUse_Silent ...................................................   Passed    0.02 sec
+          Start 1088: InterprocZeroTest.FlowKilledZero_NeverZero_Silent
+1088/1200 Test #1088: InterprocZeroTest.FlowKilledZero_NeverZero_Silent .....................................   Passed    0.02 sec
+          Start 1089: InterprocZeroTest.DirectCallDivisor_DocumentedSilent
+1089/1200 Test #1089: InterprocZeroTest.DirectCallDivisor_DocumentedSilent ..................................   Passed    0.02 sec
+          Start 1090: InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero
+1090/1200 Test #1090: InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero ...............................   Passed    0.02 sec
+          Start 1091: InterprocZeroTest.CrossTU_ZeronessTravels
+1091/1200 Test #1091: InterprocZeroTest.CrossTU_ZeronessTravels .............................................   Passed    0.02 sec
+          Start 1092: ConditionedNullTest.SwitchDefault_MaskedArg_Clean
+1092/1200 Test #1092: ConditionedNullTest.SwitchDefault_MaskedArg_Clean .....................................   Passed    0.02 sec
+          Start 1093: ConditionedNullTest.SwitchDefault_InlineArg_Clean
+1093/1200 Test #1093: ConditionedNullTest.SwitchDefault_InlineArg_Clean .....................................   Passed    0.02 sec
+          Start 1094: ConditionedNullTest.SwitchDefault_UnprovableArg_WarningStays
+1094/1200 Test #1094: ConditionedNullTest.SwitchDefault_UnprovableArg_WarningStays ..........................   Passed    0.02 sec
+          Start 1095: ConditionedNullTest.SwitchDefault_OutOfRangeArg_WarningStays
+1095/1200 Test #1095: ConditionedNullTest.SwitchDefault_OutOfRangeArg_WarningStays ..........................   Passed    0.02 sec
+          Start 1096: ConditionedNullTest.NonContiguousCases_WarningStays
+1096/1200 Test #1096: ConditionedNullTest.NonContiguousCases_WarningStays ...................................   Passed    0.02 sec
+          Start 1097: ConditionedNullTest.CaseFallsThroughToDefault_WarningStays
+1097/1200 Test #1097: ConditionedNullTest.CaseFallsThroughToDefault_WarningStays ............................   Passed    0.02 sec
+          Start 1098: ConditionedNullTest.IfGuard_ProvableArg_Clean
+1098/1200 Test #1098: ConditionedNullTest.IfGuard_ProvableArg_Clean .........................................   Passed    0.02 sec
+          Start 1099: ConditionedNullTest.MutatedParam_WarningStays
+1099/1200 Test #1099: ConditionedNullTest.MutatedParam_WarningStays .........................................   Passed    0.02 sec
+          Start 1100: ConditionedNullTest.ArgReassignedLocal_WarningStays
+1100/1200 Test #1100: ConditionedNullTest.ArgReassignedLocal_WarningStays ...................................   Passed    0.02 sec
+          Start 1101: ConditionedNullTest.CrossTU_ConditionTravels
+1101/1200 Test #1101: ConditionedNullTest.CrossTU_ConditionTravels ..........................................   Passed    0.02 sec
+          Start 1102: ConditionedNullTest.V3FileRoundtrip
+1102/1200 Test #1102: ConditionedNullTest.V3FileRoundtrip ...................................................   Passed    0.02 sec
+          Start 1103: ReturnAliasSummaryTest.HarvestsExactRelationsAndRejectsMixedSources
+1103/1200 Test #1103: ReturnAliasSummaryTest.HarvestsExactRelationsAndRejectsMixedSources ...................   Passed    0.02 sec
+          Start 1104: ReturnAliasSummaryTest.V7FileUpgradesToV11Exactly
+1104/1200 Test #1104: ReturnAliasSummaryTest.V7FileUpgradesToV11Exactly .....................................   Passed    0.02 sec
+          Start 1105: ReturnAliasSummaryTest.V6FileWithV7ColumnIsRejected
+1105/1200 Test #1105: ReturnAliasSummaryTest.V6FileWithV7ColumnIsRejected ...................................   Passed    0.02 sec
+          Start 1106: ParamContractSummaryTest.CrossTUNonNullPreconditionViolationReports
+1106/1200 Test #1106: ParamContractSummaryTest.CrossTUNonNullPreconditionViolationReports ...................   Passed    0.02 sec
+          Start 1107: ParamContractSummaryTest.HarvestsPreAndPostconditionsExactly
+1107/1200 Test #1107: ParamContractSummaryTest.HarvestsPreAndPostconditionsExactly ..........................   Passed    0.02 sec
+          Start 1108: ParamContractSummaryTest.V9FileRoundTripsAndValidatesVectors
+1108/1200 Test #1108: ParamContractSummaryTest.V9FileRoundTripsAndValidatesVectors ..........................   Passed    0.02 sec
+          Start 1109: ParamContractSummaryTest.V8FileUpgradesToV11Conservatively
+1109/1200 Test #1109: ParamContractSummaryTest.V8FileUpgradesToV11Conservatively ............................   Passed    0.02 sec
+          Start 1110: ParamContractSummaryTest.V8HeaderRejectsV9Columns
+1110/1200 Test #1110: ParamContractSummaryTest.V8HeaderRejectsV9Columns .....................................   Passed    0.02 sec
+          Start 1111: ParamContractSummaryTest.CrossTUDefiniteNonNullOutPostconditionCleans
+1111/1200 Test #1111: ParamContractSummaryTest.CrossTUDefiniteNonNullOutPostconditionCleans .................   Passed    0.03 sec
+          Start 1112: ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans
+1112/1200 Test #1112: ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans .......................   Passed    0.02 sec
+          Start 1113: ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans
+1113/1200 Test #1113: ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans .........................   Passed    0.02 sec
+          Start 1114: ParamContractSummaryTest.CrossTUOperatorOutPostconditionCleans
+1114/1200 Test #1114: ParamContractSummaryTest.CrossTUOperatorOutPostconditionCleans ........................   Passed    0.02 sec
+          Start 1115: ParamContractSummaryTest.OperatorCallForwardsOutPostcondition
+1115/1200 Test #1115: ParamContractSummaryTest.OperatorCallForwardsOutPostcondition .........................   Passed    0.02 sec
+          Start 1116: ParamContractSummaryTest.CrossTURejectedPreconditionWarns
+1116/1200 Test #1116: ParamContractSummaryTest.CrossTURejectedPreconditionWarns .............................   Passed    0.02 sec
+          Start 1117: ParamContractSummaryTest.CrossTUDefiniteNullOutPostconditionReports
+1117/1200 Test #1117: ParamContractSummaryTest.CrossTUDefiniteNullOutPostconditionReports ...................   Passed    0.02 sec
+          Start 1118: ParamContractSummaryTest.CrossTUReferenceNullPostconditionReports
+1118/1200 Test #1118: ParamContractSummaryTest.CrossTUReferenceNullPostconditionReports .....................   Passed    0.02 sec
+          Start 1119: ParamContractSummaryTest.PartialOutWriteStaysUnknown
+1119/1200 Test #1119: ParamContractSummaryTest.PartialOutWriteStaysUnknown ..................................   Passed    0.02 sec
+          Start 1120: ParamContractSummaryTest.LocalPointerToPointerRebindDoesNotEscape
+1120/1200 Test #1120: ParamContractSummaryTest.LocalPointerToPointerRebindDoesNotEscape .....................   Passed    0.02 sec
+          Start 1121: OwnershipSummaryTest.HarvestsAccessOwnershipAndOwnedReturns
+1121/1200 Test #1121: OwnershipSummaryTest.HarvestsAccessOwnershipAndOwnedReturns ...........................   Passed    0.03 sec
+          Start 1122: OwnershipSummaryTest.CrossTUOwnedReturnWrapperLeakVisible
+1122/1200 Test #1122: OwnershipSummaryTest.CrossTUOwnedReturnWrapperLeakVisible .............................   Passed    0.02 sec
+          Start 1123: OwnershipSummaryTest.CrossTUDiscardedOwnedResultIsLeak
+1123/1200 Test #1123: OwnershipSummaryTest.CrossTUDiscardedOwnedResultIsLeak ................................   Passed    0.02 sec
+          Start 1124: OwnershipSummaryTest.CrossTUDiscardedBorrowedResultIsClean
+1124/1200 Test #1124: OwnershipSummaryTest.CrossTUDiscardedBorrowedResultIsClean ............................   Passed    0.02 sec
+          Start 1125: OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak
+1125/1200 Test #1125: OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak .............................   Passed    0.02 sec
+          Start 1126: OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument
+1126/1200 Test #1126: OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument ...............................   Passed    0.02 sec
+          Start 1127: OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn
+1127/1200 Test #1127: OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn .....................................   Passed    0.02 sec
+          Start 1128: ReturnOwnershipSummaryTest.CrossTUPlacementReturnIsNotOwned
+1128/1200 Test #1128: ReturnOwnershipSummaryTest.CrossTUPlacementReturnIsNotOwned ...........................   Passed    0.02 sec
+          Start 1129: ReturnOwnershipSummaryTest.CrossTUOwnedReturnMakesCallerResponsible
+1129/1200 Test #1129: ReturnOwnershipSummaryTest.CrossTUOwnedReturnMakesCallerResponsible ...................   Passed    0.02 sec
+          Start 1130: FieldSensitivitySummaryTest.CrossTUDifferentFieldPreservesCorrelation
+1130/1200 Test #1130: FieldSensitivitySummaryTest.CrossTUDifferentFieldPreservesCorrelation .................   Passed    0.02 sec
+          Start 1131: FieldSensitivitySummaryTest.CrossTUGuardFieldStillInvalidates
+1131/1200 Test #1131: FieldSensitivitySummaryTest.CrossTUGuardFieldStillInvalidates .........................   Passed    0.02 sec
+          Start 1132: FieldSensitivitySummaryTest.CrossTURecordReferencePreservesSibling
+1132/1200 Test #1132: FieldSensitivitySummaryTest.CrossTURecordReferencePreservesSibling ....................   Passed    0.02 sec
+          Start 1133: FieldSensitivitySummaryTest.CrossTURecordReferenceGuardInvalidates
+1133/1200 Test #1133: FieldSensitivitySummaryTest.CrossTURecordReferenceGuardInvalidates ....................   Passed    0.02 sec
+          Start 1134: FieldSensitivitySummaryTest.HarvestsComposesAndPersistsExactWrites
+1134/1200 Test #1134: FieldSensitivitySummaryTest.HarvestsComposesAndPersistsExactWrites ....................   Passed    0.02 sec
+          Start 1135: FieldSensitivitySummaryTest.V10StrictParsingAndConservativeMerge
+1135/1200 Test #1135: FieldSensitivitySummaryTest.V10StrictParsingAndConservativeMerge ......................   Passed    0.02 sec
+          Start 1136: CallGraphSccTest.DeepAcyclicChainExceedsLegacySweepCap
+1136/1200 Test #1136: CallGraphSccTest.DeepAcyclicChainExceedsLegacySweepCap ................................   Passed    0.02 sec
+          Start 1137: CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder
+1137/1200 Test #1137: CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder ..............................   Passed    0.02 sec
+          Start 1138: CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible
+1138/1200 Test #1138: CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible ................................   Passed    0.02 sec
+          Start 1139: CallGraphSccTest.DeepAccessChainReachesFixedPoint
+1139/1200 Test #1139: CallGraphSccTest.DeepAccessChainReachesFixedPoint .....................................   Passed    0.02 sec
+          Start 1140: CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent
+1140/1200 Test #1140: CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent .......................   Passed    0.02 sec
+          Start 1141: FunctionPointerSummaryTest.ResolvesBoundedLocalTargetsAndRejectsAddressEscape
+1141/1200 Test #1141: FunctionPointerSummaryTest.ResolvesBoundedLocalTargetsAndRejectsAddressEscape .........   Passed    0.03 sec
+          Start 1142: FunctionPointerSummaryTest.IndirectMaybeNullReturnWarns
+1142/1200 Test #1142: FunctionPointerSummaryTest.IndirectMaybeNullReturnWarns ...............................   Passed    0.02 sec
+          Start 1143: FunctionPointerSummaryTest.IndirectOwnedReturnRemainsALeak
+1143/1200 Test #1143: FunctionPointerSummaryTest.IndirectOwnedReturnRemainsALeak ............................   Passed    0.02 sec
+          Start 1144: FunctionPointerSummaryTest.IndirectZeroReturnWarns
+1144/1200 Test #1144: FunctionPointerSummaryTest.IndirectZeroReturnWarns ....................................   Passed    0.02 sec
+          Start 1145: FunctionPointerSummaryTest.IndirectSiblingWritePreservesCorrelation
+1145/1200 Test #1145: FunctionPointerSummaryTest.IndirectSiblingWritePreservesCorrelation ...................   Passed    0.02 sec
+          Start 1146: FunctionPointerSummaryTest.IndirectNullPostconditionReports
+1146/1200 Test #1146: FunctionPointerSummaryTest.IndirectNullPostconditionReports ...........................   Passed    0.02 sec
+          Start 1147: FunctionPointerSummaryTest.IndirectPreconditionViolationReports
+1147/1200 Test #1147: FunctionPointerSummaryTest.IndirectPreconditionViolationReports .......................   Passed    0.02 sec
+          Start 1148: FunctionPointerSummaryTest.IndirectBorrowKeepsCallerOwnership
+1148/1200 Test #1148: FunctionPointerSummaryTest.IndirectBorrowKeepsCallerOwnership .........................   Passed    0.02 sec
+          Start 1149: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull
+1149/1200 Test #1149: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull ..............................   Passed    0.02 sec
+          Start 1150: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero
+1150/1200 Test #1150: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero ..............................   Passed    0.02 sec
+          Start 1151: FunctionPointerSummaryTest.IndirectZeroPassthroughPreservesArgument
+1151/1200 Test #1151: FunctionPointerSummaryTest.IndirectZeroPassthroughPreservesArgument ...................   Passed    0.02 sec
+          Start 1152: FunctionPointerSummaryTest.IndirectNullPassthroughPreservesArgument
+1152/1200 Test #1152: FunctionPointerSummaryTest.IndirectNullPassthroughPreservesArgument ...................   Passed    0.02 sec
+          Start 1153: FunctionPointerSummaryTest.IndirectConstantReturnPrunesDeadBranch
+1153/1200 Test #1153: FunctionPointerSummaryTest.IndirectConstantReturnPrunesDeadBranch .....................   Passed    0.02 sec
+          Start 1154: FunctionPointerSummaryTest.CrossTUTargetUsesPersistedSummary
+1154/1200 Test #1154: FunctionPointerSummaryTest.CrossTUTargetUsesPersistedSummary ..........................   Passed    0.02 sec
+          Start 1155: FunctionPointerSummaryTest.CTargetSetComposesFieldWrites
+1155/1200 Test #1155: FunctionPointerSummaryTest.CTargetSetComposesFieldWrites ..............................   Passed    0.02 sec
+          Start 1156: LibraryModelFileTest.LoadsStrictV10ForDirectAndControlledIndirectCalls
+1156/1200 Test #1156: LibraryModelFileTest.LoadsStrictV10ForDirectAndControlledIndirectCalls ................   Passed    0.02 sec
+          Start 1157: LibraryModelFileTest.MalformedModelFailsClosed
+1157/1200 Test #1157: LibraryModelFileTest.MalformedModelFailsClosed ........................................   Passed    0.02 sec
+          Start 1158: LibraryModelFileTest.MissingModelFailsClosed
+1158/1200 Test #1158: LibraryModelFileTest.MissingModelFailsClosed ..........................................   Passed    0.02 sec
+          Start 1159: LibraryModelFileTest.MultipleFilesMergeConflictsConservatively
+1159/1200 Test #1159: LibraryModelFileTest.MultipleFilesMergeConflictsConservatively ........................   Passed    0.02 sec
+          Start 1160: LibraryModelFileTest.ModelAndHarvestedSummaryMergeConservatively
+1160/1200 Test #1160: LibraryModelFileTest.ModelAndHarvestedSummaryMergeConservatively ......................   Passed    0.02 sec
+          Start 1161: AllocatorSizeSummaryTest.PersistsV11AllocatorSizeParameter
+1161/1200 Test #1161: AllocatorSizeSummaryTest.PersistsV11AllocatorSizeParameter ............................   Passed    0.02 sec
+          Start 1162: AllocatorSizeSummaryTest.V10UpgradesAllocatorSizeToUnknown
+1162/1200 Test #1162: AllocatorSizeSummaryTest.V10UpgradesAllocatorSizeToUnknown ............................   Passed    0.02 sec
+          Start 1163: AllocatorSizeSummaryTest.SummaryInReportsCallerOnlyWrapperUse
+1163/1200 Test #1163: AllocatorSizeSummaryTest.SummaryInReportsCallerOnlyWrapperUse .........................   Passed    0.02 sec
+          Start 1164: AllocatorSizeSummaryTest.V11RejectsMalformedAllocatorSizeVector
+1164/1200 Test #1164: AllocatorSizeSummaryTest.V11RejectsMalformedAllocatorSizeVector .......................   Passed    0.02 sec
+          Start 1165: MacSdkPathTest.EnvSdkrootWinsVerbatim
+1165/1200 Test #1165: MacSdkPathTest.EnvSdkrootWinsVerbatim .................................................   Passed    0.02 sec
+          Start 1166: MacSdkPathTest.EnvHonoredEvenWhenMissing
+1166/1200 Test #1166: MacSdkPathTest.EnvHonoredEvenWhenMissing ..............................................   Passed    0.02 sec
+          Start 1167: MacSdkPathTest.XcrunUsedWhenItExists
+1167/1200 Test #1167: MacSdkPathTest.XcrunUsedWhenItExists ..................................................   Passed    0.02 sec
+          Start 1168: MacSdkPathTest.MissingXcrunFallsThroughToBaked
+1168/1200 Test #1168: MacSdkPathTest.MissingXcrunFallsThroughToBaked ........................................   Passed    0.02 sec
+          Start 1169: MacSdkPathTest.BakedOnlyIfItExists
+1169/1200 Test #1169: MacSdkPathTest.BakedOnlyIfItExists ....................................................   Passed    0.02 sec
+          Start 1170: MacSdkPathTest.AllMissingYieldsEmpty
+1170/1200 Test #1170: MacSdkPathTest.AllMissingYieldsEmpty ..................................................   Passed    0.02 sec
+          Start 1171: ExitPolicyTest.CleanRunIsZero
+1171/1200 Test #1171: ExitPolicyTest.CleanRunIsZero .........................................................   Passed    0.02 sec
+          Start 1172: ExitPolicyTest.FindingsAreOne
+1172/1200 Test #1172: ExitPolicyTest.FindingsAreOne .........................................................   Passed    0.02 sec
+          Start 1173: ExitPolicyTest.AllBrokenIsTwo
+1173/1200 Test #1173: ExitPolicyTest.AllBrokenIsTwo .........................................................   Passed    0.02 sec
+          Start 1174: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict
+1174/1200 Test #1174: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict .................................   Passed    0.02 sec
+          Start 1175: ExitPolicyTest.ForcedAnalysisKeepsOldBehavior
+1175/1200 Test #1175: ExitPolicyTest.ForcedAnalysisKeepsOldBehavior .........................................   Passed    0.02 sec
+          Start 1176: ExitPolicyTest.NoInputsIsTwo
+1176/1200 Test #1176: ExitPolicyTest.NoInputsIsTwo ..........................................................   Passed    0.02 sec
+          Start 1177: ResourceDirTest.OverrideWinsWhenItExists
+1177/1200 Test #1177: ResourceDirTest.OverrideWinsWhenItExists ..............................................   Passed    0.02 sec
+          Start 1178: ResourceDirTest.MissingOverrideFallsThrough
+1178/1200 Test #1178: ResourceDirTest.MissingOverrideFallsThrough ...........................................   Passed    0.02 sec
+          Start 1179: ResourceDirTest.ExeRelativeLayoutIsFound
+1179/1200 Test #1179: ResourceDirTest.ExeRelativeLayoutIsFound ..............................................   Passed    0.02 sec
+          Start 1180: ResourceDirTest.HighestVersionWins
+1180/1200 Test #1180: ResourceDirTest.HighestVersionWins ....................................................   Passed    0.02 sec
+          Start 1181: ResourceDirTest.VersionDirWithoutHeadersIsSkipped
+1181/1200 Test #1181: ResourceDirTest.VersionDirWithoutHeadersIsSkipped .....................................   Passed    0.02 sec
+          Start 1182: ResourceDirTest.ExeRelativeBeatsBaked
+1182/1200 Test #1182: ResourceDirTest.ExeRelativeBeatsBaked .................................................   Passed    0.02 sec
+          Start 1183: ResourceDirTest.BakedIsLastResortOnlyIfItExists
+1183/1200 Test #1183: ResourceDirTest.BakedIsLastResortOnlyIfItExists .......................................   Passed    0.02 sec
+          Start 1184: ResourceDirTest.AllMissingYieldsEmpty
+1184/1200 Test #1184: ResourceDirTest.AllMissingYieldsEmpty .................................................   Passed    0.02 sec
+          Start 1185: ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders
+1185/1200 Test #1185: ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders ..........................   Passed    0.02 sec
+          Start 1186: StatusAutomationContract
+1186/1200 Test #1186: StatusAutomationContract ..............................................................   Passed    3.68 sec
+          Start 1187: RealworldCampaignContract
+1187/1200 Test #1187: RealworldCampaignContract .............................................................   Passed    0.09 sec
+          Start 1188: Phase83QualificationContract
+1188/1200 Test #1188: Phase83QualificationContract ..........................................................   Passed    0.07 sec
+          Start 1189: UpstreamValidationContract
+1189/1200 Test #1189: UpstreamValidationContract ............................................................   Passed    0.20 sec
+          Start 1190: UpstreamCandidateManifestContract
+1190/1200 Test #1190: UpstreamCandidateManifestContract .....................................................   Passed    0.21 sec
+          Start 1191: UpstreamCandidateEvidenceContract
+1191/1200 Test #1191: UpstreamCandidateEvidenceContract .....................................................   Passed    0.92 sec
+          Start 1192: FuzzingContract
+1192/1200 Test #1192: FuzzingContract .......................................................................   Passed    0.13 sec
+          Start 1193: SanitizerContract
+1193/1200 Test #1193: SanitizerContract .....................................................................   Passed    0.58 sec
+          Start 1194: ActionArgsParser
+1194/1200 Test #1194: ActionArgsParser ......................................................................   Passed    0.12 sec
+          Start 1195: ReleaseWorkflowContract
+1195/1200 Test #1195: ReleaseWorkflowContract ...............................................................   Passed    0.05 sec
+          Start 1196: DockerWorkflowContract
+1196/1200 Test #1196: DockerWorkflowContract ................................................................   Passed    0.05 sec
+          Start 1197: CapabilitiesCliContract
+1197/1200 Test #1197: CapabilitiesCliContract ...............................................................   Passed    0.08 sec
+          Start 1198: MeasurementLabContract
+1198/1200 Test #1198: MeasurementLabContract ................................................................   Passed    0.06 sec
+          Start 1199: MeasurementWorkflowContract
+1199/1200 Test #1199: MeasurementWorkflowContract ...........................................................   Passed    0.05 sec
+          Start 1200: ReviewDiffFlow
+1200/1200 Test #1200: ReviewDiffFlow ........................................................................   Passed    1.78 sec
+
+100% tests passed, 0 tests failed out of 1200
+
+Total Test time (real) =  34.35 sec
