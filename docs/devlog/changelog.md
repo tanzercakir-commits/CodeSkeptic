@@ -1,5 +1,44 @@
 # CodeSkeptic — Changelog
 
+- 2026-08-12: Güncel başlık adaylarında varsayılan tariflerin boş hedef bilgisini destekleyen kapsam kapısı eklendi.
+- 2026-08-12: Başlık kaydı yalnız ait olduğu kabul grubunda birim ve bulgu özetlerini yeniliyor.
+- 2026-08-12: İkinci proje güncel başlığı üç kararlı tekrarda 201/201 birim, 0 eksik ve 41 bulgu ile doğrulandı.
+
+## 2026-08-13 — Phase 9 distinct candidate coverage
+
+- Preserved separate attempted and analyzed translation-unit counts across retained snapshots, manifests, receipts, and canonical document summaries; recipes that expand whole-program analysis are no longer forced into a false equal-count model.
+- Added exact numeric-boundary checks so the canonical TODO and changelog summaries reject prefixed, suffixed, or otherwise drifted coverage counts.
+- Phase 9 current-head qualification: shadPS4 qualified with 3/3 accepted repetitions at 385/385 translation units, with 0 broken units, 0 incomplete functions, and 65 stable findings. The retained manifest, three raw receipts, checksums, analyzer identity, source identity, and semantic summary are now enforced together. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+- Phase 9 current-head qualification: libarchive qualified with 3/3 accepted repetitions at 132/132 translation units, with 0 broken units, 0 incomplete functions, and 36 stable findings. The retained manifest and three fresh raw receipts are bound to the live default-branch head and the current LLVM19 analyzer. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+
+## 2026-08-12 — Phase 9 first current-head execution
+
+- Fixed two shared-runner defects exposed by a project recipe without Ninja target closure: the optional command output is initialized as text, and target filtering runs only when target evidence exists.
+- Added structural regression coverage for both the default and target-restricted paths; existing release-candidate behavior remains pinned.
+- Ran current rtp2httpd head `e49df993ca2629bb116a29a87ce2afff24d97ef7` locally with an isolated Fedora LLVM 19 runtime: accepted `38/38`, broken 0, incomplete 0, findings 24.
+- Compared against the accepted Phase 8 receipt: all 19 unique fingerprints are unchanged, with zero additions and zero removals. The result remains discovery evidence until individual candidates pass Gates A, B, and C.
+
+## 2026-08-12 — Phase 9 frozen current-head candidate batch
+
+- Counted 260 findings across seven projects from accepted, checksummed Phase 8 receipts and froze the first low-drift current-head batch for rtp2httpd, llama.cpp, and libgit2.
+- Added a deterministic materializer that reuses qualified recipes while replacing only immutable project revisions; repository drift, unknown or duplicate projects, malformed dates, and malformed commit identities fail closed.
+- Preserved the three-repeat campaign invariant and produced a planner-accepted nine-shard matrix. The batch is discovery-only and cannot bypass Gates A, B, or C.
+- Passed 4 candidate-manifest tests, 10 ledger tests, Python syntax, JSON/YAML parsing, and diff checks.
+
+## 2026-08-12 — Phase 9 append-only validation ledger
+
+- Added a schema-checked Phase 9 ledger with the three reverified accepted records and the fixed `10` fixes / `5` projects target.
+- Added a fail-closed validator for all accepted Gate A/B/C evidence, merged identities, current default-branch ancestry records, unique IDs, and durable non-accepted classifications.
+- Added an optional previous-ledger comparison that permits only an unchanged prefix plus appended records; mutation, deletion, and reordering are rejected. A dedicated PR job compares the proposed ledger with the target tree.
+- Passed 10 focused tests, Python syntax, JSON parsing, document automation, and diff checks. Gate C supports general report/fix references without assuming one hosting platform, and recorded dates have checked ISO forms. The measured completion gate correctly remains incomplete at `3/10` and `2/5`.
+
+## 2026-08-12 — Phase 9 upstream validation boundary
+
+- Locked Phase 9 to PLAN section 6 Gates A, B, and C on current default-branch heads, with a hard completion target of ten accepted fixes across five independent projects.
+- Reverified three existing accepted fixes across two projects: shadPS4 PRs `#4702` and `#4703` remain in current `main`, and TensorFlow PR `#123994` remains in current `master`.
+- Established the measured RED baseline at `3/10` fixes and `2/5` projects; rejected, duplicate, stale, non-triggerable, and false-positive candidates remain durable non-counting evidence.
+- Restricted the first implementation slice to a schema-checked append-only ledger and fail-closed validator before any new candidate is reported.
+
 ## 2026-08-12 — Phase 8.4 release-candidate factory qualified
 
 - Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
@@ -4974,6 +5013,10 @@ dataflow trace described. The maintainers added the missing
 - 201/201 tests (ctest + single-process; +6: line shift, indentation,
   changed line reappears, identical-line counter, v1 compatibility,
   header)
+- 2026-08-12: Qualified the current libgit2 head across three fresh repetitions: all accepted at 168/168 translation units, 0 broken, 0 incomplete, and 42 deterministic findings. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
+- 2026-08-12: Submitted rtp2httpd PR #709 and marked it ready for upstream review for the first newly triaged current-head candidate. The project builds, its executable smoke check passes, the focused independent path no longer reproduces, and duplicate search found no open match. Phase 9 acceptance remains unchanged pending upstream review.
+- 2026-08-12: Submitted libgit2 PR #7345 and marked it ready for upstream review for the independently corroborated missing-mode path. The full project and test targets build, the local test partition passes, focused analysis is clean at 1/1, and no narrowed duplicate match was found. Phase 9 acceptance remains unchanged pending upstream review.
+- 2026-08-12: Qualified the current lvgl head across three fresh repetitions: all accepted at 470/470 translation units, 0 broken, 0 incomplete, and 19 deterministic findings. Added a minimal frozen configuration profile required by the current build. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
 - CLI smoke: baseline written, 2 lines added at the top of the file,
   re-analysis "1 known finding(s) filtered by baseline → Clean"
 
@@ -5920,3 +5963,10 @@ detection. The matcher is precise, no filter needed.
 - `FixedCompilationDatabase`: working directory `"."` instead of
   `build_path_` (relative-path safety).
 - CMake: `LANGUAGES CXX` → `LANGUAGES C CXX` (for LLVM's C check macro).
+- Qualified the current Abseil head with 3/3 accepted repetitions: 159/159 translation units, 0 broken units, 0 incomplete functions, and 13 stable findings. The Fedora run used the analyzer-aligned compiler and resource directory; this adds candidate evidence only and leaves the accepted-upstream ledger at 3 fixes across 2 projects.
+- Qualified the current systemd head with 3/3 accepted repetitions: 496/496 translation units, 0 broken units, 0 incomplete functions, and 0 findings. The run used an isolated Meson/Jinja/gperf tool environment and analyzer-aligned compiler flags; this adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current curl head with 3/3 accepted repetitions: 195/195 translation units, 0 broken units, 0 incomplete functions, and 62 stable findings. This adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current Redis head with 3/3 accepted repetitions: 122/122 translation units, 0 broken units, 0 incomplete functions, and 0 stable findings. This adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current TensorFlow Lite head with 3/3 accepted repetitions: 240/240 translation units, 0 broken units, 0 incomplete functions, and 74 stable findings. Independent comparison found no exact location overlap, so the accepted upstream ledger remains 3 fixes across 2 projects. Independent review caught and corrected a transcribed revision and finding count; the three checksummed receipts plus exact input manifest are now retained and cross-checked automatically against the frozen record and canonical summaries.
+- Recorded the independent evidence audit boundary: the prior eight current-head summaries are not Phase 9 completion evidence because their three raw receipts were not retained. They must be repeated under the new durable receipt gate; TensorFlow Lite is the first fully bound current-head record.
+- Kept retained receipt bytes platform-invariant so Windows line-ending conversion cannot invalidate their recorded checksums.
