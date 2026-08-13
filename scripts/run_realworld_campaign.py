@@ -33,6 +33,8 @@ MESON_OPTION = re.compile(
 )
 MESON_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
 MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=.*")
+BUILD_ENVIRONMENT = {"CC", "CXX"}
+BUILD_TOOL = re.compile(r"/usr/bin/[A-Za-z0-9_.+-]+")
 REQUIRED_EXPECTED = {
     "translation_units",
     "translation_unit_sha256",
@@ -226,6 +228,21 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
     _require_int(project.get("timeout_minutes"), f"project {project_id} timeout_minutes", 1, 330)
     _require_int(project.get("memory_mb"), f"project {project_id} memory_mb", 512, 65536)
 
+    environment = project.get("environment", {})
+    if (
+        not isinstance(environment, dict)
+        or not set(environment).issubset(BUILD_ENVIRONMENT)
+        or any(
+            not isinstance(value, str) or BUILD_TOOL.fullmatch(value) is None
+            for value in environment.values()
+        )
+    ):
+        raise ManifestError(f"project {project_id} environment is invalid")
+    if environment:
+        project["environment"] = dict(sorted(environment.items()))
+    else:
+        project.pop("environment", None)
+
     commands = project.get("commands")
     if not isinstance(commands, dict) or set(commands) != {"configure", "build"}:
         raise ManifestError(f"project {project_id} commands must contain configure and build")
@@ -417,7 +434,7 @@ def project_by_id(manifest: dict[str, Any], project_id: str) -> dict[str, Any]:
 
 
 def project_recipe(project: dict[str, Any]) -> dict[str, Any]:
-    return {
+    recipe = {
         key: project[key]
         for key in (
             "repository",
@@ -431,6 +448,9 @@ def project_recipe(project: dict[str, Any]) -> dict[str, Any]:
             "memory_mb",
         )
     }
+    if project.get("environment"):
+        recipe["environment"] = project["environment"]
+    return recipe
 
 
 def receipt_identity(
@@ -1197,12 +1217,15 @@ def run_shard(
             shutil.copyfile(source_file, destination)
         for group in ("configure", "build"):
             for command in project["commands"][group]:
+                command_environment = os.environ.copy()
+                command_environment.update(project.get("environment", {}))
                 result = _run_command(
                     _expand(command, values),
                     project_root,
                     deadline,
                     project["memory_mb"],
                     log_path,
+                    env=command_environment,
                 )
                 if result.returncode != 0:
                     raise EvidenceError(f"{group} command failed with exit {result.returncode}")

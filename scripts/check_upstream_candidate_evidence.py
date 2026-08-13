@@ -151,6 +151,17 @@ def validate_project(
     except RUNNER.CampaignError as exc:
         raise EvidenceError(f"{project_id}: retained manifest is invalid: {exc}") from exc
     manifest_project = project_from_manifest(manifest, project_id)
+    expected_recipe_sha256 = evidence.get("recipe_sha256")
+    require(
+        isinstance(expected_recipe_sha256, str)
+        and SHA256_RE.fullmatch(expected_recipe_sha256),
+        f"{project_id}: frozen recipe identity must be lowercase SHA-256",
+    )
+    require(
+        RUNNER.digest_json(RUNNER.project_recipe(manifest_project))
+        == expected_recipe_sha256,
+        f"{project_id}: retained recipe differs from frozen identity",
+    )
     expected = manifest_project.get("expected")
     require(isinstance(expected, dict), f"{project_id}: retained expectations are missing")
     require(

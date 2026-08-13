@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "campaigns": {
+    "upstream-candidates": {
+      "window_minutes": 1440,
+      "repetitions": 3,
+      "projects": [
+        "systemd"
+      ]
+    }
+  },
+  "projects": [
+    {
+      "id": "systemd",
+      "label": "v256.17",
+      "repository": "https://github.com/systemd/systemd.git",
+      "revision": "32ac7af7888bc46f91c1af7d9ba05fec929b31ad",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "meson",
+            "setup",
+            "{build}",
+            "{source}",
+            "--buildtype=release",
+            "-Dmode=release",
+            "-Dtests=false",
+            "-Dslow-tests=false",
+            "-Dinstall-tests=false",
+            "-Dfirstboot=false",
+            "-Dman=disabled",
+            "-Dhtml=disabled",
+            "-Dtranslations=false",
+            "-Dsysupdate=disabled",
+            "-Defi=false",
+            "-Dbootloader=disabled",
+            "-Dukify=disabled",
+            "-Dkernel-install=false",
+            "-Dbpf-framework=disabled",
+            "-Dseccomp=disabled",
+            "-Dselinux=disabled",
+            "-Dapparmor=disabled",
+            "-Dpolkit=disabled",
+            "-Daudit=disabled",
+            "-Dpam=disabled",
+            "-Dmicrohttpd=disabled",
+            "-Dlibcryptsetup=disabled",
+            "-Dlibcurl=disabled",
+            "-Dlibidn2=disabled",
+            "-Dqrencode=disabled",
+            "-Dopenssl=disabled",
+            "-Dp11kit=disabled",
+            "-Dtpm2=disabled",
+            "-Dxz=disabled",
+            "-Dlz4=disabled",
+            "-Dzstd=disabled"
+          ]
+        ],
+        "build": [
+          [
+            "meson",
+            "compile",
+            "-C",
+            "{build}",
+            "systemd:executable"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src/basic",
+          "src/core",
+          "src/shared"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src/basic,{source}/src/core,{source}/src/shared"
+      ],
+      "expected": {
+        "translation_units": 496,
+        "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
+        "attempted_tus": 496,
+        "analyzed_tus": 496,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 0,
+        "exit_code": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "environment": {
+        "CC": "/usr/bin/clang-19",
+        "CXX": "/usr/bin/clang++-19"
+      }
+    }
+  ]
+}

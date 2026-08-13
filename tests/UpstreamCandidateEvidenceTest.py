@@ -81,7 +81,7 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
         )
 
     def test_retained_receipts_match_snapshot_and_docs(self):
-        self.assertEqual(self.validate(), 10)
+        self.assertEqual(self.validate(), 11)
 
     def test_retained_receipt_bytes_are_platform_invariant(self):
         attributes = ATTRIBUTES.read_text(encoding="utf-8").splitlines()
@@ -102,6 +102,70 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
     def test_coverage_batch_drift_fails_closed(self):
         changed = copy.deepcopy(self.heads)
         self.tensorflow(changed)["coverage_batch_id"] = "arbitrary-drift"
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads=changed)
+
+    def test_frozen_recipe_identity_drift_fails_closed(self):
+        changed = copy.deepcopy(self.heads)
+        self.tensorflow(changed)["receipt_evidence"]["recipe_sha256"] = "0" * 64
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads=changed)
+
+    def test_coordinated_environment_drift_fails_closed(self):
+        changed = copy.deepcopy(self.heads)
+        systemd = next(
+            project
+            for project in changed["batches"][0]["projects"]
+            if project["id"] == "systemd"
+        )
+        evidence = systemd["receipt_evidence"]
+        manifest_path = self.root / evidence["manifest"]
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_project = next(
+            project for project in manifest["projects"] if project["id"] == "systemd"
+        )
+        manifest_project["environment"]["CC"] = "/usr/bin/clang-20"
+        self.write_json(manifest_path, manifest)
+        manifest_sha256 = MODULE.RUNNER.digest_json(manifest)
+        recipe_sha256 = MODULE.RUNNER.digest_json(
+            MODULE.RUNNER.project_recipe(manifest_project)
+        )
+        for entry in evidence["receipts"]:
+            receipt_path = self.root / entry["path"]
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["identity"]["manifest_sha256"] = manifest_sha256
+            receipt["identity"]["recipe_sha256"] = recipe_sha256
+            self.write_json(receipt_path, receipt)
+            entry["sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+        with self.assertRaises(MODULE.EvidenceError):
+            self.validate(heads=changed)
+
+    def test_coordinated_environment_omission_fails_closed(self):
+        changed = copy.deepcopy(self.heads)
+        systemd = next(
+            project
+            for project in changed["batches"][0]["projects"]
+            if project["id"] == "systemd"
+        )
+        evidence = systemd["receipt_evidence"]
+        manifest_path = self.root / evidence["manifest"]
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_project = next(
+            project for project in manifest["projects"] if project["id"] == "systemd"
+        )
+        manifest_project.pop("environment")
+        self.write_json(manifest_path, manifest)
+        manifest_sha256 = MODULE.RUNNER.digest_json(manifest)
+        recipe_sha256 = MODULE.RUNNER.digest_json(
+            MODULE.RUNNER.project_recipe(manifest_project)
+        )
+        for entry in evidence["receipts"]:
+            receipt_path = self.root / entry["path"]
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["identity"]["manifest_sha256"] = manifest_sha256
+            receipt["identity"]["recipe_sha256"] = recipe_sha256
+            self.write_json(receipt_path, receipt)
+            entry["sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
         with self.assertRaises(MODULE.EvidenceError):
             self.validate(heads=changed)
 
