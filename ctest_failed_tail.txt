@@ -1,0 +1,335 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1186: StatusAutomationContract
+1/1 Test #1186: StatusAutomationContract .........***Failed   38.23 sec
+.....F..E.........E...E........................
+======================================================================
+ERROR: test_first_catalog_migration_is_pinned_byte_for_byte (__main__.ProgressStatusTest.test_first_catalog_migration_is_pinned_byte_for_byte)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 609, in test_first_catalog_migration_is_pinned_byte_for_byte
+    progress_status._enforce_fixed_plan(root, "origin/main")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\progress_status.py", line 320, in _enforce_fixed_plan
+    current_payload = _catalog_payload(current_plan)
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\progress_status.py", line 309, in _catalog_payload
+    raise ProgressStatusError(
+        "docs/PLAN.md must contain exactly one fixed work-item catalog"
+    )
+progress_status.ProgressStatusError: docs/PLAN.md must contain exactly one fixed work-item catalog
+
+======================================================================
+ERROR: test_migration_catalog_preserves_unmerged_phase_8_and_9_work (__main__.ProgressStatusTest.test_migration_catalog_preserves_unmerged_phase_8_and_9_work)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 582, in test_migration_catalog_preserves_unmerged_phase_8_and_9_work
+    catalog = progress_status._load_catalog(ROOT)
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\progress_status.py", line 247, in _load_catalog
+    raise ProgressStatusError(
+        "docs/PLAN.md must contain exactly one fixed work-item catalog"
+    )
+progress_status.ProgressStatusError: docs/PLAN.md must contain exactly one fixed work-item catalog
+
+======================================================================
+ERROR: test_production_ledger_cannot_be_self_consistently_reanchored (__main__.ProgressStatusTest.test_production_ledger_cannot_be_self_consistently_reanchored)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 637, in test_production_ledger_cannot_be_self_consistently_reanchored
+    catalog = progress_status._load_catalog(ROOT)
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\progress_status.py", line 247, in _load_catalog
+    raise ProgressStatusError(
+        "docs/PLAN.md must contain exactly one fixed work-item catalog"
+    )
+progress_status.ProgressStatusError: docs/PLAN.md must contain exactly one fixed work-item catalog
+
+======================================================================
+FAIL: test_docs_guard_has_no_network_fetch_fallback (__main__.ProgressStatusTest.test_docs_guard_has_no_network_fetch_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 252, in test_docs_guard_has_no_network_fetch_fallback
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        completed.returncode,
+        ^^^^^^^^^^^^^^^^^^^^^
+        0,
+        ^^
+        completed.stdout + completed.stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 1 != 0 : W
+i
+n
+d
+o
+w
+s
+ 
+S
+u
+b
+s
+y
+s
+t
+e
+m
+ 
+f
+o
+r
+ 
+L
+i
+n
+u
+x
+ 
+h
+a
+s
+ 
+n
+o
+ 
+i
+n
+s
+t
+a
+l
+l
+e
+d
+ 
+d
+i
+s
+t
+r
+i
+b
+u
+t
+i
+o
+n
+s
+.
+
+
+
+
+Y
+o
+u
+ 
+c
+a
+n
+ 
+r
+e
+s
+o
+l
+v
+e
+ 
+t
+h
+i
+s
+ 
+b
+y
+ 
+i
+n
+s
+t
+a
+l
+l
+i
+n
+g
+ 
+a
+ 
+d
+i
+s
+t
+r
+i
+b
+u
+t
+i
+o
+n
+ 
+w
+i
+t
+h
+ 
+t
+h
+e
+ 
+i
+n
+s
+t
+r
+u
+c
+t
+i
+o
+n
+s
+ 
+b
+e
+l
+o
+w
+:
+
+
+
+
+
+
+
+
+U
+s
+e
+ 
+'
+w
+s
+l
+.
+e
+x
+e
+ 
+-
+-
+l
+i
+s
+t
+ 
+-
+-
+o
+n
+l
+i
+n
+e
+'
+ 
+t
+o
+ 
+l
+i
+s
+t
+ 
+a
+v
+a
+i
+l
+a
+b
+l
+e
+ 
+d
+i
+s
+t
+r
+i
+b
+u
+t
+i
+o
+n
+s
+
+
+
+
+a
+n
+d
+ 
+'
+w
+s
+l
+.
+e
+x
+e
+ 
+-
+-
+i
+n
+s
+t
+a
+l
+l
+ 
+<
+D
+i
+s
+t
+r
+o
+>
+'
+ 
+t
+o
+ 
+i
+n
+s
+t
+a
+l
+l
+.
+
+
+
+
+
+
+----------------------------------------------------------------------
+Ran 47 tests in 38.056s
+
+FAILED (failures=1, errors=3)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =  38.27 sec
+
+The following tests FAILED:
+	1186 - StatusAutomationContract (Failed)
+Errors while running CTest
