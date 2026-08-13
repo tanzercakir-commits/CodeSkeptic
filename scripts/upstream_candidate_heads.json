@@ -1,0 +1,262 @@
+{
+  "schema": 1,
+  "batches": [
+    {
+      "id": "2026-08-12-a",
+      "checked_at": "2026-08-12",
+      "projects": [
+      {
+        "id": "rtp2httpd",
+          "repository": "https://github.com/stackia/rtp2httpd.git",
+          "default_branch": "main",
+          "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
+          "translation_units": 38,
+          "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 24,
+        "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-1/receipt.json",
+              "sha256": "df5e62bd8806e9a66fc85689a696915d878d73bb5f24b209ea9856bbe2d90c98"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-2/receipt.json",
+              "sha256": "6265541ac02a7680e873985bcc7cff5e24622d052ee2b8acdbd2b41b3d459947"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-3/receipt.json",
+              "sha256": "751399873ff709d3337f79fcd880cc5f53d5a014b239ed6eee5679987b4d831b"
+            }
+          ]
+        }
+      },
+        {
+          "id": "llama-cpp",
+          "repository": "https://github.com/ggml-org/llama.cpp.git",
+          "default_branch": "master",
+          "head": "8e7f22b67ef4667b4ddd50230771287f328cfb3f",
+          "translation_units": 201,
+          "translation_unit_sha256": "d95ff4df0c1fcfee3980fbe17d1fc9e59d150b4db6bf7a7d6c2f9528505d4cfb",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 41,
+          "fingerprint_sha256": "019ca7fcae1ee76ee00111bf8812e4a280dda93ef3ae0429eb635a7a6a7e56d6",
+          "receipt_evidence": {
+            "campaign": "upstream-candidates",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/manifest.json",
+            "receipts": [
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-1/receipt.json", "sha256": "7074944711649d0d09b8baf9684011c24533eb697e5dbeea67da65219f8047e8"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-2/receipt.json", "sha256": "01ac307b8796cf8d7205a00f8ef5e209296098209b66d3100023065bd8304c91"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/llama-cpp/repeat-3/receipt.json", "sha256": "ddf65b67733d4a9fb7832c6f22b43451cc1d823ef36a85817aaed776ae9d41e3"}
+            ]
+          }
+        },
+      {
+        "id": "libgit2",
+          "repository": "https://github.com/libgit2/libgit2.git",
+          "default_branch": "main",
+        "head": "b0057d0fabe546a76a27557b9bb519ea0686fc25",
+          "translation_units": 168,
+          "translation_unit_sha256": "a1e4b082e08ead749e24f2e3b8152eb1c741ac54d2542a751d490b8239ce3922",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 42,
+        "fingerprint_sha256": "82105e17b32bc70d02ac4ca29796a0ae81020c0ac90a5edee3ef5c970f5743a2",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-1/receipt.json", "sha256": "9655b6d69cc1cab06cb2126f1fcc17bffd1fa3b4daa8fe686dd4ca5d91a766b7"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-2/receipt.json", "sha256": "720a8e7a68586c3a1362428591ba00a892a0376e64705a6204b1a8fb767b3a62"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/libgit2/repeat-3/receipt.json", "sha256": "2d1979fef3e9cea64b5cf4ca171ad3ece15e686f59e452801e63fdf8a296faa1"}
+          ]
+        }
+      },
+        {
+          "id": "lvgl",
+          "repository": "https://github.com/lvgl/lvgl.git",
+          "default_branch": "master",
+          "head": "34d30b0f1b1e3afae119e2ba3987a988deb1a2ea",
+          "translation_units": 470,
+          "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 13,
+          "fingerprint_sha256": "67bd7bb56cad473321bbd817f8b537ae24d9190e66a36805be70a47631bd44ef",
+          "receipt_evidence": {
+            "campaign": "upstream-candidates",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/manifest.json",
+            "receipts": [
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-1/receipt.json", "sha256": "60127188c831458859190ee5a1aeba1c3a8afe5410573d8c7e1ee213f49826be"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-2/receipt.json", "sha256": "b194f3f528b217fadc212435f77ed79290c205c06ee3c745b96642d5ffc1ff8d"},
+              {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/lvgl/repeat-3/receipt.json", "sha256": "83feb7e2316e0f04ae61e58924e72603ca34878849bc055a61d8a5136cd4a74f"}
+            ]
+          }
+        },
+      {
+        "id": "abseil",
+          "repository": "https://github.com/abseil/abseil-cpp.git",
+          "default_branch": "master",
+        "head": "ee41bbdf12162c2beebd9347d7653380c8170c0a",
+          "translation_units": 159,
+          "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 13,
+        "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-1/receipt.json", "sha256": "7890af340e9e02bf00fc3918cdca222c9ee0208b419898bb7c83eee649037607"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-2/receipt.json", "sha256": "03a01898e397a8a7aad8b76922e20c20031050d6cea5a7628f441554a1b1b8b1"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/abseil/repeat-3/receipt.json", "sha256": "a87da9c28bf5921feba27b7ccbcc43d4e00a74fcb3eabfdc13be9130793e7353"}
+          ]
+        }
+      },
+        {
+          "id": "systemd",
+          "repository": "https://github.com/systemd/systemd.git",
+          "default_branch": "main",
+          "head": "3ae53ab8f6401f997ee5574982b64b23838666e3",
+          "translation_units": 496,
+          "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+      {
+        "id": "curl",
+          "repository": "https://github.com/curl/curl.git",
+          "default_branch": "master",
+        "head": "3089e7eec8b694ff36a3aa700c4a319d656806e7",
+          "translation_units": 195,
+          "translation_unit_sha256": "5750a25ebe9c906284906187a22336c118c05b16b4c6e3fe9722ec8e6cbd7f86",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 62,
+        "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/curl/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/curl/repeat-1/receipt.json", "sha256": "0dbdf1a0c3f1bed7ad1e9273ef770044bfeb9fa620b932324e33eadedbb87815"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/curl/repeat-2/receipt.json", "sha256": "28e17b048b7de74136847f2ba78d16783f2a37c6b00a5f3f9a3b120a45d79495"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/curl/repeat-3/receipt.json", "sha256": "ccac2cbf17a884dd19b88c7975ba9a6f50f258207c2e11bf3399c5c8bd49cdc6"}
+          ]
+        }
+      },
+      {
+        "id": "redis",
+          "repository": "https://github.com/redis/redis.git",
+          "default_branch": "unstable",
+          "head": "c3f78e4b850915ace818cc51bff8a0cbf1317d94",
+          "translation_units": 122,
+          "translation_unit_sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-1/receipt.json", "sha256": "4973a4963c5d613163abb119b0b9f56dd164b2a26ba70273cecbaef1065b9442"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-2/receipt.json", "sha256": "cccca602e61ed2efcbde7cbe8109e8d4acd5cc8998fd636ddcd223b9c20c6ed2"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-3/receipt.json", "sha256": "754c1551feb4856c710aa4c437380b9b16e8ff0f221e54a6e1c459d20eace603"}
+          ]
+        }
+      },
+        {
+          "id": "tensorflow-lite",
+          "repository": "https://github.com/tensorflow/tensorflow.git",
+          "default_branch": "master",
+          "head": "e698a01bd742f4ebb2a85d87b4cbe83be17f807d",
+          "translation_units": 240,
+          "translation_unit_sha256": "037dcdd6c1bbda9e8a9be04e069874eb5f34b487c201f78017fdc9afd91afb11",
+          "coverage_batch_id": "2026-08-12-a",
+          "findings": 74,
+          "fingerprint_sha256": "cadfdc855b0b6af6bd1e43063b8b40598625906947ea6bf1820413f31f10aa91",
+          "receipt_evidence": {
+            "campaign": "release-candidate",
+            "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/manifest.json",
+            "receipts": [
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-1/receipt.json",
+                "sha256": "192ed92dbb73d1a4e64bfeed3359fa997353c1207bf604bf964986fb227ff5be"
+              },
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-2/receipt.json",
+                "sha256": "3fb03908f2af05505d25757dc9085ecca87a4eb9752b7933c0a12bf6f98fd2b1"
+              },
+              {
+                "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-3/receipt.json",
+              "sha256": "b6294489bb391d98a946bd828d2b1167cb2a98ad04c79fdadfd0e82009ff5cee"
+            }
+          ]
+        }
+      },
+      {
+        "id": "shadps4",
+        "repository": "https://github.com/shadps4-emu/shadPS4.git",
+        "default_branch": "main",
+        "head": "23392e1835a81bbd9188f971832609cda77b1527",
+        "translation_units": 385,
+        "translation_unit_sha256": "9fa9c6285e7e7f2f525b0fb6f5ef2292c410fd1805b5634c64f74653903585da",
+        "attempted_tus": 385,
+        "analyzed_tus": 385,
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 65,
+        "fingerprint_sha256": "93198a43d143e50cd9db3ee50983263831346b801e3f234ea94c11203b18c0ca",
+        "receipt_evidence": {
+          "campaign": "release-candidate",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-1/receipt.json",
+              "sha256": "da5e8faf3475d1244b10b20cf5b4e81dcbcd7d99ab80346268004bdf38f645ef"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-2/receipt.json",
+              "sha256": "b36fcf6d279bf31d37c73f5c80cc42ca8a87f3d794eee9abc991613397673f0b"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-3/receipt.json",
+              "sha256": "8bc261a4a070a2979695ca108836d46247f731c078e31bace76cf6258128ebf6"
+            }
+          ]
+        }
+      },
+      {
+        "id": "libarchive",
+        "repository": "https://github.com/libarchive/libarchive.git",
+        "default_branch": "master",
+        "head": "b738b9d38c4dffce98f29512a13fe69f23967a63",
+        "translation_units": 132,
+        "translation_unit_sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3",
+        "attempted_tus": 132,
+        "analyzed_tus": 132,
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 36,
+        "fingerprint_sha256": "d25420a7358db1903780b4098480de7d6b8249618c41c3624db09a835543ce28",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-1/receipt.json",
+              "sha256": "5b6e6ea06f972a5079c5dea137f11589d623966d052df8e11b2f923bc0b70d03"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-2/receipt.json",
+              "sha256": "31ce74dbddc8fd050ac3ba0962a8cd2da732b4b254d01c5b47ee18f2e27ad985"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-3/receipt.json",
+              "sha256": "3d9567ca8ddc47c2aeff1617c2bb2d40a612409ced218cf54794e120461300f9"
+            }
+          ]
+        }
+      }
+      ]
+    }
+  ]
+}
