@@ -117,11 +117,42 @@
               },
               {
                 "path": "scripts/upstream_candidate_receipts/2026-08-12-a/tensorflow-lite/repeat-3/receipt.json",
-                "sha256": "b6294489bb391d98a946bd828d2b1167cb2a98ad04c79fdadfd0e82009ff5cee"
-              }
-            ]
-          }
+              "sha256": "b6294489bb391d98a946bd828d2b1167cb2a98ad04c79fdadfd0e82009ff5cee"
+            }
+          ]
         }
+      },
+      {
+        "id": "shadps4",
+        "repository": "https://github.com/shadps4-emu/shadPS4.git",
+        "default_branch": "main",
+        "head": "23392e1835a81bbd9188f971832609cda77b1527",
+        "translation_units": 385,
+        "translation_unit_sha256": "9fa9c6285e7e7f2f525b0fb6f5ef2292c410fd1805b5634c64f74653903585da",
+        "attempted_tus": 385,
+        "analyzed_tus": 385,
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 65,
+        "fingerprint_sha256": "93198a43d143e50cd9db3ee50983263831346b801e3f234ea94c11203b18c0ca",
+        "receipt_evidence": {
+          "campaign": "release-candidate",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-1/receipt.json",
+              "sha256": "da5e8faf3475d1244b10b20cf5b4e81dcbcd7d99ab80346268004bdf38f645ef"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-2/receipt.json",
+              "sha256": "b36fcf6d279bf31d37c73f5c80cc42ca8a87f3d794eee9abc991613397673f0b"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/shadps4/repeat-3/receipt.json",
+              "sha256": "8bc261a4a070a2979695ca108836d46247f731c078e31bace76cf6258128ebf6"
+            }
+          ]
+        }
+      }
       ]
     }
   ]
