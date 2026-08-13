@@ -1,0 +1,54 @@
+{
+  "execution": {
+    "duration_seconds": 269.306,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "f3b88c6d6314c09143966c2902a96addd45f1876bbcff8601ff6b99c95b81c5f",
+    "project_revision": "ee41bbdf12162c2beebd9347d7653380c8170c0a",
+    "recipe_sha256": "a3f91f61ce858945f0ff52ffc1b26bda97125d7b3c323529630ebbd0e27581b8",
+    "repetition": 1,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61"
+  },
+  "project": "abseil",
+  "repetition": 1,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 159,
+      "attempted_tus": 159,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 1,
+    "findings": 13,
+    "fingerprint_sha256": "bc9d1462ed6a0732b96f63c84b5abdd0903bf3632587f39cce2fd8ca7f9313ff",
+    "fingerprints": [
+      "csf1-135ca986efbb33fd",
+      "csf1-46954827fe18f69a",
+      "csf1-508cded82e1f8468",
+      "csf1-6c7140519a38336b",
+      "csf1-6fe078ebb7452164",
+      "csf1-89c5f38913ed337a",
+      "csf1-8e96f20631638bc1",
+      "csf1-9c7766db3b994eb6",
+      "csf1-9fdaf973719f117f",
+      "csf1-b93b20401e38da36",
+      "csf1-cfde6e2fdeec7f50",
+      "csf1-dac1dc691d3823d2",
+      "csf1-e56df3d4f883f1b0"
+    ],
+    "translation_units": {
+      "count": 159,
+      "sha256": "366e8f50eac9c0ab3b139b6aa2b1a0981086de9aecc79a2d3d2f0ecfe8c14a61"
+    }
+  },
+  "status": "accepted"
+}
