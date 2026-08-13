@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "targets": {
+    "accepted_fixes": 10,
+    "projects": 5
+  },
+  "records": [
+    {
+      "id": "shadps4-4698-4702",
+      "project": "shadPS4",
+      "repository": "shadps4-emu/shadPS4",
+      "observed": {
+        "default_branch": "main",
+        "affected_head": "3aef2190ca605db6b6250429ce460e2feccc33bf",
+        "checked_at": "2026-07-13"
+      },
+      "gate_a": [
+        {"id": "source_proof", "passed": true, "evidence": "docs/devlog/changelog.md heading: First upstream finding MERGED (shadPS4 #4702)"},
+        {"id": "real_trigger", "passed": true, "evidence": "shadps4-emu/shadPS4#4698"},
+        {"id": "duplicate_check", "passed": true, "evidence": "issue accepted as distinct and closed by PR 4702"},
+        {"id": "current_head", "passed": true, "evidence": "affected default-branch head recorded before the fix"}
+      ],
+      "gate_b": {
+        "passed": true,
+        "maintained": true,
+        "channel": "issue-and-pull-request",
+        "evidence": "maintainer merged PR 4702"
+      },
+      "gate_c": {
+        "passed": true,
+        "report_ref": "shadps4-emu/shadPS4#4698",
+        "fix_ref": "shadps4-emu/shadPS4#4702",
+        "issue": 4698,
+        "pull_request": 4702,
+        "reproduction_first": true,
+        "one_defect": true,
+        "evidence": "issue 4698 and PR 4702"
+      },
+      "outcome": "accepted",
+      "fix": {
+        "merged": true,
+        "merge_commit": "d2a7f7e28819935d4e9c395edd9743bdbf71b3ac",
+        "merged_at": "2026-07-13T11:40:46Z",
+        "verified_branch": "main",
+        "verified_head": "05302af14db01da39ca850775e91750c1768c6d7",
+        "ancestry": "ancestor",
+        "verified_at": "2026-08-12"
+      }
+    },
+    {
+      "id": "shadps4-4696-4703",
+      "project": "shadPS4",
+      "repository": "shadps4-emu/shadPS4",
+      "observed": {
+        "default_branch": "main",
+        "affected_head": "d2a7f7e28819935d4e9c395edd9743bdbf71b3ac",
+        "checked_at": "2026-07-13"
+      },
+      "gate_a": [
+        {"id": "source_proof", "passed": true, "evidence": "docs/devlog/changelog.md heading: Second upstream finding MERGED (shadPS4 #4703)"},
+        {"id": "real_trigger", "passed": true, "evidence": "shadps4-emu/shadPS4#4696"},
+        {"id": "duplicate_check", "passed": true, "evidence": "issue accepted as distinct and closed by PR 4703"},
+        {"id": "current_head", "passed": true, "evidence": "affected default-branch head recorded before the fix"}
+      ],
+      "gate_b": {
+        "passed": true,
+        "maintained": true,
+        "channel": "issue-and-pull-request",
+        "evidence": "maintainer merged PR 4703"
+      },
+      "gate_c": {
+        "passed": true,
+        "report_ref": "shadps4-emu/shadPS4#4696",
+        "fix_ref": "shadps4-emu/shadPS4#4703",
+        "issue": 4696,
+        "pull_request": 4703,
+        "reproduction_first": true,
+        "one_defect": true,
+        "evidence": "issue 4696 and PR 4703"
+      },
+      "outcome": "accepted",
+      "fix": {
+        "merged": true,
+        "merge_commit": "ec334904604ba41f5d4753f4a2498ec82540e5d6",
+        "merged_at": "2026-07-13T18:29:17Z",
+        "verified_branch": "main",
+        "verified_head": "05302af14db01da39ca850775e91750c1768c6d7",
+        "ancestry": "ancestor",
+        "verified_at": "2026-08-12"
+      }
+    },
+    {
+      "id": "tensorflow-123387-123994",
+      "project": "TensorFlow",
+      "repository": "tensorflow/tensorflow",
+      "observed": {
+        "default_branch": "master",
+        "affected_head": "e5ee138f35c1016f1ff66a64e1097baf8cb26f02",
+        "checked_at": "2026-07-26"
+      },
+      "gate_a": [
+        {"id": "source_proof", "passed": true, "evidence": "docs/PLAN.md section 6 ledger"},
+        {"id": "real_trigger", "passed": true, "evidence": "tensorflow/tensorflow#123387"},
+        {"id": "duplicate_check", "passed": true, "evidence": "issue accepted as distinct and closed by PR 123994"},
+        {"id": "current_head", "passed": true, "evidence": "affected default-branch head recorded before the fix"}
+      ],
+      "gate_b": {
+        "passed": true,
+        "maintained": true,
+        "channel": "issue-and-pull-request",
+        "evidence": "maintainer merged PR 123994"
+      },
+      "gate_c": {
+        "passed": true,
+        "report_ref": "tensorflow/tensorflow#123387",
+        "fix_ref": "tensorflow/tensorflow#123994",
+        "issue": 123387,
+        "pull_request": 123994,
+        "reproduction_first": true,
+        "one_defect": true,
+        "evidence": "issue 123387 and PR 123994"
+      },
+      "outcome": "accepted",
+      "fix": {
+        "merged": true,
+        "merge_commit": "68a7e5821cbb2beb76eeebbbbdffda85a418b254",
+        "merged_at": "2026-08-07T11:42:00Z",
+        "verified_branch": "master",
+        "verified_head": "322e993b5783f7e3692b7d394e821375d9e8f980",
+        "ancestry": "ancestor",
+        "verified_at": "2026-08-12"
+      }
+    }
+  ]
+}

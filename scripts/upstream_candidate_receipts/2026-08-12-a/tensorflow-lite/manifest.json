@@ -1,0 +1,814 @@
+{
+  "schema": 1,
+  "campaigns": {
+    "nightly": {
+      "window_minutes": 720,
+      "repetitions": 3,
+      "projects": [
+        "libgit2",
+        "rtp2httpd",
+        "abseil",
+        "libarchive"
+      ]
+    },
+    "weekend": {
+      "window_minutes": 2880,
+      "repetitions": 3,
+      "projects": [
+        "systemd",
+        "curl",
+        "redis",
+        "lvgl"
+      ]
+    },
+    "release-candidate": {
+      "window_minutes": 4320,
+      "repetitions": 3,
+      "projects": [
+        "llama-cpp",
+        "tensorflow-lite",
+        "shadps4"
+      ]
+    }
+  },
+  "projects": [
+    {
+      "id": "libgit2",
+      "label": "v1.9.0",
+      "repository": "https://github.com/libgit2/libgit2.git",
+      "revision": "338e6fb681369ff0537719095e22ce9dc602dbf0",
+      "timeout_minutes": 120,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DBUILD_TESTS=OFF",
+            "-DBUILD_CLI=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "git__malloc,git__calloc,git__realloc,git__strdup",
+        "--free-functions",
+        "git__free",
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 167,
+        "translation_unit_sha256": "85f45a6cfa12bf9df0855fa1ca5c6895d050d676b0814ab0f8a53a04c6689b33",
+        "attempted_tus": 167,
+        "analyzed_tus": 167,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 39,
+        "exit_code": 1,
+        "fingerprint_sha256": "34874313efb0f492f08b77d9ab17d7ac4fe478dec41fa57fe563675334635cd3"
+      }
+    },
+    {
+      "id": "rtp2httpd",
+      "label": "a7a1e568",
+      "repository": "https://github.com/stackia/rtp2httpd.git",
+      "revision": "a7a1e568d46ee3176f8a3e94e0f88f131ebd444e",
+      "timeout_minutes": 60,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [
+        {
+          "from": "profiles/contracts/rtp2httpd/configuration.c.csk",
+          "to": "src/configuration.c.csk"
+        }
+      ],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 38,
+        "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
+        "attempted_tus": 38,
+        "analyzed_tus": 38,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 24,
+        "exit_code": 1,
+        "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
+      }
+    },
+    {
+      "id": "abseil",
+      "label": "20260526.0",
+      "repository": "https://github.com/abseil/abseil-cpp.git",
+      "revision": "5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a",
+      "timeout_minutes": 180,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_CXX_STANDARD=17",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DABSL_BUILD_TESTING=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "absl"
+        ],
+        "extensions": [
+          ".cc"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/absl"
+      ],
+      "expected": {
+        "translation_units": 158,
+        "translation_unit_sha256": "b37e177e7d29d865a747a8bdd4a85c20c399dfe8f5203b09db99098e01257cb0",
+        "attempted_tus": 158,
+        "analyzed_tus": 158,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 12,
+        "exit_code": 1,
+        "fingerprint_sha256": "3c022eaaac3da402b3076efcb7960e8d67eaa612c3e6c1b822e77c67f1a4157f"
+      }
+    },
+    {
+      "id": "libarchive",
+      "label": "v3.8.9",
+      "repository": "https://github.com/libarchive/libarchive.git",
+      "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DENABLE_TEST=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "libarchive"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": [
+          "libarchive/archive_disk_acl_darwin.c",
+          "libarchive/archive_disk_acl_freebsd.c",
+          "libarchive/archive_disk_acl_linux.c",
+          "libarchive/archive_disk_acl_sunos.c",
+          "libarchive/archive_entry_copy_bhfi.c",
+          "libarchive/archive_read_disk_windows.c",
+          "libarchive/archive_windows.c",
+          "libarchive/archive_write_disk_windows.c",
+          "libarchive/filter_fork_windows.c"
+        ]
+      },
+      "analyzer_args": [
+        "--whole-program",
+        "--report-paths",
+        "{source}/libarchive"
+      ],
+      "expected": {
+        "translation_units": 132,
+        "translation_unit_sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3",
+        "attempted_tus": 132,
+        "analyzed_tus": 255,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 38,
+        "exit_code": 1,
+        "fingerprint_sha256": "5db1b06b24804f3d7864131525ebdc2be500778f33e8c0021866cc4632bcf10a"
+      }
+    },
+    {
+      "id": "systemd",
+      "label": "v256.17",
+      "repository": "https://github.com/systemd/systemd.git",
+      "revision": "009adf6c0e435376c80fbc11675d581e0a94d350",
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "commands": {
+        "configure": [
+          [
+            "meson",
+            "setup",
+            "{build}",
+            "{source}",
+            "--buildtype=release",
+            "-Dmode=release",
+            "-Dtests=false",
+            "-Dslow-tests=false",
+            "-Dinstall-tests=false",
+            "-Dfirstboot=false",
+            "-Dman=disabled",
+            "-Dhtml=disabled",
+            "-Dtranslations=false",
+            "-Dsysupdate=disabled",
+            "-Defi=false",
+            "-Dbootloader=disabled",
+            "-Dukify=disabled",
+            "-Dkernel-install=false",
+            "-Dbpf-framework=disabled",
+            "-Dseccomp=disabled",
+            "-Dselinux=disabled",
+            "-Dapparmor=disabled",
+            "-Dpolkit=disabled",
+            "-Daudit=disabled",
+            "-Dpam=disabled",
+            "-Dmicrohttpd=disabled",
+            "-Dlibcryptsetup=disabled",
+            "-Dlibcurl=disabled",
+            "-Dlibidn2=disabled",
+            "-Dqrencode=disabled",
+            "-Dopenssl=disabled",
+            "-Dp11kit=disabled",
+            "-Dtpm2=disabled",
+            "-Dxz=disabled",
+            "-Dlz4=disabled",
+            "-Dzstd=disabled"
+          ]
+        ],
+        "build": [
+          [
+            "meson",
+            "compile",
+            "-C",
+            "{build}",
+            "systemd:executable"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src/basic",
+          "src/core",
+          "src/shared"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src/basic,{source}/src/core,{source}/src/shared"
+      ],
+      "expected": {
+        "translation_units": 390,
+        "translation_unit_sha256": "5a65361ff67a6bc1dca48d0da5aee60ead0f1a061084492684e2c1cb7313823c",
+        "attempted_tus": 390,
+        "analyzed_tus": 815,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 0,
+        "exit_code": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "curl",
+      "label": "8.11.0",
+      "repository": "https://github.com/curl/curl.git",
+      "revision": "b1ef0e1a01c0bb6ee5367bd9c186a603bde3615a",
+      "timeout_minutes": 180,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DBUILD_CURL_EXE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DBUILD_TESTING=OFF",
+            "-DHTTP_ONLY=ON",
+            "-DCURL_USE_OPENSSL=OFF",
+            "-DCURL_USE_LIBPSL=OFF",
+            "-DCURL_USE_LIBSSH2=OFF",
+            "-DCURL_ZLIB=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "lib"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "Curl_cmalloc,Curl_ccalloc,Curl_crealloc,Curl_cstrdup,curl_malloc,curl_calloc",
+        "--free-functions",
+        "Curl_cfree,curl_free",
+        "--report-paths",
+        "{source}/lib"
+      ],
+      "expected": {
+        "translation_units": 169,
+        "translation_unit_sha256": "213f0c1cb75de379b16ade4d0ab7cc8e701ced13a51fc822060db1f95ec92a01",
+        "attempted_tus": 169,
+        "analyzed_tus": 169,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 59,
+        "exit_code": 1,
+        "fingerprint_sha256": "195b80888b1e4e788c67f4e6024f31e667767e50d66d3fc3d483e619b424f094"
+      }
+    },
+    {
+      "id": "redis",
+      "label": "7.4.2",
+      "repository": "https://github.com/redis/redis.git",
+      "revision": "a0a6f23d997b024689ba157916837f493a593a34",
+      "timeout_minutes": 240,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-E",
+            "make_directory",
+            "{build}"
+          ]
+        ],
+        "build": [
+          [
+            "bear",
+            "--output",
+            "{build}/compile_commands.json",
+            "--",
+            "make",
+            "-C",
+            "{source}",
+            "-j{jobs}",
+            "CC=clang-20",
+            "MALLOC=libc",
+            "BUILD_TLS=no",
+            "USE_SYSTEMD=no"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--alloc-functions",
+        "zmalloc,zcalloc,zrealloc,ztrymalloc,zstrdup",
+        "--free-functions",
+        "zfree",
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 103,
+        "translation_unit_sha256": "289cde3a18f71ccdcf3fd3b317a232e57514c14690b8d67f8551af261bcff844",
+        "attempted_tus": 103,
+        "analyzed_tus": 206,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 0,
+        "exit_code": 0,
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "lvgl",
+      "label": "v9.2.2",
+      "repository": "https://github.com/lvgl/lvgl.git",
+      "revision": "7f07a129e8d77f4984fff8e623fd5be18ff42e74",
+      "timeout_minutes": 240,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DLV_CONF_SKIP=ON",
+            "-DLV_CONF_BUILD_DISABLE_EXAMPLES=ON",
+            "-DLV_CONF_BUILD_DISABLE_DEMOS=ON"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 311,
+        "translation_unit_sha256": "30a090f5cdffb81f3b2184b5cd537d4ac85fff23acf3cdccecdb9ec13af00e50",
+        "attempted_tus": 311,
+        "analyzed_tus": 311,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 16,
+        "exit_code": 1,
+        "fingerprint_sha256": "687bfeaa19046230afd60e116bb0d2fe73361d8b931161e33029bd79988ae808"
+      }
+    },
+    {
+      "id": "llama-cpp",
+      "label": "4dee52f8",
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454",
+      "checkout": {
+        "submodules": "none",
+        "expected_count": 0,
+        "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src",
+          "ggml/src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DGGML_NATIVE=OFF",
+            "-DLLAMA_BUILD_TESTS=OFF",
+            "-DLLAMA_BUILD_TOOLS=OFF",
+            "-DLLAMA_BUILD_EXAMPLES=OFF",
+            "-DLLAMA_BUILD_SERVER=OFF",
+            "-DLLAMA_BUILD_COMMON=OFF",
+            "-DLLAMA_BUILD_APP=OFF",
+            "-DLLAMA_BUILD_UI=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "llama",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src,{source}/ggml/src"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+        "translation_units": 200,
+        "translation_unit_sha256": "e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783",
+        "attempted_tus": 200,
+        "analyzed_tus": 200,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 40,
+        "exit_code": 1,
+        "fingerprint_sha256": "842c6903f3d506cff9b5a5723de8dc10701b294c12ce59be032f368d3eacc4b4"
+      }
+    },
+    {
+      "id": "tensorflow-lite",
+      "label": "v2.21.0",
+      "repository": "https://github.com/tensorflow/tensorflow.git",
+      "revision": "e698a01bd742f4ebb2a85d87b4cbe83be17f807d",
+      "checkout": {
+        "submodules": "none",
+        "expected_count": 0,
+        "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "tensorflow/lite"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}/tensorflow/lite",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-20",
+            "-DCMAKE_CXX_COMPILER=clang++-20",
+            "-DCMAKE_CXX_STANDARD=17",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DTENSORFLOW_SOURCE_DIR={source}",
+            "-DTFLITE_ENABLE_XNNPACK=OFF",
+            "-DTFLITE_ENABLE_GPU=OFF",
+            "-DTFLITE_ENABLE_METAL=OFF",
+            "-DTFLITE_ENABLE_NNAPI=OFF",
+            "-DTFLITE_ENABLE_EXTERNAL_DELEGATE=OFF",
+            "-DTFLITE_ENABLE_LABEL_IMAGE=OFF",
+            "-DTFLITE_ENABLE_BENCHMARK_MODEL=OFF",
+            "-DTFLITE_KERNEL_TEST=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "tensorflow-lite",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/tensorflow/lite"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+      "translation_units": 240,
+      "translation_unit_sha256": "037dcdd6c1bbda9e8a9be04e069874eb5f34b487c201f78017fdc9afd91afb11",
+      "attempted_tus": 240,
+      "analyzed_tus": 240,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+      "findings": 74,
+        "exit_code": 1,
+      "fingerprint_sha256": "cadfdc855b0b6af6bd1e43063b8b40598625906947ea6bf1820413f31f10aa91"
+      }
+    },
+    {
+      "id": "shadps4",
+      "label": "v0.17.0",
+      "repository": "https://github.com/shadps4-emu/shadPS4.git",
+      "revision": "5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa",
+      "checkout": {
+        "submodules": "recursive",
+        "expected_count": 53,
+        "expected_sha256": "9f779c183535a2af8148a3b7bfc69b4733cf947d036d98b49e740dbe7ea7c54c"
+      },
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c",
+          ".cc",
+          ".cpp"
+        ],
+        "fallback_globs": []
+      },
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=clang-19",
+            "-DCMAKE_CXX_COMPILER=clang++-19",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON",
+            "-DENABLE_TESTS=OFF",
+            "-DENABLE_SYSTEM_LIBRARIES=OFF",
+            "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=mold",
+            "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=mold"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--target",
+            "shadps4",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "timeout_minutes": 330,
+      "memory_mb": 12288,
+      "copies": [],
+      "expected": {
+        "translation_units": 382,
+        "translation_unit_sha256": "890628723d3db1645429d4fc2f134ecbdac32cd8e322e8dddf09f0d8835c24e9",
+        "attempted_tus": 382,
+        "analyzed_tus": 382,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 66,
+        "exit_code": 1,
+        "fingerprint_sha256": "0b14abf3eb69012ee95678b7a3c4198bd440a761757df8cbad482374d767fd74"
+      }
+    }
+  ]
+}
