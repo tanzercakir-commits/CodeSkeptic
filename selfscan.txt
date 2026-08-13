@@ -1,0 +1,55 @@
+[CodeSkeptic] Analysis starting... (48 files, 12 rules)
+[1/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/main.cpp.
+[2/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/GuardContracts.cpp.
+[3/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/Policy.cpp.
+[4/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/ContractParser.cpp.
+[5/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/Sidecar.cpp.
+[6/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/contracts/ContractInfo.cpp.
+[7/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ImmutableFlags.cpp.
+[8/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/SummaryDiff.cpp.
+[9/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/PathFacts.cpp.
+[10/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AssumptionMode.cpp.
+[11/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/CfgCache.cpp.
+[12/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/Interval.cpp.
+[13/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ExtentMap.cpp.
+[14/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/FunctionSummary.cpp.
+[15/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/RuleEngine.cpp.
+[16/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/ParamIntervals.cpp.
+[17/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/IntervalEval.cpp.
+[18/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/CoverageReport.cpp.
+[19/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AssertGuards.cpp.
+[20/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/FatalCalls.cpp.
+[21/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/engine/AllocFunctions.cpp.
+[22/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp.
+/home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/SourceManager.cpp:315:13: warning: braces around scalar initializer [-Wbraced-scalar-init]
+  315 |             {"-fparse-all-comments"},
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[23/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/source_manager/ResourceDir.cpp.
+[24/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/ConsoleReporter.cpp.
+[25/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/HtmlReporter.cpp.
+[26/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/JsonReporter.cpp.
+[27/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/reporter/SarifReporter.cpp.
+[28/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/Messages.cpp.
+[29/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/FunctionFilter.cpp.
+[30/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/FindingFingerprint.cpp.
+[31/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/core/Capabilities.cpp.
+[32/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/SuppressionFilter.cpp.
+[33/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/Baseline.cpp.
+[34/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/analyzer/StaticAnalyzer.cpp.
+[35/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/config/Config.cpp.
+[36/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/ContractRule.cpp.
+[37/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/MemoryLeakRule_Ex.cpp.
+[38/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/AllocSizeOverflowRule.cpp.
+[39/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/BoundsRule.cpp.
+[40/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/AssumptionRule.cpp.
+[41/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/UninitPointerRule_Ex.cpp.
+[42/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/IntOverflowRule.cpp.
+[43/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/NullDerefRule.cpp.
+[44/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/SignConversionRule.cpp.
+[45/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/PolicyRule.cpp.
+[46/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/DivByZeroRule.cpp.
+[47/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/rules/FdResourceRule.cpp.
+[48/48] Processing file /home/runner/work/CodeSkeptic/CodeSkeptic/src/server/McpServer.cpp.
+[CodeSkeptic] 1 finding(s) suppressed by source comments
+CodeSkeptic: Clean! No issues found.
