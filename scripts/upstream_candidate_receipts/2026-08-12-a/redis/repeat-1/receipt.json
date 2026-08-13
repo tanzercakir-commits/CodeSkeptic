@@ -1,0 +1,40 @@
+{
+  "execution": {
+    "duration_seconds": 194.38,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "767d4fd04b6e8ef1511d6d7125366c37baccf44c2171f343c997c3499a26d5bf",
+    "project_revision": "c3f78e4b850915ace818cc51bff8a0cbf1317d94",
+    "recipe_sha256": "fd6dd5ed22c442ac7b40ebbc605b8dd2bf61f64dbf7f4efcca854979e32423d9",
+    "repetition": 1,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc"
+  },
+  "project": "redis",
+  "repetition": 1,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 122,
+      "attempted_tus": 122,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 0,
+    "findings": 0,
+    "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "fingerprints": [],
+    "translation_units": {
+      "count": 122,
+      "sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc"
+    }
+  },
+  "status": "accepted"
+}

@@ -472,6 +472,7 @@ class ManifestContractTest(unittest.TestCase):
                 "-j{jobs}",
                 "CC=clang-20",
                 "MALLOC=libc",
+                "CFLAGS=-resource-dir=/opt/llvm/lib/clang/19",
             ]
         ]
         campaign.validate_manifest(manifest)
@@ -489,6 +490,63 @@ class ManifestContractTest(unittest.TestCase):
         ]
         with self.assertRaisesRegex(campaign.ManifestError, "bear build shape"):
             campaign.validate_manifest(manifest)
+
+    def test_build_environment_is_validated_and_recipe_bound(self) -> None:
+        baseline = campaign.validate_manifest(fixture_manifest())
+        baseline_digest = campaign.digest_json(baseline)
+        baseline_recipe = campaign.digest_json(
+            campaign.project_recipe(baseline["projects"][0])
+        )
+        self.assertNotIn("environment", baseline["projects"][0])
+        self.assertEqual(
+            baseline_digest,
+            "e2d962d0cad32776eef3a4da72da4a4f3ca3e00dcabd2d3b6ceb7977fe6e878c",
+        )
+        self.assertEqual(
+            baseline_recipe,
+            "00518a68774f47b7787e494ec78af1e6b75c85cd9e69958648f72b66d2c93e55",
+        )
+
+        manifest = fixture_manifest()
+        project = manifest["projects"][0]
+        project["environment"] = {
+            "CXX": "/usr/bin/clang++-19",
+            "CC": "/usr/bin/clang-19",
+        }
+        normalized = campaign.validate_manifest(manifest)
+        normalized_project = normalized["projects"][0]
+        self.assertEqual(
+            normalized_project["environment"],
+            {"CC": "/usr/bin/clang-19", "CXX": "/usr/bin/clang++-19"},
+        )
+        self.assertEqual(
+            campaign.project_recipe(normalized_project)["environment"],
+            normalized_project["environment"],
+        )
+        self.assertNotEqual(campaign.digest_json(normalized), baseline_digest)
+        self.assertNotEqual(
+            campaign.digest_json(campaign.project_recipe(normalized_project)),
+            baseline_recipe,
+        )
+
+        without_environment = campaign.validate_manifest(fixture_manifest())
+        self.assertEqual(campaign.digest_json(without_environment), baseline_digest)
+        self.assertEqual(
+            campaign.digest_json(
+                campaign.project_recipe(without_environment["projects"][0])
+            ),
+            baseline_recipe,
+        )
+
+        for invalid in (
+            {"LD_PRELOAD": "/usr/lib/example.so"},
+            {"CC": "clang-19"},
+            {"CC": "/usr/bin/clang-19\nextra"},
+        ):
+            changed = fixture_manifest()
+            changed["projects"][0]["environment"] = invalid
+            with self.assertRaisesRegex(campaign.ManifestError, "environment"):
+                campaign.validate_manifest(changed)
 
 
 class EvidenceContractTest(unittest.TestCase):
