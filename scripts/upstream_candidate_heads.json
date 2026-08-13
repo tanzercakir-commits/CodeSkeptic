@@ -5,8 +5,8 @@
       "id": "2026-08-12-a",
       "checked_at": "2026-08-12",
       "projects": [
-        {
-          "id": "rtp2httpd",
+      {
+        "id": "rtp2httpd",
           "repository": "https://github.com/stackia/rtp2httpd.git",
           "default_branch": "main",
           "head": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
@@ -14,8 +14,26 @@
           "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046",
           "coverage_batch_id": "2026-08-12-a",
           "findings": 24,
-          "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f"
-        },
+        "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-1/receipt.json",
+              "sha256": "df5e62bd8806e9a66fc85689a696915d878d73bb5f24b209ea9856bbe2d90c98"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-2/receipt.json",
+              "sha256": "6265541ac02a7680e873985bcc7cff5e24622d052ee2b8acdbd2b41b3d459947"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/rtp2httpd/repeat-3/receipt.json",
+              "sha256": "751399873ff709d3337f79fcd880cc5f53d5a014b239ed6eee5679987b4d831b"
+            }
+          ]
+        }
+      },
         {
           "id": "llama-cpp",
           "repository": "https://github.com/ggml-org/llama.cpp.git",

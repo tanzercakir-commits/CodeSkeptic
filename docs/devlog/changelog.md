@@ -10,6 +10,7 @@
 - Added exact numeric-boundary checks so the canonical TODO and changelog summaries reject prefixed, suffixed, or otherwise drifted coverage counts.
 - Phase 9 current-head qualification: shadPS4 qualified with 3/3 accepted repetitions at 385/385 translation units, with 0 broken units, 0 incomplete functions, and 65 stable findings. The retained manifest, three raw receipts, checksums, analyzer identity, source identity, and semantic summary are now enforced together. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
 - Phase 9 current-head qualification: libarchive qualified with 3/3 accepted repetitions at 132/132 translation units, with 0 broken units, 0 incomplete functions, and 36 stable findings. The retained manifest and three fresh raw receipts are bound to the live default-branch head and the current LLVM19 analyzer. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+- Phase 9 current-head qualification: rtp2httpd qualified with 3/3 accepted repetitions at 38/38 translation units, with 0 broken units, 0 incomplete functions, and 24 stable findings. The retained manifest and three fresh raw receipts bind the unchanged live head to the current LLVM19 analyzer. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
 
 ## 2026-08-12 — Phase 9 first current-head execution
 
