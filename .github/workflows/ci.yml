@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         # Full history: the doc guard's changelog-freshness (3) and
-        # state-block (6) checks both need a merge-base with main. The
+        # generated TODO/PROGRESS (6) checks both need a merge-base with main. The
         # default depth-1 checkout has none, so BOTH silently skipped —
         # a green lane running an unexecuted guard, from c8ca617 until
         # 2026-08-01. The guard now FAILS rather than notes when it
@@ -34,7 +34,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Doc-hygiene guard (canonical files, no scatter, changelog fresh)
+      - name: Doc lifecycle guard (fixed PLAN, generated TODO/PROGRESS, changelog)
         run: bash scripts/check_docs_sync.sh
 
       - name: Install LLVM 20 and build tools
@@ -145,3 +145,124 @@ jobs:
         run: |
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/build-and-test/${{ job.status }}"
+
+  fuzz-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang 20 fuzz toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            clang-20 ninja-build
+
+      - name: Configure dedicated libFuzzer build
+        run: >
+          cmake -B build-fuzz -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_COMPILER=clang-20
+          -DCMAKE_CXX_COMPILER=clang++-20
+          -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
+          -DCODESKEPTIC_BUILD_TESTS=OFF
+          -DCODESKEPTIC_BUILD_FUZZERS=ON
+
+      - name: Build four production-parser fuzz targets
+        run: >
+          cmake --build build-fuzz --target
+          codeskeptic_fuzz_config
+          codeskeptic_fuzz_compile_database
+          codeskeptic_fuzz_summary
+          codeskeptic_fuzz_mcp_json_rpc
+
+      - name: Run bounded deterministic smoke campaign
+        run: >
+          python3 scripts/run_fuzz_campaign.py
+          --build-dir build-fuzz
+          --mode smoke
+          --output /tmp/fuzz-smoke-receipt
+
+      - name: Retain checksummed fuzz smoke receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-smoke-receipt
+          path: /tmp/fuzz-smoke-receipt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Mirror fuzz job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/fuzz-smoke/${{ job.status }}"
+
+  sanitizer-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang 20 sanitizer toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            clang-20 ninja-build
+
+      - name: Configure sanitizer test build
+        run: >
+          cmake -B build-sanitizer-tests -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_COMPILER=clang-20
+          -DCMAKE_CXX_COMPILER=clang++-20
+          -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
+          -DCODESKEPTIC_SANITIZER=${{ matrix.sanitizer }}
+          -DCODESKEPTIC_BUILD_TESTS=ON
+          -DCODESKEPTIC_BUILD_FUZZERS=OFF
+
+      - name: Configure sanitizer fuzz build
+        run: >
+          cmake -B build-sanitizer-fuzz -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_COMPILER=clang-20
+          -DCMAKE_CXX_COMPILER=clang++-20
+          -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
+          -DCODESKEPTIC_SANITIZER=${{ matrix.sanitizer }}
+          -DCODESKEPTIC_BUILD_TESTS=OFF
+          -DCODESKEPTIC_BUILD_FUZZERS=ON
+
+      - name: Run complete sanitizer matrix
+        run: >
+          python3 scripts/run_sanitizer_matrix.py
+          --sanitizer ${{ matrix.sanitizer }}
+          --test-build build-sanitizer-tests
+          --fuzz-build build-sanitizer-fuzz
+          --output /tmp/sanitizer-${{ matrix.sanitizer }}-receipt
+
+      - name: Retain sanitizer receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-${{ matrix.sanitizer }}-receipt
+          path: /tmp/sanitizer-${{ matrix.sanitizer }}-receipt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Mirror sanitizer job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/sanitizer-${{ matrix.sanitizer }}/${{ job.status }}"

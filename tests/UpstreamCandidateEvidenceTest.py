@@ -11,7 +11,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "check_upstream_candidate_evidence.py"
 HEADS = ROOT / "scripts" / "upstream_candidate_heads.json"
-TODO = ROOT / "docs" / "TODO.md"
 CHANGELOG = ROOT / "docs" / "devlog" / "changelog.md"
 ATTRIBUTES = ROOT / ".gitattributes"
 
@@ -29,18 +28,16 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
         destination.parent.mkdir(parents=True)
         shutil.copytree(source, destination)
         self.heads = json.loads(HEADS.read_text(encoding="utf-8"))
-        self.todo = TODO.read_text(encoding="utf-8")
         self.changelog = CHANGELOG.read_text(encoding="utf-8")
 
     def tearDown(self):
         self.temporary.cleanup()
 
-    def validate(self, heads=None, todo=None, changelog=None):
+    def validate(self, heads=None, changelog=None):
         return MODULE.validate(
             self.root,
             heads if heads is not None else self.heads,
             "2026-08-12-a",
-            todo if todo is not None else self.todo,
             changelog if changelog is not None else self.changelog,
         )
 
@@ -171,18 +168,9 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
 
     def test_document_summary_drift_fails_closed(self):
         with self.assertRaises(MODULE.EvidenceError):
-            self.validate(todo=self.todo.replace("74 stable findings", "0 stable findings"))
-        with self.assertRaises(MODULE.EvidenceError):
             self.validate(changelog=self.changelog.replace("74 stable findings", "0 stable findings"))
 
     def test_document_repetition_drift_fails_closed(self):
-        with self.assertRaises(MODULE.EvidenceError):
-            self.validate(
-                todo=self.todo.replace(
-                    "completed 3 fresh accepted repetitions",
-                    "completed 2 fresh accepted repetitions",
-                )
-            )
         with self.assertRaises(MODULE.EvidenceError):
             self.validate(
                 changelog=self.changelog.replace(
@@ -192,18 +180,11 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
             )
 
     def test_duplicate_document_summary_fails_closed(self):
-        todo_line = next(
-            line
-            for line in self.todo.splitlines()
-            if "TensorFlow Lite completed 3 fresh accepted repetitions" in line
-        )
         changelog_line = next(
             line
             for line in self.changelog.splitlines()
             if "current TensorFlow Lite head with 3/3 accepted repetitions" in line
         )
-        with self.assertRaises(MODULE.EvidenceError):
-            self.validate(todo=f"{self.todo}\n{todo_line}\n")
         with self.assertRaises(MODULE.EvidenceError):
             self.validate(changelog=f"{self.changelog}\n{changelog_line}\n")
 
@@ -289,7 +270,6 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
         with self.assertRaises(MODULE.EvidenceError):
             self.validate(
                 heads=changed,
-                todo=self.todo.replace("74 stable findings", "75 stable findings"),
                 changelog=self.changelog.replace(
                     "74 stable findings", "75 stable findings"
                 ),
@@ -313,28 +293,23 @@ class UpstreamCandidateEvidenceTest(unittest.TestCase):
                 "analyzed_tus", 255
             ),
         )
-        todo = self.todo.replace("240/240", "240/255")
         changelog = self.changelog.replace("240/240", "240/255")
-        self.validate(heads, todo=todo, changelog=changelog)
+        self.validate(heads, changelog=changelog)
 
         with self.assertRaises(MODULE.EvidenceError):
-            self.validate(heads, todo=todo.replace("240/255", "240/254"), changelog=changelog)
-        with self.assertRaises(MODULE.EvidenceError):
-            self.validate(heads, todo=todo, changelog=changelog.replace("240/255", "240/254"))
+            self.validate(heads, changelog=changelog.replace("240/255", "240/254"))
         for drift in ("1240/255", "240/2550"):
             with self.assertRaises(MODULE.EvidenceError):
-                self.validate(heads, todo=todo.replace("240/255", drift), changelog=changelog)
-            with self.assertRaises(MODULE.EvidenceError):
-                self.validate(heads, todo=todo, changelog=changelog.replace("240/255", drift))
+                self.validate(heads, changelog=changelog.replace("240/255", drift))
 
         project["attempted_tus"] = 239
         with self.assertRaises(MODULE.EvidenceError):
-            self.validate(heads, todo=todo, changelog=changelog)
+            self.validate(heads, changelog=changelog)
         del project["attempted_tus"]
 
         project["analyzed_tus"] = 254
         with self.assertRaises(MODULE.EvidenceError):
-            self.validate(heads, todo=todo, changelog=changelog)
+            self.validate(heads, changelog=changelog)
 
     def test_campaign_membership_drift_fails_closed(self):
         changed = copy.deepcopy(self.heads)

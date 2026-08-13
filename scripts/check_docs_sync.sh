@@ -4,12 +4,12 @@
 #   1. the canonical planning/progress files exist and are non-empty;
 #   2. no scattered per-feature PLAN-*.md briefs (fold into PLAN.md);
 #   3. a src/ change ships with a changelog entry (progress is logged).
-#   6. append-only protected-main progress and TODO state agree with git.
+#   6. append-only progress and the PLAN-derived TODO agree with protected main.
 #   7. the executable real-world replay ledger is internally consistent.
 # Runs in the required build-and-test lane, so a miss blocks merge.
 #
-# --fix appends verified protected-main transitions and regenerates the
-# derivable TODO state view (check 6) instead of only
+# --fix appends verified protected-main transitions and regenerates the whole
+# PLAN-derived TODO queue (check 6) instead of only
 # complaining about it: the guard alone catches forgetting but does not
 # undo it, and a generator alone drifts whenever nobody runs it. Both
 # together close the hole.
@@ -33,14 +33,12 @@ if [ -n "$briefs" ]; then
     fail=1
 fi
 
-# 3. changelog freshness: a src/ change must be logged. Best-effort —
-#    silently skipped when no shared base is available (shallow clone,
-#    first commit), never a false failure.
+# 3. changelog freshness: a src/ change must be logged. This guard is fully
+#    offline: CI provides origin/main through fetch-depth: 0, and local runs
+#    use only an existing tracking ref. Documentation checks never fetch.
 base=""
 if git rev-parse --verify -q origin/main >/dev/null 2>&1; then
     base=origin/main
-elif git fetch -q --depth=50 origin main 2>/dev/null; then
-    base=FETCH_HEAD
 fi
 if [ -n "$base" ] && git merge-base "$base" HEAD >/dev/null 2>&1; then
     mb=$(git merge-base "$base" HEAD)
@@ -65,25 +63,50 @@ else
 fi
 
 # --fix: append only transitions already reachable from protected main and
-# regenerate the marked TODO state view. Everything else in TODO.md remains
-# judgment and is never touched.
+# regenerate the complete open-work TODO from PLAN. Both TODO and PROGRESS are
+# generated outputs; neither contains hand-maintained judgment.
 if [ "$mode" = "--fix" ]; then
-    python3 scripts/progress_status.py sync \
-        --base-ref "${base:-origin/main}" || exit 1
+    if [ -z "$base" ]; then
+        echo "FAIL: offline status sync requires a local origin/main tracking ref."
+        echo "      Restore it explicitly before running --fix; no fetch is attempted."
+        exit 1
+    fi
+    python3 scripts/progress_status.py sync --base-ref "$base" || exit 1
     echo "fixed: verified progress appended and TODO state regenerated"
     exit 0
 fi
 
-# 6. PROGRESS/TODO <-> protected-main reality. The ledger is append-only and
-#    may call a transition MERGED only after the commit is reachable from
-#    main. TODO's marked view binds the ledger digest, verified main, branch
-#    base, and live phase refs. Main cannot record its own merge commit in the
-#    same tree, so enforcement belongs to phase branches and PR head refs.
+# 6. PLAN/PROGRESS/TODO <-> protected-main reality. The ledger is append-only
+#    and may call a transition MERGED or close a PLAN task only after the
+#    task-closing commit is reachable from main. TODO is rendered in full from
+#    the fixed PLAN catalog minus those closures, plus git-derived branch
+#    state. The v2 ledger records task-closing commits, not ordinary
+#    reconciliation merges, so a final TODO-empty reconciliation is finite.
 cur_ref="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}}"
 is_phase=0
 case "$cur_ref" in phase-*) is_phase=1 ;; esac
+is_pr=0
+case "${GITHUB_EVENT_NAME:-}" in pull_request|pull_request_target) is_pr=1 ;; esac
+if [ -n "${GITHUB_HEAD_REF:-}" ]; then is_pr=1; fi
+if [ "$is_pr" = 1 ]; then
+    python3 scripts/progress_status.py validate-ref --ref "$cur_ref" \
+        --pull-request || ref_invalid=1
+else
+    python3 scripts/progress_status.py validate-ref --ref "$cur_ref" \
+        || ref_invalid=1
+fi
+if [ "${ref_invalid:-0}" = 1 ]; then
+    echo "FAIL: development and PR heads must use a phase-* branch."
+    fail=1
+fi
 if [ "$is_phase" = 0 ]; then
-    echo "progress/state check n/a on '$cur_ref' (enforced on phase* branches)"
+    if [ "${ref_invalid:-0}" = 1 ]; then
+        echo "progress/state check skipped on rejected ref '$cur_ref'"
+    elif [ "$cur_ref" = main ]; then
+        echo "progress/state check n/a on 'main' (main CI observes the prior tree)"
+    else
+        echo "progress/state check skipped on rejected ref '$cur_ref'"
+    fi
 fi
 if [ -n "$base" ] && [ "$is_phase" = 1 ]; then
     if python3 scripts/progress_status.py check --base-ref "$base"; then

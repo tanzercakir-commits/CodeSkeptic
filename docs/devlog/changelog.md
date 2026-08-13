@@ -1,5 +1,165 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-13 — Phase 10.3 sanitizer matrix checkpoint (in progress)
+
+- Added one CMake sanitizer profile boundary shared by the production core,
+  CLI, unit tests, and four parser fuzz targets. AddressSanitizer and
+  UndefinedBehaviorSanitizer carry compile and link instrumentation; UBSAN is
+  non-recovering. Dedicated runtime tripwires prove that the selected runtime
+  is active instead of treating compiler flags as sufficient evidence.
+- Added a bounded matrix runner for complete CTest and direct single-process
+  suites, focused serial-worker evidence, clean/finding/invalid/whole-program
+  analyzer verdicts, two ordered MCP requests, and the four-target fuzz smoke
+  campaign. The serial worker proves `max_active=1`, one joined worker thread,
+  so TSAN is recorded as not applicable while production analysis remains
+  sequential.
+- Hardened the evidence boundary before retention: receipt output may not
+  overlap either build tree; current product, test, script, workflow, PLAN,
+  generated lifecycle, fuzz, and documentation inputs are source-bound while
+  bytecode and the receipt's own hash-cycle outputs are excluded. Host
+  sanitizer options are removed before each run; ASAN explicitly enables leak
+  detection and pins LSan's failure exit, while UBSAN uses its exact retained
+  environment.
+- Pre-retention probes completed both ASAN and UBSAN matrices with `1200/1200`
+  CTest entries, `1185/1185` direct C++ tests, active runtime tripwires, all
+  analyzer/MCP gates, and four parser fuzz targets. Those temporary receipts
+  predate the final manifest/environment hardening and are deliberately not
+  promotion evidence.
+- Checkpoint verification is `11/11` review-path tests and `26/26` combined
+  fuzz/sanitizer contract tests; four sanitizer contract cases are expectedly
+  skipped until retained receipts exist. The docs lifecycle guard, Python and
+  shell syntax checks, and `git diff --check` are clean. The independent
+  read-only reviewer found no remaining source-level blocker.
+- Remaining before `CS-P10-03` local completion: rerun both complete matrices
+  against the final source bytes, retain and externally checksum the two
+  receipts and logs, make all receipt contract cases execute without skips,
+  then run final regression/CI gates. This checkpoint carries no protected-main
+  task-closing trailer and does not consume generated TODO work.
+
+## 2026-08-13 — Phase 10.2 structured parser fuzzing
+
+- Corrected the fixed PLAN boundary to the four input parsers that actually
+  exist: project configuration, Clang's compilation database, CodeSkeptic's
+  strict versioned text summary/model, and MCP JSON-RPC. SARIF remains an
+  output reporter rather than an invented input format, and no analyzer-rule
+  semantics were added.
+- Added exact in-memory production parser entry points and four dedicated
+  libFuzzer targets. Config parsing now commits the complete object only after
+  a valid file; summary/model parsing commits a complete map only after a
+  valid strict record set; MCP validation never starts analysis or filesystem
+  discovery; compilation-database validation continues to use Clang's own
+  parser rather than a second JSON grammar.
+- Made existing-but-unusable config and compilation-database inputs fail
+  closed, including malformed data, dangling links, and non-regular entries;
+  a genuinely absent optional config or compile database retains its prior
+  optional/fallback behavior. An invalid requested compilation database makes
+  the verdict unavailable with exit `2` before analysis starts.
+- Tightened the summary/model schema so `qualified-name/arity` is canonical,
+  arity agrees with every parameter vector, and null-condition,
+  zero-passthrough, null-passthrough, and return-alias indices are canonical,
+  representable, and within arity. Tightened MCP envelopes to require
+  `jsonrpc: "2.0"`, a string method, and a valid JSON-RPC id kind.
+- Added a dedicated Clang/libFuzzer CMake mode, macOS/Homebrew include-order
+  repair, nine checksummed seeds, fixed target/seed/budget mapping, 64 KiB
+  input cap, five-second per-input timeout, 2 GiB RSS ceiling, per-target wall
+  timeout, mutable temporary corpora, and a separate CI smoke job that retains
+  its receipt.
+- The documented extended campaign ran all four targets for exactly `10,000`
+  inputs each with seeds `1001..1004`: all exits were `0`, no timeout or crash
+  artifact occurred, and receipt verification re-bound each current binary,
+  exact terminal run evidence, logs, corpus, campaign, toolchain, source bytes,
+  and budgets. The canonical receipt SHA-256 is
+  `e2c556426b2d076c8f1b113597e5721bc6b11844d7191d1008389654847ae3b7`;
+  the external evidence manifest pins it and all four logs.
+- RED evidence included malformed compilation-database fallback to a false
+  clean exit, partial config mutation, invalid summary arity/index acceptance,
+  invalid MCP envelopes, non-regular input paths, mutable/escaping campaign
+  paths, unbounded budget drift, and coordinated receipt/log rewrites. The
+  strict compile-database gate also exposed fail-open assumptions in the
+  diff-review fixture: base worktree path aliases, absolute and relative Git
+  renames, and a newly added TU without an explicit compile command. The
+  remapper now preserves POSIX/Windows path, case, quote, escape, build-path,
+  and directory-relative semantics, while the fixture explicitly lists every
+  analyzed TU.
+- GREEN is `17/17` focused production tests, `13/13` fuzz-contract tests,
+  `47/47` offline lifecycle/path tests, the verified `4 x 10,000` campaign,
+  `1184/1184` direct single-process C++ tests, and the final `1198/1198`
+  complete CTest package. Receipt verification, the docs lifecycle guard,
+  Python/shell syntax checks, and `git diff --check` are also clean. A
+  separate salt-read-only review found no remaining blocker in this slice.
+- This is local implementation evidence for `CS-P10-02`, not protected-main
+  completion authority. `docs/TODO.md` therefore remains generator-owned and
+  keeps the task open until an authorized protected-main completion trailer is
+  observed.
+
+## 2026-08-13 — PLAN-driven automatic TODO and PROGRESS lifecycle
+
+- Corrected the previous partial automation: `docs/PLAN.md` now contains the
+  fixed 26-item catalog: the protected-main-unclosed Phase 8.3, 8.4, and 9
+  obligations plus the Phase 10–12 program. `docs/TODO.md` is rendered entirely
+  from its still-open items and `docs/PROGRESS.md` remains a generated,
+  append-only protected-main ledger. Neither generated file is hand-edited.
+- Made only exact `Closes-CodeSkeptic-Task: CS-Pxx-yy` entries parsed from the
+  real final Git trailer block on first-parent protected-main commits completion
+  authority. A lookalike line in message prose, phase-branch trailer, local
+  test output, changelog prose, or AI statement cannot remove work from TODO.
+  Unknown, malformed, duplicate, dependency-invalid, or repeatedly closed task
+  identities fail closed.
+- Made status synchronization reject direct `main` use and made the PLAN
+  catalog immutable once protected main contains the migration. Before that
+  merge, the exact 26 IDs and catalog SHA-256 are pinned to protected-main
+  `7dfd375`; deleting PROGRESS cannot invoke normal bootstrap, and CI rejects
+  non-`phase-*` PR heads instead of skipping the generated-state gate.
+- Preserved the existing legacy PROGRESS prefix byte-for-byte and activated a
+  closure-only v2 ledger. Ordinary reconciliation commits are omitted, so one
+  trailer-free reconciliation after the final task closure can produce an
+  empty TODO and current ledger without an infinite self-recording chain.
+- RED was five focused failures proving prose could spoof a closure, deleted
+  history could bootstrap shorter, a non-phase PR bypassed the guard, Phase
+  8/9 obligations disappeared, and final reconciliation was non-terminating.
+  GREEN is `36/36` status/path tests, including byte-pinned migration, raw-byte
+  protected-main/legacy ledger and PLAN equality, host-config- and Unicode-
+  separator-independent raw trailer parsing, old-ref mature-bootstrap
+  rejection, pair-write
+  interruption and deterministic recovery, final reconciliation, manual drift,
+  malformed history, cross-commit duplicate closure, first-parent-only
+  authority plus reverse-parent anchor rejection, dependencies, and branch
+  authority.
+- Removed the obsolete duplicate Phase 9 qualification summaries from TODO's
+  evidence validator. The authoritative retained manifest, three checksummed
+  receipts per project, frozen candidate snapshot, and unique changelog
+  summary remain cross-checked; all `21/21` candidate-evidence tests and the
+  complete docs lifecycle guard pass.
+- Final local verification is `57/57` combined status/path and candidate-
+  evidence Python tests, `36/36` focused Config/MCP/docs CTest entries,
+  `1170/1170` direct single-process C++ tests, and `1183/1183` complete CTest
+  entries in `163.39 s`. The real phase branch passes the docs gate; a
+  simulated `feature-docs-bypass` head fails it with exit `1`; Python syntax
+  and `git diff --check` are clean.
+- The first real sync on `phase-robustness-input-validation` generated all 26
+  open tasks, froze the legacy ledger at its `7dfd375` v2 anchor, and appended
+  zero task receipts because protected main remains at that commit. Therefore
+  the locally GREEN `CS-P10-01` implementation correctly
+  remains open until a later authorized merge commit carries its exact trailer.
+
+## 2026-08-13 — Phase 10.1 targeted scopes fail closed
+
+- Rejected empty and delimiter-only function scopes consistently across the
+  CLI, project config, and MCP input surfaces. A malformed targeted request can
+  no longer collapse into the empty-filter meaning of “analyze all functions.”
+- Made function- and line-scope updates atomic: a rejected value leaves the
+  previously accepted scope unchanged, while valid repeated plain and
+  qualified function names remain cumulative.
+- Recorded RED first across Config and MCP tests plus an independent binary
+  replay. GREEN is three focused tests, `34/34` Config/MCP tests,
+  `1170/1170` direct single-process C++ tests, and `1183/1183` CTest entries
+  including Python and end-to-end workflow contracts. The invalid CLI replay
+  exits `2` before analysis starts; independent review found no blocking issue.
+- This completes the local implementation evidence for `CS-P10-01` only; it
+  does not authoritatively close the task before protected main contains its
+  exact completion trailer. Fuzzing, resource budgets, the 72-hour
+  stability/performance gate, and Phases 11–12 remain open.
+
 ## 2026-08-13 — Upstream candidates moved to end-of-program batch review
 
 - Replaced per-candidate owner prompts with uninterrupted internal collection.

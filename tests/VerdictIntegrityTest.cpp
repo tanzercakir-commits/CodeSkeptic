@@ -110,6 +110,32 @@ TEST(VerdictIntegrityTest, AllRegisteredRulesDisabledIsExitTwo) {
     EXPECT_EQ(result.exitCode(), 2);
 }
 
+TEST(VerdictIntegrityTest, MalformedCompileDatabaseFailsBeforeAnalysis) {
+    const auto source = writeCleanSource("verdict_bad_compdb.cpp");
+    const fs::path build =
+        fs::path(::testing::TempDir()) / "verdict_bad_compdb_build";
+    std::error_code ec;
+    fs::remove_all(build, ec);
+    fs::create_directories(build);
+    {
+        std::ofstream db(build / "compile_commands.json");
+        db << "[{\"directory\":\"unterminated";
+    }
+
+    ::testing::internal::CaptureStderr();
+    auto result = runWithOneRule(configFor(
+        {"codeskeptic", source, "--build-path", build.string()}));
+    const std::string stderr_text =
+        ::testing::internal::GetCapturedStderr();
+
+    EXPECT_TRUE(result.compile_database_failed);
+    EXPECT_EQ(result.analyzed_tus, 0u);
+    EXPECT_EQ(result.status(), AnalysisStatus::Failed);
+    EXPECT_EQ(result.exitCode(), 2);
+    EXPECT_EQ(stderr_text.find("Analysis starting"), std::string::npos);
+    fs::remove_all(build, ec);
+}
+
 TEST(VerdictIntegrityTest, ExperimentalFindingIsVisibleButDoesNotBlock) {
     const auto source = writeCleanSource("verdict_experimental.cpp");
     StaticAnalyzer analyzer(configFor({"codeskeptic", source}));

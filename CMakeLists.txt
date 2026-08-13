@@ -47,6 +47,7 @@ else()
         endif()
     endif()
 endif()
+
 message(STATUS "CodeSkeptic identity: ${CODESKEPTIC_VERSION_STRING}")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -59,19 +60,133 @@ if(APPLE AND NOT DEFINED CMAKE_PREFIX_PATH)
     set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/llvm")
 endif()
 
+# OFF for artifact builds (Docker image): the tests FetchContent
+# googletest, which needs git + network — a hermetic image build
+# shouldn't. CI and dev builds keep the default ON.
+option(CODESKEPTIC_BUILD_TESTS "Build unit tests" ON)
+option(CODESKEPTIC_BUILD_FUZZERS
+       "Build deterministic libFuzzer parser targets" OFF)
+set(CODESKEPTIC_SANITIZER "none" CACHE STRING
+    "Runtime instrumentation profile: none, address, undefined, or thread")
+set_property(CACHE CODESKEPTIC_SANITIZER PROPERTY STRINGS
+             none address undefined thread)
+set(CODESKEPTIC_SANITIZER_PROFILES none address undefined thread)
+list(FIND CODESKEPTIC_SANITIZER_PROFILES
+     "${CODESKEPTIC_SANITIZER}" CODESKEPTIC_SANITIZER_INDEX)
+if(CODESKEPTIC_SANITIZER_INDEX EQUAL -1)
+    message(FATAL_ERROR
+        "unsupported CODESKEPTIC_SANITIZER: ${CODESKEPTIC_SANITIZER}")
+endif()
+if(NOT CODESKEPTIC_SANITIZER STREQUAL "none" AND
+   NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR
+        "CodeSkeptic sanitizer profiles require Clang or AppleClang")
+endif()
+
+# One interface target makes the runtime part of every CodeSkeptic consumer:
+# production CLI, unit tests, and each dedicated libFuzzer executable. A
+# static library cannot prove a sanitizer runtime by compile flags alone; the
+# final executable must carry the matching link option too.
+add_library(codeskeptic_sanitizer_flags INTERFACE)
+set(CODESKEPTIC_SANITIZER_FLAGS "")
+if(NOT CODESKEPTIC_SANITIZER STREQUAL "none")
+    list(APPEND CODESKEPTIC_SANITIZER_FLAGS
+         "-fsanitize=${CODESKEPTIC_SANITIZER}"
+         "-fno-omit-frame-pointer")
+    if(CODESKEPTIC_SANITIZER STREQUAL "undefined")
+        list(APPEND CODESKEPTIC_SANITIZER_FLAGS
+             "-fno-sanitize-recover=undefined")
+    endif()
+    target_compile_options(codeskeptic_sanitizer_flags INTERFACE
+                           ${CODESKEPTIC_SANITIZER_FLAGS})
+    target_link_options(codeskeptic_sanitizer_flags INTERFACE
+                        ${CODESKEPTIC_SANITIZER_FLAGS})
+endif()
+if(CODESKEPTIC_BUILD_FUZZERS AND CODESKEPTIC_BUILD_TESTS)
+    message(FATAL_ERROR
+        "Fuzzer builds are dedicated: set CODESKEPTIC_BUILD_TESTS=OFF")
+endif()
+if(CODESKEPTIC_BUILD_FUZZERS AND
+   NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "CodeSkeptic fuzz targets require Clang/libFuzzer")
+endif()
+if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
+              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+    if(NOT CMAKE_OSX_SYSROOT)
+        execute_process(
+            COMMAND xcrun --show-sdk-path
+            OUTPUT_VARIABLE CODESKEPTIC_FUZZ_SDK
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE CODESKEPTIC_FUZZ_SDK_RESULT
+        )
+        if(NOT CODESKEPTIC_FUZZ_SDK_RESULT EQUAL 0 OR
+           NOT CODESKEPTIC_FUZZ_SDK)
+            message(FATAL_ERROR
+                "macOS fuzz builds require an Xcode SDK sysroot")
+        endif()
+        set(CMAKE_OSX_SYSROOT "${CODESKEPTIC_FUZZ_SDK}" CACHE PATH
+            "SDK used by the dedicated fuzz build" FORCE)
+    endif()
+endif()
+
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 
 message(STATUS "LLVM version: ${LLVM_VERSION}")
 message(STATUS "Clang include dirs: ${CLANG_INCLUDE_DIRS}")
 
-add_subdirectory(src)
+if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
+              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+    # Homebrew LLVM's imported dependency targets publish the SDK's root C
+    # include directory as a consumer include. Clang already reaches it via
+    # -isysroot; publishing it explicitly places C headers before libc++ and
+    # breaks libc++'s include_next wrappers. Remove only that redundant root
+    # include from the imported targets, leaving their link locations intact.
+    set(CODESKEPTIC_LLVM_SDK_INCLUDE "${CMAKE_OSX_SYSROOT}/usr/include")
+    foreach(CODESKEPTIC_LLVM_DEP IN ITEMS
+            FFI::ffi FFI::ffi_static LibEdit::LibEdit ZLIB::ZLIB)
+        if(TARGET ${CODESKEPTIC_LLVM_DEP})
+            get_target_property(CODESKEPTIC_LLVM_DEP_INCLUDES
+                ${CODESKEPTIC_LLVM_DEP} INTERFACE_INCLUDE_DIRECTORIES)
+            if(CODESKEPTIC_LLVM_DEP_INCLUDES)
+                list(REMOVE_ITEM CODESKEPTIC_LLVM_DEP_INCLUDES
+                    "${CODESKEPTIC_LLVM_SDK_INCLUDE}")
+                set_property(TARGET ${CODESKEPTIC_LLVM_DEP} PROPERTY
+                    INTERFACE_INCLUDE_DIRECTORIES
+                    "${CODESKEPTIC_LLVM_DEP_INCLUDES}")
+            endif()
+        endif()
+    endforeach()
+endif()
 
-# OFF for artifact builds (Docker image): the tests FetchContent
-# googletest, which needs git + network — a hermetic image build
-# shouldn't. CI and dev builds keep the default ON.
-option(CODESKEPTIC_BUILD_TESTS "Build unit tests" ON)
+add_subdirectory(src)
+if(CODESKEPTIC_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
+
 if(CODESKEPTIC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
+              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+    # FetchContent's test dependency discovery can revisit SDK-backed
+    # imported packages after the first cleanup above. Re-apply the exact
+    # property normalization after every subdirectory has been configured;
+    # CMake evaluates the transitive interface at generation time.
+    foreach(CODESKEPTIC_LLVM_DEP IN ITEMS
+            FFI::ffi FFI::ffi_static LibEdit::LibEdit ZLIB::ZLIB)
+        if(TARGET ${CODESKEPTIC_LLVM_DEP})
+            get_target_property(CODESKEPTIC_LLVM_DEP_INCLUDES
+                ${CODESKEPTIC_LLVM_DEP} INTERFACE_INCLUDE_DIRECTORIES)
+            if(CODESKEPTIC_LLVM_DEP_INCLUDES)
+                list(REMOVE_ITEM CODESKEPTIC_LLVM_DEP_INCLUDES
+                    "${CODESKEPTIC_LLVM_SDK_INCLUDE}")
+                set_property(TARGET ${CODESKEPTIC_LLVM_DEP} PROPERTY
+                    INTERFACE_INCLUDE_DIRECTORIES
+                    "${CODESKEPTIC_LLVM_DEP_INCLUDES}")
+            endif()
+        endif()
+    endforeach()
 endif()

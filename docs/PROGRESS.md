@@ -47,3 +47,9 @@ Evidence: commit `488377ad06f6d516faf57e902703208a2c0ddbcc`; tree `f0eb7874f2da9
 Evidence: commit `7dfd37596414c9512316093ff4fb6b039673f55f`; tree `de90d8425401fa3405fed7bd0a100c7a9efe0990`.
 
 <!-- cs:progress-cursor: 7dfd37596414c9512316093ff4fb6b039673f55f -->
+
+<!-- cs:task-ledger-v2: 7dfd37596414c9512316093ff4fb6b039673f55f -->
+
+> Task-ledger v2 records only protected-main commits with exact PLAN
+> closure trailers. Ordinary reconciliation commits are intentionally
+> omitted so the final generated TODO/PROGRESS state is finite.

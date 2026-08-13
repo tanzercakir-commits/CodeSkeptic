@@ -153,8 +153,9 @@ json::Value handleToolsList(const json::Value& id) {
     });
 }
 
-json::Value runAnalyze(const json::Value& id, const json::Object* args) {
-    if (!args) return makeError(id, -32602, "missing arguments");
+std::optional<std::string> configureAnalyze(
+    const json::Object* args, codeskeptic::Config& config) {
+    if (!args) return "missing arguments";
 
     static const std::set<std::string> allowedFields = {
         "path", "build_path", "functions", "lines", "summaries",
@@ -164,30 +165,31 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
     for (const auto& field : *args) {
         const std::string name = field.first.str();
         if (!allowedFields.count(name))
-            return makeError(id, -32602, "unknown analyze field: " + name);
+            return "unknown analyze field: " + name;
     }
 
     for (const auto& name : allowedFields) {
         if (args->get(name) && !args->getString(name))
-            return makeError(id, -32602,
-                             "field must be a string: " + name);
+            return "field must be a string: " + name;
+        if (auto value = args->getString(name); value && value->contains('\0'))
+            return "field must not contain NUL: " + name;
     }
 
     auto path = args->getString("path");
-    if (!path) return makeError(id, -32602, "missing required field: path");
+    if (!path) return "missing required field: path";
     if (path->empty())
-        return makeError(id, -32602, "field must not be empty: path");
+        return "field must not be empty: path";
 
-    codeskeptic::Config config;
     config.setSourcePath(path->str());
     if (auto buildPath = args->getString("build_path"))
         config.setBuildPath(buildPath->str());
-    if (auto functions = args->getString("functions"))
-        config.addFunctions(functions->str());
+    if (auto functions = args->getString("functions")) {
+        if (!config.addFunctions(functions->str()))
+            return "invalid functions scope; expected at least one name";
+    }
     if (auto lines = args->getString("lines")) {
         if (!config.addLines(lines->str()))
-            return makeError(id, -32602,
-                             "invalid lines scope; expected e.g. 10-40,55");
+            return "invalid lines scope; expected e.g. 10-40,55";
     }
     if (auto summaries = args->getString("summaries"))
         config.setSummaryIn(summaries->str());
@@ -199,11 +201,17 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         config.addFreeFunctions(freeFns->str());
     if (auto pairs = args->getString("allocator_pairs")) {
         if (!config.addAllocatorPairs(pairs->str()))
-            return makeError(
-                id, -32602,
-                "invalid allocator_pairs; expected allocator=deallocator "
-                "entries separated by commas");
+            return "invalid allocator_pairs; expected allocator=deallocator "
+                   "entries separated by commas";
     }
+    return std::nullopt;
+}
+
+json::Value runAnalyze(const json::Value& id, const json::Object* args) {
+    codeskeptic::Config config;
+    if (auto error = configureAnalyze(args, config))
+        return makeError(id, -32602, *error);
+
     // Long-lived process: parsed ASTs are kept warm between calls (the
     // fingerprint catches staleness — a stale AST is NEVER served)
     config.setWarmCache(true);
@@ -269,6 +277,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
              static_cast<int64_t>(result.incomplete_functions)},
         }},
         {"evidence", json::Object{
+            {"compile_database_failed", result.compile_database_failed},
             {"tool_failed", result.tool_failed},
             {"summary_load_failed", result.summary_load_failed},
             {"summary_stale", result.summary_stale},
@@ -293,20 +302,24 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 }
 
 json::Value handleToolsCall(const json::Value& id,
-                            const json::Object* params) {
+                            const json::Object* params,
+                            bool executeAnalysis) {
     if (!params) return makeError(id, -32602, "missing params");
     auto name = params->getString("name");
     if (!name) return makeError(id, -32602, "missing tool name");
     if (*name != "analyze")
         return makeError(id, -32602, "unknown tool: " + name->str());
-    return runAnalyze(id, params->getObject("arguments"));
+    const json::Object* arguments = params->getObject("arguments");
+    if (executeAnalysis) return runAnalyze(id, arguments);
+
+    codeskeptic::Config config;
+    if (auto error = configureAnalyze(arguments, config))
+        return makeError(id, -32602, *error);
+    return makeResponse(id, json::Object{{"validated", true}});
 }
 
-} // anonymous namespace
-
-namespace codeskeptic {
-
-std::string handleMcpMessage(const std::string& line) {
+std::string handleMcpMessageImpl(const std::string& line,
+                                 bool executeAnalysis) {
     auto parsed = json::parse(line);
     if (!parsed) {
         llvm::consumeError(parsed.takeError());
@@ -320,18 +333,27 @@ std::string handleMcpMessage(const std::string& line) {
             makeError(nullptr, -32600, "invalid request")));
     }
 
+    auto jsonrpc = msg->getString("jsonrpc");
     auto method = msg->getString("method");
     const json::Value* idPtr = msg->get("id");
     bool isNotification = (idPtr == nullptr);
     json::Value id = idPtr ? *idPtr : json::Value(nullptr);
 
+    if (!jsonrpc || *jsonrpc != "2.0") {
+        return serialize(json::Value(
+            makeError(id, -32600, "jsonrpc must be 2.0")));
+    }
+    if (idPtr && idPtr->kind() != json::Value::Null &&
+        idPtr->kind() != json::Value::String &&
+        idPtr->kind() != json::Value::Number) {
+        return serialize(json::Value(
+            makeError(nullptr, -32600, "invalid id")));
+    }
     if (!method) {
-        if (isNotification) return "";
         return serialize(json::Value(
             makeError(id, -32600, "missing method")));
     }
 
-    // Notifications (notifications/*) get no response
     if (isNotification) return "";
 
     json::Value response(nullptr);
@@ -342,12 +364,25 @@ std::string handleMcpMessage(const std::string& line) {
     } else if (*method == "tools/list") {
         response = handleToolsList(id);
     } else if (*method == "tools/call") {
-        response = handleToolsCall(id, msg->getObject("params"));
+        response = handleToolsCall(
+            id, msg->getObject("params"), executeAnalysis);
     } else {
         response = makeError(id, -32601,
                              "method not found: " + method->str());
     }
     return serialize(response);
+}
+
+} // anonymous namespace
+
+namespace codeskeptic {
+
+std::string handleMcpMessage(const std::string& line) {
+    return handleMcpMessageImpl(line, true);
+}
+
+std::string validateMcpMessage(const std::string& line) {
+    return handleMcpMessageImpl(line, false);
 }
 
 int runMcpServer() {

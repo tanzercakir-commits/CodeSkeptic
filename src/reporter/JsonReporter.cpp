@@ -56,6 +56,8 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
              << (result->no_inputs ? "true" : "false")
              << ", \"no_rules\": "
              << (result->no_rules ? "true" : "false")
+             << ", \"compile_database_failed\": "
+             << (result->compile_database_failed ? "true" : "false")
              << ", \"tool_failed\": "
              << (result->tool_failed ? "true" : "false")
              << ", \"summary_load_failed\": "

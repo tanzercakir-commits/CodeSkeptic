@@ -149,6 +149,11 @@ AnalysisResult StaticAnalyzer::run() {
     result.analyze_broken_tus = config_.analyzeBrokenTUs();
     result.accept_partial_coverage = config_.acceptPartialCoverage();
 
+    if (!source_mgr_->compilationDatabaseValid()) {
+        result.compile_database_failed = true;
+        return result;
+    }
+
     if (source_mgr_->fileCount() == 0) {
         // Analyzing nothing must not look like a clean pass: a mistyped
         // path or a relative-path file list would otherwise print

@@ -89,7 +89,6 @@ def validate_document_summary(
     project_id: str,
     snapshot: dict[str, Any],
     repetitions: int,
-    todo_text: str,
     changelog_text: str,
 ) -> None:
     display = DISPLAY_NAMES.get(project_id, project_id)
@@ -103,36 +102,28 @@ def validate_document_summary(
         "0 incomplete",
         f"{snapshot['findings']} stable findings",
     )
-    for label, text, repetition_token in (
-        ("TODO", todo_text, f"completed {repetitions} fresh accepted repetitions"),
-        (
-            "changelog",
-            changelog_text,
-            f"with {repetitions}/{repetitions} accepted repetitions",
-        ),
-    ):
-        matches = [
-            line
-            for line in text.splitlines()
-            if display in line and "current" in line and "accepted repetitions" in line
-        ]
-        require(
-            len(matches) == 1,
-            f"{project_id}: {label} must contain one current qualification summary",
-        )
-        require(
-            repetition_token in matches[0]
-            and all(token in matches[0] for token in shared_tokens)
-            and re.search(rf"(?<!\d){re.escape(coverage_token)}(?!\d)", matches[0]) is not None,
-            f"{project_id}: {label} summary differs from retained evidence",
-        )
+    matches = [
+        line
+        for line in changelog_text.splitlines()
+        if display in line and "current" in line and "accepted repetitions" in line
+    ]
+    require(
+        len(matches) == 1,
+        f"{project_id}: changelog must contain one current qualification summary",
+    )
+    repetition_token = f"with {repetitions}/{repetitions} accepted repetitions"
+    require(
+        repetition_token in matches[0]
+        and all(token in matches[0] for token in shared_tokens)
+        and re.search(rf"(?<!\d){re.escape(coverage_token)}(?!\d)", matches[0]) is not None,
+        f"{project_id}: changelog summary differs from retained evidence",
+    )
 
 
 def validate_project(
     root: Path,
     snapshot: dict[str, Any],
     batch_id: str,
-    todo_text: str,
     changelog_text: str,
 ) -> None:
     project_id = snapshot.get("id")
@@ -209,16 +200,13 @@ def validate_project(
     except RUNNER.CampaignError as exc:
         raise EvidenceError(f"{project_id}: retained receipts are invalid: {exc}") from exc
     repetitions = manifest["campaigns"][campaign]["repetitions"]
-    validate_document_summary(
-        project_id, snapshot, repetitions, todo_text, changelog_text
-    )
+    validate_document_summary(project_id, snapshot, repetitions, changelog_text)
 
 
 def validate(
     root: Path,
     heads: dict[str, Any],
     batch_id: str,
-    todo_text: str,
     changelog_text: str,
 ) -> int:
     batch = selected_batch(heads, batch_id)
@@ -227,7 +215,7 @@ def validate(
     retained = [item for item in projects if isinstance(item, dict) and "receipt_evidence" in item]
     require(retained, "candidate batch must retain at least one receipt-backed qualification")
     for snapshot in retained:
-        validate_project(root, snapshot, batch_id, todo_text, changelog_text)
+        validate_project(root, snapshot, batch_id, changelog_text)
     return len(retained)
 
 
@@ -237,7 +225,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--root", type=Path, default=root)
     parser.add_argument("--heads", type=Path, default=root / "scripts/upstream_candidate_heads.json")
     parser.add_argument("--batch", default="2026-08-12-a")
-    parser.add_argument("--todo", type=Path, default=root / "docs/TODO.md")
     parser.add_argument("--changelog", type=Path, default=root / "docs/devlog/changelog.md")
     return parser.parse_args(argv)
 
@@ -249,7 +236,6 @@ def main(argv: list[str] | None = None) -> int:
             args.root.resolve(),
             load_json(args.heads),
             args.batch,
-            args.todo.read_text(encoding="utf-8"),
             args.changelog.read_text(encoding="utf-8"),
         )
     except (EvidenceError, OSError) as exc:

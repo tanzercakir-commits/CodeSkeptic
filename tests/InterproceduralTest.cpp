@@ -18,6 +18,7 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <vector>
 
 using namespace codeskeptic;
 using namespace codeskeptic::testing;
@@ -1158,7 +1159,7 @@ TEST(SummaryPersistTest, StaleSummary_WarnsButStillWorks) {
     // break correctness, at worst it carries missing/extra claims)
     GlobalStoreGuard guard;
     auto sumPath = writePersistFile("sum_stale.txt",
-        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\tO\tU\n");
     auto src = writePersistFile("sum_stale_caller.cpp", R"(
         int* find(int c);
         void f(int c) {
@@ -1445,6 +1446,114 @@ TEST(SummaryPersistTest, V4File_ZeroFromParamOnNonUnknown_Rejected) {
     auto p = writePersistFile("sum_v4_zf_bad.txt", content);
     std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
     EXPECT_FALSE(SummaryRegistry::parseSummaryFile(p, parsed));
+}
+
+TEST(SummaryPersistTest, TextParserRejectsWholesaleWithoutChangingOutput) {
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    parsed.emplace("sentinel/0", SummaryRegistry::FunctionSummary{});
+
+    EXPECT_FALSE(SummaryRegistry::parseSummaryText(
+        "codeskeptic-summaries v11\n"
+        "valid/0\tU\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-\n"
+        "malformed suffix\n",
+        parsed));
+
+    ASSERT_EQ(parsed.size(), 1u);
+    EXPECT_EQ(parsed.count("sentinel/0"), 1u);
+
+    std::string nulSummary =
+        "codeskeptic-summaries v11\n"
+        "valid/0\tU\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-";
+    nulSummary.push_back('\0');
+    nulSummary += "suffix\n";
+    EXPECT_FALSE(SummaryRegistry::parseSummaryText(nulSummary, parsed));
+    ASSERT_EQ(parsed.size(), 1u);
+    EXPECT_EQ(parsed.count("sentinel/0"), 1u);
+}
+
+TEST(SummaryPersistTest, TextParserAcceptsCrLfButRejectsBareCarriageReturn) {
+    const std::string row =
+        "valid/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?";
+    std::map<std::string, SummaryRegistry::FunctionSummary> lf;
+    std::map<std::string, SummaryRegistry::FunctionSummary> crlf;
+    ASSERT_TRUE(SummaryRegistry::parseSummaryText(
+        "codeskeptic-summaries v11\n" + row + "\n", lf));
+    ASSERT_TRUE(SummaryRegistry::parseSummaryText(
+        "codeskeptic-summaries v11\r\n" + row + "\r\n", crlf));
+    ASSERT_EQ(lf.size(), 1u);
+    ASSERT_EQ(crlf.size(), 1u);
+    ASSERT_EQ(lf.begin()->first, crlf.begin()->first);
+    EXPECT_EQ(lf.begin()->second.params, crlf.begin()->second.params);
+    EXPECT_EQ(lf.begin()->second.paramPreconditions,
+              crlf.begin()->second.paramPreconditions);
+    EXPECT_EQ(lf.begin()->second.paramPostconditions,
+              crlf.begin()->second.paramPostconditions);
+
+    for (const std::string& malformed : std::vector<std::string>{
+             "codeskeptic-summaries v11\r" + row + "\n",
+             "codeskeptic-summaries v11\n" + row + "\r",
+             std::string("codeskeptic-summaries v11\n") +
+                 "valid\r/1\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?\n",
+         }) {
+        std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+        parsed.emplace("sentinel/0", SummaryRegistry::FunctionSummary{});
+        EXPECT_FALSE(SummaryRegistry::parseSummaryText(malformed, parsed));
+        ASSERT_EQ(parsed.size(), 1u);
+        EXPECT_EQ(parsed.count("sentinel/0"), 1u);
+    }
+}
+
+TEST(SummaryPersistTest, RejectsNonCanonicalArityAndOutOfRangeIndexes) {
+    const std::vector<std::string> malformedRows = {
+        // Declared arity and the parameter-effect vector disagree.
+        "mismatch/2\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        // A zero-parameter summary cannot condition on parameter zero.
+        "condition/0\tM\t-\tU\t0:~:~\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-",
+        "plus-bound/1\tM\tR\tU\t0:+0:3\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        "leading-zero-bound/1\tM\tR\tU\t0:00:3\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        "negative-zero-bound/1\tM\tR\tU\t0:-0:3\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        // Every persisted parameter-index relation is range checked.
+        "zero/1\tU\tR\tU\t-\t1\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        "null/1\tU\tR\tU\t-\t-\t1\t-\tO\tU\tU\tB\tU\t?\t?",
+        "alias/1\tU\tR\tU\t-\t-\t-\t1\tO\tU\tU\tB\tU\t?\t?",
+        "overflow/1\tU\tR\tU\t-\t2147483648\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        "space/1\tU\tR\tU\t-\t 0\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+        "missing-arity\tU\t-\tU\t-\t-\t-\t-\t-\t-\t-\t-\tU\t-\t-",
+        "leading-zero/01\tU\tR\tU\t-\t-\t-\t-\tO\tU\tU\tB\tU\t?\t?",
+    };
+
+    for (const auto& row : malformedRows) {
+        std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+        parsed.emplace("sentinel/0", SummaryRegistry::FunctionSummary{});
+        EXPECT_FALSE(SummaryRegistry::parseSummaryText(
+            "codeskeptic-summaries v11\n" + row + "\n", parsed)) << row;
+        ASSERT_EQ(parsed.size(), 1u) << row;
+        EXPECT_EQ(parsed.count("sentinel/0"), 1u) << row;
+    }
+}
+
+TEST(SummaryPersistTest, NonRegularSummaryInputFailsClosed) {
+    const auto root = std::filesystem::path(::testing::TempDir()) /
+                      "codeskeptic_summary_entry_kind";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    std::filesystem::create_directories(root);
+    const auto path = root / "summary.txt";
+    std::map<std::string, SummaryRegistry::FunctionSummary> parsed;
+    parsed.emplace("sentinel/0", SummaryRegistry::FunctionSummary{});
+
+    std::filesystem::create_directory(path);
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(path.string(), parsed));
+    EXPECT_EQ(parsed.size(), 1u);
+
+    std::filesystem::remove_all(path, ec);
+#ifndef _WIN32
+    std::filesystem::create_symlink(root / "missing-target", path, ec);
+    ASSERT_FALSE(ec) << ec.message();
+    EXPECT_FALSE(SummaryRegistry::parseSummaryFile(path.string(), parsed));
+    EXPECT_EQ(parsed.size(), 1u);
+#endif
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST(SummaryPersistTest, V3File_NullCondStillParses) {

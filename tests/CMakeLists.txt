@@ -63,6 +63,21 @@ target_link_libraries(codeskeptic_tests
         GTest::gtest_main
 )
 
+# Runtime tripwires prove that the selected sanitizer is linked and active.
+# They are intentionally not CTest cases: the matrix runner executes the one
+# matching the profile and requires its diagnostic/non-zero exit as evidence.
+if(CODESKEPTIC_SANITIZER STREQUAL "address")
+    add_executable(codeskeptic_sanitizer_tripwire
+                   sanitizer/AddressTripwire.cpp)
+    target_link_libraries(codeskeptic_sanitizer_tripwire PRIVATE
+                          codeskeptic_sanitizer_flags)
+elseif(CODESKEPTIC_SANITIZER STREQUAL "undefined")
+    add_executable(codeskeptic_sanitizer_tripwire
+                   sanitizer/UndefinedTripwire.cpp)
+    target_link_libraries(codeskeptic_sanitizer_tripwire PRIVATE
+                          codeskeptic_sanitizer_flags)
+endif()
+
 include(GoogleTest)
 gtest_discover_tests(codeskeptic_tests)
 
@@ -88,6 +103,12 @@ add_test(NAME UpstreamCandidateManifestContract
 add_test(NAME UpstreamCandidateEvidenceContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/UpstreamCandidateEvidenceTest.py)
+add_test(NAME FuzzingContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/FuzzingContractTest.py)
+add_test(NAME SanitizerContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/SanitizerContractTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
