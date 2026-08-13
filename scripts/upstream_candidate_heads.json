@@ -152,6 +152,37 @@
             }
           ]
         }
+      },
+      {
+        "id": "libarchive",
+        "repository": "https://github.com/libarchive/libarchive.git",
+        "default_branch": "master",
+        "head": "b738b9d38c4dffce98f29512a13fe69f23967a63",
+        "translation_units": 132,
+        "translation_unit_sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3",
+        "attempted_tus": 132,
+        "analyzed_tus": 132,
+        "coverage_batch_id": "2026-08-12-a",
+        "findings": 36,
+        "fingerprint_sha256": "d25420a7358db1903780b4098480de7d6b8249618c41c3624db09a835543ce28",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/manifest.json",
+          "receipts": [
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-1/receipt.json",
+              "sha256": "5b6e6ea06f972a5079c5dea137f11589d623966d052df8e11b2f923bc0b70d03"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-2/receipt.json",
+              "sha256": "31ce74dbddc8fd050ac3ba0962a8cd2da732b4b254d01c5b47ee18f2e27ad985"
+            },
+            {
+              "path": "scripts/upstream_candidate_receipts/2026-08-12-a/libarchive/repeat-3/receipt.json",
+              "sha256": "3d9567ca8ddc47c2aeff1617c2bb2d40a612409ced218cf54794e120461300f9"
+            }
+          ]
+        }
       }
       ]
     }
