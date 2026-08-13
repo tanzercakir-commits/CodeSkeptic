@@ -229,6 +229,7 @@ jobs:
           -DCMAKE_C_COMPILER=clang-20
           -DCMAKE_CXX_COMPILER=clang++-20
           -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           -DCODESKEPTIC_SANITIZER=${{ matrix.sanitizer }}
           -DCODESKEPTIC_BUILD_TESTS=ON
           -DCODESKEPTIC_BUILD_FUZZERS=OFF
@@ -240,6 +241,7 @@ jobs:
           -DCMAKE_C_COMPILER=clang-20
           -DCMAKE_CXX_COMPILER=clang++-20
           -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           -DCODESKEPTIC_SANITIZER=${{ matrix.sanitizer }}
           -DCODESKEPTIC_BUILD_TESTS=OFF
           -DCODESKEPTIC_BUILD_FUZZERS=ON

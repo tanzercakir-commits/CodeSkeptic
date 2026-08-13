@@ -171,6 +171,8 @@ class SanitizerContractTest(unittest.TestCase):
         self.assertIn("python3 scripts/run_sanitizer_matrix.py", workflow)
         self.assertIn("sanitizer-${{ matrix.sanitizer }}-receipt", workflow)
         self.assertIn("if-no-files-found: error", workflow)
+        self.assertEqual(
+            workflow.count("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"), 2)
 
     def test_checksum_bound_sanitizer_evidence_disables_conversion(self) -> None:
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
