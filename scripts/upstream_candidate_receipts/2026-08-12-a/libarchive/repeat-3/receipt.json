@@ -1,0 +1,77 @@
+{
+  "execution": {
+    "duration_seconds": 106.389,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "4e38c6a3d5d8c70e52c2fcd715ff6e1f192838dbd328a71d8d0f80aa733266b1",
+    "project_revision": "b738b9d38c4dffce98f29512a13fe69f23967a63",
+    "recipe_sha256": "61cefaa9ac46b3b3b13cdf6f412de1ecdb37d972195ac5cfd78fab303781afcd",
+    "repetition": 3,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3"
+  },
+  "project": "libarchive",
+  "repetition": 3,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 132,
+      "attempted_tus": 132,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 1,
+    "findings": 36,
+    "fingerprint_sha256": "d25420a7358db1903780b4098480de7d6b8249618c41c3624db09a835543ce28",
+    "fingerprints": [
+      "csf1-009357b69a617b5e",
+      "csf1-04392e4ecb423745",
+      "csf1-0a72815965d3964d",
+      "csf1-13d44a9f69e3228b",
+      "csf1-2c913100c871c2d3",
+      "csf1-33b1d5d5b204c6e3",
+      "csf1-3ba3e451f8c60e03",
+      "csf1-4184c990e4f7f360",
+      "csf1-4184c990e4f7f360",
+      "csf1-41dd0a0c51f04f62",
+      "csf1-4277a7821281a63b",
+      "csf1-4db87eafedc56fff",
+      "csf1-4df26fa0f345d563",
+      "csf1-4e153fcde7199de5",
+      "csf1-545479e2da3cbb56",
+      "csf1-5c48c834f564b12f",
+      "csf1-679e207597612f8a",
+      "csf1-6c68f828f8227ce0",
+      "csf1-746be5bf79abd073",
+      "csf1-84237ea7afc68da2",
+      "csf1-886c678c7b918bca",
+      "csf1-896484d42b0ee225",
+      "csf1-9fde615d14fc62ba",
+      "csf1-a0a07d3d109857d7",
+      "csf1-aa48b5f47a4491de",
+      "csf1-abde005f5c9365a3",
+      "csf1-acb8e3ba6c993ab8",
+      "csf1-ada80103d7e750d6",
+      "csf1-bae8f7cb0017b981",
+      "csf1-c8212d2c50980e76",
+      "csf1-cde97ee439785124",
+      "csf1-cdec637d3423c803",
+      "csf1-ce283df386052dbe",
+      "csf1-cf11b1c655e71382",
+      "csf1-dd0ac472f505f7ef",
+      "csf1-edf93b3ea23a7d3f"
+    ],
+    "translation_units": {
+      "count": 132,
+      "sha256": "881918f476cf536f770dfe34df44809b979d42b4a35959fca58d15c0386437e3"
+    }
+  },
+  "status": "accepted"
+}

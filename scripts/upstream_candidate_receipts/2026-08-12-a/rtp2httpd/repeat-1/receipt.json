@@ -1,0 +1,65 @@
+{
+  "execution": {
+    "duration_seconds": 12.435,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "5d8c21e0cfa6198b928b98463cdbce3c563b2ebd326c2121a46a3662d22d5ee3",
+    "project_revision": "e49df993ca2629bb116a29a87ce2afff24d97ef7",
+    "recipe_sha256": "3d2bf847b9d5f8bbe1d8b49ab6e0ddb810b3382f764ebf96f273d6f246657dd8",
+    "repetition": 1,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046"
+  },
+  "project": "rtp2httpd",
+  "repetition": 1,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 38,
+      "attempted_tus": 38,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 1,
+    "findings": 24,
+    "fingerprint_sha256": "12685de7ee9ff4e34ddf26b6f9216bfdf1e83ee7a1bd8b68f4ab33904242a71f",
+    "fingerprints": [
+      "csf1-0a5224c14b86b30d",
+      "csf1-22439f7d945cc9e8",
+      "csf1-318a6a5c4161df83",
+      "csf1-3aaad61c06ceb393",
+      "csf1-540019a53676e6e7",
+      "csf1-5f10519e84fc04dd",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-6fdcd37e7241bbf5",
+      "csf1-72a1d702ff6e0522",
+      "csf1-7a482a2d560c10f3",
+      "csf1-84fa15ce69d9cc90",
+      "csf1-8f2a9e783f3a196c",
+      "csf1-ac7470803a215619",
+      "csf1-ace8bf73c12ca6e7",
+      "csf1-b7368e35aa2cde9f",
+      "csf1-c32bb8c71e01485b",
+      "csf1-ccc2c6b7d9d0ee0f",
+      "csf1-dd889b21158490de",
+      "csf1-e1b03e990757ac2e",
+      "csf1-ec3ef9a00da646e4"
+    ],
+    "translation_units": {
+      "count": 38,
+      "sha256": "d813d886d83b108f00e3a21bda89da4d7f98000a97acbab4544eded5a773a046"
+    }
+  },
+  "status": "accepted"
+}
