@@ -1,0 +1,3 @@
+# Retained receipts are checksum-bound artifacts. Keep their committed bytes
+# identical on every host; line-ending conversion would invalidate evidence.
+scripts/upstream_candidate_receipts/** -text
