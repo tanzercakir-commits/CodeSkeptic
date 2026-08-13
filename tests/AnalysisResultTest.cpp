@@ -76,6 +76,12 @@ TEST(AnalysisResultTest, EvidenceAndArtifactFailuresAreLoud) {
     tool.tool_failed = true;
     EXPECT_EQ(tool.status(), AnalysisStatus::Failed);
     EXPECT_EQ(tool.exitCode(), 2);
+
+    AnalysisResult compile_database;
+    compile_database.attempted_tus = 1;
+    compile_database.compile_database_failed = true;
+    EXPECT_EQ(compile_database.status(), AnalysisStatus::Failed);
+    EXPECT_EQ(compile_database.exitCode(), 2);
 }
 
 TEST(AnalysisResultTest, SuccessfulBaselineRecordingIsZero) {

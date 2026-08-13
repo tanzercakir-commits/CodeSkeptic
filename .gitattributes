@@ -1,0 +1,8 @@
+# Retained receipts are checksum-bound artifacts. Keep their committed bytes
+# identical on every host; line-ending conversion would invalidate evidence.
+scripts/upstream_candidate_receipts/** -text
+docs/evidence/phase10/fuzz/** -text
+docs/evidence/phase10/fuzz/** -diff
+fuzz/corpus/** -text
+docs/evidence/phase10/sanitizers/** -text
+docs/evidence/phase10/sanitizers/** -diff

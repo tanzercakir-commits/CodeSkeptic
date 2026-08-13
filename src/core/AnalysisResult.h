@@ -34,6 +34,7 @@ struct AnalysisResult {
     bool accept_partial_coverage = false;
     bool no_inputs = false;
     bool no_rules = false;
+    bool compile_database_failed = false;
     bool tool_failed = false;
     bool summary_load_failed = false;
     bool summary_stale = false;
@@ -46,7 +47,8 @@ struct AnalysisResult {
     bool hasHardFailure() const {
         const bool nothing_analyzed =
             attempted_tus > 0 && analyzed_tus == 0 && !analyze_broken_tus;
-        return no_inputs || no_rules || tool_failed || nothing_analyzed ||
+        return no_inputs || no_rules || compile_database_failed ||
+               tool_failed || nothing_analyzed ||
                summary_save_failed || baseline_load_failed ||
                baseline_write_failed || report_write_failed;
     }

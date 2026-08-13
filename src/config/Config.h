@@ -16,8 +16,13 @@ public:
     Config();
 
     bool loadFromFile(const std::string& path);
+    bool loadFromText(const std::string& text,
+                      const std::string& source = "<memory>",
+                      bool reportErrors = true);
     bool parseArgs(int argc, char* argv[]);
     bool helpRequested() const { return help_requested_; }
+    bool operator==(const Config& other) const;
+    bool operator!=(const Config& other) const { return !(*this == other); }
 
     const std::string& sourcePath() const { return source_path_; }
     const std::vector<std::string>& sourceFiles() const {
@@ -84,7 +89,7 @@ public:
     bool warmCache() const { return warm_cache_; }
 
     // Programmatic scope settings (the MCP server uses these directly)
-    void addFunctions(const std::string& list);
+    bool addFunctions(const std::string& list);
     bool addLines(const std::string& list);
 
     // Fatal-assert handlers (--fatal-asserts): user-declared noreturn
@@ -164,6 +169,9 @@ public:
     const std::string& summaryDiffGate() const { return summary_diff_gate_; }
 
 private:
+    bool loadFromTextInPlace(const std::string& text,
+                             const std::string& source,
+                             bool reportErrors);
     bool parseSeverity(const std::string& str, Severity& severity) const;
     void addNamesTo(std::set<std::string>& target, const std::string& list);
 

@@ -1,0 +1,42 @@
+{
+  "schema": "codeskeptic-fuzz-campaign-v1",
+  "max_input_bytes": 65536,
+  "input_timeout_seconds": 5,
+  "rss_limit_mb": 2048,
+  "modes": {
+    "smoke": {
+      "runs_per_target": 256,
+      "wall_timeout_seconds": 120
+    },
+    "extended": {
+      "runs_per_target": 10000,
+      "wall_timeout_seconds": 900
+    }
+  },
+  "targets": [
+    {
+      "id": "config",
+      "binary": "codeskeptic_fuzz_config",
+      "corpus": "config",
+      "seed": 1001
+    },
+    {
+      "id": "compile_database",
+      "binary": "codeskeptic_fuzz_compile_database",
+      "corpus": "compile_database",
+      "seed": 1002
+    },
+    {
+      "id": "summary",
+      "binary": "codeskeptic_fuzz_summary",
+      "corpus": "summary",
+      "seed": 1003
+    },
+    {
+      "id": "mcp_json_rpc",
+      "binary": "codeskeptic_fuzz_mcp_json_rpc",
+      "corpus": "mcp_json_rpc",
+      "seed": 1004
+    }
+  ]
+}
