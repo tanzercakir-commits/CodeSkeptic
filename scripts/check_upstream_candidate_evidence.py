@@ -16,6 +16,7 @@ from typing import Any
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 DISPLAY_NAMES = {
     "abseil": "Abseil",
+    "redis": "Redis",
     "shadps4": "shadPS4",
     "tensorflow-lite": "TensorFlow Lite",
 }

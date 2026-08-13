@@ -109,8 +109,8 @@
           "findings": 62,
           "fingerprint_sha256": "1ee00ee0dd1e2bd2c529c790e753934b14844cd6e29a50f468d41e40080c9b57"
         },
-        {
-          "id": "redis",
+      {
+        "id": "redis",
           "repository": "https://github.com/redis/redis.git",
           "default_branch": "unstable",
           "head": "c3f78e4b850915ace818cc51bff8a0cbf1317d94",
@@ -118,8 +118,17 @@
           "translation_unit_sha256": "a08c96b843900b1409249a632def069a81aa01b7571eaa2b31b58600e26505fc",
           "coverage_batch_id": "2026-08-12-a",
           "findings": 0,
-          "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
-        },
+        "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "receipt_evidence": {
+          "campaign": "upstream-candidates",
+          "manifest": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/manifest.json",
+          "receipts": [
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-1/receipt.json", "sha256": "4973a4963c5d613163abb119b0b9f56dd164b2a26ba70273cecbaef1065b9442"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-2/receipt.json", "sha256": "cccca602e61ed2efcbde7cbe8109e8d4acd5cc8998fd636ddcd223b9c20c6ed2"},
+            {"path": "scripts/upstream_candidate_receipts/2026-08-12-a/redis/repeat-3/receipt.json", "sha256": "754c1551feb4856c710aa4c437380b9b16e8ff0f221e54a6e1c459d20eace603"}
+          ]
+        }
+      },
         {
           "id": "tensorflow-lite",
           "repository": "https://github.com/tensorflow/tensorflow.git",
