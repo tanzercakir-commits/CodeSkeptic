@@ -41,10 +41,21 @@ void setFindingCounts(AnalysisResult& result,
         }));
 }
 
+std::string sourceIdentity(const std::string& path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path normalized = fs::weakly_canonical(path, ec);
+    if (ec) {
+        ec.clear();
+        normalized = fs::absolute(path, ec);
+    }
+    return (ec ? fs::path(path) : normalized).lexically_normal().string();
+}
+
 } // namespace
 
 std::size_t StaticAnalyzer::totalTUs() const {
-    return source_mgr_ ? source_mgr_->fileCount() : 0;
+    return source_mgr_ ? source_mgr_->requestedFileCount() : 0;
 }
 
 std::size_t StaticAnalyzer::brokenTUCount() const {
@@ -145,7 +156,7 @@ StaticAnalyzer::~StaticAnalyzer() {
 AnalysisResult StaticAnalyzer::run() {
     diagnostics_.clear();
     AnalysisResult result;
-    result.attempted_tus = source_mgr_->fileCount();
+    result.attempted_tus = source_mgr_->requestedFileCount();
     result.analyze_broken_tus = config_.analyzeBrokenTUs();
     result.accept_partial_coverage = config_.acceptPartialCoverage();
 
@@ -185,7 +196,7 @@ AnalysisResult StaticAnalyzer::run() {
     }
 
     std::cerr << msg(MsgId::AnalysisStarting,
-                     std::to_string(source_mgr_->fileCount()),
+                     std::to_string(source_mgr_->requestedFileCount()),
                      std::to_string(engine_.enabledRuleCount())) << "\n";
 
     // Opt-in library models are declarative specifications in the existing
@@ -247,14 +258,19 @@ AnalysisResult StaticAnalyzer::run() {
         }
     }
 
+    SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
+    SourceManager::clearBrokenTUs();
+    SourceManager::setAttemptedTUCount(result.attempted_tus);
+
     // Whole-program mode (Horizon 2): pass 1 collects summaries of
     // externally-linked functions from all TUs; rules in pass 2 see the
     // real summary instead of Opaque at cross-file calls. The cost is a
     // second parse — deliberate, enabled by flag.
+    int whole_program_result = 0;
     if (config_.wholeProgram()) {
         std::cerr << msg(MsgId::WholeProgramPass,
                          std::to_string(source_mgr_->fileCount())) << "\n";
-        source_mgr_->processAll([](clang::ASTContext& ctx) {
+        whole_program_result = source_mgr_->processAll([](clang::ASTContext& ctx) {
             auto& registry = SummaryRegistry::instance();
             registry.rebuild(ctx);
             registry.harvestGlobal();
@@ -269,10 +285,6 @@ AnalysisResult StaticAnalyzer::run() {
     // equivalent values, harmless)
     if (!config_.summaryOut().empty()) engine_.enableGlobalHarvest(true);
 
-    SourceManager::setAnalyzeBrokenTUs(config_.analyzeBrokenTUs());
-    SourceManager::clearBrokenTUs();
-    SourceManager::setAttemptedTUCount(source_mgr_->fileCount());
-
     std::unordered_set<std::string> analyzed_files;
     const int analysis_result = source_mgr_->processAll(
         [this, &result, &analyzed_files](clang::ASTContext& ctx) {
@@ -281,7 +293,7 @@ AnalysisResult StaticAnalyzer::run() {
         const auto main_path = source_manager
                                    .getFilename(source_manager.getLocForStartOfFile(main_file))
                                    .str();
-        if (analyzed_files.insert(main_path).second) {
+        if (analyzed_files.insert(sourceIdentity(main_path)).second) {
             ++result.analyzed_tus;
         }
         auto findings = engine_.runAll(ctx);
@@ -297,12 +309,33 @@ AnalysisResult StaticAnalyzer::run() {
             std::cerr << "  - " << file << "\n";
     }
     result.broken_tus = SourceManager::brokenTUs().size();
+    std::unordered_set<std::string> broken_files;
+    for (const auto& file : SourceManager::brokenTUs())
+        broken_files.insert(sourceIdentity(file));
+    std::vector<std::string> unaccounted_files;
+    for (const auto& file : source_mgr_->files()) {
+        const std::string identity = sourceIdentity(file);
+        if (!analyzed_files.count(identity) && !broken_files.count(identity))
+            unaccounted_files.push_back(file);
+    }
+    const std::size_t accounted_tus = std::min(
+        result.attempted_tus, result.analyzed_tus + result.broken_tus);
+    const std::size_t unaccounted_tus = result.attempted_tus - accounted_tus;
+    if (unaccounted_tus > 0) {
+        std::cerr << msg(MsgId::RequestedTuUnaccounted,
+                         std::to_string(unaccounted_tus)) << "\n";
+        for (const auto& file : unaccounted_files)
+            std::cerr << "  - " << file << "\n";
+    }
     // ClangTool returns non-zero for ordinary compile diagnostics as well as
     // driver failures. Broken TUs are already accounted explicitly; only an
     // unaccounted failure is a separate hard tool failure unless the caller
     // explicitly accepted a verdict over the translation units that did run.
-    if (analysis_result != 0 && !config_.acceptPartialCoverage() &&
-        result.analyzed_tus + result.broken_tus < result.attempted_tus)
+    const bool tool_returned_failure =
+        whole_program_result != 0 || analysis_result != 0;
+    if (tool_returned_failure &&
+        (result.broken_tus == 0 ||
+         result.analyzed_tus + result.broken_tus < result.attempted_tus))
         result.tool_failed = true;
 
     // Coverage: surface concrete functions whose CFG could not be built or

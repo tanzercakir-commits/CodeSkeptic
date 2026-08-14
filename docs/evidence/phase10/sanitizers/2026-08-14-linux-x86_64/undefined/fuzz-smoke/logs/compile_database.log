@@ -1,8 +1,8 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1002
-INFO: Loaded 1 modules   (4523 inline 8-bit counters): 4523 [0x55b290d3a970, 0x55b290d3bb1b), 
-INFO: Loaded 1 PC tables (4523 PCs): 4523 [0x55b290d3bb20,0x55b290d4d5d0), 
-INFO:        2 files found in /receipts/undefined-final-trace2/codeskeptic-fuzz-8u8vebjz/corpus/compile_database
+INFO: Loaded 1 modules   (4527 inline 8-bit counters): 4527 [0x55fbf7a25970, 0x55fbf7a26b1f), 
+INFO: Loaded 1 PC tables (4527 PCs): 4527 [0x55fbf7a26b20,0x55fbf7a38610), 
+INFO:        2 files found in /workspace/build/p10.4-sanitizer-evidence/undefined/codeskeptic-fuzz-db45f1o0/corpus/compile_database
 INFO: seed corpus: files: 2 min: 28b max: 123b total: 151b rss: 83Mb
 YAML:1:28: error: Expected quote at end of scalar
 [{"directory":"unterminated
@@ -23,7 +23,7 @@ YAML:1:29: error: Expected quote at end of scalar
 [{"direÿÿÿÿÿÿÿÿminaþtinaþted
 YAML:1:29: error: Expected quote at end of scalar
 [{"direÿÿÿÿÿÿÿÿminaþtinaþted
-#7	NEW    cov: 43 ft: 45 corp: 3/180b lim: 123 exec/s: 0 rss: 84Mb L: 29/123 MS: 4 InsertByte-CopyPart-CMP-CMP- DE: "\377\377\377\377\377\377\377\377"-"\001\000\000\000"-
+#7	NEW    cov: 43 ft: 45 corp: 3/180b lim: 123 exec/s: 0 rss: 83Mb L: 29/123 MS: 4 InsertByte-CopyPart-CMP-CMP- DE: "\377\377\377\377\377\377\377\377"-"\001\000\000\000"-
 YAML:3:13: error: Expected quote at end of scalar
    [{"direÿÿ 
 YAML:3:13: error: Expected quote at end of scalar

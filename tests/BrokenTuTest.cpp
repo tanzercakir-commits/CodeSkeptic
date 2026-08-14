@@ -1,4 +1,6 @@
+#include "analyzer/StaticAnalyzer.h"
 #include "config/Config.h"
+#include "rules/DivByZeroRule.h"
 #include "source_manager/SourceManager.h"
 
 #include <gtest/gtest.h>
@@ -21,7 +23,8 @@ namespace fs = std::filesystem;
 // initializers and declarations, and rules then report confidently
 // about code that does not exist (measured on Godot: a single missing
 // generated header turned into 298 spurious uninit-ptr ERRORS across
-// 176 TUs). --analyze-broken-tus restores the old behavior.
+// 176 TUs). --analyze-broken-tus may collect findings from the recovered
+// AST, but the broken evidence still prevents a project verdict.
 
 namespace {
 
@@ -79,8 +82,129 @@ TEST(BrokenTuTest, AnalyzeBrokenTUsOverride) {
     sm.processAll([&](clang::ASTContext&) { ++callbacks; });
 
     EXPECT_EQ(callbacks, 1);
-    EXPECT_TRUE(SourceManager::brokenTUs().empty());
+    ASSERT_EQ(SourceManager::brokenTUs().size(), 1u);
+    EXPECT_NE(SourceManager::brokenTUs()[0].find("bad.cpp"),
+              std::string::npos);
     SourceManager::setAnalyzeBrokenTUs(false);
+    SourceManager::clearBrokenTUs();
+}
+
+TEST(BrokenTuTest, RecoveryOptInStillCannotProduceAVerdict) {
+    TempTu tu("cs_broken_tu_recovery_verdict", kBrokenSource);
+    Config config;
+    const std::string source = (tu.dir / "bad.cpp").string();
+    const std::string build = tu.dir.string();
+    const char* argv[] = {
+        "codeskeptic", "--source", source.c_str(),
+        "--build-path", build.c_str(), "--analyze-broken-tus",
+        "--accept-partial-coverage"};
+    ASSERT_TRUE(config.parseArgs(7, const_cast<char**>(argv)));
+
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<DivByZeroRule>();
+    const AnalysisResult result = analyzer.run();
+
+    EXPECT_EQ(result.attempted_tus, 1u);
+    EXPECT_EQ(result.analyzed_tus, 1u);
+    EXPECT_EQ(result.broken_tus, 1u);
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(BrokenTuTest, MissingExplicitFileRemainsAttemptedAndFailsClosed) {
+    const fs::path dir =
+        fs::temp_directory_path() / "cs_missing_requested_tu";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path valid = dir / "valid.cpp";
+    const fs::path missing = dir / "missing.cpp";
+    const fs::path list = dir / "files.txt";
+    {
+        std::ofstream source(valid);
+        source << "int valid() { return 1; }\n";
+    }
+    {
+        std::ofstream files(list);
+        files << valid.string() << "\n" << missing.string() << "\n";
+    }
+
+    Config config;
+    const std::string list_arg = list.string();
+    const std::string build = dir.string();
+    const char* argv[] = {
+        "codeskeptic", "--files", list_arg.c_str(),
+        "--build-path", build.c_str(), "--accept-partial-coverage"};
+    ASSERT_TRUE(config.parseArgs(6, const_cast<char**>(argv)));
+
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<DivByZeroRule>();
+    const AnalysisResult result = analyzer.run();
+
+    EXPECT_EQ(analyzer.totalTUs(), 2u);
+    EXPECT_EQ(result.attempted_tus, 2u);
+    EXPECT_EQ(result.analyzed_tus, 1u);
+    EXPECT_EQ(result.broken_tus, 0u);
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
+    fs::remove_all(dir, ec);
+}
+
+TEST(BrokenTuTest, WholeProgramRecoveryPreservesBrokenEvidence) {
+    TempTu tu("cs_whole_program_broken_recovery", kBrokenSource);
+    Config config;
+    const std::string source = (tu.dir / "bad.cpp").string();
+    const std::string build = tu.dir.string();
+    const char* argv[] = {
+        "codeskeptic", "--source", source.c_str(),
+        "--build-path", build.c_str(), "--whole-program",
+        "--analyze-broken-tus", "--accept-partial-coverage"};
+    ASSERT_TRUE(config.parseArgs(8, const_cast<char**>(argv)));
+
+    StaticAnalyzer analyzer(std::move(config));
+    analyzer.addRule<DivByZeroRule>();
+    const AnalysisResult result = analyzer.run();
+
+    EXPECT_EQ(result.attempted_tus, 1u);
+    EXPECT_EQ(result.analyzed_tus, 1u);
+    EXPECT_EQ(result.broken_tus, 1u);
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
+TEST(BrokenTuTest, WarmCacheAstFailureRecordsExactRequestedTu) {
+    const fs::path dir = fs::temp_directory_path() / "cs_warm_ast_failure";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path source = dir / "orphan.cpp";
+    {
+        std::ofstream file(source);
+        file << "int orphan() { return 0; }\n";
+    }
+    {
+        std::ofstream database(dir / "compile_commands.json");
+        database << "[]\n";
+    }
+
+    SourceManager::clearBrokenTUs();
+    SourceManager manager(dir.string());
+    manager.addSourceFile(source.string());
+    manager.enableWarmCache(true);
+    int callbacks = 0;
+    const int result =
+        manager.processAll([&](clang::ASTContext&) { ++callbacks; });
+
+    EXPECT_NE(result, 0);
+    EXPECT_EQ(callbacks, 0);
+    ASSERT_EQ(SourceManager::brokenTUs().size(), 1u);
+    EXPECT_EQ(fs::path(SourceManager::brokenTUs()[0]).filename(),
+              source.filename());
+    SourceManager::clearWarmCache();
+    SourceManager::clearBrokenTUs();
+    fs::remove_all(dir, ec);
 }
 
 TEST(BrokenTuTest, CleanTuStillAnalyzed) {

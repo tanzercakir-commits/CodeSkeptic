@@ -115,8 +115,7 @@ class SanitizerContractTest(unittest.TestCase):
                 "docs/PLAN.md",
                 ".github/workflows/release.yml"):
             self.assertIn(required, files)
-        self.assertFalse(any(path.startswith(
-            "docs/evidence/phase10/sanitizers/") for path in files))
+        self.assertFalse(any(path.startswith("docs/evidence/") for path in files))
         self.assertNotIn("docs/devlog/changelog.md", files)
         self.assertFalse(any("__pycache__" in path for path in files))
         self.assertFalse(any(path.endswith((".pyc", ".pyo")) for path in files))

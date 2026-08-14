@@ -229,14 +229,19 @@ const MsgEntry kMessages[] = {
      "[CodeSkeptic] analiz kapsami: {0} fonksiyon icin veri akisi "
      "tamamlanamadi; bu fonksiyonlardaki bulgular eksik olabilir:"},
     // BrokenTuSkipped
-    {"[CodeSkeptic] {0} translation unit(s) failed to COMPILE and were "
-     "skipped - findings from an error-recovery AST are unreliable. Fix "
-     "the include paths/flags, or pass --analyze-broken-tus to analyze "
-     "anyway:",
-     "[CodeSkeptic] {0} ceviri birimi DERLENEMEDI ve atlandi - hata "
-     "kurtarmali AST'den gelen bulgular guvenilmezdir. Include yollarini/"
-     "bayraklari duzeltin ya da yine de analiz icin --analyze-broken-tus "
-     "verin:"},
+    {"[CodeSkeptic] {0} translation unit(s) failed to COMPILE. Findings "
+     "from an error-recovery AST are non-verdict evidence. Fix the include "
+     "paths/flags; --analyze-broken-tus may inspect the recovered AST but "
+     "the verdict remains unavailable:",
+     "[CodeSkeptic] {0} ceviri birimi DERLENEMEDI. Hata kurtarmali AST "
+     "bulgulari karar kaniti degildir. Include yollarini/bayraklari "
+     "duzeltin; --analyze-broken-tus kurtarilan AST'yi inceleyebilir ancak "
+     "karar yine uretilemez:"},
+    // RequestedTuUnaccounted
+    {"[CodeSkeptic] {0} requested translation unit(s) were not analyzed or "
+     "classified as broken; verdict evidence is incomplete:",
+     "[CodeSkeptic] istenen {0} ceviri birimi analiz edilmedi veya bozuk "
+     "olarak siniflandirilmadi; karar kaniti eksik:"},
     // AssumptionNonNullParam
     {"inferred assumption: parameter '{0}' is assumed non-null "
      "(dereferenced, never checked); this precondition is undeclared "
@@ -261,12 +266,12 @@ const MsgEntry kMessages[] = {
      "compile - NOTHING was analyzed, so this is not a clean result "
      "(exit 2). Fix the include paths/flags (macOS: SDKROOT / xcrun), "
      "pass --build-path with your compile_commands.json, or use "
-     "--analyze-broken-tus to force analysis on error-recovery ASTs.",
+     "--analyze-broken-tus only to inspect error-recovery evidence.",
      "[CodeSkeptic] ANALIZ BASARISIZ: hicbir ceviri birimi derlenemedi - "
      "HICBIR SEY analiz edilmedi, bu temiz bir sonuc degildir (exit 2). "
      "Include yollarini/bayraklari duzeltin (macOS: SDKROOT / xcrun), "
      "compile_commands.json ile --build-path verin ya da "
-     "--analyze-broken-tus ile zorlayin."},
+     "--analyze-broken-tus ile yalniz hata-kurtarma kanitini inceleyin."},
     // MultipleSourcePaths
     {"[CodeSkeptic] multiple source paths given ('{0}' then '{1}') - "
      "only one positional path is accepted. Pass a DIRECTORY to analyze "

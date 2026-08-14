@@ -30,6 +30,8 @@ struct AnalysisResult {
     std::size_t findings = 0;
     std::size_t report_only_findings = 0;
 
+    // These flags can request additional diagnostic evidence, but they never
+    // turn a broken or skipped requested TU into a trustworthy verdict.
     bool analyze_broken_tus = false;
     bool accept_partial_coverage = false;
     bool no_inputs = false;
@@ -54,12 +56,9 @@ struct AnalysisResult {
     }
 
     bool hasIncompleteEvidence() const {
-        const bool partial_tu_coverage =
-            broken_tus > 0 && !analyze_broken_tus &&
-            !accept_partial_coverage;
+        const bool partial_tu_coverage = broken_tus > 0;
         const bool unaccounted_tus =
-            analyzed_tus + broken_tus < attempted_tus &&
-            !accept_partial_coverage;
+            analyzed_tus + broken_tus < attempted_tus;
         return partial_tu_coverage || unaccounted_tus ||
                incomplete_functions > 0 ||
                summary_load_failed || summary_stale;

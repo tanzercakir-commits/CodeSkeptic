@@ -1,5 +1,48 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-14 — Phase 10.4 frontend and CFG stress matrix locally complete
+
+- Made verdict availability unconditional over the requested translation-unit
+  set. Missing paths are counted before filtering, broken ASTs remain recorded
+  even when recovery analysis is requested, whole-program prepass failures are
+  preserved, warm-cache AST failures name the exact TU, and neither
+  `--accept-partial-coverage` nor `--analyze-broken-tus` can manufacture exit
+  `0`/`1` from broken or skipped requested input. Recovery findings remain
+  available as explicitly non-verdict evidence.
+- Added a checksum-bound production CLI matrix with nine fixed cases covering
+  templates, dependent templates, nested macros, malformed templates/source,
+  a 64-way CFG, mixed clean/broken input, recovered broken ASTs, and a missing
+  requested TU. Every case runs twice with a 30-second crash/hang tripwire and
+  machine-checks process/report exit, status, completeness, exact TU coverage,
+  seeded findings, clean twins, and stable semantic hashes. The retained Linux
+  x86_64 run accepted `9/9` cases and `18/18` executions with zero timeout or
+  crash in `314` ms. Its receipt SHA-256 is
+  `588bcf2815b0d5495640007d733522d92e6f0abc8d45439f0de6721a9ea155b3`;
+  the 37-entry outer manifest SHA-256 is
+  `d75ce7f08371b6fb49b50f77ff0f35e49a8931aed36b7e72ec256ec8e0814fcd`.
+- Replaced the permissive real-world source-tree scan with each pinned
+  project's exact compile-database surface. cJSON is now `23/23` analyzed,
+  zero broken, zero missing, and 48 findings; tinyxml2 is `2/2`, zero broken,
+  zero missing, and 9 findings. The harness rejects any requested/enumerated
+  mismatch or incomplete TU before comparing finding pins.
+- Refreshed the retained ASAN and UBSAN matrices for the final P10.4 source
+  bytes. Both bind the same 358-file source manifest
+  `bc47c54a5baaaa9a8f2087c7f0b5d875a6c482342c1f49f6118398b019453e9c`,
+  pass all ten runtime gates, `1208/1208` CTest entries, `1192/1192` direct
+  C++ tests, and four fuzz smoke targets. ASAN receipt SHA-256 is
+  `f5aaddde5f04055634a6a03d5c2d1b48bd86317e8eef313e1ee60dd2bb449ec8`;
+  UBSAN is
+  `badb578d5034fe66d4cbfc74e1c4830fd74f783f302f452fd04a1be5191e5d48`;
+  their 40-entry outer manifest is
+  `36f20ad6a8ea65e15035d7d74a2d5d73f48d60379f1fde3d98b4d4438f8f19f6`.
+  Both receipt verifiers pass and `SanitizerContract` is `13/13` with no
+  skips. Evidence directories are excluded from source manifests to prevent
+  later phase receipts from creating cross-matrix hash cycles.
+- Independent read-only pre-evidence review found no blocking implementation
+  issue. `CS-P10-04` remains open pending final retained-evidence audit and
+  hosted Linux/Windows CI; this work stays on `phase-frontend-cfg-stress` and
+  does not write to or merge protected `main`.
+
 ## 2026-08-14 — Phase 10.3 sanitizer matrix locally complete
 
 - Closed the three failures exposed by PR #142 CI. ASAN now disables only

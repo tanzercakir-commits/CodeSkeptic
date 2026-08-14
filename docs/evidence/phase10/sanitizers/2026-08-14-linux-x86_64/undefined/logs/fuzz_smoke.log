@@ -1,2 +1,2 @@
-fuzz campaign accepted: /receipts/undefined-final-trace2/fuzz-smoke
+fuzz campaign accepted: /workspace/build/p10.4-sanitizer-evidence/undefined/fuzz-smoke
 CODESKEPTIC_SANITIZER_GATE_OK fuzz_smoke
