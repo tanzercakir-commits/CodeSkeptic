@@ -9,9 +9,9 @@
   "campaign_manifest_sha256": "ebe579cc13c1634c813ce9e5a04e654083db39d8b983f4622722ee6da1efd9c4",
   "corpus_file_count": 9,
   "corpus_manifest_sha256": "1a0dfa35e82342e7d043b64d216a46a405962a03ae4c1bf74e5e3d3dc99db343",
-  "duration_ms": 853,
+  "duration_ms": 908,
   "failures": [],
-  "finished_at": "2026-08-14T10:38:39.243576+00:00",
+  "finished_at": "2026-08-14T11:39:11.596574+00:00",
   "host": {
     "machine": "x86_64",
     "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.39",
@@ -20,14 +20,14 @@
   "mode": "smoke",
   "schema": "codeskeptic-fuzz-receipt-v1",
   "source": {
-    "commit": "f8af2d0e12060d91930635d41a8c2a1be236d841",
+    "commit": "113d5d2c14a78895b19674f62b293f4d7ee85251",
     "manifest": {
       "algorithm": "sha256",
       "digest": "8f1af5ddc40bb07c86783f710cc9c09cac336f342c8022e6e65c088e0508e25e",
       "file_count": 125
     }
   },
-  "started_at": "2026-08-14T10:38:38.390693+00:00",
+  "started_at": "2026-08-14T11:39:10.688763+00:00",
   "status": "accepted",
   "targets": [
     {
@@ -47,7 +47,7 @@
       "exit_code": 0,
       "id": "config",
       "log": "logs/config.log",
-      "log_sha256": "5f8f4fe77d5bb3a04d94da20347569bdf353615325bdeb304eaecca88730e8d9"
+      "log_sha256": "0ac998063dfa14b77b987cfbafb4cdbedc7895515da24e3ecb1e2542c6c35231"
     },
     {
       "artifacts": [],
@@ -66,7 +66,7 @@
       "exit_code": 0,
       "id": "compile_database",
       "log": "logs/compile_database.log",
-      "log_sha256": "6cd56d1af0f58d70e095deda47d0e04f768792c343e61f123f9f09d0f2119f86"
+      "log_sha256": "f169f8ae57951ffa5d9fea3b584e27b411cc12b48f68e57befb23ec147141aab"
     },
     {
       "artifacts": [],
@@ -85,11 +85,11 @@
       "exit_code": 0,
       "id": "summary",
       "log": "logs/summary.log",
-      "log_sha256": "27aeca51bcec1f585c6c1a5e1ff3115681d237de2da32d0197d7d5860dc33069"
+      "log_sha256": "6072b7a7650b67419d55c131cbfea76275b7687b7dad99f8bff242319560cb6f"
     },
     {
       "artifacts": [],
-      "binary_sha256": "69928f59f1a44c72400caaf55c0458f0b2fa1ced63720da47504cb027f49992d",
+      "binary_sha256": "0f1f79cc4cf8549085f8ed447947d70a85362a6b4905386b3670eaebe620a005",
       "command": [
         "$BUILD_DIR/fuzz/codeskeptic_fuzz_mcp_json_rpc",
         "-seed=1004",
@@ -100,11 +100,11 @@
         "-artifact_prefix=$ARTIFACT_DIR/",
         "$MUTABLE_CORPUS/mcp_json_rpc"
       ],
-      "duration_ms": 165,
+      "duration_ms": 215,
       "exit_code": 0,
       "id": "mcp_json_rpc",
       "log": "logs/mcp_json_rpc.log",
-      "log_sha256": "24177b5ed7875b41ee5302b114225dc0fae45a010620652b09479ed715368f63"
+      "log_sha256": "528ef1d7e6627f1d4d45fa07a44d0e034138a3c59a15ea3cc363fffa8d71ecc9"
     }
   ],
   "toolchain": {

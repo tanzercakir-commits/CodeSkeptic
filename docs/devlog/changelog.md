@@ -12,22 +12,24 @@
   53 missing compile commands, and 23 analyzed units; tinyxml2 recorded 3, 1,
   and 2 respectively. A request that analyzes zero units remains a hard
   failure with exit `2`, including when both partial-coverage and broken-TU
-  opt-ins are set. Windows pins PLAN and shell files to LF and selects Git Bash
-  instead of the WSL launcher for the offline docs guard.
+  opt-ins are set. Windows pins PLAN and shell files to LF, selects Git Bash
+  instead of the WSL launcher for the offline docs guard, and checks out full
+  history so protected-main anchor and merge-base checks have their required
+  objects.
 - Bounded sanitizer build parallelism at two jobs after a four-job local run
   caused system-wide resource pressure on a 16 GiB workstation. The final
   runs used Ubuntu Clang 20.1.2 and bound 352 source files with manifest
-  `4a6c33fd9e90ef6b83f0a44fcb12a15801ed3c819f979f851e90c9b6ab15e2ec`.
+  `498469fc48f0dd48a6dd7f4e349794f9d8f0777f3c147d5e5645925ea175fed4`.
 - Retained accepted Linux x86_64 ASAN and UBSAN trees under
   `docs/evidence/phase10/sanitizers/2026-08-14-linux-x86_64`. Each profile
   passed all ten runtime gates, `1202/1202` CTest entries, `1187/1187` direct
   C++ tests, all representative analyzer/MCP checks, and all four fuzz smoke
-  targets. ASAN completed in `69590` ms with receipt SHA-256
-  `ecc5623862ab2b91894091767fdb8ebc2ddb0ece41680cf064ced6e859930698`;
-  UBSAN completed in `67912` ms with receipt SHA-256
-  `7d7fa7a6f453ff5d24a4346dac4b358f1b1f7b1cc8871a3dc16eba812a9ae3f8`.
+  targets. ASAN completed in `901142` ms with receipt SHA-256
+  `24772f5a82489afec944fc6da7600f867eae7bd47acaca739455019ddd228356`;
+  UBSAN completed in `1210134` ms with receipt SHA-256
+  `174305199bd67769d61501e392df913d7213a36569ce0bc6256e3bcd0770337b`.
 - The external manifest pins every retained receipt and log; its SHA-256 is
-  `852346f0978070818604bbe3a8f91938548aecc8ce0542bc2e0a664c032ef6b0`.
+  `8657403e412b07439cdcfbba62b0557d30a4aeb3d5757c193017e36bbf79423f`.
   Both receipts pass independent verifier mode, all manifest entries pass
   `sha256sum -c`, and the sanitizer contract is `13/13` with no skips. The
   focused serial-worker gate records TSAN as not applicable with one joined

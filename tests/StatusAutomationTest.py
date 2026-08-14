@@ -141,6 +141,15 @@ class RepositoryFixture:
 
 
 class ProgressStatusTest(unittest.TestCase):
+    def test_windows_lifecycle_checkout_has_full_history(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "windows.yml").read_text(
+            encoding="utf-8"
+        )
+        checkout = workflow.split("- uses: actions/checkout@v4", 1)[1].split(
+            "- name:", 1
+        )[0]
+        self.assertIn("fetch-depth: 0", checkout)
+
     def test_corpus_coverage_excludes_missing_compile_commands(self) -> None:
         runner = (ROOT / "scripts" / "run_corpus.sh").read_text(
             encoding="utf-8"
