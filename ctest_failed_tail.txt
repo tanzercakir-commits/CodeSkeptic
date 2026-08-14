@@ -1,0 +1,7 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1188: StatusAutomationContract
+1/1 Test #1188: StatusAutomationContract .........   Passed   38.05 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =  38.09 sec
