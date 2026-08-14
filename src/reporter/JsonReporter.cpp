@@ -79,6 +79,25 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
              << result->findings << ", \"blocking\": "
              << result->blockingFindings() << ", \"report_only\": "
              << result->report_only_findings << " },\n";
+        file << "  \"translation_units\": [";
+        for (size_t i = 0; i < result->tu_receipts.size(); ++i) {
+            const auto& receipt = result->tu_receipts[i];
+            if (i > 0) file << ",";
+            file << "\n    { \"path\": \""
+                 << escapeJson(receipt.canonical_path)
+                 << "\", \"compile_command_sha256\": \""
+                 << escapeJson(receipt.compile_command_sha256)
+                 << "\", \"command_ordinal\": "
+                 << receipt.command_ordinal
+                 << ", \"phase\": \"" << escapeJson(receipt.phase)
+                 << "\", \"status\": \""
+                 << translationUnitStatusName(receipt.status)
+                 << "\", \"duration_ms\": " << receipt.duration_ms
+                 << ", \"peak_memory_kib\": " << receipt.peak_memory_kib
+                 << ", \"timeout_seconds\": " << receipt.timeout_seconds
+                 << ", \"memory_mib\": " << receipt.memory_mib << " }";
+        }
+        file << (result->tu_receipts.empty() ? "],\n" : "\n  ],\n");
     }
     file << "  \"total\": " << diagnostics.size() << ",\n";
     file << "  \"diagnostics\": [";

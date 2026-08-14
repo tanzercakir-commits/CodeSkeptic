@@ -1,30 +1,36 @@
 #include "analyzer/StaticAnalyzer.h"
+#include "analyzer/DefaultRules.h"
+#include "analyzer/WorkerRuntime.h"
 #include "core/Capabilities.h"
 #include "config/Config.h"
 #include "core/Messages.h"
+#include "core/ResourceWorkerControl.h"
 #include "engine/SummaryDiff.h"
-#include "rules/DivByZeroRule.h"
-#include "rules/IntOverflowRule.h"
-#include "rules/SignConversionRule.h"
-#include "rules/AllocSizeOverflowRule.h"
-#include "rules/BoundsRule.h"
-#include "rules/AssumptionRule.h"
-#include "rules/MemoryLeakRule_Ex.h"
-#include "rules/FdResourceRule.h"
-#include "rules/NullDerefRule.h"
-#include "rules/ContractRule.h"
-#include "rules/PolicyRule.h"
-#include "rules/UninitPointerRule_Ex.h"
 #include "server/McpServer.h"
 
 #include <cstring>
+#include <filesystem>
 #include <iostream>
+#include <llvm/Support/FileSystem.h>
 
 #ifndef CODESKEPTIC_VERSION
 #define CODESKEPTIC_VERSION "0.0.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
+    if (argc > 1 &&
+        std::strcmp(argv[1], "--internal-tu-worker") == 0) {
+        std::string resource_error;
+        const auto initialized = codeskeptic::initializeResourceWorker(
+            argc, argv, resource_error);
+        if (initialized ==
+            codeskeptic::ResourceWorkerInitialization::Failed) {
+            std::cerr << "[CodeSkeptic worker] " << resource_error << "\n";
+            return 70;
+        }
+        if (argc != 3) return 70;
+        return codeskeptic::runTranslationUnitWorker(argv[2]);
+    }
     // --version exits 0 by convention (unlike --help's usage-error exit)
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--version") == 0) {
@@ -74,10 +80,19 @@ int main(int argc, char* argv[]) {
     }
     if (config.helpRequested()) return 0;
 
+    std::string executable = llvm::sys::fs::getMainExecutable(
+        argv[0], reinterpret_cast<void*>(&main));
+    if (executable.empty()) {
+        std::error_code ec;
+        executable = std::filesystem::absolute(argv[0], ec).string();
+        if (ec) executable = argv[0];
+    }
+    config.setWorkerProgram(std::move(executable));
+
     codeskeptic::setLang(codeskeptic::parseLang(config.lang()));
 
     if (config.serve()) {
-        return codeskeptic::runMcpServer();
+        return codeskeptic::runMcpServer(config);
     }
 
     // Summary-diff mode: not analysis, but a contract-diff report
@@ -96,18 +111,7 @@ int main(int argc, char* argv[]) {
 
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
 
-    analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
-    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
-    analyzer.addRule<codeskeptic::FdResourceRule>();
-    analyzer.addRule<codeskeptic::DivByZeroRule>();
-    analyzer.addRule<codeskeptic::IntOverflowRule>();
-    analyzer.addRule<codeskeptic::SignConversionRule>();
-    analyzer.addRule<codeskeptic::AllocSizeOverflowRule>();
-    analyzer.addRule<codeskeptic::BoundsRule>();
-    analyzer.addRule<codeskeptic::AssumptionRule>();
-    analyzer.addRule<codeskeptic::NullDerefRule>();
-    analyzer.addRule<codeskeptic::ContractRule>();
-    analyzer.addRule<codeskeptic::PolicyRule>();
+    codeskeptic::registerDefaultRules(analyzer);
 
     const codeskeptic::AnalysisResult result = analyzer.run();
     const int exit_code = result.exitCode();

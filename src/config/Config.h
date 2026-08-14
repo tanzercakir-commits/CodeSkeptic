@@ -3,6 +3,7 @@
 
 #include "core/Diagnostic.h"
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -13,6 +14,11 @@ namespace codeskeptic {
 
 class Config {
 public:
+    static constexpr unsigned kDefaultTuTimeoutSeconds = 300;
+    static constexpr unsigned kDefaultTuMemoryMiB = 4096;
+    static constexpr unsigned kMaxTuTimeoutSeconds = 86400;
+    static constexpr unsigned kMaxTuMemoryMiB = 131072;
+
     Config();
 
     bool loadFromFile(const std::string& path);
@@ -57,6 +63,28 @@ public:
     // allow a verdict over the successfully analyzed subset. Default is
     // fail-closed; integrations must opt in deliberately.
     bool acceptPartialCoverage() const { return accept_partial_coverage_; }
+    unsigned tuTimeoutSeconds() const { return tu_timeout_seconds_; }
+    unsigned tuMemoryMiB() const { return tu_memory_mib_; }
+    bool setTuTimeoutSeconds(std::uint64_t value);
+    bool setTuMemoryMiB(std::uint64_t value);
+    // Exact analysis settings forwarded to an isolated translation-unit
+    // worker. Parent-only inputs/outputs, resource limits, and control modes
+    // are deliberately excluded: the coordinator supplies one exact source
+    // command and owns the final project artifact/verdict.
+    std::vector<std::string> workerArguments(
+        const std::vector<std::string>& available_rule_ids,
+        const std::string& summary_override = {},
+        bool replace_configured_summaries = false) const;
+    void setWorkerProgram(std::string path) {
+        worker_program_ = std::move(path);
+    }
+    const std::string& workerProgram() const { return worker_program_; }
+    // Derive one isolated MCP call from the long-lived server policy. Runtime
+    // budgets, rules, models, language, and project idioms are inherited;
+    // request inputs, scopes, output side effects, baselines, summaries, and
+    // control modes are cleared so one server invocation cannot smuggle CLI
+    // work into every tool call.
+    Config mcpRequestConfig() const;
     // --assumptions: opt-in intent-debt report of inferred, undeclared
     // preconditions (AssumptionRule). Off by default — it is high-volume
     // by nature and must not perturb the normal finding stream.
@@ -202,6 +230,8 @@ private:
     bool whole_program_ = false;
     bool analyze_broken_tus_ = false;
     bool accept_partial_coverage_ = false;
+    unsigned tu_timeout_seconds_ = kDefaultTuTimeoutSeconds;
+    unsigned tu_memory_mib_ = kDefaultTuMemoryMiB;
     bool assert_recovery_ = true;
     bool assumptions_ = false;
     bool warm_cache_ = false;
@@ -214,6 +244,9 @@ private:
     Severity min_severity_;
     std::set<std::string> enabled_rules_;
     std::set<std::string> disabled_rules_;
+    // Runtime-only coordinator state; it is not user configuration and is
+    // intentionally excluded from operator== and config-file parsing.
+    std::string worker_program_;
 };
 
 } // namespace codeskeptic

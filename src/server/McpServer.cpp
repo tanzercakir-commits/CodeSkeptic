@@ -1,21 +1,10 @@
 #include "server/McpServer.h"
 
 #include "analyzer/StaticAnalyzer.h"
+#include "analyzer/DefaultRules.h"
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
 #include "config/Config.h"
-#include "rules/DivByZeroRule.h"
-#include "rules/IntOverflowRule.h"
-#include "rules/SignConversionRule.h"
-#include "rules/AllocSizeOverflowRule.h"
-#include "rules/BoundsRule.h"
-#include "rules/AssumptionRule.h"
-#include "rules/MemoryLeakRule_Ex.h"
-#include "rules/FdResourceRule.h"
-#include "rules/NullDerefRule.h"
-#include "rules/ContractRule.h"
-#include "rules/PolicyRule.h"
-#include "rules/UninitPointerRule_Ex.h"
 
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_ostream.h>
@@ -76,7 +65,8 @@ json::Value handleInitialize(const json::Value& id) {
     });
 }
 
-json::Value handleToolsList(const json::Value& id) {
+json::Value handleToolsList(const json::Value& id,
+                            const codeskeptic::Config& base_config) {
     json::Object analyzeSchema{
         {"type", "object"},
         {"additionalProperties", false},
@@ -136,6 +126,26 @@ json::Value handleToolsList(const json::Value& id) {
                  "(e.g. \"pool_alloc=pool_free\"); malformed values "
                  "are rejected without partial registration"},
             }},
+            {"tu_timeout_seconds", json::Object{
+                {"type", "integer"},
+                {"minimum", static_cast<int64_t>(1)},
+                {"maximum", static_cast<int64_t>(
+                    codeskeptic::Config::kMaxTuTimeoutSeconds)},
+                {"default", static_cast<int64_t>(
+                    base_config.tuTimeoutSeconds())},
+                {"description",
+                 "Per-translation-unit wall timeout in seconds"},
+            }},
+            {"tu_memory_mib", json::Object{
+                {"type", "integer"},
+                {"minimum", static_cast<int64_t>(1)},
+                {"maximum", static_cast<int64_t>(
+                    codeskeptic::Config::kMaxTuMemoryMiB)},
+                {"default", static_cast<int64_t>(
+                    base_config.tuMemoryMiB())},
+                {"description",
+                 "Per-translation-unit memory ceiling in MiB"},
+            }},
         }},
         {"required", json::Array{"path"}},
     };
@@ -157,22 +167,29 @@ std::optional<std::string> configureAnalyze(
     const json::Object* args, codeskeptic::Config& config) {
     if (!args) return "missing arguments";
 
-    static const std::set<std::string> allowedFields = {
+    static const std::set<std::string> stringFields = {
         "path", "build_path", "functions", "lines", "summaries",
         "fatal_asserts", "alloc_functions", "free_functions",
         "allocator_pairs"
     };
+    static const std::set<std::string> integerFields = {
+        "tu_timeout_seconds", "tu_memory_mib"
+    };
     for (const auto& field : *args) {
         const std::string name = field.first.str();
-        if (!allowedFields.count(name))
+        if (!stringFields.count(name) && !integerFields.count(name))
             return "unknown analyze field: " + name;
     }
 
-    for (const auto& name : allowedFields) {
+    for (const auto& name : stringFields) {
         if (args->get(name) && !args->getString(name))
             return "field must be a string: " + name;
         if (auto value = args->getString(name); value && value->contains('\0'))
             return "field must not contain NUL: " + name;
+    }
+    for (const auto& name : integerFields) {
+        if (args->get(name) && !args->getInteger(name))
+            return "field must be an integer: " + name;
     }
 
     auto path = args->getString("path");
@@ -204,31 +221,30 @@ std::optional<std::string> configureAnalyze(
             return "invalid allocator_pairs; expected allocator=deallocator "
                    "entries separated by commas";
     }
+    if (auto timeout = args->getInteger("tu_timeout_seconds")) {
+        if (*timeout <= 0 ||
+            !config.setTuTimeoutSeconds(static_cast<std::uint64_t>(*timeout)))
+            return "tu_timeout_seconds is outside the supported range";
+    }
+    if (auto memory = args->getInteger("tu_memory_mib")) {
+        if (*memory <= 0 ||
+            !config.setTuMemoryMiB(static_cast<std::uint64_t>(*memory)))
+            return "tu_memory_mib is outside the supported range";
+    }
     return std::nullopt;
 }
 
-json::Value runAnalyze(const json::Value& id, const json::Object* args) {
-    codeskeptic::Config config;
+json::Value runAnalyze(const json::Value& id, const json::Object* args,
+                       const codeskeptic::Config& base_config) {
+    if (base_config.workerProgram().empty())
+        return makeError(id, -32603,
+                         "resource-isolated worker is unavailable");
+    codeskeptic::Config config = base_config.mcpRequestConfig();
     if (auto error = configureAnalyze(args, config))
         return makeError(id, -32602, *error);
 
-    // Long-lived process: parsed ASTs are kept warm between calls (the
-    // fingerprint catches staleness — a stale AST is NEVER served)
-    config.setWarmCache(true);
-
     codeskeptic::StaticAnalyzer analyzer(std::move(config));
-    analyzer.addRule<codeskeptic::UninitPointerRule_Ex>();
-    analyzer.addRule<codeskeptic::MemoryLeakRule_Ex>();
-    analyzer.addRule<codeskeptic::FdResourceRule>();
-    analyzer.addRule<codeskeptic::DivByZeroRule>();
-    analyzer.addRule<codeskeptic::IntOverflowRule>();
-    analyzer.addRule<codeskeptic::SignConversionRule>();
-    analyzer.addRule<codeskeptic::AllocSizeOverflowRule>();
-    analyzer.addRule<codeskeptic::BoundsRule>();
-    analyzer.addRule<codeskeptic::AssumptionRule>();
-    analyzer.addRule<codeskeptic::NullDerefRule>();
-    analyzer.addRule<codeskeptic::ContractRule>();
-    analyzer.addRule<codeskeptic::PolicyRule>();
+    codeskeptic::registerDefaultRules(analyzer);
     const codeskeptic::AnalysisResult result = analyzer.run();
 
     json::Array findings;
@@ -265,6 +281,24 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
         });
     }
 
+    json::Array translation_units;
+    for (const auto& receipt : result.tu_receipts) {
+        translation_units.push_back(json::Object{
+            {"path", receipt.canonical_path},
+            {"compile_command_sha256", receipt.compile_command_sha256},
+            {"command_ordinal",
+             static_cast<int64_t>(receipt.command_ordinal)},
+            {"phase", receipt.phase},
+            {"status", translationUnitStatusName(receipt.status)},
+            {"duration_ms", static_cast<int64_t>(receipt.duration_ms)},
+            {"peak_memory_kib",
+             static_cast<int64_t>(receipt.peak_memory_kib)},
+            {"timeout_seconds",
+             static_cast<int64_t>(receipt.timeout_seconds)},
+            {"memory_mib", static_cast<int64_t>(receipt.memory_mib)},
+        });
+    }
+
     json::Object payload{
         {"status", result.statusName()},
         {"complete", result.complete()},
@@ -287,6 +321,7 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
          static_cast<int64_t>(result.blockingFindings())},
         {"report_only_count",
          static_cast<int64_t>(result.report_only_findings)},
+        {"translation_units", std::move(translation_units)},
         {"findings", std::move(findings)},
     };
 
@@ -303,23 +338,30 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args) {
 
 json::Value handleToolsCall(const json::Value& id,
                             const json::Object* params,
-                            bool executeAnalysis) {
+                            bool executeAnalysis,
+                            const codeskeptic::Config& base_config) {
     if (!params) return makeError(id, -32602, "missing params");
     auto name = params->getString("name");
     if (!name) return makeError(id, -32602, "missing tool name");
     if (*name != "analyze")
         return makeError(id, -32602, "unknown tool: " + name->str());
     const json::Object* arguments = params->getObject("arguments");
-    if (executeAnalysis) return runAnalyze(id, arguments);
+    if (executeAnalysis) return runAnalyze(id, arguments, base_config);
 
-    codeskeptic::Config config;
+    codeskeptic::Config config = base_config.mcpRequestConfig();
     if (auto error = configureAnalyze(arguments, config))
         return makeError(id, -32602, *error);
-    return makeResponse(id, json::Object{{"validated", true}});
+    return makeResponse(id, json::Object{
+        {"validated", true},
+        {"tu_timeout_seconds",
+         static_cast<int64_t>(config.tuTimeoutSeconds())},
+        {"tu_memory_mib", static_cast<int64_t>(config.tuMemoryMiB())},
+    });
 }
 
 std::string handleMcpMessageImpl(const std::string& line,
-                                 bool executeAnalysis) {
+                                 bool executeAnalysis,
+                                 const codeskeptic::Config& base_config) {
     auto parsed = json::parse(line);
     if (!parsed) {
         llvm::consumeError(parsed.takeError());
@@ -362,10 +404,10 @@ std::string handleMcpMessageImpl(const std::string& line,
     } else if (*method == "ping") {
         response = makeResponse(id, json::Object{});
     } else if (*method == "tools/list") {
-        response = handleToolsList(id);
+        response = handleToolsList(id, base_config);
     } else if (*method == "tools/call") {
         response = handleToolsCall(
-            id, msg->getObject("params"), executeAnalysis);
+            id, msg->getObject("params"), executeAnalysis, base_config);
     } else {
         response = makeError(id, -32601,
                              "method not found: " + method->str());
@@ -378,14 +420,31 @@ std::string handleMcpMessageImpl(const std::string& line,
 namespace codeskeptic {
 
 std::string handleMcpMessage(const std::string& line) {
-    return handleMcpMessageImpl(line, true);
+    Config base_config;
+    return handleMcpMessageImpl(line, true, base_config);
+}
+
+std::string handleMcpMessage(const std::string& line,
+                             const Config& base_config) {
+    return handleMcpMessageImpl(line, true, base_config);
 }
 
 std::string validateMcpMessage(const std::string& line) {
-    return handleMcpMessageImpl(line, false);
+    Config base_config;
+    return handleMcpMessageImpl(line, false, base_config);
+}
+
+std::string validateMcpMessage(const std::string& line,
+                               const Config& base_config) {
+    return handleMcpMessageImpl(line, false, base_config);
 }
 
 int runMcpServer() {
+    Config base_config;
+    return runMcpServer(base_config);
+}
+
+int runMcpServer(const Config& base_config) {
 #ifdef _WIN32
     // Newline-delimited JSON-RPC framing: Windows text-mode stdio
     // would expand "\n" to "\r\n" on write and leave stray '\r's in
@@ -400,7 +459,7 @@ int runMcpServer() {
         // splits at '\n', so a client's "\r\n" leaves a trailing '\r'.
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
-        std::string response = handleMcpMessage(line);
+        std::string response = handleMcpMessage(line, base_config);
         if (!response.empty()) {
             std::cout << response << "\n" << std::flush;
         }

@@ -37,6 +37,10 @@ public:
     const Config& config() const { return config_; }
 
 private:
+    AnalysisResult runDirect();
+    AnalysisResult runBudgeted();
+    AnalysisResult finalizeResult(AnalysisResult result);
+
     Config config_;
     std::unique_ptr<SourceManager> source_mgr_;
     RuleEngine engine_;
