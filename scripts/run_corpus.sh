@@ -3,7 +3,8 @@
 # projects, generates compile_commands.json and runs codeskeptic on them.
 #
 # Success criteria:
-#   1. The analyzer runs WITHOUT CRASHING (exit code 0 or 1).
+#   1. Every translation unit selected from the generated compilation
+#      database is analyzed (exit code 0 or 1, no broken/skipped TU).
 #   2. The finding count does not deviate from the value pinned in
 #      corpus_expected.txt (10%+2 tolerance) — versions are pinned, so
 #      deviation signals a SEMANTIC REGRESSION (silent finding loss /
@@ -62,12 +63,11 @@ if [ "${CORPUS_DEEP:-0}" = "1" ]; then
     fetch catch2 "https://github.com/catchorg/Catch2/archive/refs/tags/v3.15.2.tar.gz"
 fi
 
-run_one() { # <mode: scan|db> <dir> [extra cmake args...]
-    # scan: analyze the whole source tree (cjson/tinyxml2 pins were
-    #       measured this way — do not change their input set).
-    # db:   analyze exactly the compile-DB files (abseil's tree carries
-    #       test/tooling sources a directory scan would wrongly include).
-    local mode="$1" dir="$2"; shift 2 || true
+run_one() { # <dir> [extra cmake args...]
+    # Analyze exactly the compile-DB files. A directory scan also admits
+    # vendored fixtures and tooling sources that the project never builds;
+    # accepting those skipped TUs would fabricate a project verdict.
+    local dir="$1"; shift || true
     echo ""
     echo "=== [$dir] ==="
     # Build directory OUTSIDE the source TREE: the scanner must not see
@@ -78,25 +78,34 @@ run_one() { # <mode: scan|db> <dir> [extra cmake args...]
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@" > /dev/null
 
-    # NO pipe: the exit code must belong to the analyzer, not the pipe
-    # (the tee trap — this is how the fake green appeared on Juliet)
-    set +e
-    if [ "$mode" = "db" ]; then
-        python3 - "$dir" <<'PYEOF'
-import json, sys
-d = sys.argv[1]
-db = json.load(open(f"build-{d}/compile_commands.json"))
-open(f"files-{d}.txt", "w").write("\n".join(sorted({e["file"] for e in db})))
+    python3 - "$dir" <<'PYEOF'
+import json
+from pathlib import Path
+import sys
+
+project = sys.argv[1]
+database_path = Path(f"build-{project}/compile_commands.json")
+database = json.loads(database_path.read_text(encoding="utf-8"))
+files = set()
+for entry in database:
+    source = Path(entry["file"])
+    if not source.is_absolute():
+        source = Path(entry["directory"]) / source
+    files.add(str(source.resolve(strict=True)))
+if not files:
+    raise SystemExit(f"{database_path}: compilation database has no files")
+Path(f"files-{project}.txt").write_text(
+    "\n".join(sorted(files)) + "\n", encoding="utf-8"
+)
 PYEOF
-        "$CS_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
-            > "out-$dir.txt" 2>&1
-    else
-        # The scan-mode pins deliberately include the source tree's own
-        # non-build test fixtures. Their skipped TUs are measured below and
-        # accepted explicitly; the analyzer's default remains fail-closed.
-        "$CS_BIN" "$dir" --build-path "build-$dir" \
-            --accept-partial-coverage > "out-$dir.txt" 2>&1
-    fi
+    local requested
+    requested=$(wc -l < "files-$dir.txt")
+
+    # NO pipe: the exit code must belong to the analyzer, not the pipe
+    # (the tee trap — this is how the fake green appeared on Juliet).
+    set +e
+    "$CS_BIN" --files "files-$dir.txt" --build-path "build-$dir" \
+        > "out-$dir.txt" 2>&1
     local code=$?
     set -e
     cat "out-$dir.txt"
@@ -113,11 +122,8 @@ PYEOF
         "out-$dir.txt" || true)
     echo "CORPUS_RESULT $dir findings=$count"
 
-    # Name the surface the count belongs to. A pinned number says nothing
-    # about how much was analysed to reach it: cjson's 54 sat next to 41
-    # translation units that never compiled, and nobody had asked which
-    # ones. Printed every run, so "N of what?" is answerable from the log
-    # instead of requiring an investigation (the libarchive lesson).
+    # Name and prove the surface the count belongs to. The verdict is valid
+    # only when every requested compile-DB translation unit was analyzed.
     local seen broke missing analysed
     seen=$(grep -oE 'Analysis starting\.\.\. \([0-9]+ files' "out-$dir.txt" \
            | grep -oE '[0-9]+' || true)
@@ -125,10 +131,14 @@ PYEOF
             "out-$dir.txt" | grep -oE '^[0-9]+' || true)
     missing=$(grep -cF 'Compile command not found.' "out-$dir.txt" || true)
     analysed=$(( ${seen:-0} - ${broke:-0} - ${missing:-0} ))
-    if [ "$analysed" -lt 0 ]; then
-        echo "[$dir] FAIL: inconsistent coverage counts" \
-             "(enumerated=${seen:-0}, broken=${broke:-0}," \
-             "missing_compile_commands=${missing:-0})"
+    if [ "${seen:-0}" -ne "$requested" ] || \
+       [ "${broke:-0}" -ne 0 ] || \
+       [ "${missing:-0}" -ne 0 ] || \
+       [ "$analysed" -ne "$requested" ]; then
+        echo "[$dir] FAIL: incomplete compile-database coverage" \
+             "(requested=$requested, enumerated=${seen:-0}," \
+             "broken=${broke:-0}, missing_compile_commands=${missing:-0}," \
+             "analysed=$analysed)"
         return 1
     fi
     echo "CORPUS_COVERAGE $dir enumerated=${seen:-?} broken=${broke:-0}" \
@@ -167,14 +177,14 @@ PYEOF
     fi
 }
 
-run_one scan cjson
-run_one scan tinyxml2
+run_one cjson
+run_one tinyxml2
 if [ "${CORPUS_DEEP:-0}" = "1" ]; then
-    run_one db abseil -DCMAKE_CXX_STANDARD=17 -DABSL_BUILD_TESTING=OFF
+    run_one abseil -DCMAKE_CXX_STANDARD=17 -DABSL_BUILD_TESTING=OFF
     # catch2 pins at ZERO findings: a clean modern-C++ codebase is the
     # FP-explosion tripwire — any rule change that suddenly produces
     # findings here turns the guard red.
-    run_one db catch2 -DCATCH_BUILD_TESTING=OFF -DCATCH_INSTALL_DOCS=OFF
+    run_one catch2 -DCATCH_BUILD_TESTING=OFF -DCATCH_INSTALL_DOCS=OFF
 fi
 
 echo ""

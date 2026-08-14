@@ -46,18 +46,19 @@ TEST(AnalysisResultTest, PartialCoverageCannotProduceCleanVerdict) {
     EXPECT_EQ(result.exitCode(), 2);
 }
 
-TEST(AnalysisResultTest, PartialCoverageRequiresExplicitAcceptance) {
+TEST(AnalysisResultTest, BrokenCoverageCannotBeAcceptedAsAVerdict) {
     AnalysisResult result;
     result.attempted_tus = 3;
     result.analyzed_tus = 2;
     result.broken_tus = 1;
+    result.analyze_broken_tus = true;
     result.accept_partial_coverage = true;
-    EXPECT_TRUE(result.complete());
-    EXPECT_EQ(result.status(), AnalysisStatus::Clean);
-    EXPECT_EQ(result.exitCode(), 0);
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
 }
 
-TEST(AnalysisResultTest, MissingCompileCommandsRequireExplicitAcceptance) {
+TEST(AnalysisResultTest, MissingRequestedTusCannotBeAcceptedAsAVerdict) {
     AnalysisResult result;
     result.attempted_tus = 3;
     result.analyzed_tus = 2;
@@ -66,9 +67,9 @@ TEST(AnalysisResultTest, MissingCompileCommandsRequireExplicitAcceptance) {
     EXPECT_EQ(result.exitCode(), 2);
 
     result.accept_partial_coverage = true;
-    EXPECT_TRUE(result.complete());
-    EXPECT_EQ(result.status(), AnalysisStatus::Clean);
-    EXPECT_EQ(result.exitCode(), 0);
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
 }
 
 TEST(AnalysisResultTest, ZeroAnalyzedCannotBeAcceptedAsClean) {

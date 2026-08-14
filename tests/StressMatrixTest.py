@@ -1,0 +1,95 @@
+import json
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import run_stress_matrix as matrix
+
+BINARY = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else None
+
+
+class StressMatrixContractTest(unittest.TestCase):
+    def test_source_manifest_binds_complete_stress_inputs_not_outputs(self):
+        files = {
+            path.relative_to(ROOT).as_posix()
+            for path in matrix._regular_files(matrix.SOURCE_ROOTS)
+        }
+        for required in (
+                "src/analyzer/StaticAnalyzer.cpp",
+                "tests/BrokenTuTest.cpp",
+                "tests/stress_corpus/manifest.json",
+                "scripts/run_corpus.sh",
+                "scripts/run_stress_matrix.py",
+                "docs/PLAN.md",
+                ".github/workflows/ci.yml"):
+            self.assertIn(required, files)
+        self.assertFalse(any(path.startswith("docs/evidence/") for path in files))
+        self.assertNotIn("docs/devlog/changelog.md", files)
+
+    def test_fixed_manifest_covers_every_plan_surface(self):
+        manifest = matrix.load_manifest()
+        categories = {case["category"] for case in manifest["cases"]}
+        self.assertEqual(
+            categories,
+            {
+                "broken-recovery",
+                "high-cfg",
+                "macro",
+                "malformed-source",
+                "missing-request",
+                "mixed-coverage",
+                "template",
+            },
+        )
+
+    def test_fixture_checksum_mutation_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copied_root = Path(tmp) / "repo"
+            shutil.copytree(ROOT / "tests" / "stress_corpus",
+                            copied_root / "tests" / "stress_corpus")
+            manifest = copied_root / "tests" / "stress_corpus" / "manifest.json"
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            fixture = copied_root / payload["cases"][0]["sources"][0]["path"]
+            fixture.write_text(fixture.read_text(encoding="utf-8") + "\n",
+                               encoding="utf-8")
+            with self.assertRaises(matrix.MatrixError):
+                matrix.load_manifest(manifest, copied_root)
+
+    def test_production_matrix_is_repeatable_and_receipt_verifies(self):
+        if BINARY is None:
+            self.skipTest("production binary supplied only by CTest")
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "evidence"
+            receipt = matrix.run_matrix(BINARY, output=output)
+            self.assertEqual(receipt["summary"]["accepted_cases"], 9)
+            self.assertEqual(receipt["summary"]["repetitions_per_case"], 2)
+            matrix.verify_receipt(output / "receipt.json", BINARY)
+
+            receipt_path = output / "receipt.json"
+            tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+            tampered["cases"][0]["runs"][0]["command"] = ["tampered"]
+            receipt_path.write_bytes(matrix.canonical_json(tampered))
+            with self.assertRaises(matrix.MatrixError):
+                matrix.verify_receipt(receipt_path, BINARY)
+
+            tampered = json.loads(matrix.canonical_json(receipt))
+            tampered["duration_ms"] = -1
+            receipt_path.write_bytes(matrix.canonical_json(tampered))
+            with self.assertRaises(matrix.MatrixError):
+                matrix.verify_receipt(receipt_path, BINARY)
+
+            receipt_path.write_bytes(matrix.canonical_json(receipt))
+            first_log = output / receipt["cases"][0]["runs"][0]["log"]
+            first_log.write_bytes(first_log.read_bytes() + b"tamper\n")
+            with self.assertRaises(matrix.MatrixError):
+                matrix.verify_receipt(receipt_path, BINARY)
+
+
+if __name__ == "__main__":
+    unittest.main()

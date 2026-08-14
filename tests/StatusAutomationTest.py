@@ -221,10 +221,13 @@ class ProgressStatusTest(unittest.TestCase):
         )[0]
         self.assertIn("fetch-depth: 0", checkout)
 
-    def test_corpus_coverage_excludes_missing_compile_commands(self) -> None:
+    def test_corpus_requires_complete_compile_database_surface(self) -> None:
         runner = (ROOT / "scripts" / "run_corpus.sh").read_text(
             encoding="utf-8"
         )
+        self.assertNotIn("--accept-partial-coverage", runner)
+        self.assertNotIn("run_one scan", runner)
+        self.assertIn('requested=$(wc -l < "files-$dir.txt")', runner)
         self.assertIn(
             "missing=$(grep -cF 'Compile command not found.'",
             runner,
@@ -237,7 +240,10 @@ class ProgressStatusTest(unittest.TestCase):
             '"missing_compile_commands=${missing:-0} analysed=$analysed"',
             runner,
         )
-        self.assertIn('if [ "$analysed" -lt 0 ]; then', runner)
+        self.assertIn('if [ "${seen:-0}" -ne "$requested" ] ||', runner)
+        self.assertIn('[ "${broke:-0}" -ne 0 ] ||', runner)
+        self.assertIn('[ "${missing:-0}" -ne 0 ] ||', runner)
+        self.assertIn('[ "$analysed" -ne "$requested" ]; then', runner)
 
     def test_cross_host_control_files_are_lf_pinned(self) -> None:
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")

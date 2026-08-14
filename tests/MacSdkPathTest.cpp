@@ -89,8 +89,8 @@ TEST(ExitPolicyTest, PartialBreakageHasNoTrustworthyVerdict) {
     EXPECT_EQ(analysisExitCode(1, 3, 2, false), 2);
 }
 
-TEST(ExitPolicyTest, ForcedAnalysisKeepsOldBehavior) {
-    EXPECT_EQ(analysisExitCode(0, 3, 3, true), 0);
+TEST(ExitPolicyTest, RecoveryOptInStillHasNoTrustworthyVerdict) {
+    EXPECT_EQ(analysisExitCode(0, 3, 3, true), 2);
 }
 
 TEST(ExitPolicyTest, NoInputsIsTwo) {

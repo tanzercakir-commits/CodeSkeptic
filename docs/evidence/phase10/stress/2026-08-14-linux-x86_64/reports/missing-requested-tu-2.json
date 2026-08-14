@@ -1,0 +1,12 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "incomplete",
+  "complete": false,
+  "exit_code": 2,
+  "coverage": { "attempted_tus": 2, "analyzed_tus": 1, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "total": 0,
+  "diagnostics": [
+  ]
+}

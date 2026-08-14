@@ -62,12 +62,10 @@ public:
     static unsigned warmCacheMisses();
     static void clearWarmCache();
 
-    // Broken-TU guard (#86): TUs whose parse ended with an
-    // uncompilable error are skipped by default — error recovery eats
-    // initializers and declarations, and rules would report
-    // confidently about code that does not exist. The skip list is
-    // process-global for the run (mirrors the warm-cache counters);
-    // StaticAnalyzer surfaces it as an honest coverage note.
+    // Broken-TU guard (#86): TUs whose parse ended with an uncompilable
+    // error are always recorded. They are skipped by default; the explicit
+    // recovery opt-in may run rules over them, but never erases the broken
+    // evidence or restores a project verdict.
     static void setAnalyzeBrokenTUs(bool allow);
     static bool analyzeBrokenTUs();
     static void recordBrokenTU(const std::string& file);
@@ -80,6 +78,9 @@ public:
     static size_t attemptedTUCount();
 
     size_t fileCount() const;
+    // Exact number of explicitly requested/discovered TU identities before
+    // missing paths are filtered from the ClangTool input list.
+    size_t requestedFileCount() const;
     const std::vector<std::string>& files() const;
 
 private:
@@ -90,6 +91,7 @@ private:
 
     std::string build_path_;
     std::vector<std::string> source_files_;
+    size_t requested_file_count_ = 0;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;
     bool comp_db_valid_ = true;
     std::string comp_db_error_;

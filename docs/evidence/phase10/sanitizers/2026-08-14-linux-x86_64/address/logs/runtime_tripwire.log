@@ -1,32 +1,32 @@
 =================================================================
-==70==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7c0b8e3e0014 at pc 0x556b61d32d4e bp 0x7ffec38a8830 sp 0x7ffec38a8828
-WRITE of size 4 at 0x7c0b8e3e0014 thread T0
-    #0 0x556b61d32d4d in main /workspace/tests/sanitizer/AddressTripwire.cpp:6:21
-    #1 0x7feb8f0c71c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
-    #2 0x7feb8f0c728a in __libc_start_main csu/../csu/libc-start.c:360:3
-    #3 0x556b61c49354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+==70==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7b3d809e0014 at pc 0x55ac3f1fad4e bp 0x7ffcef65e460 sp 0x7ffcef65e458
+WRITE of size 4 at 0x7b3d809e0014 thread T0
+    #0 0x55ac3f1fad4d in main /workspace/tests/sanitizer/AddressTripwire.cpp:6:21
+    #1 0x7f1d816291c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #2 0x7f1d8162928a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x55ac3f111354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
 
-0x7c0b8e3e0014 is located 0 bytes after 4-byte region [0x7c0b8e3e0010,0x7c0b8e3e0014)
+0x7b3d809e0014 is located 0 bytes after 4-byte region [0x7b3d809e0010,0x7b3d809e0014)
 allocated by thread T0 here:
-    #0 0x556b61d31981 in operator new[](unsigned long) (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x114981) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
-    #1 0x556b61d32cf7 in main /workspace/tests/sanitizer/AddressTripwire.cpp:5:19
-    #2 0x7feb8f0c71c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
-    #3 0x7feb8f0c728a in __libc_start_main csu/../csu/libc-start.c:360:3
-    #4 0x556b61c49354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+    #0 0x55ac3f1f9981 in operator new[](unsigned long) (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x114981) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+    #1 0x55ac3f1facf7 in main /workspace/tests/sanitizer/AddressTripwire.cpp:5:19
+    #2 0x7f1d816291c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #3 0x7f1d8162928a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #4 0x55ac3f111354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
 
 SUMMARY: AddressSanitizer: heap-buffer-overflow /workspace/tests/sanitizer/AddressTripwire.cpp:6:21 in main
 Shadow bytes around the buggy address:
-  0x7c0b8e3dfd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7c0b8e3dfe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7c0b8e3dfe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7c0b8e3dff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7c0b8e3dff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-=>0x7c0b8e3e0000: fa fa[04]fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7c0b8e3e0080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7c0b8e3e0100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7c0b8e3e0180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7c0b8e3e0200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7c0b8e3e0280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809dfd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b3d809dfe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b3d809dfe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b3d809dff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b3d809dff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x7b3d809e0000: fa fa[04]fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809e0080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809e0100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809e0180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809e0200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b3d809e0280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
 Shadow byte legend (one shadow byte represents 8 application bytes):
   Addressable:           00
   Partially addressable: 01 02 03 04 05 06 07 

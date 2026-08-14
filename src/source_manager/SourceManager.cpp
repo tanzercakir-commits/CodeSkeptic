@@ -31,9 +31,9 @@ namespace {
 // on Godot: 176 TUs analyzed with a missing generated header produced
 // 298 uninit-ptr ERRORS, all artifacts ("declared without an
 // initializer" on declarations whose initializers the recovery had
-// eaten). A TU that did not compile is SKIPPED and honestly counted;
-// --analyze-broken-tus restores the old behavior for consumers who
-// accept the risk (AI-generated code that never compiled at all).
+// eaten). A TU that did not compile is always honestly counted;
+// --analyze-broken-tus may collect non-verdict evidence from the recovered
+// AST for consumers investigating AI-generated code that never compiled.
 bool tuIsBroken(clang::ASTContext& ctx) {
     return ctx.getDiagnostics().hasUncompilableErrorOccurred();
 }
@@ -51,10 +51,9 @@ public:
         : callback_(std::move(callback)) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
-        if (!codeskeptic::SourceManager::analyzeBrokenTUs() &&
-            tuIsBroken(ctx)) {
+        if (tuIsBroken(ctx)) {
             codeskeptic::SourceManager::recordBrokenTU(mainFileOf(ctx));
-            return;
+            if (!codeskeptic::SourceManager::analyzeBrokenTUs()) return;
         }
         callback_(ctx);
     }
@@ -276,6 +275,7 @@ SourceManager::SourceManager(const std::string& build_path)
 SourceManager::~SourceManager() = default;
 
 void SourceManager::addSourceFile(const std::string& path) {
+    ++requested_file_count_;
     auto abs = fs::absolute(path);
     if (!fs::exists(abs)) {
         std::cerr << msg(MsgId::FileNotFound, abs.string()) << "\n";
@@ -296,6 +296,7 @@ void SourceManager::scanDirectory(const std::string& dir_path) {
 
             auto ext = entry.path().extension().string();
             if (ext == ".c" || ext == ".cpp" || ext == ".cc" || ext == ".cxx") {
+                ++requested_file_count_;
                 source_files_.push_back(entry.path().string());
             }
         }
@@ -409,9 +410,9 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
             // cached AST keeps its DiagnosticsEngine, so the check is
             // identical (see CodeSkepticASTConsumer).
             auto guardedCall = [&](clang::ASTContext& ctx) {
-                if (!analyzeBrokenTUs() && tuIsBroken(ctx)) {
+                if (tuIsBroken(ctx)) {
                     recordBrokenTU(mainFileOf(ctx));
-                    return;
+                    if (!analyzeBrokenTUs()) return;
                 }
                 callback(ctx);
             };
@@ -431,6 +432,7 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
             tool.buildASTs(units);
             if (units.empty() || !units[0]) {
                 anyFailed = true;
+                recordBrokenTU(file);
                 continue;
             }
             guardedCall(units[0]->getASTContext());
@@ -482,6 +484,10 @@ size_t SourceManager::attemptedTUCount() { return g_attempted_tus; }
 
 size_t SourceManager::fileCount() const {
     return source_files_.size();
+}
+
+size_t SourceManager::requestedFileCount() const {
+    return requested_file_count_;
 }
 
 const std::vector<std::string>& SourceManager::files() const {
