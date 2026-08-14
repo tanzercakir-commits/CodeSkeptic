@@ -212,7 +212,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Fallback: continuing with -std=c++17.
 [CodeSkeptic] Analysis starting... (1 files, 1 rules)
 [CodeSkeptic] Cannot open output file: /tmp/missing-baseline.txt
-[       OK ] VerdictIntegrityTest.RequestedMissingBaselineIsExitTwo (3 ms)
+[       OK ] VerdictIntegrityTest.RequestedMissingBaselineIsExitTwo (4 ms)
 [ RUN      ] VerdictIntegrityTest.AllRegisteredRulesDisabledIsExitTwo
 [CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
 json-compilation-database: Error while opening JSON database: No such file or directory
@@ -245,7 +245,7 @@ CodeSkeptic: 1 finding(s)
 fixed.cpp:1:1 [warning] null-deref: fixed test finding
 ----------------------------------------
 [       OK ] VerdictIntegrityTest.SupportedFindingStillBlocks (3 ms)
-[----------] 7 tests from VerdictIntegrityTest (18 ms total)
+[----------] 7 tests from VerdictIntegrityTest (20 ms total)
 
 [----------] 3 tests from JsonReporterTest
 [ RUN      ] JsonReporterTest.PublishesCompleteVerdictContract
@@ -268,7 +268,7 @@ fixed.cpp:1:1 [warning] null-deref: fixed test finding
 [ RUN      ] UninitPointerRuleExTest.VariableBoundLoopAssign_StillWarns
 [       OK ] UninitPointerRuleExTest.VariableBoundLoopAssign_StillWarns (2 ms)
 [ RUN      ] UninitPointerRuleExTest.ConstLoopConditionalAssign_StillWarns
-[       OK ] UninitPointerRuleExTest.ConstLoopConditionalAssign_StillWarns (2 ms)
+[       OK ] UninitPointerRuleExTest.ConstLoopConditionalAssign_StillWarns (3 ms)
 [ RUN      ] UninitPointerRuleExTest.LoopWithInitBeforeUse_Clean
 [       OK ] UninitPointerRuleExTest.LoopWithInitBeforeUse_Clean (2 ms)
 [ RUN      ] UninitPointerRuleExTest.LoopWithoutInit_Dangerous
@@ -282,9 +282,9 @@ fixed.cpp:1:1 [warning] null-deref: fixed test finding
 [ RUN      ] UninitPointerRuleExTest.BasicUninitDereferenced
 [       OK ] UninitPointerRuleExTest.BasicUninitDereferenced (2 ms)
 [ RUN      ] UninitPointerRuleExTest.InitializedNullptr_NoDereference_Clean
-[       OK ] UninitPointerRuleExTest.InitializedNullptr_NoDereference_Clean (2 ms)
+[       OK ] UninitPointerRuleExTest.InitializedNullptr_NoDereference_Clean (1 ms)
 [ RUN      ] UninitPointerRuleExTest.NoDereference_NoDiagnostic
-[       OK ] UninitPointerRuleExTest.NoDereference_NoDiagnostic (2 ms)
+[       OK ] UninitPointerRuleExTest.NoDereference_NoDiagnostic (1 ms)
 [ RUN      ] UninitPointerRuleExTest.ArrowDeref_Dangerous
 [       OK ] UninitPointerRuleExTest.ArrowDeref_Dangerous (2 ms)
 [ RUN      ] UninitPointerRuleExTest.ArraySubscriptDeref_Dangerous
@@ -591,7 +591,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [       OK ] CallGuardTest.BodylessExtern_NotKeyed_LeakStaysVisible (2 ms)
 [ RUN      ] CallGuardTest.StateReadingBody_NotKeyed_LeakStaysVisible
 [       OK ] CallGuardTest.StateReadingBody_NotKeyed_LeakStaysVisible (2 ms)
-[----------] 3 tests from CallGuardTest (7 ms total)
+[----------] 3 tests from CallGuardTest (8 ms total)
 
 [----------] 15 tests from AliasLifetimeV2Test
 [ RUN      ] AliasLifetimeV2Test.AliasReuse_FirstAllocationLeak_Reports
@@ -632,7 +632,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] ReallocLifetimeV2Test.ProvenSuccessInvalidatesOriginal_ReportsUAF
 [       OK ] ReallocLifetimeV2Test.ProvenSuccessInvalidatesOriginal_ReportsUAF (2 ms)
 [ RUN      ] ReallocLifetimeV2Test.ExactResultAliasGuardProvesSuccess
-[       OK ] ReallocLifetimeV2Test.ExactResultAliasGuardProvesSuccess (2 ms)
+[       OK ] ReallocLifetimeV2Test.ExactResultAliasGuardProvesSuccess (3 ms)
 [ RUN      ] ReallocLifetimeV2Test.ProvenSuccessFreeOriginal_ReportsDoubleFree
 [       OK ] ReallocLifetimeV2Test.ProvenSuccessFreeOriginal_ReportsDoubleFree (2 ms)
 [ RUN      ] ReallocLifetimeV2Test.UnresolvedTemporaryReportsOneAlternativeLeak
@@ -658,7 +658,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] ReallocLifetimeV2Test.GuardedReallocarrayRequiresBothNonzeroOperands
 [       OK ] ReallocLifetimeV2Test.GuardedReallocarrayRequiresBothNonzeroOperands (3 ms)
 [ RUN      ] ReallocLifetimeV2Test.ZeroSizeTemporaryDoesNotInventSuccessRelease
-[       OK ] ReallocLifetimeV2Test.ZeroSizeTemporaryDoesNotInventSuccessRelease (2 ms)
+[       OK ] ReallocLifetimeV2Test.ZeroSizeTemporaryDoesNotInventSuccessRelease (3 ms)
 [ RUN      ] ReallocLifetimeV2Test.TypeChangingResultDoesNotGainReallocAuthority
 [       OK ] ReallocLifetimeV2Test.TypeChangingResultDoesNotGainReallocAuthority (2 ms)
 [ RUN      ] ReallocLifetimeV2Test.IndirectCallDoesNotGainReallocAuthority
@@ -667,7 +667,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [       OK ] ReallocLifetimeV2Test.ExposedResultInvalidatesPendingRelation (2 ms)
 [ RUN      ] ReallocLifetimeV2Test.OtherNamespaceDoesNotGainReallocAuthority
 [       OK ] ReallocLifetimeV2Test.OtherNamespaceDoesNotGainReallocAuthority (2 ms)
-[----------] 20 tests from ReallocLifetimeV2Test (55 ms total)
+[----------] 20 tests from ReallocLifetimeV2Test (56 ms total)
 
 [----------] 2 tests from CleanupAttrTest
 [ RUN      ] CleanupAttrTest.CleanupVar_CannotLeak
@@ -678,7 +678,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 
 [----------] 4 tests from SystemdIdiomTest
 [ RUN      ] SystemdIdiomTest.CompoundLiteralThroughOutParam_Escapes_NoLeak
-[       OK ] SystemdIdiomTest.CompoundLiteralThroughOutParam_Escapes_NoLeak (2 ms)
+[       OK ] SystemdIdiomTest.CompoundLiteralThroughOutParam_Escapes_NoLeak (3 ms)
 [ RUN      ] SystemdIdiomTest.StatementExprTakePtr_Escapes_NoLeak
 [       OK ] SystemdIdiomTest.StatementExprTakePtr_Escapes_NoLeak (2 ms)
 [ RUN      ] SystemdIdiomTest.AddressIntoLocalAlias_Escapes_NoLeak
@@ -689,13 +689,13 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 
 [----------] 10 tests from OwningPointerTest
 [ RUN      ] OwningPointerTest.ReturnUniquePtrAdoption_Clean
-[       OK ] OwningPointerTest.ReturnUniquePtrAdoption_Clean (2 ms)
+[       OK ] OwningPointerTest.ReturnUniquePtrAdoption_Clean (3 ms)
 [ RUN      ] OwningPointerTest.ReturnSharedPtrAdoption_Clean
 [       OK ] OwningPointerTest.ReturnSharedPtrAdoption_Clean (2 ms)
 [ RUN      ] OwningPointerTest.LocalUniquePtrAdoption_Clean
 [       OK ] OwningPointerTest.LocalUniquePtrAdoption_Clean (2 ms)
 [ RUN      ] OwningPointerTest.GenuineLeakBesideAdoption_Reported
-[       OK ] OwningPointerTest.GenuineLeakBesideAdoption_Reported (2 ms)
+[       OK ] OwningPointerTest.GenuineLeakBesideAdoption_Reported (3 ms)
 [ RUN      ] OwningPointerTest.ConfiguredWrapper_ReturnAdoption_Clean
 [       OK ] OwningPointerTest.ConfiguredWrapper_ReturnAdoption_Clean (2 ms)
 [ RUN      ] OwningPointerTest.ConfiguredWrapper_ImplicitAdoption_Clean
@@ -708,7 +708,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [       OK ] OwningPointerTest.ScopeGuardLambdaByValue_Clean (2 ms)
 [ RUN      ] OwningPointerTest.LambdaNotCapturingPtr_LeakStays
 [       OK ] OwningPointerTest.LambdaNotCapturingPtr_LeakStays (2 ms)
-[----------] 10 tests from OwningPointerTest (27 ms total)
+[----------] 10 tests from OwningPointerTest (28 ms total)
 
 [----------] 29 tests from SmartOwnerLifetimeV2Test
 [ RUN      ] SmartOwnerLifetimeV2Test.UniqueDestructorThenRawUseReportsUAF
@@ -730,7 +730,7 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] SmartOwnerLifetimeV2Test.ManualDeleteThenResetReportsDoubleFree
 [       OK ] SmartOwnerLifetimeV2Test.ManualDeleteThenResetReportsDoubleFree (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.UniqueMoveConstructionTransfersDestruction
-[       OK ] SmartOwnerLifetimeV2Test.UniqueMoveConstructionTransfersDestruction (3 ms)
+[       OK ] SmartOwnerLifetimeV2Test.UniqueMoveConstructionTransfersDestruction (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.UniqueMoveAssignmentReleasesDestination
 [       OK ] SmartOwnerLifetimeV2Test.UniqueMoveAssignmentReleasesDestination (3 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.SharedCopyKeepsRawAliveUntilLastOwner
@@ -738,15 +738,15 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] SmartOwnerLifetimeV2Test.SharedLastOwnerDestructionReportsUAF
 [       OK ] SmartOwnerLifetimeV2Test.SharedLastOwnerDestructionReportsUAF (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.SharedResetRetainsOtherExactOwner
-[       OK ] SmartOwnerLifetimeV2Test.SharedResetRetainsOtherExactOwner (3 ms)
+[       OK ] SmartOwnerLifetimeV2Test.SharedResetRetainsOtherExactOwner (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.ConfiguredWrapperLifetimeStaysConservative
 [       OK ] SmartOwnerLifetimeV2Test.ConfiguredWrapperLifetimeStaysConservative (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.ExactCustomFamilyImplicitDeleterIsUnknown
 [       OK ] SmartOwnerLifetimeV2Test.ExactCustomFamilyImplicitDeleterIsUnknown (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.IncompatiblePointeeAdoptionIsUnknown
-[       OK ] SmartOwnerLifetimeV2Test.IncompatiblePointeeAdoptionIsUnknown (3 ms)
+[       OK ] SmartOwnerLifetimeV2Test.IncompatiblePointeeAdoptionIsUnknown (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.OwnerAddressExposureIsConservative
-[       OK ] SmartOwnerLifetimeV2Test.OwnerAddressExposureIsConservative (3 ms)
+[       OK ] SmartOwnerLifetimeV2Test.OwnerAddressExposureIsConservative (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.OwnerReferenceMutationIsConservative
 [       OK ] SmartOwnerLifetimeV2Test.OwnerReferenceMutationIsConservative (2 ms)
 [ RUN      ] SmartOwnerLifetimeV2Test.OwnerLambdaCaptureIsConservative
@@ -787,12 +787,12 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] ExceptionalOwnerLifetimeV2Test.CustomDeleterStaysConservative
 [       OK ] ExceptionalOwnerLifetimeV2Test.CustomDeleterStaysConservative (2 ms)
 [ RUN      ] ExceptionalOwnerLifetimeV2Test.RawAllocationWithoutOwnerStillLeaksAfterHandledThrow
-[       OK ] ExceptionalOwnerLifetimeV2Test.RawAllocationWithoutOwnerStillLeaksAfterHandledThrow (1 ms)
+[       OK ] ExceptionalOwnerLifetimeV2Test.RawAllocationWithoutOwnerStillLeaksAfterHandledThrow (2 ms)
 [ RUN      ] ExceptionalOwnerLifetimeV2Test.UnreachableThrowPreservesNormalDestructorEvidence
 [       OK ] ExceptionalOwnerLifetimeV2Test.UnreachableThrowPreservesNormalDestructorEvidence (2 ms)
 [ RUN      ] ExceptionalOwnerLifetimeV2Test.ConditionalDisconnectedCleanupCannotManufactureUAF
 [       OK ] ExceptionalOwnerLifetimeV2Test.ConditionalDisconnectedCleanupCannotManufactureUAF (2 ms)
-[----------] 10 tests from ExceptionalOwnerLifetimeV2Test (25 ms total)
+[----------] 10 tests from ExceptionalOwnerLifetimeV2Test (24 ms total)
 
 [----------] 2 tests from ExceptionalTransferBoundaryTest
 [ RUN      ] ExceptionalTransferBoundaryTest.LocalMemberStoreKeepsLeakVisible
@@ -813,15 +813,15 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] FdResourceRuleTest.MinusOneEarlyReturnThenCloseIsClean
 [       OK ] FdResourceRuleTest.MinusOneEarlyReturnThenCloseIsClean (2 ms)
 [ RUN      ] FdResourceRuleTest.NegativeEarlyReturnThenCloseIsClean
-[       OK ] FdResourceRuleTest.NegativeEarlyReturnThenCloseIsClean (2 ms)
+[       OK ] FdResourceRuleTest.NegativeEarlyReturnThenCloseIsClean (1 ms)
 [ RUN      ] FdResourceRuleTest.NonNegativeGuardedCloseIsClean
-[       OK ] FdResourceRuleTest.NonNegativeGuardedCloseIsClean (2 ms)
+[       OK ] FdResourceRuleTest.NonNegativeGuardedCloseIsClean (1 ms)
 [ RUN      ] FdResourceRuleTest.FailureReturnDoesNotHideSuccessLeak
-[       OK ] FdResourceRuleTest.FailureReturnDoesNotHideSuccessLeak (2 ms)
+[       OK ] FdResourceRuleTest.FailureReturnDoesNotHideSuccessLeak (1 ms)
 [ RUN      ] FdResourceRuleTest.UnrelatedEarlyReturnReports
 [       OK ] FdResourceRuleTest.UnrelatedEarlyReturnReports (2 ms)
 [ RUN      ] FdResourceRuleTest.ConditionalCloseReports
-[       OK ] FdResourceRuleTest.ConditionalCloseReports (2 ms)
+[       OK ] FdResourceRuleTest.ConditionalCloseReports (1 ms)
 [ RUN      ] FdResourceRuleTest.CleanupLabelClosesEveryPath
 [       OK ] FdResourceRuleTest.CleanupLabelClosesEveryPath (2 ms)
 [ RUN      ] FdResourceRuleTest.ReturningDescriptorTransfersOwnership
@@ -883,10 +883,10 @@ test.cpp:6:30: error: no matching 'operator new' function for non-allocating pla
 [ RUN      ] FdResourceRuleTest.ReassignedSnapshotDoesNotProveReplacementClose
 [       OK ] FdResourceRuleTest.ReassignedSnapshotDoesNotProveReplacementClose (2 ms)
 [ RUN      ] FdResourceRuleTest.ConditionalReplacementCloseStillReports
-[       OK ] FdResourceRuleTest.ConditionalReplacementCloseStillReports (1 ms)
+[       OK ] FdResourceRuleTest.ConditionalReplacementCloseStillReports (2 ms)
 [ RUN      ] FdResourceRuleTest.EqualityCleanupMissesSuccessfulReplacement
 [       OK ] FdResourceRuleTest.EqualityCleanupMissesSuccessfulReplacement (4 ms)
-[----------] 42 tests from FdResourceRuleTest (106 ms total)
+[----------] 42 tests from FdResourceRuleTest (105 ms total)
 
 [----------] 51 tests from DivByZeroRuleTest
 [ RUN      ] DivByZeroRuleTest.LiteralDivByZero
@@ -894,7 +894,7 @@ test.cpp:3:25: warning: division by zero is undefined [-Wdivision-by-zero]
     3 |             int x = 100 / 0;
       |                         ^ ~
 1 warning generated.
-[       OK ] DivByZeroRuleTest.LiteralDivByZero (1 ms)
+[       OK ] DivByZeroRuleTest.LiteralDivByZero (2 ms)
 [ RUN      ] DivByZeroRuleTest.LiteralModByZero
 test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
     3 |             int x = 100 % 0;
@@ -910,7 +910,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] DivByZeroRuleTest.ParameterUnknown_Clean
 [       OK ] DivByZeroRuleTest.ParameterUnknown_Clean (1 ms)
 [ RUN      ] DivByZeroRuleTest.UntrustedInputDivisor_Warns
-[       OK ] DivByZeroRuleTest.UntrustedInputDivisor_Warns (1 ms)
+[       OK ] DivByZeroRuleTest.UntrustedInputDivisor_Warns (2 ms)
 [ RUN      ] DivByZeroRuleTest.UntrustedInputDivisor_Guarded_Clean
 [       OK ] DivByZeroRuleTest.UntrustedInputDivisor_Guarded_Clean (2 ms)
 [ RUN      ] DivByZeroRuleTest.ConditionalMaybeZero
@@ -922,7 +922,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] DivByZeroRuleTest.GuardEqualsZero_DefiniteError
 [       OK ] DivByZeroRuleTest.GuardEqualsZero_DefiniteError (1 ms)
 [ RUN      ] DivByZeroRuleTest.GuardTruthiness_Clean
-[       OK ] DivByZeroRuleTest.GuardTruthiness_Clean (1 ms)
+[       OK ] DivByZeroRuleTest.GuardTruthiness_Clean (2 ms)
 [ RUN      ] DivByZeroRuleTest.GuardNotOperator_DefiniteError
 [       OK ] DivByZeroRuleTest.GuardNotOperator_DefiniteError (1 ms)
 [ RUN      ] DivByZeroRuleTest.GuardGreaterThanZero_Clean
@@ -932,7 +932,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] DivByZeroRuleTest.GuardThenFix_Clean
 [       OK ] DivByZeroRuleTest.GuardThenFix_Clean (1 ms)
 [ RUN      ] DivByZeroRuleTest.ZeroOnSomePathUnguarded_Warning
-[       OK ] DivByZeroRuleTest.ZeroOnSomePathUnguarded_Warning (1 ms)
+[       OK ] DivByZeroRuleTest.ZeroOnSomePathUnguarded_Warning (2 ms)
 [ RUN      ] DivByZeroRuleTest.LogicalAndGuard_Clean
 [       OK ] DivByZeroRuleTest.LogicalAndGuard_Clean (1 ms)
 [ RUN      ] DivByZeroRuleTest.FloatDivision_Ignored
@@ -958,7 +958,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] DivByZeroRuleTest.CopyOfDefiniteZero_ReportsDefinite
 [       OK ] DivByZeroRuleTest.CopyOfDefiniteZero_ReportsDefinite (2 ms)
 [ RUN      ] DivByZeroRuleTest.CopyFromUnknownParam_Clean
-[       OK ] DivByZeroRuleTest.CopyFromUnknownParam_Clean (1 ms)
+[       OK ] DivByZeroRuleTest.CopyFromUnknownParam_Clean (2 ms)
 [ RUN      ] DivByZeroRuleTest.CopyReassignedSafe_Clean
 [       OK ] DivByZeroRuleTest.CopyReassignedSafe_Clean (2 ms)
 [ RUN      ] DivByZeroRuleTest.ImmutableFlagDeadAssign_Clean
@@ -999,7 +999,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [       OK ] DivByZeroRuleTest.TwoHopGuardedMidHop_Clean (2 ms)
 [ RUN      ] DivByZeroRuleTest.TwoHopNonZeroChain_Clean
 [       OK ] DivByZeroRuleTest.TwoHopNonZeroChain_Clean (2 ms)
-[----------] 51 tests from DivByZeroRuleTest (111 ms total)
+[----------] 51 tests from DivByZeroRuleTest (112 ms total)
 
 [----------] 1 test from DivByZeroTraceTest
 [ RUN      ] DivByZeroTraceTest.GuardOnlyZero_TraceShowsCondition
@@ -1039,11 +1039,11 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [       OK ] DivByZeroBoundTest.ZeroConstantOrderings_StillWork (2 ms)
 [ RUN      ] DivByZeroBoundTest.LeOneUnprovenPath_StillWarns
 [       OK ] DivByZeroBoundTest.LeOneUnprovenPath_StillWarns (2 ms)
-[----------] 5 tests from DivByZeroBoundTest (10 ms total)
+[----------] 5 tests from DivByZeroBoundTest (11 ms total)
 
 [----------] 39 tests from IntOverflowRuleTest
 [ RUN      ] IntOverflowRuleTest.ConstantProductOverflows
-[       OK ] IntOverflowRuleTest.ConstantProductOverflows (1 ms)
+[       OK ] IntOverflowRuleTest.ConstantProductOverflows (2 ms)
 [ RUN      ] IntOverflowRuleTest.WidenedAssignmentStillOverflows
 [       OK ] IntOverflowRuleTest.WidenedAssignmentStillOverflows (2 ms)
 [ RUN      ] IntOverflowRuleTest.GuardedRangeOverflows
@@ -1073,9 +1073,9 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] IntOverflowRuleTest.GuardedAdditionStaysSilent
 [       OK ] IntOverflowRuleTest.GuardedAdditionStaysSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.BoundedAdditionStaysSilent
-[       OK ] IntOverflowRuleTest.BoundedAdditionStaysSilent (1 ms)
+[       OK ] IntOverflowRuleTest.BoundedAdditionStaysSilent (2 ms)
 [ RUN      ] IntOverflowRuleTest.CharNarrowingAddReported
-[       OK ] IntOverflowRuleTest.CharNarrowingAddReported (1 ms)
+[       OK ] IntOverflowRuleTest.CharNarrowingAddReported (2 ms)
 [ RUN      ] IntOverflowRuleTest.CharNarrowingMulReported
 [       OK ] IntOverflowRuleTest.CharNarrowingMulReported (1 ms)
 [ RUN      ] IntOverflowRuleTest.GuardedCharNarrowingStaysSilent
@@ -1083,11 +1083,11 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] IntOverflowRuleTest.UnsignedNarrowingStaysSilent
 [       OK ] IntOverflowRuleTest.UnsignedNarrowingStaysSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.ExplicitNarrowingCastStaysSilent
-[       OK ] IntOverflowRuleTest.ExplicitNarrowingCastStaysSilent (2 ms)
+[       OK ] IntOverflowRuleTest.ExplicitNarrowingCastStaysSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.SixtyFourBitBoundaryAddReported
 [       OK ] IntOverflowRuleTest.SixtyFourBitBoundaryAddReported (1 ms)
 [ RUN      ] IntOverflowRuleTest.SixtyFourBitHalfOpenStaysSilent
-[       OK ] IntOverflowRuleTest.SixtyFourBitHalfOpenStaysSilent (2 ms)
+[       OK ] IntOverflowRuleTest.SixtyFourBitHalfOpenStaysSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.SixtyFourBitSelfSquareStaysSilent
 [       OK ] IntOverflowRuleTest.SixtyFourBitSelfSquareStaysSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.UntrustedSourceMultiplyOverflows
@@ -1095,7 +1095,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] IntOverflowRuleTest.UntrustedSourceOverflowGuardedClean
 [       OK ] IntOverflowRuleTest.UntrustedSourceOverflowGuardedClean (2 ms)
 [ RUN      ] IntOverflowRuleTest.ConstantFoldedGuardRefines
-[       OK ] IntOverflowRuleTest.ConstantFoldedGuardRefines (1 ms)
+[       OK ] IntOverflowRuleTest.ConstantFoldedGuardRefines (2 ms)
 [ RUN      ] IntOverflowRuleTest.ScanfSourceMultiplyOverflows
 [       OK ] IntOverflowRuleTest.ScanfSourceMultiplyOverflows (2 ms)
 [ RUN      ] IntOverflowRuleTest.ScanfSourceGuardedClean
@@ -1109,9 +1109,9 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] IntOverflowRuleTest.ScanfSuppressedPairing_Silent
 [       OK ] IntOverflowRuleTest.ScanfSuppressedPairing_Silent (2 ms)
 [ RUN      ] IntOverflowRuleTest.ScanfWideWidth_Reported
-[       OK ] IntOverflowRuleTest.ScanfWideWidth_Reported (1 ms)
+[       OK ] IntOverflowRuleTest.ScanfWideWidth_Reported (2 ms)
 [ RUN      ] IntOverflowRuleTest.SubtractionUnderflows
-[       OK ] IntOverflowRuleTest.SubtractionUnderflows (1 ms)
+[       OK ] IntOverflowRuleTest.SubtractionUnderflows (2 ms)
 [ RUN      ] IntOverflowRuleTest.SubtractionInRangeClean
 [       OK ] IntOverflowRuleTest.SubtractionInRangeClean (1 ms)
 [ RUN      ] IntOverflowRuleTest.GuardedSubtractionClean
@@ -1120,7 +1120,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [       OK ] IntOverflowRuleTest.UnknownSubtractionSilent (1 ms)
 [ RUN      ] IntOverflowRuleTest.UnsignedSubtractionNotThisRule
 [       OK ] IntOverflowRuleTest.UnsignedSubtractionNotThisRule (1 ms)
-[----------] 39 tests from IntOverflowRuleTest (85 ms total)
+[----------] 39 tests from IntOverflowRuleTest (86 ms total)
 
 [----------] 3 tests from ReadmeCompareTest
 [ RUN      ] ReadmeCompareTest.DemoC_AtoiOverflow
@@ -1205,7 +1205,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] AllocSizeOverflowRuleTest.SizeT64SignedSourceCast_Reports
 [       OK ] AllocSizeOverflowRuleTest.SizeT64SignedSourceCast_Reports (2 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.SizeT64IdentityFactor_Silent
-[       OK ] AllocSizeOverflowRuleTest.SizeT64IdentityFactor_Silent (1 ms)
+[       OK ] AllocSizeOverflowRuleTest.SizeT64IdentityFactor_Silent (2 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.SizeT64SignedSourceDivisionGuard_Silent
 [       OK ] AllocSizeOverflowRuleTest.SizeT64SignedSourceDivisionGuard_Silent (2 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.SizeT64SignedAlias_Reports
@@ -1249,7 +1249,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] AllocSizeOverflowRuleTest.CrossTUAllocatorWrapper_Reports
 [       OK ] AllocSizeOverflowRuleTest.CrossTUAllocatorWrapper_Reports (3 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent
-[       OK ] AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent (2 ms)
+[       OK ] AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent (1 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.TransformedAllocatorWrapper_Silent
 [       OK ] AllocSizeOverflowRuleTest.TransformedAllocatorWrapper_Silent (2 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.LvglPinnedAllocationReplay_Reports
@@ -1268,7 +1268,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [       OK ] AllocSizeOverflowRuleTest.ReassignedAllocationBinding_HasNoTrace (2 ms)
 [ RUN      ] AllocSizeOverflowRuleTest.UninvokedLambdaAllocatorWrapper_Silent
 [       OK ] AllocSizeOverflowRuleTest.UninvokedLambdaAllocatorWrapper_Silent (2 ms)
-[----------] 45 tests from AllocSizeOverflowRuleTest (108 ms total)
+[----------] 45 tests from AllocSizeOverflowRuleTest (109 ms total)
 
 [----------] 68 tests from BoundsRuleTest
 [ RUN      ] BoundsRuleTest.BitmaskIndexInRangeClean
@@ -1276,7 +1276,7 @@ test.cpp:3:25: warning: remainder by zero is undefined [-Wdivision-by-zero]
 [ RUN      ] BoundsRuleTest.BitmaskIndexPlusOffsetOOB
 [       OK ] BoundsRuleTest.BitmaskIndexPlusOffsetOOB (1 ms)
 [ RUN      ] BoundsRuleTest.ModuloIndexInRangeClean
-[       OK ] BoundsRuleTest.ModuloIndexInRangeClean (2 ms)
+[       OK ] BoundsRuleTest.ModuloIndexInRangeClean (1 ms)
 [ RUN      ] BoundsRuleTest.ModuloIndexPlusOffsetOOB
 [       OK ] BoundsRuleTest.ModuloIndexPlusOffsetOOB (2 ms)
 [ RUN      ] BoundsRuleTest.ConstantIndexPastEnd
@@ -1287,7 +1287,7 @@ test.cpp:3:13: note: array 'a' declared here
     3 |             int a[10];
       |             ^
 1 warning generated.
-[       OK ] BoundsRuleTest.ConstantIndexPastEnd (1 ms)
+[       OK ] BoundsRuleTest.ConstantIndexPastEnd (2 ms)
 [ RUN      ] BoundsRuleTest.NegativeConstantIndex
 test.cpp:4:20: warning: array index -1 is before the beginning of the array [-Warray-bounds]
     4 |             return a[-1];
@@ -1296,7 +1296,7 @@ test.cpp:3:13: note: array 'a' declared here
     3 |             int a[10];
       |             ^
 1 warning generated.
-[       OK ] BoundsRuleTest.NegativeConstantIndex (2 ms)
+[       OK ] BoundsRuleTest.NegativeConstantIndex (1 ms)
 [ RUN      ] BoundsRuleTest.GuardedIndexProvenPastEnd
 [       OK ] BoundsRuleTest.GuardedIndexProvenPastEnd (2 ms)
 [ RUN      ] BoundsRuleTest.ComputedConstantIndexPastEnd
@@ -1304,7 +1304,7 @@ test.cpp:3:13: note: array 'a' declared here
 [ RUN      ] BoundsRuleTest.ConstantIndexInRange
 [       OK ] BoundsRuleTest.ConstantIndexInRange (1 ms)
 [ RUN      ] BoundsRuleTest.UnknownIndexSilent
-[       OK ] BoundsRuleTest.UnknownIndexSilent (1 ms)
+[       OK ] BoundsRuleTest.UnknownIndexSilent (2 ms)
 [ RUN      ] BoundsRuleTest.PartialOverlapSilent
 [       OK ] BoundsRuleTest.PartialOverlapSilent (2 ms)
 [ RUN      ] BoundsRuleTest.GuardedIndexInRangeClean
@@ -1338,13 +1338,13 @@ test.cpp:3:13: note: array 'a' declared here
 [ RUN      ] BoundsRuleTest.MemcpyInRangeClean
 [       OK ] BoundsRuleTest.MemcpyInRangeClean (1 ms)
 [ RUN      ] BoundsRuleTest.MemcpySizeofOversizedType
-[       OK ] BoundsRuleTest.MemcpySizeofOversizedType (2 ms)
+[       OK ] BoundsRuleTest.MemcpySizeofOversizedType (1 ms)
 [ RUN      ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow
-[       OK ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow (1 ms)
+[       OK ] BoundsRuleTest.MemcpyCountTimesSizeofOverflow (2 ms)
 [ RUN      ] BoundsRuleTest.MemcpySizeofSelfClean
 [       OK ] BoundsRuleTest.MemcpySizeofSelfClean (1 ms)
 [ RUN      ] BoundsRuleTest.StructMemberSubscriptPastEnd
-[       OK ] BoundsRuleTest.StructMemberSubscriptPastEnd (1 ms)
+[       OK ] BoundsRuleTest.StructMemberSubscriptPastEnd (2 ms)
 [ RUN      ] BoundsRuleTest.StructMemberSubscriptInRangeClean
 [       OK ] BoundsRuleTest.StructMemberSubscriptInRangeClean (1 ms)
 [ RUN      ] BoundsRuleTest.StructMemberByValueSubscript
@@ -1393,7 +1393,7 @@ test.cpp:5:18: note: array 'a' declared here
 [ RUN      ] BoundsRuleTest.PointerParamHasNoExtentSilent
 [       OK ] BoundsRuleTest.PointerParamHasNoExtentSilent (1 ms)
 [ RUN      ] BoundsRuleTest.StrcpyIntoFixedMember_Warns
-[       OK ] BoundsRuleTest.StrcpyIntoFixedMember_Warns (2 ms)
+[       OK ] BoundsRuleTest.StrcpyIntoFixedMember_Warns (1 ms)
 [ RUN      ] BoundsRuleTest.StrcpyLocalArray_Warns
 [       OK ] BoundsRuleTest.StrcpyLocalArray_Warns (1 ms)
 [ RUN      ] BoundsRuleTest.StrcpyFittingLiteral_Clean
@@ -1437,13 +1437,13 @@ test.cpp:5:18: note: array 'a' declared here
 [ RUN      ] BoundsRuleTest.TwoHopParamIndex_BoundedClean
 [       OK ] BoundsRuleTest.TwoHopParamIndex_BoundedClean (2 ms)
 [ RUN      ] BoundsRuleTest.StructHackTailArray_PointerBase_Clean
-[       OK ] BoundsRuleTest.StructHackTailArray_PointerBase_Clean (1 ms)
+[       OK ] BoundsRuleTest.StructHackTailArray_PointerBase_Clean (2 ms)
 [ RUN      ] BoundsRuleTest.StructHackTailUnion_PointerBase_Clean
-[       OK ] BoundsRuleTest.StructHackTailUnion_PointerBase_Clean (1 ms)
+[       OK ] BoundsRuleTest.StructHackTailUnion_PointerBase_Clean (2 ms)
 [ RUN      ] BoundsRuleTest.ZeroLengthTailArray_PointerBase_Clean
 [       OK ] BoundsRuleTest.ZeroLengthTailArray_PointerBase_Clean (1 ms)
 [ RUN      ] BoundsRuleTest.MiddleMemberArray_PointerBase_StillWarns
-[       OK ] BoundsRuleTest.MiddleMemberArray_PointerBase_StillWarns (1 ms)
+[       OK ] BoundsRuleTest.MiddleMemberArray_PointerBase_StillWarns (2 ms)
 [ RUN      ] BoundsRuleTest.TailArrayDirectObject_StillWarns
 [       OK ] BoundsRuleTest.TailArrayDirectObject_StillWarns (2 ms)
 [ RUN      ] BoundsRuleTest.RealFixedTailArray_PointerBase_StillWarns
@@ -1480,7 +1480,7 @@ test.cpp:5:18: note: array 'a' declared here
 [ RUN      ] NullDerefRuleTest.WhileGuard_ErrorAfterLoop
 [       OK ] NullDerefRuleTest.WhileGuard_ErrorAfterLoop (2 ms)
 [ RUN      ] NullDerefRuleTest.ParamUnguarded_Silent
-[       OK ] NullDerefRuleTest.ParamUnguarded_Silent (1 ms)
+[       OK ] NullDerefRuleTest.ParamUnguarded_Silent (2 ms)
 [ RUN      ] NullDerefRuleTest.AssignAddressOf_Clean
 [       OK ] NullDerefRuleTest.AssignAddressOf_Clean (2 ms)
 [ RUN      ] NullDerefRuleTest.AssignNew_Clean
@@ -1546,7 +1546,7 @@ test.cpp:10:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] NullDerefRuleTest.MemberFlagAddressAliasGuardCallee_Reported
 [       OK ] NullDerefRuleTest.MemberFlagAddressAliasGuardCallee_Reported (2 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagAddressAliasDifferentField_Clean
-[       OK ] NullDerefRuleTest.MemberFlagAddressAliasDifferentField_Clean (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagAddressAliasDifferentField_Clean (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagReferenceAliasGuardCallee_Reported
 [       OK ] NullDerefRuleTest.MemberFlagReferenceAliasGuardCallee_Reported (2 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagNonConstMethodCallee_Reported
@@ -1570,29 +1570,29 @@ test.cpp:10:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] NullDerefRuleTest.MemberFlagRecordReferenceWholeObject_Reported
 [       OK ] NullDerefRuleTest.MemberFlagRecordReferenceWholeObject_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagWholeObjectReferenceAlias_Reported
-[       OK ] NullDerefRuleTest.MemberFlagWholeObjectReferenceAlias_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagWholeObjectReferenceAlias_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagDirectNonConstMethod_Reported
-[       OK ] NullDerefRuleTest.MemberFlagDirectNonConstMethod_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagDirectNonConstMethod_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagDirectConstMethod_Clean
-[       OK ] NullDerefRuleTest.MemberFlagDirectConstMethod_Clean (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagDirectConstMethod_Clean (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagDirectConstMutableGuard_Reported
-[       OK ] NullDerefRuleTest.MemberFlagDirectConstMutableGuard_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagDirectConstMutableGuard_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagRvalueReferenceGuard_Reported
-[       OK ] NullDerefRuleTest.MemberFlagRvalueReferenceGuard_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagRvalueReferenceGuard_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagReassignedBetween_Reported
 test.cpp:10:37: error: assigning to 'char *' from incompatible type 'void *'
    10 |             if (c.has_source) { p = malloc(8); if (!p) return -1; }
       |                                     ^~~~~~~~~
 1 error generated.
-[       OK ] NullDerefRuleTest.MemberFlagReassignedBetween_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberFlagReassignedBetween_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberBaseAddressStored_Reported
 test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
    11 |             if (c.has_source) { p = malloc(8); if (!p) return -1; }
       |                                     ^~~~~~~~~
 1 error generated.
-[       OK ] NullDerefRuleTest.MemberBaseAddressStored_Reported (2 ms)
+[       OK ] NullDerefRuleTest.MemberBaseAddressStored_Reported (3 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagOutParamFactoryCapOverflow_Clean
-[       OK ] NullDerefRuleTest.MemberFlagOutParamFactoryCapOverflow_Clean (4 ms)
+[       OK ] NullDerefRuleTest.MemberFlagOutParamFactoryCapOverflow_Clean (5 ms)
 [ RUN      ] NullDerefRuleTest.MemberFlagOutParamFactoryDivergent_Reported
 [       OK ] NullDerefRuleTest.MemberFlagOutParamFactoryDivergent_Reported (4 ms)
 [ RUN      ] NullDerefRuleTest.GetaddrinfoCheckedResult_Clean
@@ -1600,7 +1600,7 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] NullDerefRuleTest.GetaddrinfoUncheckedResult_Reported
 [       OK ] NullDerefRuleTest.GetaddrinfoUncheckedResult_Reported (2 ms)
 [ RUN      ] NullDerefRuleTest.CompoundContractLoopDeref_Clean
-[       OK ] NullDerefRuleTest.CompoundContractLoopDeref_Clean (7 ms)
+[       OK ] NullDerefRuleTest.CompoundContractLoopDeref_Clean (8 ms)
 [ RUN      ] NullDerefRuleTest.NullPassthrough_MaybeNullSource_Warns
 [       OK ] NullDerefRuleTest.NullPassthrough_MaybeNullSource_Warns (2 ms)
 [ RUN      ] NullDerefRuleTest.NullPassthrough_NonNullArg_Clean
@@ -1621,13 +1621,13 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [       OK ] NullDerefRuleTest.LiveAssertNonNull_NarrowsClean (2 ms)
 [ RUN      ] NullDerefRuleTest.NoAssertControl_StillWarns
 [       OK ] NullDerefRuleTest.NoAssertControl_StillWarns (2 ms)
-[----------] 67 tests from NullDerefRuleTest (193 ms total)
+[----------] 67 tests from NullDerefRuleTest (202 ms total)
 
 [----------] 6 tests from UncheckedAllocTest
 [ RUN      ] UncheckedAllocTest.Malloc_UnguardedDeref_Warns
 [       OK ] UncheckedAllocTest.Malloc_UnguardedDeref_Warns (10 ms)
 [ RUN      ] UncheckedAllocTest.Malloc_IfReturnGuard_Clean
-[       OK ] UncheckedAllocTest.Malloc_IfReturnGuard_Clean (9 ms)
+[       OK ] UncheckedAllocTest.Malloc_IfReturnGuard_Clean (10 ms)
 [ RUN      ] UncheckedAllocTest.Calloc_IfBlockGuard_Clean
 [       OK ] UncheckedAllocTest.Calloc_IfBlockGuard_Clean (10 ms)
 [ RUN      ] UncheckedAllocTest.Strdup_UnguardedDeref_Warns
@@ -1636,7 +1636,7 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [       OK ] UncheckedAllocTest.Realloc_UnguardedDeref_Warns (10 ms)
 [ RUN      ] UncheckedAllocTest.Ternary_Guard_Clean
 [       OK ] UncheckedAllocTest.Ternary_Guard_Clean (10 ms)
-[----------] 6 tests from UncheckedAllocTest (56 ms total)
+[----------] 6 tests from UncheckedAllocTest (57 ms total)
 
 [----------] 3 tests from NullDerefPathSensitivityTest
 [ RUN      ] NullDerefPathSensitivityTest.CorrelatedGuards_AssignDeref_Clean
@@ -1645,7 +1645,7 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [       OK ] NullDerefPathSensitivityTest.AntiCorrelatedGuards_ErrorStays (2 ms)
 [ RUN      ] NullDerefPathSensitivityTest.PointerGuardStillWorks_WithFacts
 [       OK ] NullDerefPathSensitivityTest.PointerGuardStillWorks_WithFacts (2 ms)
-[----------] 3 tests from NullDerefPathSensitivityTest (7 ms total)
+[----------] 3 tests from NullDerefPathSensitivityTest (6 ms total)
 
 [----------] 1 test from NullDerefTraceTest
 [ RUN      ] NullDerefTraceTest.GuardOnlyNull_TraceShowsCondition
@@ -1672,16 +1672,16 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 
 [----------] 5 tests from ForeachArrayFpTest
 [ RUN      ] ForeachArrayFpTest.ExactMacroShape_NoWarning
-[       OK ] ForeachArrayFpTest.ExactMacroShape_NoWarning (11 ms)
+[       OK ] ForeachArrayFpTest.ExactMacroShape_NoWarning (10 ms)
 [ RUN      ] ForeachArrayFpTest.OpenCodedShape_NoWarning
-[       OK ] ForeachArrayFpTest.OpenCodedShape_NoWarning (11 ms)
+[       OK ] ForeachArrayFpTest.OpenCodedShape_NoWarning (10 ms)
 [ RUN      ] ForeachArrayFpTest.RelationalProvesBothOperands
 [       OK ] ForeachArrayFpTest.RelationalProvesBothOperands (2 ms)
 [ RUN      ] ForeachArrayFpTest.NullLiteralOrdering_DoesNotBless
 [       OK ] ForeachArrayFpTest.NullLiteralOrdering_DoesNotBless (2 ms)
 [ RUN      ] ForeachArrayFpTest.PostLoopDeref_StillWarns
 [       OK ] ForeachArrayFpTest.PostLoopDeref_StillWarns (10 ms)
-[----------] 5 tests from ForeachArrayFpTest (37 ms total)
+[----------] 5 tests from ForeachArrayFpTest (36 ms total)
 
 [----------] 4 tests from AssertTernaryTest
 [ RUN      ] AssertTernaryTest.CompoundAssertAfterGuard_Clean
@@ -1712,8 +1712,8 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] GuardImplicationTest.UncheckedAllocUnderGuard_Warns
 [       OK ] GuardImplicationTest.UncheckedAllocUnderGuard_Warns (2 ms)
 [ RUN      ] GuardImplicationTest.RealTgaLoader_ImplicationWitness_Clean
-[       OK ] GuardImplicationTest.RealTgaLoader_ImplicationWitness_Clean (270 ms)
-[----------] 9 tests from GuardImplicationTest (382 ms total)
+[       OK ] GuardImplicationTest.RealTgaLoader_ImplicationWitness_Clean (276 ms)
+[----------] 9 tests from GuardImplicationTest (388 ms total)
 
 [----------] 3 tests from LoopBoundNonzeroTest
 [ RUN      ] LoopBoundNonzeroTest.StoreBufferShape_NoContract_Clean
@@ -1766,7 +1766,7 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] AssertRecoveryTest.RealGlibcAssertHeader_NdebugSilenced
 [       OK ] AssertRecoveryTest.RealGlibcAssertHeader_NdebugSilenced (11 ms)
 [ RUN      ] AssertRecoveryTest.RealCassertHeader_NullptrUnderNdebug_Silenced
-[       OK ] AssertRecoveryTest.RealCassertHeader_NullptrUnderNdebug_Silenced (11 ms)
+[       OK ] AssertRecoveryTest.RealCassertHeader_NullptrUnderNdebug_Silenced (10 ms)
 [ RUN      ] AssertRecoveryTest.ReversedComparison_Silenced
 [       OK ] AssertRecoveryTest.ReversedComparison_Silenced (2 ms)
 [ RUN      ] AssertRecoveryTest.NullptrSpelling_Silenced
@@ -1901,18 +1901,18 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [       OK ] HtmlReporterTest.IncompleteEmptyReportNeverClaimsClean (0 ms)
 [ RUN      ] HtmlReporterTest.MissingSourceFile_NoContextButNoCrash
 [       OK ] HtmlReporterTest.MissingSourceFile_NoContextButNoCrash (0 ms)
-[----------] 9 tests from HtmlReporterTest (1 ms total)
+[----------] 9 tests from HtmlReporterTest (2 ms total)
 
 [----------] 4 tests from CfgCacheTest
 [ RUN      ] CfgCacheTest.SharedWithinTU_SummaryFlowAndRuleReuse
-[       OK ] CfgCacheTest.SharedWithinTU_SummaryFlowAndRuleReuse (2 ms)
+[       OK ] CfgCacheTest.SharedWithinTU_SummaryFlowAndRuleReuse (4 ms)
 [ RUN      ] CfgCacheTest.ClearedAtTUEnd_NoStaleCarryover
-[       OK ] CfgCacheTest.ClearedAtTUEnd_NoStaleCarryover (4 ms)
+[       OK ] CfgCacheTest.ClearedAtTUEnd_NoStaleCarryover (6 ms)
 [ RUN      ] CfgCacheTest.ImplicitDestructorCfgUsesSeparateCacheKey
-[       OK ] CfgCacheTest.ImplicitDestructorCfgUsesSeparateCacheKey (1 ms)
+[       OK ] CfgCacheTest.ImplicitDestructorCfgUsesSeparateCacheKey (2 ms)
 [ RUN      ] CfgCacheTest.ExceptionalDestructorCfgUsesSeparateCacheKey
 [       OK ] CfgCacheTest.ExceptionalDestructorCfgUsesSeparateCacheKey (1 ms)
-[----------] 4 tests from CfgCacheTest (11 ms total)
+[----------] 4 tests from CfgCacheTest (15 ms total)
 
 [----------] 28 tests from IntervalTest
 [ RUN      ] IntervalTest.ConstantAndContains
@@ -1990,19 +1990,19 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 [ RUN      ] IntervalAnalysisTest.GuardRefinesLowerBound
 [       OK ] IntervalAnalysisTest.GuardRefinesLowerBound (1 ms)
 [ RUN      ] IntervalAnalysisTest.GuardRefinesRange
-[       OK ] IntervalAnalysisTest.GuardRefinesRange (6 ms)
+[       OK ] IntervalAnalysisTest.GuardRefinesRange (7 ms)
 [ RUN      ] IntervalAnalysisTest.UnknownParamIsTop
 [       OK ] IntervalAnalysisTest.UnknownParamIsTop (2 ms)
 [ RUN      ] IntervalAnalysisTest.LoopCounterTerminatesViaWidening
 [       OK ] IntervalAnalysisTest.LoopCounterTerminatesViaWidening (2 ms)
-[----------] 7 tests from IntervalAnalysisTest (18 ms total)
+[----------] 7 tests from IntervalAnalysisTest (19 ms total)
 
 [----------] 2 tests from ImmutableFlagsTest
 [ RUN      ] ImmutableFlagsTest.FormatHeaderEqualityDoesNotEvaluateNonFlagOperands
-[       OK ] ImmutableFlagsTest.FormatHeaderEqualityDoesNotEvaluateNonFlagOperands (853 ms)
+[       OK ] ImmutableFlagsTest.FormatHeaderEqualityDoesNotEvaluateNonFlagOperands (851 ms)
 [ RUN      ] ImmutableFlagsTest.EqualityOperatorsPreserveBothOperandOrders
 [       OK ] ImmutableFlagsTest.EqualityOperatorsPreserveBothOperandOrders (2 ms)
-[----------] 2 tests from ImmutableFlagsTest (856 ms total)
+[----------] 2 tests from ImmutableFlagsTest (854 ms total)
 
 [----------] 8 tests from ParamIntervalsTest
 [ RUN      ] ParamIntervalsTest.StaticSingleLiteralCallerIsExact
@@ -2045,19 +2045,19 @@ test.cpp:11:37: error: assigning to 'char *' from incompatible type 'void *'
 
 [----------] 8 tests from AssumptionRuleTest
 [ RUN      ] AssumptionRuleTest.DerefWithoutCheckIsInferredAssumption
-[       OK ] AssumptionRuleTest.DerefWithoutCheckIsInferredAssumption (1 ms)
+[       OK ] AssumptionRuleTest.DerefWithoutCheckIsInferredAssumption (2 ms)
 [ RUN      ] AssumptionRuleTest.ArrowDerefCounts
-[       OK ] AssumptionRuleTest.ArrowDerefCounts (1 ms)
+[       OK ] AssumptionRuleTest.ArrowDerefCounts (2 ms)
 [ RUN      ] AssumptionRuleTest.NullCheckedIsClean
-[       OK ] AssumptionRuleTest.NullCheckedIsClean (3 ms)
+[       OK ] AssumptionRuleTest.NullCheckedIsClean (2 ms)
 [ RUN      ] AssumptionRuleTest.TruthinessGuardIsClean
 [       OK ] AssumptionRuleTest.TruthinessGuardIsClean (2 ms)
 [ RUN      ] AssumptionRuleTest.NotDereferencedIsClean
 [       OK ] AssumptionRuleTest.NotDereferencedIsClean (1 ms)
 [ RUN      ] AssumptionRuleTest.NonPointerParamIgnored
-[       OK ] AssumptionRuleTest.NonPointerParamIgnored (1 ms)
+[       OK ] AssumptionRuleTest.NonPointerParamIgnored (3 ms)
 [ RUN      ] AssumptionRuleTest.ContractedNonNullIsClean
-[       OK ] AssumptionRuleTest.ContractedNonNullIsClean (1 ms)
+[       OK ] AssumptionRuleTest.ContractedNonNullIsClean (2 ms)
 [ RUN      ] AssumptionRuleTest.OnlyUnguardedUnvalidatedParamReported
 [       OK ] AssumptionRuleTest.OnlyUnguardedUnvalidatedParamReported (2 ms)
 [----------] 8 tests from AssumptionRuleTest (17 ms total)
@@ -2195,7 +2195,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] DisjunctsV2bTest.AssertOrCorrelation_StableLen
 [       OK ] DisjunctsV2bTest.AssertOrCorrelation_StableLen (2 ms)
 [ RUN      ] DisjunctsV2bTest.AssertOrCorrelation_LenMutatedAfterUse
-[       OK ] DisjunctsV2bTest.AssertOrCorrelation_LenMutatedAfterUse (2 ms)
+[       OK ] DisjunctsV2bTest.AssertOrCorrelation_LenMutatedAfterUse (3 ms)
 [ RUN      ] DisjunctsV2bTest.AssertOrCorrelation_SystemdNulstrLoop
 [       OK ] DisjunctsV2bTest.AssertOrCorrelation_SystemdNulstrLoop (3 ms)
 [ RUN      ] DisjunctsV2bTest.FlagCorrelation_NullDeref
@@ -2211,17 +2211,17 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] DisjunctsV2bTest.RebindToSameConstant_KeepsDefiniteError
 [       OK ] DisjunctsV2bTest.RebindToSameConstant_KeepsDefiniteError (2 ms)
 [ RUN      ] DisjunctsV2bTest.CompoundAssign_ErasesWithoutStamping
-[       OK ] DisjunctsV2bTest.CompoundAssign_ErasesWithoutStamping (4 ms)
+[       OK ] DisjunctsV2bTest.CompoundAssign_ErasesWithoutStamping (2 ms)
 [ RUN      ] DisjunctsV2bTest.GlobalFlag_AssignedLocally_StaysUnkeyed
 [       OK ] DisjunctsV2bTest.GlobalFlag_AssignedLocally_StaysUnkeyed (3 ms)
 [ RUN      ] DisjunctsV2bTest.CapOverflow_WidensWithoutCrash
-[       OK ] DisjunctsV2bTest.CapOverflow_WidensWithoutCrash (4 ms)
+[       OK ] DisjunctsV2bTest.CapOverflow_WidensWithoutCrash (5 ms)
 [ RUN      ] DisjunctsV2bTest.SystemdAssertShape_Simple
 [       OK ] DisjunctsV2bTest.SystemdAssertShape_Simple (3 ms)
 [ RUN      ] DisjunctsV2bTest.SystemdAssertShape_NulstrLoop
 [       OK ] DisjunctsV2bTest.SystemdAssertShape_NulstrLoop (3 ms)
 [ RUN      ] DisjunctsV2bTest.SystemdAssertShape_UnprotectedDerefStillWarns
-[       OK ] DisjunctsV2bTest.SystemdAssertShape_UnprotectedDerefStillWarns (3 ms)
+[       OK ] DisjunctsV2bTest.SystemdAssertShape_UnprotectedDerefStillWarns (2 ms)
 [ RUN      ] DisjunctsV2bTest.CmpLadder_FallthroughProvesBoth
 [       OK ] DisjunctsV2bTest.CmpLadder_FallthroughProvesBoth (2 ms)
 [ RUN      ] DisjunctsV2bTest.CmpLadder_ElseIfForm
@@ -2263,9 +2263,9 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] ContractRuleTest.SyntaxError_IsContractSyntaxError
 [       OK ] ContractRuleTest.SyntaxError_IsContractSyntaxError (2 ms)
 [ RUN      ] ContractRuleTest.ReturnsOwned_Satisfied_Silent
-[       OK ] ContractRuleTest.ReturnsOwned_Satisfied_Silent (1 ms)
+[       OK ] ContractRuleTest.ReturnsOwned_Satisfied_Silent (2 ms)
 [ RUN      ] ContractRuleTest.ReturnsOwned_BorrowedReturn_IsError
-[       OK ] ContractRuleTest.ReturnsOwned_BorrowedReturn_IsError (1 ms)
+[       OK ] ContractRuleTest.ReturnsOwned_BorrowedReturn_IsError (2 ms)
 [ RUN      ] ContractRuleTest.ReturnsOwned_UnknownReturn_ReportedNotSilent
 [       OK ] ContractRuleTest.ReturnsOwned_UnknownReturn_ReportedNotSilent (1 ms)
 [ RUN      ] ContractRuleTest.ParamVsParam_Unsupported
@@ -2273,7 +2273,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] ContractRuleTest.NoContract_NoNoise
 [       OK ] ContractRuleTest.NoContract_NoNoise (2 ms)
 [ RUN      ] ContractRuleTest.MultipleClauses_CheckedIndependently
-[       OK ] ContractRuleTest.MultipleClauses_CheckedIndependently (2 ms)
+[       OK ] ContractRuleTest.MultipleClauses_CheckedIndependently (3 ms)
 [ RUN      ] ContractRuleTest.PartialGuard_NoContract_RealDerefStillWarns
 [       OK ] ContractRuleTest.PartialGuard_NoContract_RealDerefStillWarns (2 ms)
 [----------] 12 tests from ContractRuleTest (26 ms total)
@@ -2282,7 +2282,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] ContractRoundCTest.EnforcedRequires_NotReportedUnverified
 [       OK ] ContractRoundCTest.EnforcedRequires_NotReportedUnverified (2 ms)
 [ RUN      ] ContractRoundCTest.UnknownParamName_IsContractSyntax
-[       OK ] ContractRoundCTest.UnknownParamName_IsContractSyntax (1 ms)
+[       OK ] ContractRoundCTest.UnknownParamName_IsContractSyntax (2 ms)
 [ RUN      ] ContractRoundCTest.RequiresNonNull_CalleeSeeded_NoNoise
 [       OK ] ContractRoundCTest.RequiresNonNull_CalleeSeeded_NoNoise (2 ms)
 [ RUN      ] ContractRoundCTest.RequiresNonNull_PartialGuard_ProofBurdenDischarged
@@ -2313,7 +2313,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [       OK ] ContractRoundCTest.RequiresNonZero_GuardedVar_Silent (2 ms)
 [ RUN      ] ContractRoundCTest.RequiresNonZero_CalleeSeeded_NoNoise
 [       OK ] ContractRoundCTest.RequiresNonZero_CalleeSeeded_NoNoise (2 ms)
-[----------] 17 tests from ContractRoundCTest (37 ms total)
+[----------] 17 tests from ContractRoundCTest (38 ms total)
 
 [----------] 13 tests from ContractRoundDTest
 [ RUN      ] ContractRoundDTest.GuardedEnsures_ViolatedOnGuardTruePath_IsError
@@ -2323,21 +2323,21 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] ContractRoundDTest.GuardedEnsures_NullUnderUndecidedGuard_IsWarning
 [       OK ] ContractRoundDTest.GuardedEnsures_NullUnderUndecidedGuard_IsWarning (2 ms)
 [ RUN      ] ContractRoundDTest.GuardedEnsures_MachineProposed_IsWarning
-[       OK ] ContractRoundDTest.GuardedEnsures_MachineProposed_IsWarning (3 ms)
+[       OK ] ContractRoundDTest.GuardedEnsures_MachineProposed_IsWarning (2 ms)
 [ RUN      ] ContractRoundDTest.GuardedEnsures_ViolatingVarReturn_HasTrace
 [       OK ] ContractRoundDTest.GuardedEnsures_ViolatingVarReturn_HasTrace (2 ms)
 [ RUN      ] ContractRoundDTest.GuardedEnsures_EnforcedLine_NotUnverified
 [       OK ] ContractRoundDTest.GuardedEnsures_EnforcedLine_NotUnverified (2 ms)
 [ RUN      ] ContractRoundDTest.GuardedEnsures_UnkeyableGuard_StaysUnverified
-[       OK ] ContractRoundDTest.GuardedEnsures_UnkeyableGuard_StaysUnverified (2 ms)
+[       OK ] ContractRoundDTest.GuardedEnsures_UnkeyableGuard_StaysUnverified (3 ms)
 [ RUN      ] ContractRoundDTest.Borrows_CalleeFrees_IsError
-[       OK ] ContractRoundDTest.Borrows_CalleeFrees_IsError (1 ms)
+[       OK ] ContractRoundDTest.Borrows_CalleeFrees_IsError (2 ms)
 [ RUN      ] ContractRoundDTest.Borrows_ReadOnlyBody_Silent
 [       OK ] ContractRoundDTest.Borrows_ReadOnlyBody_Silent (2 ms)
 [ RUN      ] ContractRoundDTest.Owns_ReadOnlyBody_IsError
 [       OK ] ContractRoundDTest.Owns_ReadOnlyBody_IsError (2 ms)
 [ RUN      ] ContractRoundDTest.Owns_CalleeFrees_Silent
-[       OK ] ContractRoundDTest.Owns_CalleeFrees_Silent (2 ms)
+[       OK ] ContractRoundDTest.Owns_CalleeFrees_Silent (1 ms)
 [ RUN      ] ContractRoundDTest.Owns_UnknownParamName_IsContractSyntax
 [       OK ] ContractRoundDTest.Owns_UnknownParamName_IsContractSyntax (2 ms)
 [ RUN      ] ContractRoundDTest.CallSiteViolation_HasTrace
@@ -2351,18 +2351,18 @@ json-compilation-database: Error while opening JSON database: No such file or di
 
 [----------] 6 tests from PolicyRuleTest
 [ RUN      ] PolicyRuleTest.FileComment_CatchesAbsolutePath
-[       OK ] PolicyRuleTest.FileComment_CatchesAbsolutePath (1 ms)
+[       OK ] PolicyRuleTest.FileComment_CatchesAbsolutePath (2 ms)
 [ RUN      ] PolicyRuleTest.NoPolicy_NoNoise
 [       OK ] PolicyRuleTest.NoPolicy_NoNoise (1 ms)
 [ RUN      ] PolicyRuleTest.PathLikeButNotAbsolute_Silent
-[       OK ] PolicyRuleTest.PathLikeButNotAbsolute_Silent (1 ms)
+[       OK ] PolicyRuleTest.PathLikeButNotAbsolute_Silent (2 ms)
 [ RUN      ] PolicyRuleTest.UnknownPolicyName_IsContractSyntax
 [       OK ] PolicyRuleTest.UnknownPolicyName_IsContractSyntax (1 ms)
 [ RUN      ] PolicyRuleTest.ProfilePolicy_ActsProjectWide
 [       OK ] PolicyRuleTest.ProfilePolicy_ActsProjectWide (1 ms)
 [ RUN      ] PolicyRuleTest.MachineProposedActivation_IsWarning
-[       OK ] PolicyRuleTest.MachineProposedActivation_IsWarning (1 ms)
-[----------] 6 tests from PolicyRuleTest (11 ms total)
+[       OK ] PolicyRuleTest.MachineProposedActivation_IsWarning (2 ms)
+[----------] 6 tests from PolicyRuleTest (12 ms total)
 
 [----------] 7 tests from SidecarTest
 [ RUN      ] SidecarTest.ParseText_EntriesAndIssues
@@ -2387,15 +2387,15 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] GuardContractTest.CheckMacroShape_IdentityWrapper_IsError
 [       OK ] GuardContractTest.CheckMacroShape_IdentityWrapper_IsError (2 ms)
 [ RUN      ] GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque
-[       OK ] GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque (4 ms)
+[       OK ] GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque (2 ms)
 [ RUN      ] GuardContractTest.CheckMacroShape_VariableConjunct_StillBails
 [       OK ] GuardContractTest.CheckMacroShape_VariableConjunct_StillBails (2 ms)
 [ RUN      ] GuardContractTest.TransitiveNoreturn_BodyNeverReturns_IsError
 [       OK ] GuardContractTest.TransitiveNoreturn_BodyNeverReturns_IsError (2 ms)
 [ RUN      ] GuardContractTest.TransitiveNoreturn_BodyReturns_NotAGuard
-[       OK ] GuardContractTest.TransitiveNoreturn_BodyReturns_NotAGuard (2 ms)
+[       OK ] GuardContractTest.TransitiveNoreturn_BodyReturns_NotAGuard (6 ms)
 [ RUN      ] GuardContractTest.SameLine_DifferentCallees_BothReported
-[       OK ] GuardContractTest.SameLine_DifferentCallees_BothReported (2 ms)
+[       OK ] GuardContractTest.SameLine_DifferentCallees_BothReported (3 ms)
 [ RUN      ] GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning
 [       OK ] GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning (2 ms)
 [ RUN      ] GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract
@@ -2405,7 +2405,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] GuardContractTest.DefinitelyNullVariable_Reported
 [       OK ] GuardContractTest.DefinitelyNullVariable_Reported (2 ms)
 [ RUN      ] GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly
-[       OK ] GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly (2 ms)
+[       OK ] GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly (3 ms)
 [ RUN      ] GuardContractTest.CompoundGuard_SkippedInV1
 [       OK ] GuardContractTest.CompoundGuard_SkippedInV1 (3 ms)
 [ RUN      ] GuardContractTest.GuardAfterWork_NotAnEntryGuard
@@ -2414,7 +2414,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [       OK ] GuardContractTest.DeclaredContractOwnsTheParam_NoDoubleReport (2 ms)
 [ RUN      ] GuardContractTest.CallerWithNoPointerLocals_StillChecked
 [       OK ] GuardContractTest.CallerWithNoPointerLocals_StillChecked (2 ms)
-[----------] 16 tests from GuardContractTest (44 ms total)
+[----------] 16 tests from GuardContractTest (47 ms total)
 
 [----------] 6 tests from BestCaseTest
 [ RUN      ] BestCaseTest.GotoFailCleanup_Clean
@@ -2435,13 +2435,13 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [ RUN      ] WorstCaseTest.DeepNesting_OnePathInits
 [       OK ] WorstCaseTest.DeepNesting_OnePathInits (3 ms)
 [ RUN      ] WorstCaseTest.WideProductLattice_AllLeaksFound
-[       OK ] WorstCaseTest.WideProductLattice_AllLeaksFound (17 ms)
+[       OK ] WorstCaseTest.WideProductLattice_AllLeaksFound (6 ms)
 [ RUN      ] WorstCaseTest.LongElseIfChain_OneArmZero
 [       OK ] WorstCaseTest.LongElseIfChain_OneArmZero (3 ms)
 [ RUN      ] WorstCaseTest.NestedLoopConditionalFree
-[       OK ] WorstCaseTest.NestedLoopConditionalFree (3 ms)
+[       OK ] WorstCaseTest.NestedLoopConditionalFree (14 ms)
 [ RUN      ] WorstCaseTest.NestedLoopConditionalFree_MutatedConds
-[       OK ] WorstCaseTest.NestedLoopConditionalFree_MutatedConds (2 ms)
+[       OK ] WorstCaseTest.NestedLoopConditionalFree_MutatedConds (3 ms)
 [ RUN      ] WorstCaseTest.DoWhileFirstIteration_UninitDeref
 [       OK ] WorstCaseTest.DoWhileFirstIteration_UninitDeref (2 ms)
 [ RUN      ] WorstCaseTest.GotoBackwardLoop
@@ -2483,7 +2483,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [       OK ] LineFilterTest.SingleLineOnSignature_Overlaps (2 ms)
 [ RUN      ] LineFilterTest.RangeBetweenFunctions_Nothing
 [       OK ] LineFilterTest.RangeBetweenFunctions_Nothing (2 ms)
-[----------] 4 tests from LineFilterTest (8 ms total)
+[----------] 4 tests from LineFilterTest (9 ms total)
 
 [----------] 5 tests from ReportPathsTest
 [ RUN      ] ReportPathsTest.CommaListSplitsAndTrims
@@ -2505,16 +2505,16 @@ bad.cpp:1:10: fatal error: 'no_such_header_cs_test.h' file not found
       |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
 1 error generated.
 Error while processing /tmp/cs_broken_tu_skip/bad.cpp.
-[       OK ] BrokenTuTest.BrokenTuIsSkippedAndRecorded (3 ms)
+[       OK ] BrokenTuTest.BrokenTuIsSkippedAndRecorded (4 ms)
 [ RUN      ] BrokenTuTest.AnalyzeBrokenTUsOverride
 bad.cpp:1:10: fatal error: 'no_such_header_cs_test.h' file not found
     1 | #include "no_such_header_cs_test.h"
       |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
 1 error generated.
 Error while processing /tmp/cs_broken_tu_force/bad.cpp.
-[       OK ] BrokenTuTest.AnalyzeBrokenTUsOverride (3 ms)
+[       OK ] BrokenTuTest.AnalyzeBrokenTUsOverride (4 ms)
 [ RUN      ] BrokenTuTest.CleanTuStillAnalyzed
-[       OK ] BrokenTuTest.CleanTuStillAnalyzed (9 ms)
+[       OK ] BrokenTuTest.CleanTuStillAnalyzed (3 ms)
 [ RUN      ] BrokenTuTest.ConfigFlagParsed
 [       OK ] BrokenTuTest.ConfigFlagParsed (0 ms)
 [ RUN      ] BrokenTuTest.MissingCompileDatabaseKeepsFallbackAvailable
@@ -2545,8 +2545,8 @@ YAML:1:27: error: Expected quote at end of scalar
 [1/2] Processing file /tmp/cs_serial_analysis_worker/first.cpp.
 [2/2] Processing file /tmp/cs_serial_analysis_worker/second.cpp.
 SERIAL_WORKER_EVIDENCE callbacks=2 max_active=1 worker_threads=1 joined=1
-[       OK ] BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn (17 ms)
-[----------] 9 tests from BrokenTuTest (35 ms total)
+[       OK ] BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn (15 ms)
+[----------] 9 tests from BrokenTuTest (28 ms total)
 
 [----------] 26 tests from McpServerTest
 [ RUN      ] McpServerTest.Initialize
@@ -2579,7 +2579,7 @@ CodeSkeptic: 1 finding(s)
     -> /tmp/mcp_uaf.cpp:3:13 'p' allocated here
     -> /tmp/mcp_uaf.cpp:4:13 'p' freed here
 ----------------------------------------
-[       OK ] McpServerTest.AnalyzeCallReturnsFindingsWithTrace (6 ms)
+[       OK ] McpServerTest.AnalyzeCallReturnsFindingsWithTrace (11 ms)
 [ RUN      ] McpServerTest.AnalyzeWithFunctionScope
 [CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
 json-compilation-database: Error while opening JSON database: No such file or directory
@@ -2592,7 +2592,7 @@ CodeSkeptic: 1 finding(s)
 /tmp/mcp_two.cpp:3:41 [error] uninit-ptr: Use of uninitialized pointer: 'b' may not be assigned at this dereference
     -> /tmp/mcp_two.cpp:3:30 'b' declared without an initializer here
 ----------------------------------------
-[       OK ] McpServerTest.AnalyzeWithFunctionScope (4 ms)
+[       OK ] McpServerTest.AnalyzeWithFunctionScope (5 ms)
 [ RUN      ] McpServerTest.FilterStateResetAfterScopedAnalyze
 [CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
 json-compilation-database: Error while opening JSON database: No such file or directory
@@ -2600,7 +2600,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Fallback: continuing with -std=c++17.
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
 CodeSkeptic: Clean! No issues found.
-[       OK ] McpServerTest.FilterStateResetAfterScopedAnalyze (3 ms)
+[       OK ] McpServerTest.FilterStateResetAfterScopedAnalyze (4 ms)
 [ RUN      ] McpServerTest.WarmCache_SecondCallHits
 [CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: No such file or directory
 json-compilation-database: Error while opening JSON database: No such file or directory
@@ -2666,7 +2666,7 @@ CodeSkeptic: 1 finding(s)
 /tmp/mcp_sum_caller.cpp:5:21 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
     -> /tmp/mcp_sum_caller.cpp:4:13 'p' assigned a possibly-null value here (callee may return null)
 ----------------------------------------
-[       OK ] McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge (6 ms)
+[       OK ] McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge (5 ms)
 [ RUN      ] McpServerTest.ToolsListMentionsSummaries
 [       OK ] McpServerTest.ToolsListMentionsSummaries (0 ms)
 [ RUN      ] McpServerTest.AnalyzeMissingPath_Error
@@ -2747,14 +2747,14 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Fallback: continuing with -std=c++17.
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
 CodeSkeptic: Clean! No issues found.
-[       OK ] McpServerTest.AllocatorPairsAreExactFailClosedAndRequestScoped (5 ms)
-[----------] 26 tests from McpServerTest (62 ms total)
+[       OK ] McpServerTest.AllocatorPairsAreExactFailClosedAndRequestScoped (6 ms)
+[----------] 26 tests from McpServerTest (67 ms total)
 
 [----------] 6 tests from InterprocNullTest
 [ RUN      ] InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning
-[       OK ] InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning (2 ms)
+[       OK ] InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning (4 ms)
 [ RUN      ] InterprocNullTest.MaybeNullReturn_Guarded_Clean
-[       OK ] InterprocNullTest.MaybeNullReturn_Guarded_Clean (2 ms)
+[       OK ] InterprocNullTest.MaybeNullReturn_Guarded_Clean (3 ms)
 [ RUN      ] InterprocNullTest.NeverNullChain_Clean
 [       OK ] InterprocNullTest.NeverNullChain_Clean (2 ms)
 [ RUN      ] InterprocNullTest.MaybeNullChain_TwoLevels_Warning
@@ -2763,7 +2763,7 @@ CodeSkeptic: Clean! No issues found.
 [       OK ] InterprocNullTest.RecursiveReturn_StaysUnknown_Silent (3 ms)
 [ RUN      ] InterprocNullTest.VariableReturn_Unknown_Silent
 [       OK ] InterprocNullTest.VariableReturn_Unknown_Silent (3 ms)
-[----------] 6 tests from InterprocNullTest (17 ms total)
+[----------] 6 tests from InterprocNullTest (19 ms total)
 
 [----------] 9 tests from InterprocLeakTest
 [ RUN      ] InterprocLeakTest.FreeWrapper_DoubleFree_Error
@@ -2775,13 +2775,13 @@ CodeSkeptic: Clean! No issues found.
 [ RUN      ] InterprocLeakTest.ReadOnlyCallee_LeakVisible
 [       OK ] InterprocLeakTest.ReadOnlyCallee_LeakVisible (2 ms)
 [ RUN      ] InterprocLeakTest.StoringCallee_NoLeakReport
-[       OK ] InterprocLeakTest.StoringCallee_NoLeakReport (4 ms)
+[       OK ] InterprocLeakTest.StoringCallee_NoLeakReport (2 ms)
 [ RUN      ] InterprocLeakTest.AliasingCallee_NowFrees_DoubleFree
 [       OK ] InterprocLeakTest.AliasingCallee_NowFrees_DoubleFree (2 ms)
 [ RUN      ] InterprocLeakTest.ExternalCallee_StillEscapes
 [       OK ] InterprocLeakTest.ExternalCallee_StillEscapes (2 ms)
 [ RUN      ] InterprocLeakTest.MutualRecursionParam_Conservative_Silent
-[       OK ] InterprocLeakTest.MutualRecursionParam_Conservative_Silent (2 ms)
+[       OK ] InterprocLeakTest.MutualRecursionParam_Conservative_Silent (4 ms)
 [ RUN      ] InterprocLeakTest.DeleteWrapper_UAF
 [       OK ] InterprocLeakTest.DeleteWrapper_UAF (2 ms)
 [----------] 9 tests from InterprocLeakTest (25 ms total)
@@ -2822,9 +2822,9 @@ CodeSkeptic: Clean! No issues found.
 
 [----------] 2 tests from ExceptionalTransferSummaryTest
 [ RUN      ] ExceptionalTransferSummaryTest.ConsumedSummaryAcrossTUReportsUseAfterFree
-[       OK ] ExceptionalTransferSummaryTest.ConsumedSummaryAcrossTUReportsUseAfterFree (5 ms)
+[       OK ] ExceptionalTransferSummaryTest.ConsumedSummaryAcrossTUReportsUseAfterFree (4 ms)
 [ RUN      ] ExceptionalTransferSummaryTest.TransferredSummaryAcrossTUCannotInventRelease
-[       OK ] ExceptionalTransferSummaryTest.TransferredSummaryAcrossTUCannotInventRelease (4 ms)
+[       OK ] ExceptionalTransferSummaryTest.TransferredSummaryAcrossTUCannotInventRelease (6 ms)
 [----------] 2 tests from ExceptionalTransferSummaryTest (10 ms total)
 
 [----------] 8 tests from ReturnFlowTest
@@ -2833,7 +2833,7 @@ CodeSkeptic: Clean! No issues found.
 [ RUN      ] ReturnFlowTest.MaybeNullVarFlow_Warning
 [       OK ] ReturnFlowTest.MaybeNullVarFlow_Warning (2 ms)
 [ RUN      ] ReturnFlowTest.GuardedFallthrough_NeverNull_Silent
-[       OK ] ReturnFlowTest.GuardedFallthrough_NeverNull_Silent (3 ms)
+[       OK ] ReturnFlowTest.GuardedFallthrough_NeverNull_Silent (2 ms)
 [ RUN      ] ReturnFlowTest.DefiniteNullVar_Warning
 [       OK ] ReturnFlowTest.DefiniteNullVar_Warning (2 ms)
 [ RUN      ] ReturnFlowTest.ParamPassthrough_StaysUnknown_Silent
@@ -2882,9 +2882,9 @@ CodeSkeptic: 1 finding(s)
 /tmp/sumpersist_caller.cpp:5:21 [warning] null-deref: Possible null dereference: 'p' may be null on some paths
     -> /tmp/sumpersist_caller.cpp:4:13 'p' assigned a possibly-null value here (callee may return null)
 ----------------------------------------
-[       OK ] SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding (13 ms)
+[       OK ] SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding (12 ms)
 [ RUN      ] SummaryPersistTest.StaleSummary_WarnsButStillWorks
-[       OK ] SummaryPersistTest.StaleSummary_WarnsButStillWorks (8 ms)
+[       OK ] SummaryPersistTest.StaleSummary_WarnsButStillWorks (7 ms)
 [ RUN      ] SummaryPersistTest.V4File_ZeroFromParamParses
 [       OK ] SummaryPersistTest.V4File_ZeroFromParamParses (0 ms)
 [ RUN      ] SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected
@@ -2909,7 +2909,7 @@ CodeSkeptic: 1 finding(s)
 [       OK ] SummaryPersistTest.V5File_AlwaysZeroEncodingRejected (0 ms)
 [ RUN      ] SummaryPersistTest.V4File_ZeroFromParamStillParses
 [       OK ] SummaryPersistTest.V4File_ZeroFromParamStillParses (0 ms)
-[----------] 19 tests from SummaryPersistTest (23 ms total)
+[----------] 19 tests from SummaryPersistTest (21 ms total)
 
 [----------] 8 tests from InterprocZeroTest
 [ RUN      ] InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning
@@ -2923,16 +2923,16 @@ CodeSkeptic: 1 finding(s)
 [ RUN      ] InterprocZeroTest.FlowKilledZero_NeverZero_Silent
 [       OK ] InterprocZeroTest.FlowKilledZero_NeverZero_Silent (2 ms)
 [ RUN      ] InterprocZeroTest.DirectCallDivisor_DocumentedSilent
-[       OK ] InterprocZeroTest.DirectCallDivisor_DocumentedSilent (4 ms)
+[       OK ] InterprocZeroTest.DirectCallDivisor_DocumentedSilent (2 ms)
 [ RUN      ] InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero
 [       OK ] InterprocZeroTest.TraceNote_MentionsCalleeMayReturnZero (2 ms)
 [ RUN      ] InterprocZeroTest.CrossTU_ZeronessTravels
-[       OK ] InterprocZeroTest.CrossTU_ZeronessTravels (4 ms)
-[----------] 8 tests from InterprocZeroTest (23 ms total)
+[       OK ] InterprocZeroTest.CrossTU_ZeronessTravels (6 ms)
+[----------] 8 tests from InterprocZeroTest (24 ms total)
 
 [----------] 11 tests from ConditionedNullTest
 [ RUN      ] ConditionedNullTest.SwitchDefault_MaskedArg_Clean
-[       OK ] ConditionedNullTest.SwitchDefault_MaskedArg_Clean (2 ms)
+[       OK ] ConditionedNullTest.SwitchDefault_MaskedArg_Clean (3 ms)
 [ RUN      ] ConditionedNullTest.SwitchDefault_InlineArg_Clean
 [       OK ] ConditionedNullTest.SwitchDefault_InlineArg_Clean (2 ms)
 [ RUN      ] ConditionedNullTest.SwitchDefault_UnprovableArg_WarningStays
@@ -2953,7 +2953,7 @@ CodeSkeptic: 1 finding(s)
 [       OK ] ConditionedNullTest.CrossTU_ConditionTravels (4 ms)
 [ RUN      ] ConditionedNullTest.V3FileRoundtrip
 [       OK ] ConditionedNullTest.V3FileRoundtrip (0 ms)
-[----------] 11 tests from ConditionedNullTest (29 ms total)
+[----------] 11 tests from ConditionedNullTest (30 ms total)
 
 [----------] 3 tests from ReturnAliasSummaryTest
 [ RUN      ] ReturnAliasSummaryTest.HarvestsExactRelationsAndRejectsMixedSources
@@ -2982,7 +2982,7 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Analysis starting... (1 files, 1 rules)
 [CodeSkeptic] 5 function summaries saved to /tmp/param_contract_summary.csk
 CodeSkeptic: Clean! No issues found.
-[       OK ] ParamContractSummaryTest.HarvestsPreAndPostconditionsExactly (6 ms)
+[       OK ] ParamContractSummaryTest.HarvestsPreAndPostconditionsExactly (4 ms)
 [ RUN      ] ParamContractSummaryTest.V9FileRoundTripsAndValidatesVectors
 [       OK ] ParamContractSummaryTest.V9FileRoundTripsAndValidatesVectors (0 ms)
 [ RUN      ] ParamContractSummaryTest.V8FileUpgradesToV11Conservatively
@@ -2994,11 +2994,11 @@ CodeSkeptic: Clean! No issues found.
 [ RUN      ] ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans
 [       OK ] ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans (4 ms)
 [ RUN      ] ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans
-[       OK ] ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans (7 ms)
+[       OK ] ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans (4 ms)
 [ RUN      ] ParamContractSummaryTest.CrossTUOperatorOutPostconditionCleans
-[       OK ] ParamContractSummaryTest.CrossTUOperatorOutPostconditionCleans (4 ms)
+[       OK ] ParamContractSummaryTest.CrossTUOperatorOutPostconditionCleans (7 ms)
 [ RUN      ] ParamContractSummaryTest.OperatorCallForwardsOutPostcondition
-[       OK ] ParamContractSummaryTest.OperatorCallForwardsOutPostcondition (4 ms)
+[       OK ] ParamContractSummaryTest.OperatorCallForwardsOutPostcondition (5 ms)
 [ RUN      ] ParamContractSummaryTest.CrossTURejectedPreconditionWarns
 [       OK ] ParamContractSummaryTest.CrossTURejectedPreconditionWarns (4 ms)
 [ RUN      ] ParamContractSummaryTest.CrossTUDefiniteNullOutPostconditionReports
@@ -3028,11 +3028,11 @@ CodeSkeptic: Clean! No issues found.
 [ RUN      ] OwnershipSummaryTest.CrossTUDiscardedBorrowedResultIsClean
 [       OK ] OwnershipSummaryTest.CrossTUDiscardedBorrowedResultIsClean (4 ms)
 [ RUN      ] OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak
-[       OK ] OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak (7 ms)
+[       OK ] OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak (4 ms)
 [ RUN      ] OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument
 [       OK ] OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument (4 ms)
 [ RUN      ] OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn
-[       OK ] OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn (4 ms)
+[       OK ] OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn (7 ms)
 [----------] 7 tests from OwnershipSummaryTest (35 ms total)
 
 [----------] 2 tests from ReturnOwnershipSummaryTest
@@ -3040,7 +3040,7 @@ CodeSkeptic: Clean! No issues found.
 [       OK ] ReturnOwnershipSummaryTest.CrossTUPlacementReturnIsNotOwned (4 ms)
 [ RUN      ] ReturnOwnershipSummaryTest.CrossTUOwnedReturnMakesCallerResponsible
 [       OK ] ReturnOwnershipSummaryTest.CrossTUOwnedReturnMakesCallerResponsible (4 ms)
-[----------] 2 tests from ReturnOwnershipSummaryTest (8 ms total)
+[----------] 2 tests from ReturnOwnershipSummaryTest (9 ms total)
 
 [----------] 6 tests from FieldSensitivitySummaryTest
 [ RUN      ] FieldSensitivitySummaryTest.CrossTUDifferentFieldPreservesCorrelation
@@ -3062,11 +3062,11 @@ CodeSkeptic: Clean! No issues found.
 [       OK ] FieldSensitivitySummaryTest.HarvestsComposesAndPersistsExactWrites (5 ms)
 [ RUN      ] FieldSensitivitySummaryTest.V10StrictParsingAndConservativeMerge
 [       OK ] FieldSensitivitySummaryTest.V10StrictParsingAndConservativeMerge (0 ms)
-[----------] 6 tests from FieldSensitivitySummaryTest (25 ms total)
+[----------] 6 tests from FieldSensitivitySummaryTest (27 ms total)
 
 [----------] 5 tests from CallGraphSccTest
 [ RUN      ] CallGraphSccTest.DeepAcyclicChainExceedsLegacySweepCap
-[       OK ] CallGraphSccTest.DeepAcyclicChainExceedsLegacySweepCap (4 ms)
+[       OK ] CallGraphSccTest.DeepAcyclicChainExceedsLegacySweepCap (7 ms)
 [ RUN      ] CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder
 [       OK ] CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder (2 ms)
 [ RUN      ] CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible
@@ -3081,8 +3081,8 @@ json-compilation-database: Error while opening JSON database: No such file or di
 CodeSkeptic: Clean! No issues found.
 [       OK ] CallGraphSccTest.DeepAccessChainReachesFixedPoint (5 ms)
 [ RUN      ] CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent
-[       OK ] CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent (5 ms)
-[----------] 5 tests from CallGraphSccTest (21 ms total)
+[       OK ] CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent (3 ms)
+[----------] 5 tests from CallGraphSccTest (22 ms total)
 
 [----------] 15 tests from FunctionPointerSummaryTest
 [ RUN      ] FunctionPointerSummaryTest.ResolvesBoundedLocalTargetsAndRejectsAddressEscape
@@ -3093,9 +3093,9 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Analysis starting... (1 files, 1 rules)
 [CodeSkeptic] 19 function summaries saved to /tmp/function_pointer_summary.csk
 CodeSkeptic: Clean! No issues found.
-[       OK ] FunctionPointerSummaryTest.ResolvesBoundedLocalTargetsAndRejectsAddressEscape (7 ms)
+[       OK ] FunctionPointerSummaryTest.ResolvesBoundedLocalTargetsAndRejectsAddressEscape (6 ms)
 [ RUN      ] FunctionPointerSummaryTest.IndirectMaybeNullReturnWarns
-[       OK ] FunctionPointerSummaryTest.IndirectMaybeNullReturnWarns (3 ms)
+[       OK ] FunctionPointerSummaryTest.IndirectMaybeNullReturnWarns (5 ms)
 [ RUN      ] FunctionPointerSummaryTest.IndirectOwnedReturnRemainsALeak
 [       OK ] FunctionPointerSummaryTest.IndirectOwnedReturnRemainsALeak (2 ms)
 [ RUN      ] FunctionPointerSummaryTest.IndirectZeroReturnWarns
@@ -3109,7 +3109,7 @@ CodeSkeptic: Clean! No issues found.
 [ RUN      ] FunctionPointerSummaryTest.IndirectBorrowKeepsCallerOwnership
 [       OK ] FunctionPointerSummaryTest.IndirectBorrowKeepsCallerOwnership (2 ms)
 [ RUN      ] FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull
-[       OK ] FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull (2 ms)
+[       OK ] FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull (3 ms)
 [ RUN      ] FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero
 [       OK ] FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero (2 ms)
 [ RUN      ] FunctionPointerSummaryTest.IndirectZeroPassthroughPreservesArgument
@@ -3128,8 +3128,8 @@ json-compilation-database: Error while opening JSON database: No such file or di
 [CodeSkeptic] Analysis starting... (1 files, 1 rules)
 [CodeSkeptic] 3 function summaries saved to /tmp/function_pointer_targets_c.csk
 CodeSkeptic: Clean! No issues found.
-[       OK ] FunctionPointerSummaryTest.CTargetSetComposesFieldWrites (4 ms)
-[----------] 15 tests from FunctionPointerSummaryTest (49 ms total)
+[       OK ] FunctionPointerSummaryTest.CTargetSetComposesFieldWrites (3 ms)
+[----------] 15 tests from FunctionPointerSummaryTest (51 ms total)
 
 [----------] 5 tests from LibraryModelFileTest
 [ RUN      ] LibraryModelFileTest.LoadsStrictV10ForDirectAndControlledIndirectCalls
@@ -3227,10 +3227,10 @@ CodeSkeptic: 1 finding(s)
 ----------------------------------------
 /tmp/alloc_sink_reload_caller.cpp:7:38 [warning] alloc-size-overflow: possible allocation-size overflow: an untrusted length can wrap this unsigned 'size_t' size computation to a small value, under-sizing the buffer - bound the length before computing the size
 ----------------------------------------
-[       OK ] AllocatorSizeSummaryTest.SummaryInReportsCallerOnlyWrapperUse (11 ms)
+[       OK ] AllocatorSizeSummaryTest.SummaryInReportsCallerOnlyWrapperUse (7 ms)
 [ RUN      ] AllocatorSizeSummaryTest.V11RejectsMalformedAllocatorSizeVector
 [       OK ] AllocatorSizeSummaryTest.V11RejectsMalformedAllocatorSizeVector (0 ms)
-[----------] 4 tests from AllocatorSizeSummaryTest (16 ms total)
+[----------] 4 tests from AllocatorSizeSummaryTest (12 ms total)
 
 [----------] 6 tests from MacSdkPathTest
 [ RUN      ] MacSdkPathTest.EnvSdkrootWinsVerbatim
@@ -3272,7 +3272,7 @@ CodeSkeptic: 1 finding(s)
 [ RUN      ] ResourceDirTest.HighestVersionWins
 [       OK ] ResourceDirTest.HighestVersionWins (0 ms)
 [ RUN      ] ResourceDirTest.VersionDirWithoutHeadersIsSkipped
-[       OK ] ResourceDirTest.VersionDirWithoutHeadersIsSkipped (0 ms)
+[       OK ] ResourceDirTest.VersionDirWithoutHeadersIsSkipped (3 ms)
 [ RUN      ] ResourceDirTest.ExeRelativeBeatsBaked
 [       OK ] ResourceDirTest.ExeRelativeBeatsBaked (0 ms)
 [ RUN      ] ResourceDirTest.BakedIsLastResortOnlyIfItExists
@@ -3281,9 +3281,9 @@ CodeSkeptic: 1 finding(s)
 [       OK ] ResourceDirTest.AllMissingYieldsEmpty (0 ms)
 [ RUN      ] ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders
 [       OK ] ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders (0 ms)
-[----------] 9 tests from ResourceDirTest (2 ms total)
+[----------] 9 tests from ResourceDirTest (4 ms total)
 
 [----------] Global test environment tear-down
-[==========] 1187 tests from 114 test suites ran. (3986 ms total)
+[==========] 1187 tests from 114 test suites ran. (4019 ms total)
 [  PASSED  ] 1187 tests.
 CODESKEPTIC_SANITIZER_GATE_OK single_process_complete

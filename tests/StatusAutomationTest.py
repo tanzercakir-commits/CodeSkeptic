@@ -37,6 +37,22 @@ def bash_executable() -> str:
     raise AssertionError("a Bash implementation is required for docs guard tests")
 
 
+def read_git_trace(path: Path) -> list[dict[str, object]]:
+    """Return native Git subprocess starts from a Trace2 event stream."""
+    calls: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        argv = event.get("argv")
+        if event.get("event") != "start" or not isinstance(argv, list) or not argv:
+            continue
+        executable = (
+            str(argv[0]).replace("\\", "/").rsplit("/", 1)[-1].lower()
+        )
+        if executable in {"git", "git.exe"}:
+            calls.append({"tool": "git", "args": argv[1:]})
+    return calls
+
+
 class RepositoryFixture:
     def __init__(self, directory: Path) -> None:
         self.root = directory / "work"
@@ -44,6 +60,10 @@ class RepositoryFixture:
         self.git("init", "-b", "main")
         self.git("config", "user.name", "Status Test")
         self.git("config", "user.email", "status@example.invalid")
+        # A detached `git maintenance run --auto` can outlive its parent
+        # command and race TemporaryDirectory cleanup on hosted runners.
+        self.git("config", "gc.auto", "0")
+        self.git("config", "maintenance.auto", "false")
         (self.root / "docs").mkdir()
         (self.root / "docs" / "TODO.md").write_text(
             "# TODO\n\n<!-- cs:state-begin -->\n```\nstale\n```\n"
@@ -141,6 +161,57 @@ class RepositoryFixture:
 
 
 class ProgressStatusTest(unittest.TestCase):
+    def test_repository_fixture_disables_background_git_maintenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = RepositoryFixture(Path(temporary))
+            self.assertEqual(
+                fixture.git("config", "--get", "gc.auto").stdout.strip(),
+                "0",
+            )
+            self.assertEqual(
+                fixture.git("config", "--get", "maintenance.auto").stdout.strip(),
+                "false",
+            )
+
+    def test_git_trace_records_native_subprocess_invocations(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            trace = Path(temporary) / "git-trace.jsonl"
+            environment = os.environ.copy()
+            environment["GIT_ALLOW_PROTOCOL"] = "file"
+            environment["GIT_TRACE2_EVENT"] = str(trace)
+            completed = subprocess.run(
+                ["git", "--version"],
+                env=environment,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            blocked = subprocess.run(
+                ["git", "ls-remote", "https://example.invalid/repository"],
+                env=environment,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertIn("transport 'https' not allowed", blocked.stderr)
+            self.assertEqual(
+                read_git_trace(trace),
+                [
+                    {"tool": "git", "args": ["--version"]},
+                    {
+                        "tool": "git",
+                        "args": [
+                            "ls-remote",
+                            "https://example.invalid/repository",
+                        ],
+                    },
+                ],
+            )
+
     def test_windows_lifecycle_checkout_has_full_history(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "windows.yml").read_text(
             encoding="utf-8"
@@ -247,32 +318,12 @@ class ProgressStatusTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertNotIn(command, guard)
 
-        real_git = shutil.which("git")
-        self.assertIsNotNone(real_git)
-        assert real_git is not None
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             bin_dir = root / "bin"
             bin_dir.mkdir()
-            log = root / "calls.jsonl"
-            git_wrapper = bin_dir / "git"
-            git_wrapper.write_text(
-                "#!/usr/bin/env python3\n"
-                "import json, os, sys\n"
-                f"real = {real_git!r}\n"
-                "args = sys.argv[1:]\n"
-                "with open(os.environ['CS_OFFLINE_LOG'], 'a', encoding='utf-8') as f:\n"
-                "    f.write(json.dumps({'tool': 'git', 'args': args}) + '\\n')\n"
-                "blocked = {'fetch', 'pull', 'push', 'clone', 'ls-remote'}\n"
-                "if any(arg in blocked for arg in args):\n"
-                "    raise SystemExit(97)\n"
-                "if 'remote' in args and any(arg in {'update', 'prune'} for arg in args):\n"
-                "    raise SystemExit(97)\n"
-                "os.execv(real, [real, *args])\n",
-                encoding="utf-8",
-                newline="\n",
-            )
-            git_wrapper.chmod(0o755)
+            trace = root / "git-trace.jsonl"
+            network_log = root / "network-calls.jsonl"
             for tool in ("curl", "wget", "gh"):
                 wrapper = bin_dir / tool
                 wrapper.write_text(
@@ -289,7 +340,10 @@ class ProgressStatusTest(unittest.TestCase):
 
             environment = os.environ.copy()
             environment["PATH"] = str(bin_dir) + os.pathsep + environment["PATH"]
-            environment["CS_OFFLINE_LOG"] = str(log)
+            environment["CS_OFFLINE_LOG"] = str(network_log)
+            environment["GIT_ALLOW_PROTOCOL"] = "file"
+            environment["GIT_TERMINAL_PROMPT"] = "0"
+            environment["GIT_TRACE2_EVENT"] = str(trace)
             completed = subprocess.run(
                 [bash_executable(), "scripts/check_docs_sync.sh"],
                 cwd=ROOT,
@@ -304,10 +358,12 @@ class ProgressStatusTest(unittest.TestCase):
                 0,
                 completed.stdout + completed.stderr,
             )
-            calls = [
-                json.loads(line)
-                for line in log.read_text(encoding="utf-8").splitlines()
-            ]
+            calls = read_git_trace(trace)
+            if network_log.is_file():
+                calls.extend(
+                    json.loads(line)
+                    for line in network_log.read_text(encoding="utf-8").splitlines()
+                )
             self.assertTrue(calls)
             self.assertTrue(all(call["tool"] == "git" for call in calls))
             for call in calls:

@@ -1,8 +1,8 @@
 [CodeSkeptic] Analysis starting... (2 files, 12 rules)
 [CodeSkeptic] Whole-program pass: collecting summaries from 2 file(s)...
-[1/2] Processing file /receipts/undefined/fixture/whole/first.cpp.
-[2/2] Processing file /receipts/undefined/fixture/whole/second.cpp.
-[1/2] Processing file /receipts/undefined/fixture/whole/first.cpp.
-[2/2] Processing file /receipts/undefined/fixture/whole/second.cpp.
+[1/2] Processing file /receipts/undefined-final-trace2/fixture/whole/first.cpp.
+[2/2] Processing file /receipts/undefined-final-trace2/fixture/whole/second.cpp.
+[1/2] Processing file /receipts/undefined-final-trace2/fixture/whole/first.cpp.
+[2/2] Processing file /receipts/undefined-final-trace2/fixture/whole/second.cpp.
 CodeSkeptic: Clean! No issues found.
 CODESKEPTIC_SANITIZER_GATE_OK analyzer_whole_program
