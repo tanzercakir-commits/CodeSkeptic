@@ -1,0 +1,55 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1188: StatusAutomationContract
+1/1 Test #1188: StatusAutomationContract .........***Failed   42.07 sec
+.......F................E........................
+======================================================================
+ERROR: test_production_ledger_cannot_be_self_consistently_reanchored (__main__.ProgressStatusTest.test_production_ledger_cannot_be_self_consistently_reanchored)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 681, in test_production_ledger_cannot_be_self_consistently_reanchored
+    progress_status._commit_receipt(ROOT, main_oid)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\progress_status.py", line 174, in _commit_receipt
+    raise ProgressStatusError(
+        f"git show metadata failed ({completed.returncode}): {reason}"
+    )
+progress_status.ProgressStatusError: git show metadata failed (128): fatal: bad object 7dfd37596414c9512316093ff4fb6b039673f55f
+
+======================================================================
+FAIL: test_docs_guard_has_no_network_fetch_fallback (__main__.ProgressStatusTest.test_docs_guard_has_no_network_fetch_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StatusAutomationTest.py", line 291, in test_docs_guard_has_no_network_fetch_fallback
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        completed.returncode,
+        ^^^^^^^^^^^^^^^^^^^^^
+        0,
+        ^^
+        completed.stdout + completed.stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 1 != 0 : work ref accepted: phase-robustness-input-validation
+FAIL: verified progress/state could not be proven under CI.
+ok: capability registry, README, and rule docs are in sync
+REALWORLD_LEDGER_OK projects=11 campaigns=3 path=D:/a/CodeSkeptic/CodeSkeptic/scripts/realworld_manifest.json
+UPSTREAM_CANDIDATE_EVIDENCE_OK batch=2026-08-12-a projects=11
+git: 'Files\Git\mingw64\bin\git.EXE' is not a git command. See 'git --help'.
+git: 'Files\Git\mingw64\bin\git.EXE' is not a git command. See 'git --help'.
+progress status error: git rev-parse --verify origin/main^{commit} failed (128): fatal: Needed a single revision
+
+
+----------------------------------------------------------------------
+Ran 49 tests in 41.889s
+
+FAILED (failures=1, errors=1)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =  42.12 sec
+
+The following tests FAILED:
+	1188 - StatusAutomationContract (Failed)
+Errors while running CTest
