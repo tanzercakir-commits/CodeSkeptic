@@ -262,13 +262,13 @@ TEST(SummaryDiffTest, IdenticalHarvests_NoChanges) {
 TEST(SummaryDiffTest, ReportEndToEnd_ExitCodes) {
     auto oldPath = writeFile("sd_old.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
     auto newPathWeak = writeFile("sd_new_weak.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tM\t-\tU\n");
+        "find/1\tM\tO\tU\n");
     auto newPathSame = writeFile("sd_new_same.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
 
     std::ostringstream out;
     EXPECT_EQ(reportSummaryDiff(oldPath, newPathWeak, out), 1);
@@ -288,10 +288,10 @@ TEST(SummaryDiffTest, GateWarn_ReportsButExitsZero) {
     // still fully visible in the output, only the exit code relaxes.
     auto oldPath = writeFile("sd_gate_old.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tN\t-\tU\n");
+        "find/1\tN\tO\tU\n");
     auto newPathWeak = writeFile("sd_gate_new.txt",
         "codeskeptic-summaries v2\n"
-        "find/1\tM\t-\tU\n");
+        "find/1\tM\tO\tU\n");
 
     std::ostringstream out;
     EXPECT_EQ(reportSummaryDiff(oldPath, newPathWeak, out,

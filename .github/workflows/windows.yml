@@ -24,6 +24,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        # StatusAutomationContract exercises the protected-main lifecycle
+        # guard. Its anchor and merge-base checks must see complete history on
+        # native Windows just as they do in the Linux build-and-test lane.
+        with:
+          fetch-depth: 0
 
       - name: Setup MSVC + LLVM (shared with release.yml)
         uses: ./.github/actions/setup-msvc-llvm

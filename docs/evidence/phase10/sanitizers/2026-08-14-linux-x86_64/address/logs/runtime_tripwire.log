@@ -1,0 +1,50 @@
+=================================================================
+==379==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7bc3943e0014 at pc 0x55ff4ff86d4e bp 0x7fffd20ab530 sp 0x7fffd20ab528
+WRITE of size 4 at 0x7bc3943e0014 thread T0
+    #0 0x55ff4ff86d4d in main /workspace/tests/sanitizer/AddressTripwire.cpp:6:21
+    #1 0x7fa394fe41c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #2 0x7fa394fe428a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x55ff4fe9d354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+
+0x7bc3943e0014 is located 0 bytes after 4-byte region [0x7bc3943e0010,0x7bc3943e0014)
+allocated by thread T0 here:
+    #0 0x55ff4ff85981 in operator new[](unsigned long) (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x114981) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+    #1 0x55ff4ff86cf7 in main /workspace/tests/sanitizer/AddressTripwire.cpp:5:19
+    #2 0x7fa394fe41c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #3 0x7fa394fe428a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #4 0x55ff4fe9d354 in _start (/workspace/build-sanitizer-address-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: 417a8d3920cd41e57a2475a37961d75b8432826a)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /workspace/tests/sanitizer/AddressTripwire.cpp:6:21 in main
+Shadow bytes around the buggy address:
+  0x7bc3943dfd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7bc3943dfe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7bc3943dfe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7bc3943dff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7bc3943dff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x7bc3943e0000: fa fa[04]fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7bc3943e0080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7bc3943e0100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7bc3943e0180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7bc3943e0200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7bc3943e0280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==379==ABORTING
+CODESKEPTIC_SANITIZER_GATE_OK runtime_tripwire
