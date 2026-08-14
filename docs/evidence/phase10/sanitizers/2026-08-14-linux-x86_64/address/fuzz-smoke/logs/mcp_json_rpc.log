@@ -1,14 +1,14 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1004
-INFO: Loaded 1 modules   (575422 inline 8-bit counters): 575422 [0x56253a36ef10, 0x56253a3fb6ce), 
-INFO: Loaded 1 PC tables (575422 PCs): 575422 [0x56253a3fb6d0,0x56253acc32b0), 
-INFO:        3 files found in /receipts/address-final-trace2/codeskeptic-fuzz-lw9nctj4/corpus/mcp_json_rpc
+INFO: Loaded 1 modules   (575556 inline 8-bit counters): 575556 [0x55b82adb4f10, 0x55b82ae41754), 
+INFO: Loaded 1 PC tables (575556 PCs): 575556 [0x55b82ae41758,0x55b82b709b98), 
+INFO:        3 files found in /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/codeskeptic-fuzz-g97nrozz/corpus/mcp_json_rpc
 INFO: seed corpus: files: 3 min: 34b max: 153b total: 228b rss: 116Mb
 #5	INITED cov: 252 ft: 277 corp: 3/228b exec/s: 0 rss: 117Mb
 #6	NEW    cov: 255 ft: 280 corp: 4/269b lim: 153 exec/s: 0 rss: 117Mb L: 41/153 MS: 1 ChangeBit-
 #35	REDUCE cov: 255 ft: 280 corp: 4/266b lim: 153 exec/s: 0 rss: 120Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
 #36	NEW    cov: 269 ft: 308 corp: 5/399b lim: 153 exec/s: 0 rss: 120Mb L: 133/153 MS: 1 EraseBytes-
-	NEW_FUNC[1/1]: 0x56253649e340 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
+	NEW_FUNC[1/1]: 0x55b826ee1360 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
 #47	NEW    cov: 275 ft: 319 corp: 6/533b lim: 153 exec/s: 0 rss: 121Mb L: 134/153 MS: 1 InsertByte-
 #48	REDUCE cov: 275 ft: 319 corp: 6/529b lim: 153 exec/s: 0 rss: 121Mb L: 27/153 MS: 1 EraseBytes-
 #59	NEW    cov: 276 ft: 320 corp: 7/677b lim: 153 exec/s: 0 rss: 122Mb L: 148/153 MS: 1 InsertRepeatedBytes-

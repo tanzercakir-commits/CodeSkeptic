@@ -52,8 +52,18 @@
 # Each run prints CORPUS_COVERAGE (enumerated/broken/analysed) so the
 # coverage half stays answerable from the log.
 #
+# 2026-08-14 (P10.4 fail-closed coverage): corpus inputs now come only
+# from each pinned project's generated compile_commands.json. The earlier
+# source-tree scan needed --accept-partial-coverage and could therefore
+# publish a finding count beside skipped requested TUs. cjson is now an
+# exact 23/23 compile-DB surface with zero broken and zero missing TUs;
+# removing non-built files changes its pin 54 -> 48. tinyxml2 is an exact
+# 2/2 surface with zero broken and zero missing TUs and remains at 9.
+# run_corpus.sh rejects any requested/enumerated mismatch, broken TU, or
+# missing compile command before accepting a count.
+#
 # project finding-count
-cjson 54
+cjson 48
 tinyxml2 9
 # abseil runs only with CORPUS_DEEP=1 (weekly cron; tag 20260526.0).
 # 4 = post-v2b level; 5 was post-dedup; 12 was the post-FP-hunt level

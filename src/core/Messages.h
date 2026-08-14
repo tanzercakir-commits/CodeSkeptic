@@ -81,6 +81,7 @@ enum class MsgId {
     BoundsArrayDefinite,        // {0} = proven index range, {1} = array extent
     CoverageIncomplete,         // {0} = count of not-fully-analyzed functions
     BrokenTuSkipped,            // {0} = count of TUs that failed to compile
+    RequestedTuUnaccounted,     // {0} = count of requested TUs not processed
     AssumptionNonNullParam,     // {0} = parameter name
     BoundsCopyOverflow,         // {0} = copy size range, {1} = dest capacity bytes
     BoundsUnboundedStrCopy,     // {0} = function name, {1} = dest capacity bytes

@@ -97,9 +97,11 @@ SOURCE_ROOTS = (
 IGNORED_SOURCE_PARTS = {"__pycache__"}
 IGNORED_SOURCE_SUFFIXES = {".pyc", ".pyo"}
 IGNORED_SOURCE_PREFIXES = (
-    "docs/evidence/phase10/sanitizers/",
-    # The sanitizer receipt and its human-readable changelog entry are
-    # outputs of this matrix. Binding either would introduce a hash cycle.
+    # Evidence trees are outputs, not source. Excluding every phase prevents
+    # later receipts from invalidating an otherwise exact source manifest or
+    # creating a cross-matrix hash cycle.
+    "docs/evidence/",
+    # The human-readable entry is also an output of the matrix.
     "docs/devlog/changelog.md",
 )
 SANITIZER_ENVIRONMENT = {

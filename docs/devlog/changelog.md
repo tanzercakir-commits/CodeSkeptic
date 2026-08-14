@@ -1,5 +1,52 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.4 frontend and CFG stress matrix locally complete
+
+- Made verdict availability unconditional over the requested translation-unit
+  set. Missing paths are counted before filtering, broken ASTs remain recorded
+  even when recovery analysis is requested, whole-program prepass failures are
+  preserved, warm-cache AST failures name the exact TU, and neither
+  `--accept-partial-coverage` nor `--analyze-broken-tus` can manufacture exit
+  `0`/`1` from broken or skipped requested input. Recovery findings remain
+  available as explicitly non-verdict evidence.
+- Added a checksum-bound production CLI matrix with nine fixed cases covering
+  templates, dependent templates, nested macros, malformed templates/source,
+  a 64-way CFG, mixed clean/broken input, recovered broken ASTs, and a missing
+  requested TU. Every case runs twice with a 30-second crash/hang tripwire and
+  machine-checks process/report exit, status, completeness, exact TU coverage,
+  seeded findings, clean twins, and stable semantic hashes. The malformed
+  template now forces instantiation, so both ordinary Clang and Windows'
+  MSVC-compatible delayed-template-parsing mode diagnose the same production
+  input. The retained Linux x86_64 run accepted `9/9` cases and `18/18`
+  executions with zero timeout or crash in `327` ms. Its receipt SHA-256 is
+  `3be46ec3f1f517025d448e8df8927f554b75cab3908bdd87aec988b6be75ea4e`;
+  the 37-entry outer manifest SHA-256 is
+  `d7316415a05fc875a4e345d4150d5428dfd2cba2d20dc3b2a83a351cc1023a61`.
+- Replaced the permissive real-world source-tree scan with each pinned
+  project's exact compile-database surface. cJSON is now `23/23` analyzed,
+  zero broken, zero missing, and 48 findings; tinyxml2 is `2/2`, zero broken,
+  zero missing, and 9 findings. The harness rejects any requested/enumerated
+  mismatch or incomplete TU before comparing finding pins.
+- Refreshed the retained ASAN and UBSAN matrices for the final P10.4 source
+  bytes. Both bind the same 358-file source manifest
+  `a452bb75b509d7d0091c74a591a2ea231d5219bce219d0d181e1609987f275ef`,
+  pass all ten runtime gates, `1208/1208` CTest entries, `1192/1192` direct
+  C++ tests, and four fuzz smoke targets. ASAN completed in `66135` ms with
+  receipt SHA-256
+  `d91a04340f69104d0c3ed1414d2f5947f9be1fd54bc549109bc6f4987ab46308`;
+  UBSAN completed in `40754` ms with receipt SHA-256
+  `c92c8af369e68101e7625cb56fe0c8696aa1e5e1dce3b46e64d9818d156d41fb`;
+  their 40-entry outer manifest is
+  `e40eb2a67435c59f2e6f08cc4d808dc7d1b2549eb1de491e22656154c5ff7f85`.
+  Both receipt verifiers pass and `SanitizerContract` is `13/13` with no
+  skips. Evidence directories are excluded from source manifests to prevent
+  later phase receipts from creating cross-matrix hash cycles.
+- Independent read-only final pre-push review found no blocking correctness
+  issue after rechecking the Windows RED/GREEN path, receipt bindings, and
+  retained manifests. `CS-P10-04` remains open pending hosted Windows and all
+  other CI gates; this work stays on `phase-frontend-cfg-stress` and does not
+  write to or merge protected `main`.
+
 ## 2026-08-14 — Phase 10.3 sanitizer matrix locally complete
 
 - Closed the three failures exposed by PR #142 CI. ASAN now disables only

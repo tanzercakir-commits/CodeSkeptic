@@ -1,8 +1,8 @@
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
 CodeSkeptic: 1 finding(s)
 ----------------------------------------
-/receipts/address-final-trace2/fixture/clean/finding.cpp:1:56 [error] use-after-free: Use after free: 'p' is dereferenced after being freed
-    -> /receipts/address-final-trace2/fixture/clean/finding.cpp:1:17 'p' allocated here
-    -> /receipts/address-final-trace2/fixture/clean/finding.cpp:1:39 'p' freed here
+/workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/fixture/clean/finding.cpp:1:56 [error] use-after-free: Use after free: 'p' is dereferenced after being freed
+    -> /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/fixture/clean/finding.cpp:1:17 'p' allocated here
+    -> /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/fixture/clean/finding.cpp:1:39 'p' freed here
 ----------------------------------------
 CODESKEPTIC_SANITIZER_GATE_OK analyzer_finding

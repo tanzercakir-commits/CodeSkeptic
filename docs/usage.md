@@ -331,8 +331,9 @@ facts, but target-set resolution itself remains local to the caller TU.
 | 1 | Complete analysis; at least one supported/blocking finding was reported. |
 | 2 | **Verdict unavailable** — invalid CLI/config, no inputs, skipped TUs, incomplete dataflow/summary evidence, or artifact I/O failure. |
 
-A partially broken run fails closed with `2`. A deliberately scoped adoption
-harness may pass `--accept-partial-coverage` to restore a findings-based exit
-over the analyzed subset; attempted/analyzed/broken counts and warnings remain
-visible. This is different from `--analyze-broken-tus`, which runs rules over
-Clang's error-recovery AST and accepts that additional reliability risk.
+A partially broken run fails closed with `2`. The legacy
+`--accept-partial-coverage` acknowledgement flag is accepted for CLI/config
+compatibility, but it cannot restore a project verdict over an analyzed
+subset. `--analyze-broken-tus` may run rules over Clang's error-recovery AST
+to collect investigation evidence; the requested TU remains broken and the
+project verdict remains unavailable.

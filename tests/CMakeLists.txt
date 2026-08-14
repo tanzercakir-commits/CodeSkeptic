@@ -109,6 +109,10 @@ add_test(NAME FuzzingContract
 add_test(NAME SanitizerContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/SanitizerContractTest.py)
+add_test(NAME StressMatrixContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/StressMatrixTest.py
+                 $<TARGET_FILE:codeskeptic>)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta

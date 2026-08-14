@@ -1,0 +1,245 @@
+{
+  "schema": "codeskeptic-stress-matrix-v1",
+  "repetitions": 2,
+  "timeout_seconds": 30,
+  "cases": [
+    {
+      "id": "template-instantiation",
+      "category": "template",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/template_matrix.cpp",
+          "sha256": "6013ae6428dbc758ffe1f0cf22819368240bac40d6e3e52771599c8d3f7a45a1"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 1,
+        "status": "findings",
+        "complete": true,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "required_rules": ["div-by-zero"],
+        "required_functions": ["template_seeded"],
+        "forbidden_functions": ["template_clean"]
+      }
+    },
+    {
+      "id": "template-dependent-pattern",
+      "category": "template",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/template_dependent.cpp",
+          "sha256": "b2af4682b4f9aa9a9a991d23ae909fb0917228fbd2d59da309463747f417a6bd"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 0,
+        "status": "clean",
+        "complete": true,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    },
+    {
+      "id": "template-malformed",
+      "category": "malformed-source",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/template_malformed.cpp",
+          "sha256": "84e99fc485f2707c65c37d4753a506990614d8b76fe1be2eadf36a090f03d19e"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 2,
+        "status": "failed",
+        "complete": false,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 0,
+          "broken_tus": 1,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    },
+    {
+      "id": "nested-macro-expansion",
+      "category": "macro",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/macro_matrix.cpp",
+          "sha256": "d6455e78761a6bd0e8edcc8b2a61e5aca0235f8c9689bd97efea8d325b257010"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 1,
+        "status": "findings",
+        "complete": true,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "required_rules": ["div-by-zero"],
+        "required_functions": ["macro_seeded"],
+        "forbidden_functions": ["macro_clean"]
+      }
+    },
+    {
+      "id": "high-complexity-cfg",
+      "category": "high-cfg",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/high_cfg_matrix.cpp",
+          "sha256": "443bea721afb7a538153ef94b9fe12a40bbd250e3fb52e04a952b825168c9bd1"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 1,
+        "status": "findings",
+        "complete": true,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "required_rules": ["div-by-zero"],
+        "required_functions": ["high_cfg_seeded"],
+        "forbidden_functions": ["high_cfg_clean"]
+      }
+    },
+    {
+      "id": "malformed-source",
+      "category": "malformed-source",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/malformed_source.cpp",
+          "sha256": "b23d2df9facbcf06b58db4b627d3af7e2fce87f2c420cb65e990f5b0399aad5f"
+        }
+      ],
+      "missing_sources": [],
+      "args": [],
+      "expected": {
+        "exit_code": 2,
+        "status": "failed",
+        "complete": false,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 0,
+          "broken_tus": 1,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    },
+    {
+      "id": "mixed-clean-broken",
+      "category": "mixed-coverage",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/mixed_clean.cpp",
+          "sha256": "e1e9058a11818cc9a8b1baba131e7ec70426d66a494e335e823197b3bfbb1774"
+        },
+        {
+          "path": "tests/stress_corpus/mixed_broken.cpp",
+          "sha256": "4c98ef8826274f31153176afab332c5d9a9467dd1ab15cdc50ebbf57d9602dca"
+        }
+      ],
+      "missing_sources": [],
+      "args": ["--accept-partial-coverage"],
+      "expected": {
+        "exit_code": 2,
+        "status": "incomplete",
+        "complete": false,
+        "coverage": {
+          "attempted_tus": 2,
+          "analyzed_tus": 1,
+          "broken_tus": 1,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    },
+    {
+      "id": "broken-recovery-opt-in",
+      "category": "broken-recovery",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/recovery_broken.cpp",
+          "sha256": "3bd3e859d8ca2a35b27d28b18b18a7f22a019d26668f0bb994ec156604b8b2a8"
+        }
+      ],
+      "missing_sources": [],
+      "args": ["--analyze-broken-tus", "--accept-partial-coverage"],
+      "expected": {
+        "exit_code": 2,
+        "status": "incomplete",
+        "complete": false,
+        "coverage": {
+          "attempted_tus": 1,
+          "analyzed_tus": 1,
+          "broken_tus": 1,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    },
+    {
+      "id": "missing-requested-tu",
+      "category": "missing-request",
+      "sources": [
+        {
+          "path": "tests/stress_corpus/missing_valid.cpp",
+          "sha256": "229d3450191b3f0b42ebeec82abe2915a9a778d0ed1403555cccc35ee8b69b2a"
+        }
+      ],
+      "missing_sources": ["tests/stress_corpus/missing_absent.cpp"],
+      "args": ["--accept-partial-coverage"],
+      "expected": {
+        "exit_code": 2,
+        "status": "incomplete",
+        "complete": false,
+        "coverage": {
+          "attempted_tus": 2,
+          "analyzed_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "required_rules": [],
+        "required_functions": [],
+        "forbidden_functions": []
+      }
+    }
+  ]
+}
