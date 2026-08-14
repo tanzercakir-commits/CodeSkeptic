@@ -20,6 +20,11 @@ namespace codeskeptic {
 // I/O so it can be unit tested.
 std::string handleMcpMessage(const std::string& line);
 
+// Parses and schema-validates one message through the same production path,
+// but never performs analysis or filesystem discovery. Used by deterministic
+// parser fuzzing so arbitrary valid JSON-RPC cannot trigger an unbounded scan.
+std::string validateMcpMessage(const std::string& line);
+
 // Server loop reading line by line from stdin. Returns 0 on EOF.
 int runMcpServer();
 

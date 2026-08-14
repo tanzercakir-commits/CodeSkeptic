@@ -1,0 +1,40 @@
+{
+  "execution": {
+    "duration_seconds": 534.819,
+    "resumed": false
+  },
+  "failures": [],
+  "identity": {
+    "analyzer_sha256": "6a3d5dcd3262f96ccc1ee60e14872b343cb438fdb81d868475b244045d9905b0",
+    "manifest_sha256": "2dcee11526c3938bcd9cf9800ea06665352feafea8a40b0b9b0a803bc4d2da1d",
+    "project_revision": "32ac7af7888bc46f91c1af7d9ba05fec929b31ad",
+    "recipe_sha256": "19ce408d689b5b9002e67147fb77c0ec1e82794ce0351edc00f642179eb8533f",
+    "repetition": 2,
+    "submodules": {
+      "count": 0,
+      "mode": "none",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "translation_unit_sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808"
+  },
+  "project": "systemd",
+  "repetition": 2,
+  "schema": 1,
+  "semantic": {
+    "coverage": {
+      "analyzed_tus": 496,
+      "attempted_tus": 496,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "exit_code": 0,
+    "findings": 0,
+    "fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "fingerprints": [],
+    "translation_units": {
+      "count": 496,
+      "sha256": "a30e2fe282f58ae5b7499f82038f44bed2a64bd3c350ad8df9c81793a2598808"
+    }
+  },
+  "status": "accepted"
+}

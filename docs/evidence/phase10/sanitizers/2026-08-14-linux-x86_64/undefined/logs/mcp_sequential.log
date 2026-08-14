@@ -1,0 +1,7 @@
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+CodeSkeptic: Clean! No issues found.
+{"id":1,"jsonrpc":"2.0","result":{"content":[{"text":"{\"blocking_count\":0,\"complete\":true,\"count\":0,\"coverage\":{\"analyzed_tus\":1,\"attempted_tus\":1,\"broken_tus\":0,\"incomplete_functions\":0},\"evidence\":{\"compile_database_failed\":false,\"summary_load_failed\":false,\"summary_stale\":false,\"tool_failed\":false},\"exit_code\":0,\"findings\":[],\"report_only_count\":0,\"status\":\"clean\"}","type":"text"}],"isError":false}}
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+CodeSkeptic: Clean! No issues found.
+{"id":2,"jsonrpc":"2.0","result":{"content":[{"text":"{\"blocking_count\":0,\"complete\":true,\"count\":0,\"coverage\":{\"analyzed_tus\":1,\"attempted_tus\":1,\"broken_tus\":0,\"incomplete_functions\":0},\"evidence\":{\"compile_database_failed\":false,\"summary_load_failed\":false,\"summary_stale\":false,\"tool_failed\":false},\"exit_code\":0,\"findings\":[],\"report_only_count\":0,\"status\":\"clean\"}","type":"text"}],"isError":false}}
+CODESKEPTIC_SANITIZER_GATE_OK mcp_sequential

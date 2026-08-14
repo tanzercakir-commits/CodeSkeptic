@@ -78,6 +78,11 @@ REPORT_PY="$SCRIPT_DIR/review_report.py"
 BUILD_PATH="$(cd "$BUILD_PATH" && pwd)"
 
 HEAD_ROOT="$(git rev-parse --show-toplevel)"
+# Preserve the caller-visible spelling as well as Git's canonical spelling.
+# On macOS, /var and /private/var refer to the same tree; compile databases
+# may contain either form and both must remap onto the detached base worktree.
+HEAD_CDUP="$(git rev-parse --show-cdup)"
+HEAD_ROOT_SPELLING="$(cd "${HEAD_CDUP:-.}" && pwd)"
 BASE_SHA="$(git rev-parse --verify "${BASE_REF}^{commit}")"
 BASE_SHORT="$(git rev-parse --short "$BASE_SHA")"
 
@@ -165,8 +170,9 @@ if [ -s "$TMP/base-files.txt" ]; then
     if [ -f "$BUILD_PATH/compile_commands.json" ]; then
         BASE_DB="$TMP/basedb"
         python3 "$REPORT_PY" remap-db --src "$BUILD_PATH/compile_commands.json" \
-            --from-root "$HEAD_ROOT" --to-root "$BASE_WT" \
+            --from-root "$HEAD_ROOT_SPELLING" --to-root "$BASE_WT" \
             --protect "$BUILD_PATH" \
+            --renames "$TMP/renames.txt" \
             --out "$BASE_DB/compile_commands.json"
     fi
 

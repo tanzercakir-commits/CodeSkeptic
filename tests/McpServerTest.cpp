@@ -65,6 +65,53 @@ TEST(McpServerTest, ParseError) {
     EXPECT_NE(response.find("-32700"), std::string::npos);
 }
 
+TEST(McpServerTest, InvalidJsonRpcEnvelopeFailsClosed) {
+    for (const char* request : {
+             R"({"id":1,"method":"ping"})",
+             R"({"jsonrpc":"1.0","id":1,"method":"ping"})",
+             R"({"jsonrpc":"2.0"})",
+             R"({"jsonrpc":"2.0","method":7})",
+             R"({"jsonrpc":"2.0","id":true,"method":"ping"})",
+             R"({"jsonrpc":"2.0","id":{},"method":"ping"})",
+         }) {
+        const auto response = validateMcpMessage(request);
+        EXPECT_NE(response.find("-32600"), std::string::npos) << request;
+    }
+
+    EXPECT_TRUE(validateMcpMessage(
+        R"({"jsonrpc":"2.0","method":"notifications/initialized"})")
+                    .empty());
+}
+
+TEST(McpServerTest, ValidationOnlyNeverStartsAnalyzeSideEffects) {
+    const std::string request =
+        R"({"jsonrpc":"2.0","id":44,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"definitely-missing.cpp","functions":"f"}}})";
+
+    ::testing::internal::CaptureStderr();
+    const auto first = validateMcpMessage(request);
+    const auto second = validateMcpMessage(request);
+    const std::string stderr_text =
+        ::testing::internal::GetCapturedStderr();
+
+    EXPECT_EQ(first, second);
+    EXPECT_NE(first.find("\"validated\":true"), std::string::npos);
+    EXPECT_TRUE(stderr_text.empty());
+}
+
+TEST(McpServerTest, AnalyzeRejectsEmbeddedNulFields) {
+    for (const char* field : {"path", "build_path", "summaries", "functions",
+                              "lines", "fatal_asserts", "alloc_functions",
+                              "free_functions", "allocator_pairs"}) {
+        const std::string request =
+            std::string(R"({"jsonrpc":"2.0","id":45,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp",")") +
+            field + R"(":"x\u0000suffix"}}})";
+        const auto response = validateMcpMessage(request);
+        EXPECT_NE(response.find("-32602"), std::string::npos) << field;
+        EXPECT_NE(response.find("must not contain NUL"), std::string::npos)
+            << field;
+    }
+}
+
 TEST(McpServerTest, AnalyzeCallReturnsFindingsWithTrace) {
     auto path = writeTempSource("mcp_uaf.cpp", R"(
         void f() {
@@ -224,7 +271,7 @@ TEST(McpServerTest, AnalyzeWithSummaries_CrossFileKnowledge) {
         }
     )");
     auto sumPath = writeTempSource("mcp_sum_store.txt",
-        "codeskeptic-summaries v2\nfind/1\tM\t-\tU\n");
+        "codeskeptic-summaries v2\nfind/1\tM\tO\tU\n");
 
     auto without = handleMcpMessage(
         std::string(R"({"jsonrpc":"2.0","id":30,"method":"tools/call",)") +
@@ -270,6 +317,19 @@ TEST(McpServerTest, AnalyzeRejectsUnknownOrWrongTypedFields) {
         R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
         R"("lines":"10-x"}}})");
     EXPECT_NE(response.find("invalid lines scope"), std::string::npos);
+}
+
+TEST(McpServerTest, AnalyzeRejectsEmptyFunctionScope) {
+    for (const char* functions : {"", ",, ,"}) {
+        const std::string request =
+            std::string(R"({"jsonrpc":"2.0","id":65,"method":"tools/call",)") +
+            R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)" +
+            R"("functions":")" + functions + R"("}}})";
+        const auto response = handleMcpMessage(request);
+        EXPECT_NE(response.find("-32602"), std::string::npos);
+        EXPECT_NE(response.find("invalid functions scope"),
+                  std::string::npos);
+    }
 }
 
 TEST(McpServerTest, BrokenTuReturnsFailedVerdictAndCoverage) {

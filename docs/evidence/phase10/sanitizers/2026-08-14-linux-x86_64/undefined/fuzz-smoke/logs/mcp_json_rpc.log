@@ -1,0 +1,28 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1004
+INFO: Loaded 1 modules   (957161 inline 8-bit counters): 957161 [0x55bb292b84b0, 0x55bb293a1f99), 
+INFO: Loaded 1 PC tables (957161 PCs): 957161 [0x55bb293a1fa0,0x55bb2a23ce30), 
+INFO:        3 files found in /receipts/undefined-final-trace2/codeskeptic-fuzz-8u8vebjz/corpus/mcp_json_rpc
+INFO: seed corpus: files: 3 min: 34b max: 153b total: 228b rss: 135Mb
+#4	INITED cov: 292 ft: 334 corp: 3/228b exec/s: 0 rss: 136Mb
+#5	NEW    cov: 294 ft: 336 corp: 4/269b lim: 153 exec/s: 0 rss: 136Mb L: 41/153 MS: 1 ChangeBit-
+#34	REDUCE cov: 294 ft: 336 corp: 4/266b lim: 153 exec/s: 0 rss: 136Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
+#35	NEW    cov: 309 ft: 374 corp: 5/399b lim: 153 exec/s: 0 rss: 136Mb L: 133/153 MS: 1 EraseBytes-
+	NEW_FUNC[1/1]: 0x55bb2474c568 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
+#46	NEW    cov: 313 ft: 384 corp: 6/533b lim: 153 exec/s: 0 rss: 138Mb L: 134/153 MS: 1 InsertByte-
+#47	REDUCE cov: 313 ft: 384 corp: 6/529b lim: 153 exec/s: 0 rss: 138Mb L: 27/153 MS: 1 EraseBytes-
+#58	NEW    cov: 313 ft: 385 corp: 7/677b lim: 153 exec/s: 0 rss: 138Mb L: 148/153 MS: 1 InsertRepeatedBytes-
+#60	NEW    cov: 316 ft: 388 corp: 8/728b lim: 153 exec/s: 0 rss: 138Mb L: 51/153 MS: 2 ChangeByte-CMP- DE: "tools/call"-
+#87	NEW    cov: 317 ft: 389 corp: 9/881b lim: 153 exec/s: 0 rss: 138Mb L: 153/153 MS: 2 ChangeBinInt-CrossOver-
+#113	REDUCE cov: 317 ft: 389 corp: 9/856b lim: 153 exec/s: 0 rss: 138Mb L: 26/153 MS: 1 EraseBytes-
+#124	NEW    cov: 318 ft: 390 corp: 10/897b lim: 153 exec/s: 0 rss: 138Mb L: 41/153 MS: 1 ChangeASCIIInt-
+#141	NEW    cov: 319 ft: 391 corp: 11/1034b lim: 153 exec/s: 0 rss: 138Mb L: 137/153 MS: 2 ChangeASCIIInt-EraseBytes-
+#206	REDUCE cov: 319 ft: 391 corp: 11/1032b lim: 153 exec/s: 0 rss: 138Mb L: 25/153 MS: 5 CrossOver-CopyPart-ChangeASCIIInt-CopyPart-CrossOver-
+#214	REDUCE cov: 320 ft: 394 corp: 12/1047b lim: 153 exec/s: 0 rss: 138Mb L: 15/153 MS: 3 ChangeBit-ChangeBit-EraseBytes-
+#255	NEW    cov: 326 ft: 400 corp: 13/1180b lim: 153 exec/s: 0 rss: 138Mb L: 133/153 MS: 1 ShuffleBytes-
+#256	DONE   cov: 326 ft: 400 corp: 13/1180b lim: 153 exec/s: 0 rss: 138Mb
+###### Recommended dictionary. ######
+"\011\000" # Uses: 12
+"tools/call" # Uses: 8
+###### End of recommended dictionary. ######
+Done 256 runs in 0 second(s)

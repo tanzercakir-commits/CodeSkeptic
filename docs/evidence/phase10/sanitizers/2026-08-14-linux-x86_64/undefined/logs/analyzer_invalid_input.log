@@ -1,0 +1,7 @@
+YAML:1:27: error: Expected quote at end of scalar
+[{"directory":"unterminated
+                          ^
+[CodeSkeptic] invalid compile_commands.json: Error while parsing YAML.
+[CodeSkeptic] Fallback disabled: requested build input is unusable.
+[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).
+CODESKEPTIC_SANITIZER_GATE_OK analyzer_invalid_input

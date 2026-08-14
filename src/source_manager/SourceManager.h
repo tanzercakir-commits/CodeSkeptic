@@ -25,6 +25,12 @@ using ASTCallback = std::function<void(clang::ASTContext&)>;
 // find <stdlib.h> reports zero findings and passes vacuously.
 std::vector<std::string> platformExtraArgs();
 
+// Exact in-memory entry point used by both the production file wrapper and
+// deterministic fuzzing. Parsing remains Clang's JSON compilation-database
+// grammar; CodeSkeptic does not maintain a second interpretation.
+bool validateCompilationDatabaseText(const std::string& text,
+                                     std::string& error);
+
 class SourceManager {
 public:
     explicit SourceManager(const std::string& build_path);
@@ -33,6 +39,15 @@ public:
     void addSourceFile(const std::string& path);
     void scanDirectory(const std::string& dir_path);
     int processAll(ASTCallback callback);
+
+    // A missing compile_commands.json intentionally selects the extension-
+    // aware fallback. Once the file exists, parse/read failure is invalid
+    // input and must make the product verdict unavailable instead of silently
+    // broadening analysis under synthesized flags.
+    bool compilationDatabaseValid() const { return comp_db_valid_; }
+    const std::string& compilationDatabaseError() const {
+        return comp_db_error_;
+    }
 
     // Warm AST cache (MCP server / long-lived process): parsed TUs are
     // kept for the PROCESS lifetime, so subsequent calls do not pay the
@@ -76,6 +91,8 @@ private:
     std::string build_path_;
     std::vector<std::string> source_files_;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;
+    bool comp_db_valid_ = true;
+    std::string comp_db_error_;
     bool warm_cache_ = false;
 };
 

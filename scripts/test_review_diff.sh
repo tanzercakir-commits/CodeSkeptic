@@ -43,15 +43,23 @@ git init -q
 fail() {
     echo "FAIL: $1" >&2
     echo "--- stdout ---" >&2;    cat "$TMP/stdout.txt" 2>/dev/null >&2 || true
+    echo "--- stderr ---" >&2;    cat "$TMP/stderr.txt" 2>/dev/null >&2 || true
     echo "--- review.md ---" >&2; cat review.md 2>/dev/null >&2 || true
     exit 1
 }
 assert_grep()     { grep -qF -- "$1" "$2" || fail "expected '$1' in $2"; }
 assert_not_grep() { if grep -qF -- "$1" "$2"; then fail "unexpected '$1' in $2"; fi; }
 
-write_db() { # regenerate the compile DB for the current source file name
-    printf '[\n {"directory": "%s", "file": "%s/%s", "command": "clang -c %s/%s"}\n]\n' \
-        "$REPO" "$REPO" "$1" "$REPO" "$1" > compile_commands.json
+write_db() { # regenerate the compile DB for the current source file names
+    local separator="" source
+    printf '[\n' > compile_commands.json
+    for source in "$@"; do
+        printf '%s {"directory": "%s", "file": "%s/%s", "command": "clang -c %s/%s"}' \
+            "$separator" "$REPO" "$REPO" "$source" "$REPO" "$source" \
+            >> compile_commands.json
+        separator=$',\n'
+    done
+    printf '\n]\n' >> compile_commands.json
 }
 
 # --- base revision ----------------------------------------------------------
@@ -244,6 +252,7 @@ int vendor_deref(int* p) {
     return *p;
 }
 EOF
+write_db core.c vendor/extra.c
 git add -A
 git commit -qm vendor
 
