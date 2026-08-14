@@ -5,6 +5,7 @@
 #include "source_manager/ResourceDir.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 
@@ -15,6 +16,7 @@
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
+#include <clang/Tooling/JSONCompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/thread.h>
 
@@ -132,6 +134,45 @@ public:
 
 namespace codeskeptic {
 
+namespace {
+
+std::unique_ptr<clang::tooling::CompilationDatabase>
+loadCompilationDatabaseText(const std::string& text, std::string& error) {
+    if (text.find('\0') != std::string::npos) {
+        error = "embedded NUL byte";
+        return nullptr;
+    }
+    auto database = clang::tooling::JSONCompilationDatabase::loadFromBuffer(
+        llvm::StringRef(text.data(), text.size()), error,
+        clang::tooling::JSONCommandLineSyntax::AutoDetect);
+    if (!database) return nullptr;
+    for (const auto& command : database->getAllCompileCommands()) {
+        if (command.Directory.find('\0') != std::string::npos ||
+            command.Filename.find('\0') != std::string::npos ||
+            command.Output.find('\0') != std::string::npos)
+            error = "embedded NUL byte in compilation command";
+        for (const auto& argument : command.CommandLine)
+            if (argument.find('\0') != std::string::npos)
+                error = "embedded NUL byte in compilation command";
+        if (!error.empty()) return nullptr;
+    }
+    return database;
+}
+
+} // anonymous namespace
+
+bool validateCompilationDatabaseText(const std::string& text,
+                                     std::string& error) {
+    std::string parsed_error;
+    auto database = loadCompilationDatabaseText(text, parsed_error);
+    if (!database) {
+        error = std::move(parsed_error);
+        return false;
+    }
+    error.clear();
+    return true;
+}
+
 std::vector<std::string> platformExtraArgs() {
     std::vector<std::string> args;
 #ifdef __APPLE__
@@ -166,7 +207,63 @@ std::vector<std::string> platformExtraArgs() {
 
 SourceManager::SourceManager(const std::string& build_path)
     : build_path_(build_path) {
+    std::error_code database_ec;
+    const fs::path database_path =
+        fs::path(build_path_) / "compile_commands.json";
+    const fs::file_status entry_status =
+        fs::symlink_status(database_path, database_ec);
+    const bool database_missing =
+        database_ec == std::errc::no_such_file_or_directory &&
+        entry_status.type() == fs::file_type::not_found;
+    if (database_missing) database_ec.clear();
+    if (database_ec) {
+        comp_db_valid_ = false;
+        comp_db_error_ = database_ec.message();
+        std::cerr << msg(MsgId::CompileDbInvalid, comp_db_error_) << "\n";
+        return;
+    }
+    const bool database_entry_exists =
+        entry_status.type() != fs::file_type::not_found;
+
     std::string error_msg;
+    if (database_entry_exists) {
+        const fs::file_status resolved_status =
+            fs::status(database_path, database_ec);
+        if (database_ec || !fs::is_regular_file(resolved_status)) {
+            comp_db_valid_ = false;
+            comp_db_error_ = database_ec
+                ? database_ec.message()
+                : "path is not a regular file";
+            std::cerr << msg(MsgId::CompileDbInvalid, comp_db_error_) << "\n";
+            return;
+        }
+        std::ifstream input(database_path, std::ios::binary);
+        if (!input.is_open()) {
+            comp_db_valid_ = false;
+            comp_db_error_ = "cannot read " + database_path.string();
+            std::cerr << msg(MsgId::CompileDbInvalid, comp_db_error_) << "\n";
+            return;
+        }
+        std::string content(
+            (std::istreambuf_iterator<char>(input)),
+            std::istreambuf_iterator<char>());
+        if (input.bad()) {
+            comp_db_valid_ = false;
+            comp_db_error_ = "failed while reading " + database_path.string();
+            std::cerr << msg(MsgId::CompileDbInvalid, comp_db_error_) << "\n";
+            return;
+        }
+        comp_db_ = loadCompilationDatabaseText(content, error_msg);
+        if (!comp_db_) {
+            comp_db_valid_ = false;
+            comp_db_error_ = error_msg.empty()
+                ? "parser rejected the existing database"
+                : error_msg;
+            std::cerr << msg(MsgId::CompileDbInvalid, comp_db_error_) << "\n";
+        }
+        return;
+    }
+
     comp_db_ = clang::tooling::CompilationDatabase::loadFromDirectory(
         build_path_, error_msg);
 
@@ -300,6 +397,7 @@ int SourceManager::processAll(ASTCallback callback) {
 
 int SourceManager::processAllOnWorker(ASTCallback callback) {
     if (source_files_.empty()) return 0;
+    if (!comp_db_) return 1;
 
     if (warm_cache_) {
         bool anyFailed = false;

@@ -1,0 +1,16 @@
+Running main() from /workspace/build-sanitizer-address-tests/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn
+[1/2] Processing file /tmp/cs_serial_analysis_worker/first.cpp.
+[2/2] Processing file /tmp/cs_serial_analysis_worker/second.cpp.
+SERIAL_WORKER_EVIDENCE callbacks=2 max_active=1 worker_threads=1 joined=1
+[       OK ] BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn (19 ms)
+[----------] 1 test from BrokenTuTest (19 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (19 ms total)
+[  PASSED  ] 1 test.
+CODESKEPTIC_SANITIZER_GATE_OK focused_serial_worker

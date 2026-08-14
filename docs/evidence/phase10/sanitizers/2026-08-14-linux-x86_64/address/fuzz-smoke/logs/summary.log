@@ -1,0 +1,41 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1003
+INFO: Loaded 1 modules   (207622 inline 8-bit counters): 207622 [0x560e73b4bb80, 0x560e73b7e686), 
+INFO: Loaded 1 PC tables (207622 PCs): 207622 [0x560e73b7e688,0x560e73ea96e8), 
+INFO:        2 files found in /receipts/address/codeskeptic-fuzz-kaikl6kc/corpus/summary
+INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 99Mb
+#3	INITED cov: 140 ft: 160 corp: 2/141b exec/s: 0 rss: 99Mb
+#5	NEW    cov: 142 ft: 197 corp: 3/205b lim: 79 exec/s: 0 rss: 100Mb L: 64/79 MS: 2 InsertByte-CrossOver-
+#7	NEW    cov: 144 ft: 202 corp: 4/267b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 2 ChangeBinInt-CrossOver-
+#9	NEW    cov: 145 ft: 204 corp: 5/346b lim: 79 exec/s: 0 rss: 100Mb L: 79/79 MS: 2 CopyPart-CrossOver-
+#11	NEW    cov: 146 ft: 205 corp: 6/425b lim: 79 exec/s: 0 rss: 100Mb L: 79/79 MS: 2 ChangeBinInt-ShuffleBytes-
+#12	NEW    cov: 148 ft: 211 corp: 7/472b lim: 79 exec/s: 0 rss: 100Mb L: 47/79 MS: 1 EraseBytes-
+#13	NEW    cov: 149 ft: 212 corp: 8/551b lim: 79 exec/s: 0 rss: 100Mb L: 79/79 MS: 1 ChangeBinInt-
+#14	NEW    cov: 150 ft: 214 corp: 9/619b lim: 79 exec/s: 0 rss: 100Mb L: 68/79 MS: 1 CMP- DE: "\001\000\000\000"-
+#16	NEW    cov: 151 ft: 221 corp: 10/698b lim: 79 exec/s: 0 rss: 100Mb L: 79/79 MS: 2 ChangeByte-CrossOver-
+#22	NEW    cov: 151 ft: 222 corp: 11/760b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 1 ChangeBinInt-
+#34	REDUCE cov: 151 ft: 222 corp: 11/748b lim: 79 exec/s: 0 rss: 100Mb L: 35/79 MS: 2 ChangeByte-EraseBytes-
+#45	NEW    cov: 151 ft: 228 corp: 12/814b lim: 79 exec/s: 0 rss: 100Mb L: 66/79 MS: 1 EraseBytes-
+#67	REDUCE cov: 151 ft: 228 corp: 12/797b lim: 79 exec/s: 0 rss: 100Mb L: 18/79 MS: 2 ChangeBit-EraseBytes-
+	NEW_FUNC[1/1]: 0x560e723ad7c0 in codeskeptic::SummaryRegistry::parseSummaryText(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, std::map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, codeskeptic::SummaryRegistry::FunctionSummary, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, codeskeptic::SummaryRegistry::FunctionSummary>>>&)::$_0::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, int*) const /workspace/src/engine/FunctionSummary.cpp:4211
+#68	NEW    cov: 156 ft: 235 corp: 13/871b lim: 79 exec/s: 0 rss: 101Mb L: 74/79 MS: 1 InsertRepeatedBytes-
+#75	REDUCE cov: 156 ft: 235 corp: 13/870b lim: 79 exec/s: 0 rss: 101Mb L: 78/79 MS: 2 ChangeByte-CrossOver-
+#76	REDUCE cov: 157 ft: 237 corp: 14/949b lim: 79 exec/s: 0 rss: 101Mb L: 79/79 MS: 1 CrossOver-
+#97	NEW    cov: 159 ft: 239 corp: 15/1014b lim: 79 exec/s: 0 rss: 101Mb L: 65/79 MS: 1 InsertByte-
+#105	NEW    cov: 160 ft: 241 corp: 16/1093b lim: 79 exec/s: 0 rss: 101Mb L: 79/79 MS: 3 ChangeBinInt-ChangeBit-ShuffleBytes-
+#111	REDUCE cov: 160 ft: 241 corp: 16/1083b lim: 79 exec/s: 0 rss: 101Mb L: 52/79 MS: 1 EraseBytes-
+#113	NEW    cov: 160 ft: 242 corp: 17/1162b lim: 79 exec/s: 0 rss: 101Mb L: 79/79 MS: 2 ChangeBit-ChangeByte-
+#127	NEW    cov: 166 ft: 250 corp: 18/1169b lim: 79 exec/s: 0 rss: 101Mb L: 7/79 MS: 4 ShuffleBytes-ChangeBit-PersAutoDict-CrossOver- DE: "\001\000\000\000"-
+#133	NEW    cov: 167 ft: 251 corp: 19/1233b lim: 79 exec/s: 0 rss: 101Mb L: 64/79 MS: 1 ChangeBit-
+#165	REDUCE cov: 168 ft: 253 corp: 20/1297b lim: 79 exec/s: 0 rss: 102Mb L: 64/79 MS: 2 CopyPart-ShuffleBytes-
+#192	NEW    cov: 169 ft: 257 corp: 21/1370b lim: 79 exec/s: 0 rss: 102Mb L: 73/79 MS: 2 CopyPart-ChangeBit-
+#204	REDUCE cov: 169 ft: 257 corp: 21/1313b lim: 79 exec/s: 0 rss: 102Mb L: 16/79 MS: 2 ChangeBinInt-CrossOver-
+#210	NEW    cov: 170 ft: 258 corp: 22/1375b lim: 79 exec/s: 0 rss: 102Mb L: 62/79 MS: 1 ChangeASCIIInt-
+#218	REDUCE cov: 170 ft: 258 corp: 22/1345b lim: 79 exec/s: 0 rss: 102Mb L: 38/79 MS: 3 CrossOver-ChangeByte-PersAutoDict- DE: "\001\000\000\000"-
+#245	NEW    cov: 171 ft: 259 corp: 23/1424b lim: 79 exec/s: 0 rss: 102Mb L: 79/79 MS: 2 ChangeByte-CopyPart-
+#246	NEW    cov: 172 ft: 261 corp: 24/1503b lim: 79 exec/s: 0 rss: 102Mb L: 79/79 MS: 1 CopyPart-
+#256	DONE   cov: 172 ft: 261 corp: 24/1503b lim: 79 exec/s: 0 rss: 102Mb
+###### Recommended dictionary. ######
+"\001\000\000\000" # Uses: 23
+###### End of recommended dictionary. ######
+Done 256 runs in 0 second(s)

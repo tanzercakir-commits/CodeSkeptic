@@ -45,6 +45,7 @@ enum class MsgId {
     BaselineWritten,      // {0} = finding count, {1} = file path
     BaselineFiltered,     // {0} = count of findings matching the baseline
     CompileDbNotFound,    // {0} = error message
+    CompileDbInvalid,     // {0} = parser/read error
     OutputFileOpenError,  // {0} = path
     FileNotFound,         // {0} = path
     DirNotFound,          // {0} = path

@@ -50,6 +50,16 @@ add_library(codeskeptic_core STATIC
 
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
+target_link_libraries(codeskeptic_core PUBLIC codeskeptic_sanitizer_flags)
+
+if(CODESKEPTIC_BUILD_FUZZERS)
+    # Instrument the real production parser implementations. Dedicated fuzz
+    # builds do not link the normal CLI/tests; each fuzz executable supplies
+    # libFuzzer's main and sanitizer-coverage runtime.
+    target_compile_options(codeskeptic_core PRIVATE
+        -fsanitize=fuzzer-no-link -fno-omit-frame-pointer)
+    set_target_properties(codeskeptic PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 
 # Relocatable-tarball rpath: distro LLVM packages link the clang libs
 # against a shared libLLVM.so; the release layout bundles it in ../lib

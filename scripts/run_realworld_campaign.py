@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -31,7 +32,9 @@ MESON_OPTION = re.compile(
     r"-D[A-Za-z0-9_-]+=[A-Za-z0-9_.+-]+)"
 )
 MESON_TARGET = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:+-]*")
-MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=[A-Za-z0-9_.+-]+")
+MAKE_ASSIGNMENT = re.compile(r"[A-Z_][A-Z0-9_]*=.*")
+BUILD_ENVIRONMENT = {"CC", "CXX"}
+BUILD_TOOL = re.compile(r"/usr/bin/[A-Za-z0-9_.+-]+")
 REQUIRED_EXPECTED = {
     "translation_units",
     "translation_unit_sha256",
@@ -225,6 +228,21 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
     _require_int(project.get("timeout_minutes"), f"project {project_id} timeout_minutes", 1, 330)
     _require_int(project.get("memory_mb"), f"project {project_id} memory_mb", 512, 65536)
 
+    environment = project.get("environment", {})
+    if (
+        not isinstance(environment, dict)
+        or not set(environment).issubset(BUILD_ENVIRONMENT)
+        or any(
+            not isinstance(value, str) or BUILD_TOOL.fullmatch(value) is None
+            for value in environment.values()
+        )
+    ):
+        raise ManifestError(f"project {project_id} environment is invalid")
+    if environment:
+        project["environment"] = dict(sorted(environment.items()))
+    else:
+        project.pop("environment", None)
+
     commands = project.get("commands")
     if not isinstance(commands, dict) or set(commands) != {"configure", "build"}:
         raise ManifestError(f"project {project_id} commands must contain configure and build")
@@ -241,6 +259,42 @@ def _validate_project(raw: Any, index: int) -> dict[str, Any]:
             )
             for row_index, row in enumerate(rows)
         ]
+
+    checkout = project.get(
+        "checkout",
+        {
+            "submodules": "none",
+            "expected_count": 0,
+            "expected_sha256": digest_json([]),
+        },
+    )
+    if not isinstance(checkout, dict) or set(checkout) != {
+        "submodules",
+        "expected_count",
+        "expected_sha256",
+    }:
+        raise ManifestError(f"project {project_id} checkout fields are invalid")
+    if checkout["submodules"] not in ("none", "recursive"):
+        raise ManifestError(f"project {project_id} checkout mode is invalid")
+    _require_int(
+        checkout["expected_count"],
+        f"project {project_id} checkout.expected_count",
+        0,
+    )
+    if (
+        not isinstance(checkout["expected_sha256"], str)
+        or not SHA256.fullmatch(checkout["expected_sha256"])
+    ):
+        raise ManifestError(
+            f"project {project_id} checkout.expected_sha256 must be SHA-256"
+        )
+    if checkout["submodules"] == "none" and (
+        checkout["expected_count"] != 0
+        or checkout["expected_sha256"] != digest_json([])
+    ):
+        raise ManifestError(f"project {project_id} empty checkout identity is invalid")
+    if checkout["submodules"] == "recursive" and checkout["expected_count"] < 1:
+        raise ManifestError(f"project {project_id} recursive checkout identity is empty")
 
     copies = project.get("copies")
     if not isinstance(copies, list):
@@ -380,7 +434,7 @@ def project_by_id(manifest: dict[str, Any], project_id: str) -> dict[str, Any]:
 
 
 def project_recipe(project: dict[str, Any]) -> dict[str, Any]:
-    return {
+    recipe = {
         key: project[key]
         for key in (
             "repository",
@@ -394,6 +448,9 @@ def project_recipe(project: dict[str, Any]) -> dict[str, Any]:
             "memory_mb",
         )
     }
+    if project.get("environment"):
+        recipe["environment"] = project["environment"]
+    return recipe
 
 
 def receipt_identity(
@@ -402,13 +459,17 @@ def receipt_identity(
     repetition: int,
     analyzer_sha256: str,
     translation_unit_sha256: str,
+    submodules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if submodules is None:
+        submodules = _expected_submodules(project)
     return {
         "manifest_sha256": digest_json(manifest),
         "project_revision": project["revision"],
         "recipe_sha256": digest_json(project_recipe(project)),
         "analyzer_sha256": analyzer_sha256,
         "translation_unit_sha256": translation_unit_sha256,
+        "submodules": copy.deepcopy(submodules),
         "repetition": repetition,
     }
 
@@ -620,6 +681,83 @@ def semantic_from_report(
     return semantic
 
 
+def validate_receipt_group(
+    manifest: dict[str, Any],
+    tier: str,
+    project_id: str,
+    receipts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Validate one project's full repetition set with the campaign referee."""
+    campaign = manifest["campaigns"].get(tier)
+    if campaign is None:
+        raise ManifestError(f"unknown campaign {tier}")
+    if project_id not in campaign["projects"]:
+        raise EvidenceError(f"project {project_id} is not in campaign {tier}")
+    repetitions = campaign["repetitions"]
+    if len(receipts) != repetitions:
+        raise EvidenceError(
+            f"project {project_id} requires {repetitions} repetitions"
+        )
+
+    project = project_by_id(manifest, project_id)
+    for repetition, receipt in enumerate(receipts, 1):
+        if (
+            receipt.get("status") != "accepted"
+            or receipt.get("project") != project_id
+            or receipt.get("repetition") != repetition
+            or receipt.get("failures") != []
+        ):
+            raise EvidenceError(
+                f"project {project_id} repetition {repetition} is unavailable"
+            )
+
+    semantic_digests = {
+        digest_json(receipt.get("semantic")) for receipt in receipts
+    }
+    if len(semantic_digests) != 1:
+        raise EvidenceError(f"project {project_id} repetitions are nondeterministic")
+    analyzer_digests = {
+        receipt.get("identity", {}).get("analyzer_sha256")
+        for receipt in receipts
+        if isinstance(receipt.get("identity"), dict)
+    }
+    if len(analyzer_digests) != 1:
+        raise EvidenceError(
+            f"project {project_id} analyzer identity is nondeterministic"
+        )
+    analyzer_digest = next(iter(analyzer_digests))
+    if not isinstance(analyzer_digest, str) or not SHA256.fullmatch(
+        analyzer_digest
+    ):
+        raise EvidenceError(f"project {project_id} analyzer identity is malformed")
+
+    for repetition, receipt in enumerate(receipts, 1):
+        identity = receipt.get("identity")
+        expected_identity = receipt_identity(
+            manifest,
+            project,
+            repetition,
+            analyzer_digest,
+            project["expected"]["translation_unit_sha256"],
+        )
+        if not checkpoint_matches(receipt, expected_identity):
+            raise EvidenceError(
+                f"project {project_id} repetition {repetition} identity mismatch"
+            )
+        semantic = receipt.get("semantic")
+        _validate_semantic(project, semantic)
+    semantic = receipts[0]["semantic"]
+    return {
+        "repetitions": len(receipts),
+        "semantic_sha256": next(iter(semantic_digests)),
+        "analyzer_sha256": analyzer_digest,
+        "translation_unit_sha256": semantic["translation_units"]["sha256"],
+        "findings": semantic["findings"],
+        "exit_code": semantic["exit_code"],
+        "fingerprint_sha256": semantic["fingerprint_sha256"],
+    }
+
+
 def aggregate_receipts(
     manifest: dict[str, Any], tier: str, receipt_root: Path
 ) -> dict[str, Any]:
@@ -651,42 +789,14 @@ def aggregate_receipts(
                 raise EvidenceError(f"project {project_id} repetition {repetition} is unavailable")
             receipts.append(receipt)
 
-        semantic_digests = {digest_json(receipt.get("semantic")) for receipt in receipts}
-        if len(semantic_digests) != 1:
-            raise EvidenceError(f"project {project_id} repetitions are nondeterministic")
-        analyzer_digests = {
-            receipt.get("identity", {}).get("analyzer_sha256") for receipt in receipts
-        }
-        if len(analyzer_digests) != 1 or None in analyzer_digests:
-            raise EvidenceError(f"project {project_id} analyzer identity is nondeterministic")
-        analyzer_digest = next(iter(analyzer_digests))
-        if not isinstance(analyzer_digest, str) or not SHA256.fullmatch(analyzer_digest):
-            raise EvidenceError(f"project {project_id} analyzer identity is malformed")
+        project_summary = validate_receipt_group(
+            manifest, tier, project_id, receipts
+        )
+        analyzer_digest = project_summary["analyzer_sha256"]
         campaign_analyzer_digests.add(analyzer_digest)
         if len(campaign_analyzer_digests) != 1:
             raise EvidenceError("campaign analyzer identity is nondeterministic")
-        for repetition, receipt in enumerate(receipts, 1):
-            identity = receipt.get("identity")
-            expected_identity = receipt_identity(
-                manifest,
-                project,
-                repetition,
-                identity.get("analyzer_sha256", "") if isinstance(identity, dict) else "",
-                project["expected"]["translation_unit_sha256"],
-            )
-            if not checkpoint_matches(receipt, expected_identity):
-                raise EvidenceError(f"project {project_id} repetition {repetition} identity mismatch")
-        semantic = receipts[0]["semantic"]
-        _validate_semantic(project, semantic)
-        summary["projects"][project_id] = {
-            "repetitions": len(receipts),
-            "semantic_sha256": next(iter(semantic_digests)),
-            "analyzer_sha256": analyzer_digest,
-            "translation_unit_sha256": semantic["translation_units"]["sha256"],
-            "findings": semantic["findings"],
-            "exit_code": semantic["exit_code"],
-            "fingerprint_sha256": semantic["fingerprint_sha256"],
-        }
+        summary["projects"][project_id] = project_summary
     return summary
 
 
@@ -724,6 +834,7 @@ def _run_command(
     deadline: float,
     memory_mb: int,
     log_path: Path,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     remaining = max(0.0, deadline - time.monotonic())
     if remaining <= 0:
@@ -741,11 +852,173 @@ def _run_command(
                 text=True,
                 timeout=remaining,
                 preexec_fn=_memory_preexec(memory_mb),
+                env=env,
             )
         except subprocess.TimeoutExpired as error:
             raise EvidenceError("project shard timed out") from error
         log.write(f"EXIT {result.returncode}\n")
     return result
+
+
+def _expected_submodules(project: dict[str, Any]) -> dict[str, Any]:
+    checkout = project.get(
+        "checkout",
+        {
+            "submodules": "none",
+            "expected_count": 0,
+            "expected_sha256": digest_json([]),
+        },
+    )
+    return {
+        "mode": checkout["submodules"],
+        "count": checkout["expected_count"],
+        "sha256": checkout["expected_sha256"],
+    }
+
+
+def _capture_git(
+    command: list[str],
+    cwd: Path,
+    deadline: float,
+    memory_mb: int,
+    log_path: Path,
+    env: dict[str, str],
+) -> str:
+    remaining = max(0.0, deadline - time.monotonic())
+    if remaining <= 0:
+        raise EvidenceError("project shard timed out")
+    with log_path.open("a", encoding="utf-8", newline="\n") as log:
+        log.write(f"COMMAND cwd={cwd.as_posix()} argv={json.dumps(command)}\n")
+        log.flush()
+        try:
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=remaining,
+                preexec_fn=_memory_preexec(memory_mb),
+                env=env,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise EvidenceError("project shard timed out") from error
+        log.write(result.stdout)
+        log.write(f"EXIT {result.returncode}\n")
+    if result.returncode != 0:
+        raise EvidenceError(f"git command failed with exit {result.returncode}")
+    return result.stdout
+
+
+def _parse_submodule_status(output: str) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    pattern = re.compile(r" ([0-9a-f]{40}) (.+?)(?: \([^\r\n]*\))?$")
+    for line in output.splitlines():
+        match = pattern.fullmatch(line)
+        if match is None:
+            raise EvidenceError(
+                "recursive submodule is uninitialized, drifted, conflicted, or malformed"
+            )
+        revision, path = match.groups()
+        entries.append(
+            {"path": _require_relative(path, "submodule path"), "revision": revision}
+        )
+    entries.sort(key=lambda entry: entry["path"])
+    if not entries or len({entry["path"] for entry in entries}) != len(entries):
+        raise EvidenceError("recursive submodule identity is empty or duplicated")
+    return entries
+
+
+def _submodule_identity(
+    project: dict[str, Any],
+    project_root: Path,
+    deadline: float,
+    log_path: Path,
+) -> dict[str, Any]:
+    expected = _expected_submodules(project)
+    mode = expected["mode"]
+    git_env = os.environ.copy()
+    git_env["GIT_ALLOW_PROTOCOL"] = "https"
+    git_env["GIT_TERMINAL_PROMPT"] = "0"
+    stage = _capture_git(
+        ["git", "ls-files", "--stage"],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    gitlinks = [line for line in stage.splitlines() if line.startswith("160000 ")]
+    if mode == "none":
+        if gitlinks:
+            raise EvidenceError("project has undeclared gitlink submodules")
+        return expected
+
+    for command in (
+        ["git", "-c", "protocol.file.allow=never", "submodule", "sync", "--recursive"],
+        [
+            "git",
+            "-c",
+            "protocol.file.allow=never",
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            "--depth",
+            "1",
+            "--jobs",
+            "2",
+        ],
+    ):
+        result = _run_command(
+            command,
+            project_root,
+            deadline,
+            project["memory_mb"],
+            log_path,
+            env=git_env,
+        )
+        if result.returncode != 0:
+            raise EvidenceError(
+                f"recursive submodule checkout failed with exit {result.returncode}"
+            )
+
+    status = _capture_git(
+        ["git", "submodule", "status", "--recursive"],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    entries = _parse_submodule_status(status)
+
+    clean = _capture_git(
+        [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=no",
+            "--ignore-submodules=none",
+        ],
+        project_root,
+        deadline,
+        project["memory_mb"],
+        log_path,
+        git_env,
+    )
+    if clean:
+        raise EvidenceError("recursive submodule checkout is not clean")
+
+    actual = {
+        "mode": mode,
+        "count": len(entries),
+        "sha256": digest_json(entries),
+    }
+    if actual != expected:
+        raise EvidenceError("recursive submodule identity does not match the manifest")
+    return actual
 
 
 def _derive_translation_units(
@@ -790,6 +1063,69 @@ def _derive_translation_units(
     return [selected[path] for path in relative_paths], relative_paths
 
 
+def filter_target_translation_units(
+    command_output: str,
+    source: Path,
+    build: Path,
+    files: list[Path],
+    relative_files: list[str],
+) -> tuple[list[Path], list[str]]:
+    if len(files) != len(relative_files):
+        raise EvidenceError("translation-unit identity is malformed")
+    source_root = source.resolve()
+    for path in files:
+        resolved = path.resolve()
+        if resolved != source_root and source_root not in resolved.parents:
+            raise EvidenceError(
+                "translation-unit identity escapes the pinned source tree"
+            )
+    admitted = {
+        path.resolve(): (path, relative)
+        for path, relative in zip(files, relative_files, strict=True)
+    }
+    target_sources: set[Path] = set()
+    for line in command_output.splitlines():
+        try:
+            tokens = shlex.split(line)
+        except ValueError as error:
+            raise EvidenceError(
+                f"Ninja target closure contains an invalid command: {error}"
+            ) from error
+        compile_indexes = [index for index, token in enumerate(tokens) if token == "-c"]
+        if not compile_indexes:
+            continue
+        if len(compile_indexes) != 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile command"
+            )
+        command_sources: set[Path] = set()
+        for token in tokens:
+            if token.startswith("-"):
+                continue
+            path = Path(token)
+            if not path.is_absolute():
+                path = build / path
+            resolved = path.resolve()
+            if resolved in admitted:
+                command_sources.add(resolved)
+        if len(command_sources) > 1:
+            raise EvidenceError(
+                "Ninja target closure contains an ambiguous compile source"
+            )
+        target_sources.update(command_sources)
+
+    selected = sorted(
+        (relative, path)
+        for resolved, (path, relative) in admitted.items()
+        if resolved in target_sources
+    )
+    if not selected:
+        raise EvidenceError(
+            "Ninja target closure selected no admitted translation units"
+        )
+    return [path for _, path in selected], [relative for relative, _ in selected]
+
+
 def run_shard(
     manifest: dict[str, Any],
     project_id: str,
@@ -807,12 +1143,14 @@ def run_shard(
     if not analyzer.is_file():
         raise EvidenceError(f"analyzer unavailable: {analyzer}")
     analyzer_sha = file_digest(analyzer)
+    expected_submodules = _expected_submodules(project)
     expected_identity = receipt_identity(
         manifest,
         project,
         repetition,
         analyzer_sha,
         project["expected"]["translation_unit_sha256"],
+        expected_submodules,
     )
     started = time.monotonic()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -829,6 +1167,7 @@ def run_shard(
 
     semantic: dict[str, Any] | None = None
     actual_tu_sha = project["expected"]["translation_unit_sha256"]
+    actual_submodules = expected_submodules
     failures: list[str] = []
     log_path = output.parent / "commands.log"
     if log_path.exists():
@@ -862,6 +1201,13 @@ def run_shard(
             raise EvidenceError(
                 f"checkout revision mismatch {resolved_revision} != {project['revision']}"
             )
+        actual_submodules = _submodule_identity(
+            project,
+            project_root,
+            deadline,
+            log_path,
+        )
+
         for operation in project["copies"]:
             source_file = _inside(repository_root, repository_root / operation["from"], "copy source")
             destination = _inside(project_root, project_root / operation["to"], "copy destination")
@@ -871,12 +1217,15 @@ def run_shard(
             shutil.copyfile(source_file, destination)
         for group in ("configure", "build"):
             for command in project["commands"][group]:
+                command_environment = os.environ.copy()
+                command_environment.update(project.get("environment", {}))
                 result = _run_command(
                     _expand(command, values),
                     project_root,
                     deadline,
                     project["memory_mb"],
                     log_path,
+                    env=command_environment,
                 )
                 if result.returncode != 0:
                     raise EvidenceError(f"{group} command failed with exit {result.returncode}")
@@ -884,6 +1233,30 @@ def run_shard(
         files, relative_files = _derive_translation_units(
             project, project_root, build, compile_database
         )
+        ninja_target = None
+        for build_command in project["commands"]["build"]:
+            expanded_build_command = _expand(build_command, values)
+            if "--target" not in expanded_build_command:
+                continue
+            target_index = expanded_build_command.index("--target")
+            if target_index + 1 >= len(expanded_build_command):
+                raise EvidenceError("build target is missing")
+            ninja_target = expanded_build_command[target_index + 1]
+            break
+        target_commands = ""
+        if ninja_target is not None:
+            target_commands = _capture_git(
+                ["ninja", "-C", str(build), "-t", "commands", ninja_target],
+                project_root,
+                deadline,
+                project["memory_mb"],
+                log_path,
+                None,
+            )
+        if target_commands:
+            files, relative_files = filter_target_translation_units(
+                target_commands, project_root, build, files, relative_files
+            )
         actual_tu_sha = translation_unit_digest(relative_files)
         file_list = output.parent / "translation-units.txt"
         file_list.write_text(
@@ -892,14 +1265,15 @@ def run_shard(
         (output.parent / "translation-units.relative.txt").write_text(
             "\n".join(relative_files) + "\n", encoding="utf-8", newline="\n"
         )
-        if (
-            len(files) != project["expected"]["translation_units"]
-            or actual_tu_sha != project["expected"]["translation_unit_sha256"]
-        ):
-            raise EvidenceError(
-                "translation-unit expectation drift: "
-                f"count={len(files)} sha256={actual_tu_sha}"
-            )
+        if target_commands:
+            if (
+                len(files) != project["expected"]["translation_units"]
+                or actual_tu_sha != project["expected"]["translation_unit_sha256"]
+            ):
+                raise EvidenceError(
+                    "translation-unit expectation drift: "
+                    f"count={len(files)} sha256={actual_tu_sha}"
+                )
         report_path = output.parent / "report.json"
         analyzer_command = [
             str(analyzer),
@@ -932,7 +1306,12 @@ def run_shard(
         failures.append(str(error))
 
     identity = receipt_identity(
-        manifest, project, repetition, analyzer_sha, actual_tu_sha
+        manifest,
+        project,
+        repetition,
+        analyzer_sha,
+        actual_tu_sha,
+        actual_submodules,
     )
     accepted = not failures and semantic is not None
     receipt = {
