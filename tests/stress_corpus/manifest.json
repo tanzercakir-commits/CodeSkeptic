@@ -61,7 +61,7 @@
       "sources": [
         {
           "path": "tests/stress_corpus/template_malformed.cpp",
-          "sha256": "c2d2edd25ea7beebea814ddc353b18d211206b2ccea538a1f1aa47d50eca13ac"
+          "sha256": "84e99fc485f2707c65c37d4753a506990614d8b76fe1be2eadf36a090f03d19e"
         }
       ],
       "missing_sources": [],

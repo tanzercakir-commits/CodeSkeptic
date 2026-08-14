@@ -13,14 +13,14 @@
       "rule_id": "div-by-zero",
       "capability_tier": "supported",
       "blocks_verdict": true,
-      "fingerprint": "csf1-14556966e3f07cfd",
-      "file": "/tmp/codeskeptic-stress-i7_hchbf/nested-macro-expansion/repeat-1/macro_matrix.cpp",
+      "fingerprint": "csf1-3745c145a1ea44b8",
+      "file": "/tmp/codeskeptic-stress-n3phgmg1/nested-macro-expansion/repeat-2/macro_matrix.cpp",
       "line": 9,
       "column": 12,
       "function": "macro_seeded",
       "message": "Division by zero: 'divisor' is definitely zero",
       "notes": [
-        { "file": "/tmp/codeskeptic-stress-i7_hchbf/nested-macro-expansion/repeat-1/macro_matrix.cpp", "line": 8, "column": 5, "message": "'divisor' assigned zero here" }
+        { "file": "/tmp/codeskeptic-stress-n3phgmg1/nested-macro-expansion/repeat-2/macro_matrix.cpp", "line": 8, "column": 5, "message": "'divisor' assigned zero here" }
       ]
     }
   ]

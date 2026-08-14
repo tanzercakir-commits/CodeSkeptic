@@ -9,18 +9,18 @@
   "total": 1,
   "diagnostics": [
     {
-      "severity": "warning",
+      "severity": "error",
       "rule_id": "div-by-zero",
       "capability_tier": "supported",
       "blocks_verdict": true,
-      "fingerprint": "csf1-74dfdf190516238f",
-      "file": "/tmp/codeskeptic-stress-i7_hchbf/high-complexity-cfg/repeat-2/high_cfg_matrix.cpp",
-      "line": 50,
-      "column": 17,
-      "function": "high_cfg_seeded",
-      "message": "Possible division by zero: 'divisor' may be zero on some paths",
+      "fingerprint": "csf1-53be3e033ed4b484",
+      "file": "/tmp/codeskeptic-stress-n3phgmg1/template-instantiation/repeat-2/template_matrix.cpp",
+      "line": 10,
+      "column": 24,
+      "function": "template_seeded",
+      "message": "Division by zero: 'divisor' is definitely zero",
       "notes": [
-        { "file": "/tmp/codeskeptic-stress-i7_hchbf/high-complexity-cfg/repeat-2/high_cfg_matrix.cpp", "line": 47, "column": 18, "message": "'divisor' assigned zero here" }
+        { "file": "/tmp/codeskeptic-stress-n3phgmg1/template-instantiation/repeat-2/template_matrix.cpp", "line": 9, "column": 5, "message": "'divisor' assigned zero here" }
       ]
     }
   ]

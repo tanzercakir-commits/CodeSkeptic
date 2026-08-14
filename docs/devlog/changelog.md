@@ -1,6 +1,6 @@
 # CodeSkeptic — Changelog
 
-## 2026-08-14 — Phase 10.4 frontend and CFG stress matrix locally complete
+## 2026-08-15 — Phase 10.4 frontend and CFG stress matrix locally complete
 
 - Made verdict availability unconditional over the requested translation-unit
   set. Missing paths are counted before filtering, broken ASTs remain recorded
@@ -14,12 +14,14 @@
   a 64-way CFG, mixed clean/broken input, recovered broken ASTs, and a missing
   requested TU. Every case runs twice with a 30-second crash/hang tripwire and
   machine-checks process/report exit, status, completeness, exact TU coverage,
-  seeded findings, clean twins, and stable semantic hashes. The retained Linux
-  x86_64 run accepted `9/9` cases and `18/18` executions with zero timeout or
-  crash in `314` ms. Its receipt SHA-256 is
-  `588bcf2815b0d5495640007d733522d92e6f0abc8d45439f0de6721a9ea155b3`;
+  seeded findings, clean twins, and stable semantic hashes. The malformed
+  template now forces instantiation, so both ordinary Clang and Windows'
+  MSVC-compatible delayed-template-parsing mode diagnose the same production
+  input. The retained Linux x86_64 run accepted `9/9` cases and `18/18`
+  executions with zero timeout or crash in `327` ms. Its receipt SHA-256 is
+  `3be46ec3f1f517025d448e8df8927f554b75cab3908bdd87aec988b6be75ea4e`;
   the 37-entry outer manifest SHA-256 is
-  `d75ce7f08371b6fb49b50f77ff0f35e49a8931aed36b7e72ec256ec8e0814fcd`.
+  `d7316415a05fc875a4e345d4150d5428dfd2cba2d20dc3b2a83a351cc1023a61`.
 - Replaced the permissive real-world source-tree scan with each pinned
   project's exact compile-database surface. cJSON is now `23/23` analyzed,
   zero broken, zero missing, and 48 findings; tinyxml2 is `2/2`, zero broken,
@@ -27,21 +29,23 @@
   mismatch or incomplete TU before comparing finding pins.
 - Refreshed the retained ASAN and UBSAN matrices for the final P10.4 source
   bytes. Both bind the same 358-file source manifest
-  `bc47c54a5baaaa9a8f2087c7f0b5d875a6c482342c1f49f6118398b019453e9c`,
+  `a452bb75b509d7d0091c74a591a2ea231d5219bce219d0d181e1609987f275ef`,
   pass all ten runtime gates, `1208/1208` CTest entries, `1192/1192` direct
-  C++ tests, and four fuzz smoke targets. ASAN receipt SHA-256 is
-  `f5aaddde5f04055634a6a03d5c2d1b48bd86317e8eef313e1ee60dd2bb449ec8`;
-  UBSAN is
-  `badb578d5034fe66d4cbfc74e1c4830fd74f783f302f452fd04a1be5191e5d48`;
+  C++ tests, and four fuzz smoke targets. ASAN completed in `66135` ms with
+  receipt SHA-256
+  `d91a04340f69104d0c3ed1414d2f5947f9be1fd54bc549109bc6f4987ab46308`;
+  UBSAN completed in `40754` ms with receipt SHA-256
+  `c92c8af369e68101e7625cb56fe0c8696aa1e5e1dce3b46e64d9818d156d41fb`;
   their 40-entry outer manifest is
-  `36f20ad6a8ea65e15035d7d74a2d5d73f48d60379f1fde3d98b4d4438f8f19f6`.
+  `e40eb2a67435c59f2e6f08cc4d808dc7d1b2549eb1de491e22656154c5ff7f85`.
   Both receipt verifiers pass and `SanitizerContract` is `13/13` with no
   skips. Evidence directories are excluded from source manifests to prevent
   later phase receipts from creating cross-matrix hash cycles.
-- Independent read-only pre-evidence review found no blocking implementation
-  issue. `CS-P10-04` remains open pending final retained-evidence audit and
-  hosted Linux/Windows CI; this work stays on `phase-frontend-cfg-stress` and
-  does not write to or merge protected `main`.
+- Independent read-only final pre-push review found no blocking correctness
+  issue after rechecking the Windows RED/GREEN path, receipt bindings, and
+  retained manifests. `CS-P10-04` remains open pending hosted Windows and all
+  other CI gates; this work stays on `phase-frontend-cfg-stress` and does not
+  write to or merge protected `main`.
 
 ## 2026-08-14 — Phase 10.3 sanitizer matrix locally complete
 
