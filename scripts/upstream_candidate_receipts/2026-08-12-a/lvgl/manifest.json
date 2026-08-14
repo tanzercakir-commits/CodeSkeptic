@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "campaigns": {
+    "upstream-candidates": {
+      "window_minutes": 1440,
+      "repetitions": 3,
+      "projects": [
+        "lvgl"
+      ]
+    }
+  },
+  "projects": [
+    {
+      "id": "lvgl",
+      "label": "v9.2.2",
+      "repository": "https://github.com/lvgl/lvgl.git",
+      "revision": "34d30b0f1b1e3afae119e2ba3987a988deb1a2ea",
+      "timeout_minutes": 240,
+      "memory_mb": 8192,
+      "commands": {
+        "configure": [
+          [
+            "cmake",
+            "-S",
+            "{source}",
+            "-B",
+            "{build}",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_C_COMPILER=/usr/bin/clang-19",
+            "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-19",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            "-DLV_BUILD_USE_KCONFIG=ON",
+            "-DLV_BUILD_DEFCONFIG_PATH=configs/defconfigs/empty.defconfig",
+            "-DCONFIG_LV_BUILD_EXAMPLES=OFF",
+            "-DCONFIG_LV_BUILD_DEMOS=OFF",
+            "-DLV_FETCH_DEPENDENCIES=OFF"
+          ]
+        ],
+        "build": [
+          [
+            "cmake",
+            "--build",
+            "{build}",
+            "--parallel",
+            "{jobs}"
+          ]
+        ]
+      },
+      "copies": [],
+      "compile_database": "{build}/compile_commands.json",
+      "sources": {
+        "roots": [
+          "src"
+        ],
+        "extensions": [
+          ".c"
+        ],
+        "fallback_globs": []
+      },
+      "analyzer_args": [
+        "--report-paths",
+        "{source}/src"
+      ],
+      "expected": {
+        "translation_units": 470,
+        "translation_unit_sha256": "66854d6575038403eae53f3c1d3478ed1bb1c5eb91c511a8fda0d9223da81f1b",
+        "attempted_tus": 470,
+        "analyzed_tus": 470,
+        "broken_tus": 0,
+        "incomplete_functions": 0,
+        "findings": 13,
+        "exit_code": 1,
+        "fingerprint_sha256": "67bd7bb56cad473321bbd817f8b537ae24d9190e66a36805be70a47631bd44ef"
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -70,18 +71,106 @@ Config::Config()
     , lang_("en")
     , min_severity_(Severity::Info) {}
 
+bool Config::operator==(const Config& other) const {
+    return source_path_ == other.source_path_ &&
+           source_files_ == other.source_files_ &&
+           build_path_ == other.build_path_ &&
+           output_format_ == other.output_format_ &&
+           json_output_path_ == other.json_output_path_ &&
+           sarif_output_path_ == other.sarif_output_path_ &&
+           html_output_path_ == other.html_output_path_ &&
+           baseline_path_ == other.baseline_path_ &&
+           write_baseline_path_ == other.write_baseline_path_ &&
+           lang_ == other.lang_ && functions_ == other.functions_ &&
+           fatal_asserts_ == other.fatal_asserts_ &&
+           assert_macros_ == other.assert_macros_ &&
+           negative_assert_macros_ == other.negative_assert_macros_ &&
+           alloc_functions_ == other.alloc_functions_ &&
+           allocator_pairs_ == other.allocator_pairs_ &&
+           untrusted_int_sources_ == other.untrusted_int_sources_ &&
+           free_functions_ == other.free_functions_ &&
+           owning_pointers_ == other.owning_pointers_ &&
+           report_paths_ == other.report_paths_ &&
+           policies_ == other.policies_ &&
+           summary_diff_gate_ == other.summary_diff_gate_ &&
+           lines_ == other.lines_ && serve_ == other.serve_ &&
+           whole_program_ == other.whole_program_ &&
+           analyze_broken_tus_ == other.analyze_broken_tus_ &&
+           accept_partial_coverage_ == other.accept_partial_coverage_ &&
+           assert_recovery_ == other.assert_recovery_ &&
+           assumptions_ == other.assumptions_ &&
+           warm_cache_ == other.warm_cache_ &&
+           help_requested_ == other.help_requested_ &&
+           summary_in_path_ == other.summary_in_path_ &&
+           summary_out_path_ == other.summary_out_path_ &&
+           model_files_ == other.model_files_ &&
+           summary_diff_old_ == other.summary_diff_old_ &&
+           summary_diff_new_ == other.summary_diff_new_ &&
+           min_severity_ == other.min_severity_ &&
+           enabled_rules_ == other.enabled_rules_ &&
+           disabled_rules_ == other.disabled_rules_;
+}
+
 bool Config::loadFromFile(const std::string& path) {
-    std::ifstream file(path);
     // The default project config is optional. Once the file exists, every
     // non-comment line is a contract and is validated strictly.
-    if (!file.is_open()) {
-        std::error_code ec;
-        if (std::filesystem::exists(path, ec) && !ec) {
-            std::cerr << "[CodeSkeptic] cannot read config: " << path << "\n";
-            return false;
-        }
+    std::error_code ec;
+    const auto entryStatus = std::filesystem::symlink_status(path, ec);
+    if (ec == std::errc::no_such_file_or_directory &&
+        entryStatus.type() == std::filesystem::file_type::not_found)
         return true;
+    if (ec) {
+        std::cerr << "[CodeSkeptic] cannot inspect config: " << path
+                  << ": " << ec.message() << "\n";
+        return false;
     }
+    if (entryStatus.type() == std::filesystem::file_type::not_found) return true;
+
+    const auto resolvedStatus = std::filesystem::status(path, ec);
+    if (ec || !std::filesystem::is_regular_file(resolvedStatus)) {
+        std::cerr << "[CodeSkeptic] cannot read config: " << path;
+        if (ec) std::cerr << ": " << ec.message();
+        else std::cerr << ": path is not a regular file";
+        std::cerr << "\n";
+        return false;
+    }
+
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "[CodeSkeptic] cannot read config: " << path << "\n";
+        return false;
+    }
+
+    std::ostringstream content;
+    content << file.rdbuf();
+    if (file.bad()) {
+        std::cerr << "[CodeSkeptic] failed while reading config: " << path
+                  << "\n";
+        return false;
+    }
+    return loadFromText(content.str(), path);
+}
+
+bool Config::loadFromText(const std::string& text,
+                          const std::string& source,
+                          bool reportErrors) {
+    if (text.find('\0') != std::string::npos) {
+        if (reportErrors) configError(source, 0, "embedded NUL byte");
+        return false;
+    }
+    Config candidate = *this;
+    if (!candidate.loadFromTextInPlace(text, source, reportErrors)) return false;
+    *this = std::move(candidate);
+    return true;
+}
+
+bool Config::loadFromTextInPlace(const std::string& text,
+                                 const std::string& source,
+                                 bool reportErrors) {
+    std::istringstream file(text);
+    auto report = [&](std::size_t line, const std::string& message) {
+        if (reportErrors) configError(source, line, message);
+    };
 
     std::string line;
     std::size_t lineNumber = 0;
@@ -93,7 +182,7 @@ bool Config::loadFromFile(const std::string& path) {
 
         auto pos = line.find('=');
         if (pos == std::string::npos) {
-            configError(path, lineNumber, "expected key=value");
+            report(lineNumber, "expected key=value");
             ok = false;
             continue;
         }
@@ -101,7 +190,7 @@ bool Config::loadFromFile(const std::string& path) {
         std::string key = trim(line.substr(0, pos));
         std::string value = trim(line.substr(pos + 1));
         if (key.empty()) {
-            configError(path, lineNumber, "empty key");
+            report(lineNumber, "empty key");
             ok = false;
             continue;
         }
@@ -110,8 +199,8 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "build_path")    build_path_ = value;
         else if (key == "output_format") {
             if (!isOutputFormat(value)) {
-                configError(path, lineNumber,
-                            "output_format expects console/json/sarif/html");
+                report(lineNumber,
+                       "output_format expects console/json/sarif/html");
                 ok = false;
             } else {
                 output_format_ = value;
@@ -132,8 +221,8 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "min_severity") {
             Severity parsed;
             if (!parseSeverity(value, parsed)) {
-                configError(path, lineNumber,
-                            "min_severity expects info/warning/error");
+                report(lineNumber,
+                       "min_severity expects info/warning/error");
                 ok = false;
             } else {
                 min_severity_ = parsed;
@@ -141,21 +230,26 @@ bool Config::loadFromFile(const std::string& path) {
         }
         else if (key == "lang") {
             if (value != "en" && value != "tr") {
-                configError(path, lineNumber, "lang expects en or tr");
+                report(lineNumber, "lang expects en or tr");
                 ok = false;
             } else {
                 lang_ = value;
             }
         }
         else if (key == "baseline")      baseline_path_ = value;
-        else if (key == "function")      addFunctions(value);
+        else if (key == "function") {
+            if (!addFunctions(value)) {
+                report(lineNumber, "function expects at least one name");
+                ok = false;
+            }
+        }
         else if (key == "fatal_asserts") addFatalAsserts(value);
         else if (key == "assert_macros") addAssertMacros(value);
         else if (key == "negative_assert_macros") addNegativeAssertMacros(value);
         else if (key == "assert_recovery") {
             if (!parseBool(value, assert_recovery_)) {
-                configError(path, lineNumber,
-                            "assert_recovery expects true/false/1/0");
+                report(lineNumber,
+                       "assert_recovery expects true/false/1/0");
                 ok = false;
             }
         }
@@ -163,9 +257,9 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "free_functions")  addNamesTo(free_functions_, value);
         else if (key == "allocator_pairs") {
             if (!addAllocatorPairs(value)) {
-                configError(path, lineNumber,
-                            "allocator_pairs expects allocator=deallocator"
-                            " entries separated by commas");
+                report(lineNumber,
+                       "allocator_pairs expects allocator=deallocator"
+                       " entries separated by commas");
                 ok = false;
             }
         }
@@ -175,8 +269,7 @@ bool Config::loadFromFile(const std::string& path) {
         else if (key == "policy")          addNamesTo(policies_, value);
         else if (key == "model_file") {
             if (value.empty()) {
-                configError(path, lineNumber,
-                            "model_file expects a non-empty path");
+                report(lineNumber, "model_file expects a non-empty path");
                 ok = false;
             } else {
                 model_files_.push_back(value);
@@ -184,8 +277,8 @@ bool Config::loadFromFile(const std::string& path) {
         }
         else if (key == "summary_diff_gate") {
             if (value != "error" && value != "warn") {
-                configError(path, lineNumber,
-                            "summary_diff_gate expects error or warn");
+                report(lineNumber,
+                       "summary_diff_gate expects error or warn");
                 ok = false;
             } else {
                 summary_diff_gate_ = value;
@@ -193,29 +286,30 @@ bool Config::loadFromFile(const std::string& path) {
         }
         else if (key == "analyze_broken_tus") {
             if (!parseBool(value, analyze_broken_tus_)) {
-                configError(path, lineNumber,
-                            "analyze_broken_tus expects true/false/1/0");
+                report(lineNumber,
+                       "analyze_broken_tus expects true/false/1/0");
                 ok = false;
             }
         }
         else if (key == "accept_partial_coverage") {
             if (!parseBool(value, accept_partial_coverage_)) {
-                configError(path, lineNumber,
-                            "accept_partial_coverage expects true/false/1/0");
+                report(lineNumber,
+                       "accept_partial_coverage expects true/false/1/0");
                 ok = false;
             }
         }
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
         else {
-            configError(path, lineNumber, "unknown key '" + key + "'");
+            report(lineNumber, "unknown key '" + key + "'");
             ok = false;
         }
     }
 
     if (file.bad()) {
-        std::cerr << "[CodeSkeptic] failed while reading config: " << path
-                  << "\n";
+        if (reportErrors)
+            std::cerr << "[CodeSkeptic] failed while reading config: "
+                      << source << "\n";
         ok = false;
     }
     return ok;
@@ -269,7 +363,12 @@ bool Config::parseArgs(int argc, char* argv[]) {
         } else if (arg == "--baseline" && i + 1 < argc) {
             baseline_path_ = argv[++i];
         } else if (arg == "--function" && i + 1 < argc) {
-            addFunctions(argv[++i]);
+            const std::string value = argv[++i];
+            if (!addFunctions(value)) {
+                std::cerr << "[CodeSkeptic] --function expects at least "
+                             "one function name\n";
+                return false;
+            }
         } else if (arg == "--fatal-asserts" && i + 1 < argc) {
             addFatalAsserts(argv[++i]);
         } else if (arg == "--assert-macros" && i + 1 < argc) {
@@ -482,17 +581,25 @@ bool Config::isRuleEnabled(const std::string& rule_id) const {
     return enabled_rules_.count(rule_id) > 0;
 }
 
-void Config::addFunctions(const std::string& list) {
+bool Config::addFunctions(const std::string& list) {
+    auto parsed = functions_;
+    bool found = false;
     std::string token;
     for (size_t i = 0; i <= list.size(); ++i) {
         char c = (i < list.size()) ? list[i] : ',';
         if (c == ',') {
-            if (!token.empty()) functions_.insert(token);
+            if (!token.empty()) {
+                parsed.insert(token);
+                found = true;
+            }
             token.clear();
-        } else if (c != ' ') {
+        } else if (c != ' ' && c != '\t' && c != '\r' && c != '\n') {
             token += c;
         }
     }
+    if (!found) return false;
+    functions_ = std::move(parsed);
+    return true;
 }
 
 void Config::addFatalAsserts(const std::string& list) {
@@ -578,9 +685,10 @@ void Config::addNamesTo(std::set<std::string>& target,
 bool Config::addLines(const std::string& list) {
     // "12-40,55" -> {12,40}, {55,55}. Invalid scope is a caller error:
     // silently dropping it would expand a targeted analysis to all functions.
+    auto parsed = lines_;
     std::string token;
     bool ok = true;
-    auto flush = [this, &ok](const std::string& t) {
+    auto flush = [&parsed, &ok](const std::string& t) {
         if (t.empty()) {
             ok = false;
             return;
@@ -620,7 +728,7 @@ bool Config::addLines(const std::string& list) {
             ok = false;
             return;
         }
-        lines_.emplace_back(from, to);
+        parsed.emplace_back(from, to);
     };
     for (size_t i = 0; i <= list.size(); ++i) {
         char c = (i < list.size()) ? list[i] : ',';
@@ -631,7 +739,9 @@ bool Config::addLines(const std::string& list) {
             token += c;
         }
     }
-    return ok;
+    if (!ok) return false;
+    lines_ = std::move(parsed);
+    return true;
 }
 
 bool Config::parseSeverity(const std::string& str, Severity& severity) const {

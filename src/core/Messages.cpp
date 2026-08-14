@@ -99,6 +99,11 @@ const MsgEntry kMessages[] = {
      "[CodeSkeptic] Fallback: continuing with -std=c++17.",
      "[CodeSkeptic] compile_commands.json bulunamadi: {0}\n"
      "[CodeSkeptic] Fallback: -std=c++17 ile devam ediliyor."},
+    // CompileDbInvalid
+    {"[CodeSkeptic] invalid compile_commands.json: {0}\n"
+     "[CodeSkeptic] Fallback disabled: requested build input is unusable.",
+     "[CodeSkeptic] gecersiz compile_commands.json: {0}\n"
+     "[CodeSkeptic] Fallback kapali: istenen derleme girdisi kullanilamaz."},
     // OutputFileOpenError
     {"[CodeSkeptic] Cannot open output file: {0}",
      "[CodeSkeptic] Cikti dosyasi acilamadi: {0}"},

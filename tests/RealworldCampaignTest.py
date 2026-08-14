@@ -117,7 +117,7 @@ def accepted_receipt(
 
 
 class ManifestContractTest(unittest.TestCase):
-    def test_canonical_manifest_is_exact_nightly_and_weekend_factory(self) -> None:
+    def test_canonical_manifest_is_exact_three_tier_factory(self) -> None:
         manifest = campaign.load_manifest(MANIFEST)
         normalized = campaign.validate_manifest(manifest)
         self.assertEqual(
@@ -131,6 +131,9 @@ class ManifestContractTest(unittest.TestCase):
                 "curl",
                 "redis",
                 "lvgl",
+                "llama-cpp",
+                "tensorflow-lite",
+                "shadps4",
             },
         )
         self.assertEqual(
@@ -140,6 +143,16 @@ class ManifestContractTest(unittest.TestCase):
         self.assertEqual(
             normalized["campaigns"]["weekend"]["projects"],
             ["systemd", "curl", "redis", "lvgl"],
+        )
+        self.assertEqual(
+            normalized["campaigns"]["release-candidate"]["projects"],
+            ["llama-cpp", "tensorflow-lite", "shadps4"],
+        )
+        self.assertEqual(
+            normalized["campaigns"]["release-candidate"]["repetitions"], 3
+        )
+        self.assertEqual(
+            normalized["campaigns"]["release-candidate"]["window_minutes"], 4320
         )
         self.assertEqual(normalized["campaigns"]["nightly"]["repetitions"], 3)
         self.assertLessEqual(normalized["campaigns"]["nightly"]["window_minutes"], 720)
@@ -231,6 +244,136 @@ class ManifestContractTest(unittest.TestCase):
                 ),
             },
         )
+
+    def test_release_candidate_profiles_and_submodule_identity_are_pinned(self) -> None:
+        normalized = campaign.load_manifest(MANIFEST)
+        candidate_document = json.loads(
+            (ROOT / "scripts" / "phase83_candidates.json").read_text(encoding="utf-8")
+        )
+        candidates = {
+            project["id"]: project for project in candidate_document["projects"]
+        }
+        promoted = {
+            project["id"]: project
+            for project in normalized["projects"]
+            if project["id"] in {"llama-cpp", "tensorflow-lite", "shadps4"}
+        }
+        self.assertEqual(set(promoted), set(candidates))
+        for project_id, project in promoted.items():
+            for field in (
+                "id",
+                "label",
+                "repository",
+                "revision",
+                "compile_database",
+                "sources",
+                "commands",
+                "analyzer_args",
+                "timeout_minutes",
+                "memory_mb",
+            ):
+                self.assertEqual(project[field], candidates[project_id][field])
+
+        expected_profiles = {
+          "llama-cpp": {
+            "revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454",
+            "checkout": {
+              "submodules": "none",
+              "expected_count": 0,
+              "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            "translation_units": 200,
+            "attempted_tus": 200,
+            "analyzed_tus": 200,
+            "findings": 40,
+            "translation_unit_sha256": "e9ea7d634287ae942ce5c9b0b0cf5e1595114f60b13e8e7e431fff410ccf8783",
+            "fingerprint_sha256": "842c6903f3d506cff9b5a5723de8dc10701b294c12ce59be032f368d3eacc4b4"
+          },
+          "tensorflow-lite": {
+            "revision": "a481b10260dfdf833a1b16007eead49c1d7febf3",
+            "checkout": {
+              "submodules": "none",
+              "expected_count": 0,
+              "expected_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            },
+            "translation_units": 241,
+            "attempted_tus": 241,
+            "analyzed_tus": 245,
+            "findings": 73,
+            "translation_unit_sha256": "2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f",
+            "fingerprint_sha256": "6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a"
+          },
+          "shadps4": {
+            "revision": "5a4373c80e32c7a9d5d6e5a0b7d31d371d194caa",
+            "checkout": {
+              "submodules": "recursive",
+              "expected_count": 53,
+              "expected_sha256": "9f779c183535a2af8148a3b7bfc69b4733cf947d036d98b49e740dbe7ea7c54c"
+            },
+            "translation_units": 382,
+            "attempted_tus": 382,
+            "analyzed_tus": 382,
+            "findings": 66,
+            "translation_unit_sha256": "890628723d3db1645429d4fc2f134ecbdac32cd8e322e8dddf09f0d8835c24e9",
+            "fingerprint_sha256": "0b14abf3eb69012ee95678b7a3c4198bd440a761757df8cbad482374d767fd74"
+          }
+        }
+        actual_profiles = {
+            project_id: {
+                "revision": project["revision"],
+                "checkout": project["checkout"],
+                "translation_units": project["expected"]["translation_units"],
+                "attempted_tus": project["expected"]["attempted_tus"],
+                "analyzed_tus": project["expected"]["analyzed_tus"],
+                "findings": project["expected"]["findings"],
+                "translation_unit_sha256": project["expected"][
+                    "translation_unit_sha256"
+                ],
+                "fingerprint_sha256": project["expected"]["fingerprint_sha256"],
+            }
+            for project_id, project in promoted.items()
+        }
+        self.assertEqual(actual_profiles, expected_profiles)
+
+        shad = promoted["shadps4"]
+        identity = campaign.receipt_identity(
+            normalized,
+            shad,
+            1,
+            "a" * 64,
+            shad["expected"]["translation_unit_sha256"],
+        )
+        self.assertEqual(identity["submodules"], {
+            "mode": "recursive",
+            "count": 53,
+            "sha256": "9f779c183535a2af8148a3b7bfc69b4733cf947d036d98b49e740dbe7ea7c54c",
+        })
+
+        revision = "1" * 40
+        self.assertEqual(
+            campaign._parse_submodule_status(
+                f" {revision} dependencies/example (heads/main)"
+            ),
+            [{"path": "dependencies/example", "revision": revision}],
+        )
+        for bad in (
+            "",
+            f"-{revision} dependencies/example",
+            f"+{revision} dependencies/example",
+            f"U{revision} dependencies/example",
+        ):
+            with self.subTest(bad=bad):
+                with self.assertRaises(campaign.EvidenceError):
+                    campaign._parse_submodule_status(bad)
+
+        raw = fixture_manifest()
+        raw["projects"][0]["checkout"] = {
+            "submodules": "recursive",
+            "expected_count": 0,
+            "expected_sha256": "1" * 64,
+        }
+        with self.assertRaises(campaign.ManifestError):
+            campaign.validate_manifest(raw)
 
     def test_mutable_revision_duplicate_and_unsafe_command_fail(self) -> None:
         manifest = fixture_manifest()
@@ -329,6 +472,7 @@ class ManifestContractTest(unittest.TestCase):
                 "-j{jobs}",
                 "CC=clang-20",
                 "MALLOC=libc",
+                "CFLAGS=-resource-dir=/opt/llvm/lib/clang/19",
             ]
         ]
         campaign.validate_manifest(manifest)
@@ -346,6 +490,63 @@ class ManifestContractTest(unittest.TestCase):
         ]
         with self.assertRaisesRegex(campaign.ManifestError, "bear build shape"):
             campaign.validate_manifest(manifest)
+
+    def test_build_environment_is_validated_and_recipe_bound(self) -> None:
+        baseline = campaign.validate_manifest(fixture_manifest())
+        baseline_digest = campaign.digest_json(baseline)
+        baseline_recipe = campaign.digest_json(
+            campaign.project_recipe(baseline["projects"][0])
+        )
+        self.assertNotIn("environment", baseline["projects"][0])
+        self.assertEqual(
+            baseline_digest,
+            "e2d962d0cad32776eef3a4da72da4a4f3ca3e00dcabd2d3b6ceb7977fe6e878c",
+        )
+        self.assertEqual(
+            baseline_recipe,
+            "00518a68774f47b7787e494ec78af1e6b75c85cd9e69958648f72b66d2c93e55",
+        )
+
+        manifest = fixture_manifest()
+        project = manifest["projects"][0]
+        project["environment"] = {
+            "CXX": "/usr/bin/clang++-19",
+            "CC": "/usr/bin/clang-19",
+        }
+        normalized = campaign.validate_manifest(manifest)
+        normalized_project = normalized["projects"][0]
+        self.assertEqual(
+            normalized_project["environment"],
+            {"CC": "/usr/bin/clang-19", "CXX": "/usr/bin/clang++-19"},
+        )
+        self.assertEqual(
+            campaign.project_recipe(normalized_project)["environment"],
+            normalized_project["environment"],
+        )
+        self.assertNotEqual(campaign.digest_json(normalized), baseline_digest)
+        self.assertNotEqual(
+            campaign.digest_json(campaign.project_recipe(normalized_project)),
+            baseline_recipe,
+        )
+
+        without_environment = campaign.validate_manifest(fixture_manifest())
+        self.assertEqual(campaign.digest_json(without_environment), baseline_digest)
+        self.assertEqual(
+            campaign.digest_json(
+                campaign.project_recipe(without_environment["projects"][0])
+            ),
+            baseline_recipe,
+        )
+
+        for invalid in (
+            {"LD_PRELOAD": "/usr/lib/example.so"},
+            {"CC": "clang-19"},
+            {"CC": "/usr/bin/clang-19\nextra"},
+        ):
+            changed = fixture_manifest()
+            changed["projects"][0]["environment"] = invalid
+            with self.assertRaisesRegex(campaign.ManifestError, "environment"):
+                campaign.validate_manifest(changed)
 
 
 class EvidenceContractTest(unittest.TestCase):
@@ -579,6 +780,57 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("run_realworld_campaign.py aggregate", realworld)
         self.assertNotIn("pull_request_target", realworld)
         self.assertNotIn("continue-on-error", realworld)
+
+
+    def test_release_candidate_workflow_selects_llvm19_only_for_that_tier(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "realworld.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("build-analyzer:\n    needs: plan", workflow)
+        self.assertIn('needs.plan.outputs.tier }}" = release-candidate', workflow)
+        self.assertIn("version=19", workflow)
+        self.assertIn("version=20", workflow)
+        self.assertIn("compiler_packages=(clang-20)", workflow)
+        self.assertIn("compiler_packages+=(clang-19 mold", workflow)
+        self.assertIn('"${compiler_packages[@]}" cmake ninja-build', workflow)
+        self.assertIn("llvm-${{ steps.llvm.outputs.version }}-dev", workflow)
+        self.assertIn("clang-${{ steps.llvm.outputs.version }}", workflow)
+        self.assertIn("-DLLVM_DIR=${{ steps.llvm.outputs.root }}/lib/cmake/llvm", workflow)
+        self.assertIn("-DClang_DIR=${{ steps.llvm.outputs.root }}/lib/cmake/clang", workflow)
+
+
+    def test_release_candidate_installs_qualified_linker(self):
+        workflow = (ROOT / ".github/workflows/realworld.yml").read_text(
+            encoding="utf-8"
+        )
+        package_lines = [
+            line for line in workflow.splitlines() if "clang-19" in line
+        ]
+        self.assertEqual(len(package_lines), 1)
+        packages = package_lines[0].split("(", 1)[1].split(")", 1)[0].split()
+        required = {
+            "clang-19",
+            "clang-tools-19",
+            "mold",
+            "libasound2-dev",
+            "libdecor-0-dev",
+            "libgles2-mesa-dev",
+            "libglfw3-dev",
+            "libopenal-dev",
+            "libpulse-dev",
+            "libudev-dev",
+            "libwayland-dev",
+            "libx11-dev",
+            "libxcursor-dev",
+            "libxext-dev",
+            "libxfixes-dev",
+            "libxi-dev",
+            "libxkbcommon-dev",
+            "libxrandr-dev",
+            "libxss-dev",
+            "libxtst-dev",
+        }
+        self.assertTrue(required.issubset(packages))
 
 
 if __name__ == "__main__":

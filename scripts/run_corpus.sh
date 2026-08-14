@@ -21,13 +21,32 @@ WORK="${2:-corpus-work}"
 mkdir -p "$WORK"
 cd "$WORK"
 
-fetch() { # <dir> <url>
+fetch() {
     local dir="$1" url="$2"
-    if [ ! -d "$dir" ]; then
-        echo "[corpus] fetching $dir ..."
-        curl -sL --retry 3 "$url" -o "$dir.tgz"
-        mkdir "$dir"
-        tar xzf "$dir.tgz" -C "$dir" --strip-components=1
+    local archive="${dir}.tgz" staging="${dir}.extract"
+    if [[ ! -f "${dir}.ready" ]]; then
+        echo "[corpus] fetching $(basename "$dir")"
+        local attempt valid=false
+        for attempt in 1 2 3; do
+            rm -f "$archive"
+            if curl --fail --show-error --location --retry 3 --retry-all-errors \
+                    --retry-delay 2 --output "$archive" "$url" \
+                    && tar -tzf "$archive" >/dev/null 2>&1; then
+                valid=true
+                break
+            fi
+            sleep $((attempt * 2))
+        done
+        if [[ "$valid" != true ]]; then
+            echo "[corpus] download validation failed: $(basename "$dir")" >&2
+            return 1
+        fi
+        rm -rf "$staging"
+        mkdir -p "$staging"
+        tar -xzf "$archive" -C "$staging" --strip-components=1
+        rm -rf "$dir"
+        mv "$staging" "$dir"
+        touch "${dir}.ready"
     fi
 }
 
@@ -99,13 +118,21 @@ PYEOF
     # translation units that never compiled, and nobody had asked which
     # ones. Printed every run, so "N of what?" is answerable from the log
     # instead of requiring an investigation (the libarchive lesson).
-    local seen broke
+    local seen broke missing analysed
     seen=$(grep -oE 'Analysis starting\.\.\. \([0-9]+ files' "out-$dir.txt" \
            | grep -oE '[0-9]+' || true)
     broke=$(grep -oE '[0-9]+ translation unit\(s\) failed to COMPILE' \
             "out-$dir.txt" | grep -oE '^[0-9]+' || true)
+    missing=$(grep -cF 'Compile command not found.' "out-$dir.txt" || true)
+    analysed=$(( ${seen:-0} - ${broke:-0} - ${missing:-0} ))
+    if [ "$analysed" -lt 0 ]; then
+        echo "[$dir] FAIL: inconsistent coverage counts" \
+             "(enumerated=${seen:-0}, broken=${broke:-0}," \
+             "missing_compile_commands=${missing:-0})"
+        return 1
+    fi
     echo "CORPUS_COVERAGE $dir enumerated=${seen:-?} broken=${broke:-0}" \
-         "analysed=$(( ${seen:-0} - ${broke:-0} ))"
+         "missing_compile_commands=${missing:-0} analysed=$analysed"
 
     # Compare against the pinned expectation (if any). Tolerance 10%+2:
     # versions are pinned, a large deviation is a semantic regression.

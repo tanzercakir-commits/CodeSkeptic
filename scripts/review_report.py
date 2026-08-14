@@ -41,10 +41,14 @@ dropped.
 import argparse
 import fnmatch
 import json
+import ntpath
 import os
+import posixpath
 import re
+import shlex
 import sys
 from collections import Counter
+from pathlib import PurePosixPath
 
 # ---------------------------------------------------------------------------
 # Baseline-v2 key parity (see src/analyzer/Baseline.cpp)
@@ -439,56 +443,274 @@ def cmd_assemble(args):
 # remap-db
 # ---------------------------------------------------------------------------
 
+def _is_windows_path(path):
+    return (re.match(r"^[A-Za-z]:[/\\]", path) is not None or
+            path.startswith("\\\\") or path.startswith("//"))
+
+
 def _path_pattern_body(path):
-    """Return a regex body matching a path with either separator style."""
+    """Return a regex body with the path spelling's separator semantics."""
     path = path.rstrip("/\\")
     if not path:
         raise ValueError("path prefix must not be empty")
-    pieces = re.split(r"([/\\]+)", path)
+    separator = r"[/\\]+" if _is_windows_path(path) else r"/+"
+    split_pattern = r"([/\\]+)" if _is_windows_path(path) else r"(/+)"
+    pieces = re.split(split_pattern, path)
     return "".join(
-        r"[/\\]+" if re.fullmatch(r"[/\\]+", piece) else re.escape(piece)
+        separator if re.fullmatch(split_pattern, piece) else re.escape(piece)
         for piece in pieces
         if piece
     )
 
 
+_ATTACHED_PATH_OPTIONS = (
+    "-isysroot", "-iframework", "-idirafter", "-include", "-imacros",
+    "-isystem", "-iquote", "-MF", "-MJ", "-I", "/I", "-F", "-o",
+)
+_ASSIGNED_PATH_OPTIONS = (
+    "--sysroot=", "--gcc-toolchain=", "--serialize-diagnostics=",
+    "-resource-dir=", "-fmodule-map-file=", "-fmodules-cache-path=",
+    "-fprofile-instr-use=", "-fprofile-sample-use=",
+)
+
+
+def _path_option_pattern():
+    options = sorted(_ATTACHED_PATH_OPTIONS + _ASSIGNED_PATH_OPTIONS,
+                     key=len, reverse=True)
+    return "(?:" + "|".join(re.escape(value) for value in options) + ")?"
+
+
+def _path_regex_flags(path):
+    """Match host-independent path semantics, not the current test host."""
+    return re.IGNORECASE if _is_windows_path(path) else 0
+
+
 def _path_prefix_pattern(path):
-    return re.compile(
-        _path_pattern_body(path) + r"(?=[/\\\s\"\']|$)",
-        re.IGNORECASE,
+    # A repository path is a command/JSON token, never a suffix embedded in
+    # another path. Keep attached compiler options (-I/path, -isystem/path,
+    # /IC:\\path, etc.) working while refusing `/cache` + `/repo/path` false
+    # matches that would silently retarget an external dependency.
+    option = _path_option_pattern()
+    boundary = r"(?=[/\\\"']|$)" if _is_windows_path(path) \
+        else r"(?=[/\"']|$)"
+    return re.compile(r"\A(?P<prefix>[\"']?" + option + r"[\"']?)" +
+                      r"(?P<path>" +
+                      _path_pattern_body(path) +
+                      r")" + boundary, _path_regex_flags(path))
+
+
+def _replace_bounded_path(pattern, value, replacement):
+    """Replace the path capture while preserving an attached option."""
+    return pattern.sub(
+        lambda match: match.group(0)[:match.start("path") - match.start(0)] +
+        replacement,
+        value,
     )
 
 
-def _rewrite_compile_path(value, src_root, dst_root, protect=None):
-    """Rewrite source paths while preserving build-only dependencies."""
-    hidden = []
+def _map_command_tokens(value, transform, windows=False):
+    """Transform shell-like tokens without losing their original quoting."""
+    def decode_token(raw):
+        decoded = []
+        quote = None
+        index = 0
+        while index < len(raw):
+            char = raw[index]
+            if quote == "'":
+                if char == "'":
+                    quote = None
+                else:
+                    decoded.append(char)
+                index += 1
+                continue
+            if char in ("'", '"'):
+                if quote is None:
+                    quote = char
+                    index += 1
+                    continue
+                if quote == char:
+                    quote = None
+                    index += 1
+                    continue
+            if char == "\\" and index + 1 < len(raw):
+                following = raw[index + 1]
+                # Decode POSIX quoting where it is unambiguous for a path,
+                # while preserving Windows separators such as C:\\Projects.
+                if quote == '"':
+                    # Inside double quotes POSIX preserves backslash unless
+                    # it escapes one of the shell-special double-quote bytes.
+                    escapable = following in '\\"$`\n'
+                elif windows:
+                    escapable = following.isspace() or following in "\\\"'"
+                else:
+                    # POSIX quote-free backslash escapes the next byte.
+                    escapable = True
+                if escapable:
+                    decoded.append(following)
+                    index += 2
+                    continue
+            decoded.append(char)
+            index += 1
+        if quote is not None:
+            return None
+        return "".join(decoded)
 
-    def hide(match):
-        token = f"\x00CS_PROTECTED_{len(hidden)}\x00"
-        hidden.append((token, match.group(0)))
-        return token
+    def transform_raw(raw):
+        if not raw:
+            return raw
+        decoded = decode_token(raw)
+        if decoded is None:
+            return raw
+        rewritten = transform(decoded)
+        if rewritten == decoded:
+            return raw
+        return shlex.quote(rewritten)
 
-    if protect:
-        value = _path_prefix_pattern(protect).sub(hide, value)
+    pieces = []
+    start = 0
+    quote = None
+    escaped = False
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            continue
+        if quote is not None:
+            if char == quote:
+                quote = None
+            continue
+        if char in ("'", '"'):
+            quote = char
+            continue
+        if char.isspace():
+            pieces.append(transform_raw(value[start:index]))
+            pieces.append(char)
+            start = index + 1
+    pieces.append(transform_raw(value[start:]))
+    return "".join(pieces)
 
-    # A compile DB may reuse dependencies from an older sibling build. Those
-    # directories do not exist in a source-only base worktree and must retain
-    # their HEAD paths just like the explicitly selected BUILD_PATH.
-    build_root = re.compile(
-        _path_pattern_body(src_root)
-        + r"[/\\]+(?:build|cmake-build)(?:[-_.][^/\\\s\"\']*)?"
-        + r"(?=[/\\\s\"\']|$)",
-        re.IGNORECASE,
-    )
-    value = build_root.sub(hide, value)
-    value = _path_prefix_pattern(src_root).sub(lambda _m: dst_root, value)
-    for token, original in hidden:
-        value = value.replace(token, original)
-    return value
+
+def _rewrite_compile_paths(value, src_roots, dst_root, protect_roots=(),
+                           command=True):
+    """Rewrite equivalent source-root spellings, preserving build paths."""
+    src_roots = tuple(dict.fromkeys(
+        root.rstrip("/\\") for root in src_roots if root.rstrip("/\\")))
+    protect_roots = tuple(dict.fromkeys(
+        root.rstrip("/\\") for root in protect_roots
+        if root.rstrip("/\\") and all(
+            os.path.normcase(root.rstrip("/\\")) != os.path.normcase(source)
+            for source in src_roots)))
+    def rewrite_token(token_value):
+        hidden = []
+
+        def hide(match):
+            marker = f"\x00CS_PROTECTED_{len(hidden)}\x00"
+            hidden.append((marker, match.group("path")))
+            return marker
+
+        for protect in sorted(protect_roots, key=len, reverse=True):
+            pattern = _path_prefix_pattern(protect)
+            token_value = pattern.sub(
+                lambda match: match.group("prefix") + hide(match),
+                token_value)
+
+        # A compile DB may reuse dependencies from an older sibling build.
+        # Preserve those HEAD paths in the source-only base worktree.
+        for src_root in sorted(src_roots, key=len, reverse=True):
+            option = _path_option_pattern()
+            separator = r"[/\\]+" if _is_windows_path(src_root) else r"/+"
+            boundary = r"(?=[/\\\"']|$)" if _is_windows_path(src_root) \
+                else r"(?=[/\"']|$)"
+            build_root = re.compile(
+                r"\A(?P<prefix>[\"']?" + option + r"[\"']?)" +
+                r"(?P<path>" + _path_pattern_body(src_root)
+                + separator +
+                r"(?:build|cmake-build)(?:[-_.][^/\\\s\"\']*)?"
+                + r")" + boundary, _path_regex_flags(src_root))
+            token_value = build_root.sub(
+                lambda match: match.group("prefix") + hide(match),
+                token_value)
+        for src_root in sorted(src_roots, key=len, reverse=True):
+            token_value = _replace_bounded_path(
+                _path_prefix_pattern(src_root), token_value, dst_root)
+        for marker, original in hidden:
+            token_value = token_value.replace(marker, original)
+        return token_value
+
+    if command:
+        return _map_command_tokens(
+            value, rewrite_token,
+            windows=any(_is_windows_path(root) for root in src_roots))
+    return rewrite_token(value)
+
+
+def _rewrite_compile_path(value, src_root, dst_root, protect=None,
+                          command=True):
+    """Rewrite one source-root spelling while preserving build paths."""
+    protects = () if protect is None else (protect,)
+    return _rewrite_compile_paths(
+        value, (src_root,), dst_root, protects, command=command)
+
+
+def _rewrite_compile_renames(value, dst_root, renames, command=True):
+    """Map head-side renamed paths onto their old base-side paths."""
+    path_module = ntpath if _is_windows_path(dst_root) else posixpath
+    pairs = []
+    for old, new in renames:
+        old_path = path_module.join(dst_root, old)
+        new_path = path_module.join(dst_root, new)
+        pairs.append((new_path, old_path))
+    def rewrite_token(token_value):
+        for new_path, old_path in sorted(
+                pairs, key=lambda pair: len(pair[0]), reverse=True):
+            token_value = _replace_bounded_path(
+                _path_prefix_pattern(new_path), token_value, old_path)
+        return token_value
+
+    if command:
+        return _map_command_tokens(
+            value, rewrite_token, windows=_is_windows_path(dst_root))
+    return rewrite_token(value)
+
+
+def _rewrite_relative_renames(value, directory, dst_root, renames,
+                              command=True):
+    """Map directory-relative compile inputs by exact repository path."""
+    windows = _is_windows_path(dst_root) or _is_windows_path(directory)
+    path_module = ntpath if windows else posixpath
+
+    def norm(path):
+        normalized = path_module.normpath(path)
+        return normalized.casefold() if windows else normalized
+
+    pairs = tuple(
+        (norm(path_module.join(dst_root, new)),
+         path_module.normpath(path_module.join(dst_root, old)))
+        for old, new in renames)
+
+    def rewrite_token(token_value):
+        if not token_value or path_module.isabs(token_value):
+            return token_value
+        candidate = norm(path_module.join(directory, token_value))
+        for new_absolute, old_absolute in pairs:
+            if candidate == new_absolute:
+                return path_module.relpath(old_absolute, directory)
+        return token_value
+
+    if command:
+        return _map_command_tokens(value, rewrite_token, windows=windows)
+    return rewrite_token(value)
 
 
 def cmd_remap_db(args):
-    src_root = os.path.realpath(args.from_root).rstrip(os.sep)
+    source_spellings = tuple(dict.fromkeys(
+        candidate.rstrip(os.sep) for candidate in (
+            os.path.abspath(args.from_root),
+            os.path.realpath(args.from_root),
+        ) if candidate.rstrip(os.sep)))
+    src_root = source_spellings[0] if source_spellings else ""
     dst_root = os.path.realpath(args.to_root).rstrip(os.sep)
     if not src_root or src_root == os.sep:
         print("[review] refusing to remap from root '%s'" % src_root,
@@ -500,28 +722,75 @@ def cmd_remap_db(args):
     # them with a sentinel through the root rewrite. Head build outputs
     # applied to base sources is the same pragmatic assumption as
     # reusing head compile flags at all.
-    protect = None
+    protect_spellings = ()
     if args.protect:
-        protect = os.path.realpath(args.protect).rstrip(os.sep)
-        try:
-            common = os.path.commonpath((src_root, protect))
-        except ValueError:
-            common = ""
-        if os.path.normcase(common) != os.path.normcase(src_root):
-            protect = None  # outside the root: the rewrite can't touch it
+        candidates = tuple(dict.fromkeys(
+            candidate.rstrip(os.sep) for candidate in (
+                os.path.abspath(args.protect),
+                os.path.realpath(args.protect),
+            ) if candidate.rstrip(os.sep)))
+        accepted = []
+        for protect in candidates:
+            for source in source_spellings:
+                try:
+                    common = os.path.commonpath((source, protect))
+                except ValueError:
+                    continue
+                if (os.path.normcase(common) == os.path.normcase(source) and
+                        os.path.normcase(protect) != os.path.normcase(source)):
+                    accepted.append(protect)
+                    break
+        protect_spellings = tuple(dict.fromkeys(accepted))
 
-    def rw(s):
-        return _rewrite_compile_path(s, src_root, dst_root, protect)
+    renames = []
+    if args.renames:
+        with open(args.renames, "r", encoding="utf-8") as stream:
+            for line_number, raw in enumerate(stream, 1):
+                line = raw.rstrip("\n")
+                if not line:
+                    continue
+                fields = line.split("\t")
+                if len(fields) != 2:
+                    raise ValueError(
+                        f"malformed rename map at line {line_number}")
+                old, new = fields
+                for path in (old, new):
+                    if (not path or os.path.isabs(path) or
+                            ".." in PurePosixPath(path).parts):
+                        raise ValueError(
+                            f"unsafe rename path at line {line_number}")
+                renames.append((old, new))
+
+    def rw(s, command=False):
+        rewritten = _rewrite_compile_paths(
+            s, source_spellings, dst_root, protect_spellings, command=command)
+        return _rewrite_compile_renames(
+            rewritten, dst_root, renames, command=command)
 
     with open(args.src, "r", encoding="utf-8") as f:
         entries = json.load(f)
     for e in entries:
-        for field in ("directory", "file", "command", "output"):
-            if field in e and isinstance(e[field], str):
-                e[field] = rw(e[field])
+        if isinstance(e.get("directory"), str):
+            e["directory"] = rw(e["directory"])
+        directory = e.get("directory")
+        if not isinstance(directory, str) or not os.path.isabs(directory):
+            directory = dst_root
+        if isinstance(e.get("file"), str):
+            e["file"] = _rewrite_relative_renames(
+                rw(e["file"]), directory, dst_root, renames, command=False)
+        if isinstance(e.get("output"), str):
+            e["output"] = rw(e["output"])
+        if isinstance(e.get("command"), str):
+            e["command"] = _rewrite_relative_renames(
+                rw(e["command"], command=True), directory, dst_root,
+                renames, command=True)
         if isinstance(e.get("arguments"), list):
-            e["arguments"] = [rw(a) if isinstance(a, str) else a
-                              for a in e["arguments"]]
+            e["arguments"] = [
+                _rewrite_relative_renames(
+                    rw(value), directory, dst_root, renames, command=False)
+                if isinstance(value, str) else value
+                for value in e["arguments"]
+            ]
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(entries, f, indent=1)
@@ -540,6 +809,8 @@ def main():
     p_remap.add_argument("--to-root", required=True)
     p_remap.add_argument("--protect", help="path prefix to keep un-remapped "
                          "(the head build dir — absent from a worktree)")
+    p_remap.add_argument("--renames", help="tab-separated old/new paths from "
+                         "the Git rename map")
     p_remap.add_argument("--out", required=True)
 
     p_asm = sub.add_parser("assemble")

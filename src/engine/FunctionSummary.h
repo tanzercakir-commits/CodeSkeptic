@@ -242,6 +242,9 @@ public:
     static bool parseSummaryFile(
         const std::string& path,
         std::map<std::string, FunctionSummary>& out);
+    static bool parseSummaryText(
+        const std::string& text,
+        std::map<std::string, FunctionSummary>& out);
 
     void clear();
     void clearGlobal();

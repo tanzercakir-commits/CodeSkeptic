@@ -47,6 +47,43 @@ TEST(ConfigTest, RejectsInvalidEnumAndLineScope) {
     EXPECT_FALSE(parse(lines, {"codeskeptic", "--lines", "10-x", "x.cpp"}));
 }
 
+TEST(ConfigTest, RejectsEmptyFunctionScopeWithoutExpandingAnalysis) {
+    Config empty;
+    EXPECT_FALSE(parse(empty,
+                       {"codeskeptic", "--function", "", "x.cpp"}));
+    EXPECT_TRUE(empty.functions().empty());
+
+    Config delimiters;
+    EXPECT_FALSE(parse(delimiters,
+                       {"codeskeptic", "--function", ",, ,", "x.cpp"}));
+    EXPECT_TRUE(delimiters.functions().empty());
+
+    Config file;
+    const auto path = writeConfig("codeskeptic_empty_function.conf",
+                                  "function = , ,\n");
+    EXPECT_FALSE(file.loadFromFile(path));
+    EXPECT_TRUE(file.functions().empty());
+}
+
+TEST(ConfigTest, FunctionAndLineScopesAreAtomicAndRepeatable) {
+    Config functions;
+    ASSERT_TRUE(parse(functions,
+                      {"codeskeptic", "--function", "Parser::parse",
+                       "--function", "emit, Worker::run", "x.cpp"}));
+    EXPECT_EQ(functions.functions(),
+              std::set<std::string>({"Parser::parse", "Worker::run",
+                                     "emit"}));
+    const auto acceptedFunctions = functions.functions();
+    EXPECT_FALSE(functions.addFunctions(", ,"));
+    EXPECT_EQ(functions.functions(), acceptedFunctions);
+
+    Config lines;
+    ASSERT_TRUE(lines.addLines("7"));
+    EXPECT_FALSE(lines.addLines("10-20,bad"));
+    EXPECT_EQ(lines.lines(),
+              (std::vector<std::pair<unsigned, unsigned>>{{7, 7}}));
+}
+
 TEST(ConfigTest, ConfigTrimsWhitespaceAndRejectsUnknownKeys) {
     Config valid;
     const auto validPath = writeConfig(
@@ -61,6 +98,53 @@ TEST(ConfigTest, ConfigTrimsWhitespaceAndRejectsUnknownKeys) {
     const auto invalidPath = writeConfig(
         "codeskeptic_invalid.conf", "min_severtiy=error\n");
     EXPECT_FALSE(invalid.loadFromFile(invalidPath));
+}
+
+TEST(ConfigTest, InvalidConfigTextPreservesEntirePriorState) {
+    Config config;
+    config.setSourcePath("before.cpp");
+    ASSERT_TRUE(config.addFunctions("before"));
+    ASSERT_TRUE(config.addLines("7"));
+    const Config before = config;
+
+    EXPECT_FALSE(config.loadFromText(
+        "source_path = after.cpp\n"
+        "function = after\n"
+        "unknown_key = rejected\n",
+        "atomic-test"));
+
+    EXPECT_EQ(config, before);
+
+    std::string embeddedNul = "source_path = accepted.cpp";
+    embeddedNul.push_back('\0');
+    embeddedNul += "ignored.cpp\n";
+    EXPECT_FALSE(config.loadFromText(embeddedNul, "nul-test"));
+    EXPECT_EQ(config, before);
+}
+
+TEST(ConfigTest, MissingConfigIsOptionalButNonRegularEntriesFailClosed) {
+    const auto root = std::filesystem::path(::testing::TempDir()) /
+                      "codeskeptic_config_entry_kind";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    std::filesystem::create_directories(root);
+    const auto configPath = root / ".codeskeptic.conf";
+
+    Config missing;
+    EXPECT_TRUE(missing.loadFromFile(configPath.string()));
+
+    std::filesystem::create_directory(configPath);
+    Config directory;
+    EXPECT_FALSE(directory.loadFromFile(configPath.string()));
+
+    std::filesystem::remove_all(configPath, ec);
+#ifndef _WIN32
+    std::filesystem::create_symlink(root / "missing-target", configPath, ec);
+    ASSERT_FALSE(ec) << ec.message();
+    Config dangling;
+    EXPECT_FALSE(dangling.loadFromFile(configPath.string()));
+#endif
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST(ConfigTest, AllocatorPairsParseAtomicallyFromCliAndConfig) {

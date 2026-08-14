@@ -1,5 +1,387 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-14 — Phase 10.3 sanitizer matrix locally complete
+
+- Closed the three failures exposed by PR #142 CI. ASAN now disables only
+  explicit user poisoning, which avoids the instrumented-header/uninstrumented
+  system-Clang DSO mismatch while leak detection, heap redzones, and the
+  crashing runtime tripwire remain active. Explicit partial-coverage requests
+  now accept translation units omitted from the compile database without
+  weakening the default fail-closed verdict. Corpus coverage now reports those
+  omissions instead of counting them as analyzed: cJSON recorded 76 enumerated,
+  53 missing compile commands, and 23 analyzed units; tinyxml2 recorded 3, 1,
+  and 2 respectively. A request that analyzes zero units remains a hard
+  failure with exit `2`, including when both partial-coverage and broken-TU
+  opt-ins are set. Windows pins PLAN and shell files to LF and selects Git Bash
+  instead of the WSL launcher for the offline docs guard.
+- Bounded sanitizer build parallelism at two jobs after a four-job local run
+  caused system-wide resource pressure on a 16 GiB workstation. The final
+  runs used Ubuntu Clang 20.1.2 and bound 352 source files with manifest
+  `4a6c33fd9e90ef6b83f0a44fcb12a15801ed3c819f979f851e90c9b6ab15e2ec`.
+- Retained accepted Linux x86_64 ASAN and UBSAN trees under
+  `docs/evidence/phase10/sanitizers/2026-08-14-linux-x86_64`. Each profile
+  passed all ten runtime gates, `1202/1202` CTest entries, `1187/1187` direct
+  C++ tests, all representative analyzer/MCP checks, and all four fuzz smoke
+  targets. ASAN completed in `69590` ms with receipt SHA-256
+  `ecc5623862ab2b91894091767fdb8ebc2ddb0ece41680cf064ced6e859930698`;
+  UBSAN completed in `67912` ms with receipt SHA-256
+  `7d7fa7a6f453ff5d24a4346dac4b358f1b1f7b1cc8871a3dc16eba812a9ae3f8`.
+- The external manifest pins every retained receipt and log; its SHA-256 is
+  `852346f0978070818604bbe3a8f91938548aecc8ce0542bc2e0a664c032ef6b0`.
+  Both receipts pass independent verifier mode, all manifest entries pass
+  `sha256sum -c`, and the sanitizer contract is `13/13` with no skips. The
+  focused serial-worker gate records TSAN as not applicable with one joined
+  worker and `max_active=1`.
+- `CS-P10-03` now meets its local acceptance gates on
+  `phase-robustness-input-validation`. Generated `docs/TODO.md` and
+  `docs/PROGRESS.md` remain unchanged and the task remains open in
+  protected-main authority until an authorized merge records the closing
+  transition; this work does not write to or merge `main`.
+
+## 2026-08-13 — Phase 10.3 sanitizer matrix checkpoint (in progress)
+
+- Added one CMake sanitizer profile boundary shared by the production core,
+  CLI, unit tests, and four parser fuzz targets. AddressSanitizer and
+  UndefinedBehaviorSanitizer carry compile and link instrumentation; UBSAN is
+  non-recovering. Dedicated runtime tripwires prove that the selected runtime
+  is active instead of treating compiler flags as sufficient evidence.
+- Added a bounded matrix runner for complete CTest and direct single-process
+  suites, focused serial-worker evidence, clean/finding/invalid/whole-program
+  analyzer verdicts, two ordered MCP requests, and the four-target fuzz smoke
+  campaign. The serial worker proves `max_active=1`, one joined worker thread,
+  so TSAN is recorded as not applicable while production analysis remains
+  sequential.
+- Hardened the evidence boundary before retention: receipt output may not
+  overlap either build tree; current product, test, script, workflow, PLAN,
+  generated lifecycle, fuzz, and documentation inputs are source-bound while
+  bytecode and the receipt's own hash-cycle outputs are excluded. Host
+  sanitizer options are removed before each run; ASAN explicitly enables leak
+  detection and pins LSan's failure exit, while UBSAN uses its exact retained
+  environment.
+- Pre-retention probes completed both ASAN and UBSAN matrices with `1200/1200`
+  CTest entries, `1185/1185` direct C++ tests, active runtime tripwires, all
+  analyzer/MCP gates, and four parser fuzz targets. Those temporary receipts
+  predate the final manifest/environment hardening and are deliberately not
+  promotion evidence.
+- Checkpoint verification is `11/11` review-path tests and `26/26` combined
+  fuzz/sanitizer contract tests; four sanitizer contract cases are expectedly
+  skipped until retained receipts exist. The docs lifecycle guard, Python and
+  shell syntax checks, and `git diff --check` are clean. The independent
+  read-only reviewer found no remaining source-level blocker.
+- Remaining before `CS-P10-03` local completion: rerun both complete matrices
+  against the final source bytes, retain and externally checksum the two
+  receipts and logs, make all receipt contract cases execute without skips,
+  then run final regression/CI gates. This checkpoint carries no protected-main
+  task-closing trailer and does not consume generated TODO work.
+
+## 2026-08-13 — Phase 10.2 structured parser fuzzing
+
+- Corrected the fixed PLAN boundary to the four input parsers that actually
+  exist: project configuration, Clang's compilation database, CodeSkeptic's
+  strict versioned text summary/model, and MCP JSON-RPC. SARIF remains an
+  output reporter rather than an invented input format, and no analyzer-rule
+  semantics were added.
+- Added exact in-memory production parser entry points and four dedicated
+  libFuzzer targets. Config parsing now commits the complete object only after
+  a valid file; summary/model parsing commits a complete map only after a
+  valid strict record set; MCP validation never starts analysis or filesystem
+  discovery; compilation-database validation continues to use Clang's own
+  parser rather than a second JSON grammar.
+- Made existing-but-unusable config and compilation-database inputs fail
+  closed, including malformed data, dangling links, and non-regular entries;
+  a genuinely absent optional config or compile database retains its prior
+  optional/fallback behavior. An invalid requested compilation database makes
+  the verdict unavailable with exit `2` before analysis starts.
+- Tightened the summary/model schema so `qualified-name/arity` is canonical,
+  arity agrees with every parameter vector, and null-condition,
+  zero-passthrough, null-passthrough, and return-alias indices are canonical,
+  representable, and within arity. Tightened MCP envelopes to require
+  `jsonrpc: "2.0"`, a string method, and a valid JSON-RPC id kind.
+- Added a dedicated Clang/libFuzzer CMake mode, macOS/Homebrew include-order
+  repair, nine checksummed seeds, fixed target/seed/budget mapping, 64 KiB
+  input cap, five-second per-input timeout, 2 GiB RSS ceiling, per-target wall
+  timeout, mutable temporary corpora, and a separate CI smoke job that retains
+  its receipt.
+- The documented extended campaign ran all four targets for exactly `10,000`
+  inputs each with seeds `1001..1004`: all exits were `0`, no timeout or crash
+  artifact occurred, and receipt verification re-bound each current binary,
+  exact terminal run evidence, logs, corpus, campaign, toolchain, source bytes,
+  and budgets. The canonical receipt SHA-256 is
+  `e2c556426b2d076c8f1b113597e5721bc6b11844d7191d1008389654847ae3b7`;
+  the external evidence manifest pins it and all four logs.
+- RED evidence included malformed compilation-database fallback to a false
+  clean exit, partial config mutation, invalid summary arity/index acceptance,
+  invalid MCP envelopes, non-regular input paths, mutable/escaping campaign
+  paths, unbounded budget drift, and coordinated receipt/log rewrites. The
+  strict compile-database gate also exposed fail-open assumptions in the
+  diff-review fixture: base worktree path aliases, absolute and relative Git
+  renames, and a newly added TU without an explicit compile command. The
+  remapper now preserves POSIX/Windows path, case, quote, escape, build-path,
+  and directory-relative semantics, while the fixture explicitly lists every
+  analyzed TU.
+- GREEN is `17/17` focused production tests, `13/13` fuzz-contract tests,
+  `47/47` offline lifecycle/path tests, the verified `4 x 10,000` campaign,
+  `1184/1184` direct single-process C++ tests, and the final `1198/1198`
+  complete CTest package. Receipt verification, the docs lifecycle guard,
+  Python/shell syntax checks, and `git diff --check` are also clean. A
+  separate salt-read-only review found no remaining blocker in this slice.
+- This is local implementation evidence for `CS-P10-02`, not protected-main
+  completion authority. `docs/TODO.md` therefore remains generator-owned and
+  keeps the task open until an authorized protected-main completion trailer is
+  observed.
+
+## 2026-08-13 — PLAN-driven automatic TODO and PROGRESS lifecycle
+
+- Corrected the previous partial automation: `docs/PLAN.md` now contains the
+  fixed 26-item catalog: the protected-main-unclosed Phase 8.3, 8.4, and 9
+  obligations plus the Phase 10–12 program. `docs/TODO.md` is rendered entirely
+  from its still-open items and `docs/PROGRESS.md` remains a generated,
+  append-only protected-main ledger. Neither generated file is hand-edited.
+- Made only exact `Closes-CodeSkeptic-Task: CS-Pxx-yy` entries parsed from the
+  real final Git trailer block on first-parent protected-main commits completion
+  authority. A lookalike line in message prose, phase-branch trailer, local
+  test output, changelog prose, or AI statement cannot remove work from TODO.
+  Unknown, malformed, duplicate, dependency-invalid, or repeatedly closed task
+  identities fail closed.
+- Made status synchronization reject direct `main` use and made the PLAN
+  catalog immutable once protected main contains the migration. Before that
+  merge, the exact 26 IDs and catalog SHA-256 are pinned to protected-main
+  `7dfd375`; deleting PROGRESS cannot invoke normal bootstrap, and CI rejects
+  non-`phase-*` PR heads instead of skipping the generated-state gate.
+- Preserved the existing legacy PROGRESS prefix byte-for-byte and activated a
+  closure-only v2 ledger. Ordinary reconciliation commits are omitted, so one
+  trailer-free reconciliation after the final task closure can produce an
+  empty TODO and current ledger without an infinite self-recording chain.
+- RED was five focused failures proving prose could spoof a closure, deleted
+  history could bootstrap shorter, a non-phase PR bypassed the guard, Phase
+  8/9 obligations disappeared, and final reconciliation was non-terminating.
+  GREEN is `36/36` status/path tests, including byte-pinned migration, raw-byte
+  protected-main/legacy ledger and PLAN equality, host-config- and Unicode-
+  separator-independent raw trailer parsing, old-ref mature-bootstrap
+  rejection, pair-write
+  interruption and deterministic recovery, final reconciliation, manual drift,
+  malformed history, cross-commit duplicate closure, first-parent-only
+  authority plus reverse-parent anchor rejection, dependencies, and branch
+  authority.
+- Removed the obsolete duplicate Phase 9 qualification summaries from TODO's
+  evidence validator. The authoritative retained manifest, three checksummed
+  receipts per project, frozen candidate snapshot, and unique changelog
+  summary remain cross-checked; all `21/21` candidate-evidence tests and the
+  complete docs lifecycle guard pass.
+- Final local verification is `57/57` combined status/path and candidate-
+  evidence Python tests, `36/36` focused Config/MCP/docs CTest entries,
+  `1170/1170` direct single-process C++ tests, and `1183/1183` complete CTest
+  entries in `163.39 s`. The real phase branch passes the docs gate; a
+  simulated `feature-docs-bypass` head fails it with exit `1`; Python syntax
+  and `git diff --check` are clean.
+- The first real sync on `phase-robustness-input-validation` generated all 26
+  open tasks, froze the legacy ledger at its `7dfd375` v2 anchor, and appended
+  zero task receipts because protected main remains at that commit. Therefore
+  the locally GREEN `CS-P10-01` implementation correctly
+  remains open until a later authorized merge commit carries its exact trailer.
+
+## 2026-08-13 — Phase 10.1 targeted scopes fail closed
+
+- Rejected empty and delimiter-only function scopes consistently across the
+  CLI, project config, and MCP input surfaces. A malformed targeted request can
+  no longer collapse into the empty-filter meaning of “analyze all functions.”
+- Made function- and line-scope updates atomic: a rejected value leaves the
+  previously accepted scope unchanged, while valid repeated plain and
+  qualified function names remain cumulative.
+- Recorded RED first across Config and MCP tests plus an independent binary
+  replay. GREEN is three focused tests, `34/34` Config/MCP tests,
+  `1170/1170` direct single-process C++ tests, and `1183/1183` CTest entries
+  including Python and end-to-end workflow contracts. The invalid CLI replay
+  exits `2` before analysis starts; independent review found no blocking issue.
+- This completes the local implementation evidence for `CS-P10-01` only; it
+  does not authoritatively close the task before protected main contains its
+  exact completion trailer. Fuzzing, resource budgets, the 72-hour
+  stability/performance gate, and Phases 11–12 remain open.
+
+## 2026-08-13 — Upstream candidates moved to end-of-program batch review
+
+- Replaced per-candidate owner prompts with uninterrupted internal collection.
+  Every candidate dossier retains the trigger path, CWE, current-head proof,
+  duplicate search, severity, and proposed issue text.
+- Prohibited upstream issues, PRs, comments, forks, and maintainer contact
+  during the active product program. The complete candidate set is presented
+  once at program completion; only owner-selected targets may proceed after
+  target-specific approval.
+- Preserved issue-first reporting, separate approval for direct PRs, showcase
+  eligibility after maintainer confirmation or acceptance, and explicit owner
+  approval before the complete program's final `main` merge.
+
+## 2026-08-13 — Owner-controlled upstream reporting restored
+
+- Corrected the over-broad execution-authority wording: continuous authority
+  remains for CodeSkeptic push, PR, intermediate merge, and release/tag work,
+  but no longer claims to cover any upstream action.
+- Made target-specific owner approval mandatory before upstream issues, PRs,
+  comments, forks, or maintainer contact. The default reporting route is now
+  issue-first; a direct PR requires separate approval. Maintainer-confirmed or
+  accepted issues may enter the public showcase, while the accepted-fix ledger
+  still counts only merged fixes.
+- Required owner notice and explicit go-ahead before the final `main` merge
+  after the complete product program.
+- Closed rtp2httpd PR #709 and libgit2 PR #7345 unmerged at the owner's request.
+  The former remains internal candidate evidence; the latter is also retained
+  as unproven because its description and changed path did not match and the
+  reported state correlation was not demonstrated as triggerable. Neither PR
+  changes the Phase 9 ledger (`3/10` fixes across `2/5` projects).
+
+## 2026-08-13 — Phase 9 documentation structure recovery
+
+- Moved all eleven canonical current-head qualification summaries into the
+  Phase 9 evidence slice instead of leaving them after the file-discipline
+  footer or inside the recovered-program roadmap.
+- Restored the uninterrupted Phase 9 roadmap item, removed duplicate scratch
+  notes, and consolidated the two pending upstream submissions under the
+  measured `3/10` fixes across `2/5` projects state.
+- This recovery changes no retained receipt, manifest, candidate identity,
+  analyzer result, accepted-fix ledger entry, product code, or quality floor.
+
+## 2026-08-13 — Phase 9 distinct candidate coverage
+
+- Phase 9 current-head qualification: lvgl qualified with 3/3 accepted repetitions at 470/470 translation units, with 0 broken units, 0 incomplete functions, and 13 stable findings. The live-head manifest, Kconfig profile, LLVM19 recipe, and three fresh raw receipts are retained and cross-checked automatically. This does not change the accepted upstream ledger.
+- Phase 9 current-head qualification: llama-cpp qualified with 3/3 accepted repetitions at 201/201 translation units, with 0 broken units, 0 incomplete functions, and 41 stable findings. The live-head manifest, LLVM19 recipe, and three fresh raw receipts are retained and cross-checked automatically. This does not change the accepted upstream ledger.
+- Preserved separate attempted and analyzed translation-unit counts across retained snapshots, manifests, receipts, and canonical document summaries; recipes that expand whole-program analysis are no longer forced into a false equal-count model.
+- Added exact numeric-boundary checks so the canonical TODO and changelog summaries reject prefixed, suffixed, or otherwise drifted coverage counts.
+- Phase 9 current-head qualification: shadPS4 qualified with 3/3 accepted repetitions at 385/385 translation units, with 0 broken units, 0 incomplete functions, and 65 stable findings. The retained manifest, three raw receipts, checksums, analyzer identity, source identity, and semantic summary are now enforced together. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+- Phase 9 current-head qualification: libarchive qualified with 3/3 accepted repetitions at 132/132 translation units, with 0 broken units, 0 incomplete functions, and 36 stable findings. The retained manifest and three fresh raw receipts are bound to the live default-branch head and the current LLVM19 analyzer. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+- Phase 9 current-head qualification: rtp2httpd qualified with 3/3 accepted repetitions at 38/38 translation units, with 0 broken units, 0 incomplete functions, and 24 stable findings. The retained manifest and three fresh raw receipts bind the unchanged live head to the current LLVM19 analyzer. This does not change the accepted upstream ledger of 3 fixes across 2 projects.
+
+## 2026-08-12 — Phase 9 first current-head execution
+
+- Fixed two shared-runner defects exposed by a project recipe without Ninja target closure: the optional command output is initialized as text, and target filtering runs only when target evidence exists.
+- Added structural regression coverage for both the default and target-restricted paths; existing release-candidate behavior remains pinned.
+- Ran current rtp2httpd head `e49df993ca2629bb116a29a87ce2afff24d97ef7` locally with an isolated Fedora LLVM 19 runtime: accepted `38/38`, broken 0, incomplete 0, findings 24.
+- Compared against the accepted Phase 8 receipt: all 19 unique fingerprints are unchanged, with zero additions and zero removals. The result remains discovery evidence until individual candidates pass Gates A, B, and C.
+
+## 2026-08-12 — Phase 9 frozen current-head candidate batch
+
+- Counted 260 findings across seven projects from accepted, checksummed Phase 8 receipts and froze the first low-drift current-head batch for rtp2httpd, llama.cpp, and libgit2.
+- Added a deterministic materializer that reuses qualified recipes while replacing only immutable project revisions; repository drift, unknown or duplicate projects, malformed dates, and malformed commit identities fail closed.
+- Preserved the three-repeat campaign invariant and produced a planner-accepted nine-shard matrix. The batch is discovery-only and cannot bypass Gates A, B, or C.
+- Passed 4 candidate-manifest tests, 10 ledger tests, Python syntax, JSON/YAML parsing, and diff checks.
+
+## 2026-08-12 — Phase 9 append-only validation ledger
+
+- Added a schema-checked Phase 9 ledger with the three reverified accepted records and the fixed `10` fixes / `5` projects target.
+- Added a fail-closed validator for all accepted Gate A/B/C evidence, merged identities, current default-branch ancestry records, unique IDs, and durable non-accepted classifications.
+- Added an optional previous-ledger comparison that permits only an unchanged prefix plus appended records; mutation, deletion, and reordering are rejected. A dedicated PR job compares the proposed ledger with the target tree.
+- Passed 10 focused tests, Python syntax, JSON parsing, document automation, and diff checks. Gate C supports general report/fix references without assuming one hosting platform, and recorded dates have checked ISO forms. The measured completion gate correctly remains incomplete at `3/10` and `2/5`.
+
+## 2026-08-12 — Phase 9 upstream validation boundary
+
+- Locked Phase 9 to PLAN section 6 Gates A, B, and C on current default-branch heads, with a hard completion target of ten accepted fixes across five independent projects.
+- Reverified three existing accepted fixes across two projects: shadPS4 PRs `#4702` and `#4703` remain in current `main`, and TensorFlow PR `#123994` remains in current `master`.
+- Established the measured RED baseline at `3/10` fixes and `2/5` projects; rejected, duplicate, stale, non-triggerable, and false-positive candidates remain durable non-counting evidence.
+- Restricted the first implementation slice to a schema-checked append-only ledger and fail-closed validator before any new candidate is reported.
+
+## 2026-08-12 — Phase 8.4 release-candidate factory qualified
+
+- Hosted run `31536531313` at `21278b2e561c76aabc0fbca6c72c911eb341c62a` accepted all nine checksummed receipts and the aggregate receipt after a failed-only rerun recovered one pre-project checkout interruption.
+- All three repetitions are identical per project: llama.cpp `200/200` with 40 findings, ShadPS4 `382/382` with 66 findings, and TensorFlow Lite `241` requested / `245` analyzed with 73 findings.
+- All nine receipts use one analyzer identity; broken TUs, incomplete functions, and failure entries total zero. The aggregate is accepted and its checksum verifies.
+- The accepted aggregate is uniquely pinned to artifact ID `9123466154`, artifact digest `sha256:4fe8b5450c497aff60a33f815f4ec4d4d8c3f34bb1b0994a1e98e2683520295c`, and receipt SHA-256 `684b868c9ec86da57b279c3bc5db81482ec8578990649e7aefef5767f84dfbf5`; same-name artifact ID `9121649494` is unavailable evidence.
+- Phase 8.4 is qualified; partial receipts from attempts 1–8 remain classified as unavailable evidence.
+
+## 2026-08-11 — Phase 8.4 hosted dual-toolchain correction
+
+- Run `31525147338` showed that replacing the shard compiler with `clang-19` broke the immutable candidate recipes, which explicitly configure their source builds with `clang-20`.
+- Phase 8.4 hosted factory attempt 3 (`31525916462`, head `6f0453b741aee8a6f09489915cb6476b48a6c7ee`) confirmed both compiler packages were available and exposed a deterministic target-selection mismatch: TensorFlow Lite repeated 269 units rather than the qualified 241. The 28 additions were exclusively non-target tools, profiling, Python, and example units. Cancelled the unwinnable run, moved the proven Phase 8.3 Ninja target-closure filter into the shared campaign runner, and verified against the downloaded artifact that it restores the exact 241/241 relative identity set. Hosted rerun remains pending.
+- Phase 8.4 hosted factory attempt 4 (`31528519780`, head `4bc34a99338d9df0ba7ad045315d6eb0ce2b7cd3`) reached the new target-closure integration. All Llama commands exited 0, after which each repetition exposed the same `file_list` versus `files` wiring error. Cancelled the run, corrected the binding to transform the existing `files` and `relative_files` pair, and passed syntax, 23 focused tests, structural binding verification, and diff checks before the next rerun.
+- Phase 8.4 hosted factory attempt 5 (`31529684488`, head `43d40d136731d753f9da7625940d08d154d638e2`) proved the target-closure binding with three identical accepted Llama receipts: 200/200, broken 0, incomplete 0, findings 40. Shad configure failed identically in all three repetitions because `mold`, present in the qualified Phase 8.3 image, was absent from the factory image. Restored `mold` only in the release-candidate package step and added a regression assertion; TensorFlow repetitions from the attempt continue in parallel.
+- Phase 8.4 hosted factory attempt 6 (`31531567925`, head `b1b8d83e9cd7d66a5f83f81388aa54f9f8bc603a`) exposed a package-array wiring error: every shard tried to execute `mold` before the install command because the token sat outside the Bash array expression. Moved it inside the release-only package array and strengthened both the tier-selection and linker regression assertions; all 17 factory tests pass.
+- Phase 8.4 hosted factory attempt 7 (`31532850193`, head `4fb651d38c83713492abe7d21b7c52975c48a751`) confirmed the corrected package array and accepted all three Llama receipts. Shad moved beyond the linker probe, then exposed the remaining environment delta: the qualified X11, Wayland, audio, input, and OpenGL development packages were absent. Copied the complete Phase 8.3 Shad package set into the release-only array, changed the regression to verify the full required subset, passed 17 factory tests, and cancelled the unwinnable run.
+- Phase 8.4 hosted factory attempt 8 (`31534556897`, head `703dfa16fff0ffc7d5549e0a3170b0d5c9d6cfff`) accepted all Llama repeats and moved Shad through configure into compilation. The build then failed with exit 127 at CMake's missing `clang-scan-deps` launcher. Restored the exact Phase 8.3 `clang-tools-19` package, pinned it in the release-only dependency subset, passed 17 factory tests, and cancelled the unwinnable run.
+- Cancelled the invalid run after TensorFlow Lite configure receipts proved the missing executable; no partial result was admitted.
+- Release-candidate shards now install both `clang-20` for candidate builds and `clang-19` for analyzer resources; nightly and weekend shards remain unchanged.
+- Updated the workflow contract to pin the two-package release behavior.
+
+## 2026-08-11 — Phase 8.4 hosted shard toolchain correction
+
+- Run `31523815926` proved the plan and shared LLVM 19 analyzer stages, then produced unavailable llama.cpp receipts with `199` broken TUs because shard images lacked the matching Clang resource headers.
+- Cancelled the invalid run; its partial artifacts remain classified as unavailable and are not promotion evidence.
+- Added tier-aware shard packages: release-candidate jobs install `clang-19`, while nightly and weekend jobs retain `clang-20` and their existing expectations.
+- Extended the workflow contract test to pin both analyzer-build and shard-runtime toolchain selection.
+
+## 2026-08-11 — Phase 8.4 factory promotion implementation and local qualification
+
+- Promoted the three exact Phase 8.3 recipes into an 11-project manifest and added a manual 72-hour release-candidate campaign with three repetitions per project.
+- Extended factory checkout identity with pinned recursive submodule count and checksum evidence; ShadPS4 requires the qualified 53-entry identity before build.
+- Extended the shared-analyzer workflow to select LLVM 19 for the release-candidate tier, retain LLVM 20 for existing tiers, and preserve aggregate equality across all three receipts.
+- Verified RED `2` to GREEN `0` with a nine-shard plan, both campaign contract suites, an LLVM 19 Release build at `100/100`, and full CTest at `1177/1177`; the later accepted hosted aggregation is recorded above.
+
+## 2026-08-11 — Phase 8.4 release-candidate factory boundary
+
+- Locked promotion to the three exact Phase 8.3 candidate recipes and their immutable coverage and fingerprint expectations.
+- Required a manual 72-hour campaign with three repetitions per project, one shared analyzer artifact, and aggregate equality across all receipts.
+- Required ShadPS4's recursive 53-entry submodule identity to match its qualified checksum before the build begins.
+- Recorded the pre-implementation RED: boundary head `0759dca` rejects the absent release-candidate tier with exit `2`; GREEN requires a nine-shard plan and hosted aggregation.
+
+## 2026-08-11 — Phase 8.3 exact qualification closed
+
+- Rebased the release-candidate factory onto the fixed-width summary guard and aligned the shared analyzer build with LLVM 19.
+- Closed hosted run `31515185143` at head `ecec77a8b02bb2ffdbf62d4deff936bbcaf65ff6` using one immutable analyzer artifact across all candidates.
+- Qualified llama.cpp at `200/200` executions with 40 findings, TensorFlow Lite at `241` requested and `245` admitted executions with 73 findings, and ShadPS4 at `382/382` with 66 findings.
+- Every receipt reports zero broken translation units, zero incomplete functions, and a findings-only semantic exit.
+
+## 2026-08-11 — Fixed-width summary guard
+
+- Limited zero-passthrough width reasoning to fixed builtin integer types.
+- Kept dependent, enum, incomplete, and other uncertain-width types conservative.
+- Added a regression case from the real template pattern that exposed the invalid width query.
+- Verified the focused regression and full local suites with LLVM 20 and LLVM 19; the exact Shad candidate completed 382/382 translation units with LLVM 19.
+
+## 2026-08-11 — Phase 8.3 production-target qualification correction
+
+Rebased the observational release-candidate lane onto protected-main commit
+`7dfd37596414c9512316093ff4fb6b039673f55f`, which contains the GCC14
+immutable-flag correction from PR #139. The qualification contract now requires
+translation units to belong both to the real compile database and to the named
+Ninja production target's command closure. RED-first tests exclude
+configured-only sources, dependency sources, malformed closures, and paths
+outside the pinned source tree.
+
+This corrects the TensorFlow Lite surface without accepting expectations. Its
+505-step hosted build configured 269 unique project source paths, but ten were
+not members of the production library target and required generated or Python
+binding headers absent from that build. The exact `tensorflow-lite` target is
+241 unique translation units with digest
+`2dd69e73c882f6a3ea17a63349500db7d350eb1d3aaa5a8a47f06a716f5fed5f`.
+A full local observation completed with coverage fields 241 attempted, 245
+analyzed, zero broken, and zero incomplete functions, plus 73 supported
+blocking findings and normal exit 1. Its fingerprint digest is
+`6cf30f16db0a5eb2537e6178a30087a0385b7dfdb1ff5f61d9bb2815a765a81a`
+and report SHA-256 is
+`717f15b1dab63648e5864c85db0994bdf1d1648a7bf6631cf11563babbf152fb`.
+
+The first shadPS4 hosted build showed that Clang 20 with GCC 14's default
+libstdc++ is not a valid recipe for the pinned sources. A narrow disposable
+Ubuntu probe established only that libc++ 20 exposes the required C++23
+`std::jthread` and `std::stop_token` surface (`_LIBCPP_VERSION=200100`). The
+complete libc++ rerun reached step 2,181 of 2,452 and then disproved that recipe
+because the packaged library does not expose `std::chrono::current_zone()`.
+The immutable upstream production workflow is the stronger recipe authority:
+Ubuntu 24.04, Clang 19 with the default libstdc++, and mold. RED-first contract
+assertions now pin those shadPS4 compiler and linker choices, preserve its
+upstream-enabled Discord/updater surface, and enable Release IPO; llama.cpp
+and TensorFlow Lite remain on Clang 20. The first production-shaped rerun
+configured successfully and reached step 433 of 2,554, where CMake's C++23
+dependency scan invoked the absent `clang-scan-deps-19` binary and stopped with
+exit 127. The matching `clang-tools-19` package is now pinned instead of
+disabling IPO or narrowing the production surface. The corrected hosted run
+then completed all 2,554 build steps and exposed an observer-only parsing
+defect: CMake's Clang dependency-scanner form places its source path before
+`-c`. A RED-first regression preserves that real command shape. Target closure
+selection now matches command tokens position-independently against the
+already validated compile-database surface, while ambiguous matches and an
+empty intersection still fail closed. The three-candidate hosted rerun remains
+the referee; no canonical expectation, production factory membership, or
+accepted contract intent changed. No C++ production function changed, so the
+contract-first shadow counts are all zero.
+
 ## 2026-08-11 — GCC14 immutable-flag evaluator hardening and local qualification
 
 Phase 8.3 hosted qualification completed the pinned TensorFlow Lite surface's
@@ -101,7 +483,8 @@ used the same hosted analyzer, accepted all twelve original shards without
 finding/fingerprint drift, and produced aggregate receipt SHA-256
 `2954b90c3fba14d6d76bab985949428bc6cd091a466cf321970ddbf160a478ce`.
 All ordinary PR checks are green and PR #137 has no review threads. Protected-
-main merge remains pending.
+main delivery later completed at squash commit
+`488377ad06f6d516faf57e902703208a2c0ddbcc`.
 
 No C++ function changed, so contract-first shadow dogfood is not applicable:
 functions considered 0, proposals 0, eligible 0, rejected 0, unsupported 0.
@@ -224,7 +607,8 @@ campaign-wide analyzer SHA-256 is
 `146e6761107acfaf7fd6a1057a420e7abadcdb2de77bc66b09d3e3af5933e4f3` and
 the checksummed aggregate receipt SHA-256 is
 `08f8fe075e2dba92c8706c9028026d46cbb6b5148913d113146c1b64ffd559f6`.
-Protected-main merge remains pending.
+Protected-main delivery later completed through PR #136 at squash commit
+`3b1714e1e9e3997ab63507837c3a177c1bdefab1`.
 
 Local release gates are green: the deterministic factory suite passes 12/12,
 the full NMake/CTest suite passes 1166/1166, the direct C++ suite passes
@@ -292,8 +676,9 @@ desktop path. Its recovered Phase 8–12 program is now recorded as the durable
 queue in `docs/TODO.md`: real-repository factory, upstream validation,
 robustness/performance, distribution/governance, and external beta/v1.0. This
 does not alter the fixed `docs/PLAN.md` or create a forbidden parallel plan;
-only Phase 8.1 is active, and later phases still require their own locked
-boundaries before implementation.
+Phase 8.1 was the next active slice at recovery time. It and Phase 8.2 are now
+delivered through protected main; Phase 8.3 and Phase 8.4 are qualified on the
+still-open PR #138 branch.
 
 ## 2026-08-10 — Verified progress and Windows review maintenance boundary
 
@@ -4867,6 +5252,10 @@ dataflow trace described. The maintainers added the missing
 - 201/201 tests (ctest + single-process; +6: line shift, indentation,
   changed line reappears, identical-line counter, v1 compatibility,
   header)
+- 2026-08-12: Qualified the current libgit2 head with 3/3 accepted repetitions at 168/168 translation units, 0 broken units, 0 incomplete functions, and 42 stable findings. The live-head manifest, full-dependency Clang 19 recipe, and three fresh raw receipts are retained and cross-checked automatically. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
+- 2026-08-12: Submitted rtp2httpd PR #709 and marked it ready for upstream review for the first newly triaged current-head candidate. The project builds, its executable smoke check passes, the focused independent path no longer reproduces, and duplicate search found no open match. Phase 9 acceptance remains unchanged pending upstream review.
+- 2026-08-12: Submitted libgit2 PR #7345 and marked it ready for upstream review for the independently corroborated missing-mode path. The full project and test targets build, the local test partition passes, focused analysis is clean at 1/1, and no narrowed duplicate match was found. Phase 9 acceptance remains unchanged pending upstream review.
+- 2026-08-12: Qualified the current lvgl head across three fresh repetitions: all accepted at 470/470 translation units, 0 broken, 0 incomplete, and 19 deterministic findings. Added a minimal frozen configuration profile required by the current build. This remains candidate evidence; the Phase 9 ledger is still 3 accepted fixes across 2 projects.
 - CLI smoke: baseline written, 2 lines added at the top of the file,
   re-analysis "1 known finding(s) filtered by baseline → Clean"
 
@@ -5813,3 +6202,10 @@ detection. The matcher is precise, no filter needed.
 - `FixedCompilationDatabase`: working directory `"."` instead of
   `build_path_` (relative-path safety).
 - CMake: `LANGUAGES CXX` → `LANGUAGES C CXX` (for LLVM's C check macro).
+- Qualified the current Abseil head with 3/3 accepted repetitions: 159/159 translation units, 0 broken units, 0 incomplete functions, and 13 stable findings. The retained manifest and three fresh raw receipts bind the unchanged live head to the current LLVM19 analyzer. This adds candidate evidence only and leaves the accepted-upstream ledger at 3 fixes across 2 projects.
+- Qualified the current systemd head with 3/3 accepted repetitions at 496/496 translation units, 0 broken units, 0 incomplete functions, and 0 stable findings. The exact LLVM19 Meson/Jinja/gperf recipe, manifest, and three fresh raw receipts are retained and cross-checked automatically; this adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current curl head with 3/3 accepted repetitions: 195/195 translation units, 0 broken units, 0 incomplete functions, and 62 stable findings. The live-head manifest and three fresh raw receipts are retained and cross-checked automatically. This adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current Redis head with 3/3 accepted repetitions: 122/122 translation units, 0 broken units, 0 incomplete functions, and 0 stable findings. The exact manifest and three fresh raw receipts bind the unchanged live head to the current LLVM19 analyzer. This adds candidate evidence only and leaves the accepted-upstream ledger unchanged.
+- Qualified the current TensorFlow Lite head with 3/3 accepted repetitions: 240/240 translation units, 0 broken units, 0 incomplete functions, and 74 stable findings. Independent comparison found no exact location overlap, so the accepted upstream ledger remains 3 fixes across 2 projects. Independent review caught and corrected a transcribed revision and finding count; the three checksummed receipts plus exact input manifest are now retained and cross-checked automatically against the frozen record and canonical summaries.
+- Recorded the independent evidence audit boundary: the prior eight current-head summaries are not Phase 9 completion evidence because their three raw receipts were not retained. They must be repeated under the new durable receipt gate; TensorFlow Lite is the first fully bound current-head record.
+- Kept retained receipt bytes platform-invariant so Windows line-ending conversion cannot invalidate their recorded checksums.
