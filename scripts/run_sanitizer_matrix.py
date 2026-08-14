@@ -30,14 +30,20 @@ FUZZ_SPEC.loader.exec_module(FUZZ_RUNNER)
 
 SCHEMA = "codeskeptic-sanitizer-receipt-v1"
 FUZZ_MODE = "smoke"
-BUILD_JOBS = 4
+# LLVM/Clang sanitizer builds are memory-heavy.  Two compile jobs keep the
+# complete matrix bounded on 16 GiB developer and hosted CI machines.
+BUILD_JOBS = 2
 PROFILES = {
     "address": {
         "runtime_environment": {
+            # LLVM's BumpPtrAllocator uses explicit ASAN poisoning in inline
+            # headers.  System Clang DSOs are not ASAN-instrumented, so their
+            # allocations cannot pair that poison with an inline unpoison.
+            # Heap redzones, leak checks, and the runtime tripwire stay active.
             "ASAN_OPTIONS": (
                 "abort_on_error=1:halt_on_error=1:"
                 "allocator_may_return_null=0:strict_string_checks=1:"
-                "detect_leaks=1"
+                "detect_leaks=1:allow_user_poisoning=0"
             ),
             "LSAN_OPTIONS": "exitcode=23",
         },

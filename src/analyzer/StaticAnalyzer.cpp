@@ -299,8 +299,9 @@ AnalysisResult StaticAnalyzer::run() {
     result.broken_tus = SourceManager::brokenTUs().size();
     // ClangTool returns non-zero for ordinary compile diagnostics as well as
     // driver failures. Broken TUs are already accounted explicitly; only an
-    // unaccounted failure is a separate hard tool failure.
-    if (analysis_result != 0 &&
+    // unaccounted failure is a separate hard tool failure unless the caller
+    // explicitly accepted a verdict over the translation units that did run.
+    if (analysis_result != 0 && !config_.acceptPartialCoverage() &&
         result.analyzed_tus + result.broken_tus < result.attempted_tus)
         result.tool_failed = true;
 

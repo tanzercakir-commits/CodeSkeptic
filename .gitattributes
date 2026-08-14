@@ -1,5 +1,7 @@
 # Retained receipts are checksum-bound artifacts. Keep their committed bytes
 # identical on every host; line-ending conversion would invalidate evidence.
+docs/PLAN.md text eol=lf
+*.sh text eol=lf
 scripts/upstream_candidate_receipts/** -text
 docs/evidence/phase10/fuzz/** -text
 docs/evidence/phase10/fuzz/** -diff

@@ -1,5 +1,43 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-14 — Phase 10.3 sanitizer matrix locally complete
+
+- Closed the three failures exposed by PR #142 CI. ASAN now disables only
+  explicit user poisoning, which avoids the instrumented-header/uninstrumented
+  system-Clang DSO mismatch while leak detection, heap redzones, and the
+  crashing runtime tripwire remain active. Explicit partial-coverage requests
+  now accept translation units omitted from the compile database without
+  weakening the default fail-closed verdict. Corpus coverage now reports those
+  omissions instead of counting them as analyzed: cJSON recorded 76 enumerated,
+  53 missing compile commands, and 23 analyzed units; tinyxml2 recorded 3, 1,
+  and 2 respectively. A request that analyzes zero units remains a hard
+  failure with exit `2`, including when both partial-coverage and broken-TU
+  opt-ins are set. Windows pins PLAN and shell files to LF and selects Git Bash
+  instead of the WSL launcher for the offline docs guard.
+- Bounded sanitizer build parallelism at two jobs after a four-job local run
+  caused system-wide resource pressure on a 16 GiB workstation. The final
+  runs used Ubuntu Clang 20.1.2 and bound 352 source files with manifest
+  `4a6c33fd9e90ef6b83f0a44fcb12a15801ed3c819f979f851e90c9b6ab15e2ec`.
+- Retained accepted Linux x86_64 ASAN and UBSAN trees under
+  `docs/evidence/phase10/sanitizers/2026-08-14-linux-x86_64`. Each profile
+  passed all ten runtime gates, `1202/1202` CTest entries, `1187/1187` direct
+  C++ tests, all representative analyzer/MCP checks, and all four fuzz smoke
+  targets. ASAN completed in `69590` ms with receipt SHA-256
+  `ecc5623862ab2b91894091767fdb8ebc2ddb0ece41680cf064ced6e859930698`;
+  UBSAN completed in `67912` ms with receipt SHA-256
+  `7d7fa7a6f453ff5d24a4346dac4b358f1b1f7b1cc8871a3dc16eba812a9ae3f8`.
+- The external manifest pins every retained receipt and log; its SHA-256 is
+  `852346f0978070818604bbe3a8f91938548aecc8ce0542bc2e0a664c032ef6b0`.
+  Both receipts pass independent verifier mode, all manifest entries pass
+  `sha256sum -c`, and the sanitizer contract is `13/13` with no skips. The
+  focused serial-worker gate records TSAN as not applicable with one joined
+  worker and `max_active=1`.
+- `CS-P10-03` now meets its local acceptance gates on
+  `phase-robustness-input-validation`. Generated `docs/TODO.md` and
+  `docs/PROGRESS.md` remain unchanged and the task remains open in
+  protected-main authority until an authorized merge records the closing
+  transition; this work does not write to or merge `main`.
+
 ## 2026-08-13 — Phase 10.3 sanitizer matrix checkpoint (in progress)
 
 - Added one CMake sanitizer profile boundary shared by the production core,

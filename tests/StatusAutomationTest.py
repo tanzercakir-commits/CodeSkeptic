@@ -21,6 +21,22 @@ import progress_status  # noqa: E402
 import review_report  # noqa: E402
 
 
+def bash_executable() -> str:
+    """Prefer Git Bash over the WSL launcher on native Windows runners."""
+    if os.name == "nt":
+        git = shutil.which("git")
+        if git:
+            git_root = Path(git).resolve().parent.parent
+            for relative in (Path("bin/bash.exe"), Path("usr/bin/bash.exe")):
+                candidate = git_root / relative
+                if candidate.is_file():
+                    return str(candidate)
+    bash = shutil.which("bash")
+    if bash:
+        return bash
+    raise AssertionError("a Bash implementation is required for docs guard tests")
+
+
 class RepositoryFixture:
     def __init__(self, directory: Path) -> None:
         self.root = directory / "work"
@@ -125,6 +141,29 @@ class RepositoryFixture:
 
 
 class ProgressStatusTest(unittest.TestCase):
+    def test_corpus_coverage_excludes_missing_compile_commands(self) -> None:
+        runner = (ROOT / "scripts" / "run_corpus.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "missing=$(grep -cF 'Compile command not found.'",
+            runner,
+        )
+        self.assertIn(
+            "analysed=$(( ${seen:-0} - ${broke:-0} - ${missing:-0} ))",
+            runner,
+        )
+        self.assertIn(
+            '"missing_compile_commands=${missing:-0} analysed=$analysed"',
+            runner,
+        )
+        self.assertIn('if [ "$analysed" -lt 0 ]; then', runner)
+
+    def test_cross_host_control_files_are_lf_pinned(self) -> None:
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn("docs/PLAN.md text eol=lf\n", attributes)
+        self.assertIn("*.sh text eol=lf\n", attributes)
+
     def test_in_flight_discovery_is_offline_and_uses_local_tracking_refs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = RepositoryFixture(Path(temporary))
@@ -241,7 +280,7 @@ class ProgressStatusTest(unittest.TestCase):
             environment["PATH"] = str(bin_dir) + os.pathsep + environment["PATH"]
             environment["CS_OFFLINE_LOG"] = str(log)
             completed = subprocess.run(
-                ["bash", "scripts/check_docs_sync.sh"],
+                [bash_executable(), "scripts/check_docs_sync.sh"],
                 cwd=ROOT,
                 env=environment,
                 capture_output=True,

@@ -57,6 +57,31 @@ TEST(AnalysisResultTest, PartialCoverageRequiresExplicitAcceptance) {
     EXPECT_EQ(result.exitCode(), 0);
 }
 
+TEST(AnalysisResultTest, MissingCompileCommandsRequireExplicitAcceptance) {
+    AnalysisResult result;
+    result.attempted_tus = 3;
+    result.analyzed_tus = 2;
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
+
+    result.accept_partial_coverage = true;
+    EXPECT_TRUE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Clean);
+    EXPECT_EQ(result.exitCode(), 0);
+}
+
+TEST(AnalysisResultTest, ZeroAnalyzedCannotBeAcceptedAsClean) {
+    AnalysisResult result;
+    result.attempted_tus = 3;
+    result.analyze_broken_tus = true;
+    result.accept_partial_coverage = true;
+
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Failed);
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
 TEST(AnalysisResultTest, EvidenceAndArtifactFailuresAreLoud) {
     AnalysisResult stale;
     stale.attempted_tus = stale.analyzed_tus = 1;

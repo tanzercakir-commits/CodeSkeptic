@@ -1,0 +1,12 @@
+[1/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/ConsoleReporter.cpp.o
+[2/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/JsonReporter.cpp.o
+[3/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/HtmlReporter.cpp.o
+[4/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/SarifReporter.cpp.o
+[5/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/server/McpServer.cpp.o
+[6/11] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/StaticAnalyzer.cpp.o
+[7/11] Linking CXX static library src/libcodeskeptic_core.a
+[8/11] Linking CXX executable fuzz/codeskeptic_fuzz_config
+[9/11] Linking CXX executable fuzz/codeskeptic_fuzz_compile_database
+[10/11] Linking CXX executable fuzz/codeskeptic_fuzz_summary
+[11/11] Linking CXX executable fuzz/codeskeptic_fuzz_mcp_json_rpc
+CODESKEPTIC_SANITIZER_GATE_OK build_fuzz

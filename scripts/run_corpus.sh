@@ -118,13 +118,21 @@ PYEOF
     # translation units that never compiled, and nobody had asked which
     # ones. Printed every run, so "N of what?" is answerable from the log
     # instead of requiring an investigation (the libarchive lesson).
-    local seen broke
+    local seen broke missing analysed
     seen=$(grep -oE 'Analysis starting\.\.\. \([0-9]+ files' "out-$dir.txt" \
            | grep -oE '[0-9]+' || true)
     broke=$(grep -oE '[0-9]+ translation unit\(s\) failed to COMPILE' \
             "out-$dir.txt" | grep -oE '^[0-9]+' || true)
+    missing=$(grep -cF 'Compile command not found.' "out-$dir.txt" || true)
+    analysed=$(( ${seen:-0} - ${broke:-0} - ${missing:-0} ))
+    if [ "$analysed" -lt 0 ]; then
+        echo "[$dir] FAIL: inconsistent coverage counts" \
+             "(enumerated=${seen:-0}, broken=${broke:-0}," \
+             "missing_compile_commands=${missing:-0})"
+        return 1
+    fi
     echo "CORPUS_COVERAGE $dir enumerated=${seen:-?} broken=${broke:-0}" \
-         "analysed=$(( ${seen:-0} - ${broke:-0} ))"
+         "missing_compile_commands=${missing:-0} analysed=$analysed"
 
     # Compare against the pinned expectation (if any). Tolerance 10%+2:
     # versions are pinned, a large deviation is a semantic regression.

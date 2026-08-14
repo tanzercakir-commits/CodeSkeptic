@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,7 +17,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "run_sanitizer_matrix.py"
 EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" /
-                 "sanitizers" / "2026-08-13-macos-arm64")
+                 "sanitizers" / "2026-08-14-linux-x86_64")
 
 
 def load_runner():
@@ -26,6 +27,19 @@ def load_runner():
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     return runner
+
+
+def cmake_compiler(environment: str, candidates: tuple[str, ...]) -> str:
+    configured = os.environ.get(environment)
+    if configured:
+        resolved = shutil.which(configured)
+        if resolved:
+            return resolved
+    for candidate in candidates:
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    raise AssertionError(f"no {environment} compiler is available")
 
 
 class SanitizerContractTest(unittest.TestCase):
@@ -38,10 +52,16 @@ class SanitizerContractTest(unittest.TestCase):
         self.assertIn('-fno-sanitize-recover=undefined', cmake)
 
     def test_invalid_sanitizer_profile_fails_before_dependency_discovery(self) -> None:
+        c_compiler = cmake_compiler(
+            "CC", ("clang-20", "clang", "cc", "gcc", "cl"))
+        cxx_compiler = cmake_compiler(
+            "CXX", ("clang++-20", "clang++", "c++", "g++", "cl"))
         with tempfile.TemporaryDirectory() as temporary:
             completed = subprocess.run(
                 [
                     "cmake", "-S", str(ROOT), "-B", temporary,
+                    f"-DCMAKE_C_COMPILER={c_compiler}",
+                    f"-DCMAKE_CXX_COMPILER={cxx_compiler}",
                     "-DCODESKEPTIC_SANITIZER=not-a-runtime",
                     "-DCODESKEPTIC_BUILD_TESTS=OFF",
                 ],
@@ -79,7 +99,7 @@ class SanitizerContractTest(unittest.TestCase):
             ),
         )
         self.assertEqual(runner.FUZZ_MODE, "smoke")
-        self.assertEqual(runner.BUILD_JOBS, 4)
+        self.assertEqual(runner.BUILD_JOBS, 2)
 
     def test_source_manifest_binds_all_complete_suite_inputs(self) -> None:
         runner = load_runner()
@@ -139,6 +159,7 @@ class SanitizerContractTest(unittest.TestCase):
         )
         self.assertEqual(address_receipt["LSAN_OPTIONS"], "exitcode=23")
         self.assertIn("detect_leaks=1", address_receipt["ASAN_OPTIONS"])
+        self.assertIn("allow_user_poisoning=0", address_receipt["ASAN_OPTIONS"])
         self.assertEqual(
             undefined_receipt,
             {"UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"},

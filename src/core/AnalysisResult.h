@@ -46,7 +46,7 @@ struct AnalysisResult {
 
     bool hasHardFailure() const {
         const bool nothing_analyzed =
-            attempted_tus > 0 && analyzed_tus == 0 && !analyze_broken_tus;
+            attempted_tus > 0 && analyzed_tus == 0;
         return no_inputs || no_rules || compile_database_failed ||
                tool_failed || nothing_analyzed ||
                summary_save_failed || baseline_load_failed ||
@@ -58,7 +58,8 @@ struct AnalysisResult {
             broken_tus > 0 && !analyze_broken_tus &&
             !accept_partial_coverage;
         const bool unaccounted_tus =
-            analyzed_tus + broken_tus < attempted_tus;
+            analyzed_tus + broken_tus < attempted_tus &&
+            !accept_partial_coverage;
         return partial_tu_coverage || unaccounted_tus ||
                incomplete_functions > 0 ||
                summary_load_failed || summary_stale;
