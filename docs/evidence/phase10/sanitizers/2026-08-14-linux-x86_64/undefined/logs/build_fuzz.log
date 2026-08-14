@@ -44,11 +44,11 @@
 [40/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o
 [41/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o
 [42/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractParser.cpp.o
-[43/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o
-[44/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o
+[43/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o
+[44/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o
 [45/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Policy.cpp.o
-[46/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o
-[47/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
+[46/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
+[47/56] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o
 [48/56] Linking CXX static library src/libcodeskeptic_core.a
 [49/56] Building CXX object fuzz/CMakeFiles/codeskeptic_fuzz_config.dir/FuzzConfig.cpp.o
 [50/56] Building CXX object fuzz/CMakeFiles/codeskeptic_fuzz_compile_database.dir/FuzzCompileDatabase.cpp.o

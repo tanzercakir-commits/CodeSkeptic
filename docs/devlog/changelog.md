@@ -12,24 +12,24 @@
   53 missing compile commands, and 23 analyzed units; tinyxml2 recorded 3, 1,
   and 2 respectively. A request that analyzes zero units remains a hard
   failure with exit `2`, including when both partial-coverage and broken-TU
-  opt-ins are set. Windows pins PLAN and shell files to LF, selects Git Bash
-  instead of the WSL launcher for the offline docs guard, and checks out full
-  history so protected-main anchor and merge-base checks have their required
-  objects.
+  opt-ins are set. Windows pins PLAN, generated TODO/PROGRESS, and shell files
+  to LF, selects Git Bash instead of the WSL launcher for the offline docs
+  guard, and checks out full history so protected-main anchor and merge-base
+  checks have their required objects.
 - Bounded sanitizer build parallelism at two jobs after a four-job local run
   caused system-wide resource pressure on a 16 GiB workstation. The final
   runs used Ubuntu Clang 20.1.2 and bound 352 source files with manifest
-  `498469fc48f0dd48a6dd7f4e349794f9d8f0777f3c147d5e5645925ea175fed4`.
+  `15d9853f2fe5d76cf89496f47c30d58521b6862eefa2883a24ba11ed800f9939`.
 - Retained accepted Linux x86_64 ASAN and UBSAN trees under
   `docs/evidence/phase10/sanitizers/2026-08-14-linux-x86_64`. Each profile
   passed all ten runtime gates, `1202/1202` CTest entries, `1187/1187` direct
   C++ tests, all representative analyzer/MCP checks, and all four fuzz smoke
-  targets. ASAN completed in `901142` ms with receipt SHA-256
-  `24772f5a82489afec944fc6da7600f867eae7bd47acaca739455019ddd228356`;
-  UBSAN completed in `1210134` ms with receipt SHA-256
-  `174305199bd67769d61501e392df913d7213a36569ce0bc6256e3bcd0770337b`.
+  targets. ASAN completed in `62954` ms with receipt SHA-256
+  `3c2e04c383eb5fcc88cf5ee983c949c7a835335975031e8bdce8202d82a4cd7f`;
+  UBSAN completed in `1201269` ms with receipt SHA-256
+  `5310c6b48da00c4892c6801719cc7ff76f32405b649612a2011691b832f8d6bf`.
 - The external manifest pins every retained receipt and log; its SHA-256 is
-  `8657403e412b07439cdcfbba62b0557d30a4aeb3d5757c193017e36bbf79423f`.
+  `ad7c84a9cf24c626bc65e5afbc02d35cfaae7f988888c4910193197a50dd691d`.
   Both receipts pass independent verifier mode, all manifest entries pass
   `sha256sum -c`, and the sanitizer contract is `13/13` with no skips. The
   focused serial-worker gate records TSAN as not applicable with one joined

@@ -33,24 +33,24 @@
 [29/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/server/McpServer.cpp.o
 [30/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/UninitPointerRule_Ex.cpp.o
 [31/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FunctionSummary.cpp.o
-[32/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/MemoryLeakRule_Ex.cpp.o
-[33/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/FdResourceRule.cpp.o
+[32/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/FdResourceRule.cpp.o
+[33/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/MemoryLeakRule_Ex.cpp.o
 [34/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/IntOverflowRule.cpp.o
 [35/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/DivByZeroRule.cpp.o
 [36/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/SignConversionRule.cpp.o
 [37/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AllocSizeOverflowRule.cpp.o
 [38/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/BoundsRule.cpp.o
 [39/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/NullDerefRule.cpp.o
-[40/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o
-[41/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o
+[40/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o
+[41/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o
 [42/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractParser.cpp.o
 [43/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o
 [44/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o
 [45/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Policy.cpp.o
 [46/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o
-[47/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
-[48/92] Linking CXX static library src/libcodeskeptic_core.a
-[49/92] Building CXX object src/CMakeFiles/codeskeptic.dir/main.cpp.o
+[47/92] Building CXX object src/CMakeFiles/codeskeptic.dir/main.cpp.o
+[48/92] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
+[49/92] Linking CXX static library src/libcodeskeptic_core.a
 [50/92] Linking CXX executable src/codeskeptic
 [51/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/DiagnosticTest.cpp.o
 [52/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/TestHelper.cpp.o
@@ -63,8 +63,8 @@
 [59/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/UninitPointerRuleExTest.cpp.o
 [60/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/FdResourceRuleTest.cpp.o
 [61/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/DivByZeroRuleTest.cpp.o
-[62/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/IntOverflowRuleTest.cpp.o
-[63/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/MemoryLeakRuleExTest.cpp.o
+[62/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/MemoryLeakRuleExTest.cpp.o
+[63/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/IntOverflowRuleTest.cpp.o
 [64/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/SignConversionRuleTest.cpp.o
 [65/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/AllocSizeOverflowRuleTest.cpp.o
 [66/92] Building CXX object tests/CMakeFiles/codeskeptic_tests.dir/BoundsRuleTest.cpp.o
