@@ -1,0 +1,12 @@
+-- CodeSkeptic identity: 0.4.9-dev+ga9b0a37791d4.dirty
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Could NOT find CURL (missing: CURL_LIBRARY CURL_INCLUDE_DIR) 
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Could NOT find CURL (missing: CURL_LIBRARY CURL_INCLUDE_DIR) 
+-- LLVM version: 20.1.2
+-- Clang include dirs: /usr/lib/llvm-20/include
+-- Clang resource dir: /usr/lib/llvm-20/lib/clang/20
+-- Configuring done (0.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /work/build-p10-06-ubsan-tests
+CODESKEPTIC_SANITIZER_GATE_OK configure_tests

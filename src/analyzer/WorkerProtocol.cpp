@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <cctype>
 #include <limits>
 #include <set>
 #include <sstream>
@@ -23,7 +24,7 @@ constexpr std::uintmax_t kMaxResponseBytes = 64u << 20;
 bool readBounded(const std::string& path, std::uintmax_t maximum,
                  std::string& text, std::string& error) {
     std::error_code ec;
-    const auto status = std::filesystem::status(path, ec);
+    const auto status = std::filesystem::symlink_status(path, ec);
     if (ec || !std::filesystem::is_regular_file(status)) {
         error = "worker protocol path is not a regular file: " + path;
         return false;
@@ -48,12 +49,16 @@ bool readBounded(const std::string& path, std::uintmax_t maximum,
 }
 
 bool writeAtomic(const std::string& path, const json::Value& value,
-                 std::string& error) {
+                 std::uintmax_t maximum, std::string& error) {
     std::string text;
     llvm::raw_string_ostream stream(text);
     stream << value;
     stream.flush();
     text.push_back('\n');
+    if (text.size() > maximum) {
+        error = "worker protocol output exceeds size limit: " + path;
+        return false;
+    }
 
     const std::string temporary = path + ".tmp";
     {
@@ -167,7 +172,120 @@ bool validSha256(const std::string& value) {
     return true;
 }
 
+bool validFindingFingerprint(const std::string& value) {
+    if (value.size() != 21 || value.rfind("csf1-", 0) != 0) return false;
+    for (std::size_t i = 5; i < value.size(); ++i) {
+        const unsigned char c = value[i];
+        if (!std::isdigit(c) && !(c >= 'a' && c <= 'f')) return false;
+    }
+    return true;
+}
+
+void appendLengthPrefixed(std::ostringstream& output,
+                          const std::string& value) {
+    output << value.size() << ':' << value << '\n';
+}
+
+std::string dependencyManifestDigestInput(
+    const DependencyManifest& manifest) {
+    std::ostringstream output;
+    appendLengthPrefixed(output, manifest.toolchain_identity_sha256);
+    output << (manifest.cacheable ? 1 : 0) << '\n';
+    output << manifest.files.size() << '\n';
+    for (const auto& file : manifest.files) {
+        appendLengthPrefixed(output, file.canonical_path);
+        appendLengthPrefixed(output, file.content_sha256);
+        output << (file.sidecar_exists ? "1\n" : "0\n");
+        appendLengthPrefixed(output, file.sidecar_sha256);
+    }
+    return output.str();
+}
+
+json::Object dependencyManifestObject(const DependencyManifest& manifest) {
+    json::Array files;
+    for (const auto& file : manifest.files) {
+        files.push_back(json::Object{
+            {"canonical_path", file.canonical_path},
+            {"content_sha256", file.content_sha256},
+            {"sidecar_exists", file.sidecar_exists},
+            {"sidecar_sha256", file.sidecar_sha256},
+        });
+    }
+    return json::Object{
+        {"toolchain_identity_sha256",
+         manifest.toolchain_identity_sha256},
+        {"files", std::move(files)},
+        {"cacheable", manifest.cacheable},
+        {"sha256", manifest.sha256},
+    };
+}
+
+bool parseDependencyManifest(const json::Object& object,
+                             DependencyManifest& manifest,
+                             std::string& error) {
+    if (!onlyFields(object,
+                    {"toolchain_identity_sha256", "files", "cacheable",
+                     "sha256"},
+                    "worker dependency manifest", error) ||
+        !stringField(object, "toolchain_identity_sha256",
+                     manifest.toolchain_identity_sha256, error) ||
+        !boolField(object, "cacheable", manifest.cacheable, error) ||
+        !stringField(object, "sha256", manifest.sha256, error))
+        return false;
+    const auto* files = object.getArray("files");
+    if (!files || files->size() > 100000) {
+        error = "invalid worker dependency manifest files";
+        return false;
+    }
+    manifest.files.clear();
+    manifest.files.reserve(files->size());
+    std::string previous;
+    for (const auto& item : *files) {
+        const auto* entry = item.getAsObject();
+        DependencyEvidence evidence;
+        if (!entry ||
+            !onlyFields(*entry,
+                        {"canonical_path", "content_sha256",
+                         "sidecar_exists", "sidecar_sha256"},
+                        "worker dependency", error) ||
+            !stringField(*entry, "canonical_path",
+                         evidence.canonical_path, error, false) ||
+            !stringField(*entry, "content_sha256",
+                         evidence.content_sha256, error, false) ||
+            !boolField(*entry, "sidecar_exists",
+                       evidence.sidecar_exists, error) ||
+            !stringField(*entry, "sidecar_sha256",
+                         evidence.sidecar_sha256, error))
+            return false;
+        if (!validSha256(evidence.content_sha256) ||
+            (evidence.sidecar_exists !=
+             validSha256(evidence.sidecar_sha256)) ||
+            (!previous.empty() && previous >= evidence.canonical_path)) {
+            error = "invalid worker dependency manifest entry";
+            return false;
+        }
+        previous = evidence.canonical_path;
+        manifest.files.push_back(std::move(evidence));
+    }
+
+    const bool entirely_empty = manifest.files.empty() &&
+        manifest.toolchain_identity_sha256.empty() && manifest.sha256.empty();
+    if (entirely_empty) return true;
+    if (manifest.files.empty() ||
+        !validSha256(manifest.toolchain_identity_sha256) ||
+        !validSha256(manifest.sha256) ||
+        dependencyManifestSha256(manifest) != manifest.sha256) {
+        error = "worker dependency manifest checksum mismatch";
+        return false;
+    }
+    return true;
+}
+
 bool parsePhase(llvm::StringRef value, TranslationUnitPhase& phase) {
+    if (value == "dependency-probe") {
+        phase = TranslationUnitPhase::DependencyProbe;
+        return true;
+    }
     if (value == "analysis") {
         phase = TranslationUnitPhase::Analysis;
         return true;
@@ -356,6 +474,10 @@ bool parseDiagnostic(const json::Object& object, Diagnostic& diagnostic,
         error = "invalid worker diagnostic severity";
         return false;
     }
+    if (!validFindingFingerprint(diagnostic.fingerprint)) {
+        error = "invalid worker diagnostic fingerprint";
+        return false;
+    }
     const auto* notes = object.getArray("notes");
     if (!notes || notes->size() > 100000) {
         error = "invalid worker diagnostic notes";
@@ -402,7 +524,8 @@ bool writeWorkerRequest(const std::string& path,
         {"response_path", request.response_path},
         {"summary_fragment_path", request.summary_fragment_path},
     };
-    return writeAtomic(path, json::Value(std::move(root)), error);
+    return writeAtomic(path, json::Value(std::move(root)),
+                       kMaxRequestBytes, error);
 }
 
 bool readWorkerRequest(const std::string& path,
@@ -452,8 +575,11 @@ bool writeWorkerResponse(const std::string& path,
         {"analysis", analysisObject(response.analysis)},
         {"diagnostics", std::move(diagnostics)},
         {"summary_fragment_sha256", response.summary_fragment_sha256},
+        {"dependency_manifest",
+         dependencyManifestObject(response.dependency_manifest)},
     };
-    return writeAtomic(path, json::Value(std::move(root)), error);
+    return writeAtomic(path, json::Value(std::move(root)),
+                       kMaxResponseBytes, error);
 }
 
 bool readWorkerResponse(const std::string& path,
@@ -468,7 +594,8 @@ bool readWorkerResponse(const std::string& path,
         !onlyFields(*root,
                     {"protocol", "request_id", "phase", "canonical_path",
                      "compile_command_sha256", "command_ordinal", "analysis",
-                     "diagnostics", "summary_fragment_sha256"},
+                     "diagnostics", "summary_fragment_sha256",
+                     "dependency_manifest"},
                     "worker response", error) ||
         !stringField(*root, "request_id", response.request_id, error, false) ||
         !stringField(*root, "canonical_path", response.canonical_path, error,
@@ -483,9 +610,12 @@ bool readWorkerResponse(const std::string& path,
     const auto phase = root->getString("phase");
     const auto* analysis = root->getObject("analysis");
     const auto* diagnostics = root->getArray("diagnostics");
+    const auto* dependency_manifest = root->getObject("dependency_manifest");
     if (!phase || !parsePhase(*phase, response.phase) || !analysis ||
         !parseAnalysis(*analysis, response.analysis, error) || !diagnostics ||
-        diagnostics->size() > 100000) {
+        diagnostics->size() > 100000 || !dependency_manifest ||
+        !parseDependencyManifest(*dependency_manifest,
+                                 response.dependency_manifest, error)) {
         if (error.empty()) error = "invalid worker response payload";
         return false;
     }
@@ -521,6 +651,15 @@ std::string sha256File(const std::string& path, std::string& error) {
         llvm::ArrayRef<std::uint8_t>(
             reinterpret_cast<const std::uint8_t*>(content.data()),
             content.size()));
+    return llvm::toHex(digest, true);
+}
+
+std::string dependencyManifestSha256(const DependencyManifest& manifest) {
+    const std::string input = dependencyManifestDigestInput(manifest);
+    const auto digest = llvm::SHA256::hash(
+        llvm::ArrayRef<std::uint8_t>(
+            reinterpret_cast<const std::uint8_t*>(input.data()),
+            input.size()));
     return llvm::toHex(digest, true);
 }
 

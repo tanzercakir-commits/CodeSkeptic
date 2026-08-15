@@ -30,6 +30,19 @@ enum class TranslationUnitStatus {
     WorkerFailed,
 };
 
+enum class TranslationUnitOrigin {
+    Executed,
+    Checkpoint,
+};
+
+inline const char* translationUnitOriginName(TranslationUnitOrigin origin) {
+    switch (origin) {
+        case TranslationUnitOrigin::Executed: return "executed";
+        case TranslationUnitOrigin::Checkpoint: return "checkpoint";
+    }
+    return "executed";
+}
+
 inline const char* translationUnitStatusName(TranslationUnitStatus status) {
     switch (status) {
         case TranslationUnitStatus::Completed: return "completed";
@@ -52,6 +65,9 @@ struct TranslationUnitReceipt {
     std::uint64_t peak_memory_kib = 0;
     unsigned timeout_seconds = 0;
     unsigned memory_mib = 0;
+    TranslationUnitOrigin origin = TranslationUnitOrigin::Executed;
+    std::string checkpoint_key_sha256;
+    std::string payload_sha256;
 };
 
 struct AnalysisResult {

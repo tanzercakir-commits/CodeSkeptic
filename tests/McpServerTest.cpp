@@ -378,6 +378,13 @@ TEST(McpServerTest, AnalyzeRejectsUnknownOrWrongTypedFields) {
     EXPECT_NE(response.find("unknown analyze field"), std::string::npos);
 
     response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":601,"method":"tools/call",)"
+        R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
+        R"("checkpoint_dir":"/tmp/forged"}}})");
+    EXPECT_NE(response.find("unknown analyze field: checkpoint_dir"),
+              std::string::npos);
+
+    response = handleMcpMessage(
         R"({"jsonrpc":"2.0","id":61,"method":"tools/call",)"
         R"("params":{"name":"analyze","arguments":{"path":"x.cpp",)"
         R"("functions":7}}})");

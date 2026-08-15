@@ -3,6 +3,7 @@
 #include "analyzer/AnalysisCoordinator.h"
 #include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
+#include "analyzer/UnitEvidenceStore.h"
 #include "analyzer/WorkerProtocol.h"
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
@@ -23,7 +24,9 @@
 #include "reporter/SarifReporter.h"
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <clang/AST/ASTContext.h>
 #include <clang/Basic/SourceManager.h>
@@ -118,34 +121,94 @@ UnitExecutionResult missingWorkerOutcome() {
     return outcome;
 }
 
-UnitExecutionResult executeIsolatedWorker(
+struct IsolatedWorkerResult {
+    UnitExecutionResult outcome;
+    WorkerResponse response;
+    std::string summary_fragment;
+    bool has_response = false;
+};
+
+bool readSummaryFragment(const std::string& path, std::string& content,
+                         std::string& error) {
+    std::error_code ec;
+    const auto status = std::filesystem::status(path, ec);
+    if (ec || !std::filesystem::is_regular_file(status)) {
+        error = "summary fragment is not a regular file";
+        return false;
+    }
+    const auto size = std::filesystem::file_size(path, ec);
+    if (ec || size > (64u << 20)) {
+        error = "summary fragment exceeds size limit";
+        return false;
+    }
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        error = "cannot read summary fragment";
+        return false;
+    }
+    content.assign(std::istreambuf_iterator<char>(input),
+                   std::istreambuf_iterator<char>());
+    if (input.bad()) {
+        error = "failed while reading summary fragment";
+        return false;
+    }
+    return true;
+}
+
+bool loadCachedSummaryFragment(const std::string& content,
+                               std::string& error) {
+    TemporaryDirectory temporary;
+    if (!createTemporaryDirectory("codeskeptic-cached-summary", temporary,
+                                  error))
+        return false;
+    const auto path = temporary.path() / "summary.csk";
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        error = "cannot materialize cached summary fragment";
+        return false;
+    }
+    output.write(content.data(), static_cast<std::streamsize>(content.size()));
+    output.close();
+    if (!output.good() || !SummaryRegistry::instance().loadGlobal(
+                              path.string())) {
+        error = "cached summary fragment parser rejected evidence";
+        return false;
+    }
+    return true;
+}
+
+IsolatedWorkerResult executeIsolatedWorker(
     const Config& config,
     const std::vector<std::string>& rule_ids,
     const TranslationUnitExecution& unit,
     TranslationUnitPhase phase,
     const std::string& summary_override,
     bool replace_configured_summaries,
-    bool produce_summary_fragment) {
+    bool produce_summary_fragment,
+    std::chrono::steady_clock::time_point deadline) {
     std::error_code source_error;
     if (!std::filesystem::is_regular_file(unit.canonical_path,
                                           source_error)) {
         if (source_error &&
             source_error != std::errc::no_such_file_or_directory)
-            return failedWorkerOutcome(
+            return {failedWorkerOutcome(
                 "cannot inspect requested translation unit: " +
-                source_error.message());
-        return missingWorkerOutcome();
+                source_error.message())};
+        return {missingWorkerOutcome()};
     }
     if (unit.command_line.empty() || unit.compile_command_sha256.empty()) {
-        return failedWorkerOutcome("missing or inconsistent compile command");
+        return {failedWorkerOutcome(
+            "missing or inconsistent compile command")};
     }
     if (translationUnitCommandSha256(unit) != unit.compile_command_sha256)
-        return failedWorkerOutcome("missing or inconsistent compile command");
+        return {failedWorkerOutcome(
+            "missing or inconsistent compile command")};
 
     TemporaryDirectory temporary;
     std::string error;
     if (!createTemporaryDirectory("codeskeptic-tu-worker", temporary, error))
-        return failedWorkerOutcome("cannot create worker directory: " + error);
+        return {failedWorkerOutcome(
+            "cannot create worker directory: " + error)};
 
     WorkerRequest request;
     request.request_id =
@@ -164,26 +227,31 @@ UnitExecutionResult executeIsolatedWorker(
     const std::string request_path =
         (temporary.path() / "request.json").string();
     if (!writeWorkerRequest(request_path, request, error))
-        return failedWorkerOutcome("cannot write worker request: " + error);
+        return {failedWorkerOutcome(
+            "cannot write worker request: " + error)};
 
-    UnitExecutionResult outcome;
-    outcome.resource = ResourceSupervisor::run(
+    IsolatedWorkerResult result;
+    auto& outcome = result.outcome;
+    outcome.resource = ResourceSupervisor::runUntil(
         config.workerProgram(), {"--internal-tu-worker", request_path},
-        ResourceLimits{config.tuTimeoutSeconds(), config.tuMemoryMiB()});
-    if (outcome.resource.status != ResourceRunStatus::Completed) return outcome;
+        ResourceLimits{config.tuTimeoutSeconds(), config.tuMemoryMiB()},
+        deadline);
+    if (outcome.resource.status != ResourceRunStatus::Completed) return result;
     if (outcome.resource.exit_code != 0) {
         outcome.resource.status = ResourceRunStatus::Crashed;
         if (outcome.resource.error.empty())
             outcome.resource.error = "worker exited without a valid response";
-        return outcome;
+        return result;
     }
 
     WorkerResponse response;
     if (!readWorkerResponse(request.response_path, request, response, error)) {
         outcome.resource.status = ResourceRunStatus::Crashed;
         outcome.resource.error = "invalid worker response: " + error;
-        return outcome;
+        return result;
     }
+    result.response = response;
+    result.has_response = true;
     outcome.analysis = std::move(response.analysis);
     outcome.diagnostics = std::move(response.diagnostics);
 
@@ -198,9 +266,13 @@ UnitExecutionResult executeIsolatedWorker(
                        request.summary_fragment_path)) {
             outcome.analysis.summary_load_failed = true;
             outcome.resource.error = "summary fragment parser rejected worker output";
+        } else if (!readSummaryFragment(request.summary_fragment_path,
+                                        result.summary_fragment, error)) {
+            outcome.analysis.summary_load_failed = true;
+            outcome.resource.error = error;
         }
     }
-    return outcome;
+    return result;
 }
 
 } // namespace
@@ -320,7 +392,7 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
         return seed;
     }
     const auto units = source_mgr_->executionUnits();
-    seed.attempted_tus = units.size();
+    seed.attempted_tus = source_mgr_->requestedFileCount();
     if (units.empty()) {
         std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
         seed.no_inputs = true;
@@ -383,6 +455,29 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
         }
     }
 
+    const ResourceLimits limits{
+        config_.tuTimeoutSeconds(), config_.tuMemoryMiB()};
+    std::unique_ptr<UnitEvidenceStore> evidence_store;
+    if (!config_.checkpointDir().empty()) {
+        std::string evidence_error;
+        auto cache_configuration = config_.workerArguments(rule_ids);
+        cache_configuration.push_back(
+            config_.summaryOut().empty()
+                ? "internal-summary-fragments=disabled"
+                : "internal-summary-fragments=enabled");
+        evidence_store = UnitEvidenceStore::open(
+            config_.checkpointDir(), units, config_.wholeProgram(),
+            config_.workerProgram(), cache_configuration,
+            rule_ids, limits, evidence_error,
+            config_.checkpointPerRunNamespace());
+        if (!evidence_store) {
+            seed.tool_failed = true;
+            std::cerr << "[CodeSkeptic] checkpoint unavailable: "
+                      << evidence_error << "\n";
+            return seed;
+        }
+    }
+
     TemporaryDirectory run_directory;
     std::string directory_error;
     if (!createTemporaryDirectory("codeskeptic-tu-run", run_directory,
@@ -395,10 +490,69 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
     bool merged_summary_ready = false;
     bool merged_summary_failed = false;
 
+    const auto inputPathsFor =
+        [this](const std::string& summary_override,
+               bool replace_configured_summaries) {
+            std::vector<std::string> paths;
+            if (replace_configured_summaries) {
+                if (!summary_override.empty())
+                    paths.push_back(summary_override);
+                return paths;
+            }
+            paths.insert(paths.end(), config_.modelFiles().begin(),
+                         config_.modelFiles().end());
+            if (!config_.summaryIn().empty())
+                paths.push_back(config_.summaryIn());
+            return paths;
+        };
+
     const UnitExecutor executor =
         [this, &rule_ids, &merged_summary, &merged_summary_ready,
-         &merged_summary_failed](const TranslationUnitExecution& unit,
-                                 TranslationUnitPhase phase) {
+         &merged_summary_failed, &evidence_store, &inputPathsFor](
+             const TranslationUnitExecution& unit,
+             TranslationUnitPhase phase) {
+            const auto logical_started = std::chrono::steady_clock::now();
+            const auto logical_deadline = config_.tuTimeoutSeconds() > 0
+                ? logical_started +
+                      std::chrono::seconds(config_.tuTimeoutSeconds())
+                : std::chrono::steady_clock::time_point::max();
+            std::uint64_t logical_peak_memory_kib = 0;
+            const auto finish = [&](UnitExecutionResult outcome) {
+                logical_peak_memory_kib = std::max(
+                    logical_peak_memory_kib,
+                    outcome.resource.peak_memory_kib);
+                const auto finished = std::chrono::steady_clock::now();
+                outcome.resource.duration_ms =
+                    static_cast<std::uint64_t>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            finished - logical_started).count());
+                outcome.resource.peak_memory_kib = logical_peak_memory_kib;
+                if (config_.tuTimeoutSeconds() > 0 &&
+                    finished >= logical_deadline &&
+                    outcome.resource.status !=
+                        ResourceRunStatus::MemoryExceeded) {
+                    outcome.resource.status = ResourceRunStatus::TimedOut;
+                    outcome.resource.exit_code = -2;
+                    if (outcome.resource.error.empty())
+                        outcome.resource.error =
+                            "translation-unit deadline exhausted";
+                }
+                return outcome;
+            };
+            const auto execute_worker =
+                [&](TranslationUnitPhase worker_phase,
+                    const std::string& worker_summary_override,
+                    bool worker_replace_summaries,
+                    bool worker_produce_fragment) {
+                    auto executed = executeIsolatedWorker(
+                        config_, rule_ids, unit, worker_phase,
+                        worker_summary_override, worker_replace_summaries,
+                        worker_produce_fragment, logical_deadline);
+                    logical_peak_memory_kib = std::max(
+                        logical_peak_memory_kib,
+                        executed.outcome.resource.peak_memory_kib);
+                    return executed;
+                };
             if (config_.wholeProgram() &&
                 phase == TranslationUnitPhase::Analysis &&
                 !merged_summary_ready) {
@@ -407,8 +561,8 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
                     merged_summary_failed = true;
             }
             if (merged_summary_failed)
-                return failedWorkerOutcome(
-                    "cannot materialize merged whole-program summary");
+                return finish(failedWorkerOutcome(
+                    "cannot materialize merged whole-program summary"));
 
             const bool harvest =
                 phase == TranslationUnitPhase::SummaryHarvest;
@@ -418,9 +572,155 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
             const bool produce_fragment =
                 harvest || (!config_.summaryOut().empty() &&
                             !config_.wholeProgram());
-            return executeIsolatedWorker(
-                config_, rule_ids, unit, phase, summary_override,
-                replace_summaries, produce_fragment);
+            if (!evidence_store) {
+                return finish(execute_worker(
+                    phase, summary_override, replace_summaries,
+                    produce_fragment).outcome);
+            }
+
+            std::string evidence_error;
+            if (!evidence_store->verifyAnalyzerIdentity(
+                    evidence_error, logical_deadline))
+                return finish(failedWorkerOutcome(evidence_error));
+            auto probe = execute_worker(
+                TranslationUnitPhase::DependencyProbe, {}, false, false);
+            if (probe.outcome.resource.status !=
+                    ResourceRunStatus::Completed ||
+                !probe.has_response ||
+                probe.outcome.analysis.hasHardFailure() ||
+                probe.outcome.analysis.hasIncompleteEvidence() ||
+                probe.response.dependency_manifest.files.empty()) {
+                if (probe.outcome.resource.error.empty())
+                    probe.outcome.resource.error =
+                        "dependency probe did not produce complete evidence";
+                return finish(std::move(probe.outcome));
+            }
+            if (!evidence_store->verifyAnalyzerIdentity(
+                    evidence_error, logical_deadline)) {
+                auto failed = failedWorkerOutcome(evidence_error);
+                return finish(std::move(failed));
+            }
+            const auto input_paths = inputPathsFor(
+                summary_override, replace_summaries);
+            const std::string input_sha256 =
+                orderedInputFilesSha256(input_paths, evidence_error,
+                                        logical_deadline);
+            if (input_sha256.empty()) {
+                auto failed = failedWorkerOutcome(
+                    "cannot hash exact model/summary inputs: " +
+                    evidence_error);
+                return finish(std::move(failed));
+            }
+
+            CachedUnitEvidence cached;
+            const auto lookup = probe.response.dependency_manifest.cacheable
+                ? evidence_store->lookup(
+                      unit, phase, probe.response.dependency_manifest,
+                      input_sha256, cached, evidence_error,
+                      logical_deadline)
+                : EvidenceLookupStatus::Miss;
+            if (lookup == EvidenceLookupStatus::Failed) {
+                auto failed = failedWorkerOutcome(evidence_error);
+                return finish(std::move(failed));
+            }
+            if (lookup == EvidenceLookupStatus::Hit) {
+                auto verification = execute_worker(
+                    TranslationUnitPhase::DependencyProbe,
+                    {}, false, false);
+                if (verification.outcome.resource.status !=
+                        ResourceRunStatus::Completed ||
+                    !verification.has_response ||
+                    verification.outcome.analysis.hasHardFailure() ||
+                    verification.outcome.analysis.hasIncompleteEvidence() ||
+                    verification.response.dependency_manifest.files.empty()) {
+                    if (verification.outcome.resource.error.empty())
+                        verification.outcome.resource.error =
+                            "cache-hit verification probe did not produce "
+                            "complete evidence";
+                    return finish(std::move(verification.outcome));
+                }
+                if (!evidence_store->verifyAnalyzerIdentity(
+                        evidence_error, logical_deadline)) {
+                    auto failed = failedWorkerOutcome(evidence_error);
+                    return finish(std::move(failed));
+                }
+                if (!(verification.response.dependency_manifest ==
+                      probe.response.dependency_manifest)) {
+                    auto failed = failedWorkerOutcome(
+                        "dependency evidence changed during cache lookup");
+                    return finish(std::move(failed));
+                }
+                const std::string verified_inputs =
+                    orderedInputFilesSha256(input_paths, evidence_error,
+                                            logical_deadline);
+                if (verified_inputs != input_sha256 ||
+                    (produce_fragment &&
+                     (cached.summary_fragment.empty() ||
+                      !loadCachedSummaryFragment(
+                          cached.summary_fragment, evidence_error)))) {
+                    auto failed = failedWorkerOutcome(
+                        evidence_error.empty()
+                            ? "model/summary input changed during cache lookup"
+                            : evidence_error);
+                    return finish(std::move(failed));
+                }
+                UnitExecutionResult outcome;
+                outcome.resource = verification.outcome.resource;
+                outcome.analysis = std::move(cached.response.analysis);
+                outcome.diagnostics = std::move(cached.response.diagnostics);
+                outcome.origin = TranslationUnitOrigin::Checkpoint;
+                outcome.checkpoint_key_sha256 =
+                    std::move(cached.checkpoint_key_sha256);
+                outcome.payload_sha256 = std::move(cached.payload_sha256);
+                return finish(std::move(outcome));
+            }
+
+            auto executed = execute_worker(
+                phase, summary_override, replace_summaries,
+                produce_fragment);
+            if (!evidence_store->verifyAnalyzerIdentity(
+                    evidence_error, logical_deadline)) {
+                auto failed = failedWorkerOutcome(evidence_error);
+                return finish(std::move(failed));
+            }
+            if (executed.outcome.resource.status !=
+                    ResourceRunStatus::Completed ||
+                !executed.has_response)
+                return finish(std::move(executed.outcome));
+
+            const std::string verified_inputs =
+                orderedInputFilesSha256(input_paths, evidence_error,
+                                        logical_deadline);
+            if (!(executed.response.dependency_manifest ==
+                  probe.response.dependency_manifest) ||
+                verified_inputs != input_sha256) {
+                executed.outcome.analysis.tool_failed = true;
+                executed.outcome.resource.error =
+                    "dependency or model/summary evidence changed during "
+                    "worker execution";
+                return finish(std::move(executed.outcome));
+            }
+            if (executed.outcome.analysis.hasHardFailure() ||
+                executed.outcome.analysis.hasIncompleteEvidence())
+                return finish(std::move(executed.outcome));
+            if (!probe.response.dependency_manifest.cacheable)
+                return finish(std::move(executed.outcome));
+
+            std::string checkpoint_key;
+            std::string payload_sha;
+            if (!evidence_store->store(
+                    unit, phase, probe.response.dependency_manifest,
+                    input_sha256, executed.response,
+                    executed.summary_fragment, checkpoint_key, payload_sha,
+                    evidence_error, logical_deadline)) {
+                executed.outcome.analysis.tool_failed = true;
+                executed.outcome.resource.error = evidence_error;
+                return finish(std::move(executed.outcome));
+            }
+            executed.outcome.checkpoint_key_sha256 =
+                std::move(checkpoint_key);
+            executed.outcome.payload_sha256 = std::move(payload_sha);
+            return finish(std::move(executed.outcome));
         };
 
     if (config_.wholeProgram()) {
@@ -430,9 +730,22 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
 
     auto coordinated = AnalysisCoordinator::run(
         units,
-        ResourceLimits{config_.tuTimeoutSeconds(), config_.tuMemoryMiB()},
+        limits,
         config_.wholeProgram(), executor);
     AnalysisResult result = std::move(coordinated.analysis);
+    // Coverage counts the exact requested source set; receipts and
+    // analyzed_tus may be larger when one source has multiple admitted
+    // compile commands. Keep this identical to the direct path and the
+    // real-world ledger contract.
+    result.attempted_tus = seed.attempted_tus;
+    if (evidence_store) {
+        std::string analyzer_error;
+        if (!evidence_store->verifyAnalyzerIdentity(analyzer_error)) {
+            result.tool_failed = true;
+            std::cerr << "[CodeSkeptic] checkpoint unavailable: "
+                      << analyzer_error << "\n";
+        }
+    }
     result.analyze_broken_tus = config_.analyzeBrokenTUs();
     result.accept_partial_coverage = config_.acceptPartialCoverage();
     result.summary_load_failed =

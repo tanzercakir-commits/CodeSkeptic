@@ -70,6 +70,29 @@ TEST(AnalysisCoordinatorTest, ResourceFailureKeepsEarlierAndLaterUnits) {
               TranslationUnitStatus::TimedOut);
 }
 
+TEST(AnalysisCoordinatorTest, ReceiptPreservesCheckpointOriginAndPayload) {
+    const std::vector<TranslationUnitExecution> units = {
+        unit("/src/a.cpp", "sha-a"),
+    };
+    const auto result = AnalysisCoordinator::run(
+        units, ResourceLimits{10, 256}, false,
+        [](const TranslationUnitExecution& execution,
+           TranslationUnitPhase) {
+            auto outcome = completed(execution.canonical_path.c_str(), "cached");
+            outcome.origin = TranslationUnitOrigin::Checkpoint;
+            outcome.checkpoint_key_sha256 = std::string(64, 'a');
+            outcome.payload_sha256 = std::string(64, 'b');
+            return outcome;
+        });
+
+    ASSERT_EQ(result.analysis.tu_receipts.size(), 1u);
+    const auto& receipt = result.analysis.tu_receipts.front();
+    EXPECT_EQ(receipt.origin, TranslationUnitOrigin::Checkpoint);
+    EXPECT_STREQ(translationUnitOriginName(receipt.origin), "checkpoint");
+    EXPECT_EQ(receipt.checkpoint_key_sha256, std::string(64, 'a'));
+    EXPECT_EQ(receipt.payload_sha256, std::string(64, 'b'));
+}
+
 TEST(AnalysisCoordinatorTest, WholeProgramPrepassFailureStopsAnalysisPhase) {
     const std::vector<TranslationUnitExecution> units = {
         unit("/src/a.cpp", "sha-a"), unit("/src/b.cpp", "sha-b")};

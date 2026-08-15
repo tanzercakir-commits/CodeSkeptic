@@ -1,0 +1,115 @@
+{
+  "budget": {
+    "input_timeout_seconds": 5,
+    "max_input_bytes": 65536,
+    "rss_limit_mb": 2048,
+    "runs_per_target": 256,
+    "wall_timeout_seconds_per_target": 120
+  },
+  "campaign_manifest_sha256": "ebe579cc13c1634c813ce9e5a04e654083db39d8b983f4622722ee6da1efd9c4",
+  "corpus_file_count": 9,
+  "corpus_manifest_sha256": "1a0dfa35e82342e7d043b64d216a46a405962a03ae4c1bf74e5e3d3dc99db343",
+  "duration_ms": 180987,
+  "failures": [],
+  "finished_at": "2026-08-15T09:48:51.828020+00:00",
+  "host": {
+    "machine": "x86_64",
+    "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "mode": "smoke",
+  "schema": "codeskeptic-fuzz-receipt-v1",
+  "source": {
+    "commit": "a9b0a37791d41833db65d6130300a2bdd27e69fc",
+    "manifest": {
+      "algorithm": "sha256",
+      "digest": "1008f95e4d4668402ef8e21d6a7eb3a01653b6c19cdca7a5c5d43480ed3bff67",
+      "file_count": 139
+    }
+  },
+  "started_at": "2026-08-15T09:45:50.840863+00:00",
+  "status": "accepted",
+  "targets": [
+    {
+      "artifacts": [],
+      "binary_sha256": "810fa56b1c0417ef1358d8f9ae52c525f9559fb25c3ce1151870934a91eaafa6",
+      "command": [
+        "$BUILD_DIR/fuzz/codeskeptic_fuzz_config",
+        "-seed=1001",
+        "-runs=256",
+        "-max_len=$MAX_INPUT_BYTES",
+        "-timeout=$INPUT_TIMEOUT_SECONDS",
+        "-rss_limit_mb=$RSS_LIMIT_MB",
+        "-artifact_prefix=$ARTIFACT_DIR/",
+        "$MUTABLE_CORPUS/config"
+      ],
+      "duration_ms": 64,
+      "exit_code": 0,
+      "id": "config",
+      "log": "logs/config.log",
+      "log_sha256": "8390bdb6c6640ef50dc8a869abc3d3d153c61bfd48ee1daa00de617b2ef5453a"
+    },
+    {
+      "artifacts": [],
+      "binary_sha256": "6f427c166b2189f3b6f775aaa61267134a8e3998be30a2f3bce1e530857ebf8e",
+      "command": [
+        "$BUILD_DIR/fuzz/codeskeptic_fuzz_compile_database",
+        "-seed=1002",
+        "-runs=256",
+        "-max_len=$MAX_INPUT_BYTES",
+        "-timeout=$INPUT_TIMEOUT_SECONDS",
+        "-rss_limit_mb=$RSS_LIMIT_MB",
+        "-artifact_prefix=$ARTIFACT_DIR/",
+        "$MUTABLE_CORPUS/compile_database"
+      ],
+      "duration_ms": 64,
+      "exit_code": 0,
+      "id": "compile_database",
+      "log": "logs/compile_database.log",
+      "log_sha256": "a840cf7abfde8733fd5d14617183a7b3ce4e95934f50160039256e063b9cb75e"
+    },
+    {
+      "artifacts": [],
+      "binary_sha256": "4df6e6d844a0dccd8f21a4c1f94f8bef4efad24668143c4fef4e5cdea032a981",
+      "command": [
+        "$BUILD_DIR/fuzz/codeskeptic_fuzz_summary",
+        "-seed=1003",
+        "-runs=256",
+        "-max_len=$MAX_INPUT_BYTES",
+        "-timeout=$INPUT_TIMEOUT_SECONDS",
+        "-rss_limit_mb=$RSS_LIMIT_MB",
+        "-artifact_prefix=$ARTIFACT_DIR/",
+        "$MUTABLE_CORPUS/summary"
+      ],
+      "duration_ms": 90392,
+      "exit_code": 0,
+      "id": "summary",
+      "log": "logs/summary.log",
+      "log_sha256": "f5c6b325687dd0a272f45b13b83b295537cdd99359443b1a3c21d5e47810dab8"
+    },
+    {
+      "artifacts": [],
+      "binary_sha256": "b096d0a13ed29d659f7f5e207e27c3a6d0d003cc2e7623e89878e013f13eb408",
+      "command": [
+        "$BUILD_DIR/fuzz/codeskeptic_fuzz_mcp_json_rpc",
+        "-seed=1004",
+        "-runs=256",
+        "-max_len=$MAX_INPUT_BYTES",
+        "-timeout=$INPUT_TIMEOUT_SECONDS",
+        "-rss_limit_mb=$RSS_LIMIT_MB",
+        "-artifact_prefix=$ARTIFACT_DIR/",
+        "$MUTABLE_CORPUS/mcp_json_rpc"
+      ],
+      "duration_ms": 90223,
+      "exit_code": 0,
+      "id": "mcp_json_rpc",
+      "log": "logs/mcp_json_rpc.log",
+      "log_sha256": "cafa568674b7c66f54b565233fd44a0f635e5556e16ca49a0142561959b368c4"
+    }
+  ],
+  "toolchain": {
+    "path": "/usr/bin/clang++-20",
+    "version_first_line": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)",
+    "version_output_sha256": "fc7eaa7835f292237f1a4c1ba25055189c8219ecb87e27bb3db4d3478ca1949a"
+  }
+}

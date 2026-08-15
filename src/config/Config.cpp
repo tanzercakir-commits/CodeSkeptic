@@ -62,7 +62,7 @@ const std::set<std::string>& singleValueOptions() {
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
         "--files", "--tu-timeout-seconds", "--tu-memory-mib",
-        "--write-baseline"
+        "--checkpoint-dir", "--write-baseline"
     };
     return options;
 }
@@ -115,6 +115,9 @@ bool Config::operator==(const Config& other) const {
            accept_partial_coverage_ == other.accept_partial_coverage_ &&
            tu_timeout_seconds_ == other.tu_timeout_seconds_ &&
            tu_memory_mib_ == other.tu_memory_mib_ &&
+           checkpoint_dir_ == other.checkpoint_dir_ &&
+           checkpoint_per_run_namespace_ ==
+               other.checkpoint_per_run_namespace_ &&
            assert_recovery_ == other.assert_recovery_ &&
            assumptions_ == other.assumptions_ &&
            warm_cache_ == other.warm_cache_ &&
@@ -144,6 +147,7 @@ Config Config::mcpRequestConfig() const {
     scoped.serve_ = false;
     scoped.whole_program_ = false;
     scoped.warm_cache_ = false;
+    scoped.checkpoint_per_run_namespace_ = !scoped.checkpoint_dir_.empty();
     scoped.help_requested_ = false;
     scoped.summary_in_path_.clear();
     scoped.summary_out_path_.clear();
@@ -357,6 +361,15 @@ bool Config::loadFromTextInPlace(const std::string& text,
                 ok = false;
             }
         }
+        else if (key == "checkpoint_dir") {
+            if (value.empty()) {
+                report(lineNumber,
+                       "checkpoint_dir expects a non-empty path");
+                ok = false;
+            } else {
+                checkpoint_dir_ = value;
+            }
+        }
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
         else {
@@ -501,6 +514,14 @@ bool Config::parseArgs(int argc, char* argv[]) {
                 return false;
             }
             tu_memory_mib_ = parsed;
+        } else if (arg == "--checkpoint-dir" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            if (value.empty()) {
+                std::cerr << "[CodeSkeptic] --checkpoint-dir expects a "
+                             "non-empty path\n";
+                return false;
+            }
+            checkpoint_dir_ = value;
         } else if (arg == "--assumptions") {
             assumptions_ = true;
         } else if (arg == "--summary-in" && i + 1 < argc) {
@@ -607,6 +628,9 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         (default: 300; range: 1-86400)\n"
                       << "  --tu-memory-mib <N>   Per-translation-unit memory ceiling in MiB\n"
                       << "                         (default: 4096; range: 1-131072)\n"
+                      << "  --checkpoint-dir <path> Persistent verified TU cache and resume\n"
+                      << "                         ledger (corrupt/incompatible data fails\n"
+                      << "                         closed)\n"
                       << "  --summary-out <file>   Save harvested cross-file function\n"
                       << "                         summaries to a file after analysis\n"
                       << "  --summary-in <file>    Load function summaries saved earlier;\n"

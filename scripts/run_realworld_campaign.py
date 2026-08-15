@@ -7,10 +7,12 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
 import shutil
+import stat
 import string
 import subprocess
 import sys
@@ -46,6 +48,8 @@ REQUIRED_EXPECTED = {
     "exit_code",
     "fingerprint_sha256",
 }
+MAX_RECEIPT_BYTES = 16 << 20
+MAX_CHECKSUM_BYTES = 1024
 
 
 class CampaignError(RuntimeError):
@@ -496,32 +500,147 @@ def _sidecar(path: Path) -> Path:
     return Path(f"{path}.sha256")
 
 
+def _path_kind(path: Path) -> str:
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return "missing"
+    except OSError as error:
+        raise EvidenceError(f"cannot inspect evidence path {path}: {error}") from error
+    if stat.S_ISREG(mode):
+        return "regular"
+    if stat.S_ISDIR(mode):
+        return "directory"
+    return "non-regular"
+
+
+def _read_regular_bytes(path: Path, maximum: int) -> bytes:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise EvidenceError(f"evidence path is not a readable regular file: {path}: {error}") from error
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise EvidenceError(f"evidence path is not a regular file: {path}")
+        if metadata.st_size > maximum:
+            raise EvidenceError(f"evidence file exceeds size limit: {path}")
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            block = os.read(descriptor, min(1 << 20, maximum + 1 - total))
+            if not block:
+                break
+            chunks.append(block)
+            total += len(block)
+            if total > maximum:
+                raise EvidenceError(f"evidence file exceeds size limit: {path}")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
+def _write_new_regular_staging(path: Path, payload: bytes) -> None:
+    kind = _path_kind(path)
+    if kind not in {"missing", "regular"}:
+        raise EvidenceError(f"evidence staging path is non-regular: {path}")
+    if kind == "regular":
+        try:
+            path.unlink()
+        except OSError as error:
+            raise EvidenceError(f"cannot recover evidence staging file {path}: {error}") from error
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as error:
+        raise EvidenceError(f"cannot create evidence staging file {path}: {error}") from error
+    try:
+        offset = 0
+        while offset < len(payload):
+            written = os.write(descriptor, payload[offset:])
+            if written <= 0:
+                raise OSError("short evidence staging write")
+            offset += written
+        os.fsync(descriptor)
+    except OSError as error:
+        raise EvidenceError(f"cannot write evidence staging file {path}: {error}") from error
+    finally:
+        os.close(descriptor)
+
+
+def _unlink_regular_target(path: Path) -> None:
+    kind = _path_kind(path)
+    if kind not in {"missing", "regular"}:
+        raise EvidenceError(f"evidence publication target is non-regular: {path}")
+    if kind == "regular":
+        try:
+            path.unlink()
+        except OSError as error:
+            raise EvidenceError(f"cannot replace evidence target {path}: {error}") from error
+
+
 def write_receipt(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    if _path_kind(path.parent) != "directory":
+        raise EvidenceError(f"evidence parent is not a real directory: {path.parent}")
+    encoded = (
+        json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    ).encode("utf-8")
+    if len(encoded) > MAX_RECEIPT_BYTES:
+        raise EvidenceError(f"receipt exceeds size limit: {path}")
     temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(encoded, encoding="utf-8", newline="\n")
-    os.replace(temporary, path)
-    digest = file_digest(path)
+    _write_new_regular_staging(temporary, encoded)
+    digest = digest_bytes(encoded)
     sidecar = _sidecar(path)
     sidecar_temporary = sidecar.with_name(f".{sidecar.name}.tmp")
-    sidecar_temporary.write_text(f"{digest}  {path.name}\n", encoding="ascii", newline="\n")
-    os.replace(sidecar_temporary, sidecar)
+    checksum = f"{digest}  {path.name}\n".encode("ascii")
+    try:
+        _write_new_regular_staging(sidecar_temporary, checksum)
+        # Publish from an empty pair so an interruption leaves either no
+        # checkpoint or one recognizable regular orphan. The loader removes
+        # that orphan and continues through the per-TU evidence store.
+        if (_path_kind(path) not in {"missing", "regular"} or
+                _path_kind(sidecar) not in {"missing", "regular"}):
+            raise EvidenceError(f"evidence publication target is non-regular: {path}")
+        _unlink_regular_target(path)
+        _unlink_regular_target(sidecar)
+        os.replace(sidecar_temporary, sidecar)
+        os.replace(temporary, path)
+    finally:
+        for candidate in (temporary, sidecar_temporary):
+            if _path_kind(candidate) == "regular":
+                candidate.unlink()
 
 
 def load_verified_receipt(path: Path) -> dict[str, Any]:
     sidecar = _sidecar(path)
-    if not path.is_file() or not sidecar.is_file():
+    receipt_kind = _path_kind(path)
+    checksum_kind = _path_kind(sidecar)
+    if (receipt_kind not in {"missing", "regular"} or
+            checksum_kind not in {"missing", "regular"}):
+        raise EvidenceError(f"receipt or checksum is not a regular file: {path}")
+    if receipt_kind != "regular" or checksum_kind != "regular":
         raise EvidenceError(f"missing receipt or checksum: {path}")
-    fields = sidecar.read_text(encoding="ascii").strip().split()
+    try:
+        receipt_bytes = _read_regular_bytes(path, MAX_RECEIPT_BYTES)
+        checksum_bytes = _read_regular_bytes(sidecar, MAX_CHECKSUM_BYTES)
+        checksum_text = checksum_bytes.decode("ascii")
+    except UnicodeDecodeError as error:
+        raise EvidenceError(f"malformed receipt checksum: {sidecar}") from error
+    fields = checksum_text.strip().split()
     if len(fields) != 2 or fields[1] != path.name or not SHA256.fullmatch(fields[0]):
         raise EvidenceError(f"malformed receipt checksum: {sidecar}")
-    actual = file_digest(path)
+    actual = digest_bytes(receipt_bytes)
     if actual != fields[0]:
         raise EvidenceError(f"receipt checksum mismatch: {path}")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        payload = json.loads(receipt_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EvidenceError(f"malformed receipt: {path}: {error}") from error
     if not isinstance(payload, dict) or payload.get("schema") != SCHEMA:
         raise EvidenceError(f"unsupported receipt schema: {path}")
@@ -537,11 +656,196 @@ def checkpoint_matches(receipt: dict[str, Any], identity: dict[str, Any]) -> boo
     )
 
 
+def load_matching_checkpoint(
+    checkpoint: Path, identity: dict[str, Any], project: dict[str, Any]
+) -> dict[str, Any] | None:
+    sidecar = _sidecar(checkpoint)
+    receipt_kind = _path_kind(checkpoint)
+    checksum_kind = _path_kind(sidecar)
+    if (receipt_kind not in {"missing", "regular"} or
+            checksum_kind not in {"missing", "regular"}):
+        raise EvidenceError(f"explicit checkpoint path is non-regular: {checkpoint}")
+    if receipt_kind == "missing" and checksum_kind == "missing":
+        return None
+    if receipt_kind != checksum_kind:
+        orphan = checkpoint if receipt_kind == "regular" else sidecar
+        try:
+            orphan.unlink()
+        except OSError as error:
+            raise EvidenceError(
+                f"cannot recover incomplete explicit checkpoint: {checkpoint}: {error}"
+            ) from error
+        return None
+    receipt = load_verified_receipt(checkpoint)
+    if not checkpoint_matches(receipt, identity):
+        raise EvidenceError(
+            f"explicit checkpoint is incompatible with this exact shard: {checkpoint}"
+        )
+    if set(receipt) != {
+        "schema",
+        "status",
+        "project",
+        "repetition",
+        "identity",
+        "semantic",
+        "execution",
+        "failures",
+    }:
+        raise EvidenceError("explicit checkpoint receipt shape is malformed")
+    if (
+        receipt.get("project") != project["id"]
+        or receipt.get("repetition") != identity.get("repetition")
+    ):
+        raise EvidenceError("explicit checkpoint shard identity is malformed")
+    semantic = receipt.get("semantic")
+    _validate_semantic(project, semantic)
+    _validate_execution(project, semantic, receipt.get("execution"))
+    return receipt
+
+
+def analyzer_checkpoint_arguments(checkpoint: Path | None) -> list[str]:
+    if checkpoint is None:
+        return []
+    unit_directory = checkpoint.parent / "unit-evidence"
+    return ["--checkpoint-dir", str(unit_directory)]
+
+
+def translation_unit_plan(
+    report: dict[str, Any],
+    requested_translation_units: int,
+    analyzed_executions: int,
+    expected_paths: list[Path] | None = None,
+    whole_program: bool = False,
+) -> dict[str, Any]:
+    receipts = report.get("translation_units")
+    if not isinstance(receipts, list) or not receipts:
+        raise EvidenceError("report has no translation-unit receipt plan")
+    expected_fields = {
+        "path",
+        "compile_command_sha256",
+        "command_ordinal",
+        "phase",
+        "status",
+        "duration_ms",
+        "peak_memory_kib",
+        "timeout_seconds",
+        "memory_mib",
+        "origin",
+        "checkpoint_key_sha256",
+        "payload_sha256",
+    }
+    path_indexes: dict[str, int] = {}
+    if expected_paths is not None:
+        path_indexes = {
+            str(path.resolve()): index for index, path in enumerate(expected_paths)
+        }
+        if len(path_indexes) != requested_translation_units:
+            raise EvidenceError("requested translation-unit paths are not unique")
+
+    normalized: list[list[Any]] = []
+    identities_by_phase: dict[str, set[tuple[str, str, int]]] = {}
+    origins = {"executed": 0, "checkpoint": 0}
+    seen: set[tuple[str, str, int, str]] = set()
+    phase_order: list[str] = []
+    for receipt in receipts:
+        if not isinstance(receipt, dict) or set(receipt) != expected_fields:
+            raise EvidenceError("translation-unit receipt is malformed")
+        path = receipt["path"]
+        command_sha = receipt["compile_command_sha256"]
+        ordinal = receipt["command_ordinal"]
+        phase = receipt["phase"]
+        origin = receipt["origin"]
+        key = receipt["checkpoint_key_sha256"]
+        payload = receipt["payload_sha256"]
+        if (
+            not isinstance(path, str)
+            or not path
+            or not isinstance(command_sha, str)
+            or not SHA256.fullmatch(command_sha)
+            or isinstance(ordinal, bool)
+            or not isinstance(ordinal, int)
+            or ordinal < 0
+            or phase not in ("summary-harvest", "analysis")
+            or receipt["status"] != "completed"
+            or origin not in origins
+        ):
+            raise EvidenceError("translation-unit receipt identity is invalid")
+        for field in (
+            "duration_ms",
+            "peak_memory_kib",
+            "timeout_seconds",
+            "memory_mib",
+        ):
+            value = receipt[field]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise EvidenceError(
+                    f"translation-unit receipt field {field} is invalid"
+                )
+        if receipt["timeout_seconds"] == 0 or receipt["memory_mib"] == 0:
+            raise EvidenceError("translation-unit receipt budgets are invalid")
+        digests_present = (
+            isinstance(key, str)
+            and isinstance(payload, str)
+            and SHA256.fullmatch(key) is not None
+            and SHA256.fullmatch(payload) is not None
+        )
+        if origin == "checkpoint" and not digests_present:
+            raise EvidenceError("checkpoint receipt lacks exact payload identity")
+        if not digests_present and (key != "" or payload != ""):
+            raise EvidenceError("translation-unit payload identity is malformed")
+
+        canonical = str(Path(path).resolve())
+        if path_indexes and canonical not in path_indexes:
+            raise EvidenceError("translation-unit receipt path was not requested")
+        base = (canonical, command_sha, ordinal)
+        exact = (*base, phase)
+        if exact in seen:
+            raise EvidenceError("translation-unit receipt plan contains a duplicate")
+        seen.add(exact)
+        identities_by_phase.setdefault(phase, set()).add(base)
+        if not phase_order or phase_order[-1] != phase:
+            phase_order.append(phase)
+        normalized.append(
+            [
+                path_indexes.get(canonical, canonical),
+                command_sha,
+                ordinal,
+                phase,
+            ]
+        )
+        origins[origin] += 1
+
+    expected_phases = (
+        ["summary-harvest", "analysis"] if whole_program else ["analysis"]
+    )
+    if phase_order != expected_phases:
+        raise EvidenceError("translation-unit receipt phases are out of order")
+    for phase in expected_phases:
+        if len(identities_by_phase.get(phase, set())) != analyzed_executions:
+            raise EvidenceError("translation-unit receipt plan has omission")
+        if path_indexes and {
+            identity[0] for identity in identities_by_phase[phase]
+        } != set(path_indexes):
+            raise EvidenceError("translation-unit receipt plan has path omission")
+    if whole_program and (
+        identities_by_phase["summary-harvest"]
+        != identities_by_phase["analysis"]
+    ):
+        raise EvidenceError("whole-program receipt phases bind different units")
+    return {
+        "count": len(receipts),
+        "sha256": digest_json(normalized),
+        "executed": origins["executed"],
+        "checkpoint": origins["checkpoint"],
+    }
+
+
 def _report_semantic(
     process_exit: int,
     report: dict[str, Any],
     translation_units: int,
     translation_unit_sha256: str,
+    whole_program: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(report, dict):
         raise EvidenceError("analyzer report root is not an object")
@@ -567,6 +871,12 @@ def _report_semantic(
         or normalized_coverage["incomplete_functions"] != 0
     ):
         raise EvidenceError("report does not prove exact TU coverage")
+    translation_unit_plan(
+        report,
+        translation_units,
+        normalized_coverage["analyzed_tus"],
+        whole_program=whole_program,
+    )
     diagnostics = report.get("diagnostics")
     total = report.get("total")
     if isinstance(total, bool) or not isinstance(total, int) or total < 0 or not isinstance(diagnostics, list):
@@ -667,6 +977,67 @@ def _validate_semantic(project: dict[str, Any], semantic: dict[str, Any]) -> Non
         raise EvidenceError(f"project {project['id']} expectation drift: {details}")
 
 
+def _validate_execution(
+    project: dict[str, Any],
+    semantic: dict[str, Any],
+    execution: dict[str, Any],
+    require_plan: bool = True,
+) -> dict[str, Any] | None:
+    if not isinstance(execution, dict):
+        raise EvidenceError(
+            f"project {project['id']} execution evidence is malformed"
+        )
+    expected_fields = {"duration_seconds", "resumed", "translation_unit_plan"}
+    legacy_fields = {"duration_seconds", "resumed"}
+    allowed_fields = (
+        (expected_fields,) if require_plan else (expected_fields, legacy_fields)
+    )
+    if not any(set(execution) == fields for fields in allowed_fields):
+        raise EvidenceError(
+            f"project {project['id']} execution evidence is malformed"
+        )
+    duration = execution.get("duration_seconds")
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or not math.isfinite(duration)
+        or duration < 0
+        or not isinstance(execution.get("resumed"), bool)
+    ):
+        raise EvidenceError(
+            f"project {project['id']} execution evidence is malformed"
+        )
+    if "translation_unit_plan" not in execution:
+        return None
+    plan = execution.get("translation_unit_plan")
+    if (
+        not isinstance(plan, dict)
+        or set(plan) != {"count", "sha256", "executed", "checkpoint"}
+        or isinstance(plan.get("count"), bool)
+        or not isinstance(plan.get("count"), int)
+        or plan["count"] <= 0
+        or not isinstance(plan.get("sha256"), str)
+        or not SHA256.fullmatch(plan["sha256"])
+        or any(
+            isinstance(plan.get(name), bool)
+            or not isinstance(plan.get(name), int)
+            or plan[name] < 0
+            for name in ("executed", "checkpoint")
+        )
+        or plan["executed"] + plan["checkpoint"] != plan["count"]
+    ):
+        raise EvidenceError(
+            f"project {project['id']} translation-unit plan is malformed"
+        )
+    phases = 2 if "--whole-program" in project["analyzer_args"] else 1
+    expected_count = semantic["coverage"]["analyzed_tus"] * phases
+    if plan["count"] != expected_count:
+        raise EvidenceError(
+            f"project {project['id']} translation-unit plan is inconsistent"
+        )
+    return plan
+
+
 def semantic_from_report(
     project: dict[str, Any],
     process_exit: int,
@@ -675,7 +1046,11 @@ def semantic_from_report(
     translation_unit_sha256: str,
 ) -> dict[str, Any]:
     semantic = _report_semantic(
-        process_exit, report, translation_units, translation_unit_sha256
+        process_exit,
+        report,
+        translation_units,
+        translation_unit_sha256,
+        whole_program="--whole-program" in project["analyzer_args"],
     )
     _validate_semantic(project, semantic)
     return semantic
@@ -686,6 +1061,8 @@ def validate_receipt_group(
     tier: str,
     project_id: str,
     receipts: list[dict[str, Any]],
+    *,
+    require_execution_plan: bool = True,
 ) -> dict[str, Any]:
     """Validate one project's full repetition set with the campaign referee."""
     campaign = manifest["campaigns"].get(tier)
@@ -700,6 +1077,8 @@ def validate_receipt_group(
         )
 
     project = project_by_id(manifest, project_id)
+    plan_digests: set[str] = set()
+    plan_presence: set[bool] = set()
     for repetition, receipt in enumerate(receipts, 1):
         if (
             receipt.get("status") != "accepted"
@@ -746,6 +1125,23 @@ def validate_receipt_group(
             )
         semantic = receipt.get("semantic")
         _validate_semantic(project, semantic)
+        plan = _validate_execution(
+            project,
+            semantic,
+            receipt.get("execution"),
+            require_plan=require_execution_plan,
+        )
+        plan_presence.add(plan is not None)
+        if plan is not None:
+            plan_digests.add(plan["sha256"])
+    if len(plan_presence) != 1:
+        raise EvidenceError(
+            f"project {project_id} execution schemas are nondeterministic"
+        )
+    if plan_digests and len(plan_digests) != 1:
+        raise EvidenceError(
+            f"project {project_id} translation-unit plans are nondeterministic"
+        )
     semantic = receipts[0]["semantic"]
     return {
         "repetitions": len(receipts),
@@ -1154,18 +1550,14 @@ def run_shard(
     )
     started = time.monotonic()
     output.parent.mkdir(parents=True, exist_ok=True)
-    if checkpoint is not None and checkpoint.is_file() and _sidecar(checkpoint).is_file():
-        try:
-            prior = load_verified_receipt(checkpoint)
-            if checkpoint_matches(prior, expected_identity):
-                resumed = copy.deepcopy(prior)
-                resumed["execution"] = {"duration_seconds": 0.0, "resumed": True}
-                write_receipt(output, resumed)
-                return 0
-        except EvidenceError:
-            pass
+    if checkpoint is not None:
+        # The shard receipt validates explicit resume identity, but is not
+        # verdict authority. Rebuild the current compile database and let the
+        # analyzer's per-unit evidence store revalidate exact command plans.
+        load_matching_checkpoint(checkpoint, expected_identity, project)
 
     semantic: dict[str, Any] | None = None
+    unit_plan: dict[str, Any] | None = None
     actual_tu_sha = project["expected"]["translation_unit_sha256"]
     actual_submodules = expected_submodules
     failures: list[str] = []
@@ -1283,6 +1675,7 @@ def run_shard(
             str(build),
             "--json",
             str(report_path),
+            *analyzer_checkpoint_arguments(checkpoint),
             *_expand(project["analyzer_args"], values),
         ]
         result = _run_command(
@@ -1299,7 +1692,18 @@ def run_shard(
         except json.JSONDecodeError as error:
             raise EvidenceError(f"analyzer report is malformed: {error}") from error
         semantic = _report_semantic(
-            result.returncode, report, len(files), actual_tu_sha
+            result.returncode,
+            report,
+            len(files),
+            actual_tu_sha,
+            whole_program="--whole-program" in project["analyzer_args"],
+        )
+        unit_plan = translation_unit_plan(
+            report,
+            len(files),
+            semantic["coverage"]["analyzed_tus"],
+            files,
+            whole_program="--whole-program" in project["analyzer_args"],
         )
         _validate_semantic(project, semantic)
     except (CampaignError, OSError, subprocess.SubprocessError) as error:
@@ -1323,7 +1727,10 @@ def run_shard(
         "semantic": semantic,
         "execution": {
             "duration_seconds": round(time.monotonic() - started, 3),
-            "resumed": False,
+            "resumed": bool(
+                unit_plan is not None and unit_plan["checkpoint"] > 0
+            ),
+            "translation_unit_plan": unit_plan,
         },
         "failures": failures or ([] if accepted else ["missing semantic evidence"]),
     }

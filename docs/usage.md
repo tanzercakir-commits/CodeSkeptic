@@ -103,6 +103,12 @@ codeskeptic <source_path> [options]
   --model-file <file>    Load an opt-in library model in the strict
                          summary schema (repeatable; malformed or
                          missing files make the verdict unavailable)
+  --tu-timeout-seconds <N> Per-translation-unit wall timeout
+                         (default: 300; range: 1..86400)
+  --tu-memory-mib <N>   Per-translation-unit memory ceiling in MiB
+                         (default: 4096; range: 1..131072)
+  --checkpoint-dir <path> Persist exact verified TU outcomes and resume
+                         an interrupted analysis without weakening coverage
   --lang <en|tr>         Diagnostic message language (default: en)
   --capabilities [--json] Print the tiered product scope and exit
 ```
@@ -150,8 +156,43 @@ fail with exit `2`):
 `sarif_output`, `min_severity`, `enable_rule`, `disable_rule`, `lang`,
 `function`, `fatal_asserts`, `assert_macros`, `assert_recovery`,
 `alloc_functions`, `free_functions`, `allocator_pairs`, and repeatable
-`model_file` entries. An allocator may appear in multiple `allocator_pairs`
-entries to admit multiple exact deallocators.
+`model_file` entries. `tu_timeout_seconds`, `tu_memory_mib`, and
+`checkpoint_dir` apply the same bounded worker and resume policy as their CLI
+forms. An allocator may appear in multiple `allocator_pairs` entries to admit
+multiple exact deallocators.
+
+Checkpoint reuse is an optimization, never verdict authority. Every entry is
+bound to the analyzer, exact source and dependency contents, compile command
+and ordinal, semantic configuration, enabled rules, model/summary inputs,
+resource limits, and analysis phase. A valid entry with a different key is a
+normal miss. A corrupt entry or an explicitly selected checkpoint whose run
+identity is incompatible fails closed with exit `2`; use a new directory for
+an intentional cold run. Manifest publication uses create-new staging: a
+regular staging remainder left by an interrupted write is recovered, while a
+symlink or other non-regular staging node is rejected without following it.
+The dependency probe and the subsequent miss worker or cache-hit verification
+probe share one absolute per-TU/phase wall-clock deadline; a checkpoint can
+therefore never multiply the configured timeout. Receipt duration covers this
+whole logical pipeline. Inputs containing volatile date/time preprocessor
+macros in source, headers, compile-command definitions, or response files are
+analyzed normally but are not persisted. This decision observes actual Clang
+macro expansion, including token-paste and indirection; nested `@response`
+arguments are expanded inside the isolated worker under bounded parsing. Both
+a lexical header alias and its resolved target are bound so the exact `.csk`
+sidecar path read by Clang cannot escape invalidation through a symlink.
+Analyzer identity is rechecked at lookup and publication boundaries. The fast
+guard includes stable file identity plus platform change-time metadata, and
+any change forces a full binary SHA-256 comparison; restoring size and mtime
+alone cannot publish or reuse a polluted entry. Entry staging follows the same
+interruption rule as the manifest: real stale directories are recovered and
+non-directory or symlink staging state is rejected.
+
+When `checkpoint_dir` is inherited by the long-lived MCP server, CodeSkeptic
+owns a `requests/` namespace below that root and partitions calls by the exact
+analyzer, semantic configuration, and translation-unit plan identities. A
+repeat of request A can therefore resume A, while an unrelated request B gets
+an independent cold namespace instead of making the server-wide checkpoint
+incompatible. MCP request arguments cannot choose or escape this storage root.
 
 Project idioms are configuration, not code: allocator wrappers, exact
 allocator families, fatal assert handlers and owning smart pointers belong in

@@ -77,6 +77,9 @@ TranslationUnitReceipt makeReceipt(
         outcome.resource.peak_memory_kib,
         limits.timeout_seconds,
         limits.memory_mib,
+        outcome.origin,
+        outcome.checkpoint_key_sha256,
+        outcome.payload_sha256,
     };
 }
 
@@ -98,6 +101,8 @@ void recomputeFindingCounts(CoordinatedAnalysisResult& result) {
 
 const char* translationUnitPhaseName(TranslationUnitPhase phase) {
     switch (phase) {
+        case TranslationUnitPhase::DependencyProbe:
+            return "dependency-probe";
         case TranslationUnitPhase::SummaryHarvest:
             return "summary-harvest";
         case TranslationUnitPhase::Analysis:
