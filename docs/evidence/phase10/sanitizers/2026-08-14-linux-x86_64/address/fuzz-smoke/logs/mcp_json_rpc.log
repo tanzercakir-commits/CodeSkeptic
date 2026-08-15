@@ -1,27 +1,25 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1004
-INFO: Loaded 1 modules   (575556 inline 8-bit counters): 575556 [0x55b82adb4f10, 0x55b82ae41754), 
-INFO: Loaded 1 PC tables (575556 PCs): 575556 [0x55b82ae41758,0x55b82b709b98), 
-INFO:        3 files found in /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/codeskeptic-fuzz-g97nrozz/corpus/mcp_json_rpc
-INFO: seed corpus: files: 3 min: 34b max: 153b total: 228b rss: 116Mb
-#5	INITED cov: 252 ft: 277 corp: 3/228b exec/s: 0 rss: 117Mb
-#6	NEW    cov: 255 ft: 280 corp: 4/269b lim: 153 exec/s: 0 rss: 117Mb L: 41/153 MS: 1 ChangeBit-
-#35	REDUCE cov: 255 ft: 280 corp: 4/266b lim: 153 exec/s: 0 rss: 120Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
-#36	NEW    cov: 269 ft: 308 corp: 5/399b lim: 153 exec/s: 0 rss: 120Mb L: 133/153 MS: 1 EraseBytes-
-	NEW_FUNC[1/1]: 0x55b826ee1360 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
-#47	NEW    cov: 275 ft: 319 corp: 6/533b lim: 153 exec/s: 0 rss: 121Mb L: 134/153 MS: 1 InsertByte-
-#48	REDUCE cov: 275 ft: 319 corp: 6/529b lim: 153 exec/s: 0 rss: 121Mb L: 27/153 MS: 1 EraseBytes-
-#59	NEW    cov: 276 ft: 320 corp: 7/677b lim: 153 exec/s: 0 rss: 122Mb L: 148/153 MS: 1 InsertRepeatedBytes-
-#61	NEW    cov: 279 ft: 323 corp: 8/733b lim: 153 exec/s: 0 rss: 122Mb L: 56/153 MS: 2 ChangeByte-CMP- DE: "allocator_pairs"-
-#82	NEW    cov: 280 ft: 324 corp: 9/886b lim: 153 exec/s: 0 rss: 124Mb L: 153/153 MS: 1 ChangeByte-
-#108	REDUCE cov: 280 ft: 324 corp: 9/884b lim: 153 exec/s: 0 rss: 126Mb L: 25/153 MS: 1 EraseBytes-
-#120	NEW    cov: 282 ft: 326 corp: 10/891b lim: 153 exec/s: 0 rss: 126Mb L: 7/153 MS: 2 ChangeBit-CrossOver-
-#126	NEW    cov: 283 ft: 327 corp: 11/932b lim: 153 exec/s: 0 rss: 127Mb L: 41/153 MS: 1 ChangeASCIIInt-
-#128	NEW    cov: 284 ft: 328 corp: 12/976b lim: 153 exec/s: 0 rss: 127Mb L: 44/153 MS: 2 CopyPart-EraseBytes-
-#254	NEW    cov: 289 ft: 333 corp: 13/1109b lim: 153 exec/s: 0 rss: 134Mb L: 133/153 MS: 1 ShuffleBytes-
-#256	DONE   cov: 289 ft: 333 corp: 13/1109b lim: 153 exec/s: 0 rss: 134Mb
+INFO: Loaded 1 modules   (580196 inline 8-bit counters): 580196 [0x564a6fc44290, 0x564a6fcd1cf4), 
+INFO: Loaded 1 PC tables (580196 PCs): 580196 [0x564a6fcd1cf8,0x564a705ac338), 
+INFO:        3 files found in /workspace/build/p10-05-sampling-final-address/codeskeptic-fuzz-3oxisp1g/corpus/mcp_json_rpc
+INFO: seed corpus: files: 3 min: 34b max: 153b total: 228b rss: 117Mb
+#5	INITED cov: 313 ft: 365 corp: 3/228b exec/s: 0 rss: 118Mb
+#6	NEW    cov: 316 ft: 368 corp: 4/269b lim: 153 exec/s: 0 rss: 118Mb L: 41/153 MS: 1 ChangeBit-
+#35	REDUCE cov: 316 ft: 368 corp: 4/266b lim: 153 exec/s: 0 rss: 120Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
+#36	NEW    cov: 330 ft: 398 corp: 5/399b lim: 153 exec/s: 0 rss: 120Mb L: 133/153 MS: 1 EraseBytes-
+	NEW_FUNC[1/1]: 0x564a6bd192c0 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
+#47	NEW    cov: 336 ft: 409 corp: 6/533b lim: 153 exec/s: 0 rss: 122Mb L: 134/153 MS: 1 InsertByte-
+#48	REDUCE cov: 336 ft: 409 corp: 6/529b lim: 153 exec/s: 0 rss: 122Mb L: 27/153 MS: 1 EraseBytes-
+#59	NEW    cov: 337 ft: 410 corp: 7/677b lim: 153 exec/s: 0 rss: 123Mb L: 148/153 MS: 1 InsertRepeatedBytes-
+#61	NEW    cov: 340 ft: 413 corp: 8/727b lim: 153 exec/s: 0 rss: 123Mb L: 50/153 MS: 2 ChangeByte-CMP- DE: "free_func"-
+#79	NEW    cov: 346 ft: 420 corp: 9/871b lim: 153 exec/s: 0 rss: 124Mb L: 144/153 MS: 3 PersAutoDict-InsertByte-InsertByte- DE: "free_func"-
+#126	NEW    cov: 348 ft: 422 corp: 10/878b lim: 153 exec/s: 0 rss: 128Mb L: 7/153 MS: 2 ChangeBit-CrossOver-
+#132	NEW    cov: 349 ft: 423 corp: 11/919b lim: 153 exec/s: 0 rss: 128Mb L: 41/153 MS: 1 ChangeASCIIInt-
+#164	NEW    cov: 349 ft: 434 corp: 12/1072b lim: 153 exec/s: 0 rss: 130Mb L: 153/153 MS: 2 ChangeASCIIInt-ChangeBit-
+#256	DONE   cov: 349 ft: 434 corp: 12/1072b lim: 153 exec/s: 0 rss: 134Mb
 ###### Recommended dictionary. ######
 "\011\000" # Uses: 13
-"allocator_pairs" # Uses: 4
+"free_func" # Uses: 6
 ###### End of recommended dictionary. ######
 Done 256 runs in 0 second(s)

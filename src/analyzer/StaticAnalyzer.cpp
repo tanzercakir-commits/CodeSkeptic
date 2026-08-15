@@ -1,7 +1,9 @@
 #include "analyzer/StaticAnalyzer.h"
 
+#include "analyzer/AnalysisCoordinator.h"
 #include "analyzer/Baseline.h"
 #include "analyzer/SuppressionFilter.h"
+#include "analyzer/WorkerProtocol.h"
 #include "core/Capabilities.h"
 #include "core/FindingFingerprint.h"
 #include "core/FunctionFilter.h"
@@ -25,6 +27,8 @@
 #include <iostream>
 #include <clang/AST/ASTContext.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/ADT/SmallString.h>
+#include <llvm/Support/FileSystem.h>
 #include <string>
 #include <unordered_set>
 
@@ -50,6 +54,153 @@ std::string sourceIdentity(const std::string& path) {
         normalized = fs::absolute(path, ec);
     }
     return (ec ? fs::path(path) : normalized).lexically_normal().string();
+}
+
+class TemporaryDirectory {
+public:
+    TemporaryDirectory() = default;
+    explicit TemporaryDirectory(std::filesystem::path path)
+        : path_(std::move(path)) {}
+    TemporaryDirectory(const TemporaryDirectory&) = delete;
+    TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
+    TemporaryDirectory(TemporaryDirectory&& other) noexcept
+        : path_(std::move(other.path_)) {
+        other.path_.clear();
+    }
+    TemporaryDirectory& operator=(TemporaryDirectory&& other) noexcept {
+        if (this == &other) return *this;
+        if (!path_.empty()) {
+            std::error_code ec;
+            std::filesystem::remove_all(path_, ec);
+        }
+        path_ = std::move(other.path_);
+        other.path_.clear();
+        return *this;
+    }
+    ~TemporaryDirectory() {
+        if (path_.empty()) return;
+        std::error_code ec;
+        std::filesystem::remove_all(path_, ec);
+    }
+    const std::filesystem::path& path() const { return path_; }
+
+private:
+    std::filesystem::path path_;
+};
+
+bool createTemporaryDirectory(const char* prefix, TemporaryDirectory& result,
+                              std::string& error) {
+    llvm::SmallString<256> path;
+    if (const std::error_code ec =
+            llvm::sys::fs::createUniqueDirectory(prefix, path)) {
+        error = ec.message();
+        return false;
+    }
+    result = TemporaryDirectory(std::filesystem::path(path.str().str()));
+    return true;
+}
+
+UnitExecutionResult failedWorkerOutcome(const std::string& error) {
+    UnitExecutionResult outcome;
+    outcome.resource.status = ResourceRunStatus::Crashed;
+    outcome.resource.error = error;
+    outcome.analysis.attempted_tus = 1;
+    outcome.analysis.tool_failed = true;
+    return outcome;
+}
+
+UnitExecutionResult missingWorkerOutcome() {
+    UnitExecutionResult outcome;
+    outcome.resource.status = ResourceRunStatus::Completed;
+    outcome.resource.exit_code = 0;
+    outcome.analysis.attempted_tus = 1;
+    outcome.analysis.no_inputs = true;
+    return outcome;
+}
+
+UnitExecutionResult executeIsolatedWorker(
+    const Config& config,
+    const std::vector<std::string>& rule_ids,
+    const TranslationUnitExecution& unit,
+    TranslationUnitPhase phase,
+    const std::string& summary_override,
+    bool replace_configured_summaries,
+    bool produce_summary_fragment) {
+    std::error_code source_error;
+    if (!std::filesystem::is_regular_file(unit.canonical_path,
+                                          source_error)) {
+        if (source_error &&
+            source_error != std::errc::no_such_file_or_directory)
+            return failedWorkerOutcome(
+                "cannot inspect requested translation unit: " +
+                source_error.message());
+        return missingWorkerOutcome();
+    }
+    if (unit.command_line.empty() || unit.compile_command_sha256.empty()) {
+        return failedWorkerOutcome("missing or inconsistent compile command");
+    }
+    if (translationUnitCommandSha256(unit) != unit.compile_command_sha256)
+        return failedWorkerOutcome("missing or inconsistent compile command");
+
+    TemporaryDirectory temporary;
+    std::string error;
+    if (!createTemporaryDirectory("codeskeptic-tu-worker", temporary, error))
+        return failedWorkerOutcome("cannot create worker directory: " + error);
+
+    WorkerRequest request;
+    request.request_id =
+        temporary.path().filename().string() + ":" +
+        translationUnitPhaseName(phase) + ":" +
+        unit.compile_command_sha256 + ":" +
+        std::to_string(unit.command_ordinal);
+    request.unit = unit;
+    request.phase = phase;
+    request.config_arguments = config.workerArguments(
+        rule_ids, summary_override, replace_configured_summaries);
+    request.response_path = (temporary.path() / "response.json").string();
+    if (produce_summary_fragment)
+        request.summary_fragment_path =
+            (temporary.path() / "summary.csk").string();
+    const std::string request_path =
+        (temporary.path() / "request.json").string();
+    if (!writeWorkerRequest(request_path, request, error))
+        return failedWorkerOutcome("cannot write worker request: " + error);
+
+    UnitExecutionResult outcome;
+    outcome.resource = ResourceSupervisor::run(
+        config.workerProgram(), {"--internal-tu-worker", request_path},
+        ResourceLimits{config.tuTimeoutSeconds(), config.tuMemoryMiB()});
+    if (outcome.resource.status != ResourceRunStatus::Completed) return outcome;
+    if (outcome.resource.exit_code != 0) {
+        outcome.resource.status = ResourceRunStatus::Crashed;
+        if (outcome.resource.error.empty())
+            outcome.resource.error = "worker exited without a valid response";
+        return outcome;
+    }
+
+    WorkerResponse response;
+    if (!readWorkerResponse(request.response_path, request, response, error)) {
+        outcome.resource.status = ResourceRunStatus::Crashed;
+        outcome.resource.error = "invalid worker response: " + error;
+        return outcome;
+    }
+    outcome.analysis = std::move(response.analysis);
+    outcome.diagnostics = std::move(response.diagnostics);
+
+    if (!request.summary_fragment_path.empty() &&
+        !outcome.analysis.summary_save_failed) {
+        const std::string actual =
+            sha256File(request.summary_fragment_path, error);
+        if (actual.empty() || actual != response.summary_fragment_sha256) {
+            outcome.analysis.tool_failed = true;
+            outcome.resource.error = "summary fragment checksum mismatch";
+        } else if (!SummaryRegistry::instance().loadGlobal(
+                       request.summary_fragment_path)) {
+            outcome.analysis.summary_load_failed = true;
+            outcome.resource.error = "summary fragment parser rejected worker output";
+        }
+    }
+    return outcome;
 }
 
 } // namespace
@@ -154,6 +305,166 @@ StaticAnalyzer::~StaticAnalyzer() {
 }
 
 AnalysisResult StaticAnalyzer::run() {
+    if (!config_.workerProgram().empty()) return runBudgeted();
+    return runDirect();
+}
+
+AnalysisResult StaticAnalyzer::runBudgeted() {
+    diagnostics_.clear();
+    AnalysisResult seed;
+    seed.analyze_broken_tus = config_.analyzeBrokenTUs();
+    seed.accept_partial_coverage = config_.acceptPartialCoverage();
+
+    if (!source_mgr_->compilationDatabaseValid()) {
+        seed.compile_database_failed = true;
+        return seed;
+    }
+    const auto units = source_mgr_->executionUnits();
+    seed.attempted_tus = units.size();
+    if (units.empty()) {
+        std::cerr << msg(MsgId::NoFilesToAnalyze) << "\n";
+        seed.no_inputs = true;
+        return seed;
+    }
+    if (engine_.ruleCount() == 0) {
+        std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
+        seed.no_rules = true;
+        return seed;
+    }
+    const auto rule_ids = engine_.ruleIds();
+    for (const auto& rule_id : rule_ids) {
+        if (!config_.isRuleEnabled(rule_id))
+            engine_.enableRule(rule_id, false);
+    }
+    if (engine_.enabledRuleCount() == 0) {
+        std::cerr << msg(MsgId::NoRulesRegistered) << "\n";
+        seed.no_rules = true;
+        return seed;
+    }
+
+    std::cerr << msg(MsgId::AnalysisStarting,
+                     std::to_string(units.size()),
+                     std::to_string(engine_.enabledRuleCount())) << "\n";
+
+    // Parent owns the authoritative merged summary state. Child workers load
+    // the same configured inputs for ordinary per-TU analysis; whole-program
+    // mode instead consumes one parent-merged harvest after every prepass
+    // receipt has completed.
+    auto& registry = SummaryRegistry::instance();
+    registry.clearGlobal();
+    for (const auto& path : config_.modelFiles()) {
+        if (!registry.loadGlobal(path)) {
+            seed.summary_load_failed = true;
+            std::cerr << msg(MsgId::SummaryLoadError, path) << "\n";
+        }
+    }
+    if (!config_.summaryIn().empty()) {
+        if (!registry.loadGlobal(config_.summaryIn())) {
+            seed.summary_load_failed = true;
+            std::cerr << msg(MsgId::SummaryLoadError, config_.summaryIn())
+                      << "\n";
+        } else {
+            std::error_code ec;
+            const auto summary_time = std::filesystem::last_write_time(
+                config_.summaryIn(), ec);
+            if (!ec) {
+                for (const auto& file : source_mgr_->files()) {
+                    std::error_code source_ec;
+                    const auto source_time =
+                        std::filesystem::last_write_time(file, source_ec);
+                    if (!source_ec && source_time > summary_time) {
+                        seed.summary_stale = true;
+                        std::cerr << msg(MsgId::SummaryStaleWarning,
+                                         config_.summaryIn(), file) << "\n";
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    TemporaryDirectory run_directory;
+    std::string directory_error;
+    if (!createTemporaryDirectory("codeskeptic-tu-run", run_directory,
+                                  directory_error)) {
+        seed.tool_failed = true;
+        return seed;
+    }
+    const std::string merged_summary =
+        (run_directory.path() / "merged-summary.csk").string();
+    bool merged_summary_ready = false;
+    bool merged_summary_failed = false;
+
+    const UnitExecutor executor =
+        [this, &rule_ids, &merged_summary, &merged_summary_ready,
+         &merged_summary_failed](const TranslationUnitExecution& unit,
+                                 TranslationUnitPhase phase) {
+            if (config_.wholeProgram() &&
+                phase == TranslationUnitPhase::Analysis &&
+                !merged_summary_ready) {
+                merged_summary_ready = true;
+                if (!SummaryRegistry::instance().saveGlobal(merged_summary))
+                    merged_summary_failed = true;
+            }
+            if (merged_summary_failed)
+                return failedWorkerOutcome(
+                    "cannot materialize merged whole-program summary");
+
+            const bool harvest =
+                phase == TranslationUnitPhase::SummaryHarvest;
+            const bool replace_summaries = config_.wholeProgram();
+            const std::string summary_override =
+                replace_summaries && !harvest ? merged_summary : std::string{};
+            const bool produce_fragment =
+                harvest || (!config_.summaryOut().empty() &&
+                            !config_.wholeProgram());
+            return executeIsolatedWorker(
+                config_, rule_ids, unit, phase, summary_override,
+                replace_summaries, produce_fragment);
+        };
+
+    if (config_.wholeProgram()) {
+        std::cerr << msg(MsgId::WholeProgramPass,
+                         std::to_string(source_mgr_->fileCount())) << "\n";
+    }
+
+    auto coordinated = AnalysisCoordinator::run(
+        units,
+        ResourceLimits{config_.tuTimeoutSeconds(), config_.tuMemoryMiB()},
+        config_.wholeProgram(), executor);
+    AnalysisResult result = std::move(coordinated.analysis);
+    result.analyze_broken_tus = config_.analyzeBrokenTUs();
+    result.accept_partial_coverage = config_.acceptPartialCoverage();
+    result.summary_load_failed =
+        result.summary_load_failed || seed.summary_load_failed;
+    result.summary_stale = result.summary_stale || seed.summary_stale;
+    result.tool_failed = result.tool_failed || seed.tool_failed;
+    diagnostics_ = std::move(coordinated.diagnostics);
+    for (const auto& receipt : result.tu_receipts) {
+        if (receipt.status == TranslationUnitStatus::Completed) continue;
+        std::cerr << "[CodeSkeptic] translation unit "
+                  << translationUnitStatusName(receipt.status) << ": "
+                  << receipt.canonical_path << " (command_sha256="
+                  << receipt.compile_command_sha256 << ", ordinal="
+                  << receipt.command_ordinal << ", phase=" << receipt.phase
+                  << ")\n";
+    }
+
+    if (!config_.summaryOut().empty()) {
+        if (registry.saveGlobal(config_.summaryOut())) {
+            std::cerr << msg(MsgId::SummariesSaved,
+                             std::to_string(registry.globalSize()),
+                             config_.summaryOut()) << "\n";
+        } else {
+            result.summary_save_failed = true;
+            std::cerr << msg(MsgId::SummarySaveError, config_.summaryOut())
+                      << "\n";
+        }
+    }
+    return finalizeResult(std::move(result));
+}
+
+AnalysisResult StaticAnalyzer::runDirect() {
     diagnostics_.clear();
     AnalysisResult result;
     result.attempted_tus = source_mgr_->requestedFileCount();
@@ -369,6 +680,10 @@ AnalysisResult StaticAnalyzer::run() {
         }
     }
 
+    return finalizeResult(std::move(result));
+}
+
+AnalysisResult StaticAnalyzer::finalizeResult(AnalysisResult result) {
     // The same file may arrive under different paths (e.g. "tests/../x.c"
     // in the compile DB) — canonical path for deduplication and
     // baseline keys

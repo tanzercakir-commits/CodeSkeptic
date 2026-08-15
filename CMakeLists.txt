@@ -102,6 +102,16 @@ if(NOT CODESKEPTIC_SANITIZER STREQUAL "none")
     target_link_options(codeskeptic_sanitizer_flags INTERFACE
                         ${CODESKEPTIC_SANITIZER_FLAGS})
 endif()
+
+# Tiny, dependency-free child-side half of the resource-supervision
+# handshake. Keeping it separate lets the dedicated probe use the exact
+# production handshake without linking the Clang-heavy analyzer core.
+add_library(codeskeptic_resource_worker_control STATIC
+    src/core/ResourceWorkerControl.cpp)
+target_include_directories(codeskeptic_resource_worker_control
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(codeskeptic_resource_worker_control
+    PUBLIC codeskeptic_sanitizer_flags)
 if(CODESKEPTIC_BUILD_FUZZERS AND CODESKEPTIC_BUILD_TESTS)
     message(FATAL_ERROR
         "Fuzzer builds are dedicated: set CODESKEPTIC_BUILD_TESTS=OFF")

@@ -3,6 +3,7 @@ add_library(codeskeptic_core STATIC
     core/Capabilities.cpp
     core/FindingFingerprint.cpp
     core/FunctionFilter.cpp
+    core/ResourceSupervisor.cpp
     source_manager/SourceManager.cpp
     source_manager/ResourceDir.cpp
     engine/AllocFunctions.cpp
@@ -26,6 +27,10 @@ add_library(codeskeptic_core STATIC
     reporter/SarifReporter.cpp
     config/Config.cpp
     analyzer/StaticAnalyzer.cpp
+    analyzer/AnalysisCoordinator.cpp
+    analyzer/WorkerProtocol.cpp
+    analyzer/WorkerRuntime.cpp
+    analyzer/DefaultRules.cpp
     analyzer/SuppressionFilter.cpp
     analyzer/Baseline.cpp
     server/McpServer.cpp
@@ -51,6 +56,8 @@ add_library(codeskeptic_core STATIC
 add_executable(codeskeptic main.cpp)
 target_link_libraries(codeskeptic PRIVATE codeskeptic_core)
 target_link_libraries(codeskeptic_core PUBLIC codeskeptic_sanitizer_flags)
+target_link_libraries(codeskeptic_core PUBLIC
+                      codeskeptic_resource_worker_control)
 
 if(CODESKEPTIC_BUILD_FUZZERS)
     # Instrument the real production parser implementations. Dedicated fuzz
@@ -157,3 +164,7 @@ target_link_libraries(codeskeptic_core
         clangASTMatchers
         LLVMSupport
 )
+
+if(WIN32)
+    target_link_libraries(codeskeptic_core PUBLIC Psapi)
+endif()

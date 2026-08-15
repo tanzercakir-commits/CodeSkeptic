@@ -31,6 +31,21 @@ std::vector<std::string> platformExtraArgs();
 bool validateCompilationDatabaseText(const std::string& text,
                                      std::string& error);
 
+struct TranslationUnitExecution {
+    std::string canonical_path;
+    std::string working_directory;
+    std::vector<std::string> command_line;
+    std::string output;
+    std::string compile_command_sha256;
+    std::size_t command_ordinal = 0;
+};
+
+// Stable identity of the exact command the isolated worker will execute.
+// The worker recomputes this value before parsing so a request cannot bind a
+// receipt to one command while analyzing another.
+std::string translationUnitCommandSha256(
+    const TranslationUnitExecution& execution);
+
 class SourceManager {
 public:
     explicit SourceManager(const std::string& build_path);
@@ -82,6 +97,7 @@ public:
     // missing paths are filtered from the ClangTool input list.
     size_t requestedFileCount() const;
     const std::vector<std::string>& files() const;
+    std::vector<TranslationUnitExecution> executionUnits() const;
 
 private:
     // The body of processAll, run on a large-stack worker thread (deep
@@ -90,6 +106,10 @@ private:
     int processAllOnWorker(ASTCallback callback);
 
     std::string build_path_;
+    // Every explicit/discovered request, including missing paths. Resource
+    // coordination needs an exact failure receipt even when ClangTool cannot
+    // be started for that entry.
+    std::vector<std::string> requested_files_;
     std::vector<std::string> source_files_;
     size_t requested_file_count_ = 0;
     std::unique_ptr<clang::tooling::CompilationDatabase> comp_db_;

@@ -4,10 +4,13 @@
 #include "engine/AssertGuards.h"
 #include "source_manager/ResourceDir.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <sstream>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
@@ -18,6 +21,8 @@
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/JSONCompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/ADT/StringExtras.h>
+#include <llvm/Support/SHA256.h>
 #include <llvm/Support/thread.h>
 
 namespace fs = std::filesystem;
@@ -43,6 +48,52 @@ std::string mainFileOf(clang::ASTContext& ctx) {
     if (auto ref = sm.getFileEntryRefForID(sm.getMainFileID()))
         return ref->getName().str();
     return "<unknown>";
+}
+
+std::string canonicalIdentity(const std::string& path) {
+    std::error_code ec;
+    fs::path canonical = fs::weakly_canonical(path, ec);
+    if (ec) {
+        ec.clear();
+        canonical = fs::absolute(path, ec);
+    }
+    return (ec ? fs::path(path) : canonical).lexically_normal().string();
+}
+
+void appendLengthPrefixed(std::ostringstream& out,
+                          const std::string& value) {
+    out << value.size() << ':' << value << '\n';
+}
+
+std::string serializedCommand(
+    const clang::tooling::CompileCommand& command) {
+    std::ostringstream out;
+    appendLengthPrefixed(out, command.Directory);
+    appendLengthPrefixed(out, command.Filename);
+    appendLengthPrefixed(out, command.Output);
+    out << command.CommandLine.size() << '\n';
+    for (const auto& argument : command.CommandLine)
+        appendLengthPrefixed(out, argument);
+    return out.str();
+}
+
+std::string sha256(const std::string& value) {
+    llvm::SHA256 hasher;
+    hasher.update(llvm::StringRef(value));
+    const auto digest = hasher.final();
+    return llvm::toHex(llvm::ArrayRef<std::uint8_t>(digest), true);
+}
+
+std::string serializedExecution(
+    const codeskeptic::TranslationUnitExecution& execution) {
+    std::ostringstream out;
+    appendLengthPrefixed(out, execution.working_directory);
+    appendLengthPrefixed(out, execution.canonical_path);
+    appendLengthPrefixed(out, execution.output);
+    out << execution.command_line.size() << '\n';
+    for (const auto& argument : execution.command_line)
+        appendLengthPrefixed(out, argument);
+    return out.str();
 }
 
 class CodeSkepticASTConsumer : public clang::ASTConsumer {
@@ -132,6 +183,11 @@ public:
 } // anonymous namespace
 
 namespace codeskeptic {
+
+std::string translationUnitCommandSha256(
+    const TranslationUnitExecution& execution) {
+    return sha256(serializedExecution(execution));
+}
 
 namespace {
 
@@ -277,6 +333,7 @@ SourceManager::~SourceManager() = default;
 void SourceManager::addSourceFile(const std::string& path) {
     ++requested_file_count_;
     auto abs = fs::absolute(path);
+    requested_files_.push_back(abs.lexically_normal().string());
     if (!fs::exists(abs)) {
         std::cerr << msg(MsgId::FileNotFound, abs.string()) << "\n";
         return;
@@ -297,6 +354,8 @@ void SourceManager::scanDirectory(const std::string& dir_path) {
             auto ext = entry.path().extension().string();
             if (ext == ".c" || ext == ".cpp" || ext == ".cc" || ext == ".cxx") {
                 ++requested_file_count_;
+                requested_files_.push_back(
+                    fs::absolute(entry.path()).lexically_normal().string());
                 source_files_.push_back(entry.path().string());
             }
         }
@@ -492,6 +551,40 @@ size_t SourceManager::requestedFileCount() const {
 
 const std::vector<std::string>& SourceManager::files() const {
     return source_files_;
+}
+
+std::vector<TranslationUnitExecution> SourceManager::executionUnits() const {
+    std::vector<TranslationUnitExecution> units;
+    if (!comp_db_) return units;
+
+    std::vector<std::string> files = requested_files_;
+    std::sort(files.begin(), files.end(), [](const std::string& lhs,
+                                             const std::string& rhs) {
+        return canonicalIdentity(lhs) < canonicalIdentity(rhs);
+    });
+    for (const auto& file : files) {
+        auto commands = comp_db_->getCompileCommands(file);
+        std::sort(commands.begin(), commands.end(),
+                  [](const clang::tooling::CompileCommand& lhs,
+                     const clang::tooling::CompileCommand& rhs) {
+                      return serializedCommand(lhs) < serializedCommand(rhs);
+                  });
+        if (commands.empty()) {
+            units.push_back(TranslationUnitExecution{
+                canonicalIdentity(file), {}, {}, {}, {}, 0});
+            continue;
+        }
+        for (std::size_t ordinal = 0; ordinal < commands.size(); ++ordinal) {
+            const auto& command = commands[ordinal];
+            TranslationUnitExecution execution{
+                canonicalIdentity(file), command.Directory,
+                command.CommandLine, command.Output, {}, ordinal};
+            execution.compile_command_sha256 =
+                translationUnitCommandSha256(execution);
+            units.push_back(std::move(execution));
+        }
+    }
+    return units;
 }
 
 } // namespace codeskeptic
