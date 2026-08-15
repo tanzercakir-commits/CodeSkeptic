@@ -60,9 +60,13 @@
   `3307dac87db2c914bee6d23f3374d7cb1bb0bfe9fe4ce5320b8e709019c6f4b0` /
   `3e847bd5bfd80215dcb2f5993fb590583e3b0650fe5190544da8ef9b1018292f`.
   Exact-container verify-only accepted all three workloads and all ten
-  repetitions. Full regression, final audit, commit/push, and exact-head
-  hosted CI remain pending; this checkpoint does not close `CS-P10-07` or
-  write protected `main`.
+  repetitions. The final HEAD binary then passed `1280/1280` direct C++ tests
+  and `1299/1299` CTest cases; the repository status contract passed `52/52`.
+  The isolated P10.7 worktree does not materialize the prior sanitizer and
+  dedicated stress build directories, so their three plus one runtime checks
+  remain explicit contract skips; exact-head hosted sanitizer/stress jobs are
+  mandatory. Final independent audit, push, and hosted CI remain pending; this
+  checkpoint does not close `CS-P10-07` or write protected `main`.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
