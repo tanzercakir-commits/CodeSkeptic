@@ -3,13 +3,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start    1: DiagnosticTest.SeverityToString
    1/1254 Test    #1: DiagnosticTest.SeverityToString .......................................................   Passed    0.02 sec
           Start    2: DiagnosticTest.Location
-   2/1254 Test    #2: DiagnosticTest.Location ...............................................................   Passed    0.01 sec
+   2/1254 Test    #2: DiagnosticTest.Location ...............................................................   Passed    0.02 sec
           Start    3: DiagnosticTest.SortBySeverity
    3/1254 Test    #3: DiagnosticTest.SortBySeverity .........................................................   Passed    0.02 sec
           Start    4: DiagnosticTest.EqualityAndDedup
    4/1254 Test    #4: DiagnosticTest.EqualityAndDedup .......................................................   Passed    0.02 sec
           Start    5: DiagnosticTest.SortByFileThenLine
-   5/1254 Test    #5: DiagnosticTest.SortByFileThenLine .....................................................   Passed    0.01 sec
+   5/1254 Test    #5: DiagnosticTest.SortByFileThenLine .....................................................   Passed    0.02 sec
           Start    6: MessagesTest.LangSwitchAndSubstitution
    6/1254 Test    #6: MessagesTest.LangSwitchAndSubstitution ................................................   Passed    0.02 sec
           Start    7: AnalysisResultTest.CompleteCleanAndFindingsHaveStableExitCodes
@@ -19,7 +19,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start    9: AnalysisResultTest.PartialCoverageCannotProduceCleanVerdict
    9/1254 Test    #9: AnalysisResultTest.PartialCoverageCannotProduceCleanVerdict ...........................   Passed    0.01 sec
           Start   10: AnalysisResultTest.BrokenCoverageCannotBeAcceptedAsAVerdict
-  10/1254 Test   #10: AnalysisResultTest.BrokenCoverageCannotBeAcceptedAsAVerdict ...........................   Passed    0.01 sec
+  10/1254 Test   #10: AnalysisResultTest.BrokenCoverageCannotBeAcceptedAsAVerdict ...........................   Passed    0.02 sec
           Start   11: AnalysisResultTest.MissingRequestedTusCannotBeAcceptedAsAVerdict
   11/1254 Test   #11: AnalysisResultTest.MissingRequestedTusCannotBeAcceptedAsAVerdict ......................   Passed    0.02 sec
           Start   12: AnalysisResultTest.IncompleteReceiptCannotBeMaskedByCounts
@@ -35,15 +35,15 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   17: AnalysisResultTest.TuIdentityIncludesCompileCommandAndOrdinal
   17/1254 Test   #17: AnalysisResultTest.TuIdentityIncludesCompileCommandAndOrdinal .........................   Passed    0.02 sec
           Start   18: AnalysisCoordinatorTest.ResourceFailureKeepsEarlierAndLaterUnits
-  18/1254 Test   #18: AnalysisCoordinatorTest.ResourceFailureKeepsEarlierAndLaterUnits ......................   Passed    0.01 sec
+  18/1254 Test   #18: AnalysisCoordinatorTest.ResourceFailureKeepsEarlierAndLaterUnits ......................   Passed    0.02 sec
           Start   19: AnalysisCoordinatorTest.WholeProgramPrepassFailureStopsAnalysisPhase
   19/1254 Test   #19: AnalysisCoordinatorTest.WholeProgramPrepassFailureStopsAnalysisPhase ..................   Passed    0.02 sec
           Start   20: AnalysisCoordinatorTest.WholeProgramBrokenPrepassPreservesCoverage
-  20/1254 Test   #20: AnalysisCoordinatorTest.WholeProgramBrokenPrepassPreservesCoverage ....................   Passed    0.02 sec
+  20/1254 Test   #20: AnalysisCoordinatorTest.WholeProgramBrokenPrepassPreservesCoverage ....................   Passed    0.01 sec
           Start   21: AnalysisCoordinatorTest.MissingUnitIsIncompleteNotAResourceCrash
-  21/1254 Test   #21: AnalysisCoordinatorTest.MissingUnitIsIncompleteNotAResourceCrash ......................   Passed    0.02 sec
+  21/1254 Test   #21: AnalysisCoordinatorTest.MissingUnitIsIncompleteNotAResourceCrash ......................   Passed    0.01 sec
           Start   22: WorkerProtocolTest.RequestRoundTripPreservesExactCommandIdentity
-  22/1254 Test   #22: WorkerProtocolTest.RequestRoundTripPreservesExactCommandIdentity ......................   Passed    0.02 sec
+  22/1254 Test   #22: WorkerProtocolTest.RequestRoundTripPreservesExactCommandIdentity ......................   Passed    0.01 sec
           Start   23: WorkerProtocolTest.ResponseRejectsIdentityDriftBeforeAggregation
   23/1254 Test   #23: WorkerProtocolTest.ResponseRejectsIdentityDriftBeforeAggregation ......................   Passed    0.02 sec
           Start   24: WorkerProtocolTest.ResponseRejectsFindingCountDrift
@@ -59,17 +59,17 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   29: WorkerProtocolTest.RuntimeRejectsCommandHashDrift
   29/1254 Test   #29: WorkerProtocolTest.RuntimeRejectsCommandHashDrift .....................................   Passed    0.02 sec
           Start   30: BudgetedAnalysisTest.WholeProgramProductionWorkersPreserveCrossTuFinding
-  30/1254 Test   #30: BudgetedAnalysisTest.WholeProgramProductionWorkersPreserveCrossTuFinding ..............   Passed    0.11 sec
+  30/1254 Test   #30: BudgetedAnalysisTest.WholeProgramProductionWorkersPreserveCrossTuFinding ..............   Passed    0.12 sec
           Start   31: BudgetedAnalysisTest.TimeoutPreservesCompletedReceiptsAndContinues
   31/1254 Test   #31: BudgetedAnalysisTest.TimeoutPreservesCompletedReceiptsAndContinues ....................   Passed    1.05 sec
           Start   32: BudgetedAnalysisTest.MemoryCeilingFailsExactTranslationUnitClosed
   32/1254 Test   #32: BudgetedAnalysisTest.MemoryCeilingFailsExactTranslationUnitClosed .....................   Passed    0.10 sec
           Start   33: BudgetedAnalysisTest.ProductionWorkersPreserveMissingAndBrokenCoverage
-  33/1254 Test   #33: BudgetedAnalysisTest.ProductionWorkersPreserveMissingAndBrokenCoverage ................   Passed    0.06 sec
+  33/1254 Test   #33: BudgetedAnalysisTest.ProductionWorkersPreserveMissingAndBrokenCoverage ................   Passed    0.07 sec
           Start   34: BudgetedAnalysisTest.ProductionPlanPreservesDistinctCompileCommands
-  34/1254 Test   #34: BudgetedAnalysisTest.ProductionPlanPreservesDistinctCompileCommands ...................   Passed    0.06 sec
+  34/1254 Test   #34: BudgetedAnalysisTest.ProductionPlanPreservesDistinctCompileCommands ...................   Passed    0.07 sec
           Start   35: BudgetedAnalysisTest.ProductionWorkersPreserveSummaryAndModelInputs
-  35/1254 Test   #35: BudgetedAnalysisTest.ProductionWorkersPreserveSummaryAndModelInputs ...................   Passed    0.06 sec
+  35/1254 Test   #35: BudgetedAnalysisTest.ProductionWorkersPreserveSummaryAndModelInputs ...................   Passed    0.07 sec
           Start   36: BudgetedAnalysisTest.ProductionArtifactFailuresRemainFailClosed
   36/1254 Test   #36: BudgetedAnalysisTest.ProductionArtifactFailuresRemainFailClosed .......................   Passed    0.14 sec
           Start   37: BudgetedAnalysisTest.ConfigFileBudgetsReachProductionReceipt
@@ -81,7 +81,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   40: CapabilitiesTest.JsonSurfacePublishesTieredScopeContract
   40/1254 Test   #40: CapabilitiesTest.JsonSurfacePublishesTieredScopeContract ..............................   Passed    0.02 sec
           Start   41: CapabilitiesTest.TextSurfaceIsHumanReadable
-  41/1254 Test   #41: CapabilitiesTest.TextSurfaceIsHumanReadable ...........................................   Passed    0.02 sec
+  41/1254 Test   #41: CapabilitiesTest.TextSurfaceIsHumanReadable ...........................................   Passed    0.01 sec
           Start   42: FindingFingerprintTest.StableAcrossCheckoutRootsLineShiftsAndFormatting
   42/1254 Test   #42: FindingFingerprintTest.StableAcrossCheckoutRootsLineShiftsAndFormatting ...............   Passed    0.02 sec
           Start   43: FindingFingerprintTest.SemanticInputsChangeIdentity
@@ -93,7 +93,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   46: ConfigTest.RejectsInvalidEnumAndLineScope
   46/1254 Test   #46: ConfigTest.RejectsInvalidEnumAndLineScope .............................................   Passed    0.02 sec
           Start   47: ConfigTest.RejectsEmptyFunctionScopeWithoutExpandingAnalysis
-  47/1254 Test   #47: ConfigTest.RejectsEmptyFunctionScopeWithoutExpandingAnalysis ..........................   Passed    0.02 sec
+  47/1254 Test   #47: ConfigTest.RejectsEmptyFunctionScopeWithoutExpandingAnalysis ..........................   Passed    0.01 sec
           Start   48: ConfigTest.FunctionAndLineScopesAreAtomicAndRepeatable
   48/1254 Test   #48: ConfigTest.FunctionAndLineScopesAreAtomicAndRepeatable ................................   Passed    0.02 sec
           Start   49: ConfigTest.ConfigTrimsWhitespaceAndRejectsUnknownKeys
@@ -105,7 +105,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   52: ConfigTest.AllocatorPairsParseAtomicallyFromCliAndConfig
   52/1254 Test   #52: ConfigTest.AllocatorPairsParseAtomicallyFromCliAndConfig ..............................   Passed    0.02 sec
           Start   53: ConfigTest.AllocatorPairsRejectMalformedValueWithoutPartialState
-  53/1254 Test   #53: ConfigTest.AllocatorPairsRejectMalformedValueWithoutPartialState ......................   Passed    0.02 sec
+  53/1254 Test   #53: ConfigTest.AllocatorPairsRejectMalformedValueWithoutPartialState ......................   Passed    0.01 sec
           Start   54: ConfigTest.ConfigAndCliLayersCanCompleteOutputSelection
   54/1254 Test   #54: ConfigTest.ConfigAndCliLayersCanCompleteOutputSelection ...............................   Passed    0.02 sec
           Start   55: ConfigTest.HelpIsSuccessfulControlFlow
@@ -119,7 +119,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   59: ConfigTest.McpRequestConfigKeepsPolicyButClearsParentWork
   59/1254 Test   #59: ConfigTest.McpRequestConfigKeepsPolicyButClearsParentWork .............................   Passed    0.02 sec
           Start   60: ConfigTest.PerTuBudgetsRejectZeroNegativeSuffixAndOverflowAtomically
-  60/1254 Test   #60: ConfigTest.PerTuBudgetsRejectZeroNegativeSuffixAndOverflowAtomically ..................   Passed    0.02 sec
+  60/1254 Test   #60: ConfigTest.PerTuBudgetsRejectZeroNegativeSuffixAndOverflowAtomically ..................   Passed    0.01 sec
           Start   61: ConfigTest.WorkerArgumentsPreserveAnalysisSettingsButNotParentControls
   61/1254 Test   #61: ConfigTest.WorkerArgumentsPreserveAnalysisSettingsButNotParentControls ................   Passed    0.02 sec
           Start   62: ConfigTest.ModelFileOptionsAreRepeatableAndLayered
@@ -129,7 +129,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start   64: VerdictIntegrityTest.BaselineWriteFailureIsExitTwo
   64/1254 Test   #64: VerdictIntegrityTest.BaselineWriteFailureIsExitTwo ....................................   Passed    0.02 sec
           Start   65: VerdictIntegrityTest.RequestedMissingBaselineIsExitTwo
-  65/1254 Test   #65: VerdictIntegrityTest.RequestedMissingBaselineIsExitTwo ................................   Passed    0.03 sec
+  65/1254 Test   #65: VerdictIntegrityTest.RequestedMissingBaselineIsExitTwo ................................   Passed    0.02 sec
           Start   66: VerdictIntegrityTest.AllRegisteredRulesDisabledIsExitTwo
   66/1254 Test   #66: VerdictIntegrityTest.AllRegisteredRulesDisabledIsExitTwo ..............................   Passed    0.02 sec
           Start   67: VerdictIntegrityTest.MalformedCompileDatabaseFailsBeforeAnalysis
@@ -253,7 +253,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  126: MemoryLeakRuleExTest.FunctionParamEscape_Clean
  126/1254 Test  #126: MemoryLeakRuleExTest.FunctionParamEscape_Clean ........................................   Passed    0.02 sec
           Start  127: MemoryLeakRuleExTest.DoubleFree
- 127/1254 Test  #127: MemoryLeakRuleExTest.DoubleFree .......................................................   Passed    0.03 sec
+ 127/1254 Test  #127: MemoryLeakRuleExTest.DoubleFree .......................................................   Passed    0.02 sec
           Start  128: MemoryLeakRuleExTest.ArrayNewDelete_Clean
  128/1254 Test  #128: MemoryLeakRuleExTest.ArrayNewDelete_Clean .............................................   Passed    0.02 sec
           Start  129: MemoryLeakRuleExTest.NoAllocation_Clean
@@ -273,9 +273,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  136: MemoryLeakRuleExTest.AddrOfArg_Escapes_NoLeak
  136/1254 Test  #136: MemoryLeakRuleExTest.AddrOfArg_Escapes_NoLeak .........................................   Passed    0.02 sec
           Start  137: MemoryLeakRuleExTest.TFLite_123387_Rfft2dWorkBufferLeak_Reports
- 137/1254 Test  #137: MemoryLeakRuleExTest.TFLite_123387_Rfft2dWorkBufferLeak_Reports .......................   Passed    0.03 sec
+ 137/1254 Test  #137: MemoryLeakRuleExTest.TFLite_123387_Rfft2dWorkBufferLeak_Reports .......................   Passed    0.02 sec
           Start  138: MemoryLeakRuleExTest.ImmutableFlagCorrelation_Clean
- 138/1254 Test  #138: MemoryLeakRuleExTest.ImmutableFlagCorrelation_Clean ...................................   Passed    0.03 sec
+ 138/1254 Test  #138: MemoryLeakRuleExTest.ImmutableFlagCorrelation_Clean ...................................   Passed    0.02 sec
           Start  139: MemoryLeakRuleExTest.ImmutableTrueFlagLeak_StillReports
  139/1254 Test  #139: MemoryLeakRuleExTest.ImmutableTrueFlagLeak_StillReports ...............................   Passed    0.02 sec
           Start  140: MemoryLeakRuleExTest.MutatedFlag_NotConstantFolded
@@ -287,7 +287,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  143: MemoryLeakRuleExTest.MaybeZeroCallFlag_NotFolded
  143/1254 Test  #143: MemoryLeakRuleExTest.MaybeZeroCallFlag_NotFolded ......................................   Passed    0.02 sec
           Start  144: MemoryLeakRuleExTest.FlagCopyCorrelation_Clean
- 144/1254 Test  #144: MemoryLeakRuleExTest.FlagCopyCorrelation_Clean ........................................   Passed    0.02 sec
+ 144/1254 Test  #144: MemoryLeakRuleExTest.FlagCopyCorrelation_Clean ........................................   Passed    0.03 sec
           Start  145: MemoryLeakRuleExTest.MutatedFlagCopy_NotFolded
  145/1254 Test  #145: MemoryLeakRuleExTest.MutatedFlagCopy_NotFolded ........................................   Passed    0.02 sec
           Start  146: MemoryLeakRuleExTest.FopenNotClosed_ResourceLeak
@@ -349,7 +349,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  174: AbseilFpTest.CarbonCheckShape_TransformingWrapper_StillWarns
  174/1254 Test  #174: AbseilFpTest.CarbonCheckShape_TransformingWrapper_StillWarns ..........................   Passed    0.02 sec
           Start  175: AbseilFpTest.RawCheckShape_NonTerminatingBranch_StillWarns
- 175/1254 Test  #175: AbseilFpTest.RawCheckShape_NonTerminatingBranch_StillWarns ............................   Passed    0.02 sec
+ 175/1254 Test  #175: AbseilFpTest.RawCheckShape_NonTerminatingBranch_StillWarns ............................   Passed    0.03 sec
           Start  176: AbseilFpTest.BuiltinExpect_GuardStillRefines_BothDirections
  176/1254 Test  #176: AbseilFpTest.BuiltinExpect_GuardStillRefines_BothDirections ...........................   Passed    0.02 sec
           Start  177: FprimeFpTest.PlacementNew_IsNotAnAllocation
@@ -387,7 +387,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  193: AllocatorPairTest.BuiltinFreeAndDeleteDoNotCloseCustomFamily
  193/1254 Test  #193: AllocatorPairTest.BuiltinFreeAndDeleteDoNotCloseCustomFamily ..........................   Passed    0.02 sec
           Start  194: AllocatorPairTest.BuiltinReallocCannotTransferCustomFamily
- 194/1254 Test  #194: AllocatorPairTest.BuiltinReallocCannotTransferCustomFamily ............................   Passed    0.02 sec
+ 194/1254 Test  #194: AllocatorPairTest.BuiltinReallocCannotTransferCustomFamily ............................   Passed    0.03 sec
           Start  195: AllocatorPairTest.InstanceMethodsDoNotGainPairAuthority
  195/1254 Test  #195: AllocatorPairTest.InstanceMethodsDoNotGainPairAuthority ...............................   Passed    0.02 sec
           Start  196: AllocatorPairTest.StaticMethodsMayFormExactFamily
@@ -397,7 +397,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  198: AllocatorPairTest.ConsumedSummaryCannotInventExactFamilyRelease
  198/1254 Test  #198: AllocatorPairTest.ConsumedSummaryCannotInventExactFamilyRelease .......................   Passed    0.02 sec
           Start  199: AllocatorPairTest.ClosedIndirectSummaryStaysConservative
- 199/1254 Test  #199: AllocatorPairTest.ClosedIndirectSummaryStaysConservative ..............................   Passed    0.03 sec
+ 199/1254 Test  #199: AllocatorPairTest.ClosedIndirectSummaryStaysConservative ..............................   Passed    0.02 sec
           Start  200: AllocatorPairTest.SummaryOwnedReturnHasNoInventedFamily
  200/1254 Test  #200: AllocatorPairTest.SummaryOwnedReturnHasNoInventedFamily ...............................   Passed    0.02 sec
           Start  201: AddrOfMemberTest.MemberAddressThroughOutParam_Escapes_NoLeak
@@ -427,7 +427,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  213: CarbonFpTest.ArenaPlacementNew_IsNotAnAllocation
  213/1254 Test  #213: CarbonFpTest.ArenaPlacementNew_IsNotAnAllocation ......................................   Passed    0.02 sec
           Start  214: CarbonFpTest.ArenaPlacementNew_ByValue_IsNotAnAllocation
- 214/1254 Test  #214: CarbonFpTest.ArenaPlacementNew_ByValue_IsNotAnAllocation ..............................   Passed    0.03 sec
+ 214/1254 Test  #214: CarbonFpTest.ArenaPlacementNew_ByValue_IsNotAnAllocation ..............................   Passed    0.02 sec
           Start  215: CallGuardTest.ConstReturningHelper_CorrelatedGuards_Clean
  215/1254 Test  #215: CallGuardTest.ConstReturningHelper_CorrelatedGuards_Clean .............................   Passed    0.02 sec
           Start  216: CallGuardTest.BodylessExtern_NotKeyed_LeakStaysVisible
@@ -439,7 +439,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  219: AliasLifetimeV2Test.FreeThroughAliasThenUseOwner_ReportsUAF
  219/1254 Test  #219: AliasLifetimeV2Test.FreeThroughAliasThenUseOwner_ReportsUAF ...........................   Passed    0.02 sec
           Start  220: AliasLifetimeV2Test.FreeOwnerThenUseAlias_ReportsUAF
- 220/1254 Test  #220: AliasLifetimeV2Test.FreeOwnerThenUseAlias_ReportsUAF ..................................   Passed    0.02 sec
+ 220/1254 Test  #220: AliasLifetimeV2Test.FreeOwnerThenUseAlias_ReportsUAF ..................................   Passed    0.03 sec
           Start  221: AliasLifetimeV2Test.FreeThroughAliasThenFreeOwner_ReportsDoubleFree
  221/1254 Test  #221: AliasLifetimeV2Test.FreeThroughAliasThenFreeOwner_ReportsDoubleFree ...................   Passed    0.02 sec
           Start  222: AliasLifetimeV2Test.FreeOwnerThenFreeAlias_ReportsDoubleFree
@@ -449,7 +449,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  224: AliasLifetimeV2Test.ReassignedAliasDoesNotPoisonOwner
  224/1254 Test  #224: AliasLifetimeV2Test.ReassignedAliasDoesNotPoisonOwner .................................   Passed    0.02 sec
           Start  225: AliasLifetimeV2Test.BranchConflictingAliasRemainsPathExact
- 225/1254 Test  #225: AliasLifetimeV2Test.BranchConflictingAliasRemainsPathExact ............................   Passed    0.03 sec
+ 225/1254 Test  #225: AliasLifetimeV2Test.BranchConflictingAliasRemainsPathExact ............................   Passed    0.02 sec
           Start  226: AliasLifetimeV2Test.AliasNullGuardClearsOwnerFailurePath
  226/1254 Test  #226: AliasLifetimeV2Test.AliasNullGuardClearsOwnerFailurePath ..............................   Passed    0.02 sec
           Start  227: AliasLifetimeV2Test.AddressExposedAliasCannotProveLaterUAF
@@ -457,7 +457,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  228: AliasLifetimeV2Test.WritableReferenceAliasCannotProveLaterUAF
  228/1254 Test  #228: AliasLifetimeV2Test.WritableReferenceAliasCannotProveLaterUAF .........................   Passed    0.02 sec
           Start  229: AliasLifetimeV2Test.CastChangingAliasCannotProveLaterUAF
- 229/1254 Test  #229: AliasLifetimeV2Test.CastChangingAliasCannotProveLaterUAF ..............................   Passed    0.03 sec
+ 229/1254 Test  #229: AliasLifetimeV2Test.CastChangingAliasCannotProveLaterUAF ..............................   Passed    0.02 sec
           Start  230: AliasLifetimeV2Test.ReferenceBoundBeforeAllocationStillReleasesOwner
  230/1254 Test  #230: AliasLifetimeV2Test.ReferenceBoundBeforeAllocationStillReleasesOwner ..................   Passed    0.02 sec
           Start  231: AliasLifetimeV2Test.PointerCopyBeforeAllocationDoesNotFollowOwner
@@ -477,7 +477,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  238: ReallocLifetimeV2Test.ReallocarrayFailurePreservesOriginal_SuccessTransfers
  238/1254 Test  #238: ReallocLifetimeV2Test.ReallocarrayFailurePreservesOriginal_SuccessTransfers ...........   Passed    0.02 sec
           Start  239: ReallocLifetimeV2Test.DirectOverwriteNonzeroReportsFailureLeak
- 239/1254 Test  #239: ReallocLifetimeV2Test.DirectOverwriteNonzeroReportsFailureLeak ........................   Passed    0.03 sec
+ 239/1254 Test  #239: ReallocLifetimeV2Test.DirectOverwriteNonzeroReportsFailureLeak ........................   Passed    0.02 sec
           Start  240: ReallocLifetimeV2Test.GuardedNonzeroDirectOverwriteReportsFailureLeak
  240/1254 Test  #240: ReallocLifetimeV2Test.GuardedNonzeroDirectOverwriteReportsFailureLeak .................   Passed    0.02 sec
           Start  241: ReallocLifetimeV2Test.UnknownSizeTemporaryDegradesWithoutLifetimeClaim
@@ -489,7 +489,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  244: ReallocLifetimeV2Test.NullInputBehavesAsAllocation
  244/1254 Test  #244: ReallocLifetimeV2Test.NullInputBehavesAsAllocation ....................................   Passed    0.02 sec
           Start  245: ReallocLifetimeV2Test.StdReallocHasExactSuccessAuthority
- 245/1254 Test  #245: ReallocLifetimeV2Test.StdReallocHasExactSuccessAuthority ..............................   Passed    0.03 sec
+ 245/1254 Test  #245: ReallocLifetimeV2Test.StdReallocHasExactSuccessAuthority ..............................   Passed    0.02 sec
           Start  246: ReallocLifetimeV2Test.ReallocarrayOverflowFailurePreservesOriginal
  246/1254 Test  #246: ReallocLifetimeV2Test.ReallocarrayOverflowFailurePreservesOriginal ....................   Passed    0.02 sec
           Start  247: ReallocLifetimeV2Test.GuardedReallocarrayRequiresBothNonzeroOperands
@@ -507,7 +507,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  253: CleanupAttrTest.CleanupVar_CannotLeak
  253/1254 Test  #253: CleanupAttrTest.CleanupVar_CannotLeak .................................................   Passed    0.02 sec
           Start  254: CleanupAttrTest.PlainNeighbor_StillTracked
- 254/1254 Test  #254: CleanupAttrTest.PlainNeighbor_StillTracked ............................................   Passed    0.02 sec
+ 254/1254 Test  #254: CleanupAttrTest.PlainNeighbor_StillTracked ............................................   Passed    0.03 sec
           Start  255: SystemdIdiomTest.CompoundLiteralThroughOutParam_Escapes_NoLeak
  255/1254 Test  #255: SystemdIdiomTest.CompoundLiteralThroughOutParam_Escapes_NoLeak ........................   Passed    0.02 sec
           Start  256: SystemdIdiomTest.StatementExprTakePtr_Escapes_NoLeak
@@ -545,7 +545,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  272: SmartOwnerLifetimeV2Test.CapturedReleaseAliasesRawAndDeleteIsClean
  272/1254 Test  #272: SmartOwnerLifetimeV2Test.CapturedReleaseAliasesRawAndDeleteIsClean ....................   Passed    0.02 sec
           Start  273: SmartOwnerLifetimeV2Test.GetAliasObservesLastOwnerDestruction
- 273/1254 Test  #273: SmartOwnerLifetimeV2Test.GetAliasObservesLastOwnerDestruction .........................   Passed    0.02 sec
+ 273/1254 Test  #273: SmartOwnerLifetimeV2Test.GetAliasObservesLastOwnerDestruction .........................   Passed    0.03 sec
           Start  274: SmartOwnerLifetimeV2Test.UniqueResetThenRawUseReportsUAF
  274/1254 Test  #274: SmartOwnerLifetimeV2Test.UniqueResetThenRawUseReportsUAF ..............................   Passed    0.02 sec
           Start  275: SmartOwnerLifetimeV2Test.UniqueResetReplacementFreesOnlyOldRaw
@@ -557,7 +557,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  278: SmartOwnerLifetimeV2Test.UniqueMoveConstructionTransfersDestruction
  278/1254 Test  #278: SmartOwnerLifetimeV2Test.UniqueMoveConstructionTransfersDestruction ...................   Passed    0.02 sec
           Start  279: SmartOwnerLifetimeV2Test.UniqueMoveAssignmentReleasesDestination
- 279/1254 Test  #279: SmartOwnerLifetimeV2Test.UniqueMoveAssignmentReleasesDestination ......................   Passed    0.02 sec
+ 279/1254 Test  #279: SmartOwnerLifetimeV2Test.UniqueMoveAssignmentReleasesDestination ......................   Passed    0.03 sec
           Start  280: SmartOwnerLifetimeV2Test.SharedCopyKeepsRawAliveUntilLastOwner
  280/1254 Test  #280: SmartOwnerLifetimeV2Test.SharedCopyKeepsRawAliveUntilLastOwner ........................   Passed    0.02 sec
           Start  281: SmartOwnerLifetimeV2Test.SharedLastOwnerDestructionReportsUAF
@@ -605,7 +605,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  302: ExceptionalOwnerLifetimeV2Test.SharedExceptionalCleanupKeepsOuterOwnerAlive
  302/1254 Test  #302: ExceptionalOwnerLifetimeV2Test.SharedExceptionalCleanupKeepsOuterOwnerAlive ...........   Passed    0.02 sec
           Start  303: ExceptionalOwnerLifetimeV2Test.DisconnectedSharedCleanupStaysConservative
- 303/1254 Test  #303: ExceptionalOwnerLifetimeV2Test.DisconnectedSharedCleanupStaysConservative .............   Passed    0.03 sec
+ 303/1254 Test  #303: ExceptionalOwnerLifetimeV2Test.DisconnectedSharedCleanupStaysConservative .............   Passed    0.02 sec
           Start  304: ExceptionalOwnerLifetimeV2Test.CustomDeleterStaysConservative
  304/1254 Test  #304: ExceptionalOwnerLifetimeV2Test.CustomDeleterStaysConservative .........................   Passed    0.02 sec
           Start  305: ExceptionalOwnerLifetimeV2Test.RawAllocationWithoutOwnerStillLeaksAfterHandledThrow
@@ -619,7 +619,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  309: ExceptionalTransferBoundaryTest.GlobalMemberStoreEscapes
  309/1254 Test  #309: ExceptionalTransferBoundaryTest.GlobalMemberStoreEscapes ..............................   Passed    0.02 sec
           Start  310: FdResourceRuleTest.DirectAcquirersReport
- 310/1254 Test  #310: FdResourceRuleTest.DirectAcquirersReport ..............................................   Passed    0.03 sec
+ 310/1254 Test  #310: FdResourceRuleTest.DirectAcquirersReport ..............................................   Passed    0.02 sec
           Start  311: FdResourceRuleTest.CloseReleasesDescriptor
  311/1254 Test  #311: FdResourceRuleTest.CloseReleasesDescriptor ............................................   Passed    0.02 sec
           Start  312: FdResourceRuleTest.ShutdownAloneDoesNotCloseDescriptor
@@ -667,7 +667,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  333: FdResourceRuleTest.FailureSentinelWrapperStillReportsSuccessLeak
  333/1254 Test  #333: FdResourceRuleTest.FailureSentinelWrapperStillReportsSuccessLeak ......................   Passed    0.02 sec
           Start  334: FdResourceRuleTest.ConsumingWrapperChainClosesDescriptor
- 334/1254 Test  #334: FdResourceRuleTest.ConsumingWrapperChainClosesDescriptor ..............................   Passed    0.02 sec
+ 334/1254 Test  #334: FdResourceRuleTest.ConsumingWrapperChainClosesDescriptor ..............................   Passed    0.03 sec
           Start  335: FdResourceRuleTest.ConditionalConsumerDoesNotSuppressLeak
  335/1254 Test  #335: FdResourceRuleTest.ConditionalConsumerDoesNotSuppressLeak .............................   Passed    0.02 sec
           Start  336: FdResourceRuleTest.TransferWrapperEscapesDescriptor
@@ -699,7 +699,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  349: FdResourceRuleTest.ReassignedSnapshotDoesNotProveReplacementClose
  349/1254 Test  #349: FdResourceRuleTest.ReassignedSnapshotDoesNotProveReplacementClose .....................   Passed    0.02 sec
           Start  350: FdResourceRuleTest.ConditionalReplacementCloseStillReports
- 350/1254 Test  #350: FdResourceRuleTest.ConditionalReplacementCloseStillReports ............................   Passed    0.03 sec
+ 350/1254 Test  #350: FdResourceRuleTest.ConditionalReplacementCloseStillReports ............................   Passed    0.02 sec
           Start  351: FdResourceRuleTest.EqualityCleanupMissesSuccessfulReplacement
  351/1254 Test  #351: FdResourceRuleTest.EqualityCleanupMissesSuccessfulReplacement .........................   Passed    0.02 sec
           Start  352: DivByZeroRuleTest.LiteralDivByZero
@@ -733,7 +733,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  366: DivByZeroRuleTest.GuardGreaterThanZero_Clean
  366/1254 Test  #366: DivByZeroRuleTest.GuardGreaterThanZero_Clean ..........................................   Passed    0.02 sec
           Start  367: DivByZeroRuleTest.WhileGuard_CleanInside_ErrorAfter
- 367/1254 Test  #367: DivByZeroRuleTest.WhileGuard_CleanInside_ErrorAfter ...................................   Passed    0.02 sec
+ 367/1254 Test  #367: DivByZeroRuleTest.WhileGuard_CleanInside_ErrorAfter ...................................   Passed    0.03 sec
           Start  368: DivByZeroRuleTest.GuardThenFix_Clean
  368/1254 Test  #368: DivByZeroRuleTest.GuardThenFix_Clean ..................................................   Passed    0.02 sec
           Start  369: DivByZeroRuleTest.ZeroOnSomePathUnguarded_Warning
@@ -763,11 +763,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  381: DivByZeroRuleTest.CopyOfDefiniteZero_ReportsDefinite
  381/1254 Test  #381: DivByZeroRuleTest.CopyOfDefiniteZero_ReportsDefinite ..................................   Passed    0.02 sec
           Start  382: DivByZeroRuleTest.CopyFromUnknownParam_Clean
- 382/1254 Test  #382: DivByZeroRuleTest.CopyFromUnknownParam_Clean ..........................................   Passed    0.02 sec
+ 382/1254 Test  #382: DivByZeroRuleTest.CopyFromUnknownParam_Clean ..........................................   Passed    0.03 sec
           Start  383: DivByZeroRuleTest.CopyReassignedSafe_Clean
  383/1254 Test  #383: DivByZeroRuleTest.CopyReassignedSafe_Clean ............................................   Passed    0.02 sec
           Start  384: DivByZeroRuleTest.ImmutableFlagDeadAssign_Clean
- 384/1254 Test  #384: DivByZeroRuleTest.ImmutableFlagDeadAssign_Clean .......................................   Passed    0.03 sec
+ 384/1254 Test  #384: DivByZeroRuleTest.ImmutableFlagDeadAssign_Clean .......................................   Passed    0.02 sec
           Start  385: DivByZeroRuleTest.InterprocUntrustedArg_Reports
  385/1254 Test  #385: DivByZeroRuleTest.InterprocUntrustedArg_Reports .......................................   Passed    0.02 sec
           Start  386: DivByZeroRuleTest.InterprocCallerGuards_Clean
@@ -779,19 +779,19 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  389: DivByZeroRuleTest.InterprocMixedCallers_ReportsZeroablePath
  389/1254 Test  #389: DivByZeroRuleTest.InterprocMixedCallers_ReportsZeroablePath ...........................   Passed    0.02 sec
           Start  390: DivByZeroRuleTest.InterprocExternalCallee_NotSeeded
- 390/1254 Test  #390: DivByZeroRuleTest.InterprocExternalCallee_NotSeeded ...................................   Passed    0.02 sec
+ 390/1254 Test  #390: DivByZeroRuleTest.InterprocExternalCallee_NotSeeded ...................................   Passed    0.03 sec
           Start  391: DivByZeroRuleTest.PassthroughIdentity_ScanfArg_Warns
  391/1254 Test  #391: DivByZeroRuleTest.PassthroughIdentity_ScanfArg_Warns ..................................   Passed    0.02 sec
           Start  392: DivByZeroRuleTest.PassthroughIdentity_NonZeroArg_Clean
  392/1254 Test  #392: DivByZeroRuleTest.PassthroughIdentity_NonZeroArg_Clean ................................   Passed    0.02 sec
           Start  393: DivByZeroRuleTest.PassthroughTwoHop_Warns
- 393/1254 Test  #393: DivByZeroRuleTest.PassthroughTwoHop_Warns .............................................   Passed    0.02 sec
+ 393/1254 Test  #393: DivByZeroRuleTest.PassthroughTwoHop_Warns .............................................   Passed    0.03 sec
           Start  394: DivByZeroRuleTest.PassthroughGuardedResult_Clean
  394/1254 Test  #394: DivByZeroRuleTest.PassthroughGuardedResult_Clean ......................................   Passed    0.02 sec
           Start  395: DivByZeroRuleTest.PassthroughLiteralZero_DefiniteError
  395/1254 Test  #395: DivByZeroRuleTest.PassthroughLiteralZero_DefiniteError ................................   Passed    0.02 sec
           Start  396: DivByZeroRuleTest.PassthroughMixedNonZeroPaths_Warns
- 396/1254 Test  #396: DivByZeroRuleTest.PassthroughMixedNonZeroPaths_Warns ..................................   Passed    0.02 sec
+ 396/1254 Test  #396: DivByZeroRuleTest.PassthroughMixedNonZeroPaths_Warns ..................................   Passed    0.03 sec
           Start  397: DivByZeroRuleTest.PassthroughNarrowing_NoClaimEitherWay
  397/1254 Test  #397: DivByZeroRuleTest.PassthroughNarrowing_NoClaimEitherWay ...............................   Passed    0.02 sec
           Start  398: DivByZeroRuleTest.PassthroughUnknownArg_Clean
@@ -805,7 +805,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  402: DivByZeroRuleTest.TwoHopNonZeroChain_Clean
  402/1254 Test  #402: DivByZeroRuleTest.TwoHopNonZeroChain_Clean ............................................   Passed    0.02 sec
           Start  403: DivByZeroTraceTest.GuardOnlyZero_TraceShowsCondition
- 403/1254 Test  #403: DivByZeroTraceTest.GuardOnlyZero_TraceShowsCondition ..................................   Passed    0.03 sec
+ 403/1254 Test  #403: DivByZeroTraceTest.GuardOnlyZero_TraceShowsCondition ..................................   Passed    0.02 sec
           Start  404: LibGit2FpTest.AssignInCondition_ZeroGuard_Refines
  404/1254 Test  #404: LibGit2FpTest.AssignInCondition_ZeroGuard_Refines .....................................   Passed    0.02 sec
           Start  405: LibGit2FpTest.AssignInCondition_EqNull_Refines
@@ -885,7 +885,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  442: IntOverflowRuleTest.UntrustedSourceOverflowGuardedClean
  442/1254 Test  #442: IntOverflowRuleTest.UntrustedSourceOverflowGuardedClean ...............................   Passed    0.02 sec
           Start  443: IntOverflowRuleTest.ConstantFoldedGuardRefines
- 443/1254 Test  #443: IntOverflowRuleTest.ConstantFoldedGuardRefines ........................................   Passed    0.02 sec
+ 443/1254 Test  #443: IntOverflowRuleTest.ConstantFoldedGuardRefines ........................................   Passed    0.03 sec
           Start  444: IntOverflowRuleTest.ScanfSourceMultiplyOverflows
  444/1254 Test  #444: IntOverflowRuleTest.ScanfSourceMultiplyOverflows ......................................   Passed    0.02 sec
           Start  445: IntOverflowRuleTest.ScanfSourceGuardedClean
@@ -903,11 +903,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  451: IntOverflowRuleTest.SubtractionUnderflows
  451/1254 Test  #451: IntOverflowRuleTest.SubtractionUnderflows .............................................   Passed    0.02 sec
           Start  452: IntOverflowRuleTest.SubtractionInRangeClean
- 452/1254 Test  #452: IntOverflowRuleTest.SubtractionInRangeClean ...........................................   Passed    0.03 sec
+ 452/1254 Test  #452: IntOverflowRuleTest.SubtractionInRangeClean ...........................................   Passed    0.02 sec
           Start  453: IntOverflowRuleTest.GuardedSubtractionClean
  453/1254 Test  #453: IntOverflowRuleTest.GuardedSubtractionClean ...........................................   Passed    0.02 sec
           Start  454: IntOverflowRuleTest.UnknownSubtractionSilent
- 454/1254 Test  #454: IntOverflowRuleTest.UnknownSubtractionSilent ..........................................   Passed    0.03 sec
+ 454/1254 Test  #454: IntOverflowRuleTest.UnknownSubtractionSilent ..........................................   Passed    0.02 sec
           Start  455: IntOverflowRuleTest.UnsignedSubtractionNotThisRule
  455/1254 Test  #455: IntOverflowRuleTest.UnsignedSubtractionNotThisRule ....................................   Passed    0.02 sec
           Start  456: ReadmeCompareTest.DemoC_AtoiOverflow
@@ -923,13 +923,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  461: SignConversionRuleTest.Nlohmann_3491_UbjsonSizeValue_Reports
  461/1254 Test  #461: SignConversionRuleTest.Nlohmann_3491_UbjsonSizeValue_Reports ..........................   Passed    0.02 sec
           Start  462: SignConversionRuleTest.ReturnValueSource_ExplicitCast_Reports
- 462/1254 Test  #462: SignConversionRuleTest.ReturnValueSource_ExplicitCast_Reports .........................   Passed    0.02 sec
+ 462/1254 Test  #462: SignConversionRuleTest.ReturnValueSource_ExplicitCast_Reports .........................   Passed    0.03 sec
           Start  463: SignConversionRuleTest.UpperBoundOnlyGuard_StillReports
  463/1254 Test  #463: SignConversionRuleTest.UpperBoundOnlyGuard_StillReports ...............................   Passed    0.02 sec
           Start  464: SignConversionRuleTest.AllocatorArgument_NotThisRulesDomain
  464/1254 Test  #464: SignConversionRuleTest.AllocatorArgument_NotThisRulesDomain ...........................   Passed    0.02 sec
           Start  465: SignConversionRuleTest.LengthUsedForCopy_Reports
- 465/1254 Test  #465: SignConversionRuleTest.LengthUsedForCopy_Reports ......................................   Passed    0.02 sec
+ 465/1254 Test  #465: SignConversionRuleTest.LengthUsedForCopy_Reports ......................................   Passed    0.03 sec
           Start  466: SignConversionRuleTest.NegativityGuard_Silent
  466/1254 Test  #466: SignConversionRuleTest.NegativityGuard_Silent .........................................   Passed    0.02 sec
           Start  467: SignConversionRuleTest.SafePostCastRangeUse_Silent
@@ -951,7 +951,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  475: SignConversionRuleTest.ModeTSink_NotALength_Silent
  475/1254 Test  #475: SignConversionRuleTest.ModeTSink_NotALength_Silent ....................................   Passed    0.02 sec
           Start  476: SignConversionRuleTest.DevTSink_NotALength_Silent
- 476/1254 Test  #476: SignConversionRuleTest.DevTSink_NotALength_Silent .....................................   Passed    0.03 sec
+ 476/1254 Test  #476: SignConversionRuleTest.DevTSink_NotALength_Silent .....................................   Passed    0.02 sec
           Start  477: SignConversionRuleTest.SizeTTypedefSink_StillReports
  477/1254 Test  #477: SignConversionRuleTest.SizeTTypedefSink_StillReports ..................................   Passed    0.02 sec
           Start  478: SignConversionRuleTest.PointerOutParam_CShape_Reports
@@ -963,7 +963,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  481: AllocSizeOverflowRuleTest.BoundedLength_Silent
  481/1254 Test  #481: AllocSizeOverflowRuleTest.BoundedLength_Silent ........................................   Passed    0.02 sec
           Start  482: AllocSizeOverflowRuleTest.NoDeclaredSource_Silent
- 482/1254 Test  #482: AllocSizeOverflowRuleTest.NoDeclaredSource_Silent .....................................   Passed    0.02 sec
+ 482/1254 Test  #482: AllocSizeOverflowRuleTest.NoDeclaredSource_Silent .....................................   Passed    0.03 sec
           Start  483: AllocSizeOverflowRuleTest.NotAnAllocatorSink_Silent
  483/1254 Test  #483: AllocSizeOverflowRuleTest.NotAnAllocatorSink_Silent ...................................   Passed    0.02 sec
           Start  484: AllocSizeOverflowRuleTest.SignedArithmetic_NotThisRule
@@ -1009,7 +1009,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  504: AllocSizeOverflowRuleTest.NarrowedSignedCornerSmallFactor_Silent
  504/1254 Test  #504: AllocSizeOverflowRuleTest.NarrowedSignedCornerSmallFactor_Silent ......................   Passed    0.02 sec
           Start  505: AllocSizeOverflowRuleTest.NarrowedSignedCornerLargeFactor_Reports
- 505/1254 Test  #505: AllocSizeOverflowRuleTest.NarrowedSignedCornerLargeFactor_Reports .....................   Passed    0.03 sec
+ 505/1254 Test  #505: AllocSizeOverflowRuleTest.NarrowedSignedCornerLargeFactor_Reports .....................   Passed    0.02 sec
           Start  506: AllocSizeOverflowRuleTest.UnstableSignedAlias_Silent
  506/1254 Test  #506: AllocSizeOverflowRuleTest.UnstableSignedAlias_Silent ..................................   Passed    0.02 sec
           Start  507: AllocSizeOverflowRuleTest.BuiltinMulOverflowEqualityCheck_Silent
@@ -1027,7 +1027,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  513: AllocSizeOverflowRuleTest.CrossTUAllocatorWrapper_Reports
  513/1254 Test  #513: AllocSizeOverflowRuleTest.CrossTUAllocatorWrapper_Reports .............................   Passed    0.02 sec
           Start  514: AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent
- 514/1254 Test  #514: AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent .............................   Passed    0.02 sec
+ 514/1254 Test  #514: AllocSizeOverflowRuleTest.BodylessAllocatorWrapper_Silent .............................   Passed    0.03 sec
           Start  515: AllocSizeOverflowRuleTest.TransformedAllocatorWrapper_Silent
  515/1254 Test  #515: AllocSizeOverflowRuleTest.TransformedAllocatorWrapper_Silent ..........................   Passed    0.02 sec
           Start  516: AllocSizeOverflowRuleTest.LvglPinnedAllocationReplay_Reports
@@ -1047,7 +1047,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  523: AllocSizeOverflowRuleTest.UninvokedLambdaAllocatorWrapper_Silent
  523/1254 Test  #523: AllocSizeOverflowRuleTest.UninvokedLambdaAllocatorWrapper_Silent ......................   Passed    0.02 sec
           Start  524: BoundsRuleTest.BitmaskIndexInRangeClean
- 524/1254 Test  #524: BoundsRuleTest.BitmaskIndexInRangeClean ...............................................   Passed    0.03 sec
+ 524/1254 Test  #524: BoundsRuleTest.BitmaskIndexInRangeClean ...............................................   Passed    0.02 sec
           Start  525: BoundsRuleTest.BitmaskIndexPlusOffsetOOB
  525/1254 Test  #525: BoundsRuleTest.BitmaskIndexPlusOffsetOOB ..............................................   Passed    0.02 sec
           Start  526: BoundsRuleTest.ModuloIndexInRangeClean
@@ -1059,7 +1059,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  529: BoundsRuleTest.NegativeConstantIndex
  529/1254 Test  #529: BoundsRuleTest.NegativeConstantIndex ..................................................   Passed    0.02 sec
           Start  530: BoundsRuleTest.GuardedIndexProvenPastEnd
- 530/1254 Test  #530: BoundsRuleTest.GuardedIndexProvenPastEnd ..............................................   Passed    0.02 sec
+ 530/1254 Test  #530: BoundsRuleTest.GuardedIndexProvenPastEnd ..............................................   Passed    0.03 sec
           Start  531: BoundsRuleTest.ComputedConstantIndexPastEnd
  531/1254 Test  #531: BoundsRuleTest.ComputedConstantIndexPastEnd ...........................................   Passed    0.02 sec
           Start  532: BoundsRuleTest.ConstantIndexInRange
@@ -1067,7 +1067,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  533: BoundsRuleTest.UnknownIndexSilent
  533/1254 Test  #533: BoundsRuleTest.UnknownIndexSilent .....................................................   Passed    0.02 sec
           Start  534: BoundsRuleTest.PartialOverlapSilent
- 534/1254 Test  #534: BoundsRuleTest.PartialOverlapSilent ...................................................   Passed    0.02 sec
+ 534/1254 Test  #534: BoundsRuleTest.PartialOverlapSilent ...................................................   Passed    0.03 sec
           Start  535: BoundsRuleTest.GuardedIndexInRangeClean
  535/1254 Test  #535: BoundsRuleTest.GuardedIndexInRangeClean ...............................................   Passed    0.02 sec
           Start  536: BoundsRuleTest.HeapMallocPastEnd
@@ -1083,9 +1083,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  541: BoundsRuleTest.HeapReassignedPointerSilent
  541/1254 Test  #541: BoundsRuleTest.HeapReassignedPointerSilent ............................................   Passed    0.02 sec
           Start  542: BoundsRuleTest.HeapAddressTakenSilent
- 542/1254 Test  #542: BoundsRuleTest.HeapAddressTakenSilent .................................................   Passed    0.03 sec
+ 542/1254 Test  #542: BoundsRuleTest.HeapAddressTakenSilent .................................................   Passed    0.02 sec
           Start  543: BoundsRuleTest.HeapVariableSizeSilent
- 543/1254 Test  #543: BoundsRuleTest.HeapVariableSizeSilent .................................................   Passed    0.02 sec
+ 543/1254 Test  #543: BoundsRuleTest.HeapVariableSizeSilent .................................................   Passed    0.03 sec
           Start  544: BoundsRuleTest.MemcpyPastFixedArray
  544/1254 Test  #544: BoundsRuleTest.MemcpyPastFixedArray ...................................................   Passed    0.02 sec
           Start  545: BoundsRuleTest.MemcpyExactFitClean
@@ -1097,7 +1097,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  548: BoundsRuleTest.MemcpyVariableSizeSilent
  548/1254 Test  #548: BoundsRuleTest.MemcpyVariableSizeSilent ...............................................   Passed    0.02 sec
           Start  549: BoundsRuleTest.MemcpyInRangeClean
- 549/1254 Test  #549: BoundsRuleTest.MemcpyInRangeClean .....................................................   Passed    0.03 sec
+ 549/1254 Test  #549: BoundsRuleTest.MemcpyInRangeClean .....................................................   Passed    0.02 sec
           Start  550: BoundsRuleTest.MemcpySizeofOversizedType
  550/1254 Test  #550: BoundsRuleTest.MemcpySizeofOversizedType ..............................................   Passed    0.02 sec
           Start  551: BoundsRuleTest.MemcpyCountTimesSizeofOverflow
@@ -1137,17 +1137,17 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  568: BoundsRuleTest.StrcpyPrecheckEarlyReturn_Clean
  568/1254 Test  #568: BoundsRuleTest.StrcpyPrecheckEarlyReturn_Clean ........................................   Passed    0.02 sec
           Start  569: BoundsRuleTest.StrcatDstOnlyGuard_Reported
- 569/1254 Test  #569: BoundsRuleTest.StrcatDstOnlyGuard_Reported ............................................   Passed    0.03 sec
+ 569/1254 Test  #569: BoundsRuleTest.StrcatDstOnlyGuard_Reported ............................................   Passed    0.02 sec
           Start  570: BoundsRuleTest.StrcpyCheckAfterCopy_Reported
  570/1254 Test  #570: BoundsRuleTest.StrcpyCheckAfterCopy_Reported ..........................................   Passed    0.02 sec
           Start  571: BoundsRuleTest.StrcpyMeasuredThenIgnored_Reported
- 571/1254 Test  #571: BoundsRuleTest.StrcpyMeasuredThenIgnored_Reported .....................................   Passed    0.02 sec
+ 571/1254 Test  #571: BoundsRuleTest.StrcpyMeasuredThenIgnored_Reported .....................................   Passed    0.03 sec
           Start  572: BoundsRuleTest.StrcpyOtherVarGuard_Reported
  572/1254 Test  #572: BoundsRuleTest.StrcpyOtherVarGuard_Reported ...........................................   Passed    0.02 sec
           Start  573: BoundsRuleTest.UntrustedLenMemcpy_Warn
  573/1254 Test  #573: BoundsRuleTest.UntrustedLenMemcpy_Warn ................................................   Passed    0.02 sec
           Start  574: BoundsRuleTest.UntrustedLenGuarded_Clean
- 574/1254 Test  #574: BoundsRuleTest.UntrustedLenGuarded_Clean ..............................................   Passed    0.03 sec
+ 574/1254 Test  #574: BoundsRuleTest.UntrustedLenGuarded_Clean ..............................................   Passed    0.02 sec
           Start  575: BoundsRuleTest.UntrustedLenScanfStrncpy_Warn
  575/1254 Test  #575: BoundsRuleTest.UntrustedLenScanfStrncpy_Warn ..........................................   Passed    0.02 sec
           Start  576: BoundsRuleTest.TrustedOrUnknownLen_Clean
@@ -1161,7 +1161,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  580: BoundsRuleTest.StrncpyConstant_DefiniteVsFits
  580/1254 Test  #580: BoundsRuleTest.StrncpyConstant_DefiniteVsFits .........................................   Passed    0.02 sec
           Start  581: BoundsRuleTest.MemsetUntrustedLen_Warn
- 581/1254 Test  #581: BoundsRuleTest.MemsetUntrustedLen_Warn ................................................   Passed    0.03 sec
+ 581/1254 Test  #581: BoundsRuleTest.MemsetUntrustedLen_Warn ................................................   Passed    0.02 sec
           Start  582: BoundsRuleTest.ConfiguredUntrustedSource_WarnAndRestore
  582/1254 Test  #582: BoundsRuleTest.ConfiguredUntrustedSource_WarnAndRestore ...............................   Passed    0.02 sec
           Start  583: BoundsRuleTest.TwoHopParamIndex_DefiniteOOB
@@ -1177,7 +1177,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  588: BoundsRuleTest.MiddleMemberArray_PointerBase_StillWarns
  588/1254 Test  #588: BoundsRuleTest.MiddleMemberArray_PointerBase_StillWarns ...............................   Passed    0.02 sec
           Start  589: BoundsRuleTest.TailArrayDirectObject_StillWarns
- 589/1254 Test  #589: BoundsRuleTest.TailArrayDirectObject_StillWarns .......................................   Passed    0.03 sec
+ 589/1254 Test  #589: BoundsRuleTest.TailArrayDirectObject_StillWarns .......................................   Passed    0.02 sec
           Start  590: BoundsRuleTest.RealFixedTailArray_PointerBase_StillWarns
  590/1254 Test  #590: BoundsRuleTest.RealFixedTailArray_PointerBase_StillWarns ..............................   Passed    0.02 sec
           Start  591: BoundsRuleTest.C99FlexibleArrayMember_Clean
@@ -1185,13 +1185,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  592: NullDerefRuleTest.DependentTemplatePatternDefersToInstantiation
  592/1254 Test  #592: NullDerefRuleTest.DependentTemplatePatternDefersToInstantiation .......................   Passed    0.02 sec
           Start  593: NullDerefRuleTest.DefiniteNullDeref
- 593/1254 Test  #593: NullDerefRuleTest.DefiniteNullDeref ...................................................   Passed    0.03 sec
+ 593/1254 Test  #593: NullDerefRuleTest.DefiniteNullDeref ...................................................   Passed    0.02 sec
           Start  594: NullDerefRuleTest.ZeroLiteralInit
  594/1254 Test  #594: NullDerefRuleTest.ZeroLiteralInit .....................................................   Passed    0.02 sec
           Start  595: NullDerefRuleTest.ArrowDeref
  595/1254 Test  #595: NullDerefRuleTest.ArrowDeref ..........................................................   Passed    0.02 sec
           Start  596: NullDerefRuleTest.SubscriptDeref
- 596/1254 Test  #596: NullDerefRuleTest.SubscriptDeref ......................................................   Passed    0.02 sec
+ 596/1254 Test  #596: NullDerefRuleTest.SubscriptDeref ......................................................   Passed    0.03 sec
           Start  597: NullDerefRuleTest.AssignNullInsideGuard
  597/1254 Test  #597: NullDerefRuleTest.AssignNullInsideGuard ...............................................   Passed    0.02 sec
           Start  598: NullDerefRuleTest.MaybeNull_Warning
@@ -1207,13 +1207,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  603: NullDerefRuleTest.ShortCircuitAnd_Clean
  603/1254 Test  #603: NullDerefRuleTest.ShortCircuitAnd_Clean ...............................................   Passed    0.02 sec
           Start  604: NullDerefRuleTest.WhileGuard_ErrorAfterLoop
- 604/1254 Test  #604: NullDerefRuleTest.WhileGuard_ErrorAfterLoop ...........................................   Passed    0.02 sec
+ 604/1254 Test  #604: NullDerefRuleTest.WhileGuard_ErrorAfterLoop ...........................................   Passed    0.03 sec
           Start  605: NullDerefRuleTest.ParamUnguarded_Silent
  605/1254 Test  #605: NullDerefRuleTest.ParamUnguarded_Silent ...............................................   Passed    0.02 sec
           Start  606: NullDerefRuleTest.AssignAddressOf_Clean
  606/1254 Test  #606: NullDerefRuleTest.AssignAddressOf_Clean ...............................................   Passed    0.02 sec
           Start  607: NullDerefRuleTest.AssignNew_Clean
- 607/1254 Test  #607: NullDerefRuleTest.AssignNew_Clean .....................................................   Passed    0.02 sec
+ 607/1254 Test  #607: NullDerefRuleTest.AssignNew_Clean .....................................................   Passed    0.03 sec
           Start  608: NullDerefRuleTest.OutParamEscape_Clean
  608/1254 Test  #608: NullDerefRuleTest.OutParamEscape_Clean ................................................   Passed    0.02 sec
           Start  609: NullDerefRuleTest.LinkedListBuildLoop_WarningNotError
@@ -1257,7 +1257,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  628: NullDerefRuleTest.MemberFlagConstMethodCallee_Clean
  628/1254 Test  #628: NullDerefRuleTest.MemberFlagConstMethodCallee_Clean ...................................   Passed    0.02 sec
           Start  629: NullDerefRuleTest.MemberFlagConstMutableGuardCallee_Reported
- 629/1254 Test  #629: NullDerefRuleTest.MemberFlagConstMutableGuardCallee_Reported ..........................   Passed    0.03 sec
+ 629/1254 Test  #629: NullDerefRuleTest.MemberFlagConstMutableGuardCallee_Reported ..........................   Passed    0.02 sec
           Start  630: NullDerefRuleTest.MemberFlagConstMutableSiblingCallee_Clean
  630/1254 Test  #630: NullDerefRuleTest.MemberFlagConstMutableSiblingCallee_Clean ...........................   Passed    0.02 sec
           Start  631: NullDerefRuleTest.MemberFlagReturnedAddressGuardCallee_Reported
@@ -1285,7 +1285,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  642: NullDerefRuleTest.MemberFlagReassignedBetween_Reported
  642/1254 Test  #642: NullDerefRuleTest.MemberFlagReassignedBetween_Reported ................................   Passed    0.02 sec
           Start  643: NullDerefRuleTest.MemberBaseAddressStored_Reported
- 643/1254 Test  #643: NullDerefRuleTest.MemberBaseAddressStored_Reported ....................................   Passed    0.03 sec
+ 643/1254 Test  #643: NullDerefRuleTest.MemberBaseAddressStored_Reported ....................................   Passed    0.02 sec
           Start  644: NullDerefRuleTest.MemberFlagOutParamFactoryCapOverflow_Clean
  644/1254 Test  #644: NullDerefRuleTest.MemberFlagOutParamFactoryCapOverflow_Clean ..........................   Passed    0.02 sec
           Start  645: NullDerefRuleTest.MemberFlagOutParamFactoryDivergent_Reported
@@ -1307,7 +1307,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  653: NullDerefRuleTest.NullPassthrough_WrittenParam_NoClaim
  653/1254 Test  #653: NullDerefRuleTest.NullPassthrough_WrittenParam_NoClaim ................................   Passed    0.02 sec
           Start  654: NullDerefRuleTest.NullPassthrough_PlainVarArg_Clean
- 654/1254 Test  #654: NullDerefRuleTest.NullPassthrough_PlainVarArg_Clean ...................................   Passed    0.02 sec
+ 654/1254 Test  #654: NullDerefRuleTest.NullPassthrough_PlainVarArg_Clean ...................................   Passed    0.03 sec
           Start  655: NullDerefRuleTest.NullPassthrough_AllocThroughKeep_Warns
  655/1254 Test  #655: NullDerefRuleTest.NullPassthrough_AllocThroughKeep_Warns ..............................   Passed    0.02 sec
           Start  656: NullDerefRuleTest.NullPassthrough_MixedNonNullPaths_Warns
@@ -1315,7 +1315,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  657: NullDerefRuleTest.LiveAssertNonNull_NarrowsClean
  657/1254 Test  #657: NullDerefRuleTest.LiveAssertNonNull_NarrowsClean ......................................   Passed    0.02 sec
           Start  658: NullDerefRuleTest.NoAssertControl_StillWarns
- 658/1254 Test  #658: NullDerefRuleTest.NoAssertControl_StillWarns ..........................................   Passed    0.02 sec
+ 658/1254 Test  #658: NullDerefRuleTest.NoAssertControl_StillWarns ..........................................   Passed    0.03 sec
           Start  659: UncheckedAllocTest.Malloc_UnguardedDeref_Warns
  659/1254 Test  #659: UncheckedAllocTest.Malloc_UnguardedDeref_Warns ........................................   Passed    0.03 sec
           Start  660: UncheckedAllocTest.Malloc_IfReturnGuard_Clean
@@ -1325,41 +1325,41 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  662: UncheckedAllocTest.Strdup_UnguardedDeref_Warns
  662/1254 Test  #662: UncheckedAllocTest.Strdup_UnguardedDeref_Warns ........................................   Passed    0.02 sec
           Start  663: UncheckedAllocTest.Realloc_UnguardedDeref_Warns
- 663/1254 Test  #663: UncheckedAllocTest.Realloc_UnguardedDeref_Warns .......................................   Passed    0.02 sec
+ 663/1254 Test  #663: UncheckedAllocTest.Realloc_UnguardedDeref_Warns .......................................   Passed    0.03 sec
           Start  664: UncheckedAllocTest.Ternary_Guard_Clean
  664/1254 Test  #664: UncheckedAllocTest.Ternary_Guard_Clean ................................................   Passed    0.03 sec
           Start  665: NullDerefPathSensitivityTest.CorrelatedGuards_AssignDeref_Clean
  665/1254 Test  #665: NullDerefPathSensitivityTest.CorrelatedGuards_AssignDeref_Clean .......................   Passed    0.02 sec
           Start  666: NullDerefPathSensitivityTest.AntiCorrelatedGuards_ErrorStays
- 666/1254 Test  #666: NullDerefPathSensitivityTest.AntiCorrelatedGuards_ErrorStays ..........................   Passed    0.03 sec
+ 666/1254 Test  #666: NullDerefPathSensitivityTest.AntiCorrelatedGuards_ErrorStays ..........................   Passed    0.02 sec
           Start  667: NullDerefPathSensitivityTest.PointerGuardStillWorks_WithFacts
  667/1254 Test  #667: NullDerefPathSensitivityTest.PointerGuardStillWorks_WithFacts .........................   Passed    0.02 sec
           Start  668: NullDerefTraceTest.GuardOnlyNull_TraceShowsCondition
  668/1254 Test  #668: NullDerefTraceTest.GuardOnlyNull_TraceShowsCondition ..................................   Passed    0.02 sec
           Start  669: LlamaFpTest.DefensiveTernary_NoMaybeNullAfterJoin
- 669/1254 Test  #669: LlamaFpTest.DefensiveTernary_NoMaybeNullAfterJoin .....................................   Passed    0.03 sec
+ 669/1254 Test  #669: LlamaFpTest.DefensiveTernary_NoMaybeNullAfterJoin .....................................   Passed    0.02 sec
           Start  670: LlamaFpTest.IfGuard_CheckThenUse_StillWarns
  670/1254 Test  #670: LlamaFpTest.IfGuard_CheckThenUse_StillWarns ...........................................   Passed    0.02 sec
           Start  671: LlamaFpTest.TernaryArmDeref_NotFlagged
  671/1254 Test  #671: LlamaFpTest.TernaryArmDeref_NotFlagged ................................................   Passed    0.02 sec
           Start  672: ReportDedupTest.WarningFlood_CollapsesToOneFinding
- 672/1254 Test  #672: ReportDedupTest.WarningFlood_CollapsesToOneFinding ....................................   Passed    0.03 sec
+ 672/1254 Test  #672: ReportDedupTest.WarningFlood_CollapsesToOneFinding ....................................   Passed    0.02 sec
           Start  673: ReportDedupTest.IndependentVariables_StillTwoFindings
  673/1254 Test  #673: ReportDedupTest.IndependentVariables_StillTwoFindings .................................   Passed    0.02 sec
           Start  674: ReportDedupTest.DefiniteErrors_KeepPerLineGranularity
  674/1254 Test  #674: ReportDedupTest.DefiniteErrors_KeepPerLineGranularity .................................   Passed    0.02 sec
           Start  675: ForeachArrayFpTest.ExactMacroShape_NoWarning
- 675/1254 Test  #675: ForeachArrayFpTest.ExactMacroShape_NoWarning ..........................................   Passed    0.03 sec
+ 675/1254 Test  #675: ForeachArrayFpTest.ExactMacroShape_NoWarning ..........................................   Passed    0.02 sec
           Start  676: ForeachArrayFpTest.OpenCodedShape_NoWarning
- 676/1254 Test  #676: ForeachArrayFpTest.OpenCodedShape_NoWarning ...........................................   Passed    0.02 sec
+ 676/1254 Test  #676: ForeachArrayFpTest.OpenCodedShape_NoWarning ...........................................   Passed    0.03 sec
           Start  677: ForeachArrayFpTest.RelationalProvesBothOperands
  677/1254 Test  #677: ForeachArrayFpTest.RelationalProvesBothOperands .......................................   Passed    0.02 sec
           Start  678: ForeachArrayFpTest.NullLiteralOrdering_DoesNotBless
  678/1254 Test  #678: ForeachArrayFpTest.NullLiteralOrdering_DoesNotBless ...................................   Passed    0.02 sec
           Start  679: ForeachArrayFpTest.PostLoopDeref_StillWarns
- 679/1254 Test  #679: ForeachArrayFpTest.PostLoopDeref_StillWarns ...........................................   Passed    0.02 sec
+ 679/1254 Test  #679: ForeachArrayFpTest.PostLoopDeref_StillWarns ...........................................   Passed    0.03 sec
           Start  680: AssertTernaryTest.CompoundAssertAfterGuard_Clean
- 680/1254 Test  #680: AssertTernaryTest.CompoundAssertAfterGuard_Clean ......................................   Passed    0.03 sec
+ 680/1254 Test  #680: AssertTernaryTest.CompoundAssertAfterGuard_Clean ......................................   Passed    0.02 sec
           Start  681: AssertTernaryTest.CompoundAssertNoGuard_Clean
  681/1254 Test  #681: AssertTernaryTest.CompoundAssertNoGuard_Clean .........................................   Passed    0.02 sec
           Start  682: AssertTernaryTest.StaticCastBoolGuard_Clean
@@ -1367,15 +1367,15 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  683: AssertTernaryTest.AssertOnOtherVar_LeakStaysVisible
  683/1254 Test  #683: AssertTernaryTest.AssertOnOtherVar_LeakStaysVisible ...................................   Passed    0.02 sec
           Start  684: GuardImplicationTest.TgaShape_SingleGuardWithLoopNoise_Clean
- 684/1254 Test  #684: GuardImplicationTest.TgaShape_SingleGuardWithLoopNoise_Clean ..........................   Passed    0.03 sec
+ 684/1254 Test  #684: GuardImplicationTest.TgaShape_SingleGuardWithLoopNoise_Clean ..........................   Passed    0.02 sec
           Start  685: GuardImplicationTest.FourIndependentGuards_Clean
- 685/1254 Test  #685: GuardImplicationTest.FourIndependentGuards_Clean ......................................   Passed    0.03 sec
+ 685/1254 Test  #685: GuardImplicationTest.FourIndependentGuards_Clean ......................................   Passed    0.02 sec
           Start  686: GuardImplicationTest.CallInitializedGuardFlag_Clean
- 686/1254 Test  #686: GuardImplicationTest.CallInitializedGuardFlag_Clean ...................................   Passed    0.03 sec
+ 686/1254 Test  #686: GuardImplicationTest.CallInitializedGuardFlag_Clean ...................................   Passed    0.02 sec
           Start  687: GuardImplicationTest.WrongGuard_StillWarns
  687/1254 Test  #687: GuardImplicationTest.WrongGuard_StillWarns ............................................   Passed    0.02 sec
           Start  688: GuardImplicationTest.GuardReassignedInLoop_StillWarns
- 688/1254 Test  #688: GuardImplicationTest.GuardReassignedInLoop_StillWarns .................................   Passed    0.02 sec
+ 688/1254 Test  #688: GuardImplicationTest.GuardReassignedInLoop_StillWarns .................................   Passed    0.03 sec
           Start  689: GuardImplicationTest.PointerReassignedInLoop_StillWarns
  689/1254 Test  #689: GuardImplicationTest.PointerReassignedInLoop_StillWarns ...............................   Passed    0.02 sec
           Start  690: GuardImplicationTest.NoGuardAfterNoise_StillWarns
@@ -1389,7 +1389,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  694: LoopBoundNonzeroTest.NonzeroFactDoesNotLeakPastLoop
  694/1254 Test  #694: LoopBoundNonzeroTest.NonzeroFactDoesNotLeakPastLoop ...................................   Passed    0.02 sec
           Start  695: LoopBoundNonzeroTest.SignedBound_NoNonzeroInference
- 695/1254 Test  #695: LoopBoundNonzeroTest.SignedBound_NoNonzeroInference ...................................   Passed    0.02 sec
+ 695/1254 Test  #695: LoopBoundNonzeroTest.SignedBound_NoNonzeroInference ...................................   Passed    0.03 sec
           Start  696: StaticLocalTest.DoubleCheckedLazyInit_Clean
  696/1254 Test  #696: StaticLocalTest.DoubleCheckedLazyInit_Clean ...........................................   Passed    0.02 sec
           Start  697: StaticLocalTest.PlainLocalNullInit_StillReports
@@ -1405,11 +1405,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  702: DerefThroughCallTest.GuardedBeforeCall_Clean
  702/1254 Test  #702: DerefThroughCallTest.GuardedBeforeCall_Clean ..........................................   Passed    0.02 sec
           Start  703: DerefThroughCallTest.NBoundedMemFn_NotFlagged
- 703/1254 Test  #703: DerefThroughCallTest.NBoundedMemFn_NotFlagged .........................................   Passed    0.02 sec
+ 703/1254 Test  #703: DerefThroughCallTest.NBoundedMemFn_NotFlagged .........................................   Passed    0.03 sec
           Start  704: RealWorldReproTest.ShadPS4_4697_NullDescDeref_Reports
  704/1254 Test  #704: RealWorldReproTest.ShadPS4_4697_NullDescDeref_Reports .................................   Passed    0.02 sec
           Start  705: RealWorldReproTest.CarbonLang_7523_NullDeclContextDeref_Reports
- 705/1254 Test  #705: RealWorldReproTest.CarbonLang_7523_NullDeclContextDeref_Reports .......................   Passed    0.02 sec
+ 705/1254 Test  #705: RealWorldReproTest.CarbonLang_7523_NullDeclContextDeref_Reports .......................   Passed    0.03 sec
           Start  706: AssertRecoveryTest.Control_UncheckedMallocWarns
  706/1254 Test  #706: AssertRecoveryTest.Control_UncheckedMallocWarns .......................................   Passed    0.02 sec
           Start  707: AssertRecoveryTest.CurlShape_EmptyBodyMacro_Silenced
@@ -1427,7 +1427,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  713: AssertRecoveryTest.LuaSpelling_SubstringNameRule_Silenced
  713/1254 Test  #713: AssertRecoveryTest.LuaSpelling_SubstringNameRule_Silenced .............................   Passed    0.02 sec
           Start  714: AssertRecoveryTest.Conjunction_NarrowsBothSubjects
- 714/1254 Test  #714: AssertRecoveryTest.Conjunction_NarrowsBothSubjects ....................................   Passed    0.03 sec
+ 714/1254 Test  #714: AssertRecoveryTest.Conjunction_NarrowsBothSubjects ....................................   Passed    0.02 sec
           Start  715: AssertRecoveryTest.MixedConjunction_KeepsTheUsableHalf
  715/1254 Test  #715: AssertRecoveryTest.MixedConjunction_KeepsTheUsableHalf ................................   Passed    0.02 sec
           Start  716: AssertRecoveryTest.Gate3_DisjunctionAboveConjunction_StillWarns
@@ -1451,7 +1451,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  725: AssertRecoveryTest.MemberSubject_RecoversBaseNonNull
  725/1254 Test  #725: AssertRecoveryTest.MemberSubject_RecoversBaseNonNull ..................................   Passed    0.02 sec
           Start  726: AssertRecoveryTest.MemberSubject_DoesNotBlessAnotherBase
- 726/1254 Test  #726: AssertRecoveryTest.MemberSubject_DoesNotBlessAnotherBase ..............................   Passed    0.02 sec
+ 726/1254 Test  #726: AssertRecoveryTest.MemberSubject_DoesNotBlessAnotherBase ..............................   Passed    0.03 sec
           Start  727: AssertRecoveryTest.MemberSubject_BaseReassignmentStalesGuard
  727/1254 Test  #727: AssertRecoveryTest.MemberSubject_BaseReassignmentStalesGuard ..........................   Passed    0.02 sec
           Start  728: AssertRecoveryTest.Gate3_CallInsideAssert_StillWarns
@@ -1479,7 +1479,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  739: AssertRecoveryTest.Bug3_ExplicitDeclarationOverridesTheVeto
  739/1254 Test  #739: AssertRecoveryTest.Bug3_ExplicitDeclarationOverridesTheVeto ...........................   Passed    0.02 sec
           Start  740: AssertRecoveryTest.Finding2_NegativeVocabulary_StillWarns
- 740/1254 Test  #740: AssertRecoveryTest.Finding2_NegativeVocabulary_StillWarns .............................   Passed    0.03 sec
+ 740/1254 Test  #740: AssertRecoveryTest.Finding2_NegativeVocabulary_StillWarns .............................   Passed    0.02 sec
           Start  741: AssertRecoveryTest.Finding2_NegativeAssertMacrosFlag_Vetoes
  741/1254 Test  #741: AssertRecoveryTest.Finding2_NegativeAssertMacrosFlag_Vetoes ...........................   Passed    0.02 sec
           Start  742: AssertRecoveryTest.Finding2_PositivePathUnbroken
@@ -1487,11 +1487,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  743: AssertRecoveryTest.Bug1b_LoopBehindPragma_StillWarns
  743/1254 Test  #743: AssertRecoveryTest.Bug1b_LoopBehindPragma_StillWarns ..................................   Passed    0.02 sec
           Start  744: AssertRecoveryTest.Bug1b_LoopBehindBraces_StillWarns
- 744/1254 Test  #744: AssertRecoveryTest.Bug1b_LoopBehindBraces_StillWarns ..................................   Passed    0.02 sec
+ 744/1254 Test  #744: AssertRecoveryTest.Bug1b_LoopBehindBraces_StillWarns ..................................   Passed    0.03 sec
           Start  745: AssertRecoveryTest.Bug1b_BracedRangeFor_StillWarns
  745/1254 Test  #745: AssertRecoveryTest.Bug1b_BracedRangeFor_StillWarns ....................................   Passed    0.02 sec
           Start  746: AssertRecoveryTest.Bug1b_StatementBeforeLoopStillRecovers
- 746/1254 Test  #746: AssertRecoveryTest.Bug1b_StatementBeforeLoopStillRecovers .............................   Passed    0.02 sec
+ 746/1254 Test  #746: AssertRecoveryTest.Bug1b_StatementBeforeLoopStillRecovers .............................   Passed    0.03 sec
           Start  747: AssertRecoveryTest.Sqlite_LoopInBranch_UnwrittenPointer_GuardSurvives
  747/1254 Test  #747: AssertRecoveryTest.Sqlite_LoopInBranch_UnwrittenPointer_GuardSurvives .................   Passed    0.02 sec
           Start  748: AssertRecoveryTest.Sqlite_LoopWritesThePointer_RejectionHolds
@@ -1501,7 +1501,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  750: AssertRecoveryTest.CompoundBody_GLibStyle_RecoversGuard
  750/1254 Test  #750: AssertRecoveryTest.CompoundBody_GLibStyle_RecoversGuard ...............................   Passed    0.02 sec
           Start  751: AssertRecoveryTest.CompoundBody_LoopStillRejectsRebound
- 751/1254 Test  #751: AssertRecoveryTest.CompoundBody_LoopStillRejectsRebound ...............................   Passed    0.02 sec
+ 751/1254 Test  #751: AssertRecoveryTest.CompoundBody_LoopStillRejectsRebound ...............................   Passed    0.03 sec
           Start  752: AssertRecoveryTest.Gate1_LiveAssertUnchanged_NoDoubleHandling
  752/1254 Test  #752: AssertRecoveryTest.Gate1_LiveAssertUnchanged_NoDoubleHandling .........................   Passed    0.02 sec
           Start  753: AssertRecoveryTest.Gate1_LiveAssertUnrelatedCondition_StillWarns
@@ -1515,7 +1515,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  757: AssertRecoveryTest.Mechanism_OnlyDiscardingBodiesAreRecorded
  757/1254 Test  #757: AssertRecoveryTest.Mechanism_OnlyDiscardingBodiesAreRecorded ..........................   Passed    0.02 sec
           Start  758: SarifReporterTest.MinimalStructure
- 758/1254 Test  #758: SarifReporterTest.MinimalStructure ....................................................   Passed    0.02 sec
+ 758/1254 Test  #758: SarifReporterTest.MinimalStructure ....................................................   Passed    0.01 sec
           Start  759: SarifReporterTest.ResultFields
  759/1254 Test  #759: SarifReporterTest.ResultFields ........................................................   Passed    0.02 sec
           Start  760: SarifReporterTest.SeverityLevelMapping
@@ -1527,7 +1527,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  763: SarifReporterTest.InvocationPublishesReportOnlyCounts
  763/1254 Test  #763: SarifReporterTest.InvocationPublishesReportOnlyCounts .................................   Passed    0.02 sec
           Start  764: SarifReporterTest.MessageEscaping
- 764/1254 Test  #764: SarifReporterTest.MessageEscaping .....................................................   Passed    0.01 sec
+ 764/1254 Test  #764: SarifReporterTest.MessageEscaping .....................................................   Passed    0.02 sec
           Start  765: SarifReporterTest.WindowsAbsolutePathsGetFileUris
  765/1254 Test  #765: SarifReporterTest.WindowsAbsolutePathsGetFileUris .....................................   Passed    0.02 sec
           Start  766: HtmlReporterTest.BasicStructure_CardsFiltersFindings
@@ -1571,19 +1571,19 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  785: IntervalTest.JoinHull
  785/1254 Test  #785: IntervalTest.JoinHull .................................................................   Passed    0.02 sec
           Start  786: IntervalTest.JoinWithEmptyIsIdentity
- 786/1254 Test  #786: IntervalTest.JoinWithEmptyIsIdentity ..................................................   Passed    0.02 sec
+ 786/1254 Test  #786: IntervalTest.JoinWithEmptyIsIdentity ..................................................   Passed    0.01 sec
           Start  787: IntervalTest.JoinWithInfinity
  787/1254 Test  #787: IntervalTest.JoinWithInfinity .........................................................   Passed    0.02 sec
           Start  788: IntervalTest.MeetIntersection
- 788/1254 Test  #788: IntervalTest.MeetIntersection .........................................................   Passed    0.01 sec
+ 788/1254 Test  #788: IntervalTest.MeetIntersection .........................................................   Passed    0.02 sec
           Start  789: IntervalTest.MeetDisjointIsEmpty
- 789/1254 Test  #789: IntervalTest.MeetDisjointIsEmpty ......................................................   Passed    0.01 sec
+ 789/1254 Test  #789: IntervalTest.MeetDisjointIsEmpty ......................................................   Passed    0.02 sec
           Start  790: IntervalTest.ConstrainOrderings
  790/1254 Test  #790: IntervalTest.ConstrainOrderings .......................................................   Passed    0.02 sec
           Start  791: IntervalTest.ConstrainLeOneProvesNonZeroOnFalseEdge
  791/1254 Test  #791: IntervalTest.ConstrainLeOneProvesNonZeroOnFalseEdge ...................................   Passed    0.02 sec
           Start  792: IntervalTest.ConstrainNeTrimsEndpoint
- 792/1254 Test  #792: IntervalTest.ConstrainNeTrimsEndpoint .................................................   Passed    0.01 sec
+ 792/1254 Test  #792: IntervalTest.ConstrainNeTrimsEndpoint .................................................   Passed    0.02 sec
           Start  793: IntervalTest.ConstrainNeSingletonEmpties
  793/1254 Test  #793: IntervalTest.ConstrainNeSingletonEmpties ..............................................   Passed    0.02 sec
           Start  794: IntervalTest.ConstrainContradictionEmpties
@@ -1597,15 +1597,15 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  798: IntervalTest.MulByZeroIsZeroEvenIfOtherUnbounded
  798/1254 Test  #798: IntervalTest.MulByZeroIsZeroEvenIfOtherUnbounded ......................................   Passed    0.02 sec
           Start  799: IntervalTest.Negate
- 799/1254 Test  #799: IntervalTest.Negate ...................................................................   Passed    0.02 sec
+ 799/1254 Test  #799: IntervalTest.Negate ...................................................................   Passed    0.01 sec
           Start  800: IntervalTest.AddOverflowCollapsesToTop
- 800/1254 Test  #800: IntervalTest.AddOverflowCollapsesToTop ................................................   Passed    0.02 sec
+ 800/1254 Test  #800: IntervalTest.AddOverflowCollapsesToTop ................................................   Passed    0.01 sec
           Start  801: IntervalTest.MulOverflowCollapsesToTop
  801/1254 Test  #801: IntervalTest.MulOverflowCollapsesToTop ................................................   Passed    0.02 sec
           Start  802: IntervalTest.FitsSignedBits
  802/1254 Test  #802: IntervalTest.FitsSignedBits ...........................................................   Passed    0.02 sec
           Start  803: IntervalTest.MallocProductOverflowDetectable
- 803/1254 Test  #803: IntervalTest.MallocProductOverflowDetectable ..........................................   Passed    0.02 sec
+ 803/1254 Test  #803: IntervalTest.MallocProductOverflowDetectable ..........................................   Passed    0.01 sec
           Start  804: IntervalTest.WidenUnstableUpperGoesInfinite
  804/1254 Test  #804: IntervalTest.WidenUnstableUpperGoesInfinite ...........................................   Passed    0.02 sec
           Start  805: IntervalTest.WidenStableKeepsBound
@@ -1659,7 +1659,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  829: CoverageReportTest.RecordsConcreteCfgFailurePrecisely
  829/1254 Test  #829: CoverageReportTest.RecordsConcreteCfgFailurePrecisely .................................   Passed    0.02 sec
           Start  830: CoverageReportTest.KeepsDistinctFunctionsInOrder
- 830/1254 Test  #830: CoverageReportTest.KeepsDistinctFunctionsInOrder ......................................   Passed    0.01 sec
+ 830/1254 Test  #830: CoverageReportTest.KeepsDistinctFunctionsInOrder ......................................   Passed    0.02 sec
           Start  831: CoverageReportTest.ClearResets
  831/1254 Test  #831: CoverageReportTest.ClearResets ........................................................   Passed    0.02 sec
           Start  832: CoverageReportTest.AnalyzerGapMakesVerdictUnavailable
@@ -1689,7 +1689,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  844: FatalCallsTest.RegisteredHandler_KillsZeroPath
  844/1254 Test  #844: FatalCallsTest.RegisteredHandler_KillsZeroPath ........................................   Passed    0.02 sec
           Start  845: FatalCallsTest.DeadCodeAfterFatalCall_NotReported
- 845/1254 Test  #845: FatalCallsTest.DeadCodeAfterFatalCall_NotReported .....................................   Passed    0.03 sec
+ 845/1254 Test  #845: FatalCallsTest.DeadCodeAfterFatalCall_NotReported .....................................   Passed    0.02 sec
           Start  846: FatalCallsTest.LeakOnFatalPath_NotReported
  846/1254 Test  #846: FatalCallsTest.LeakOnFatalPath_NotReported ............................................   Passed    0.02 sec
           Start  847: FatalCallsTest.OtherCallsUnaffected
@@ -1719,7 +1719,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  859: SummaryDiffTest.AddedParameterPreconditionIsWeakened
  859/1254 Test  #859: SummaryDiffTest.AddedParameterPreconditionIsWeakened ..................................   Passed    0.02 sec
           Start  860: SummaryDiffTest.SaferParameterPreconditionIsStrengthened
- 860/1254 Test  #860: SummaryDiffTest.SaferParameterPreconditionIsStrengthened ..............................   Passed    0.02 sec
+ 860/1254 Test  #860: SummaryDiffTest.SaferParameterPreconditionIsStrengthened ..............................   Passed    0.01 sec
           Start  861: SummaryDiffTest.ParameterPostconditionLossOrChangeIsWeakened
  861/1254 Test  #861: SummaryDiffTest.ParameterPostconditionLossOrChangeIsWeakened ..........................   Passed    0.02 sec
           Start  862: SummaryDiffTest.ParameterPostconditionGainIsStrengthened
@@ -1727,7 +1727,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  863: SummaryDiffTest.DirectionlessDrift_Changed
  863/1254 Test  #863: SummaryDiffTest.DirectionlessDrift_Changed ............................................   Passed    0.02 sec
           Start  864: SummaryDiffTest.AddedRemoved_AndWeakenedFirst
- 864/1254 Test  #864: SummaryDiffTest.AddedRemoved_AndWeakenedFirst .........................................   Passed    0.01 sec
+ 864/1254 Test  #864: SummaryDiffTest.AddedRemoved_AndWeakenedFirst .........................................   Passed    0.02 sec
           Start  865: SummaryDiffTest.IdenticalHarvests_NoChanges
  865/1254 Test  #865: SummaryDiffTest.IdenticalHarvests_NoChanges ...........................................   Passed    0.02 sec
           Start  866: SummaryDiffTest.ReportEndToEnd_ExitCodes
@@ -1735,25 +1735,25 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  867: SummaryDiffTest.GateWarn_ReportsButExitsZero
  867/1254 Test  #867: SummaryDiffTest.GateWarn_ReportsButExitsZero ..........................................   Passed    0.02 sec
           Start  868: SummaryDiffTest.AddedPossibleFieldWriteIsWeakened
- 868/1254 Test  #868: SummaryDiffTest.AddedPossibleFieldWriteIsWeakened .....................................   Passed    0.01 sec
+ 868/1254 Test  #868: SummaryDiffTest.AddedPossibleFieldWriteIsWeakened .....................................   Passed    0.02 sec
           Start  869: SummaryDiffTest.RemovedPossibleFieldWriteIsStrengthened
  869/1254 Test  #869: SummaryDiffTest.RemovedPossibleFieldWriteIsStrengthened ...............................   Passed    0.02 sec
           Start  870: SummaryDiffTest.ExactFieldWritesLostIsWeakened
- 870/1254 Test  #870: SummaryDiffTest.ExactFieldWritesLostIsWeakened ........................................   Passed    0.01 sec
+ 870/1254 Test  #870: SummaryDiffTest.ExactFieldWritesLostIsWeakened ........................................   Passed    0.02 sec
           Start  871: SummaryDiffTest.AllocatorSizeSinkLossIsWeakened
  871/1254 Test  #871: SummaryDiffTest.AllocatorSizeSinkLossIsWeakened .......................................   Passed    0.02 sec
           Start  872: SummaryDiffTest.AllocatorSizeSinkGainIsStrengthened
  872/1254 Test  #872: SummaryDiffTest.AllocatorSizeSinkGainIsStrengthened ...................................   Passed    0.02 sec
           Start  873: SuppressionMarkerTest.BareMarkerSuppressesAllRules
- 873/1254 Test  #873: SuppressionMarkerTest.BareMarkerSuppressesAllRules ....................................   Passed    0.02 sec
+ 873/1254 Test  #873: SuppressionMarkerTest.BareMarkerSuppressesAllRules ....................................   Passed    0.01 sec
           Start  874: SuppressionMarkerTest.RuleListLimitsSuppression
  874/1254 Test  #874: SuppressionMarkerTest.RuleListLimitsSuppression .......................................   Passed    0.02 sec
           Start  875: SuppressionMarkerTest.NextLineVariantDoesNotMatchLineMarker
  875/1254 Test  #875: SuppressionMarkerTest.NextLineVariantDoesNotMatchLineMarker ...........................   Passed    0.02 sec
           Start  876: SuppressionMarkerTest.TrailingCommentAfterRuleList
- 876/1254 Test  #876: SuppressionMarkerTest.TrailingCommentAfterRuleList ....................................   Passed    0.01 sec
+ 876/1254 Test  #876: SuppressionMarkerTest.TrailingCommentAfterRuleList ....................................   Passed    0.02 sec
           Start  877: SuppressionMarkerTest.NoMarker_NoSuppression
- 877/1254 Test  #877: SuppressionMarkerTest.NoMarker_NoSuppression ..........................................   Passed    0.01 sec
+ 877/1254 Test  #877: SuppressionMarkerTest.NoMarker_NoSuppression ..........................................   Passed    0.02 sec
           Start  878: SuppressionFilterTest.DisableLineSameLine
  878/1254 Test  #878: SuppressionFilterTest.DisableLineSameLine .............................................   Passed    0.02 sec
           Start  879: SuppressionFilterTest.DisableNextLine
@@ -1765,9 +1765,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  882: BaselineTest.WriteLoadFilterRoundtrip
  882/1254 Test  #882: BaselineTest.WriteLoadFilterRoundtrip .................................................   Passed    0.02 sec
           Start  883: BaselineTest.KeyV1IncludesLineAndMessage
- 883/1254 Test  #883: BaselineTest.KeyV1IncludesLineAndMessage ..............................................   Passed    0.01 sec
+ 883/1254 Test  #883: BaselineTest.KeyV1IncludesLineAndMessage ..............................................   Passed    0.02 sec
           Start  884: BaselineTest.MissingFile_LoadFailsButFilterIsNoop
- 884/1254 Test  #884: BaselineTest.MissingFile_LoadFailsButFilterIsNoop .....................................   Passed    0.02 sec
+ 884/1254 Test  #884: BaselineTest.MissingFile_LoadFailsButFilterIsNoop .....................................   Passed    0.01 sec
           Start  885: BaselineTest.EmptyDiagnostics_WritesEmptyFile
  885/1254 Test  #885: BaselineTest.EmptyDiagnostics_WritesEmptyFile .........................................   Passed    0.02 sec
           Start  886: BaselineV2Test.LineShift_StillSuppressed
@@ -1779,7 +1779,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  889: BaselineV2Test.IdenticalLines_CountedSeparately
  889/1254 Test  #889: BaselineV2Test.IdenticalLines_CountedSeparately .......................................   Passed    0.02 sec
           Start  890: BaselineV2Test.OldV1File_StillMatchesByLine
- 890/1254 Test  #890: BaselineV2Test.OldV1File_StillMatchesByLine ...........................................   Passed    0.01 sec
+ 890/1254 Test  #890: BaselineV2Test.OldV1File_StillMatchesByLine ...........................................   Passed    0.02 sec
           Start  891: BaselineV2Test.FileHeaderWritten
  891/1254 Test  #891: BaselineV2Test.FileHeaderWritten ......................................................   Passed    0.02 sec
           Start  892: FilesUxTest.ZeroAnalyzableFiles_IsAnError
@@ -1795,7 +1795,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  897: DisjunctsV2bTest.FlagCorrelation_EnumStatus
  897/1254 Test  #897: DisjunctsV2bTest.FlagCorrelation_EnumStatus ...........................................   Passed    0.02 sec
           Start  898: DisjunctsV2bTest.FlagCorrelation_MemoryLeak
- 898/1254 Test  #898: DisjunctsV2bTest.FlagCorrelation_MemoryLeak ...........................................   Passed    0.03 sec
+ 898/1254 Test  #898: DisjunctsV2bTest.FlagCorrelation_MemoryLeak ...........................................   Passed    0.02 sec
           Start  899: DisjunctsV2bTest.FlagCorrelation_UninitPointer
  899/1254 Test  #899: DisjunctsV2bTest.FlagCorrelation_UninitPointer ........................................   Passed    0.02 sec
           Start  900: DisjunctsV2bTest.StaleGuard_InfeasibleBranchSilent
@@ -1807,7 +1807,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  903: DisjunctsV2bTest.GlobalFlag_AssignedLocally_StaysUnkeyed
  903/1254 Test  #903: DisjunctsV2bTest.GlobalFlag_AssignedLocally_StaysUnkeyed ..............................   Passed    0.02 sec
           Start  904: DisjunctsV2bTest.CapOverflow_WidensWithoutCrash
- 904/1254 Test  #904: DisjunctsV2bTest.CapOverflow_WidensWithoutCrash .......................................   Passed    0.02 sec
+ 904/1254 Test  #904: DisjunctsV2bTest.CapOverflow_WidensWithoutCrash .......................................   Passed    0.03 sec
           Start  905: DisjunctsV2bTest.SystemdAssertShape_Simple
  905/1254 Test  #905: DisjunctsV2bTest.SystemdAssertShape_Simple ............................................   Passed    0.02 sec
           Start  906: DisjunctsV2bTest.SystemdAssertShape_NulstrLoop
@@ -1831,13 +1831,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  915: ContractParserTest.ParsesEnsuresWithGuard
  915/1254 Test  #915: ContractParserTest.ParsesEnsuresWithGuard .............................................   Passed    0.02 sec
           Start  916: ContractParserTest.ParsesRequiresDisjunction
- 916/1254 Test  #916: ContractParserTest.ParsesRequiresDisjunction ..........................................   Passed    0.02 sec
+ 916/1254 Test  #916: ContractParserTest.ParsesRequiresDisjunction ..........................................   Passed    0.01 sec
           Start  917: ContractParserTest.ParsesEffectsAndPolicy
  917/1254 Test  #917: ContractParserTest.ParsesEffectsAndPolicy .............................................   Passed    0.02 sec
           Start  918: ContractParserTest.MachineProposedTag
  918/1254 Test  #918: ContractParserTest.MachineProposedTag .................................................   Passed    0.02 sec
           Start  919: ContractParserTest.SyntaxErrorsAreNeverSilent
- 919/1254 Test  #919: ContractParserTest.SyntaxErrorsAreNeverSilent .........................................   Passed    0.02 sec
+ 919/1254 Test  #919: ContractParserTest.SyntaxErrorsAreNeverSilent .........................................   Passed    0.01 sec
           Start  920: ContractRuleTest.EnsuresNonNull_Violated_IsError
  920/1254 Test  #920: ContractRuleTest.EnsuresNonNull_Violated_IsError ......................................   Passed    0.02 sec
           Start  921: ContractRuleTest.EnsuresNonNull_Satisfied_Silent
@@ -1871,13 +1871,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  935: ContractRoundCTest.RequiresNonNull_PartialGuard_ProofBurdenDischarged
  935/1254 Test  #935: ContractRoundCTest.RequiresNonNull_PartialGuard_ProofBurdenDischarged .................   Passed    0.02 sec
           Start  936: ContractRoundCTest.RequiresUnlessZero_ThroughLoop_ProofDischarged
- 936/1254 Test  #936: ContractRoundCTest.RequiresUnlessZero_ThroughLoop_ProofDischarged .....................   Passed    0.02 sec
+ 936/1254 Test  #936: ContractRoundCTest.RequiresUnlessZero_ThroughLoop_ProofDischarged .....................   Passed    0.03 sec
           Start  937: ContractRoundCTest.CallSite_NullLiteral_IsError
  937/1254 Test  #937: ContractRoundCTest.CallSite_NullLiteral_IsError .......................................   Passed    0.02 sec
           Start  938: ContractRoundCTest.CallSite_MaybeNullVar_IsWarning
  938/1254 Test  #938: ContractRoundCTest.CallSite_MaybeNullVar_IsWarning ....................................   Passed    0.02 sec
           Start  939: ContractRoundCTest.CallSite_GuardedVar_Silent
- 939/1254 Test  #939: ContractRoundCTest.CallSite_GuardedVar_Silent .........................................   Passed    0.02 sec
+ 939/1254 Test  #939: ContractRoundCTest.CallSite_GuardedVar_Silent .........................................   Passed    0.03 sec
           Start  940: ContractRoundCTest.CallSite_MachineProposed_IsWarning
  940/1254 Test  #940: ContractRoundCTest.CallSite_MachineProposed_IsWarning .................................   Passed    0.02 sec
           Start  941: ContractRoundCTest.RelationalEscape_Satisfied_Silent
@@ -1889,9 +1889,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  944: ContractRoundCTest.RequiresNonZero_ZeroLiteral_IsError
  944/1254 Test  #944: ContractRoundCTest.RequiresNonZero_ZeroLiteral_IsError ................................   Passed    0.02 sec
           Start  945: ContractRoundCTest.RequiresNonZero_TrackedZeroVar_IsError
- 945/1254 Test  #945: ContractRoundCTest.RequiresNonZero_TrackedZeroVar_IsError .............................   Passed    0.02 sec
+ 945/1254 Test  #945: ContractRoundCTest.RequiresNonZero_TrackedZeroVar_IsError .............................   Passed    0.03 sec
           Start  946: ContractRoundCTest.RequiresNonZero_MaybeZeroVar_IsWarning
- 946/1254 Test  #946: ContractRoundCTest.RequiresNonZero_MaybeZeroVar_IsWarning .............................   Passed    0.03 sec
+ 946/1254 Test  #946: ContractRoundCTest.RequiresNonZero_MaybeZeroVar_IsWarning .............................   Passed    0.02 sec
           Start  947: ContractRoundCTest.RequiresNonZero_GuardedVar_Silent
  947/1254 Test  #947: ContractRoundCTest.RequiresNonZero_GuardedVar_Silent ..................................   Passed    0.02 sec
           Start  948: ContractRoundCTest.RequiresNonZero_CalleeSeeded_NoNoise
@@ -1899,7 +1899,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  949: ContractRoundDTest.GuardedEnsures_ViolatedOnGuardTruePath_IsError
  949/1254 Test  #949: ContractRoundDTest.GuardedEnsures_ViolatedOnGuardTruePath_IsError .....................   Passed    0.02 sec
           Start  950: ContractRoundDTest.GuardedEnsures_NullOnGuardFalsePath_Silent
- 950/1254 Test  #950: ContractRoundDTest.GuardedEnsures_NullOnGuardFalsePath_Silent .........................   Passed    0.03 sec
+ 950/1254 Test  #950: ContractRoundDTest.GuardedEnsures_NullOnGuardFalsePath_Silent .........................   Passed    0.02 sec
           Start  951: ContractRoundDTest.GuardedEnsures_NullUnderUndecidedGuard_IsWarning
  951/1254 Test  #951: ContractRoundDTest.GuardedEnsures_NullUnderUndecidedGuard_IsWarning ...................   Passed    0.02 sec
           Start  952: ContractRoundDTest.GuardedEnsures_MachineProposed_IsWarning
@@ -1921,7 +1921,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  960: ContractRoundDTest.Owns_UnknownParamName_IsContractSyntax
  960/1254 Test  #960: ContractRoundDTest.Owns_UnknownParamName_IsContractSyntax .............................   Passed    0.02 sec
           Start  961: ContractRoundDTest.CallSiteViolation_HasTrace
- 961/1254 Test  #961: ContractRoundDTest.CallSiteViolation_HasTrace .........................................   Passed    0.02 sec
+ 961/1254 Test  #961: ContractRoundDTest.CallSiteViolation_HasTrace .........................................   Passed    0.03 sec
           Start  962: PolicyTest.AbsolutePathHeuristic
  962/1254 Test  #962: PolicyTest.AbsolutePathHeuristic ......................................................   Passed    0.02 sec
           Start  963: PolicyRuleTest.FileComment_CatchesAbsolutePath
@@ -1955,7 +1955,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  977: GuardContractTest.CheckMacroShape_IdentityWrapper_IsError
  977/1254 Test  #977: GuardContractTest.CheckMacroShape_IdentityWrapper_IsError .............................   Passed    0.02 sec
           Start  978: GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque
- 978/1254 Test  #978: GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque ......................   Passed    0.03 sec
+ 978/1254 Test  #978: GuardContractTest.CheckMacroShape_NonIdentityWrapper_StaysOpaque ......................   Passed    0.02 sec
           Start  979: GuardContractTest.CheckMacroShape_VariableConjunct_StillBails
  979/1254 Test  #979: GuardContractTest.CheckMacroShape_VariableConjunct_StillBails .........................   Passed    0.02 sec
           Start  980: GuardContractTest.TransitiveNoreturn_BodyNeverReturns_IsError
@@ -1967,13 +1967,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  983: GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning
  983/1254 Test  #983: GuardContractTest.ComplainThenReturnGuard_NullLiteral_IsWarning .......................   Passed    0.02 sec
           Start  984: GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract
- 984/1254 Test  #984: GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract ......................   Passed    0.02 sec
+ 984/1254 Test  #984: GuardContractTest.SilentReturnGuard_NullTolerantApi_NotAContract ......................   Passed    0.03 sec
           Start  985: GuardContractTest.WorkThenReturnGuard_NotAContract
  985/1254 Test  #985: GuardContractTest.WorkThenReturnGuard_NotAContract ....................................   Passed    0.02 sec
           Start  986: GuardContractTest.DefinitelyNullVariable_Reported
  986/1254 Test  #986: GuardContractTest.DefinitelyNullVariable_Reported .....................................   Passed    0.02 sec
           Start  987: GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly
- 987/1254 Test  #987: GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly ................................   Passed    0.02 sec
+ 987/1254 Test  #987: GuardContractTest.MaybeNull_NotReported_V1DefiniteOnly ................................   Passed    0.03 sec
           Start  988: GuardContractTest.CompoundGuard_SkippedInV1
  988/1254 Test  #988: GuardContractTest.CompoundGuard_SkippedInV1 ...........................................   Passed    0.02 sec
           Start  989: GuardContractTest.GuardAfterWork_NotAnEntryGuard
@@ -1983,7 +1983,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  991: GuardContractTest.CallerWithNoPointerLocals_StillChecked
  991/1254 Test  #991: GuardContractTest.CallerWithNoPointerLocals_StillChecked ..............................   Passed    0.02 sec
           Start  992: BestCaseTest.GotoFailCleanup_Clean
- 992/1254 Test  #992: BestCaseTest.GotoFailCleanup_Clean ....................................................   Passed    0.03 sec
+ 992/1254 Test  #992: BestCaseTest.GotoFailCleanup_Clean ....................................................   Passed    0.02 sec
           Start  993: BestCaseTest.TernaryGuardDivision_Clean
  993/1254 Test  #993: BestCaseTest.TernaryGuardDivision_Clean ...............................................   Passed    0.02 sec
           Start  994: BestCaseTest.TernaryGuardNullDeref_Clean
@@ -1995,7 +1995,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start  997: BestCaseTest.CommaOperatorOrdering_Clean
  997/1254 Test  #997: BestCaseTest.CommaOperatorOrdering_Clean ..............................................   Passed    0.02 sec
           Start  998: WorstCaseTest.DeepNesting_OnePathInits
- 998/1254 Test  #998: WorstCaseTest.DeepNesting_OnePathInits ................................................   Passed    0.03 sec
+ 998/1254 Test  #998: WorstCaseTest.DeepNesting_OnePathInits ................................................   Passed    0.02 sec
           Start  999: WorstCaseTest.WideProductLattice_AllLeaksFound
  999/1254 Test  #999: WorstCaseTest.WideProductLattice_AllLeaksFound ........................................   Passed    0.02 sec
           Start 1000: WorstCaseTest.LongElseIfChain_OneArmZero
@@ -2007,7 +2007,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1003: WorstCaseTest.DoWhileFirstIteration_UninitDeref
 1003/1254 Test #1003: WorstCaseTest.DoWhileFirstIteration_UninitDeref .......................................   Passed    0.02 sec
           Start 1004: WorstCaseTest.GotoBackwardLoop
-1004/1254 Test #1004: WorstCaseTest.GotoBackwardLoop ........................................................   Passed    0.03 sec
+1004/1254 Test #1004: WorstCaseTest.GotoBackwardLoop ........................................................   Passed    0.02 sec
           Start 1005: WorstCaseTest.SwitchWithoutDefault_MaybeUninit
 1005/1254 Test #1005: WorstCaseTest.SwitchWithoutDefault_MaybeUninit ........................................   Passed    0.02 sec
           Start 1006: TraceTest.UseAfterFree_HasAllocAndFreeNotes
@@ -2021,13 +2021,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1010: TraceTest.UninitPtr_HasDeclaredNote
 1010/1254 Test #1010: TraceTest.UninitPtr_HasDeclaredNote ...................................................   Passed    0.02 sec
           Start 1011: FunctionFilterTest.EmptyFilter_AnalyzesAll
-1011/1254 Test #1011: FunctionFilterTest.EmptyFilter_AnalyzesAll ............................................   Passed    0.02 sec
+1011/1254 Test #1011: FunctionFilterTest.EmptyFilter_AnalyzesAll ............................................   Passed    0.03 sec
           Start 1012: FunctionFilterTest.FilterSelectsSingleFunction
 1012/1254 Test #1012: FunctionFilterTest.FilterSelectsSingleFunction ........................................   Passed    0.02 sec
           Start 1013: FunctionFilterTest.FilterWithUnknownName_AnalyzesNothing
 1013/1254 Test #1013: FunctionFilterTest.FilterWithUnknownName_AnalyzesNothing ..............................   Passed    0.02 sec
           Start 1014: FunctionFilterTest.QualifiedNameMatchesMethod
-1014/1254 Test #1014: FunctionFilterTest.QualifiedNameMatchesMethod .........................................   Passed    0.03 sec
+1014/1254 Test #1014: FunctionFilterTest.QualifiedNameMatchesMethod .........................................   Passed    0.02 sec
           Start 1015: LineFilterTest.EmptyRanges_AnalyzesAll
 1015/1254 Test #1015: LineFilterTest.EmptyRanges_AnalyzesAll ................................................   Passed    0.02 sec
           Start 1016: LineFilterTest.RangeSelectsSecondFunction
@@ -2041,7 +2041,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1020: ReportPathsTest.InteriorSpacesPreserved
 1020/1254 Test #1020: ReportPathsTest.InteriorSpacesPreserved ...............................................   Passed    0.02 sec
           Start 1021: ReportPathsTest.EmptyTokensDropped
-1021/1254 Test #1021: ReportPathsTest.EmptyTokensDropped ....................................................   Passed    0.02 sec
+1021/1254 Test #1021: ReportPathsTest.EmptyTokensDropped ....................................................   Passed    0.01 sec
           Start 1022: ReportPathsTest.DefaultIsEmpty_NoFiltering
 1022/1254 Test #1022: ReportPathsTest.DefaultIsEmpty_NoFiltering ............................................   Passed    0.02 sec
           Start 1023: ReportPathsTest.CliFlagParsed
@@ -2051,11 +2051,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1025: BrokenTuTest.AnalyzeBrokenTUsOverride
 1025/1254 Test #1025: BrokenTuTest.AnalyzeBrokenTUsOverride .................................................   Passed    0.02 sec
           Start 1026: BrokenTuTest.RecoveryOptInStillCannotProduceAVerdict
-1026/1254 Test #1026: BrokenTuTest.RecoveryOptInStillCannotProduceAVerdict ..................................   Passed    0.02 sec
+1026/1254 Test #1026: BrokenTuTest.RecoveryOptInStillCannotProduceAVerdict ..................................   Passed    0.03 sec
           Start 1027: BrokenTuTest.MissingExplicitFileRemainsAttemptedAndFailsClosed
 1027/1254 Test #1027: BrokenTuTest.MissingExplicitFileRemainsAttemptedAndFailsClosed ........................   Passed    0.02 sec
           Start 1028: BrokenTuTest.WholeProgramRecoveryPreservesBrokenEvidence
-1028/1254 Test #1028: BrokenTuTest.WholeProgramRecoveryPreservesBrokenEvidence ..............................   Passed    0.02 sec
+1028/1254 Test #1028: BrokenTuTest.WholeProgramRecoveryPreservesBrokenEvidence ..............................   Passed    0.03 sec
           Start 1029: BrokenTuTest.WarmCacheAstFailureRecordsExactRequestedTu
 1029/1254 Test #1029: BrokenTuTest.WarmCacheAstFailureRecordsExactRequestedTu ...............................   Passed    0.02 sec
           Start 1030: BrokenTuTest.CleanTuStillAnalyzed
@@ -2065,13 +2065,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1032: BrokenTuTest.MissingCompileDatabaseKeepsFallbackAvailable
 1032/1254 Test #1032: BrokenTuTest.MissingCompileDatabaseKeepsFallbackAvailable .............................   Passed    0.02 sec
           Start 1033: BrokenTuTest.ExistingMalformedCompileDatabaseIsInvalidInput
-1033/1254 Test #1033: BrokenTuTest.ExistingMalformedCompileDatabaseIsInvalidInput ...........................   Passed    0.02 sec
+1033/1254 Test #1033: BrokenTuTest.ExistingMalformedCompileDatabaseIsInvalidInput ...........................   Passed    0.01 sec
           Start 1034: BrokenTuTest.NonRegularCompileDatabaseEntriesFailClosed
 1034/1254 Test #1034: BrokenTuTest.NonRegularCompileDatabaseEntriesFailClosed ...............................   Passed    0.02 sec
           Start 1035: BrokenTuTest.BufferValidationUsesProductionClangParser
 1035/1254 Test #1035: BrokenTuTest.BufferValidationUsesProductionClangParser ................................   Passed    0.02 sec
           Start 1036: BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn
-1036/1254 Test #1036: BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn ..............................   Passed    0.04 sec
+1036/1254 Test #1036: BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn ..............................   Passed    0.03 sec
           Start 1037: BrokenTuTest.ExecutionPlanPreservesMultipleCompileCommandsPerPath
 1037/1254 Test #1037: BrokenTuTest.ExecutionPlanPreservesMultipleCompileCommandsPerPath .....................   Passed    0.02 sec
           Start 1038: BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath
@@ -2087,7 +2087,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1043: McpServerTest.ToolsListPublishesResolvedServerBudgetDefaults
 1043/1254 Test #1043: McpServerTest.ToolsListPublishesResolvedServerBudgetDefaults ..........................   Passed    0.02 sec
           Start 1044: McpServerTest.AnalyzeWithoutBoundWorkerFailsClosed
-1044/1254 Test #1044: McpServerTest.AnalyzeWithoutBoundWorkerFailsClosed ....................................   Passed    0.02 sec
+1044/1254 Test #1044: McpServerTest.AnalyzeWithoutBoundWorkerFailsClosed ....................................   Passed    0.01 sec
           Start 1045: McpServerTest.AnalyzeValidatesTypedPerTuBudgets
 1045/1254 Test #1045: McpServerTest.AnalyzeValidatesTypedPerTuBudgets .......................................   Passed    0.02 sec
           Start 1046: McpServerTest.AnalyzeInheritsServerBudgetsUnlessRequestOverrides
@@ -2097,7 +2097,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1048: McpServerTest.ParseError
 1048/1254 Test #1048: McpServerTest.ParseError ..............................................................   Passed    0.02 sec
           Start 1049: McpServerTest.InvalidJsonRpcEnvelopeFailsClosed
-1049/1254 Test #1049: McpServerTest.InvalidJsonRpcEnvelopeFailsClosed .......................................   Passed    0.01 sec
+1049/1254 Test #1049: McpServerTest.InvalidJsonRpcEnvelopeFailsClosed .......................................   Passed    0.02 sec
           Start 1050: McpServerTest.ValidationOnlyNeverStartsAnalyzeSideEffects
 1050/1254 Test #1050: McpServerTest.ValidationOnlyNeverStartsAnalyzeSideEffects .............................   Passed    0.01 sec
           Start 1051: McpServerTest.AnalyzeRejectsEmbeddedNulFields
@@ -2111,7 +2111,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1055: McpServerTest.RepeatedProductionRequestPreservesFindings
 1055/1254 Test #1055: McpServerTest.RepeatedProductionRequestPreservesFindings ..............................   Passed    0.07 sec
           Start 1056: McpServerTest.ProductionWorkerReanalyzesChangedSource
-1056/1254 Test #1056: McpServerTest.ProductionWorkerReanalyzesChangedSource .................................   Passed    0.07 sec
+1056/1254 Test #1056: McpServerTest.ProductionWorkerReanalyzesChangedSource .................................   Passed    0.06 sec
           Start 1057: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge
 1057/1254 Test #1057: McpServerTest.AnalyzeWithSummaries_CrossFileKnowledge .................................   Passed    0.07 sec
           Start 1058: McpServerTest.ToolsListMentionsSummaries
@@ -2121,7 +2121,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1060: McpServerTest.AnalyzeRejectsUnknownOrWrongTypedFields
 1060/1254 Test #1060: McpServerTest.AnalyzeRejectsUnknownOrWrongTypedFields .................................   Passed    0.02 sec
           Start 1061: McpServerTest.AnalyzeRejectsEmptyFunctionScope
-1061/1254 Test #1061: McpServerTest.AnalyzeRejectsEmptyFunctionScope ........................................   Passed    0.02 sec
+1061/1254 Test #1061: McpServerTest.AnalyzeRejectsEmptyFunctionScope ........................................   Passed    0.01 sec
           Start 1062: McpServerTest.BrokenTuReturnsFailedVerdictAndCoverage
 1062/1254 Test #1062: McpServerTest.BrokenTuReturnsFailedVerdictAndCoverage .................................   Passed    0.04 sec
           Start 1063: McpServerTest.MissingSummaryReturnsIncompleteEvidence
@@ -2129,11 +2129,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1064: McpServerTest.UnknownTool_Error
 1064/1254 Test #1064: McpServerTest.UnknownTool_Error .......................................................   Passed    0.02 sec
           Start 1065: McpServerTest.ToolsListContainsIdiomParams
-1065/1254 Test #1065: McpServerTest.ToolsListContainsIdiomParams ............................................   Passed    0.01 sec
+1065/1254 Test #1065: McpServerTest.ToolsListContainsIdiomParams ............................................   Passed    0.02 sec
           Start 1066: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall
-1066/1254 Test #1066: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall .........................   Passed    0.07 sec
+1066/1254 Test #1066: McpServerTest.FatalAsserts_KillsPath_AndDoesNotLeakToNextCall .........................   Passed    0.06 sec
           Start 1067: McpServerTest.AllocFunctions_ExtendLeakTracking
-1067/1254 Test #1067: McpServerTest.AllocFunctions_ExtendLeakTracking .......................................   Passed    0.04 sec
+1067/1254 Test #1067: McpServerTest.AllocFunctions_ExtendLeakTracking .......................................   Passed    0.05 sec
           Start 1068: McpServerTest.AllocatorPairsAreExactFailClosedAndRequestScoped
 1068/1254 Test #1068: McpServerTest.AllocatorPairsAreExactFailClosedAndRequestScoped ........................   Passed    0.07 sec
           Start 1069: InterprocNullTest.MaybeNullReturn_UnguardedDeref_Warning
@@ -2179,7 +2179,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1089: InterprocAliasTest.AliasReturnedBorrowed_LeakVisible
 1089/1254 Test #1089: InterprocAliasTest.AliasReturnedBorrowed_LeakVisible ..................................   Passed    0.02 sec
           Start 1090: InterprocAliasTest.AddressTakenAlias_Conservative
-1090/1254 Test #1090: InterprocAliasTest.AddressTakenAlias_Conservative .....................................   Passed    0.03 sec
+1090/1254 Test #1090: InterprocAliasTest.AddressTakenAlias_Conservative .....................................   Passed    0.02 sec
           Start 1091: InterprocAliasTest.ReadOnlyThroughAlias_LeakVisible
 1091/1254 Test #1091: InterprocAliasTest.ReadOnlyThroughAlias_LeakVisible ...................................   Passed    0.02 sec
           Start 1092: CrossTUTest.MaybeNullReturn_AcrossTU_Warning
@@ -2225,31 +2225,31 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1112: SummaryPersistTest.MissingFile_ReturnsFalse
 1112/1254 Test #1112: SummaryPersistTest.MissingFile_ReturnsFalse ...........................................   Passed    0.02 sec
           Start 1113: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding
-1113/1254 Test #1113: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding ...........................   Passed    0.02 sec
+1113/1254 Test #1113: SummaryPersistTest.EndToEnd_SummaryOutThenIn_CrossTUFinding ...........................   Passed    0.03 sec
           Start 1114: SummaryPersistTest.StaleSummary_WarnsButStillWorks
-1114/1254 Test #1114: SummaryPersistTest.StaleSummary_WarnsButStillWorks ....................................   Passed    0.03 sec
+1114/1254 Test #1114: SummaryPersistTest.StaleSummary_WarnsButStillWorks ....................................   Passed    0.02 sec
           Start 1115: SummaryPersistTest.V4File_ZeroFromParamParses
 1115/1254 Test #1115: SummaryPersistTest.V4File_ZeroFromParamParses .........................................   Passed    0.02 sec
           Start 1116: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected
 1116/1254 Test #1116: SummaryPersistTest.V4File_ZeroFromParamOnNonUnknown_Rejected ..........................   Passed    0.02 sec
           Start 1117: SummaryPersistTest.TextParserRejectsWholesaleWithoutChangingOutput
-1117/1254 Test #1117: SummaryPersistTest.TextParserRejectsWholesaleWithoutChangingOutput ....................   Passed    0.01 sec
+1117/1254 Test #1117: SummaryPersistTest.TextParserRejectsWholesaleWithoutChangingOutput ....................   Passed    0.02 sec
           Start 1118: SummaryPersistTest.TextParserAcceptsCrLfButRejectsBareCarriageReturn
 1118/1254 Test #1118: SummaryPersistTest.TextParserAcceptsCrLfButRejectsBareCarriageReturn ..................   Passed    0.02 sec
           Start 1119: SummaryPersistTest.RejectsNonCanonicalArityAndOutOfRangeIndexes
 1119/1254 Test #1119: SummaryPersistTest.RejectsNonCanonicalArityAndOutOfRangeIndexes .......................   Passed    0.02 sec
           Start 1120: SummaryPersistTest.NonRegularSummaryInputFailsClosed
-1120/1254 Test #1120: SummaryPersistTest.NonRegularSummaryInputFailsClosed ..................................   Passed    0.01 sec
+1120/1254 Test #1120: SummaryPersistTest.NonRegularSummaryInputFailsClosed ..................................   Passed    0.02 sec
           Start 1121: SummaryPersistTest.V3File_NullCondStillParses
 1121/1254 Test #1121: SummaryPersistTest.V3File_NullCondStillParses .........................................   Passed    0.02 sec
           Start 1122: SummaryPersistTest.V5File_NullFromParamParses
-1122/1254 Test #1122: SummaryPersistTest.V5File_NullFromParamParses .........................................   Passed    0.02 sec
+1122/1254 Test #1122: SummaryPersistTest.V5File_NullFromParamParses .........................................   Passed    0.01 sec
           Start 1123: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected
 1123/1254 Test #1123: SummaryPersistTest.V5File_NullFromParamOnNonUnknown_Rejected ..........................   Passed    0.02 sec
           Start 1124: SummaryPersistTest.V6File_AlwaysZeroParsesAndUpgradesToV11
 1124/1254 Test #1124: SummaryPersistTest.V6File_AlwaysZeroParsesAndUpgradesToV11 ............................   Passed    0.02 sec
           Start 1125: SummaryPersistTest.V5File_AlwaysZeroEncodingRejected
-1125/1254 Test #1125: SummaryPersistTest.V5File_AlwaysZeroEncodingRejected ..................................   Passed    0.02 sec
+1125/1254 Test #1125: SummaryPersistTest.V5File_AlwaysZeroEncodingRejected ..................................   Passed    0.01 sec
           Start 1126: SummaryPersistTest.V4File_ZeroFromParamStillParses
 1126/1254 Test #1126: SummaryPersistTest.V4File_ZeroFromParamStillParses ....................................   Passed    0.02 sec
           Start 1127: InterprocZeroTest.BadSourceLiteral_UnguardedDiv_Warning
@@ -2307,7 +2307,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1153: ParamContractSummaryTest.V8HeaderRejectsV9Columns
 1153/1254 Test #1153: ParamContractSummaryTest.V8HeaderRejectsV9Columns .....................................   Passed    0.02 sec
           Start 1154: ParamContractSummaryTest.CrossTUDefiniteNonNullOutPostconditionCleans
-1154/1254 Test #1154: ParamContractSummaryTest.CrossTUDefiniteNonNullOutPostconditionCleans .................   Passed    0.02 sec
+1154/1254 Test #1154: ParamContractSummaryTest.CrossTUDefiniteNonNullOutPostconditionCleans .................   Passed    0.03 sec
           Start 1155: ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans
 1155/1254 Test #1155: ParamContractSummaryTest.CrossTUReferenceOutPostconditionCleans .......................   Passed    0.02 sec
           Start 1156: ParamContractSummaryTest.CrossTUChainedOutPostconditionCleans
@@ -2325,9 +2325,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1162: ParamContractSummaryTest.PartialOutWriteStaysUnknown
 1162/1254 Test #1162: ParamContractSummaryTest.PartialOutWriteStaysUnknown ..................................   Passed    0.02 sec
           Start 1163: ParamContractSummaryTest.LocalPointerToPointerRebindDoesNotEscape
-1163/1254 Test #1163: ParamContractSummaryTest.LocalPointerToPointerRebindDoesNotEscape .....................   Passed    0.03 sec
+1163/1254 Test #1163: ParamContractSummaryTest.LocalPointerToPointerRebindDoesNotEscape .....................   Passed    0.02 sec
           Start 1164: OwnershipSummaryTest.HarvestsAccessOwnershipAndOwnedReturns
-1164/1254 Test #1164: OwnershipSummaryTest.HarvestsAccessOwnershipAndOwnedReturns ...........................   Passed    0.02 sec
+1164/1254 Test #1164: OwnershipSummaryTest.HarvestsAccessOwnershipAndOwnedReturns ...........................   Passed    0.03 sec
           Start 1165: OwnershipSummaryTest.CrossTUOwnedReturnWrapperLeakVisible
 1165/1254 Test #1165: OwnershipSummaryTest.CrossTUOwnedReturnWrapperLeakVisible .............................   Passed    0.02 sec
           Start 1166: OwnershipSummaryTest.CrossTUDiscardedOwnedResultIsLeak
@@ -2337,7 +2337,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1168: OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak
 1168/1254 Test #1168: OwnershipSummaryTest.CrossTUBorrowedReturnDoesNotHideLeak .............................   Passed    0.02 sec
           Start 1169: OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument
-1169/1254 Test #1169: OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument ...............................   Passed    0.02 sec
+1169/1254 Test #1169: OwnershipSummaryTest.AliasWrapperPreservesOwnedArgument ...............................   Passed    0.03 sec
           Start 1170: OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn
 1170/1254 Test #1170: OwnershipSummaryTest.BorrowedCallKeepsOwnedReturn .....................................   Passed    0.02 sec
           Start 1171: ReturnOwnershipSummaryTest.CrossTUPlacementReturnIsNotOwned
@@ -2347,7 +2347,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1173: FieldSensitivitySummaryTest.CrossTUDifferentFieldPreservesCorrelation
 1173/1254 Test #1173: FieldSensitivitySummaryTest.CrossTUDifferentFieldPreservesCorrelation .................   Passed    0.02 sec
           Start 1174: FieldSensitivitySummaryTest.CrossTUGuardFieldStillInvalidates
-1174/1254 Test #1174: FieldSensitivitySummaryTest.CrossTUGuardFieldStillInvalidates .........................   Passed    0.02 sec
+1174/1254 Test #1174: FieldSensitivitySummaryTest.CrossTUGuardFieldStillInvalidates .........................   Passed    0.03 sec
           Start 1175: FieldSensitivitySummaryTest.CrossTURecordReferencePreservesSibling
 1175/1254 Test #1175: FieldSensitivitySummaryTest.CrossTURecordReferencePreservesSibling ....................   Passed    0.02 sec
           Start 1176: FieldSensitivitySummaryTest.CrossTURecordReferenceGuardInvalidates
@@ -2361,7 +2361,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1180: CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder
 1180/1254 Test #1180: CallGraphSccTest.DeepNullChainIsIndependentOfSourceOrder ..............................   Passed    0.02 sec
           Start 1181: CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible
-1181/1254 Test #1181: CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible ................................   Passed    0.03 sec
+1181/1254 Test #1181: CallGraphSccTest.DeepBorrowChainKeepsCallerLeakVisible ................................   Passed    0.02 sec
           Start 1182: CallGraphSccTest.DeepAccessChainReachesFixedPoint
 1182/1254 Test #1182: CallGraphSccTest.DeepAccessChainReachesFixedPoint .....................................   Passed    0.02 sec
           Start 1183: CallGraphSccTest.NullableFactPropagatesInsideRecursiveComponent
@@ -2385,13 +2385,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1192: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull
 1192/1254 Test #1192: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeNull ..............................   Passed    0.02 sec
           Start 1193: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero
-1193/1254 Test #1193: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero ..............................   Passed    0.03 sec
+1193/1254 Test #1193: FunctionPointerSummaryTest.MixedTargetsPreserveMaybeZero ..............................   Passed    0.02 sec
           Start 1194: FunctionPointerSummaryTest.IndirectZeroPassthroughPreservesArgument
 1194/1254 Test #1194: FunctionPointerSummaryTest.IndirectZeroPassthroughPreservesArgument ...................   Passed    0.02 sec
           Start 1195: FunctionPointerSummaryTest.IndirectNullPassthroughPreservesArgument
 1195/1254 Test #1195: FunctionPointerSummaryTest.IndirectNullPassthroughPreservesArgument ...................   Passed    0.02 sec
           Start 1196: FunctionPointerSummaryTest.IndirectConstantReturnPrunesDeadBranch
-1196/1254 Test #1196: FunctionPointerSummaryTest.IndirectConstantReturnPrunesDeadBranch .....................   Passed    0.03 sec
+1196/1254 Test #1196: FunctionPointerSummaryTest.IndirectConstantReturnPrunesDeadBranch .....................   Passed    0.02 sec
           Start 1197: FunctionPointerSummaryTest.CrossTUTargetUsesPersistedSummary
 1197/1254 Test #1197: FunctionPointerSummaryTest.CrossTUTargetUsesPersistedSummary ..........................   Passed    0.02 sec
           Start 1198: FunctionPointerSummaryTest.CTargetSetComposesFieldWrites
@@ -2403,11 +2403,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1201: LibraryModelFileTest.MissingModelFailsClosed
 1201/1254 Test #1201: LibraryModelFileTest.MissingModelFailsClosed ..........................................   Passed    0.02 sec
           Start 1202: LibraryModelFileTest.MultipleFilesMergeConflictsConservatively
-1202/1254 Test #1202: LibraryModelFileTest.MultipleFilesMergeConflictsConservatively ........................   Passed    0.03 sec
+1202/1254 Test #1202: LibraryModelFileTest.MultipleFilesMergeConflictsConservatively ........................   Passed    0.02 sec
           Start 1203: LibraryModelFileTest.ModelAndHarvestedSummaryMergeConservatively
-1203/1254 Test #1203: LibraryModelFileTest.ModelAndHarvestedSummaryMergeConservatively ......................   Passed    0.03 sec
+1203/1254 Test #1203: LibraryModelFileTest.ModelAndHarvestedSummaryMergeConservatively ......................   Passed    0.02 sec
           Start 1204: AllocatorSizeSummaryTest.PersistsV11AllocatorSizeParameter
-1204/1254 Test #1204: AllocatorSizeSummaryTest.PersistsV11AllocatorSizeParameter ............................   Passed    0.03 sec
+1204/1254 Test #1204: AllocatorSizeSummaryTest.PersistsV11AllocatorSizeParameter ............................   Passed    0.02 sec
           Start 1205: AllocatorSizeSummaryTest.V10UpgradesAllocatorSizeToUnknown
 1205/1254 Test #1205: AllocatorSizeSummaryTest.V10UpgradesAllocatorSizeToUnknown ............................   Passed    0.02 sec
           Start 1206: AllocatorSizeSummaryTest.SummaryInReportsCallerOnlyWrapperUse
@@ -2429,13 +2429,13 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1214: ExitPolicyTest.CleanRunIsZero
 1214/1254 Test #1214: ExitPolicyTest.CleanRunIsZero .........................................................   Passed    0.02 sec
           Start 1215: ExitPolicyTest.FindingsAreOne
-1215/1254 Test #1215: ExitPolicyTest.FindingsAreOne .........................................................   Passed    0.01 sec
+1215/1254 Test #1215: ExitPolicyTest.FindingsAreOne .........................................................   Passed    0.02 sec
           Start 1216: ExitPolicyTest.AllBrokenIsTwo
 1216/1254 Test #1216: ExitPolicyTest.AllBrokenIsTwo .........................................................   Passed    0.02 sec
           Start 1217: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict
-1217/1254 Test #1217: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict .................................   Passed    0.02 sec
+1217/1254 Test #1217: ExitPolicyTest.PartialBreakageHasNoTrustworthyVerdict .................................   Passed    0.01 sec
           Start 1218: ExitPolicyTest.RecoveryOptInStillHasNoTrustworthyVerdict
-1218/1254 Test #1218: ExitPolicyTest.RecoveryOptInStillHasNoTrustworthyVerdict ..............................   Passed    0.02 sec
+1218/1254 Test #1218: ExitPolicyTest.RecoveryOptInStillHasNoTrustworthyVerdict ..............................   Passed    0.01 sec
           Start 1219: ExitPolicyTest.NoInputsIsTwo
 1219/1254 Test #1219: ExitPolicyTest.NoInputsIsTwo ..........................................................   Passed    0.02 sec
           Start 1220: ResourceDirTest.OverrideWinsWhenItExists
@@ -2451,23 +2451,23 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1225: ResourceDirTest.ExeRelativeBeatsBaked
 1225/1254 Test #1225: ResourceDirTest.ExeRelativeBeatsBaked .................................................   Passed    0.02 sec
           Start 1226: ResourceDirTest.BakedIsLastResortOnlyIfItExists
-1226/1254 Test #1226: ResourceDirTest.BakedIsLastResortOnlyIfItExists .......................................   Passed    0.01 sec
+1226/1254 Test #1226: ResourceDirTest.BakedIsLastResortOnlyIfItExists .......................................   Passed    0.02 sec
           Start 1227: ResourceDirTest.AllMissingYieldsEmpty
 1227/1254 Test #1227: ResourceDirTest.AllMissingYieldsEmpty .................................................   Passed    0.02 sec
           Start 1228: ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders
 1228/1254 Test #1228: ResourceDirTest.ConfiguredResourceDirCarriesIntrinsicHeaders ..........................   Passed    0.02 sec
           Start 1229: ResourceSupervisorTest.CompletedChildCarriesBoundedStatistics
-1229/1254 Test #1229: ResourceSupervisorTest.CompletedChildCarriesBoundedStatistics .........................   Passed    0.03 sec
+1229/1254 Test #1229: ResourceSupervisorTest.CompletedChildCarriesBoundedStatistics .........................   Passed    0.02 sec
           Start 1230: ResourceSupervisorTest.SuccessfulExitWithoutCompletionMarkerFailsClosed
 1230/1254 Test #1230: ResourceSupervisorTest.SuccessfulExitWithoutCompletionMarkerFailsClosed ...............   Passed    0.02 sec
           Start 1231: ResourceSupervisorTest.PostReadySamplingFailureFailsClosed
 1231/1254 Test #1231: ResourceSupervisorTest.PostReadySamplingFailureFailsClosed ............................   Passed    0.02 sec
           Start 1232: ResourceSupervisorTest.ParentPeakDoesNotPolluteCompletedChild
-1232/1254 Test #1232: ResourceSupervisorTest.ParentPeakDoesNotPolluteCompletedChild .........................   Passed    0.22 sec
+1232/1254 Test #1232: ResourceSupervisorTest.ParentPeakDoesNotPolluteCompletedChild .........................   Passed    0.21 sec
           Start 1233: ResourceSupervisorTest.TimeoutKillsChildWithinBound
-1233/1254 Test #1233: ResourceSupervisorTest.TimeoutKillsChildWithinBound ...................................   Passed    1.02 sec
+1233/1254 Test #1233: ResourceSupervisorTest.TimeoutKillsChildWithinBound ...................................   Passed    1.03 sec
           Start 1234: ResourceSupervisorTest.MemoryCeilingIsIndependentlyTriggerable
-1234/1254 Test #1234: ResourceSupervisorTest.MemoryCeilingIsIndependentlyTriggerable ........................   Passed    0.05 sec
+1234/1254 Test #1234: ResourceSupervisorTest.MemoryCeilingIsIndependentlyTriggerable ........................   Passed    0.04 sec
           Start 1235: ResourceSupervisorTest.FreedTransientPeakStillExceedsMemoryCeiling
 1235/1254 Test #1235: ResourceSupervisorTest.FreedTransientPeakStillExceedsMemoryCeiling ....................   Passed    0.05 sec
           Start 1236: ResourceSupervisorTest.MissingProgramFailsWithoutVerdict
@@ -2475,7 +2475,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1237: ResourceSupervisorTest.ChildHandshakeStopsWhenSupervisorIsGone
 1237/1254 Test #1237: ResourceSupervisorTest.ChildHandshakeStopsWhenSupervisorIsGone ........................   Passed    0.02 sec
           Start 1238: StatusAutomationContract
-1238/1254 Test #1238: StatusAutomationContract ..............................................................   Passed    3.82 sec
+1238/1254 Test #1238: StatusAutomationContract ..............................................................   Passed    3.84 sec
           Start 1239: RealworldCampaignContract
 1239/1254 Test #1239: RealworldCampaignContract .............................................................   Passed    0.06 sec
           Start 1240: Phase83QualificationContract
@@ -2485,11 +2485,11 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1242: UpstreamCandidateManifestContract
 1242/1254 Test #1242: UpstreamCandidateManifestContract .....................................................   Passed    0.14 sec
           Start 1243: UpstreamCandidateEvidenceContract
-1243/1254 Test #1243: UpstreamCandidateEvidenceContract .....................................................   Passed    0.54 sec
+1243/1254 Test #1243: UpstreamCandidateEvidenceContract .....................................................   Passed    0.55 sec
           Start 1244: FuzzingContract
 1244/1254 Test #1244: FuzzingContract .......................................................................   Passed    0.08 sec
           Start 1245: SanitizerContract
-1245/1254 Test #1245: SanitizerContract .....................................................................   Passed    3.62 sec
+1245/1254 Test #1245: SanitizerContract .....................................................................   Passed    3.64 sec
           Start 1246: StressMatrixContract
 1246/1254 Test #1246: StressMatrixContract ..................................................................   Passed    1.58 sec
           Start 1247: ResourceBudgetWorkflowContract
@@ -2499,7 +2499,7 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1249: ReleaseWorkflowContract
 1249/1254 Test #1249: ReleaseWorkflowContract ...............................................................   Passed    0.03 sec
           Start 1250: DockerWorkflowContract
-1250/1254 Test #1250: DockerWorkflowContract ................................................................   Passed    0.03 sec
+1250/1254 Test #1250: DockerWorkflowContract ................................................................   Passed    0.04 sec
           Start 1251: CapabilitiesCliContract
 1251/1254 Test #1251: CapabilitiesCliContract ...............................................................   Passed    0.05 sec
           Start 1252: MeasurementLabContract
@@ -2507,9 +2507,9 @@ Test project /workspace/build-sanitizer-undefined-tests
           Start 1253: MeasurementWorkflowContract
 1253/1254 Test #1253: MeasurementWorkflowContract ...........................................................   Passed    0.03 sec
           Start 1254: ReviewDiffFlow
-1254/1254 Test #1254: ReviewDiffFlow ........................................................................   Passed    1.83 sec
+1254/1254 Test #1254: ReviewDiffFlow ........................................................................   Passed    1.77 sec
 
 100% tests passed, 0 tests failed out of 1254
 
-Total Test time (real) =  40.84 sec
+Total Test time (real) =  40.75 sec
 CODESKEPTIC_SANITIZER_GATE_OK ctest_complete

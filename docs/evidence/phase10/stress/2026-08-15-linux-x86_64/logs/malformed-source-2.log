@@ -1,17 +1,17 @@
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-/tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp:1:32: error: expected ')'
+/tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp:1:32: error: expected ')'
     1 | int malformed_source(int value {
       |                                ^
-/tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp:1:21: note: to match this '('
+/tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp:1:21: note: to match this '('
     1 | int malformed_source(int value {
       |                     ^
-/tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp:3:2: error: expected function body after function declarator
+/tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp:3:2: error: expected function body after function declarator
     3 | }
       |  ^
 2 errors generated.
-Error while processing /tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp.
+Error while processing /tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp.
 [CodeSkeptic] 1 translation unit(s) failed to COMPILE. Findings from an error-recovery AST are non-verdict evidence. Fix the include paths/flags; --analyze-broken-tus may inspect the recovered AST but the verdict remains unavailable:
-  - /tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp
-[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-3pygu6i4/malformed-source/repeat-2/malformed_source.cpp (command_sha256=f10e2fbc4fdfbe1e70e35b3a733788bc8626eff66e81690e999d7cf3bc55b1dc, ordinal=0, phase=analysis)
+  - /tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp
+[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-7cbv1zwv/malformed-source/repeat-2/malformed_source.cpp (command_sha256=5efcb3553e57c6c1e4420ad84c37a0327b65d74fc61a645c5b5ba4e49d616a7f, ordinal=0, phase=analysis)
 [CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

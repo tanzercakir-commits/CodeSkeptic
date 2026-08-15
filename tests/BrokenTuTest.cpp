@@ -426,7 +426,7 @@ TEST(BrokenTuTest, ExecutionPlanRetainsMissingRequestedPath) {
 
     ASSERT_EQ(units.size(), 1u);
     EXPECT_EQ(units[0].canonical_path,
-              std::filesystem::absolute(missing).lexically_normal().string());
+              std::filesystem::weakly_canonical(missing).string());
     EXPECT_FALSE(units[0].command_line.empty());
     EXPECT_EQ(units[0].compile_command_sha256,
               translationUnitCommandSha256(units[0]));

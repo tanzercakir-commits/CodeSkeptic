@@ -40,26 +40,32 @@
   an `/MD` worker-control library linked into its `/MT` probe. `NOMINMAX` is
   now defined before `windows.h`, and the worker-control target is created
   only after LLVM selects the MSVC CRT model for the downstream target
-  graph. The workflow contract is `5/5`. The final
+  graph. The next native macOS compile reached the supervisor and exposed the
+  Darwin `getpid()` call without its declaring header; the Apple branch now
+  includes `<unistd.h>`. The Windows build then completed and exposed an
+  assertion that compared the canonical long spelling of `%TEMP%` with its
+  `RUNNER~1` spelling; the missing-request regression now compares the same
+  `weakly_canonical` identity used by production. The workflow contract is
+  `6/6`. The final
   sanitizer and stress source manifests agree on 377 files with digest
-  `50d451974d957b35de7db78597459f26277b263f950c1169583d80c00b5ccab8`.
+  `91f7080aba5a7f01b980a2f0d5f42ddce88332530a7801fbb7854a4bcdea8db7`.
 - Refreshed the retained stress matrix after the final supervisor regression
   changed the bound source bytes. It accepts `9/9` cases and `18/18`
-  executions in `676` ms; receipt SHA-256 is
-  `b94ab622fb06a04fcab22ecd46c5066067abf55ab2e941c34f92d9380b619d73`,
+  executions in `679` ms; receipt SHA-256 is
+  `56490a70c7ea950e07a5445a665893037ba8dd58934abaf03909dc95f3e14690`,
   and the 37-entry outer manifest SHA-256 is
-  `17a1afeb55894a378064dce14efdd48d573a6f3478ffb6059208a5a1bdd4e6bb`.
+  `92625c37d7a4ffc41a43b68467f465247b062a4d34faf2d9adc5f7e2a9b881f9`.
   Its verifier, `StressMatrixContract` `4/4`, and all manifest entries pass.
 - Retained final Linux x86_64 ASAN and UBSAN trees bind those exact source
   bytes. Both pass all ten runtime gates, `1254/1254` CTest entries,
   `1237/1237` direct C++ tests, representative clean/finding/invalid/
   whole-program and sequential MCP paths, and four fuzz smoke targets. ASAN
-  completed in `76692` ms with receipt SHA-256
-  `cb4d50b40a41353eae11635e97225d9de682b82de38d4d6d5d68153935dd3d07`;
-  UBSAN completed in `49157` ms with receipt SHA-256
-  `de79fca27695a7b54995496d60e710751fd58d6642b0b93e03a1b3b7586ce1a1`.
+  completed in `317125` ms with receipt SHA-256
+  `95819a673a0192dd852a809cbd3281f37be9f163d8f79e882ecb32f09a89989c`;
+  UBSAN completed in `289051` ms with receipt SHA-256
+  `ec7c21382ce3db8ce75cfecec7004d48eda4329c623c046fac5f69b084d215a1`.
   The 40-entry outer manifest SHA-256 is
-  `6c7cbcdba66a4e865334bf487e06555c5c39c761289d357cd80e8272795fe64b`;
+  `3c7e4e9cba518d7aa7973bbb52ce5022ea917604d296ba67b1fc3ce958e81153`;
   both retained verifier modes pass and `SanitizerContract` is `13/13` with
   no skips.
 - Independent read-only pre-evidence, narrow lifecycle, and final evidence

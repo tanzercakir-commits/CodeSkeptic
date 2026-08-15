@@ -26,6 +26,7 @@
 #elif defined(__APPLE__)
 #include <libproc.h>
 #include <signal.h>
+#include <unistd.h>
 #else
 #include <signal.h>
 #include <unistd.h>

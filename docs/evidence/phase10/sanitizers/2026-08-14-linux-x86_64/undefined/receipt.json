@@ -4,43 +4,43 @@
       "binaries": {
         "fuzz/codeskeptic_fuzz_compile_database": "d83fd036c10854613486653b23522687997e2d4ff3ffe00287427bdb02ec313a",
         "fuzz/codeskeptic_fuzz_config": "83316f72325ec35c92badc60778177386c173c9745caf2085e1590a6328eee42",
-        "fuzz/codeskeptic_fuzz_mcp_json_rpc": "05a3e2ce819e37d2a1407b7872732b684fa4fe3ba939036b38b5a990df625c87",
+        "fuzz/codeskeptic_fuzz_mcp_json_rpc": "aac43f0e939c4fbe6fc53043b89f1f647f7dbe720949b9a8fa6c1f0cd2d5491b",
         "fuzz/codeskeptic_fuzz_summary": "3091101849f1290cc8fb7120c814cbb6abcdda67e1acf1c7a41ef6ddffa63dad"
       },
       "cmake_cache_sha256": "1df902c28e9186ba51bb51ba98abe8b6d4a0ec0de380260188685b629186464b",
-      "compile_commands_sha256": "49aa3776ef38f87e2c22af999cfb76c01b80f1d7ddfbe7a5d750c0aff1f14fc3",
+      "compile_commands_sha256": "04822dd5b985588ce028b1c47e91f3434a2526486210055ec291d661f4733425",
       "link_graph_file_count": 1,
-      "link_graph_sha256": "362b053cce9f09071434cd743391d8c544f95222bd5520723f5141d2edfea132",
+      "link_graph_sha256": "b5818f1b4f5c55ca75dcaecef8a60ce4d97d5cf665c5551d6aadfb049ecd531c",
       "selected_compile_command_sha256": {
-        "fuzz/FuzzCompileDatabase.cpp": "e3458d92ebd486863a83f53a8061a9b67ef59bba8d348985eb016d094a3220e1",
-        "fuzz/FuzzConfig.cpp": "30ad44377ee509483aa4c7bab244e79c60815f86ab910a7d4b00b45cd40228f7",
-        "fuzz/FuzzMcpJsonRpc.cpp": "c2795978e6a2e5abb65e325ac2d81ee6848bdf40f82de0ac683a6361d4fd5618",
-        "fuzz/FuzzSummary.cpp": "513ea2116e67c2934db928a05d626fe544489892cfc39f0a117f2e8d792ed9bd",
-        "src/config/Config.cpp": "b6a97972fc1cef273164c5be50a900cecec9eda056b4b8e7a53f54b1324051b7"
+        "fuzz/FuzzCompileDatabase.cpp": "d0738f5c387a6f519d5de74577dfd925829b6851838507d0b2e4818f2f01cc3c",
+        "fuzz/FuzzConfig.cpp": "b467810f334dcf8b83d98a003c15900854628ffb2b09d9c122e113eb90978823",
+        "fuzz/FuzzMcpJsonRpc.cpp": "8a31308eb25d61b22a6230435cbbe4814e6b45ebae48f2f2023e0515ab1f7ca5",
+        "fuzz/FuzzSummary.cpp": "1f54c89b5b8d6939161202ee8c9af4dfef8c8b0a3bfe0de9dd1bc65d8c964bdd",
+        "src/config/Config.cpp": "513762423b13ec9193589d95ed513c4d08eda796d3e91ce1d4a4a457c09974fc"
       }
     },
     "tests": {
       "binaries": {
-        "src/codeskeptic": "47840d792d5c6ceee85f82b682a10c07cdbedc847c370efd137260fbc9134b13",
+        "src/codeskeptic": "e327be2434cae8729c1f6f8f918d306438f2ec71fd07fd032bd916ef510ee994",
         "tests/codeskeptic_sanitizer_tripwire": "076b9735a21229aa41211709b2ec25eda5b56c1e8afedfdc43a11aaea7989632",
-        "tests/codeskeptic_tests": "0a1adffb4897cce40c9ded008034d7801171aefe92e8a51511530af96ba086d0"
+        "tests/codeskeptic_tests": "7bb4e036b003dc8bbf16fdcd5584b2b919e31c6e936c7b0b17766b586193175b"
       },
       "cmake_cache_sha256": "bee55b773ac085c97bc0846b8de06dbb618716cd2809b2b1a94e449d9f43d26f",
-      "compile_commands_sha256": "4ffdccd8a9e4b711ab0b0f1cd643fea4255d216ac800a162626e41eb320016f7",
+      "compile_commands_sha256": "c054383f69184ef7ab0504684b5bb2dbf8b785471607b26402ea4f1e8a53d1bc",
       "link_graph_file_count": 1,
-      "link_graph_sha256": "7187d4d01abad60a38f2b5ce56767c353fd263443f9cf1b3e82d714a393184a6",
+      "link_graph_sha256": "76b1740143a3cde61104c681d68d1074e1648987d8df340c084fcf4a72b611a1",
       "selected_compile_command_sha256": {
-        "src/config/Config.cpp": "9acd10d1db3313b444f86626e9989abef885a7dff05ffd1e5025f3e1457a2680",
-        "tests/BrokenTuTest.cpp": "9596396669c67ca9eef0876fd0530760a688c40e6cca07cc2d0f721f0047be88"
+        "src/config/Config.cpp": "462087966d15db6c56a53d119eda57150b1f8beb4a3100e67b3ae2dc62feaa74",
+        "tests/BrokenTuTest.cpp": "8169e2cdf5a62f153b8caf671e18b708d4204802f3515c2dce88ba5cfa5990c9"
       }
     }
   },
-  "duration_ms": 49157,
+  "duration_ms": 289051,
   "failures": [],
-  "finished_at": "2026-08-15T02:27:48.946996+00:00",
+  "finished_at": "2026-08-15T03:58:55.684000+00:00",
   "fixture": {
     "algorithm": "sha256",
-    "digest": "b27ab7d2d19c7cc7bc3a1375b965d4d633f1bb321b024ffe76e03da15d74d12f",
+    "digest": "4919f07c53cd8f983ca09687fbaeca1755287c9a50e7bf4ad68d85884efa3d21",
     "entries": [
       {
         "path": "clean/clean.cpp",
@@ -48,7 +48,7 @@
       },
       {
         "path": "clean/compile_commands.json",
-        "sha256": "47261507d3d97e6b5d32e068cdd02ef4dc2f462b06bdf2d29a7fac0953a901d5"
+        "sha256": "a5da22e9de2190a79fd9a7820e7aa67164593a1a5d91c3e93612eae70e28e18d"
       },
       {
         "path": "clean/finding.cpp",
@@ -60,7 +60,7 @@
       },
       {
         "path": "whole/compile_commands.json",
-        "sha256": "5a283b8027ada130e00850eaa4ce25bf97509895cc13a7aba9e50a8823e29d11"
+        "sha256": "65c8c7bd23bf1a9ae3143c97adf266cbca0ebb34c6dd1efb8a364b1d70012a96"
       },
       {
         "path": "whole/first.cpp",
@@ -78,13 +78,13 @@
       "command": [
         "$TEST_BUILD/tests/codeskeptic_sanitizer_tripwire"
       ],
-      "duration_ms": 114,
+      "duration_ms": 60003,
       "evidence": {
         "runtime_active": true
       },
-      "exit_code": 1,
+      "exit_code": 124,
       "log": "logs/runtime_tripwire.log",
-      "log_sha256": "8c817f5770b6cebe58035a594050d838e9a5d70b8ab42c284e32be2456f1790f",
+      "log_sha256": "ca6244f43b33eea372e4938b9b0633acae1e293518f464869603336665494153",
       "name": "runtime_tripwire"
     },
     {
@@ -92,7 +92,7 @@
         "$TEST_BUILD/tests/codeskeptic_tests",
         "--gtest_filter=BrokenTuTest.AnalysisWorkerIsSerialAndJoinedBeforeReturn"
       ],
-      "duration_ms": 65,
+      "duration_ms": 66,
       "evidence": {
         "joined": true,
         "max_active": 1,
@@ -110,27 +110,27 @@
         "$TEST_BUILD",
         "--output-on-failure"
       ],
-      "duration_ms": 40890,
+      "duration_ms": 40778,
       "evidence": {
         "listing_sha256": "20c13a68afe66b4e80a65daf80618b7bfbb70c7c901ed2b70c56d87c97b62360",
         "test_count": 1254
       },
       "exit_code": 0,
       "log": "logs/ctest_complete.log",
-      "log_sha256": "38c89df7dad9b5da02b752909b31c8e10f9e01747c06b5c7eef1a49c9613ba45",
+      "log_sha256": "3fca3a4e3e91ccb69c7d7788b5a9b3a01c8823a983aecb1d1d5c38e654864257",
       "name": "ctest_complete"
     },
     {
       "command": [
         "$TEST_BUILD/tests/codeskeptic_tests"
       ],
-      "duration_ms": 4986,
+      "duration_ms": 4981,
       "evidence": {
         "test_count": 1237
       },
       "exit_code": 0,
       "log": "logs/single_process_complete.log",
-      "log_sha256": "4c4acad10e6420824407ab28fa407b5e99628edada6bfee0c636268d25f9e375",
+      "log_sha256": "bcce65e757b9e9ede534dd1c06184593024d4440999931ffbd65da232fb95883",
       "name": "single_process_complete"
     },
     {
@@ -162,7 +162,7 @@
       },
       "exit_code": 1,
       "log": "logs/analyzer_finding.log",
-      "log_sha256": "2fe52d01bdc769a9df4507ce914ccb35fa49fc749121b7636d4ee3c4b0c1ff32",
+      "log_sha256": "a2f9d683ce1ba498f90cdaedf97e84d4d65c9802bb674112134d54166f35f420",
       "name": "analyzer_finding"
     },
     {
@@ -189,14 +189,14 @@
         "$OUTPUT/fixture/whole",
         "--whole-program"
       ],
-      "duration_ms": 114,
+      "duration_ms": 164,
       "evidence": {
         "expected_verdict_exit": 0,
         "source_files": 2
       },
       "exit_code": 0,
       "log": "logs/analyzer_whole_program.log",
-      "log_sha256": "156c109031bd80637879816505614ce614e0a677f685203bc3bd3fa33ef3e61d",
+      "log_sha256": "aecb361240ff5c284e0ad0c916c771df53507c72b8d04235166621e47bdf2200",
       "name": "analyzer_whole_program"
     },
     {
@@ -211,11 +211,11 @@
           2
         ],
         "sequential_loop": true,
-        "stdin_sha256": "5089fd21145fb96ee32e7c5587493e8fee84c9b9bf2f5c0b4b736a4bc5df7c92"
+        "stdin_sha256": "735eecba82c5533eb0e5788a37f94b09898eba8d9121df2b0e919169fd739a65"
       },
       "exit_code": 0,
       "log": "logs/mcp_sequential.log",
-      "log_sha256": "74dfbd66732ecf0a71de9512cf9b49d2982e74edd3234bcc1809416e86dfbc9e",
+      "log_sha256": "8ed3aa724dbee2e444c6efcb747d0d9ef45e79b67fc614e0b77062db31722dd0",
       "name": "mcp_sequential"
     },
     {
@@ -229,15 +229,15 @@
         "--output",
         "$OUTPUT/fuzz-smoke"
       ],
-      "duration_ms": 1218,
+      "duration_ms": 181268,
       "evidence": {
         "mode": "smoke",
-        "receipt_sha256": "3f9535c15a43a271d5016146ff50316cd3fb434a5a0a7a1c550611e4486c2ca8",
+        "receipt_sha256": "a03b9d30467da6f6b58b946ad310dc31e6484b9c2c24ba58b271e68c2b89e336",
         "target_count": 4
       },
       "exit_code": 0,
       "log": "logs/fuzz_smoke.log",
-      "log_sha256": "e0899d1464bd31ca9b1a4cd92609c4ef3c235a8a7c74b2340a24530248a7033a",
+      "log_sha256": "863ee82d01a85fa95002e412cbf70a63044794971b74a642838f071b368315f7",
       "name": "fuzz_smoke"
     }
   ],
@@ -259,7 +259,7 @@
       "evidence": {},
       "exit_code": 0,
       "log": "logs/configure_tests.log",
-      "log_sha256": "7628db7451ce47d6a5bd567d40308b4ca6c0bf2d7496b271641f8d4477c3478c",
+      "log_sha256": "d9ab6901c9186b9d0256bd95c9913ac6579780b01af33f3f8ed6a654793f92d9",
       "name": "configure_tests"
     },
     {
@@ -274,7 +274,7 @@
       "evidence": {},
       "exit_code": 0,
       "log": "logs/configure_fuzz.log",
-      "log_sha256": "efd6f80293c085e02e77e8d158a6d915016400c771d0e0acd5579ff573032917",
+      "log_sha256": "a19e03b5e847b643e93c89e1b65ea88548c3e304a302ca7df93e187b95e85ca4",
       "name": "configure_fuzz"
     },
     {
@@ -323,14 +323,14 @@
   },
   "schema": "codeskeptic-sanitizer-receipt-v1",
   "source": {
-    "base_commit": "767187a92552714a34c1a228e65a5ab48ff5aa55",
+    "base_commit": "98990dbd2adde6414bf4a44130e517b1ae5233c2",
     "manifest": {
       "algorithm": "sha256",
-      "digest": "50d451974d957b35de7db78597459f26277b263f950c1169583d80c00b5ccab8",
+      "digest": "91f7080aba5a7f01b980a2f0d5f42ddce88332530a7801fbb7854a4bcdea8db7",
       "file_count": 377
     }
   },
-  "started_at": "2026-08-15T02:26:59.789504+00:00",
+  "started_at": "2026-08-15T03:54:06.633045+00:00",
   "status": "accepted",
   "toolchain": {
     "path": "/usr/bin/clang++-20",

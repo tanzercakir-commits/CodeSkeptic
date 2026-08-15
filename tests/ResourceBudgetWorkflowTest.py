@@ -69,6 +69,16 @@ class ResourceBudgetWorkflowTest(unittest.TestCase):
         self.assertLess(source.index("#define NOMINMAX"),
                         source.index("#include <windows.h>"))
 
+    def test_darwin_supervisor_declares_the_parent_pid_api(self) -> None:
+        source = RESOURCE_SUPERVISOR.read_text(encoding="utf-8")
+        darwin_headers = (
+            "#elif defined(__APPLE__)\n"
+            "#include <libproc.h>\n"
+            "#include <signal.h>\n"
+            "#include <unistd.h>"
+        )
+        self.assertIn(darwin_headers, source)
+
     def test_worker_control_inherits_the_llvm_selected_msvc_crt(self) -> None:
         cmake = ROOT_CMAKE.read_text(encoding="utf-8")
         worker_target = "add_library(codeskeptic_resource_worker_control"
