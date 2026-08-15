@@ -8,6 +8,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -15,6 +16,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 sys.dont_write_bytecode = True
@@ -355,8 +357,35 @@ def process_is_running(pid: int) -> bool:
             line for line in status.read_text(encoding="utf-8").splitlines()
             if line.startswith("State:")
         )
-    except (FileNotFoundError, StopIteration):
+    except StopIteration:
         return False
+    except FileNotFoundError:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        try:
+            observed = subprocess.run(
+                ["ps", "-o", "stat=", "-p", str(pid)],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=0.5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return True
+        state = observed.stdout.strip()
+        if observed.returncode != 0 or not state:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
+        return not state.startswith("Z")
     return " Z " not in f" {state} " and "(zombie)" not in state
 
 
@@ -1267,24 +1296,43 @@ class DeterminismQualificationTest(unittest.TestCase):
             root = Path(directory)
             stdout = root / "stdout.log"
             stderr = root / "stderr.log"
+            heartbeat = root / "heartbeat.log"
+            grandchild_program = (
+                "import signal,sys,time; "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                "f=open(sys.argv[1],'ab',buffering=0); "
+                "exec('while True:\\n f.write(b\"x\")\\n time.sleep(0.02)')"
+            )
             child_program = (
-                "import subprocess,sys,time; "
-                "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']); "
+                "import os,signal,subprocess,sys,time; "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                f"heartbeat={str(heartbeat)!r}; "
+                f"child=subprocess.Popen([sys.executable,'-c',{grandchild_program!r},"
+                f"{str(heartbeat)!r}]); "
+                "exec('for _ in range(100):\\n"
+                " if os.path.exists(heartbeat): break\\n"
+                " time.sleep(0.005)'); "
+                "assert os.path.exists(heartbeat); "
                 "print(child.pid, flush=True); time.sleep(30)"
             )
             started = time.monotonic()
             with self.assertRaisesRegex(qualification.QualificationError, "timed out"):
                 qualification._run_bounded_process(
-                    [sys.executable, "-c", child_program],
-                    os.environ.copy(), 0.2, stdout, stderr, [], 1024,
+                    [sys.executable, "-c", child_program], os.environ.copy(),
+                    1.0, stdout, stderr, [heartbeat], 1024,
                 )
-            self.assertLess(time.monotonic() - started, 2.0)
+            self.assertLess(time.monotonic() - started, 2.5)
             child_pid = int(stdout.read_text(encoding="utf-8").strip())
             for _ in range(40):
                 if not process_is_running(child_pid):
                     break
                 time.sleep(0.025)
             self.assertFalse(process_is_running(child_pid))
+            self.assertTrue(heartbeat.is_file())
+            heartbeat_size = heartbeat.stat().st_size
+            self.assertGreater(heartbeat_size, 0)
+            time.sleep(0.1)
+            self.assertEqual(heartbeat.stat().st_size, heartbeat_size)
 
             orphan_program = (
                 "import subprocess,sys; "
@@ -1309,6 +1357,134 @@ class DeterminismQualificationTest(unittest.TestCase):
                 qualification._run_bounded_process(
                     [sys.executable, "-c", "print('x' * 10000)"],
                     os.environ.copy(), 5, stdout, stderr, [], 128,
+                )
+
+    def test_process_group_reaps_finished_leader_before_forced_signal(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group contract")
+
+        events: list[str] = []
+        group_alive = True
+
+        class FinishedLeader:
+            pid = 424242
+            returncode: int | None = None
+
+            def poll(self) -> int:
+                events.append("poll")
+                self.returncode = -signal.SIGTERM
+                return self.returncode
+
+            def wait(self, timeout: float | None = None) -> int:
+                if self.returncode is None:
+                    raise subprocess.TimeoutExpired(["fixture"], timeout)
+                return self.returncode
+
+            def kill(self) -> None:
+                raise AssertionError("finished leader must not be killed")
+
+        leader = FinishedLeader()
+
+        def group_exists(_process_group: int) -> bool:
+            events.append("probe")
+            return group_alive
+
+        def signal_group(_process_group: int, sig: int) -> None:
+            nonlocal group_alive
+            events.append(signal.Signals(sig).name)
+            if sig == signal.SIGKILL:
+                self.assertIsNotNone(
+                    leader.returncode, "leader must be reaped before SIGKILL"
+                )
+                group_alive = False
+
+        with (
+            mock.patch.object(qualification, "_process_group_exists", group_exists),
+            mock.patch.object(qualification.os, "killpg", signal_group),
+            mock.patch.object(
+                qualification.time, "monotonic", side_effect=(0.0, 1.0, 2.0)
+            ),
+        ):
+            qualification._terminate_process_group(leader)
+        self.assertIn("SIGKILL", events)
+        self.assertLess(events.index("poll"), events.index("SIGKILL"))
+
+    def test_process_group_cleanup_permission_error_is_fail_closed(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group contract")
+
+        class UnsignalableLeader:
+            pid = 424243
+            returncode: int | None = None
+
+            def poll(self) -> int | None:
+                return self.returncode
+
+            def wait(self, timeout: float | None = None) -> int:
+                if self.returncode is None:
+                    raise subprocess.TimeoutExpired(["fixture"], timeout)
+                return self.returncode
+
+            def kill(self) -> None:
+                self.returncode = -signal.SIGKILL
+
+        with (
+            mock.patch.object(
+                qualification, "_process_group_exists", return_value=True
+            ),
+            mock.patch.object(
+                qualification.os,
+                "killpg",
+                side_effect=PermissionError(1, "Operation not permitted"),
+            ),
+            mock.patch.object(
+                qualification.time,
+                "monotonic",
+                side_effect=(0.0, 1.0, 2.0, 3.0),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "cleanup failed.*Operation not permitted",
+            ):
+                qualification._terminate_process_group(
+                    UnsignalableLeader(), "qualification process timed out"
+                )
+
+    def test_process_group_must_be_gone_after_forced_signal(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group contract")
+
+        class ReapedLeader:
+            pid = 424244
+            returncode = -signal.SIGTERM
+
+            def poll(self) -> int:
+                return self.returncode
+
+            def wait(self, timeout: float | None = None) -> int:
+                del timeout
+                return self.returncode
+
+            def kill(self) -> None:
+                raise AssertionError("reaped leader must not be killed")
+
+        with (
+            mock.patch.object(
+                qualification, "_process_group_exists", return_value=True
+            ),
+            mock.patch.object(qualification.os, "killpg"),
+            mock.patch.object(
+                qualification.time,
+                "monotonic",
+                side_effect=(0.0, 1.0, 2.0, 3.0),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "cleanup failed"
+            ):
+                qualification._terminate_process_group(
+                    ReapedLeader(), "qualification process timed out"
                 )
 
     def test_aggregate_artifact_memory_is_bounded(self) -> None:

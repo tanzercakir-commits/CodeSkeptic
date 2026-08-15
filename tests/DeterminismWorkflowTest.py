@@ -57,6 +57,33 @@ class DeterminismWorkflowTest(unittest.TestCase):
         self.assertNotIn("continue-on-error", text)
         self.assertNotIn("pull_request_target", text)
 
+    def test_runner_context_is_only_used_after_a_step_starts(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        job_definition = text.split("    steps:\n", 1)[0]
+        self.assertNotIn("${{ runner.", job_definition)
+        materialize = text.split(
+            "      - name: Materialize protected-base performance authority\n", 1
+        )[1].split("      - name:", 1)[0]
+        qualify = text.split(
+            "      - name: Qualify unit, real-repository, and "
+            "llama-cpp release-candidate workloads\n",
+            1,
+        )[1].split("      - name:", 1)[0]
+        self.assertIn(
+            "PINNED_BASELINE: ${{ runner.temp }}/"
+            "pinned-base-determinism-baseline.json",
+            materialize,
+        )
+        self.assertIn(
+            "BASELINE_ROOT: ${{ runner.temp }}/pinned-base-worktree",
+            materialize,
+        )
+        self.assertIn(
+            "PINNED_BASELINE: ${{ runner.temp }}/"
+            "pinned-base-determinism-baseline.json",
+            qualify,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

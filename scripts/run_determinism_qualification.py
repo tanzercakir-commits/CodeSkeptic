@@ -2642,30 +2642,66 @@ def _process_group_exists(process_group: int) -> bool:
         return True
 
 
-def _terminate_process_group(process: subprocess.Popen[Any]) -> None:
+def _signal_process_group(
+    process: subprocess.Popen[Any], sig: signal.Signals
+) -> PermissionError | None:
+    try:
+        os.killpg(process.pid, sig)
+    except ProcessLookupError:
+        return None
+    except PermissionError as error:
+        return error
+    return None
+
+
+def _wait_for_process_group_exit(
+    process: subprocess.Popen[Any], timeout_seconds: float
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        # Reap a finished group leader before probing the PGID. Darwin can
+        # report EPERM when a zombie leader is the last visible group member.
+        process.poll()
+        if not _process_group_exists(process.pid):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(0.01, remaining))
+
+
+def _terminate_process_group(
+    process: subprocess.Popen[Any],
+    failure: str = "qualification process cleanup failed",
+) -> None:
+    group_failure: str | None = None
     if os.name == "posix":
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+        term_error = _signal_process_group(process, signal.SIGTERM)
+        if not _wait_for_process_group_exit(process, 0.5):
+            kill_error = _signal_process_group(process, signal.SIGKILL)
+            if not _wait_for_process_group_exit(process, 0.5):
+                signal_error = kill_error or term_error
+                detail = f": {signal_error}" if signal_error is not None else ""
+                group_failure = (
+                    "process-group cleanup failed: group remained after SIGKILL"
+                    + detail
+                )
     else:
         if process.poll() is None:
             process.terminate()
-    deadline = time.monotonic() + 0.5
-    while (os.name == "posix" and _process_group_exists(process.pid) and
-           time.monotonic() < deadline):
-        time.sleep(0.01)
-    if os.name == "posix" and _process_group_exists(process.pid):
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
     if process.poll() is None:
         try:
             process.wait(timeout=0.5)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait(timeout=1.0)
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired as error:
+                raise QualificationError(
+                    f"{failure}; direct-process cleanup incomplete"
+                ) from error
+    if group_failure is not None:
+        raise QualificationError(f"{failure}; {group_failure}")
 
 
 def _run_bounded_process(
@@ -2705,12 +2741,12 @@ def _run_bounded_process(
                 break
             time.sleep(0.025)
         if failure:
-            _terminate_process_group(process)
+            _terminate_process_group(process, failure)
         else:
             process.wait()
             if os.name == "posix" and _process_group_exists(process.pid):
                 failure = "qualification process left live descendants"
-                _terminate_process_group(process)
+                _terminate_process_group(process, failure)
     for path in (stdout_path, stderr_path, *monitored_paths):
         try:
             size = path.stat().st_size

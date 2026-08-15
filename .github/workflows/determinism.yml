@@ -24,8 +24,6 @@ jobs:
     env:
       QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       WORKLOAD_MANIFEST: scripts/determinism_workloads.json
-      PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
-      BASELINE_ROOT: ${{ runner.temp }}/pinned-base-worktree
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,6 +52,8 @@ jobs:
         id: baseline
         env:
           BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_ref }}
+          PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
+          BASELINE_ROOT: ${{ runner.temp }}/pinned-base-worktree
         run: |
           git worktree add --detach "$BASELINE_ROOT" "$BASELINE_SHA"
           if test -f "$BASELINE_ROOT/scripts/determinism_baseline.json"; then
@@ -106,6 +106,8 @@ jobs:
           fi
 
       - name: Qualify unit, real-repository, and llama-cpp release-candidate workloads
+        env:
+          PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
         run: |
           baseline_args=(--baseline "$PINNED_BASELINE")
           if test "${{ steps.baseline.outputs.available }}" != true; then
