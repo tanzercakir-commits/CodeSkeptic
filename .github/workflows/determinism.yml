@@ -38,6 +38,8 @@ jobs:
             clang-20 cmake ninja-build time
 
       - name: Build exact-head release analyzer
+        env:
+          CODESKEPTIC_VERSION_OVERRIDE: 0.4.9-dev
         run: |
           CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
             /usr/bin/cmake -S . -B build-determinism -G Ninja \

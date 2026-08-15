@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "determinism.yml"
+CMAKE = ROOT / "CMakeLists.txt"
 
 
 class DeterminismWorkflowTest(unittest.TestCase):
@@ -45,6 +46,33 @@ class DeterminismWorkflowTest(unittest.TestCase):
         self.assertIn("/usr/bin/cmake --build build-determinism", text)
         self.assertIn("--c-compiler /usr/bin/clang-20", text)
         self.assertIn("--cxx-compiler /usr/bin/clang++-20", text)
+
+        build = text.split(
+            "      - name: Build exact-head release analyzer\n", 1
+        )[1].split("      - name:", 1)[0]
+        self.assertIn(
+            "env:\n          CODESKEPTIC_VERSION_OVERRIDE: 0.4.9-dev",
+            build,
+        )
+        self.assertNotIn("-DCODESKEPTIC_VERSION_OVERRIDE", build)
+
+    def test_evidence_identity_override_does_not_mutate_cmake_cache(self) -> None:
+        text = CMAKE.read_text(encoding="utf-8")
+        cache_override = 'if(CODESKEPTIC_VERSION_OVERRIDE)'
+        environment_override = (
+            'elseif(DEFINED ENV{CODESKEPTIC_VERSION_OVERRIDE} AND\n'
+            '       NOT "$ENV{CODESKEPTIC_VERSION_OVERRIDE}" STREQUAL "")'
+        )
+        git_identity = "COMMAND git describe --tags --exact-match HEAD"
+        self.assertIn(cache_override, text)
+        self.assertIn(environment_override, text)
+        self.assertIn(
+            'set(CODESKEPTIC_VERSION_STRING '
+            '"$ENV{CODESKEPTIC_VERSION_OVERRIDE}")',
+            text,
+        )
+        self.assertLess(text.index(cache_override), text.index(environment_override))
+        self.assertLess(text.index(environment_override), text.index(git_identity))
 
     def test_hosted_evidence_is_bounded_visible_and_fail_closed(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
