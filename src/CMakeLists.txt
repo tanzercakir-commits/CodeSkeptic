@@ -29,6 +29,7 @@ add_library(codeskeptic_core STATIC
     analyzer/StaticAnalyzer.cpp
     analyzer/AnalysisCoordinator.cpp
     analyzer/WorkerProtocol.cpp
+    analyzer/UnitEvidenceStore.cpp
     analyzer/WorkerRuntime.cpp
     analyzer/DefaultRules.cpp
     analyzer/SuppressionFilter.cpp

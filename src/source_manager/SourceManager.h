@@ -8,6 +8,7 @@
 
 namespace clang {
 class ASTContext;
+class FileEntryRef;
 namespace tooling {
 class CompilationDatabase;
 }
@@ -24,6 +25,13 @@ using ASTCallback = std::function<void(clang::ASTContext&)>;
 // compile snippets IDENTICALLY — a test TU that silently fails to
 // find <stdlib.h> reports zero findings and passes vacuously.
 std::vector<std::string> platformExtraArgs();
+
+// Clang may expose a VFS-remapped external spelling even though only the
+// originally requested or real filesystem path exists. Prefer an existing
+// lexical spelling so symlink sidecars remain semantic inputs, then fall back
+// to an existing requested/real path. Dependency hashing and sidecar lookup
+// must use this same choice.
+std::string resolvedFilePathForEvidence(const clang::FileEntryRef& file);
 
 // Exact in-memory entry point used by both the production file wrapper and
 // deterministic fuzzing. Parsing remains Clang's JSON compilation-database
@@ -64,15 +72,14 @@ public:
         return comp_db_error_;
     }
 
-    // Warm AST cache (MCP server / long-lived process): parsed TUs are
-    // kept for the PROCESS lifetime, so subsequent calls do not pay the
-    // parse cost. The key is path+build-path; if the fingerprint
-    // (mtime+size) does not match, it is rebuilt — a STALE AST IS NEVER
-    // SERVED. Stays off in one-shot CLI runs (memory: we do not want to
-    // keep all ASTs alive during a large directory scan).
+    // Legacy programmatic compatibility switch. Persistent AST reuse is
+    // deliberately disabled: Clang AST identity must cover the exact command,
+    // transitive dependency resolution, sidecars, and toolchain. Production
+    // reuse is handled by the verified process-isolated evidence store.
     void enableWarmCache(bool enabled) { warm_cache_ = enabled; }
 
-    // Test/diagnostics: cache counters and reset (process-lifetime store)
+    // Test/diagnostics: the compatibility path records reparses as misses;
+    // hits remain zero because an unverifiable AST is never served.
     static unsigned warmCacheHits();
     static unsigned warmCacheMisses();
     static void clearWarmCache();
@@ -86,6 +93,15 @@ public:
     static void recordBrokenTU(const std::string& file);
     static const std::vector<std::string>& brokenTUs();
     static void clearBrokenTUs();
+    // Exact files resolved by Clang for the most recent isolated parse. This
+    // includes the main source and transitive headers and is reset explicitly
+    // at worker-request boundaries before a dependency manifest is produced.
+    static const std::vector<std::string>& dependencyFiles();
+    // True when Clang actually expanded a time-dependent preprocessor builtin
+    // during the current isolated parse. Observing expansion rather than raw
+    // bytes also catches token-paste and macro-indirection spellings.
+    static bool volatilePreprocessorBuiltinExpanded();
+    static void clearDependencyFiles();
     // Attempted-TU count for THIS run, published as a static so the
     // decoupled console reporter can detect the nothing-was-analyzed
     // case (set by StaticAnalyzer::run before processing).

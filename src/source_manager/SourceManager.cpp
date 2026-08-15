@@ -9,14 +9,15 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <sstream>
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
-#include <clang/Frontend/ASTUnit.h>
+#include <clang/Basic/FileEntry.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
+#include <clang/Lex/PPCallbacks.h>
+#include <clang/Lex/Preprocessor.h>
 #include <clang/Tooling/ArgumentsAdjusters.h>
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/JSONCompilationDatabase.h>
@@ -58,6 +59,61 @@ std::string canonicalIdentity(const std::string& path) {
         canonical = fs::absolute(path, ec);
     }
     return (ec ? fs::path(path) : canonical).lexically_normal().string();
+}
+
+std::string lexicalIdentity(const std::string& path) {
+    std::error_code ec;
+    fs::path lexical(path);
+    if (lexical.is_relative()) lexical = fs::absolute(lexical, ec);
+    return (ec ? fs::path(path) : lexical).lexically_normal().string();
+}
+
+bool isRegularPath(const std::string& path) {
+    if (path.empty()) return false;
+    std::error_code ec;
+    return fs::is_regular_file(fs::status(path, ec)) && !ec;
+}
+
+std::vector<std::string>& dependencyList() {
+    static std::vector<std::string> files;
+    return files;
+}
+
+bool& volatilePreprocessorBuiltinSeen() {
+    static bool seen = false;
+    return seen;
+}
+
+class VolatilePreprocessorCallbacks : public clang::PPCallbacks {
+public:
+    void MacroExpands(const clang::Token& name_token,
+                      const clang::MacroDefinition&,
+                      clang::SourceRange,
+                      const clang::MacroArgs*) override {
+        const auto* identifier = name_token.getIdentifierInfo();
+        if (!identifier) return;
+        const auto name = identifier->getName();
+        if (name == "__DATE__" || name == "__TIME__" ||
+            name == "__TIMESTAMP__")
+            volatilePreprocessorBuiltinSeen() = true;
+    }
+};
+
+void recordDependencyFiles(clang::ASTContext& ctx) {
+    auto& files = dependencyList();
+    const auto& source = ctx.getSourceManager();
+    for (auto it = source.fileinfo_begin(); it != source.fileinfo_end(); ++it) {
+        const std::string path =
+            codeskeptic::resolvedFilePathForEvidence(it->first);
+        // Preserve an existing lexical spelling in addition to its canonical
+        // identity so alias.h -> real.h binds alias.h.csk. VFS-remapped names
+        // that do not exist on disk have already fallen back to Clang's
+        // requested/real path, matching Sidecar.cpp.
+        files.push_back(lexicalIdentity(path));
+        files.push_back(canonicalIdentity(path));
+    }
+    std::sort(files.begin(), files.end());
+    files.erase(std::unique(files.begin(), files.end()), files.end());
 }
 
 void appendLengthPrefixed(std::ostringstream& out,
@@ -102,6 +158,7 @@ public:
         : callback_(std::move(callback)) {}
 
     void HandleTranslationUnit(clang::ASTContext& ctx) override {
+        recordDependencyFiles(ctx);
         if (tuIsBroken(ctx)) {
             codeskeptic::SourceManager::recordBrokenTU(mainFileOf(ctx));
             if (!codeskeptic::SourceManager::analyzeBrokenTUs()) return;
@@ -121,6 +178,8 @@ public:
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance& ci,
                       llvm::StringRef /*file*/) override {
+        ci.getPreprocessor().addPPCallbacks(
+            std::make_unique<VolatilePreprocessorCallbacks>());
         // AR.3: the vanished-assert recorder is a PPCallbacks hook, so
         // it must be installed HERE, before preprocessing. The warm-AST
         // path (processAllOnWorker) never reaches this point and is
@@ -215,6 +274,23 @@ loadCompilationDatabaseText(const std::string& text, std::string& error) {
 }
 
 } // anonymous namespace
+
+std::string resolvedFilePathForEvidence(const clang::FileEntryRef& file) {
+    const std::string named = lexicalIdentity(file.getName().str());
+    if (isRegularPath(named)) return named;
+
+    const std::string requested =
+        lexicalIdentity(file.getNameAsRequested().str());
+    if (isRegularPath(requested)) return requested;
+
+    const std::string real_name =
+        file.getFileEntry().tryGetRealPathName().str();
+    if (!real_name.empty()) {
+        const std::string real = lexicalIdentity(real_name);
+        if (isRegularPath(real)) return real;
+    }
+    return named;
+}
 
 bool validateCompilationDatabaseText(const std::string& text,
                                      std::string& error) {
@@ -385,51 +461,14 @@ void applyPlatformAdjusters(clang::tooling::ClangTool& tool) {
     }
 }
 
-// --- Process-lifetime warm AST cache ---
-//
-// Deliberate global state (not the OPPOSITE of the filter-leak lesson,
-// but its complement): here cross-call persistence IS the feature, and
-// correctness is protected by a content-derived key — path+build-path
-// key, mtime+size fingerprint. If the fingerprint does not match, the
-// entry is rebuilt; there is no path by which a stale AST could be
-// served.
-struct CachedAst {
-    std::string fingerprint;
-    std::unique_ptr<clang::ASTUnit> unit;
-};
-
-std::map<std::string, CachedAst>& astCache() {
-    static std::map<std::string, CachedAst> cache;
-    return cache;
-}
 unsigned g_warmHits = 0;
 unsigned g_warmMisses = 0;
-
-// Simple memory ceiling: not worth LRU complexity — flush everything on
-// overflow (in MCP usage the file count is small, rarely triggered)
-constexpr size_t kMaxCachedAsts = 16;
-
-std::string fingerprintOf(const std::string& path) {
-    std::error_code ec;
-    auto size = fs::file_size(path, ec);
-    if (ec) return {};
-    auto mtime = fs::last_write_time(path, ec);
-    if (ec) return {};
-    // Explicit casts: on Apple libc++ file_time_type's rep is __int128,
-    // which has no std::to_string overload (ambiguous-call error). The
-    // narrowing is harmless — this is a cache fingerprint, not a
-    // timestamp.
-    return std::to_string(static_cast<unsigned long long>(size)) + ":" +
-           std::to_string(static_cast<long long>(
-               mtime.time_since_epoch().count()));
-}
 
 } // anonymous namespace
 
 unsigned SourceManager::warmCacheHits() { return g_warmHits; }
 unsigned SourceManager::warmCacheMisses() { return g_warmMisses; }
 void SourceManager::clearWarmCache() {
-    astCache().clear();
     g_warmHits = 0;
     g_warmMisses = 0;
 }
@@ -459,54 +498,24 @@ int SourceManager::processAllOnWorker(ASTCallback callback) {
     if (source_files_.empty()) return 0;
     if (!comp_db_) return 1;
 
-    if (warm_cache_) {
-        bool anyFailed = false;
-        for (const auto& file : source_files_) {
-            const std::string key = file + "|" + build_path_;
-            const std::string fp = fingerprintOf(file);
-
-            // The broken-TU guard applies to both cache paths — a
-            // cached AST keeps its DiagnosticsEngine, so the check is
-            // identical (see CodeSkepticASTConsumer).
-            auto guardedCall = [&](clang::ASTContext& ctx) {
-                if (tuIsBroken(ctx)) {
-                    recordBrokenTU(mainFileOf(ctx));
-                    if (!analyzeBrokenTUs()) return;
-                }
-                callback(ctx);
-            };
-
-            auto it = astCache().find(key);
-            if (!fp.empty() && it != astCache().end() &&
-                it->second.fingerprint == fp && it->second.unit) {
-                ++g_warmHits;
-                guardedCall(it->second.unit->getASTContext());
-                continue;
-            }
-
-            ++g_warmMisses;
-            clang::tooling::ClangTool tool(*comp_db_, {file});
-            applyPlatformAdjusters(tool);
-            std::vector<std::unique_ptr<clang::ASTUnit>> units;
-            tool.buildASTs(units);
-            if (units.empty() || !units[0]) {
-                anyFailed = true;
-                recordBrokenTU(file);
-                continue;
-            }
-            guardedCall(units[0]->getASTContext());
-
-            if (astCache().size() >= kMaxCachedAsts) astCache().clear();
-            astCache()[key] = {fp, std::move(units[0])};
-        }
-        return anyFailed ? 1 : 0;
-    }
+    // The compatibility switch records reparses but deliberately shares the
+    // exact normal ClangTool path. That preserves every compile command for a
+    // source while ensuring an unverifiable process-lifetime AST is never
+    // served.
+    if (warm_cache_) g_warmMisses += source_files_.size();
 
     clang::tooling::ClangTool tool(*comp_db_, source_files_);
     applyPlatformAdjusters(tool);
 
     CodeSkepticActionFactory factory(callback);
-    return tool.run(&factory);
+    const int result = tool.run(&factory);
+    if (warm_cache_ && result != 0) {
+        for (const auto& file : source_files_) {
+            if (comp_db_->getCompileCommands(file).empty())
+                recordBrokenTU(file);
+        }
+    }
+    return result;
 }
 
 namespace {
@@ -536,6 +545,16 @@ const std::vector<std::string>& SourceManager::brokenTUs() {
     return brokenList();
 }
 void SourceManager::clearBrokenTUs() { brokenList().clear(); }
+const std::vector<std::string>& SourceManager::dependencyFiles() {
+    return dependencyList();
+}
+bool SourceManager::volatilePreprocessorBuiltinExpanded() {
+    return volatilePreprocessorBuiltinSeen();
+}
+void SourceManager::clearDependencyFiles() {
+    dependencyList().clear();
+    volatilePreprocessorBuiltinSeen() = false;
+}
 
 namespace { size_t g_attempted_tus = 0; }
 void SourceManager::setAttemptedTUCount(size_t n) { g_attempted_tus = n; }

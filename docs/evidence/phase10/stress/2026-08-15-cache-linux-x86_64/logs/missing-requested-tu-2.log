@@ -1,0 +1,5 @@
+[CodeSkeptic] File not found: /tmp/codeskeptic-stress-ja2klmo_/missing-requested-tu/repeat-2/missing_absent.cpp
+[CodeSkeptic] Analysis starting... (2 files, 12 rules)
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] translation unit missing: /tmp/codeskeptic-stress-ja2klmo_/missing-requested-tu/repeat-2/missing_absent.cpp (command_sha256=4167066e247fa65bc9b9a1dfc396da3f0ea6e35af140294c51fea326e791a62e, ordinal=0, phase=analysis)
+[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

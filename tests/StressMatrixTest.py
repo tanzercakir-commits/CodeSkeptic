@@ -12,6 +12,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import run_stress_matrix as matrix
 
 BINARY = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else None
+EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" / "stress" /
+                 "2026-08-15-cache-linux-x86_64")
 
 
 class StressMatrixContractTest(unittest.TestCase):
@@ -89,6 +91,44 @@ class StressMatrixContractTest(unittest.TestCase):
             first_log.write_bytes(first_log.read_bytes() + b"tamper\n")
             with self.assertRaises(matrix.MatrixError):
                 matrix.verify_receipt(receipt_path, BINARY)
+
+    def test_retained_receipt_binds_current_source_and_complete_matrix(self):
+        receipt_path = EVIDENCE_ROOT / "receipt.json"
+        if not receipt_path.is_file():
+            self.skipTest("stress evidence is not materialized")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["source"]["manifest"],
+                         matrix.source_manifest())
+        self.assertEqual(
+            receipt["summary"],
+            {
+                "accepted_cases": 9,
+                "repetitions_per_case": 2,
+                "timeouts": 0,
+                "crashes": 0,
+            },
+        )
+
+    def test_external_manifest_pins_latest_retained_stress_tree(self):
+        manifest = EVIDENCE_ROOT / "SHA256SUMS"
+        if not manifest.is_file():
+            self.skipTest("stress external manifest is not materialized")
+        entries = {}
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            digest, separator, relative = line.partition("  ")
+            self.assertTrue(separator)
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+            self.assertNotIn(relative, entries)
+            entries[relative] = digest
+        expected = {
+            path.relative_to(EVIDENCE_ROOT.parent).as_posix()
+            for path in EVIDENCE_ROOT.rglob("*")
+            if path.is_file() and path != manifest
+        }
+        self.assertEqual(set(entries), expected)
+        for relative, digest in entries.items():
+            self.assertEqual(
+                matrix.sha256_file(EVIDENCE_ROOT.parent / relative), digest)
 
 
 if __name__ == "__main__":

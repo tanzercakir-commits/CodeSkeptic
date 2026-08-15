@@ -1,0 +1,30 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1003
+INFO: Loaded 1 modules   (207538 inline 8-bit counters): 207538 [0x563aafe95b80, 0x563aafec8632), 
+INFO: Loaded 1 PC tables (207538 PCs): 207538 [0x563aafec8638,0x563ab01f3158), 
+INFO:        2 files found in /work/docs/evidence/phase10/sanitizers/.staging-cache-linux-x86_64/address/codeskeptic-fuzz-zeg1j755/corpus/summary
+INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 99Mb
+#3	INITED cov: 152 ft: 175 corp: 2/141b exec/s: 0 rss: 100Mb
+#5	NEW    cov: 154 ft: 212 corp: 3/205b lim: 79 exec/s: 0 rss: 100Mb L: 64/79 MS: 2 InsertByte-CrossOver-
+#7	NEW    cov: 156 ft: 217 corp: 4/267b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 2 ChangeBinInt-CrossOver-
+#8	NEW    cov: 156 ft: 219 corp: 5/346b lim: 79 exec/s: 0 rss: 100Mb L: 79/79 MS: 1 CopyPart-
+#9	NEW    cov: 158 ft: 225 corp: 6/412b lim: 79 exec/s: 0 rss: 100Mb L: 66/79 MS: 1 CopyPart-
+#10	NEW    cov: 159 ft: 227 corp: 7/474b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 1 ChangeBinInt-
+#22	NEW    cov: 160 ft: 228 corp: 8/536b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 2 ShuffleBytes-ShuffleBytes-
+#39	NEW    cov: 161 ft: 229 corp: 9/605b lim: 79 exec/s: 0 rss: 100Mb L: 69/79 MS: 2 ChangeByte-EraseBytes-
+#50	NEW    cov: 161 ft: 240 corp: 10/671b lim: 79 exec/s: 0 rss: 100Mb L: 66/79 MS: 1 EraseBytes-
+#66	NEW    cov: 161 ft: 252 corp: 11/714b lim: 79 exec/s: 0 rss: 100Mb L: 43/79 MS: 1 CrossOver-
+#97	REDUCE cov: 161 ft: 252 corp: 11/683b lim: 79 exec/s: 0 rss: 101Mb L: 35/79 MS: 1 EraseBytes-
+#119	NEW    cov: 162 ft: 253 corp: 12/746b lim: 79 exec/s: 0 rss: 101Mb L: 63/79 MS: 2 InsertByte-CopyPart-
+#135	NEW    cov: 163 ft: 257 corp: 13/825b lim: 79 exec/s: 0 rss: 101Mb L: 79/79 MS: 1 CopyPart-
+#136	NEW    cov: 168 ft: 264 corp: 14/832b lim: 79 exec/s: 0 rss: 101Mb L: 7/79 MS: 1 CrossOver-
+#137	REDUCE cov: 168 ft: 264 corp: 14/827b lim: 79 exec/s: 0 rss: 101Mb L: 30/79 MS: 1 EraseBytes-
+#149	NEW    cov: 168 ft: 267 corp: 15/904b lim: 79 exec/s: 0 rss: 101Mb L: 77/79 MS: 2 ShuffleBytes-CopyPart-
+#170	NEW    cov: 170 ft: 269 corp: 16/962b lim: 79 exec/s: 0 rss: 101Mb L: 58/79 MS: 1 CopyPart-
+#171	NEW    cov: 170 ft: 270 corp: 17/1020b lim: 79 exec/s: 0 rss: 101Mb L: 58/79 MS: 1 EraseBytes-
+#177	REDUCE cov: 171 ft: 272 corp: 18/1045b lim: 79 exec/s: 0 rss: 101Mb L: 25/79 MS: 1 EraseBytes-
+#178	NEW    cov: 171 ft: 274 corp: 19/1081b lim: 79 exec/s: 0 rss: 101Mb L: 36/79 MS: 1 CrossOver-
+#213	NEW    cov: 171 ft: 277 corp: 20/1093b lim: 79 exec/s: 0 rss: 102Mb L: 12/79 MS: 5 CrossOver-EraseBytes-InsertRepeatedBytes-EraseBytes-EraseBytes-
+#219	REDUCE cov: 171 ft: 277 corp: 20/1060b lim: 79 exec/s: 0 rss: 102Mb L: 36/79 MS: 1 CrossOver-
+#256	DONE   cov: 171 ft: 277 corp: 20/1060b lim: 79 exec/s: 0 rss: 102Mb
+Done 256 runs in 0 second(s)

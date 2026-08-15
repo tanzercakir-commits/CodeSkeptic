@@ -43,8 +43,8 @@ fi
 if [ -n "$base" ] && git merge-base "$base" HEAD >/dev/null 2>&1; then
     mb=$(git merge-base "$base" HEAD)
     changed=$(git diff --name-only "$mb" HEAD)
-    if echo "$changed" | grep -qE '^src/' &&
-       ! echo "$changed" | grep -qxF 'docs/devlog/changelog.md'; then
+    if grep -qE '^src/' <<< "$changed" &&
+       ! grep -qxF 'docs/devlog/changelog.md' <<< "$changed"; then
         echo "FAIL: src/ changed but docs/devlog/changelog.md was not updated."
         echo "      Every code change logs its rationale in the changelog."
         fail=1
