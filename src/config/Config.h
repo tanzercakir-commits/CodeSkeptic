@@ -65,6 +65,10 @@ public:
     bool acceptPartialCoverage() const { return accept_partial_coverage_; }
     unsigned tuTimeoutSeconds() const { return tu_timeout_seconds_; }
     unsigned tuMemoryMiB() const { return tu_memory_mib_; }
+    const std::string& checkpointDir() const { return checkpoint_dir_; }
+    bool checkpointPerRunNamespace() const {
+        return checkpoint_per_run_namespace_;
+    }
     bool setTuTimeoutSeconds(std::uint64_t value);
     bool setTuMemoryMiB(std::uint64_t value);
     // Exact analysis settings forwarded to an isolated translation-unit
@@ -109,10 +113,8 @@ public:
     void setSummaryIn(const std::string& path) { summary_in_path_ = path; }
     void setSummaryOut(const std::string& path) { summary_out_path_ = path; }
 
-    // Warm AST cache: a programmatic switch for long-lived processes
-    // (MCP server). Not enabled in the CLI — keeping all ASTs alive for
-    // the process lifetime during a large directory scan is wrong
-    // memory-wise.
+    // Legacy programmatic compatibility switch. AST reuse is disabled; the
+    // exact process-isolated checkpoint store owns safe persistent reuse.
     void setWarmCache(bool enabled) { warm_cache_ = enabled; }
     bool warmCache() const { return warm_cache_; }
 
@@ -232,6 +234,8 @@ private:
     bool accept_partial_coverage_ = false;
     unsigned tu_timeout_seconds_ = kDefaultTuTimeoutSeconds;
     unsigned tu_memory_mib_ = kDefaultTuMemoryMiB;
+    std::string checkpoint_dir_;
+    bool checkpoint_per_run_namespace_ = false;
     bool assert_recovery_ = true;
     bool assumptions_ = false;
     bool warm_cache_ = false;

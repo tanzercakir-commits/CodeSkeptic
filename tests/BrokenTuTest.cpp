@@ -4,6 +4,8 @@
 #include "source_manager/SourceManager.h"
 
 #include <gtest/gtest.h>
+#include <clang/AST/ASTContext.h>
+#include <clang/Basic/SourceManager.h>
 
 #include <cstdio>
 #include <atomic>
@@ -204,6 +206,88 @@ TEST(BrokenTuTest, WarmCacheAstFailureRecordsExactRequestedTu) {
               source.filename());
     SourceManager::clearWarmCache();
     SourceManager::clearBrokenTUs();
+    fs::remove_all(dir, ec);
+}
+
+TEST(BrokenTuTest, LegacyWarmCacheNeverServesSameSizeSameMtimeAst) {
+    const fs::path dir =
+        fs::temp_directory_path() / "cs_warm_ast_content_identity";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path source = dir / "value.cpp";
+    {
+        std::ofstream file(source);
+        file << "int value() { return 1; }\n";
+    }
+    const auto original_time = fs::last_write_time(source, ec);
+    ASSERT_FALSE(ec);
+
+    SourceManager manager(dir.string());
+    manager.addSourceFile(source.string());
+    manager.enableWarmCache(true);
+    std::string observed;
+    ASSERT_EQ(manager.processAll([&](clang::ASTContext& context) {
+        const auto& source_manager = context.getSourceManager();
+        observed = source_manager
+                       .getBufferData(source_manager.getMainFileID())
+                       .str();
+    }), 0);
+    EXPECT_NE(observed.find("return 1"), std::string::npos);
+
+    {
+        std::ofstream file(source, std::ios::binary | std::ios::trunc);
+        file << "int value() { return 2; }\n";
+    }
+    fs::last_write_time(source, original_time, ec);
+    ASSERT_FALSE(ec);
+    observed.clear();
+    ASSERT_EQ(manager.processAll([&](clang::ASTContext& context) {
+        const auto& source_manager = context.getSourceManager();
+        observed = source_manager
+                       .getBufferData(source_manager.getMainFileID())
+                       .str();
+    }), 0);
+    EXPECT_NE(observed.find("return 2"), std::string::npos);
+    EXPECT_EQ(SourceManager::warmCacheHits(), 0u);
+
+    SourceManager::clearWarmCache();
+    fs::remove_all(dir, ec);
+}
+
+TEST(BrokenTuTest, LegacyWarmCachePreservesEveryCompileCommand) {
+    const fs::path dir =
+        fs::temp_directory_path() / "cs_warm_ast_multi_command";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path source = dir / "multi.cpp";
+    {
+        std::ofstream file(source);
+        file << "int value() { return VALUE; }\n";
+    }
+    {
+        std::ofstream database(dir / "compile_commands.json");
+        database
+            << "[{\"directory\":\"" << dir.string()
+            << "\",\"arguments\":[\"clang++\",\"-DVALUE=1\",\""
+            << source.string() << "\"],\"file\":\""
+            << source.string() << "\"},"
+            << "{\"directory\":\"" << dir.string()
+            << "\",\"arguments\":[\"clang++\",\"-DVALUE=2\",\""
+            << source.string() << "\"],\"file\":\""
+            << source.string() << "\"}]\n";
+    }
+
+    SourceManager manager(dir.string());
+    manager.addSourceFile(source.string());
+    manager.enableWarmCache(true);
+    unsigned callbacks = 0;
+    EXPECT_EQ(manager.processAll(
+                  [&](clang::ASTContext&) { ++callbacks; }), 0);
+    EXPECT_EQ(callbacks, 2u);
+
+    SourceManager::clearWarmCache();
     fs::remove_all(dir, ec);
 }
 

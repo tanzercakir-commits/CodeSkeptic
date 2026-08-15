@@ -111,12 +111,42 @@ ResourceRunResult ResourceSupervisor::run(
     return runWithMemorySampler(program, arguments, limits, {});
 }
 
+ResourceRunResult ResourceSupervisor::runUntil(
+    const std::string& program,
+    const std::vector<std::string>& arguments,
+    ResourceLimits limits,
+    std::chrono::steady_clock::time_point deadline) {
+    return runWithMemorySamplerUntil(
+        program, arguments, limits, {}, deadline);
+}
+
 ResourceRunResult ResourceSupervisor::runWithMemorySampler(
     const std::string& program,
     const std::vector<std::string>& arguments,
     ResourceLimits limits,
     const MemorySampler& memory_sampler) {
+    const auto started = std::chrono::steady_clock::now();
+    const auto deadline = limits.timeout_seconds > 0
+        ? started + std::chrono::seconds(limits.timeout_seconds)
+        : std::chrono::steady_clock::time_point::max();
+    return runWithMemorySamplerUntil(
+        program, arguments, limits, memory_sampler, deadline);
+}
+
+ResourceRunResult ResourceSupervisor::runWithMemorySamplerUntil(
+    const std::string& program,
+    const std::vector<std::string>& arguments,
+    ResourceLimits limits,
+    const MemorySampler& memory_sampler,
+    std::chrono::steady_clock::time_point deadline) {
     ResourceRunResult result;
+    const auto started = std::chrono::steady_clock::now();
+    if (limits.timeout_seconds > 0 && started >= deadline) {
+        result.status = ResourceRunStatus::TimedOut;
+        result.exit_code = -2;
+        result.error = "worker deadline exhausted before launch";
+        return result;
+    }
     llvm::SmallString<128> unique_directory;
     const std::error_code directory_error =
         llvm::sys::fs::createUniqueDirectory("codeskeptic-resource-worker",
@@ -154,7 +184,6 @@ ResourceRunResult ResourceSupervisor::runWithMemorySampler(
 
     std::string error;
     bool execution_failed = false;
-    const auto started = std::chrono::steady_clock::now();
     const llvm::sys::ProcessInfo process = llvm::sys::ExecuteNoWait(
         program, args, std::nullopt, {}, 0, &error, &execution_failed);
     if (execution_failed || process.Pid == llvm::sys::ProcessInfo::InvalidPid) {
@@ -170,8 +199,6 @@ ResourceRunResult ResourceSupervisor::runWithMemorySampler(
                               : residentMemoryKiB(process);
     };
 
-    const auto deadline = started +
-        std::chrono::seconds(limits.timeout_seconds);
     const std::uint64_t memory_limit_kib =
         static_cast<std::uint64_t>(limits.memory_mib) * 1024u;
     bool timed_out = false;

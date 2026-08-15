@@ -323,6 +323,12 @@ class ProgressStatusTest(unittest.TestCase):
         for command in forbidden:
             with self.subTest(command=command):
                 self.assertNotIn(command, guard)
+        self.assertNotIn('echo "$changed" | grep', guard)
+        self.assertIn("grep -qE '^src/' <<< \"$changed\"", guard)
+        self.assertIn(
+            "grep -qxF 'docs/devlog/changelog.md' <<< \"$changed\"",
+            guard,
+        )
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -1,5 +1,113 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
+
+- Replaced the legacy timestamp/size AST shortcut with a parent-owned,
+  process-isolated unit evidence store. Exact keys bind the analyzer binary and
+  protocol, canonical source and compile-command ordinal, resolved source,
+  header, response/PCH/module/VFS and sibling-sidecar contents, semantic
+  configuration and enabled rules, ordered model/summary inputs, resource
+  limits, and analysis phase. Volatile date/time preprocessor inputs execute
+  normally without persistence, including definitions supplied directly or
+  through recursive response files. A Clang preprocessor callback observes
+  actual builtin expansion, so token-paste and macro indirection cannot evade
+  that boundary; isolated workers also expand nested `@response` arguments
+  under the same depth and size limits used by their evidence collector.
+  Lexical dependency aliases and resolved targets are both bound so
+  symlink-addressed `.csk` sidecars invalidate.
+- Added strict checksummed manifests and content-addressed unit payloads with
+  atomic publication, bounded parsers, symlink rejection, exact planned-phase
+  cardinality, and analyzer-identity checks before, during, and after a run.
+  Different valid keys are ordinary misses; a corrupt expected entry or an
+  incompatible explicitly selected checkpoint makes evidence unavailable with
+  exit `2` and cannot manufacture a clean verdict. A pre-created empty
+  checkpoint directory is initialized safely, while an existing manifest with
+  a missing or non-directory entry store is rejected. Manifest staging is
+  opened create-new without following symlinks; a regular file left by an
+  interrupted pre-rename write is recovered, while non-regular staging state
+  remains fail-closed and cannot truncate an external target.
+  Content-addressed entry staging likewise recovers only a real stale
+  directory. Analyzer file-id/change-time drift forces a full executable
+  SHA-256 comparison at lookup and completed-manifest publication, so a
+  same-size/restored-mtime mutation cannot pollute a later run.
+- Partitioned a configured long-lived MCP checkpoint root into deterministic
+  analyzer/configuration/translation-unit-plan namespaces. Sequential A, A, B,
+  A requests now prove executed, checkpoint, executed, checkpoint origins
+  without treating B as an incompatible explicit checkpoint or allowing a
+  request to choose the storage path.
+- Whole-program harvest fragments are persisted per exact unit, canonically
+  remerged, and bind every analysis-phase key through the merged-summary
+  digest. A dependency probe brackets every cache hit to reject TOCTOU drift;
+  source/header shadowing, sidecars, compile commands, models, summaries,
+  configuration, rules, and analyzer changes all have production-path
+  invalidation regressions. Probe, cache-hit verification, and cache-miss
+  execution share one absolute per-TU/phase wall-clock deadline, so enabling a
+  checkpoint cannot multiply the configured timeout; receipts measure the
+  complete logical pipeline. Parent-side input hashing, cache parsing, and
+  publication receive that same deadline, and a timed-out store rolls back
+  its completed manifest instead of leaving a reusable timed-out entry.
+- Interrupted production-worker analysis now preserves completed units and
+  resumes the same unchanged inputs without duplicate or omitted command,
+  ordinal, or phase identities. Resumed coverage, diagnostics, and semantic
+  fingerprints match a cold run while receipts separately report `executed`
+  and `checkpoint` origins. A prior accepted shard receipt validates resume
+  identity but never short-circuits checkout/build or substitutes its old
+  verdict: the current compile database is regenerated and every unit is
+  revalidated through the exact-key store. The real-world shard referee
+  validates the exact requested-path projection, every compile-command ordinal
+  and whole-program phase, and cross-repetition plan digest; it refuses
+  malformed, partial, or incompatible checkpoint evidence. Immutable Phase 8
+  receipts use one
+  explicit legacy validator because their historical schema predates plans;
+  current checkpoints and aggregation keep the strict default.
+- Split hosted checkpoint restore and save operations so an unavailable shard
+  still publishes its verified per-TU subset under an immutable run-attempt
+  key. A later rerun restores only from the exact commit, manifest, project,
+  and repetition prefix; workflow contracts pin the ordering and failure-path
+  save condition. Campaign receipt/checksum staging uses create-new,
+  no-follow writes; checksum-first publication from an empty pair makes either
+  regular crash orphan recoverable through the per-TU store, while symlink or
+  other non-regular state remains fail-closed.
+- Made the accepted-shard revalidation regression portable to macOS by
+  canonicalizing its temporary analyzer fixture before command matching.
+  macOS exposes the same temporary directory through `/var` and
+  `/private/var`; the production campaign path was already canonical and the
+  fixture now tests that path instead of rejecting a valid analyzer invocation.
+- Removed a long-diff race from the offline changelog guard. Its `pipefail`
+  pipeline previously let `grep -q` close early and turn the producer's
+  `SIGPIPE` into a false "changelog missing" result; direct here-string
+  matching preserves the exact file-list checks without a producer process.
+- Exact-source local qualification passes `1279/1279` direct C++ tests,
+  `1296/1296` repository-aware CTest entries, `67/67` focused cache/worker/MCP
+  cases, `52/52` status-automation cases, `25/25` real-world campaign cases,
+  and `21/21` upstream-evidence compatibility cases. The bound source manifest
+  contains `380` files with SHA-256
+  `21fcebaf569ca40c281ee07fdd170f2a0609be802ff3c66b8eb7b3df8767acc7`;
+  the independent source-stage audit passed.
+- Retained the exact-source frontend stress replay at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`: all nine
+  cases passed two deterministic repetitions with zero timeout/crash in
+  `709` ms. Its receipt SHA-256 is
+  `07273a9eaee1ec8b009958bc26aee8a5837f172074dd5c13397fdafa92d595e4`;
+  the 37-entry tree manifest SHA-256 is
+  `fe6694e1d8d7f6d936f44e33f2fb9d5265b6e9c0dec2efa09f25c8db2d280151`.
+- Retained independent ASAN and UBSAN trees at
+  `docs/evidence/phase10/sanitizers/2026-08-15-cache-linux-x86_64`.
+  Each passed all ten runtime gates, `1296/1296` CTest entries,
+  `1279/1279` direct C++ tests, representative analyzer/MCP paths, and four
+  fuzz targets against the same source manifest. ASAN completed in `157876`
+  ms with receipt SHA-256
+  `42263633fc03f8bd58b85dcc2cc292213bf951700d32cf60d243e6e958b0d4df`;
+  UBSAN completed in `129201` ms with receipt SHA-256
+  `c10f22153ad15a5470b31a9819851ff09b2e41f185ed3f776e9bfc0bdd891ba6`.
+  Both verify-only passes and the materialized `13/13` sanitizer contract
+  succeeded without skips; the `6/6` stress contract also passed without a
+  skip, and the 40-entry tree manifest SHA-256 is
+  `6a138ac43cd09d4c51ee3d9b75f6ea879335d811be021936bdf740743613ab64`.
+  The fresh independent final evidence audit passed. Commit/push and exact-head
+  hosted CI remain pending; this checkpoint does not close `CS-P10-06` or
+  write protected `main`.
+
 ## 2026-08-15 — Phase 10.5 per-TU resource budgets locally complete
 
 - Replaced in-process multi-TU execution with an exact-command coordinator and

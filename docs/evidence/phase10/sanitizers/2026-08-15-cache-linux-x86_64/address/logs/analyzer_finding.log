@@ -1,0 +1,9 @@
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+CodeSkeptic: 1 finding(s)
+----------------------------------------
+/work/docs/evidence/phase10/sanitizers/.staging-cache-linux-x86_64/address/fixture/clean/finding.cpp:1:56 [error] use-after-free: Use after free: 'p' is dereferenced after being freed
+    -> /work/docs/evidence/phase10/sanitizers/.staging-cache-linux-x86_64/address/fixture/clean/finding.cpp:1:17 'p' allocated here
+    -> /work/docs/evidence/phase10/sanitizers/.staging-cache-linux-x86_64/address/fixture/clean/finding.cpp:1:39 'p' freed here
+----------------------------------------
+CODESKEPTIC_SANITIZER_GATE_OK analyzer_finding

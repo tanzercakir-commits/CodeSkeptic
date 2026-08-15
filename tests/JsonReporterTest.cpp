@@ -83,7 +83,9 @@ TEST(JsonReporterTest, PublishesExactTranslationUnitReceipts) {
     result.analyzed_tus = 1;
     result.tu_receipts.push_back(TranslationUnitReceipt{
         "/project/a.cpp", std::string(64, 'a'), 3, "analysis",
-        TranslationUnitStatus::TimedOut, 1005, 24576, 1, 96});
+        TranslationUnitStatus::TimedOut, 1005, 24576, 1, 96,
+        TranslationUnitOrigin::Checkpoint, std::string(64, 'b'),
+        std::string(64, 'c')});
 
     const std::string json = readJsonReport(result);
 
@@ -101,4 +103,12 @@ TEST(JsonReporterTest, PublishesExactTranslationUnitReceipts) {
               std::string::npos);
     EXPECT_NE(json.find("\"timeout_seconds\": 1"), std::string::npos);
     EXPECT_NE(json.find("\"memory_mib\": 96"), std::string::npos);
+    EXPECT_NE(json.find("\"origin\": \"checkpoint\""),
+              std::string::npos);
+    EXPECT_NE(json.find("\"checkpoint_key_sha256\": \"" +
+                        std::string(64, 'b') + "\""),
+              std::string::npos);
+    EXPECT_NE(json.find("\"payload_sha256\": \"" +
+                        std::string(64, 'c') + "\""),
+              std::string::npos);
 }

@@ -11,7 +11,35 @@
 
 namespace codeskeptic {
 
-inline constexpr int kWorkerProtocolVersion = 1;
+inline constexpr int kWorkerProtocolVersion = 3;
+
+struct DependencyEvidence {
+    std::string canonical_path;
+    std::string content_sha256;
+    bool sidecar_exists = false;
+    std::string sidecar_sha256;
+
+    bool operator==(const DependencyEvidence& other) const {
+        return canonical_path == other.canonical_path &&
+               content_sha256 == other.content_sha256 &&
+               sidecar_exists == other.sidecar_exists &&
+               sidecar_sha256 == other.sidecar_sha256;
+    }
+};
+
+struct DependencyManifest {
+    std::string toolchain_identity_sha256;
+    std::vector<DependencyEvidence> files;
+    bool cacheable = true;
+    std::string sha256;
+
+    bool operator==(const DependencyManifest& other) const {
+        return toolchain_identity_sha256 ==
+                   other.toolchain_identity_sha256 &&
+               files == other.files && cacheable == other.cacheable &&
+               sha256 == other.sha256;
+    }
+};
 
 struct WorkerRequest {
     std::string request_id;
@@ -31,6 +59,7 @@ struct WorkerResponse {
     AnalysisResult analysis;
     DiagnosticList diagnostics;
     std::string summary_fragment_sha256;
+    DependencyManifest dependency_manifest;
 };
 
 bool writeWorkerRequest(const std::string& path,
@@ -48,6 +77,7 @@ bool readWorkerResponse(const std::string& path,
                         std::string& error);
 
 std::string sha256File(const std::string& path, std::string& error);
+std::string dependencyManifestSha256(const DependencyManifest& manifest);
 
 } // namespace codeskeptic
 

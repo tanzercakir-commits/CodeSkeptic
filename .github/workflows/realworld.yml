@@ -137,16 +137,19 @@ jobs:
           path: analyzer
 
       - name: Restore exact-identity checkpoint
-        uses: actions/cache@v4
+        id: restore-checkpoint
+        uses: actions/cache/restore@v4
         with:
           path: realworld-checkpoints
-          key: >-
-            realworld-v1-${{ github.sha }}-${{ hashFiles('scripts/realworld_manifest.json') }}-
-            ${{ matrix.project }}-${{ matrix.repetition }}
+          key: realworld-v2-${{ github.sha }}-${{ hashFiles('scripts/realworld_manifest.json') }}-${{ matrix.project }}-${{ matrix.repetition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            realworld-v2-${{ github.sha }}-${{ hashFiles('scripts/realworld_manifest.json') }}-${{ matrix.project }}-${{ matrix.repetition }}-
 
       - name: Run one independent project repetition
+        id: run-shard
         shell: bash
         run: |
+          mkdir -p "realworld-checkpoints/${{ matrix.project }}/repeat-${{ matrix.repetition }}"
           chmod +x analyzer/codeskeptic
           python3 scripts/run_realworld_campaign.py run \
             --project "${{ matrix.project }}" \
@@ -155,6 +158,13 @@ jobs:
             --workspace campaign-work \
             --output "evidence/${{ matrix.project }}/repeat-${{ matrix.repetition }}/receipt.json" \
             --checkpoint "realworld-checkpoints/${{ matrix.project }}/repeat-${{ matrix.repetition }}/receipt.json"
+
+      - name: Persist exact progress even when the shard is unavailable
+        if: ${{ always() && steps.run-shard.outcome != 'skipped' }}
+        uses: actions/cache/save@v4
+        with:
+          path: realworld-checkpoints
+          key: realworld-v2-${{ github.sha }}-${{ hashFiles('scripts/realworld_manifest.json') }}-${{ matrix.project }}-${{ matrix.repetition }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload shard evidence even when unavailable
         if: always()

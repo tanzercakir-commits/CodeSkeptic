@@ -296,6 +296,9 @@ json::Value runAnalyze(const json::Value& id, const json::Object* args,
             {"timeout_seconds",
              static_cast<int64_t>(receipt.timeout_seconds)},
             {"memory_mib", static_cast<int64_t>(receipt.memory_mib)},
+            {"origin", translationUnitOriginName(receipt.origin)},
+            {"checkpoint_key_sha256", receipt.checkpoint_key_sha256},
+            {"payload_sha256", receipt.payload_sha256},
         });
     }
 

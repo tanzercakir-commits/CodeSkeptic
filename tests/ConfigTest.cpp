@@ -243,6 +243,34 @@ TEST(ConfigTest, PerTuBudgetsLayerFromConfigThenCli) {
     EXPECT_EQ(config.tuMemoryMiB(), 2048u);
 }
 
+TEST(ConfigTest, CheckpointDirectoryLayersFromConfigThenCli) {
+    const auto path = writeConfig(
+        "codeskeptic_checkpoint.conf",
+        "checkpoint_dir = configured-checkpoints\n");
+    Config config;
+    ASSERT_TRUE(config.loadFromFile(path));
+    EXPECT_EQ(config.checkpointDir(), "configured-checkpoints");
+
+    ASSERT_TRUE(parse(config,
+                      {"codeskeptic", "--checkpoint-dir", "cli-checkpoints",
+                       "x.cpp"}));
+    EXPECT_EQ(config.checkpointDir(), "cli-checkpoints");
+}
+
+TEST(ConfigTest, CheckpointDirectoryRejectsEmptyValuesAtomically) {
+    Config cli;
+    const Config cli_before = cli;
+    EXPECT_FALSE(parse(cli,
+                       {"codeskeptic", "--checkpoint-dir", "", "x.cpp"}));
+    EXPECT_EQ(cli, cli_before);
+
+    Config file;
+    const Config file_before = file;
+    EXPECT_FALSE(file.loadFromText("checkpoint_dir =   \n",
+                                   "checkpoint-test"));
+    EXPECT_EQ(file, file_before);
+}
+
 TEST(ConfigTest, McpRequestConfigKeepsPolicyButClearsParentWork) {
     const auto files = writeConfig(
         "codeskeptic_mcp_parent_files.txt", "parent-a.cpp\nparent-b.cpp\n");
@@ -256,7 +284,8 @@ TEST(ConfigTest, McpRequestConfigKeepsPolicyButClearsParentWork) {
         "10-20", "--summary-in", "parent.csk", "--summary-out",
         "parent-out.csk", "--summary-diff", "old.csk", "new.csk",
         "--model-file", "model.csk", "--tu-timeout-seconds", "17",
-        "--tu-memory-mib", "768", "--files", files.c_str()}));
+        "--tu-memory-mib", "768", "--checkpoint-dir", "checkpoints",
+        "--files", files.c_str()}));
     base.setWorkerProgram("codeskeptic-worker");
 
     const Config scoped = base.mcpRequestConfig();
@@ -281,6 +310,8 @@ TEST(ConfigTest, McpRequestConfigKeepsPolicyButClearsParentWork) {
     EXPECT_EQ(scoped.modelFiles()[0], "model.csk");
     EXPECT_EQ(scoped.tuTimeoutSeconds(), 17u);
     EXPECT_EQ(scoped.tuMemoryMiB(), 768u);
+    EXPECT_EQ(scoped.checkpointDir(), "checkpoints");
+    EXPECT_TRUE(scoped.checkpointPerRunNamespace());
     EXPECT_EQ(scoped.workerProgram(), "codeskeptic-worker");
 }
 

@@ -1,0 +1,63 @@
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1001
+INFO: Loaded 1 modules   (2606 inline 8-bit counters): 2606 [0x558820de5ff8, 0x558820de6a26), 
+INFO: Loaded 1 PC tables (2606 PCs): 2606 [0x558820de6a28,0x558820df0d08), 
+INFO:        2 files found in /work/docs/evidence/phase10/sanitizers/.staging-cache-linux-x86_64/address/codeskeptic-fuzz-7ekl68lg/corpus/config
+INFO: seed corpus: files: 2 min: 81b max: 124b total: 205b rss: 84Mb
+#3	INITED cov: 264 ft: 310 corp: 2/205b exec/s: 0 rss: 85Mb
+#4	NEW    cov: 266 ft: 320 corp: 3/329b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 CrossOver-
+#5	NEW    cov: 266 ft: 322 corp: 4/453b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 ChangeBinInt-
+#6	NEW    cov: 267 ft: 323 corp: 5/577b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 ChangeByte-
+#7	NEW    cov: 269 ft: 336 corp: 6/701b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 CrossOver-
+#8	NEW    cov: 269 ft: 340 corp: 7/782b lim: 124 exec/s: 0 rss: 85Mb L: 81/124 MS: 1 ShuffleBytes-
+#9	NEW    cov: 270 ft: 341 corp: 8/906b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 ChangeBit-
+#10	NEW    cov: 274 ft: 345 corp: 9/1030b lim: 124 exec/s: 0 rss: 85Mb L: 124/124 MS: 1 CopyPart-
+#12	NEW    cov: 281 ft: 370 corp: 10/1152b lim: 124 exec/s: 0 rss: 85Mb L: 122/124 MS: 2 CrossOver-CrossOver-
+#13	NEW    cov: 282 ft: 373 corp: 11/1274b lim: 124 exec/s: 0 rss: 85Mb L: 122/124 MS: 1 ChangeBinInt-
+#16	NEW    cov: 282 ft: 374 corp: 12/1337b lim: 124 exec/s: 0 rss: 85Mb L: 63/124 MS: 3 ChangeBit-ChangeBinInt-EraseBytes-
+#20	NEW    cov: 285 ft: 378 corp: 13/1461b lim: 124 exec/s: 0 rss: 86Mb L: 124/124 MS: 4 ChangeBit-CMP-ChangeBinInt-CrossOver- DE: "unknown_key"-
+#21	NEW    cov: 286 ft: 450 corp: 14/1552b lim: 124 exec/s: 0 rss: 86Mb L: 91/124 MS: 1 InsertRepeatedBytes-
+#23	NEW    cov: 286 ft: 455 corp: 15/1676b lim: 124 exec/s: 0 rss: 86Mb L: 124/124 MS: 2 ChangeByte-ShuffleBytes-
+#26	NEW    cov: 292 ft: 466 corp: 16/1800b lim: 124 exec/s: 0 rss: 86Mb L: 124/124 MS: 3 ShuffleBytes-ChangeBit-CopyPart-
+#34	NEW    cov: 292 ft: 468 corp: 17/1924b lim: 124 exec/s: 0 rss: 86Mb L: 124/124 MS: 3 ChangeBit-ChangeBit-ShuffleBytes-
+#35	NEW    cov: 292 ft: 470 corp: 18/2048b lim: 124 exec/s: 0 rss: 86Mb L: 124/124 MS: 1 PersAutoDict- DE: "unknown_key"-
+#39	NEW    cov: 292 ft: 471 corp: 19/2162b lim: 124 exec/s: 0 rss: 86Mb L: 114/124 MS: 4 ShuffleBytes-PersAutoDict-EraseBytes-PersAutoDict- DE: "unknown_key"-"unknown_key"-
+#40	NEW    cov: 292 ft: 485 corp: 20/2195b lim: 124 exec/s: 0 rss: 86Mb L: 33/124 MS: 1 CrossOver-
+#57	NEW    cov: 292 ft: 491 corp: 21/2312b lim: 124 exec/s: 0 rss: 87Mb L: 117/124 MS: 2 ChangeBinInt-EraseBytes-
+#61	NEW    cov: 292 ft: 501 corp: 22/2435b lim: 124 exec/s: 0 rss: 87Mb L: 123/124 MS: 4 ChangeBit-ChangeByte-CopyPart-CrossOver-
+#63	REDUCE cov: 292 ft: 501 corp: 22/2417b lim: 124 exec/s: 0 rss: 87Mb L: 104/124 MS: 2 ChangeBit-EraseBytes-
+#66	REDUCE cov: 292 ft: 501 corp: 22/2410b lim: 124 exec/s: 0 rss: 87Mb L: 117/124 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#69	NEW    cov: 293 ft: 502 corp: 23/2534b lim: 124 exec/s: 0 rss: 87Mb L: 124/124 MS: 3 ShuffleBytes-ChangeByte-CopyPart-
+#70	REDUCE cov: 293 ft: 502 corp: 23/2506b lim: 124 exec/s: 0 rss: 87Mb L: 96/124 MS: 1 EraseBytes-
+#77	NEW    cov: 293 ft: 504 corp: 24/2630b lim: 124 exec/s: 0 rss: 88Mb L: 124/124 MS: 2 PersAutoDict-CrossOver- DE: "unknown_key"-
+#78	NEW    cov: 294 ft: 513 corp: 25/2711b lim: 124 exec/s: 0 rss: 88Mb L: 81/124 MS: 1 CopyPart-
+#79	NEW    cov: 295 ft: 515 corp: 26/2808b lim: 124 exec/s: 0 rss: 88Mb L: 97/124 MS: 1 EraseBytes-
+#86	NEW    cov: 298 ft: 518 corp: 27/2932b lim: 124 exec/s: 0 rss: 88Mb L: 124/124 MS: 2 ChangeBinInt-CopyPart-
+#89	NEW    cov: 300 ft: 524 corp: 28/3006b lim: 124 exec/s: 0 rss: 88Mb L: 74/124 MS: 3 InsertRepeatedBytes-ShuffleBytes-EraseBytes-
+#90	REDUCE cov: 300 ft: 524 corp: 28/2995b lim: 124 exec/s: 0 rss: 88Mb L: 113/124 MS: 1 EraseBytes-
+#94	NEW    cov: 301 ft: 525 corp: 29/3077b lim: 124 exec/s: 0 rss: 88Mb L: 82/124 MS: 4 ChangeBinInt-ShuffleBytes-InsertByte-CrossOver-
+#106	NEW    cov: 301 ft: 526 corp: 30/3201b lim: 124 exec/s: 0 rss: 89Mb L: 124/124 MS: 2 CrossOver-CopyPart-
+#111	NEW    cov: 301 ft: 528 corp: 31/3218b lim: 124 exec/s: 0 rss: 89Mb L: 17/124 MS: 5 CrossOver-ChangeByte-EraseBytes-InsertRepeatedBytes-CrossOver-
+#127	REDUCE cov: 301 ft: 528 corp: 31/3203b lim: 124 exec/s: 0 rss: 89Mb L: 109/124 MS: 1 CrossOver-
+#132	NEW    cov: 301 ft: 529 corp: 32/3281b lim: 124 exec/s: 0 rss: 90Mb L: 78/124 MS: 5 PersAutoDict-PersAutoDict-ChangeBit-CrossOver-CrossOver- DE: "unknown_key"-"unknown_key"-
+#134	NEW    cov: 301 ft: 530 corp: 33/3379b lim: 124 exec/s: 0 rss: 90Mb L: 98/124 MS: 2 EraseBytes-CrossOver-
+#135	REDUCE cov: 301 ft: 530 corp: 33/3377b lim: 124 exec/s: 0 rss: 90Mb L: 107/124 MS: 1 EraseBytes-
+#138	NEW    cov: 302 ft: 531 corp: 34/3501b lim: 124 exec/s: 0 rss: 90Mb L: 124/124 MS: 3 PersAutoDict-ShuffleBytes-ChangeByte- DE: "unknown_key"-
+#142	NEW    cov: 302 ft: 532 corp: 35/3548b lim: 124 exec/s: 0 rss: 90Mb L: 47/124 MS: 4 ChangeBinInt-ChangeBinInt-CrossOver-ShuffleBytes-
+#147	NEW    cov: 302 ft: 533 corp: 36/3671b lim: 124 exec/s: 0 rss: 90Mb L: 123/124 MS: 5 ChangeByte-CopyPart-ChangeBit-ChangeBinInt-ChangeBinInt-
+#153	NEW    cov: 305 ft: 536 corp: 37/3795b lim: 124 exec/s: 0 rss: 90Mb L: 124/124 MS: 1 InsertByte-
+#158	NEW    cov: 309 ft: 546 corp: 38/3906b lim: 124 exec/s: 0 rss: 90Mb L: 111/124 MS: 5 CopyPart-ChangeBit-CopyPart-InsertByte-CopyPart-
+#160	REDUCE cov: 309 ft: 546 corp: 38/3880b lim: 124 exec/s: 0 rss: 90Mb L: 98/124 MS: 2 CopyPart-EraseBytes-
+#161	NEW    cov: 309 ft: 547 corp: 39/3991b lim: 124 exec/s: 0 rss: 90Mb L: 111/124 MS: 1 ChangeByte-
+#189	REDUCE cov: 309 ft: 547 corp: 39/3981b lim: 124 exec/s: 0 rss: 91Mb L: 103/124 MS: 3 ChangeByte-ShuffleBytes-EraseBytes-
+#207	NEW    cov: 309 ft: 550 corp: 40/4105b lim: 124 exec/s: 0 rss: 91Mb L: 124/124 MS: 3 ChangeBit-CopyPart-CopyPart-
+#217	NEW    cov: 309 ft: 551 corp: 41/4229b lim: 124 exec/s: 0 rss: 91Mb L: 124/124 MS: 5 ShuffleBytes-ChangeByte-CMP-ChangeBit-CrossOver- DE: "untrusted_int_sources"-
+#224	REDUCE cov: 309 ft: 551 corp: 41/4184b lim: 124 exec/s: 0 rss: 91Mb L: 62/124 MS: 2 CrossOver-CrossOver-
+#241	REDUCE cov: 311 ft: 554 corp: 42/4288b lim: 124 exec/s: 0 rss: 92Mb L: 104/124 MS: 2 ChangeByte-InsertByte-
+#247	NEW    cov: 314 ft: 560 corp: 43/4412b lim: 124 exec/s: 0 rss: 92Mb L: 124/124 MS: 1 CrossOver-
+#256	DONE   cov: 314 ft: 560 corp: 43/4412b lim: 124 exec/s: 0 rss: 92Mb
+###### Recommended dictionary. ######
+"unknown_key" # Uses: 17
+"untrusted_int_sources" # Uses: 1
+###### End of recommended dictionary. ######
+Done 256 runs in 0 second(s)
