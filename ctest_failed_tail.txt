@@ -1,0 +1,39 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1038: BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath
+1/1 Test #1038: BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath ...***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath
+[CodeSkeptic] compile_commands.json not found: fixed-compilation-database: Error while opening fixed database: no such file or directory
+json-compilation-database: Error while opening JSON database: no such file or directory
+
+[CodeSkeptic] Fallback: continuing with -std=c++17.
+[CodeSkeptic] File not found: C:\Users\RUNNER~1\AppData\Local\Temp\codeskeptic_missing_execution_plan\missing.cpp
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(429): error: Expected equality of these values:
+  units[0].canonical_path
+    Which is: "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\codeskeptic_missing_execution_plan\\missing.cpp"
+  std::filesystem::absolute(missing).lexically_normal().string()
+    Which is: "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\codeskeptic_missing_execution_plan\\missing.cpp"
+
+[  FAILED  ] BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath (1 ms)
+[----------] 1 test from BrokenTuTest (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.06 sec
+
+The following tests FAILED:
+	1038 - BrokenTuTest.ExecutionPlanRetainsMissingRequestedPath (Failed)
+Errors while running CTest
