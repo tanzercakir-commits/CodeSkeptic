@@ -6,9 +6,11 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -111,9 +113,38 @@ def accepted_receipt(
             "fingerprints": ["csf1-0000000000000001"],
             "fingerprint_sha256": expected["fingerprint_sha256"],
         },
-        "execution": {"duration_seconds": 1.25, "resumed": False},
+        "execution": {
+            "duration_seconds": 1.25,
+            "resumed": False,
+            "translation_unit_plan": {
+                "count": expected["translation_units"],
+                "sha256": "d" * 64,
+                "executed": expected["translation_units"],
+                "checkpoint": 0,
+            },
+        },
         "failures": [],
     }
+
+
+def translation_unit_receipts(count: int) -> list[dict]:
+    return [
+        {
+            "path": f"/tmp/unit-{index}.c",
+            "compile_command_sha256": f"{index + 1:064x}",
+            "command_ordinal": 0,
+            "phase": "analysis",
+            "status": "completed",
+            "duration_ms": 10,
+            "peak_memory_kib": 1024,
+            "timeout_seconds": 30,
+            "memory_mib": 4096,
+            "origin": "executed",
+            "checkpoint_key_sha256": "",
+            "payload_sha256": "",
+        }
+        for index in range(count)
+    ]
 
 
 class ManifestContractTest(unittest.TestCase):
@@ -550,10 +581,13 @@ class ManifestContractTest(unittest.TestCase):
 
 
 class EvidenceContractTest(unittest.TestCase):
-    def test_whole_program_coverage_pins_extra_analysis_executions(self) -> None:
+    def test_multi_command_coverage_pins_extra_analysis_executions(self) -> None:
         manifest = fixture_manifest()
         manifest["projects"][0]["expected"]["analyzed_tus"] = 3
         project = campaign.validate_manifest(manifest)["projects"][0]
+        receipts = translation_unit_receipts(3)
+        receipts[2]["path"] = receipts[0]["path"]
+        receipts[2]["command_ordinal"] = 1
         report = {
             "complete": True,
             "exit_code": 1,
@@ -565,12 +599,58 @@ class EvidenceContractTest(unittest.TestCase):
                 "incomplete_functions": 0,
             },
             "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
+            "translation_units": receipts,
         }
 
         semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
 
         self.assertEqual(semantic["coverage"]["attempted_tus"], 2)
         self.assertEqual(semantic["coverage"]["analyzed_tus"], 3)
+
+    def test_whole_program_requires_both_exact_phase_sets(self) -> None:
+        manifest = fixture_manifest()
+        manifest["projects"][0]["analyzer_args"].append("--whole-program")
+        project = campaign.validate_manifest(manifest)["projects"][0]
+        analysis = translation_unit_receipts(2)
+        report = {
+            "complete": True,
+            "exit_code": 1,
+            "total": 1,
+            "coverage": {
+                "attempted_tus": 2,
+                "analyzed_tus": 2,
+                "broken_tus": 0,
+                "incomplete_functions": 0,
+            },
+            "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
+            "translation_units": analysis,
+        }
+
+        with self.assertRaisesRegex(campaign.EvidenceError, "phases"):
+            campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
+
+        harvest = copy.deepcopy(analysis)
+        for receipt in harvest:
+            receipt["phase"] = "summary-harvest"
+        report["translation_units"] = harvest + analysis
+        semantic = campaign.semantic_from_report(
+            project, 1, report, 2, "a" * 64
+        )
+        self.assertEqual(semantic["coverage"]["analyzed_tus"], 2)
+
+    def test_plan_requires_every_requested_path_with_multi_command_units(self) -> None:
+        receipts = translation_unit_receipts(2)
+        receipts[1]["path"] = receipts[0]["path"]
+        receipts[1]["command_ordinal"] = 1
+        report = {"translation_units": receipts}
+
+        with self.assertRaisesRegex(campaign.EvidenceError, "path omission"):
+            campaign.translation_unit_plan(
+                report,
+                2,
+                2,
+                [Path("/tmp/unit-0.c"), Path("/tmp/unit-1.c")],
+            )
 
     def test_report_requires_complete_exact_coverage_and_verdict(self) -> None:
         project = fixture_manifest()["projects"][0]
@@ -585,6 +665,7 @@ class EvidenceContractTest(unittest.TestCase):
                 "incomplete_functions": 0,
             },
             "diagnostics": [{"fingerprint": "csf1-0000000000000001"}],
+            "translation_units": translation_unit_receipts(2),
         }
         semantic = campaign.semantic_from_report(project, 1, report, 2, "a" * 64)
         self.assertEqual(semantic["findings"], 1)
@@ -604,7 +685,16 @@ class EvidenceContractTest(unittest.TestCase):
         broken = copy.deepcopy(report)
         broken["coverage"]["analyzed_tus"] = 1
         with self.assertRaisesRegex(campaign.EvidenceError, "exact TU coverage"):
-            campaign.semantic_from_report(project, 1, broken, 2, "a" * 64)
+                campaign.semantic_from_report(project, 1, broken, 2, "a" * 64)
+
+        duplicate = copy.deepcopy(report)
+        duplicate["translation_units"][1] = copy.deepcopy(
+            duplicate["translation_units"][0]
+        )
+        with self.assertRaisesRegex(campaign.EvidenceError, "duplicate"):
+            campaign.semantic_from_report(
+                project, 1, duplicate, 2, "a" * 64
+            )
 
     def test_receipt_checksum_and_checkpoint_identity_fail_closed(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
@@ -623,6 +713,221 @@ class EvidenceContractTest(unittest.TestCase):
             with self.assertRaisesRegex(campaign.EvidenceError, "checksum"):
                 campaign.load_verified_receipt(path)
 
+    def test_receipt_staging_and_read_symlinks_fail_without_escape(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        receipt = accepted_receipt(manifest, 1)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "receipt.json"
+            outside = root / "outside.txt"
+            outside.write_text("sentinel\n", encoding="utf-8")
+            (root / ".receipt.json.tmp").symlink_to(outside)
+
+            with self.assertRaisesRegex(campaign.EvidenceError, "staging"):
+                campaign.write_receipt(path, receipt)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "sentinel\n")
+
+            (root / ".receipt.json.tmp").unlink()
+            campaign.write_receipt(path, receipt)
+            real_receipt = root / "real-receipt.json"
+            path.replace(real_receipt)
+            path.symlink_to(real_receipt)
+            with self.assertRaisesRegex(campaign.EvidenceError, "regular"):
+                campaign.load_verified_receipt(path)
+
+    def test_explicit_checkpoint_mismatch_and_partial_pair_fail_closed(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        receipt = accepted_receipt(manifest, 1)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "checkpoint" / "receipt.json"
+            self.assertIsNone(
+                campaign.load_matching_checkpoint(
+                    path, receipt["identity"], manifest["projects"][0]
+                )
+            )
+
+            campaign.write_receipt(path, receipt)
+            stale = copy.deepcopy(receipt["identity"])
+            stale["analyzer_sha256"] = "c" * 64
+            with self.assertRaisesRegex(campaign.EvidenceError, "incompatible"):
+                campaign.load_matching_checkpoint(
+                    path, stale, manifest["projects"][0]
+                )
+
+            path.with_suffix(".json.sha256").unlink()
+            self.assertIsNone(campaign.load_matching_checkpoint(
+                path, receipt["identity"], manifest["projects"][0]
+            ))
+            self.assertFalse(path.exists())
+
+            campaign.write_receipt(path, receipt)
+            path.unlink()
+            sidecar = path.with_suffix(".json.sha256")
+            self.assertTrue(sidecar.is_file())
+            self.assertIsNone(campaign.load_matching_checkpoint(
+                path, receipt["identity"], manifest["projects"][0]
+            ))
+            self.assertFalse(sidecar.exists())
+
+            for mutation, expected in (
+                (("project", "forged"), "shard identity"),
+                (("repetition", 2), "shard identity"),
+            ):
+                malformed = copy.deepcopy(receipt)
+                malformed[mutation[0]] = mutation[1]
+                campaign.write_receipt(path, malformed)
+                with self.assertRaisesRegex(campaign.EvidenceError, expected):
+                    campaign.load_matching_checkpoint(
+                        path, receipt["identity"], manifest["projects"][0]
+                    )
+
+            malformed = copy.deepcopy(receipt)
+            malformed["execution"]["duration_seconds"] = "fast"
+            campaign.write_receipt(path, malformed)
+            with self.assertRaisesRegex(campaign.EvidenceError, "execution"):
+                campaign.load_matching_checkpoint(
+                    path, receipt["identity"], manifest["projects"][0]
+                )
+
+            malformed = copy.deepcopy(receipt)
+            malformed["execution"]["translation_unit_plan"]["count"] += 1
+            malformed["execution"]["translation_unit_plan"]["executed"] += 1
+            campaign.write_receipt(path, malformed)
+            with self.assertRaisesRegex(campaign.EvidenceError, "inconsistent"):
+                campaign.load_matching_checkpoint(
+                    path, receipt["identity"], manifest["projects"][0]
+                )
+
+    def test_analyzer_checkpoint_directory_is_stable_and_parent_scoped(self) -> None:
+        checkpoint = Path("root/project/repeat-1/receipt.json")
+        self.assertEqual(
+            campaign.analyzer_checkpoint_arguments(checkpoint),
+            ["--checkpoint-dir", "root/project/repeat-1/unit-evidence"],
+        )
+        self.assertEqual(campaign.analyzer_checkpoint_arguments(None), [])
+
+    def test_accepted_shard_receipt_revalidates_current_execution_plan(self) -> None:
+        raw_manifest = fixture_manifest()
+        relative_files = ["src/a.c", "src/b.c"]
+        raw_manifest["projects"][0]["expected"]["translation_unit_sha256"] = (
+            campaign.translation_unit_digest(relative_files)
+        )
+        manifest = campaign.validate_manifest(raw_manifest)
+        project = manifest["projects"][0]
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            analyzer = root / "codeskeptic"
+            analyzer.write_bytes(b"fixture analyzer")
+            analyzer_sha = campaign.file_digest(analyzer)
+            checkpoint = root / "checkpoint" / "receipt.json"
+            prior = accepted_receipt(manifest, 1, analyzer_sha=analyzer_sha)
+            campaign.write_receipt(checkpoint, prior)
+            output = root / "output" / "receipt.json"
+            files = [root / "work" / "alpha" / path for path in relative_files]
+            analyzer_invocations: list[list[str]] = []
+
+            def fake_command(command, cwd, deadline, memory_mb, log_path, env=None):
+                del cwd, deadline, memory_mb, log_path, env
+                if command and command[0] == str(analyzer):
+                    analyzer_invocations.append(command)
+                    report = {
+                        "complete": True,
+                        "exit_code": 1,
+                        "total": 1,
+                        "coverage": {
+                            "attempted_tus": 2,
+                            "analyzed_tus": 2,
+                            "broken_tus": 0,
+                            "incomplete_functions": 0,
+                        },
+                        "diagnostics": [
+                            {"fingerprint": "csf1-0000000000000001"}
+                        ],
+                        "translation_units": translation_unit_receipts(2),
+                    }
+                    for index, receipt in enumerate(report["translation_units"]):
+                        receipt["path"] = str(files[index])
+                        receipt["origin"] = "checkpoint" if index == 0 else "executed"
+                        receipt["checkpoint_key_sha256"] = f"{index + 3:064x}"
+                        receipt["payload_sha256"] = f"{index + 5:064x}"
+                    report_path = Path(command[command.index("--json") + 1])
+                    report_path.write_text(json.dumps(report), encoding="utf-8")
+                    return subprocess.CompletedProcess(command, 1)
+                return subprocess.CompletedProcess(command, 0)
+
+            revision_result = subprocess.CompletedProcess(
+                ["git", "rev-parse", "HEAD"], 0, stdout=project["revision"] + "\n"
+            )
+            with (
+                mock.patch.object(campaign, "_run_command", side_effect=fake_command),
+                mock.patch.object(
+                    campaign.subprocess, "run", return_value=revision_result
+                ),
+                mock.patch.object(
+                    campaign,
+                    "_derive_translation_units",
+                    return_value=(files, relative_files),
+                ),
+                mock.patch.object(
+                    campaign,
+                    "_submodule_identity",
+                    return_value=campaign._expected_submodules(project),
+                ),
+            ):
+                code = campaign.run_shard(
+                    manifest,
+                    "alpha",
+                    1,
+                    analyzer,
+                    root / "work",
+                    output,
+                    checkpoint,
+                    ROOT,
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(len(analyzer_invocations), 1)
+            receipt = campaign.load_verified_receipt(output)
+            self.assertNotEqual(
+                receipt["execution"]["translation_unit_plan"]["sha256"],
+                prior["execution"]["translation_unit_plan"]["sha256"],
+            )
+            self.assertEqual(
+                receipt["execution"]["translation_unit_plan"]["checkpoint"], 1
+            )
+            self.assertTrue(receipt["execution"]["resumed"])
+
+    def test_legacy_execution_plan_exception_is_explicit_and_uniform(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        receipts = [accepted_receipt(manifest, repetition) for repetition in (1, 2, 3)]
+        for receipt in receipts:
+            del receipt["execution"]["translation_unit_plan"]
+
+        with self.assertRaisesRegex(campaign.EvidenceError, "execution evidence"):
+            campaign.validate_receipt_group(
+                manifest, "nightly", "alpha", receipts
+            )
+        summary = campaign.validate_receipt_group(
+            manifest,
+            "nightly",
+            "alpha",
+            receipts,
+            require_execution_plan=False,
+        )
+        self.assertEqual(summary["repetitions"], 3)
+
+        receipts[1] = accepted_receipt(manifest, 2)
+        with self.assertRaisesRegex(campaign.EvidenceError, "execution schemas"):
+            campaign.validate_receipt_group(
+                manifest,
+                "nightly",
+                "alpha",
+                receipts,
+                require_execution_plan=False,
+            )
+
     def test_aggregate_requires_three_identical_accepted_repetitions(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
@@ -635,6 +940,28 @@ class EvidenceContractTest(unittest.TestCase):
             summary = campaign.aggregate_receipts(manifest, "nightly", root)
             self.assertEqual(summary["status"], "accepted")
             self.assertEqual(summary["projects"]["alpha"]["repetitions"], 3)
+
+            malformed_plan = accepted_receipt(manifest, 2)
+            malformed_plan["execution"]["translation_unit_plan"]["count"] += 1
+            malformed_plan["execution"]["translation_unit_plan"]["executed"] += 1
+            campaign.write_receipt(
+                root / "alpha" / "repeat-2" / "receipt.json", malformed_plan
+            )
+            with self.assertRaisesRegex(campaign.EvidenceError, "inconsistent"):
+                campaign.aggregate_receipts(manifest, "nightly", root)
+
+            plan_drift = accepted_receipt(manifest, 2)
+            plan_drift["execution"]["translation_unit_plan"]["sha256"] = "e" * 64
+            campaign.write_receipt(
+                root / "alpha" / "repeat-2" / "receipt.json", plan_drift
+            )
+            with self.assertRaisesRegex(campaign.EvidenceError, "plans are nondeterministic"):
+                campaign.aggregate_receipts(manifest, "nightly", root)
+
+            campaign.write_receipt(
+                root / "alpha" / "repeat-2" / "receipt.json",
+                accepted_receipt(manifest, 2),
+            )
 
             missing = root / "alpha" / "repeat-3" / "receipt.json"
             missing.unlink()
@@ -778,6 +1105,31 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("timeout-minutes: 355", realworld)
         self.assertIn("if: always()", realworld)
         self.assertIn("run_realworld_campaign.py aggregate", realworld)
+        self.assertNotIn("uses: actions/cache@v4", realworld)
+        self.assertIn("uses: actions/cache/restore@v4", realworld)
+        self.assertIn("uses: actions/cache/save@v4", realworld)
+        self.assertIn("github.run_id", realworld)
+        self.assertIn("github.run_attempt", realworld)
+        self.assertIn("restore-keys: |", realworld)
+        self.assertIn(
+            "if: ${{ always() && steps.run-shard.outcome != 'skipped' }}",
+            realworld,
+        )
+        self.assertIn(
+            'mkdir -p "realworld-checkpoints/${{ matrix.project }}/repeat-${{ matrix.repetition }}"',
+            realworld,
+        )
+        self.assertNotIn(
+            'repeat-${{ matrix.repetition }}/unit-evidence"', realworld
+        )
+        self.assertLess(
+            realworld.index("uses: actions/cache/restore@v4"),
+            realworld.index("id: run-shard"),
+        )
+        self.assertLess(
+            realworld.index("id: run-shard"),
+            realworld.index("uses: actions/cache/save@v4"),
+        )
         self.assertNotIn("pull_request_target", realworld)
         self.assertNotIn("continue-on-error", realworld)
 

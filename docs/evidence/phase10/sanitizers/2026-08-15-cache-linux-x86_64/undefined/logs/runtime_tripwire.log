@@ -1,0 +1,4 @@
+/work/tests/sanitizer/UndefinedTripwire.cpp:6:20: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
+
+SANITIZER MATRIX WALL TIMEOUT
+CODESKEPTIC_SANITIZER_GATE_OK runtime_tripwire

@@ -271,9 +271,34 @@ repetition with `fail-fast: false`. Every shard writes a checksummed receipt,
 including an explicit unavailable receipt on analyzer or evidence failure. A
 separate aggregate referee verifies checksums, identities, exact coverage, and
 three-way semantic equality; duration and host metadata do not weaken or alter
-that equality. A checkpoint is reused only when its manifest, project,
+that equality. A prior accepted shard receipt validates explicit resume
+identity but is never reused as a verdict: the shard rebuilds its current
+compile database and re-enters the analyzer's per-unit validation path. A
+checkpoint unit is reused only when its manifest, project,
 revision, recipe, analyzer, translation-unit, and repetition identities all
-match.
+match. Within a shard, the analyzer additionally binds every execution unit to
+its exact compile-command ordinal and phase, resolved dependency-content
+manifest, semantic configuration and rules, analyzer binary, model/summary
+inputs, and resource limits. Resumed and cold runs must have the same coverage,
+diagnostics, and semantic fingerprint projection; execution origin is retained
+only as telemetry. The referee also proves that every requested path appears
+in every required phase, while allowing multiple compile-command ordinals for
+one path, and requires the exact plan digest to agree across repetitions.
+Corrupt or explicitly incompatible state is rejected with an unavailable
+verdict rather than converted into a cold success.
+Manifest staging uses create-new publication and resumes only a regular
+interruption remainder; symlinks and other non-regular staging inputs fail
+closed. Dependency probing plus either cache verification or miss execution
+also consumes one shared absolute per-TU/phase deadline, and receipt duration
+measures that combined pipeline rather than separate timeout windows.
+Analyzer file-id/change-time drift forces a full executable SHA-256 check at
+cache lookup and completed-manifest publication, including same-size and
+restored-mtime changes. Campaign receipt/checksum publication uses no-follow
+create-new staging; a single regular crash orphan is discarded so the exact
+per-TU checkpoint can resume, while non-regular state is rejected.
+GitHub orchestration restores by that exact identity prefix and publishes a
+new immutable run-attempt checkpoint even when the analyzer reports an
+unavailable shard, allowing the next rerun to retain completed unit evidence.
 
 ## Reading the real-world scan numbers
 

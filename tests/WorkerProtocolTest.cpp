@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <set>
 
 using namespace codeskeptic;
 
@@ -60,6 +61,74 @@ TEST(WorkerProtocolTest, RequestRoundTripPreservesExactCommandIdentity) {
               expected.summary_fragment_path);
 }
 
+TEST(WorkerRuntimeTest, CompileCommandEvidenceBindsNestedAndBinaryInputs) {
+    const auto root = tempPath("codeskeptic-worker-command-inputs");
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    ASSERT_TRUE(std::filesystem::create_directories(root));
+    const auto write = [&root](const char* name, const char* contents) {
+        std::ofstream output(root / name,
+                             std::ios::binary | std::ios::trunc);
+        output << contents;
+    };
+    write("nested.rsp", "-DVALUE=1\n");
+    write("outer.rsp", "@nested.rsp -Wall\n");
+    write("state.pch", "pch-v1\n");
+    write("module.pcm", "module-v1\n");
+    write("module.modulemap", "module Auxiliary {}\n");
+    write("overlay.yaml", "{ 'version': 0, 'roots': [] }\n");
+
+    TranslationUnitExecution unit;
+    unit.working_directory = root.string();
+    unit.command_line = {
+        "clang++", "@outer.rsp", "-include-pch", "state.pch",
+        "-fmodule-file=Core=module.pcm",
+        "-fmodule-map-file=module.modulemap", "-ivfsoverlay",
+        "overlay.yaml", "main.cpp"};
+    std::vector<DependencyEvidence> first;
+    std::string error;
+    bool volatile_input = false;
+    ASSERT_TRUE(collectCompileCommandDependencyEvidence(
+        unit, first, error, &volatile_input))
+        << error;
+    EXPECT_FALSE(volatile_input);
+    std::set<std::string> names;
+    for (const auto& item : first)
+        names.insert(std::filesystem::path(item.canonical_path)
+                         .filename().string());
+    EXPECT_EQ(names,
+              (std::set<std::string>{"nested.rsp", "outer.rsp", "state.pch",
+                                     "module.pcm", "module.modulemap",
+                                     "overlay.yaml"}));
+
+    write("nested.rsp", "-DVALUE=2\n");
+    std::vector<DependencyEvidence> changed;
+    ASSERT_TRUE(collectCompileCommandDependencyEvidence(
+        unit, changed, error, &volatile_input))
+        << error;
+    EXPECT_NE(first, changed);
+
+    unit.command_line.insert(unit.command_line.begin() + 1,
+                             "-DBUILD_STAMP=__TIME__");
+    ASSERT_TRUE(collectCompileCommandDependencyEvidence(
+        unit, changed, error, &volatile_input)) << error;
+    EXPECT_TRUE(volatile_input);
+    unit.command_line.erase(unit.command_line.begin() + 1);
+
+    write("nested.rsp", "-DBUILD_STAMP=__TIMESTAMP__\n");
+    volatile_input = false;
+    ASSERT_TRUE(collectCompileCommandDependencyEvidence(
+        unit, changed, error, &volatile_input)) << error;
+    EXPECT_TRUE(volatile_input);
+
+    unit.command_line.push_back("-fmodule-map-file=missing.modulemap");
+    std::vector<DependencyEvidence> rejected;
+    EXPECT_FALSE(
+        collectCompileCommandDependencyEvidence(unit, rejected, error));
+    EXPECT_NE(error.find("not a regular file"), std::string::npos) << error;
+    std::filesystem::remove_all(root, ec);
+}
+
 TEST(WorkerProtocolTest, ResponseRejectsIdentityDriftBeforeAggregation) {
     const auto path = tempPath("codeskeptic-worker-identity-response.json");
     const WorkerRequest expected = sampleRequest(path);
@@ -72,9 +141,20 @@ TEST(WorkerProtocolTest, ResponseRejectsIdentityDriftBeforeAggregation) {
     response.analysis.attempted_tus = 1;
     response.analysis.analyzed_tus = 1;
     response.analysis.findings = 1;
+    response.dependency_manifest.toolchain_identity_sha256 =
+        std::string(64, 'a');
+    response.dependency_manifest.files = {
+        DependencyEvidence{"/project/a file.cpp", std::string(64, 'b'),
+                           true, std::string(64, 'c')},
+        DependencyEvidence{"/project/header.h", std::string(64, 'd'),
+                           false, {}},
+    };
+    response.dependency_manifest.sha256 =
+        dependencyManifestSha256(response.dependency_manifest);
     response.diagnostics.push_back(Diagnostic{
         Severity::Warning, expected.unit.canonical_path, 7, 3,
-        "null-deref", "possible null dereference", "f", {}, "csf1:test"});
+        "null-deref", "possible null dereference", "f", {},
+        "csf1-0123456789abcdef"});
     std::string error;
 
     ASSERT_TRUE(writeWorkerResponse(path.string(), response, error)) << error;
@@ -82,12 +162,63 @@ TEST(WorkerProtocolTest, ResponseRejectsIdentityDriftBeforeAggregation) {
     ASSERT_TRUE(readWorkerResponse(path.string(), expected, accepted, error))
         << error;
     ASSERT_EQ(accepted.diagnostics.size(), 1u);
-    EXPECT_EQ(accepted.diagnostics[0].fingerprint, "csf1:test");
+    EXPECT_EQ(accepted.diagnostics[0].fingerprint,
+              "csf1-0123456789abcdef");
+    EXPECT_EQ(accepted.dependency_manifest, response.dependency_manifest);
 
     response.command_ordinal += 1;
     ASSERT_TRUE(writeWorkerResponse(path.string(), response, error)) << error;
     EXPECT_FALSE(readWorkerResponse(path.string(), expected, accepted, error));
     EXPECT_NE(error.find("identity"), std::string::npos);
+}
+
+TEST(WorkerProtocolTest, ResponseRejectsMalformedFindingFingerprint) {
+    const auto path = tempPath("codeskeptic-worker-fingerprint-response.json");
+    const WorkerRequest expected = sampleRequest(path);
+    WorkerResponse response;
+    response.request_id = expected.request_id;
+    response.canonical_path = expected.unit.canonical_path;
+    response.compile_command_sha256 = expected.unit.compile_command_sha256;
+    response.command_ordinal = expected.unit.command_ordinal;
+    response.phase = expected.phase;
+    response.analysis.attempted_tus = 1;
+    response.analysis.analyzed_tus = 1;
+    response.analysis.findings = 1;
+    response.diagnostics.push_back(Diagnostic{
+        Severity::Warning, expected.unit.canonical_path, 7, 3,
+        "null-deref", "possible null dereference", "f", {}, "forged"});
+    std::string error;
+
+    ASSERT_TRUE(writeWorkerResponse(path.string(), response, error)) << error;
+    WorkerResponse accepted;
+    EXPECT_FALSE(readWorkerResponse(path.string(), expected, accepted, error));
+    EXPECT_NE(error.find("fingerprint"), std::string::npos) << error;
+}
+
+TEST(WorkerProtocolTest, ResponseRejectsDependencyManifestDrift) {
+    const auto path = tempPath("codeskeptic-worker-dependencies.json");
+    const WorkerRequest expected = sampleRequest(path);
+    WorkerResponse response;
+    response.request_id = expected.request_id;
+    response.canonical_path = expected.unit.canonical_path;
+    response.compile_command_sha256 = expected.unit.compile_command_sha256;
+    response.command_ordinal = expected.unit.command_ordinal;
+    response.phase = expected.phase;
+    response.analysis.attempted_tus = 1;
+    response.analysis.analyzed_tus = 1;
+    response.dependency_manifest.toolchain_identity_sha256 =
+        std::string(64, 'a');
+    response.dependency_manifest.files = {
+        DependencyEvidence{"/project/a.cpp", std::string(64, 'b'),
+                           false, {}},
+    };
+    response.dependency_manifest.sha256 = std::string(64, 'c');
+    std::string error;
+
+    ASSERT_TRUE(writeWorkerResponse(path.string(), response, error)) << error;
+    WorkerResponse accepted;
+    EXPECT_FALSE(readWorkerResponse(path.string(), expected, accepted, error));
+    EXPECT_NE(error.find("dependency manifest"), std::string::npos) << error;
 }
 
 TEST(WorkerProtocolTest, ResponseRejectsFindingCountDrift) {
@@ -104,7 +235,8 @@ TEST(WorkerProtocolTest, ResponseRejectsFindingCountDrift) {
     response.analysis.findings = 2;
     response.diagnostics.push_back(Diagnostic{
         Severity::Warning, expected.unit.canonical_path, 7, 3,
-        "null-deref", "possible null dereference", "f", {}, "csf1:test"});
+        "null-deref", "possible null dereference", "f", {},
+        "csf1-0123456789abcdef"});
     std::string error;
 
     ASSERT_TRUE(writeWorkerResponse(path.string(), response, error)) << error;
@@ -210,6 +342,11 @@ TEST(WorkerProtocolTest, RuntimeAnalyzesExactlyTheBoundCommand) {
     EXPECT_EQ(response.analysis.attempted_tus, 1u);
     EXPECT_EQ(response.analysis.analyzed_tus, 1u);
     EXPECT_EQ(response.analysis.exitCode(), 0);
+    ASSERT_FALSE(response.dependency_manifest.files.empty());
+    EXPECT_EQ(response.dependency_manifest.files.front().canonical_path,
+              request.unit.canonical_path);
+    EXPECT_EQ(response.dependency_manifest.sha256,
+              dependencyManifestSha256(response.dependency_manifest));
 }
 
 TEST(WorkerProtocolTest, RuntimeRejectsCommandHashDrift) {

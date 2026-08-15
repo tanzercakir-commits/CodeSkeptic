@@ -196,7 +196,15 @@ def validate_project(
     campaign = evidence.get("campaign")
     require(isinstance(campaign, str) and campaign, f"{project_id}: campaign is required")
     try:
-        RUNNER.validate_receipt_group(manifest, campaign, project_id, receipts)
+        # These immutable Phase 8 receipts predate per-command execution-plan
+        # evidence. Current campaign aggregation keeps the strict default.
+        RUNNER.validate_receipt_group(
+            manifest,
+            campaign,
+            project_id,
+            receipts,
+            require_execution_plan=False,
+        )
     except RUNNER.CampaignError as exc:
         raise EvidenceError(f"{project_id}: retained receipts are invalid: {exc}") from exc
     repetitions = manifest["campaigns"][campaign]["repetitions"]

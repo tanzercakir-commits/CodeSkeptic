@@ -15,6 +15,7 @@ add_executable(codeskeptic_tests
     AnalysisResultTest.cpp
     AnalysisCoordinatorTest.cpp
     WorkerProtocolTest.cpp
+    UnitEvidenceStoreTest.cpp
     BudgetedAnalysisTest.cpp
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp

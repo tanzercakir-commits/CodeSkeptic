@@ -106,6 +106,47 @@ python3 scripts/run_realworld_campaign.py run \
   --checkpoint checkpoints/libgit2/repeat-1/receipt.json
 ```
 
+The shard receipt and the per-TU store beneath the same checkpoint directory
+form one explicit resume boundary. Completed exact command/ordinal/phase units
+may be restored after interruption; missing units are executed once, and the
+final receipt records `executed` and `checkpoint` origins whose sum must equal
+the exact plan. An accepted shard receipt validates the requested resume
+identity but never substitutes for rebuilding the current compile database and
+revalidating the analyzer's exact per-unit plan. Source or dependency bytes,
+compile commands, semantic config,
+rules, analyzer identity, resource limits, ordered models/summaries, or the
+whole-program merged summary invalidate affected entries. A corrupt entry or
+an incompatible explicit checkpoint is unavailable evidence (exit `2`), not a
+silent cold retry. To request a cold run deliberately, use a new empty
+checkpoint path. The path may already exist as an empty real directory; the
+analyzer creates its manifest and entry directory. Symlinked/non-directory
+paths, non-regular manifest staging nodes, or an existing manifest whose entry
+directory vanished, fail closed. A regular staging file left by interruption
+is recovered before create-new publication. Dependency discovery, cache-hit
+verification, and a cache-miss worker share the same absolute per-TU/phase
+timeout; their combined wall time cannot consume multiple timeout windows.
+The campaign receipt and checksum are staged with create-new, no-follow file
+opens and published checksum-first from an empty pair. If interruption leaves
+only one regular half, the next run removes that orphan and continues through
+the checksummed per-TU store; a symlink or other non-regular half remains a
+hard evidence error.
+
+For a long-lived MCP server the configured root is server-owned: exact
+analyzer, semantic-config, and TU-plan identities select deterministic
+`requests/<digest>` children. Heterogeneous tool calls do not overwrite one
+another's manifests, while repeating an exact request resumes its own child;
+the request itself cannot select the checkpoint path.
+
+Hosted shards use separate restore and save actions. The restore prefix is
+still pinned to the exact commit, campaign manifest, project, and repetition;
+the immutable save key adds the workflow run and attempt. The save step runs
+after an analyzer failure, so a rerun can recover the most recent verified
+per-TU subset instead of restarting the whole project. A runner cancellation
+or hard job timeout can prevent any post-step from executing and therefore
+cannot promise a checkpoint beyond the last successfully published attempt.
+The analyzer owns creation of the `unit-evidence` child so a freshly restored
+or empty parent cannot be mistaken for a corrupt initialized store.
+
 After all three receipts for every project exist, run the separate referee:
 
 ```bash

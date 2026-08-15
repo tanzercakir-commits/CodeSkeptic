@@ -95,7 +95,13 @@ bool JsonReporter::report(const DiagnosticList& diagnostics,
                  << "\", \"duration_ms\": " << receipt.duration_ms
                  << ", \"peak_memory_kib\": " << receipt.peak_memory_kib
                  << ", \"timeout_seconds\": " << receipt.timeout_seconds
-                 << ", \"memory_mib\": " << receipt.memory_mib << " }";
+                 << ", \"memory_mib\": " << receipt.memory_mib
+                 << ", \"origin\": \""
+                 << translationUnitOriginName(receipt.origin)
+                 << "\", \"checkpoint_key_sha256\": \""
+                 << escapeJson(receipt.checkpoint_key_sha256)
+                 << "\", \"payload_sha256\": \""
+                 << escapeJson(receipt.payload_sha256) << "\" }";
         }
         file << (result->tu_receipts.empty() ? "],\n" : "\n  ],\n");
     }

@@ -1,6 +1,7 @@
 #ifndef CODESKEPTIC_RESOURCE_SUPERVISOR_H
 #define CODESKEPTIC_RESOURCE_SUPERVISOR_H
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -43,6 +44,11 @@ public:
     static ResourceRunResult run(const std::string& program,
                                  const std::vector<std::string>& arguments,
                                  ResourceLimits limits);
+    static ResourceRunResult runUntil(
+        const std::string& program,
+        const std::vector<std::string>& arguments,
+        ResourceLimits limits,
+        std::chrono::steady_clock::time_point deadline);
 
 private:
     using MemorySampler = std::function<std::uint64_t()>;
@@ -51,6 +57,12 @@ private:
         const std::vector<std::string>& arguments,
         ResourceLimits limits,
         const MemorySampler& memory_sampler);
+    static ResourceRunResult runWithMemorySamplerUntil(
+        const std::string& program,
+        const std::vector<std::string>& arguments,
+        ResourceLimits limits,
+        const MemorySampler& memory_sampler,
+        std::chrono::steady_clock::time_point deadline);
     friend struct ResourceSupervisorTestAccess;
 };
 

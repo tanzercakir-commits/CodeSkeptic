@@ -17,7 +17,17 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "run_sanitizer_matrix.py"
 EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" /
-                 "sanitizers" / "2026-08-14-linux-x86_64")
+                 "sanitizers" / "2026-08-15-cache-linux-x86_64")
+MATERIALIZED_BUILDS = {
+    "address": (
+        ROOT / "build-p10-06-asan-tests",
+        ROOT / "build-p10-06-asan-fuzz",
+    ),
+    "undefined": (
+        ROOT / "build-p10-06-ubsan-tests",
+        ROOT / "build-p10-06-ubsan-fuzz",
+    ),
+}
 
 
 def load_runner():
@@ -205,8 +215,7 @@ class SanitizerContractTest(unittest.TestCase):
         checked = 0
         for profile in runner.PROFILES:
             receipt = EVIDENCE_ROOT / profile
-            test_build = ROOT / f"build-sanitizer-{profile}-tests"
-            fuzz_build = ROOT / f"build-sanitizer-{profile}-fuzz"
+            test_build, fuzz_build = MATERIALIZED_BUILDS[profile]
             if not receipt.is_dir() or not test_build.is_dir() or not fuzz_build.is_dir():
                 continue
             verified = runner.verify_receipt(receipt, test_build, fuzz_build)
@@ -218,8 +227,7 @@ class SanitizerContractTest(unittest.TestCase):
     def test_verifier_rejects_coordinated_log_append(self) -> None:
         runner = load_runner()
         retained = EVIDENCE_ROOT / "address"
-        test_build = ROOT / "build-sanitizer-address-tests"
-        fuzz_build = ROOT / "build-sanitizer-address-fuzz"
+        test_build, fuzz_build = MATERIALIZED_BUILDS["address"]
         if not retained.is_dir() or not test_build.is_dir() or not fuzz_build.is_dir():
             self.skipTest("ASAN evidence/builds are not materialized")
         with tempfile.TemporaryDirectory() as temporary:
@@ -240,8 +248,7 @@ class SanitizerContractTest(unittest.TestCase):
     def test_verifier_rejects_command_and_runtime_rewrites(self) -> None:
         runner = load_runner()
         retained = EVIDENCE_ROOT / "address"
-        test_build = ROOT / "build-sanitizer-address-tests"
-        fuzz_build = ROOT / "build-sanitizer-address-fuzz"
+        test_build, fuzz_build = MATERIALIZED_BUILDS["address"]
         if not retained.is_dir() or not test_build.is_dir() or not fuzz_build.is_dir():
             self.skipTest("ASAN evidence/builds are not materialized")
         for mutation, message in (
@@ -262,7 +269,7 @@ class SanitizerContractTest(unittest.TestCase):
                     runner.verify_receipt(copied, test_build, fuzz_build)
 
     def test_external_manifest_pins_every_retained_receipt_and_log(self) -> None:
-        manifest = EVIDENCE_ROOT.parent / "SHA256SUMS"
+        manifest = EVIDENCE_ROOT / "SHA256SUMS"
         if not manifest.is_file():
             self.skipTest("sanitizer external manifest is not materialized")
         entries = {}
