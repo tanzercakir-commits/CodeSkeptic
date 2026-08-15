@@ -2,6 +2,7 @@
 
 #include "core/Messages.h"
 
+#include <charconv>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -36,6 +37,21 @@ bool isOutputFormat(const std::string& value) {
            value == "sarif" || value == "html";
 }
 
+bool parseBoundedUnsigned(const std::string& value,
+                          unsigned maximum,
+                          unsigned& out) {
+    if (value.empty()) return false;
+    std::uint64_t parsed = 0;
+    const char* first = value.data();
+    const char* last = first + value.size();
+    const auto result = std::from_chars(first, last, parsed, 10);
+    if (result.ec != std::errc{} || result.ptr != last || parsed == 0 ||
+        parsed > maximum)
+        return false;
+    out = static_cast<unsigned>(parsed);
+    return true;
+}
+
 const std::set<std::string>& singleValueOptions() {
     static const std::set<std::string> options = {
         "--source", "--build-path", "--json", "--sarif", "--html",
@@ -45,7 +61,7 @@ const std::set<std::string>& singleValueOptions() {
         "--free-functions", "--allocator-pairs", "--untrusted-int-sources",
         "--owning-pointers", "--report-paths", "--policy", "--gate",
         "--lines", "--summary-in", "--summary-out", "--model-file",
-        "--files",
+        "--files", "--tu-timeout-seconds", "--tu-memory-mib",
         "--write-baseline"
     };
     return options;
@@ -97,6 +113,8 @@ bool Config::operator==(const Config& other) const {
            whole_program_ == other.whole_program_ &&
            analyze_broken_tus_ == other.analyze_broken_tus_ &&
            accept_partial_coverage_ == other.accept_partial_coverage_ &&
+           tu_timeout_seconds_ == other.tu_timeout_seconds_ &&
+           tu_memory_mib_ == other.tu_memory_mib_ &&
            assert_recovery_ == other.assert_recovery_ &&
            assumptions_ == other.assumptions_ &&
            warm_cache_ == other.warm_cache_ &&
@@ -109,6 +127,29 @@ bool Config::operator==(const Config& other) const {
            min_severity_ == other.min_severity_ &&
            enabled_rules_ == other.enabled_rules_ &&
            disabled_rules_ == other.disabled_rules_;
+}
+
+Config Config::mcpRequestConfig() const {
+    Config scoped = *this;
+    scoped.source_path_.clear();
+    scoped.source_files_.clear();
+    scoped.output_format_ = "console";
+    scoped.json_output_path_.clear();
+    scoped.sarif_output_path_.clear();
+    scoped.html_output_path_.clear();
+    scoped.baseline_path_.clear();
+    scoped.write_baseline_path_.clear();
+    scoped.functions_.clear();
+    scoped.lines_.clear();
+    scoped.serve_ = false;
+    scoped.whole_program_ = false;
+    scoped.warm_cache_ = false;
+    scoped.help_requested_ = false;
+    scoped.summary_in_path_.clear();
+    scoped.summary_out_path_.clear();
+    scoped.summary_diff_old_.clear();
+    scoped.summary_diff_new_.clear();
+    return scoped;
 }
 
 bool Config::loadFromFile(const std::string& path) {
@@ -298,6 +339,24 @@ bool Config::loadFromTextInPlace(const std::string& text,
                 ok = false;
             }
         }
+        else if (key == "tu_timeout_seconds") {
+            if (!parseBoundedUnsigned(value, kMaxTuTimeoutSeconds,
+                                      tu_timeout_seconds_)) {
+                report(lineNumber,
+                       "tu_timeout_seconds expects an integer from 1 to " +
+                           std::to_string(kMaxTuTimeoutSeconds));
+                ok = false;
+            }
+        }
+        else if (key == "tu_memory_mib") {
+            if (!parseBoundedUnsigned(value, kMaxTuMemoryMiB,
+                                      tu_memory_mib_)) {
+                report(lineNumber,
+                       "tu_memory_mib expects an integer from 1 to " +
+                           std::to_string(kMaxTuMemoryMiB));
+                ok = false;
+            }
+        }
         else if (key == "enable_rule")   enabled_rules_.insert(value);
         else if (key == "disable_rule")  disabled_rules_.insert(value);
         else {
@@ -421,6 +480,27 @@ bool Config::parseArgs(int argc, char* argv[]) {
             analyze_broken_tus_ = true;
         } else if (arg == "--accept-partial-coverage") {
             accept_partial_coverage_ = true;
+        } else if (arg == "--tu-timeout-seconds" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            unsigned parsed = 0;
+            if (!parseBoundedUnsigned(value, kMaxTuTimeoutSeconds, parsed)) {
+                std::cerr << "[CodeSkeptic] --tu-timeout-seconds expects an "
+                             "integer from 1 to "
+                          << kMaxTuTimeoutSeconds << ", got: " << value
+                          << "\n";
+                return false;
+            }
+            tu_timeout_seconds_ = parsed;
+        } else if (arg == "--tu-memory-mib" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            unsigned parsed = 0;
+            if (!parseBoundedUnsigned(value, kMaxTuMemoryMiB, parsed)) {
+                std::cerr << "[CodeSkeptic] --tu-memory-mib expects an "
+                             "integer from 1 to "
+                          << kMaxTuMemoryMiB << ", got: " << value << "\n";
+                return false;
+            }
+            tu_memory_mib_ = parsed;
         } else if (arg == "--assumptions") {
             assumptions_ = true;
         } else if (arg == "--summary-in" && i + 1 < argc) {
@@ -523,6 +603,10 @@ bool Config::parseArgs(int argc, char* argv[]) {
                       << "                         across all files first, then analyze\n"
                       << "  --accept-partial-coverage  Legacy acknowledgement flag; partial\n"
                       << "                         TU coverage still has no verdict (exit 2)\n"
+                      << "  --tu-timeout-seconds <N> Per-translation-unit wall timeout\n"
+                      << "                         (default: 300; range: 1-86400)\n"
+                      << "  --tu-memory-mib <N>   Per-translation-unit memory ceiling in MiB\n"
+                      << "                         (default: 4096; range: 1-131072)\n"
                       << "  --summary-out <file>   Save harvested cross-file function\n"
                       << "                         summaries to a file after analysis\n"
                       << "  --summary-in <file>    Load function summaries saved earlier;\n"
@@ -573,6 +657,93 @@ bool Config::parseArgs(int argc, char* argv[]) {
         return false;
     }
     return true;
+}
+
+bool Config::setTuTimeoutSeconds(std::uint64_t value) {
+    if (value == 0 || value > kMaxTuTimeoutSeconds) return false;
+    tu_timeout_seconds_ = static_cast<unsigned>(value);
+    return true;
+}
+
+bool Config::setTuMemoryMiB(std::uint64_t value) {
+    if (value == 0 || value > kMaxTuMemoryMiB) return false;
+    tu_memory_mib_ = static_cast<unsigned>(value);
+    return true;
+}
+
+std::vector<std::string> Config::workerArguments(
+    const std::vector<std::string>& available_rule_ids,
+    const std::string& summary_override,
+    bool replace_configured_summaries) const {
+    std::vector<std::string> args;
+    auto add = [&args](const std::string& option, const std::string& value) {
+        args.push_back(option);
+        args.push_back(value);
+    };
+    auto join = [](const auto& values) {
+        std::string joined;
+        for (const auto& value : values) {
+            if (!joined.empty()) joined += ',';
+            joined += value;
+        }
+        return joined;
+    };
+
+    add("--lang", lang_);
+    switch (min_severity_) {
+        case Severity::Info: add("--severity", "info"); break;
+        case Severity::Warning: add("--severity", "warning"); break;
+        case Severity::Error: add("--severity", "error"); break;
+    }
+    if (!functions_.empty()) add("--function", join(functions_));
+    if (!lines_.empty()) {
+        std::vector<std::string> ranges;
+        ranges.reserve(lines_.size());
+        for (const auto& [first, last] : lines_) {
+            ranges.push_back(first == last
+                                 ? std::to_string(first)
+                                 : std::to_string(first) + "-" +
+                                       std::to_string(last));
+        }
+        add("--lines", join(ranges));
+    }
+    if (!fatal_asserts_.empty()) add("--fatal-asserts", join(fatal_asserts_));
+    if (!assert_macros_.empty()) add("--assert-macros", join(assert_macros_));
+    if (!negative_assert_macros_.empty())
+        add("--negative-assert-macros", join(negative_assert_macros_));
+    if (!assert_recovery_) args.push_back("--no-assert-recovery");
+    if (!alloc_functions_.empty())
+        add("--alloc-functions", join(alloc_functions_));
+    if (!free_functions_.empty())
+        add("--free-functions", join(free_functions_));
+    if (!allocator_pairs_.empty()) {
+        std::vector<std::string> pairs;
+        for (const auto& [allocator, deallocators] : allocator_pairs_)
+            for (const auto& deallocator : deallocators)
+                pairs.push_back(allocator + "=" + deallocator);
+        add("--allocator-pairs", join(pairs));
+    }
+    if (!untrusted_int_sources_.empty())
+        add("--untrusted-int-sources", join(untrusted_int_sources_));
+    if (!owning_pointers_.empty())
+        add("--owning-pointers", join(owning_pointers_));
+    if (!report_paths_.empty()) add("--report-paths", join(report_paths_));
+    if (!policies_.empty()) add("--policy", join(policies_));
+    if (analyze_broken_tus_) args.push_back("--analyze-broken-tus");
+    if (accept_partial_coverage_) args.push_back("--accept-partial-coverage");
+    if (assumptions_) args.push_back("--assumptions");
+
+    for (const auto& rule_id : available_rule_ids) {
+        if (!isRuleEnabled(rule_id)) add("--disable-rule", rule_id);
+    }
+
+    if (replace_configured_summaries) {
+        if (!summary_override.empty()) add("--summary-in", summary_override);
+    } else {
+        if (!summary_in_path_.empty()) add("--summary-in", summary_in_path_);
+        for (const auto& model : model_files_) add("--model-file", model);
+    }
+    return args;
 }
 
 bool Config::isRuleEnabled(const std::string& rule_id) const {

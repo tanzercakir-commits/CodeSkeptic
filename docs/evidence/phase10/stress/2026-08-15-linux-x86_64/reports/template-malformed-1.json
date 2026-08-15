@@ -6,6 +6,9 @@
   "coverage": { "attempted_tus": 1, "analyzed_tus": 0, "broken_tus": 1, "incomplete_functions": 0 },
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/tmp/codeskeptic-stress-7cbv1zwv/template-malformed/repeat-1/template_malformed.cpp", "compile_command_sha256": "f1941a66c3a2d12b965d01b41de1756a29a5a7145c95898030f62e60f71fc98b", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 19, "peak_memory_kib": 76624, "timeout_seconds": 300, "memory_mib": 4096 }
+  ],
   "total": 0,
   "diagnostics": [
   ]

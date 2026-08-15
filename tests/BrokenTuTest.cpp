@@ -373,3 +373,61 @@ TEST(BrokenTuTest, AnalysisWorkerIsSerialAndJoinedBeforeReturn) {
               << " joined=" << (active.load() == 0 ? 1 : 0) << "\n";
     fs::remove_all(dir, ec);
 }
+
+TEST(BrokenTuTest, ExecutionPlanPreservesMultipleCompileCommandsPerPath) {
+    const fs::path dir =
+        fs::temp_directory_path() / "cs_multi_command_execution_plan";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const fs::path source = dir / "shared.cpp";
+    {
+        std::ofstream file(source);
+        file << "int shared() { return VALUE; }\n";
+    }
+    {
+        std::ofstream database(dir / "compile_commands.json");
+        database
+            << "[{\"directory\":\"" << dir.generic_string()
+            << "\",\"arguments\":[\"clang++\",\"-DVALUE=1\","
+               "\"-c\",\"shared.cpp\"],\"file\":\"shared.cpp\"},"
+            << "{\"directory\":\"" << dir.generic_string()
+            << "\",\"arguments\":[\"clang++\",\"-DVALUE=2\","
+               "\"-c\",\"shared.cpp\"],\"file\":\"shared.cpp\"}]";
+    }
+
+    SourceManager manager(dir.string());
+    manager.addSourceFile(source.string());
+    ASSERT_TRUE(manager.compilationDatabaseValid());
+    const auto units = manager.executionUnits();
+
+    ASSERT_EQ(units.size(), 2u);
+    EXPECT_EQ(units[0].canonical_path, units[1].canonical_path);
+    EXPECT_EQ(units[0].command_ordinal, 0u);
+    EXPECT_EQ(units[1].command_ordinal, 1u);
+    EXPECT_FALSE(units[0].compile_command_sha256.empty());
+    EXPECT_FALSE(units[1].compile_command_sha256.empty());
+    EXPECT_NE(units[0].compile_command_sha256,
+              units[1].compile_command_sha256);
+    EXPECT_NE(units[0].command_line, units[1].command_line);
+    fs::remove_all(dir, ec);
+}
+
+TEST(BrokenTuTest, ExecutionPlanRetainsMissingRequestedPath) {
+    const auto root = std::filesystem::path(::testing::TempDir()) /
+                      "codeskeptic_missing_execution_plan";
+    std::filesystem::create_directories(root);
+    const auto missing = root / "missing.cpp";
+    std::filesystem::remove(missing);
+
+    SourceManager manager(root.string());
+    manager.addSourceFile(missing.string());
+    const auto units = manager.executionUnits();
+
+    ASSERT_EQ(units.size(), 1u);
+    EXPECT_EQ(units[0].canonical_path,
+              std::filesystem::weakly_canonical(missing).string());
+    EXPECT_FALSE(units[0].command_line.empty());
+    EXPECT_EQ(units[0].compile_command_sha256,
+              translationUnitCommandSha256(units[0]));
+}

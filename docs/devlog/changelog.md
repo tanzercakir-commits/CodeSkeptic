@@ -1,5 +1,79 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.5 per-TU resource budgets locally complete
+
+- Replaced in-process multi-TU execution with an exact-command coordinator and
+  one OS-isolated worker process per requested translation unit. Worker
+  requests bind canonical file, compile-command SHA-256, command ordinal,
+  configuration, rules, summaries, and output identity; strict response
+  parsing rejects count, identity, finding, and completion-marker drift before
+  aggregation.
+- Added explicit defaults of 300 seconds and 4096 MiB per TU, bounded CLI and
+  configuration parsing, inherited and per-request MCP overrides, and durable
+  JSON resource receipts. Timeout, memory exhaustion, launch/protocol failure,
+  missing input, and broken input identify the exact TU, preserve completed
+  receipts, keep later independent units observable, and make the project
+  verdict unavailable with exit `2`.
+- Added post-exec start/completion handshakes so the supervisor measures the
+  worker image rather than a transient spawning parent. Linux uses monotonic
+  `VmHWM`, Windows uses `PeakWorkingSetSize`, and Darwin resets and samples a
+  monotonic physical-footprint interval. Unexpected worker exit, failed
+  sampling/handshake, timeout, or memory excess is fail-closed and the exact
+  child is terminated and reaped. Every post-ready sample remains mandatory
+  until the completion marker is observed; a deterministic injected sampling
+  failure now proves `Crashed`, exit `-2`, and no verdict instead of permitting
+  a final unmeasured poll.
+- Added production-path regressions for whole-program summaries, distinct
+  compile commands, missing/broken inputs, timeout and memory failure,
+  summary/model merging, failed JSON/SARIF/HTML/baseline artifacts, CLI/config,
+  and MCP. Restored the whole-program activation marker on the budgeted parent
+  path after the retained-matrix contract caught its absence; the production
+  worker regression now pins that evidence without changing receipt or verdict
+  semantics. The current Linux Clang 20 source passes `1237/1237` direct C++
+  tests and `1254/1254` CTest entries.
+- Added a contract-pinned `resource-budget-macos` PR/push lane using native
+  macOS 14 and Homebrew LLVM 20. Its first hosted build exposed Homebrew
+  Clang receiving an SDK `/usr/include` without the matching `-isysroot`;
+  Apple sysroot discovery and imported SDK-include cleanup now apply to every
+  Apple build while preserving a caller-supplied sysroot. The same hosted head
+  exposed Win32 `max` macro expansion at the supervisor peak calculation and
+  an `/MD` worker-control library linked into its `/MT` probe. `NOMINMAX` is
+  now defined before `windows.h`, and the worker-control target is created
+  only after LLVM selects the MSVC CRT model for the downstream target
+  graph. The next native macOS compile reached the supervisor and exposed the
+  Darwin `getpid()` call without its declaring header; the Apple branch now
+  includes `<unistd.h>`. The Windows build then completed and exposed an
+  assertion that compared the canonical long spelling of `%TEMP%` with its
+  `RUNNER~1` spelling; the missing-request regression now compares the same
+  `weakly_canonical` identity used by production. The workflow contract is
+  `6/6`. The final
+  sanitizer and stress source manifests agree on 377 files with digest
+  `91f7080aba5a7f01b980a2f0d5f42ddce88332530a7801fbb7854a4bcdea8db7`.
+- Refreshed the retained stress matrix after the final supervisor regression
+  changed the bound source bytes. It accepts `9/9` cases and `18/18`
+  executions in `679` ms; receipt SHA-256 is
+  `56490a70c7ea950e07a5445a665893037ba8dd58934abaf03909dc95f3e14690`,
+  and the 37-entry outer manifest SHA-256 is
+  `92625c37d7a4ffc41a43b68467f465247b062a4d34faf2d9adc5f7e2a9b881f9`.
+  Its verifier, `StressMatrixContract` `4/4`, and all manifest entries pass.
+- Retained final Linux x86_64 ASAN and UBSAN trees bind those exact source
+  bytes. Both pass all ten runtime gates, `1254/1254` CTest entries,
+  `1237/1237` direct C++ tests, representative clean/finding/invalid/
+  whole-program and sequential MCP paths, and four fuzz smoke targets. ASAN
+  completed in `317125` ms with receipt SHA-256
+  `95819a673a0192dd852a809cbd3281f37be9f163d8f79e882ecb32f09a89989c`;
+  UBSAN completed in `289051` ms with receipt SHA-256
+  `ec7c21382ce3db8ce75cfecec7004d48eda4329c623c046fac5f69b084d215a1`.
+  The 40-entry outer manifest SHA-256 is
+  `3c7e4e9cba518d7aa7973bbb52ce5022ea917604d296ba67b1fc3ce958e81153`;
+  both retained verifier modes pass and `SanitizerContract` is `13/13` with
+  no skips.
+- Independent read-only pre-evidence, narrow lifecycle, and final evidence
+  audits found no material blocker after independently rechecking the full
+  normal suite, receipt/build/source bindings, and both outer manifests.
+  `CS-P10-05` remains open pending hosted Linux, Windows, and native macOS
+  gates. No protected-main write or merge is performed here.
+
 ## 2026-08-15 — Phase 10.4 frontend and CFG stress matrix locally complete
 
 - Made verdict availability unconditional over the requested translation-unit

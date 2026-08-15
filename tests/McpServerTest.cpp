@@ -1,7 +1,7 @@
 #include "server/McpServer.h"
 
+#include "config/Config.h"
 #include "core/FunctionFilter.h"
-#include "source_manager/SourceManager.h"
 
 #include <fstream>
 #include <filesystem>
@@ -23,7 +23,24 @@ std::string writeTempSource(const std::string& name,
     return std::filesystem::path(path).generic_string();
 }
 
+std::string testMcpMessage(const std::string& line) {
+    Config base;
+    base.setWorkerProgram(CODESKEPTIC_BINARY);
+    return codeskeptic::handleMcpMessage(line, base);
+}
+
+std::string testMcpMessage(const std::string& line,
+                           const Config& base) {
+    return codeskeptic::handleMcpMessage(line, base);
+}
+
+std::string unconfiguredMcpMessage(const std::string& line) {
+    return codeskeptic::handleMcpMessage(line);
+}
+
 } // anonymous namespace
+
+#define handleMcpMessage testMcpMessage
 
 TEST(McpServerTest, Initialize) {
     auto response = handleMcpMessage(
@@ -52,6 +69,70 @@ TEST(McpServerTest, ToolsListContainsAnalyze) {
     EXPECT_NE(response.find("\"analyze\""), std::string::npos);
     EXPECT_NE(response.find("\"inputSchema\""), std::string::npos);
     EXPECT_NE(response.find("dataflow traces"), std::string::npos);
+    EXPECT_NE(response.find("\"tu_timeout_seconds\""), std::string::npos);
+    EXPECT_NE(response.find("\"tu_memory_mib\""), std::string::npos);
+    EXPECT_NE(response.find("\"default\":300"), std::string::npos);
+    EXPECT_NE(response.find("\"default\":4096"), std::string::npos);
+}
+
+TEST(McpServerTest, ToolsListPublishesResolvedServerBudgetDefaults) {
+    Config base;
+    ASSERT_TRUE(base.setTuTimeoutSeconds(77));
+    ASSERT_TRUE(base.setTuMemoryMiB(3072));
+
+    const auto response = handleMcpMessage(
+        R"({"jsonrpc":"2.0","id":79,"method":"tools/list"})", base);
+
+    EXPECT_NE(response.find("\"default\":77"), std::string::npos)
+        << response;
+    EXPECT_NE(response.find("\"default\":3072"), std::string::npos)
+        << response;
+}
+
+TEST(McpServerTest, AnalyzeWithoutBoundWorkerFailsClosed) {
+    const auto response = unconfiguredMcpMessage(
+        R"({"jsonrpc":"2.0","id":80,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp"}}})");
+    EXPECT_NE(response.find("-32603"), std::string::npos) << response;
+    EXPECT_NE(response.find("resource-isolated"), std::string::npos)
+        << response;
+}
+
+TEST(McpServerTest, AnalyzeValidatesTypedPerTuBudgets) {
+    const auto valid = validateMcpMessage(
+        R"({"jsonrpc":"2.0","id":71,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_timeout_seconds":45,"tu_memory_mib":2048}}})");
+    EXPECT_NE(valid.find("\"validated\":true"), std::string::npos);
+
+    for (const char* request : {
+             R"({"jsonrpc":"2.0","id":72,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_timeout_seconds":"45"}}})",
+             R"({"jsonrpc":"2.0","id":73,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_timeout_seconds":1.5}}})",
+             R"({"jsonrpc":"2.0","id":74,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_timeout_seconds":0}}})",
+             R"({"jsonrpc":"2.0","id":75,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_memory_mib":-1}}})",
+             R"({"jsonrpc":"2.0","id":76,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_memory_mib":4294967296}}})",
+         }) {
+        const auto response = validateMcpMessage(request);
+        EXPECT_NE(response.find("-32602"), std::string::npos) << request;
+    }
+}
+
+TEST(McpServerTest, AnalyzeInheritsServerBudgetsUnlessRequestOverrides) {
+    Config base;
+    ASSERT_TRUE(base.setTuTimeoutSeconds(77));
+    ASSERT_TRUE(base.setTuMemoryMiB(3072));
+    const std::string request =
+        R"({"jsonrpc":"2.0","id":77,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp"}}})";
+    const auto inherited = validateMcpMessage(request, base);
+    EXPECT_NE(inherited.find("\"tu_timeout_seconds\":77"),
+              std::string::npos);
+    EXPECT_NE(inherited.find("\"tu_memory_mib\":3072"),
+              std::string::npos);
+
+    const auto overridden = validateMcpMessage(
+        R"({"jsonrpc":"2.0","id":78,"method":"tools/call","params":{"name":"analyze","arguments":{"path":"x.cpp","tu_timeout_seconds":9,"tu_memory_mib":128}}})",
+        base);
+    EXPECT_NE(overridden.find("\"tu_timeout_seconds\":9"),
+              std::string::npos);
+    EXPECT_NE(overridden.find("\"tu_memory_mib\":128"),
+              std::string::npos);
 }
 
 TEST(McpServerTest, UnknownMethod_Error) {
@@ -197,12 +278,9 @@ std::string analyzeRequest(int id, const std::string& path) {
 
 } // anonymous namespace
 
-TEST(McpServerTest, WarmCache_SecondCallHits) {
-    // MCP is a long-lived process: a second analyze call on the same
-    // file must not pay the parse cost — and the AST served from the
-    // cache must produce the SAME findings (the cache does not change
-    // behavior, it only speeds things up).
-    SourceManager::clearWarmCache();
+TEST(McpServerTest, RepeatedProductionRequestPreservesFindings) {
+    // Per-TU resource isolation uses fresh worker processes. Repeating an MCP
+    // request must preserve the finding without sharing an AST cache.
     auto path = writeTempSource("mcp_warm_hit.cpp", R"(
         void f() {
             int* p = new int(1);
@@ -213,23 +291,16 @@ TEST(McpServerTest, WarmCache_SecondCallHits) {
     )");
 
     auto first = handleMcpMessage(analyzeRequest(20, path));
-    EXPECT_GE(SourceManager::warmCacheMisses(), 1u);
-    EXPECT_EQ(SourceManager::warmCacheHits(), 0u);
-
     auto second = handleMcpMessage(analyzeRequest(21, path));
-    EXPECT_GE(SourceManager::warmCacheHits(), 1u);
 
     EXPECT_NE(first.find("use-after-free"), std::string::npos);
     EXPECT_NE(second.find("use-after-free"), std::string::npos);
     EXPECT_NE(second.find("\\\"count\\\":1"), std::string::npos);
 }
 
-TEST(McpServerTest, WarmCache_InvalidatedOnChange) {
-    // Design invariant: a STALE AST IS NEVER SERVED. When the file
-    // changes (different size -> different fingerprint) the second call
-    // must report the NEW content's findings — the old use-after-free
-    // disappears, the new div-by-zero shows up.
-    SourceManager::clearWarmCache();
+TEST(McpServerTest, ProductionWorkerReanalyzesChangedSource) {
+    // A fresh worker must report new content on the same path: the old
+    // use-after-free disappears and the new div-by-zero appears.
     auto path = writeTempSource("mcp_warm_inval.cpp", R"(
         void f() {
             int* p = new int(1);
