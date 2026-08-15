@@ -77,33 +77,43 @@
   pipeline previously let `grep -q` close early and turn the producer's
   `SIGPIPE` into a false "changelog missing" result; direct here-string
   matching preserves the exact file-list checks without a producer process.
-- Exact-source local qualification passes `1279/1279` direct C++ tests,
-  `1296/1296` repository-aware CTest entries, `67/67` focused cache/worker/MCP
+- Reconciled the first exact-head hosted run without weakening any gate.
+  Clang VFS spellings such as `/include/c++/...` now bind the existing physical
+  standard-library file while preserving lexical symlink identity for sidecar
+  lookup, so the real NIST Juliet suite no longer loses dependency evidence.
+  Windows checkpoint namespaces use a 128-bit directory prefix while their
+  manifests still compare every full SHA-256 identity and fail closed on a
+  prefix collision; native JSON fixtures no longer embed unescaped backslashes.
+  A repository-wide LF checkout rule, with the existing binary/evidence
+  exceptions retained, makes source-manifest bytes identical across Linux,
+  macOS, and Windows rather than accepting line-ending drift.
+- Exact-source local qualification passes `1280/1280` direct C++ tests,
+  `1297/1297` repository-aware CTest entries, the selected six hosted-regression
   cases, `52/52` status-automation cases, `25/25` real-world campaign cases,
   and `21/21` upstream-evidence compatibility cases. The bound source manifest
   contains `380` files with SHA-256
-  `21fcebaf569ca40c281ee07fdd170f2a0609be802ff3c66b8eb7b3df8767acc7`;
+  `a902a872bfccbb1dc47335811987db1d085cb8d4e3d8e8a1c4eb1b485e374c0e`;
   the independent source-stage audit passed.
 - Retained the exact-source frontend stress replay at
   `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`: all nine
   cases passed two deterministic repetitions with zero timeout/crash in
-  `709` ms. Its receipt SHA-256 is
-  `07273a9eaee1ec8b009958bc26aee8a5837f172074dd5c13397fdafa92d595e4`;
+  `695` ms. Its receipt SHA-256 is
+  `0e4eaeb4f9e0f6b3ef45690b010feb7a08e0f25e65cd64ad60dd6f161182e780`;
   the 37-entry tree manifest SHA-256 is
-  `fe6694e1d8d7f6d936f44e33f2fb9d5265b6e9c0dec2efa09f25c8db2d280151`.
+  `3c033f5497ae9b941f3ce42ed9885e5a40b7cbadcaefda79bc473763ac654870`.
 - Retained independent ASAN and UBSAN trees at
   `docs/evidence/phase10/sanitizers/2026-08-15-cache-linux-x86_64`.
-  Each passed all ten runtime gates, `1296/1296` CTest entries,
-  `1279/1279` direct C++ tests, representative analyzer/MCP paths, and four
-  fuzz targets against the same source manifest. ASAN completed in `157876`
+  Each passed all ten runtime gates, `1297/1297` CTest entries,
+  `1280/1280` direct C++ tests, representative analyzer/MCP paths, and four
+  fuzz targets against the same source manifest. ASAN completed in `159640`
   ms with receipt SHA-256
-  `42263633fc03f8bd58b85dcc2cc292213bf951700d32cf60d243e6e958b0d4df`;
-  UBSAN completed in `129201` ms with receipt SHA-256
-  `c10f22153ad15a5470b31a9819851ff09b2e41f185ed3f776e9bfc0bdd891ba6`.
+  `3d2854032b17171b11a59b2119f839745d8cb32280e7e72754da1378aabf0072`;
+  UBSAN completed in `1319390` ms with receipt SHA-256
+  `fea1f76331ecff018bc7a5f12cf272684513e3e5e83b7b68164452d88545a5e1`.
   Both verify-only passes and the materialized `13/13` sanitizer contract
   succeeded without skips; the `6/6` stress contract also passed without a
   skip, and the 40-entry tree manifest SHA-256 is
-  `6a138ac43cd09d4c51ee3d9b75f6ea879335d811be021936bdf740743613ab64`.
+  `05bf6c88351f5bb4a350f07e0b60b65a44617e3c168d1a0a53fd9f83d1c90145`.
   The fresh independent final evidence audit passed. Commit/push and exact-head
   hosted CI remain pending; this checkpoint does not close `CS-P10-06` or
   write protected `main`.

@@ -269,14 +269,14 @@ TEST(BrokenTuTest, LegacyWarmCachePreservesEveryCompileCommand) {
     {
         std::ofstream database(dir / "compile_commands.json");
         database
-            << "[{\"directory\":\"" << dir.string()
+            << "[{\"directory\":\"" << dir.generic_string()
             << "\",\"arguments\":[\"clang++\",\"-DVALUE=1\",\""
-            << source.string() << "\"],\"file\":\""
-            << source.string() << "\"},"
-            << "{\"directory\":\"" << dir.string()
+            << source.generic_string() << "\"],\"file\":\""
+            << source.generic_string() << "\"},"
+            << "{\"directory\":\"" << dir.generic_string()
             << "\",\"arguments\":[\"clang++\",\"-DVALUE=2\",\""
-            << source.string() << "\"],\"file\":\""
-            << source.string() << "\"}]\n";
+            << source.generic_string() << "\"],\"file\":\""
+            << source.generic_string() << "\"}]\n";
     }
 
     SourceManager manager(dir.string());

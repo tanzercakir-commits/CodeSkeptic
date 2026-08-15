@@ -197,6 +197,7 @@ TEST(UnitEvidenceStoreTest, NamespacedStorePartitionsExactRunIdentities) {
     std::size_t namespaces = 0;
     for (const auto& entry : std::filesystem::directory_iterator(requests)) {
         ASSERT_TRUE(entry.is_directory());
+        EXPECT_EQ(entry.path().filename().string().size(), 32u);
         EXPECT_TRUE(std::filesystem::is_regular_file(
             entry.path() / "manifest.json"));
         ++namespaces;

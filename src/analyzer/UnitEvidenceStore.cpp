@@ -716,7 +716,11 @@ std::unique_ptr<UnitEvidenceStore> UnitEvidenceStore::open(
         appendLengthPrefixed(identity, store->analyzer_sha256_);
         appendLengthPrefixed(identity, store->configuration_sha256_);
         appendLengthPrefixed(identity, store->plan_sha256_);
-        root = requests / hashText(identity.str());
+        // The manifest still binds the full analyzer/configuration/plan
+        // digests. A 128-bit directory discriminator keeps ordinary Windows
+        // checkpoint paths below MAX_PATH; a collision remains fail-closed
+        // because the full manifest identity is validated on open.
+        root = requests / hashText(identity.str()).substr(0, 32);
     }
     store->directory_ = root.string();
     ec.clear();

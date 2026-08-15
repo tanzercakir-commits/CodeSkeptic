@@ -803,7 +803,8 @@ class EvidenceContractTest(unittest.TestCase):
         checkpoint = Path("root/project/repeat-1/receipt.json")
         self.assertEqual(
             campaign.analyzer_checkpoint_arguments(checkpoint),
-            ["--checkpoint-dir", "root/project/repeat-1/unit-evidence"],
+            ["--checkpoint-dir",
+             str(checkpoint.parent / "unit-evidence")],
         )
         self.assertEqual(campaign.analyzer_checkpoint_arguments(None), [])
 

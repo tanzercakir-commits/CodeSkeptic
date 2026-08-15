@@ -349,6 +349,50 @@ TEST(WorkerProtocolTest, RuntimeAnalyzesExactlyTheBoundCommand) {
               dependencyManifestSha256(response.dependency_manifest));
 }
 
+TEST(WorkerProtocolTest, RuntimeBindsRemappedStandardLibraryDependencies) {
+    const auto root = tempPath("codeskeptic-worker-runtime-system-header");
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    ASSERT_TRUE(std::filesystem::create_directories(root));
+    const auto source = root / "system-header.cpp";
+    const auto request_path = root / "request.json";
+    const auto response_path = root / "response.json";
+    {
+        std::ofstream output(source, std::ios::binary | std::ios::trunc);
+        output << "#include <exception>\n"
+                  "int clean() { return sizeof(std::exception); }\n";
+    }
+    WorkerRequest request = sampleRequest(response_path);
+    request.request_id = "runtime-system-header";
+    request.unit.canonical_path =
+        std::filesystem::weakly_canonical(source).string();
+    request.unit.working_directory = root.string();
+    request.unit.command_line = {
+        "clang++", "-std=c++17", "-fsyntax-only",
+        request.unit.canonical_path};
+    request.unit.output.clear();
+    request.unit.command_ordinal = 0;
+    request.unit.compile_command_sha256 =
+        translationUnitCommandSha256(request.unit);
+    request.summary_fragment_path.clear();
+    std::string error;
+    ASSERT_TRUE(writeWorkerRequest(request_path.string(), request, error))
+        << error;
+
+    ASSERT_EQ(runTranslationUnitWorker(request_path.string()), 0);
+    WorkerResponse response;
+    ASSERT_TRUE(readWorkerResponse(
+        response_path.string(), request, response, error)) << error;
+    EXPECT_EQ(response.analysis.exitCode(), 0);
+    ASSERT_FALSE(response.dependency_manifest.files.empty());
+    for (const auto& dependency : response.dependency_manifest.files) {
+        EXPECT_TRUE(std::filesystem::is_regular_file(
+            dependency.canonical_path, ec))
+            << dependency.canonical_path << ": " << ec.message();
+        ec.clear();
+    }
+}
+
 TEST(WorkerProtocolTest, RuntimeRejectsCommandHashDrift) {
     const auto root = tempPath("codeskeptic-worker-runtime-hash");
     std::filesystem::create_directories(root);

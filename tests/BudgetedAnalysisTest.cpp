@@ -1337,14 +1337,19 @@ TEST(BudgetedAnalysisTest, McpRequestUsesProductionWorkerAndResolvedBudgets) {
     EXPECT_NE(resumed_response.find("\\\"origin\\\":\\\"checkpoint\\\""),
               std::string::npos) << resumed_response;
 
-    std::string other_request = request_text;
-    const std::string clean_path =
-        (project.path() / "mcp-clean.cpp").string();
     const std::string other_path =
         (project.path() / "mcp-other.cpp").string();
-    const auto path_position = other_request.find(clean_path);
-    ASSERT_NE(path_position, std::string::npos) << other_request;
-    other_request.replace(path_position, clean_path.size(), other_path);
+    auto other_payload = llvm::json::parse(request_text);
+    ASSERT_TRUE(static_cast<bool>(other_payload)) << request_text;
+    auto* other_params = other_payload->getAsObject()->getObject("params");
+    ASSERT_NE(other_params, nullptr);
+    auto* other_arguments = other_params->getObject("arguments");
+    ASSERT_NE(other_arguments, nullptr);
+    (*other_arguments)["path"] = other_path;
+    std::string other_request;
+    llvm::raw_string_ostream other_stream(other_request);
+    other_stream << *other_payload;
+    other_stream.flush();
     const std::string other_response = handleMcpMessage(other_request, base);
     EXPECT_EQ(other_response.find("\"error\""), std::string::npos)
         << other_response;

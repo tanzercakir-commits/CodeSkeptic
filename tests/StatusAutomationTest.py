@@ -247,6 +247,7 @@ class ProgressStatusTest(unittest.TestCase):
 
     def test_cross_host_control_files_are_lf_pinned(self) -> None:
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn("* text=auto eol=lf\n", attributes)
         self.assertIn("docs/PLAN.md text eol=lf\n", attributes)
         self.assertIn("docs/TODO.md text eol=lf\n", attributes)
         self.assertIn("docs/PROGRESS.md text eol=lf\n", attributes)

@@ -1,5 +1,7 @@
 #include "contracts/Sidecar.h"
 
+#include "source_manager/SourceManager.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Decl.h>
 #include <clang/Basic/SourceManager.h>
@@ -96,9 +98,12 @@ ParsedContracts sidecarContractsForDecl(const FunctionDecl* func,
     ParsedContracts out;
     if (!func) return out;
 
-    const SourceManager& sm = ctx.getSourceManager();
-    const std::string file =
-        sm.getFilename(sm.getExpansionLoc(func->getLocation())).str();
+    const clang::SourceManager& sm = ctx.getSourceManager();
+    const SourceLocation location = sm.getExpansionLoc(func->getLocation());
+    const auto file_ref = sm.getFileEntryRefForID(sm.getFileID(location));
+    const std::string file = file_ref
+        ? resolvedFilePathForEvidence(*file_ref)
+        : sm.getFilename(location).str();
     if (file.empty()) return out;
     const std::string cskPath = file + ".csk";
 

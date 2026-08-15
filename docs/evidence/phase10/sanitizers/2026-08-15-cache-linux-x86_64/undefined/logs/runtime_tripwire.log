@@ -1,8 +1,8 @@
 /work/tests/sanitizer/UndefinedTripwire.cpp:6:20: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
-    #0 0x55b0791413fb in main /work/tests/sanitizer/UndefinedTripwire.cpp:6:20
-    #1 0x7f5084da91c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
-    #2 0x7f5084da928a in __libc_start_main csu/../csu/libc-start.c:360:3
-    #3 0x55b0791133e4 in _start (/work/build-p10-06-ubsan-tests/tests/codeskeptic_sanitizer_tripwire+0x53e4) (BuildId: b45c3ef638341c60ddf009907ddae3f01fcfab1d)
+    #0 0x561af685b3fb in main /work/tests/sanitizer/UndefinedTripwire.cpp:6:20
+    #1 0x7f0d773401c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #2 0x7f0d7734028a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x561af682d3e4 in _start (/work/build-p10-06-ubsan-tests/tests/codeskeptic_sanitizer_tripwire+0x53e4) (BuildId: b45c3ef638341c60ddf009907ddae3f01fcfab1d)
 
 SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /work/tests/sanitizer/UndefinedTripwire.cpp:6:20 
 CODESKEPTIC_SANITIZER_GATE_OK runtime_tripwire

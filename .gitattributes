@@ -1,5 +1,6 @@
 # Retained receipts are checksum-bound artifacts. Keep their committed bytes
 # identical on every host; line-ending conversion would invalidate evidence.
+* text=auto eol=lf
 docs/PLAN.md text eol=lf
 docs/TODO.md text eol=lf
 docs/PROGRESS.md text eol=lf

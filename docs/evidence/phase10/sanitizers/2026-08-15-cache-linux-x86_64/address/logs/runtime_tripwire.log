@@ -1,32 +1,32 @@
 =================================================================
-==70==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7b2cd53e0014 at pc 0x55e1858f5d4e bp 0x7ffdf04b63c0 sp 0x7ffdf04b63b8
-WRITE of size 4 at 0x7b2cd53e0014 thread T0
-    #0 0x55e1858f5d4d in main /work/tests/sanitizer/AddressTripwire.cpp:6:21
-    #1 0x7f0cd63741c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
-    #2 0x7f0cd637428a in __libc_start_main csu/../csu/libc-start.c:360:3
-    #3 0x55e18580c354 in _start (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
+==90==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x7b9bbbbe0014 at pc 0x55ca01eb0d4e bp 0x7ffef4270720 sp 0x7ffef4270718
+WRITE of size 4 at 0x7b9bbbbe0014 thread T0
+    #0 0x55ca01eb0d4d in main /work/tests/sanitizer/AddressTripwire.cpp:6:21
+    #1 0x7f7bbcb701c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #2 0x7f7bbcb7028a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x55ca01dc7354 in _start (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
 
-0x7b2cd53e0014 is located 0 bytes after 4-byte region [0x7b2cd53e0010,0x7b2cd53e0014)
+0x7b9bbbbe0014 is located 0 bytes after 4-byte region [0x7b9bbbbe0010,0x7b9bbbbe0014)
 allocated by thread T0 here:
-    #0 0x55e1858f4981 in operator new[](unsigned long) (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x114981) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
-    #1 0x55e1858f5cf7 in main /work/tests/sanitizer/AddressTripwire.cpp:5:19
-    #2 0x7f0cd63741c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
-    #3 0x7f0cd637428a in __libc_start_main csu/../csu/libc-start.c:360:3
-    #4 0x55e18580c354 in _start (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
+    #0 0x55ca01eaf981 in operator new[](unsigned long) (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x114981) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
+    #1 0x55ca01eb0cf7 in main /work/tests/sanitizer/AddressTripwire.cpp:5:19
+    #2 0x7f7bbcb701c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #3 0x7f7bbcb7028a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #4 0x55ca01dc7354 in _start (/work/build-p10-06-asan-tests/tests/codeskeptic_sanitizer_tripwire+0x2c354) (BuildId: e97bc7996ef359de05c873b15c3219056e919af5)
 
 SUMMARY: AddressSanitizer: heap-buffer-overflow /work/tests/sanitizer/AddressTripwire.cpp:6:21 in main
 Shadow bytes around the buggy address:
-  0x7b2cd53dfd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7b2cd53dfe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7b2cd53dfe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7b2cd53dff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-  0x7b2cd53dff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-=>0x7b2cd53e0000: fa fa[04]fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7b2cd53e0080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7b2cd53e0100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7b2cd53e0180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7b2cd53e0200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
-  0x7b2cd53e0280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbdfd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b9bbbbdfe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b9bbbbdfe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b9bbbbdff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7b9bbbbdff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x7b9bbbbe0000: fa fa[04]fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbe0080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbe0100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbe0180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbe0200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x7b9bbbbe0280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
 Shadow byte legend (one shadow byte represents 8 application bytes):
   Addressable:           00
   Partially addressable: 01 02 03 04 05 06 07 
@@ -46,5 +46,5 @@ Shadow byte legend (one shadow byte represents 8 application bytes):
   ASan internal:           fe
   Left alloca redzone:     ca
   Right alloca redzone:    cb
-==70==ABORTING
+==90==ABORTING
 CODESKEPTIC_SANITIZER_GATE_OK runtime_tripwire

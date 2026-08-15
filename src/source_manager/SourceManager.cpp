@@ -13,6 +13,7 @@
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/ASTContext.h>
+#include <clang/Basic/FileEntry.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/FrontendAction.h>
 #include <clang/Lex/PPCallbacks.h>
@@ -67,6 +68,12 @@ std::string lexicalIdentity(const std::string& path) {
     return (ec ? fs::path(path) : lexical).lexically_normal().string();
 }
 
+bool isRegularPath(const std::string& path) {
+    if (path.empty()) return false;
+    std::error_code ec;
+    return fs::is_regular_file(fs::status(path, ec)) && !ec;
+}
+
 std::vector<std::string>& dependencyList() {
     static std::vector<std::string> files;
     return files;
@@ -96,11 +103,12 @@ void recordDependencyFiles(clang::ASTContext& ctx) {
     auto& files = dependencyList();
     const auto& source = ctx.getSourceManager();
     for (auto it = source.fileinfo_begin(); it != source.fileinfo_end(); ++it) {
-        const std::string path = it->first.getName().str();
-        // Sidecar lookup intentionally uses Clang's lexical file spelling.
-        // Preserve it as evidence in addition to the resolved file identity,
-        // otherwise alias.h -> real.h could read alias.h.csk while only
-        // real.h.csk was bound to the checkpoint.
+        const std::string path =
+            codeskeptic::resolvedFilePathForEvidence(it->first);
+        // Preserve an existing lexical spelling in addition to its canonical
+        // identity so alias.h -> real.h binds alias.h.csk. VFS-remapped names
+        // that do not exist on disk have already fallen back to Clang's
+        // requested/real path, matching Sidecar.cpp.
         files.push_back(lexicalIdentity(path));
         files.push_back(canonicalIdentity(path));
     }
@@ -266,6 +274,23 @@ loadCompilationDatabaseText(const std::string& text, std::string& error) {
 }
 
 } // anonymous namespace
+
+std::string resolvedFilePathForEvidence(const clang::FileEntryRef& file) {
+    const std::string named = lexicalIdentity(file.getName().str());
+    if (isRegularPath(named)) return named;
+
+    const std::string requested =
+        lexicalIdentity(file.getNameAsRequested().str());
+    if (isRegularPath(requested)) return requested;
+
+    const std::string real_name =
+        file.getFileEntry().tryGetRealPathName().str();
+    if (!real_name.empty()) {
+        const std::string real = lexicalIdentity(real_name);
+        if (isRegularPath(real)) return real;
+    }
+    return named;
+}
 
 bool validateCompilationDatabaseText(const std::string& text,
                                      std::string& error) {

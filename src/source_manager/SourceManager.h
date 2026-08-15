@@ -8,6 +8,7 @@
 
 namespace clang {
 class ASTContext;
+class FileEntryRef;
 namespace tooling {
 class CompilationDatabase;
 }
@@ -24,6 +25,13 @@ using ASTCallback = std::function<void(clang::ASTContext&)>;
 // compile snippets IDENTICALLY — a test TU that silently fails to
 // find <stdlib.h> reports zero findings and passes vacuously.
 std::vector<std::string> platformExtraArgs();
+
+// Clang may expose a VFS-remapped external spelling even though only the
+// originally requested or real filesystem path exists. Prefer an existing
+// lexical spelling so symlink sidecars remain semantic inputs, then fall back
+// to an existing requested/real path. Dependency hashing and sidecar lookup
+// must use this same choice.
+std::string resolvedFilePathForEvidence(const clang::FileEntryRef& file);
 
 // Exact in-memory entry point used by both the production file wrapper and
 // deterministic fuzzing. Parsing remains Clang's JSON compilation-database
