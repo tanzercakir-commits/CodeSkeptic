@@ -1,0 +1,112 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+      Start  1: codeskeptic_tests_NOT_BUILT
+Could not find executable codeskeptic_tests_NOT_BUILT
+Looked in the following places:
+codeskeptic_tests_NOT_BUILT
+codeskeptic_tests_NOT_BUILT
+Release/codeskeptic_tests_NOT_BUILT
+Release/codeskeptic_tests_NOT_BUILT
+Debug/codeskeptic_tests_NOT_BUILT
+Debug/codeskeptic_tests_NOT_BUILT
+MinSizeRel/codeskeptic_tests_NOT_BUILT
+MinSizeRel/codeskeptic_tests_NOT_BUILT
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT
+Deployment/codeskeptic_tests_NOT_BUILT
+Deployment/codeskeptic_tests_NOT_BUILT
+Development/codeskeptic_tests_NOT_BUILT
+Development/codeskeptic_tests_NOT_BUILT
+Unable to find executable: codeskeptic_tests_NOT_BUILT
+ 1/18 Test  #1: codeskeptic_tests_NOT_BUILT .........***Not Run   0.00 sec
+      Start  2: StatusAutomationContract
+ 2/18 Test  #2: StatusAutomationContract ............   Passed   10.98 sec
+      Start  3: RealworldCampaignContract
+ 3/18 Test  #3: RealworldCampaignContract ...........   Passed    0.10 sec
+      Start  4: Phase83QualificationContract
+ 4/18 Test  #4: Phase83QualificationContract ........   Passed    0.07 sec
+      Start  5: UpstreamValidationContract
+ 5/18 Test  #5: UpstreamValidationContract ..........   Passed    0.26 sec
+      Start  6: UpstreamCandidateManifestContract
+ 6/18 Test  #6: UpstreamCandidateManifestContract ...   Passed    0.28 sec
+      Start  7: UpstreamCandidateEvidenceContract
+ 7/18 Test  #7: UpstreamCandidateEvidenceContract ...   Passed    1.03 sec
+      Start  8: FuzzingContract
+ 8/18 Test  #8: FuzzingContract .....................   Passed    0.12 sec
+      Start  9: SanitizerContract
+ 9/18 Test  #9: SanitizerContract ...................   Passed    2.14 sec
+      Start 10: StressMatrixContract
+10/18 Test #10: StressMatrixContract ................***Failed    0.11 sec
+..E.
+======================================================================
+ERROR: test_production_matrix_is_repeatable_and_receipt_verifies (__main__.StressMatrixContractTest.test_production_matrix_is_repeatable_and_receipt_verifies)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/StressMatrixTest.py", line 69, in test_production_matrix_is_repeatable_and_receipt_verifies
+    receipt = matrix.run_matrix(BINARY, output=output)
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_stress_matrix.py", line 348, in run_matrix
+    identity = _binary_identity(binary)
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_stress_matrix.py", line 254, in _binary_identity
+    raise MatrixError(f"missing analyzer binary: {binary}")
+run_stress_matrix.MatrixError: missing analyzer binary: /Users/runner/work/CodeSkeptic/CodeSkeptic/build/src/codeskeptic
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.026s
+
+FAILED (errors=1)
+
+      Start 11: ResourceBudgetWorkflowContract
+11/18 Test #11: ResourceBudgetWorkflowContract ......   Passed    0.06 sec
+      Start 12: ActionArgsParser
+12/18 Test #12: ActionArgsParser ....................   Passed    0.14 sec
+      Start 13: ReleaseWorkflowContract
+13/18 Test #13: ReleaseWorkflowContract .............   Passed    0.05 sec
+      Start 14: DockerWorkflowContract
+14/18 Test #14: DockerWorkflowContract ..............   Passed    0.06 sec
+      Start 15: CapabilitiesCliContract
+15/18 Test #15: CapabilitiesCliContract .............***Failed    0.05 sec
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/CapabilitiesCliTest.py", line 19, in <module>
+    result = subprocess.run(
+        [str(binary), "--capabilities", "--json"],
+    ...<2 lines>...
+        capture_output=True,
+    )
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1990, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/runner/work/CodeSkeptic/CodeSkeptic/build/src/codeskeptic'
+
+      Start 16: MeasurementLabContract
+16/18 Test #16: MeasurementLabContract ..............   Passed    0.06 sec
+      Start 17: MeasurementWorkflowContract
+17/18 Test #17: MeasurementWorkflowContract .........   Passed    0.05 sec
+      Start 18: ReviewDiffFlow
+18/18 Test #18: ReviewDiffFlow ......................***Failed    0.15 sec
+FAIL: delta review: expected gate exit 1, got 2
+--- stdout ---
+--- stderr ---
+--- review.md ---
+
+
+78% tests passed, 4 tests failed out of 18
+
+Total Test time (real) =  15.74 sec
+
+The following tests FAILED:
+	  1 - codeskeptic_tests_NOT_BUILT (Not Run)
+	 10 - StressMatrixContract (Failed)
+	 15 - CapabilitiesCliContract (Failed)
+	 18 - ReviewDiffFlow (Failed)
+Errors while running CTest
