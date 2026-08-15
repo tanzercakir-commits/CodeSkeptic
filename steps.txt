@@ -1,0 +1,9 @@
+configure=success
+build=failure
+test=skipped
+test-single=skipped
+smoke=skipped
+nodev-dirmode=skipped
+package=skipped
+package-no7z=skipped
+reloc-smoke=skipped
