@@ -2,10 +2,13 @@
 #define CODESKEPTIC_RESOURCE_SUPERVISOR_H
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 namespace codeskeptic {
+
+struct ResourceSupervisorTestAccess;
 
 struct ResourceLimits {
     unsigned timeout_seconds = 0;
@@ -40,6 +43,15 @@ public:
     static ResourceRunResult run(const std::string& program,
                                  const std::vector<std::string>& arguments,
                                  ResourceLimits limits);
+
+private:
+    using MemorySampler = std::function<std::uint64_t()>;
+    static ResourceRunResult runWithMemorySampler(
+        const std::string& program,
+        const std::vector<std::string>& arguments,
+        ResourceLimits limits,
+        const MemorySampler& memory_sampler);
+    friend struct ResourceSupervisorTestAccess;
 };
 
 } // namespace codeskeptic

@@ -141,7 +141,9 @@ TEST(BudgetedAnalysisTest, WholeProgramProductionWorkersPreserveCrossTuFinding) 
                           30, 1024, true));
     DiagnosticList diagnostics;
 
+    testing::internal::CaptureStderr();
     const AnalysisResult result = analyze(std::move(config), diagnostics);
+    const std::string stderr_output = testing::internal::GetCapturedStderr();
 
     EXPECT_EQ(result.attempted_tus, 2u);
     EXPECT_EQ(result.analyzed_tus, 2u);
@@ -153,6 +155,7 @@ TEST(BudgetedAnalysisTest, WholeProgramProductionWorkersPreserveCrossTuFinding) 
                             [](const TranslationUnitReceipt& receipt) {
                                 return receipt.phase == "summary-harvest";
                             }), 2);
+    EXPECT_NE(stderr_output.find("Whole-program pass"), std::string::npos);
     EXPECT_NE(std::find_if(diagnostics.begin(), diagnostics.end(),
                            [](const Diagnostic& diagnostic) {
                                return diagnostic.rule_id == "null-deref";

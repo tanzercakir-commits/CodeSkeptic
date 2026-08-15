@@ -17,11 +17,29 @@ using codeskeptic::ResourceLimits;
 using codeskeptic::ResourceRunStatus;
 using codeskeptic::ResourceSupervisor;
 
+namespace codeskeptic {
+
+struct ResourceSupervisorTestAccess {
+    static ResourceRunResult failSecondMemorySample(
+        const std::string& program,
+        const std::vector<std::string>& arguments,
+        ResourceLimits limits) {
+        unsigned samples = 0;
+        return ResourceSupervisor::runWithMemorySampler(
+            program, arguments, limits, [&samples]() -> std::uint64_t {
+                ++samples;
+                return samples == 1 ? 1024u : 0u;
+            });
+    }
+};
+
+} // namespace codeskeptic
+
 TEST(ResourceSupervisorTest, CompletedChildCarriesBoundedStatistics) {
     const auto result = ResourceSupervisor::run(
         CODESKEPTIC_RESOURCE_PROBE, {"complete"}, ResourceLimits{5, 512});
 
-    EXPECT_EQ(result.status, ResourceRunStatus::Completed);
+    EXPECT_EQ(result.status, ResourceRunStatus::Completed) << result.error;
     EXPECT_EQ(result.exit_code, 0);
     EXPECT_LT(result.duration_ms, 5000u);
     EXPECT_GT(result.peak_memory_kib, 0u);
@@ -33,8 +51,22 @@ TEST(ResourceSupervisorTest, SuccessfulExitWithoutCompletionMarkerFailsClosed) {
         ResourceLimits{5, 512});
 
     EXPECT_EQ(result.status, ResourceRunStatus::Crashed);
-    EXPECT_NE(result.error.find("completion handshake"), std::string::npos)
+    EXPECT_TRUE(
+        result.error.find("completion handshake") != std::string::npos ||
+        result.error.find("cannot sample running worker") != std::string::npos)
         << result.error;
+}
+
+TEST(ResourceSupervisorTest, PostReadySamplingFailureFailsClosed) {
+    const auto result =
+        codeskeptic::ResourceSupervisorTestAccess::failSecondMemorySample(
+            CODESKEPTIC_RESOURCE_PROBE, {"complete"},
+            ResourceLimits{5, 512});
+
+    EXPECT_EQ(result.status, ResourceRunStatus::Crashed);
+    EXPECT_EQ(result.exit_code, -2);
+    EXPECT_NE(result.error.find("cannot sample running worker"),
+              std::string::npos) << result.error;
 }
 
 TEST(ResourceSupervisorTest, ParentPeakDoesNotPolluteCompletedChild) {

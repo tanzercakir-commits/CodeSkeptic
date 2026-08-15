@@ -423,6 +423,11 @@ AnalysisResult StaticAnalyzer::runBudgeted() {
                 replace_summaries, produce_fragment);
         };
 
+    if (config_.wholeProgram()) {
+        std::cerr << msg(MsgId::WholeProgramPass,
+                         std::to_string(source_mgr_->fileCount())) << "\n";
+    }
+
     auto coordinated = AnalysisCoordinator::run(
         units,
         ResourceLimits{config_.tuTimeoutSeconds(), config_.tuMemoryMiB()},

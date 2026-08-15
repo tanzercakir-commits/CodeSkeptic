@@ -104,6 +104,14 @@ ResourceRunResult ResourceSupervisor::run(
     const std::string& program,
     const std::vector<std::string>& arguments,
     ResourceLimits limits) {
+    return runWithMemorySampler(program, arguments, limits, {});
+}
+
+ResourceRunResult ResourceSupervisor::runWithMemorySampler(
+    const std::string& program,
+    const std::vector<std::string>& arguments,
+    ResourceLimits limits,
+    const MemorySampler& memory_sampler) {
     ResourceRunResult result;
     llvm::SmallString<128> unique_directory;
     const std::error_code directory_error =
@@ -153,6 +161,10 @@ ResourceRunResult ResourceSupervisor::run(
         cleanup_control();
         return result;
     }
+    const auto sample_memory_kib = [&memory_sampler, &process]() {
+        return memory_sampler ? memory_sampler()
+                              : residentMemoryKiB(process);
+    };
 
     const auto deadline = started +
         std::chrono::seconds(limits.timeout_seconds);
@@ -186,7 +198,7 @@ ResourceRunResult ResourceSupervisor::run(
                 break;
             }
             if (ready) {
-                const std::uint64_t memory = residentMemoryKiB(process);
+                const std::uint64_t memory = sample_memory_kib();
                 if (memory == 0) {
                     handshake_failed = true;
                     error = "cannot sample ready worker resident memory";
@@ -209,11 +221,26 @@ ResourceRunResult ResourceSupervisor::run(
                 }
                 handshake_ready = true;
             }
-        } else {
-            const std::uint64_t memory = residentMemoryKiB(process);
-            if (memory > 0)
-                result.peak_memory_kib =
-                    std::max(result.peak_memory_kib, memory);
+        } else if (!completion_seen) {
+            const std::uint64_t memory = sample_memory_kib();
+            if (memory == 0) {
+                handshake_failed = true;
+                std::string sample_wait_error;
+                completed = llvm::sys::Wait(
+                    process, 0u, &sample_wait_error, nullptr, true);
+                if (completed.Pid != llvm::sys::ProcessInfo::InvalidPid) {
+                    error = "worker exited before completion handshake";
+                    if (!sample_wait_error.empty())
+                        error += ": " + sample_wait_error;
+                } else {
+                    error = "cannot sample running worker resident memory";
+                    if (!terminateProcess(process))
+                        error += "; failed to terminate unsampled worker";
+                }
+                break;
+            }
+            result.peak_memory_kib =
+                std::max(result.peak_memory_kib, memory);
             if (memory_limit_kib > 0 && memory > memory_limit_kib) {
                 memory_exceeded = true;
                 if (!terminateProcess(process))

@@ -1,9 +1,11 @@
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-/tmp/codeskeptic-stress-n3phgmg1/template-malformed/repeat-2/template_malformed.cpp:3:20: error: expected expression
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+/tmp/codeskeptic-stress-jpen1jlc/template-malformed/repeat-2/template_malformed.cpp:3:20: error: expected expression
     3 |     return value + ;
       |                    ^
 1 error generated.
-Error while processing /tmp/codeskeptic-stress-n3phgmg1/template-malformed/repeat-2/template_malformed.cpp.
+Error while processing /tmp/codeskeptic-stress-jpen1jlc/template-malformed/repeat-2/template_malformed.cpp.
 [CodeSkeptic] 1 translation unit(s) failed to COMPILE. Findings from an error-recovery AST are non-verdict evidence. Fix the include paths/flags; --analyze-broken-tus may inspect the recovered AST but the verdict remains unavailable:
-  - /tmp/codeskeptic-stress-n3phgmg1/template-malformed/repeat-2/template_malformed.cpp
+  - /tmp/codeskeptic-stress-jpen1jlc/template-malformed/repeat-2/template_malformed.cpp
+[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-jpen1jlc/template-malformed/repeat-2/template_malformed.cpp (command_sha256=5d7a39166aa69977156723b92ec9038c622874d3488206514f3ba3c38c477abb, ordinal=0, phase=analysis)
 [CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

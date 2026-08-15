@@ -2,45 +2,45 @@
   "builds": {
     "fuzz": {
       "binaries": {
-        "fuzz/codeskeptic_fuzz_compile_database": "7a1db4541f25c2bd646ab767bb8245f7319bd70c31a883395bed8e2a31af17fa",
-        "fuzz/codeskeptic_fuzz_config": "2bc7e76f5c8c962c7e8e8166d1aebf454e99ffd46b7ada8459ca00f5ee591bb3",
-        "fuzz/codeskeptic_fuzz_mcp_json_rpc": "32cb7e0877ed9e205f5572a9b14012ea28d5c9de0a294b042547ac15d12d5f85",
+        "fuzz/codeskeptic_fuzz_compile_database": "92f66e3ded9bde8d82752c9d6cbdeac5958778b17d9f9d4a91a63304d2118f5e",
+        "fuzz/codeskeptic_fuzz_config": "5dcf80be22c5f8432edbe37cae1fcbc039f915a305936b83d9149d0145fe5b73",
+        "fuzz/codeskeptic_fuzz_mcp_json_rpc": "7d049a026bb7ebac313742abb4706658672aa439da42199f01005ac9aac2c347",
         "fuzz/codeskeptic_fuzz_summary": "c8256857faa50cb9eeb3f8dff604c4dba57cb2bf4e5812300c309ba8528c04bc"
       },
-      "cmake_cache_sha256": "83955a890494fe59529c72143c6b6ea7b85f91447a84cc7602337ba617ddae14",
-      "compile_commands_sha256": "a6348d62f6e99ee297a3dc827ed8eefd1fd1fe7998e485488fa4e8a50cf38387",
+      "cmake_cache_sha256": "8b489d758a36071132e27dc6f4c5a1f82467dbf7494828186ae6e42f39e55886",
+      "compile_commands_sha256": "9f6c2a64028dfba5c3bc04c7d6bbc90bbb0ef27f1fc7694e09185bdf4e71eebc",
       "link_graph_file_count": 1,
-      "link_graph_sha256": "bcb110d796686431c621091c50a3f1c75f2791a063ba82ef2afd38157cb164a7",
+      "link_graph_sha256": "f0d3105956f71043406708b27e99f92333819557fe599954ea8227d47c474bc5",
       "selected_compile_command_sha256": {
-        "fuzz/FuzzCompileDatabase.cpp": "945ee702c42868aebb953c405c4694804c40f2edc6625cc952d3e2be966779f2",
-        "fuzz/FuzzConfig.cpp": "0bcf7d6c457b702e6bdc44bb2378cf3158683d183068d827f44da2422e8b716d",
-        "fuzz/FuzzMcpJsonRpc.cpp": "dbf79808bdc07fdc9e05ee5018ef0680626e9ecaa15828414df98153c31d1f5e",
-        "fuzz/FuzzSummary.cpp": "3b6bb8dbe6e7d6eeb283e1675d28ab98573640bc8fcd842518e1013bebc94c9e",
-        "src/config/Config.cpp": "6d8628599edbf0c8e5588c4f9944fa357f6f9ae6e772fe098f5a2f5d456a62ce"
+        "fuzz/FuzzCompileDatabase.cpp": "b8c06924cdfda95aa7ab8424611da26f94f1ff363800da2a87207ef85ed870e9",
+        "fuzz/FuzzConfig.cpp": "f7d0a2c1c17c3819e7b1d3dddf7771d1ae24dd9e312d8dda5624edde08effac9",
+        "fuzz/FuzzMcpJsonRpc.cpp": "349fefe47e836f9d9b883328f671d318083d35206939ed975d7a457486760fe0",
+        "fuzz/FuzzSummary.cpp": "73285697c66ad8d103da3cf1434ea563909e941d09eb7a5945f9947c4ed01076",
+        "src/config/Config.cpp": "d797be9892a962038b062f5f2821a41f677810d8be0de1362d75dd1b6f3a7bdb"
       }
     },
     "tests": {
       "binaries": {
-        "src/codeskeptic": "9bea57924b6fea306039ad6e6700adf3842b4eb22c9aa752468b390d9bcbbb58",
+        "src/codeskeptic": "6b7281128d983b59f2dc6eedf099d93b366aec53136900a01df6f73eccc2a037",
         "tests/codeskeptic_sanitizer_tripwire": "7a908e71ea5160150e5048d5c1c38d741a3b2ff99d5830c9bb81b2cc7f5c600c",
-        "tests/codeskeptic_tests": "f909c4d0444244f89292c992f7140d63544daccd0f26e317d5f14906a5832feb"
+        "tests/codeskeptic_tests": "e18e63a26c6d1d6b8bfeff925ad7069181878c14eb4ff74b17a35a311565e3ad"
       },
-      "cmake_cache_sha256": "5cf520a20e4efce920719f54ede9bfb0e3040a4a3c239ffe733c870c2d3398be",
-      "compile_commands_sha256": "8bd826a2dc4c2a3483f304748a65fa78e9947d36f84ba291c6c5e2e7a99226e0",
+      "cmake_cache_sha256": "e6868b36b6ac9537d7d9957b589065353cb412d5d3e78b13da884d8892b2b381",
+      "compile_commands_sha256": "6d2caff306e917b2ab9f4a590866debe78ff8f3f2a0687b63ff9adfe0ccc98fe",
       "link_graph_file_count": 1,
-      "link_graph_sha256": "6a2a68a60834310404d4b5759ab88d7889e1120dcd23596b379642bc1502aef1",
+      "link_graph_sha256": "6aae3734c7c8bf5f5eb337814232470cc5784a8c34b6c5d3c269d4143153c35b",
       "selected_compile_command_sha256": {
-        "src/config/Config.cpp": "3ded841c3794264d30ad84213e7b48044dc7bd4674a7575a13f5e97a029422d9",
-        "tests/BrokenTuTest.cpp": "09206b5de85b9c64910403670730285e043f120a25f0a79f5885b12bc7afd483"
+        "src/config/Config.cpp": "5a65aaf4d8788944be89bba8bc29cd4ced8817d2b1e1ada94a0c90a2662eb9f8",
+        "tests/BrokenTuTest.cpp": "aa636a0a751368aa9382936f89e31cf68228c6e6fd88200e37345cf6fddddbc1"
       }
     }
   },
-  "duration_ms": 66135,
+  "duration_ms": 76301,
   "failures": [],
-  "finished_at": "2026-08-14T22:22:53.046379+00:00",
+  "finished_at": "2026-08-15T00:45:09.107065+00:00",
   "fixture": {
     "algorithm": "sha256",
-    "digest": "177dd90a2ada0b0421922827a6ea6fb9cd2cb21101b16c21fba559a7aeac14b4",
+    "digest": "bcb465e035218b21ad35398e5f21728d2415f91165ccff4117d2725b0d6f373c",
     "entries": [
       {
         "path": "clean/clean.cpp",
@@ -48,7 +48,7 @@
       },
       {
         "path": "clean/compile_commands.json",
-        "sha256": "6b6fc0d90c286600d8cdf121854bdabacfe69273ceed2aac399eb29a18cf8db2"
+        "sha256": "0a6a9563ea18de5066d68dbe448286be7fd51df0e6a8119ae30f8135e40a98de"
       },
       {
         "path": "clean/finding.cpp",
@@ -60,7 +60,7 @@
       },
       {
         "path": "whole/compile_commands.json",
-        "sha256": "25544b9ee7cdeed227c10673fff40e235c9395957bb406bf6ef84d6928730067"
+        "sha256": "b46e0cb9db0bf57ca44d8049700e28504d75c7511e7395c456e9aa1cc0019810"
       },
       {
         "path": "whole/first.cpp",
@@ -78,13 +78,13 @@
       "command": [
         "$TEST_BUILD/tests/codeskeptic_sanitizer_tripwire"
       ],
-      "duration_ms": 114,
+      "duration_ms": 115,
       "evidence": {
         "runtime_active": true
       },
       "exit_code": -6,
       "log": "logs/runtime_tripwire.log",
-      "log_sha256": "37c935c193a9b3c880f74e97b48d058d8fc733ad5898cdce0b654275355672c7",
+      "log_sha256": "09c0570a098566b49879dd397157bbfe38ba25f3d7ddcc4da6afa1d152d121bd",
       "name": "runtime_tripwire"
     },
     {
@@ -100,7 +100,7 @@
       },
       "exit_code": 0,
       "log": "logs/focused_serial_worker.log",
-      "log_sha256": "0b9ff85e174b3bfb23e8176f7289a3945168516e778a90214b76c15c2fd0fd0e",
+      "log_sha256": "e5cf94335832fa01fa9115e58f890d422b8f6ff0cf7d7300bcb023b5c5767081",
       "name": "focused_serial_worker"
     },
     {
@@ -110,27 +110,27 @@
         "$TEST_BUILD",
         "--output-on-failure"
       ],
-      "duration_ms": 58833,
+      "duration_ms": 64728,
       "evidence": {
-        "listing_sha256": "af166e207e21526bd5bb53804e9cc820774c991df2aff9840e09d358040a1138",
-        "test_count": 1208
+        "listing_sha256": "4182e7614cf75d76a0868ac4a04857b4c602c37794213b32ba03065422f84b92",
+        "test_count": 1254
       },
       "exit_code": 0,
       "log": "logs/ctest_complete.log",
-      "log_sha256": "8658fdf496e403ce80380ed04179f9b99fcac4239e4f9d92fa2f75bcd237deb2",
+      "log_sha256": "a0a74a4f0ad10e67bf463db0587b49bdaa6af339cc45cf0ec9f884b7fdc7ca3a",
       "name": "ctest_complete"
     },
     {
       "command": [
         "$TEST_BUILD/tests/codeskeptic_tests"
       ],
-      "duration_ms": 4228,
+      "duration_ms": 8149,
       "evidence": {
-        "test_count": 1192
+        "test_count": 1237
       },
       "exit_code": 0,
       "log": "logs/single_process_complete.log",
-      "log_sha256": "62af5e78214bf4e3ffbd9c1a0e13c5838b174a3db72c8027963f04d6408d9e5f",
+      "log_sha256": "e37393cceb767ed1ea818420976ccb3514b18a34860251993500ef5138e0f91c",
       "name": "single_process_complete"
     },
     {
@@ -146,7 +146,7 @@
       },
       "exit_code": 0,
       "log": "logs/analyzer_clean.log",
-      "log_sha256": "eac48fad3a34e2a0dee91411039579dfcb2f27b334d1d304672010d17192ad42",
+      "log_sha256": "6701648401a3b19f3069904f073661c6cc441fcd05470806ffd3a1d1176ccad5",
       "name": "analyzer_clean"
     },
     {
@@ -156,13 +156,13 @@
         "--build-path",
         "$OUTPUT/fixture/clean"
       ],
-      "duration_ms": 65,
+      "duration_ms": 114,
       "evidence": {
         "expected_verdict_exit": 1
       },
       "exit_code": 1,
       "log": "logs/analyzer_finding.log",
-      "log_sha256": "33694f4e3ce66a1346437241d56a832002b773477963664a960eccc9e76178fe",
+      "log_sha256": "5a96c6a6f5bbc1e1c8946be714b49867b7e68c3cbd61586ff8b7e81b11c0dba2",
       "name": "analyzer_finding"
     },
     {
@@ -172,7 +172,7 @@
         "--build-path",
         "$OUTPUT/fixture/invalid"
       ],
-      "duration_ms": 33,
+      "duration_ms": 65,
       "evidence": {
         "expected_verdict_exit": 2
       },
@@ -189,14 +189,14 @@
         "$OUTPUT/fixture/whole",
         "--whole-program"
       ],
-      "duration_ms": 64,
+      "duration_ms": 216,
       "evidence": {
         "expected_verdict_exit": 0,
         "source_files": 2
       },
       "exit_code": 0,
       "log": "logs/analyzer_whole_program.log",
-      "log_sha256": "e4794c1acc40b39dcbe577dde3f0a23557f952274b4df27dfd327757103eeb98",
+      "log_sha256": "f0781f645a41e013be0d64ea5f625f7c6b397cc3b0936f65148c741575e02dea",
       "name": "analyzer_whole_program"
     },
     {
@@ -204,18 +204,18 @@
         "$TEST_BUILD/src/codeskeptic",
         "--serve"
       ],
-      "duration_ms": 64,
+      "duration_ms": 115,
       "evidence": {
         "request_ids": [
           1,
           2
         ],
         "sequential_loop": true,
-        "stdin_sha256": "9d510a2b2df88c2c3cece5eadba171fe703458dadde28c9e76cd54a85ef2d582"
+        "stdin_sha256": "992e84713e051831e58886c90c46a346601f29d4d0eefc8ff59086503b12a01e"
       },
       "exit_code": 0,
       "log": "logs/mcp_sequential.log",
-      "log_sha256": "82edb35954e13c9bffbbc0ebe84594ad6181a9b9e57b4097f03fbc29b36ed5c6",
+      "log_sha256": "22254eb85ecd96025f8399ae5bb9d50507a834d8ef0edfa308cedeef90b0262f",
       "name": "mcp_sequential"
     },
     {
@@ -229,15 +229,15 @@
         "--output",
         "$OUTPUT/fuzz-smoke"
       ],
-      "duration_ms": 1268,
+      "duration_ms": 1269,
       "evidence": {
         "mode": "smoke",
-        "receipt_sha256": "be03e9cf4c5e68d220474ec185f956911569b4107757812e935f6ba1f6b0b6e4",
+        "receipt_sha256": "8fd0bc7ed39d6918797ee6a094151022e8af2b29be057c3db4baa267ad064857",
         "target_count": 4
       },
       "exit_code": 0,
       "log": "logs/fuzz_smoke.log",
-      "log_sha256": "5750fa44bc84f5d5bc04136b4bb0feb12850de6904dbe624908988a0a7b7f348",
+      "log_sha256": "c83f4cb9618e04973e6780e72d558c3a83891fcfc3c0c80f739cea9a651a2e2f",
       "name": "fuzz_smoke"
     }
   ],
@@ -255,11 +255,11 @@
         "-B",
         "$TEST_BUILD"
       ],
-      "duration_ms": 315,
+      "duration_ms": 415,
       "evidence": {},
       "exit_code": 0,
       "log": "logs/configure_tests.log",
-      "log_sha256": "58f3ef1929e1b6612e41cc0ec34e83cafccde463ced6d0947f652538dd8f61eb",
+      "log_sha256": "4df68881df0c86c1990b1275f880869748e9618a849dc92db2bc31aa7752c009",
       "name": "configure_tests"
     },
     {
@@ -270,11 +270,11 @@
         "-B",
         "$FUZZ_BUILD"
       ],
-      "duration_ms": 115,
+      "duration_ms": 114,
       "evidence": {},
       "exit_code": 0,
       "log": "logs/configure_fuzz.log",
-      "log_sha256": "685b7d3f94672aa647fa9f790c493c30d7d38cf19c07c39343fc0aafaa205a66",
+      "log_sha256": "7777d0e36d3fa9adfed9f1a67256188c43d81f82e951e9b74667525f0abc76d3",
       "name": "configure_fuzz"
     },
     {
@@ -309,7 +309,7 @@
         "--parallel",
         "2"
       ],
-      "duration_ms": 33,
+      "duration_ms": 17,
       "evidence": {},
       "exit_code": 0,
       "log": "logs/build_fuzz.log",
@@ -324,14 +324,14 @@
   },
   "schema": "codeskeptic-sanitizer-receipt-v1",
   "source": {
-    "base_commit": "b4b5d647e6df409953c26377afbc0eb490081517",
+    "base_commit": "a83958c72ff5cb339e0ebe1a68c042759550f54a",
     "manifest": {
       "algorithm": "sha256",
-      "digest": "a452bb75b509d7d0091c74a591a2ea231d5219bce219d0d181e1609987f275ef",
-      "file_count": 358
+      "digest": "dc98bc14cca3d76174c602d447aef271413637a84cc8866e25a8c793ef8d72c6",
+      "file_count": 377
     }
   },
-  "started_at": "2026-08-14T22:21:46.911506+00:00",
+  "started_at": "2026-08-15T00:43:52.805648+00:00",
   "status": "accepted",
   "toolchain": {
     "path": "/usr/bin/clang++-20",
