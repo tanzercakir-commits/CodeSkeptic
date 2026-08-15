@@ -103,19 +103,18 @@ def fixture_build_toolchain() -> dict:
 def input_receipt(kind: str, repo_root: Path = ROOT) -> dict:
     source_root = workload_source_root(kind, repo_root)
     marker = "$RELEASE_SOURCE" if kind == "release-candidate" else "$REPO"
-    roots = [(repo_root, "$REPO")]
     if kind == "unit":
-        roots.append((repo_root.parent / f".{repo_root.name}-unit-build", "$UNIT_BUILD"))
+        build_root = repo_root.parent / f".{repo_root.name}-unit-build"
         relative = "tests/thesis_corpus/sample.cpp"
     elif kind == "real-repository":
-        roots.append((repo_root.parent / f".{repo_root.name}-build", "$BUILD"))
+        build_root = repo_root.parent / f".{repo_root.name}-build"
         relative = "src/sample.cpp"
     else:
-        roots.extend([
-            (source_root, "$RELEASE_SOURCE"),
-            (repo_root.parent / f".{repo_root.name}-release-build", "$RELEASE_BUILD"),
-        ])
+        build_root = repo_root.parent / f".{repo_root.name}-release-build"
         relative = "src/sample.cpp"
+    roots = qualification._normalization_roots(
+        repo_root, kind, source_root, build_root
+    )
     source = source_root / relative
     execution = {
         "working_directory": str(source_root),
@@ -705,6 +704,11 @@ class DeterminismQualificationTest(unittest.TestCase):
         )
         self.assertIsNone(project.get("environment"))
         self.assertIsInstance(qualification._release_environment(project), dict)
+        release_roots = input_receipt("release-candidate")["roots"]
+        self.assertEqual(
+            [item["marker"] for item in release_roots],
+            ["$RELEASE_BUILD", "$RELEASE_SOURCE", "$REPO"],
+        )
 
     def test_one_semantic_drift_or_missing_repetition_fails_closed(self) -> None:
         raw_manifest = manifest()

@@ -1945,6 +1945,24 @@ def _resolve_analyzer_args(
     return result
 
 
+def _normalization_roots(
+    repo: Path, kind: str, source_root: Path, build_root: Path,
+) -> list[tuple[Path, str]]:
+    roots = [(repo.resolve(), "$REPO")]
+    if kind == "unit":
+        roots.append((build_root.resolve(), "$UNIT_BUILD"))
+    elif kind == "real-repository":
+        roots.append((build_root.resolve(), "$BUILD"))
+    elif kind == "release-candidate":
+        roots.extend([
+            (source_root.resolve(), "$RELEASE_SOURCE"),
+            (build_root.resolve(), "$RELEASE_BUILD"),
+        ])
+    else:
+        raise QualificationError("unknown workload normalization kind")
+    return roots
+
+
 def _pin_release_command(
     command: list[str], cmake: Path, ninja: Path,
     c_compiler: Path, cxx_compiler: Path,
@@ -2238,7 +2256,7 @@ def prepare_workloads(
             unit_build = work / "unit-build"
             compile_db = _write_unit_compile_database(sources, unit_build, clang)
             entries = _load_compile_database(compile_db)
-            roots = [(repo, "$REPO"), (unit_build, "$UNIT_BUILD")]
+            roots = _normalization_roots(repo, kind, repo, unit_build)
             compile_identity = _compile_identity(entries, sources, roots)
             extra = {
                 "corpus_manifest_sha256": sha256_file(
@@ -2264,7 +2282,7 @@ def prepare_workloads(
             })
             if not sources:
                 raise QualificationError("real-repository compile database has no admitted TUs")
-            roots = [(repo, "$REPO"), (build, "$BUILD")]
+            roots = _normalization_roots(repo, kind, repo, build)
             compile_identity = _compile_identity(entries, sources, roots)
             extra = {
                 "policy": workload["input"]["policy"],
@@ -2285,10 +2303,9 @@ def prepare_workloads(
                 for relative in workload["input"]["translation_units"]
             ]
             entries = _load_compile_database(release_build / "compile_commands.json")
-            roots = [
-                (source_root, "$RELEASE_SOURCE"),
-                (release_build, "$RELEASE_BUILD"),
-            ]
+            roots = _normalization_roots(
+                repo, kind, source_root, release_build
+            )
             compile_identity = _compile_identity(entries, sources, roots)
             extra = _release_identity(repo, workload, source_root)
             extra["selected_compile_commands_sha256"] = compile_identity
