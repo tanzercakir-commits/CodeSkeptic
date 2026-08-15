@@ -1,5 +1,53 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.7 determinism and performance qualification (in progress)
+
+- Added an exact three-workload qualification contract for the 24-TU thesis
+  corpus, the 55-TU CodeSkeptic `src/` build, and a pinned 12-TU llama.cpp
+  release-candidate slice. Every workload requires ten repetitions and binds
+  canonical input bytes, every selected compile command and ordinal, analyzer
+  limits, source revision, toolchain, build cache, hardware inventory, and four
+  bounded raw artifacts per repetition. Accepted evidence recomputes semantic
+  projections and wall/CPU/RSS claims from the raw analyzer and GNU time bytes;
+  missing, partial, malformed, oversized, timed-out, or drifting evidence is
+  retained as rejected evidence and cannot manufacture a verdict.
+- Added protected baseline authority and promotion checks. Initial publication
+  has an explicit infrastructure revision followed only by the pinned baseline,
+  calibration evidence, and changelog; later profiles bind the exact predecessor
+  baseline/profile and source revision. Candidate deletion, evidence drift, a
+  changed hardware/toolchain inventory, or an unauthorized source change fails
+  closed. Hosted builds pin the exact CMake, Ninja, and Clang 20 executables and
+  independently validate protected-base and candidate authority.
+- The first real 30-run campaign correctly failed at final raw verification
+  because the production release-candidate receipt omitted the repository
+  normalization root. A shared production/test root constructor now binds
+  `$REPO` for all workloads and the release source/build roots in addition;
+  `20/20` qualification and `2/2` workflow regressions plus a fresh independent
+  audit passed before the campaign was restarted from zero.
+- Retained the initial Fedora Linux x86_64 calibration at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64` and its
+  accepted bootstrap qualification at
+  `docs/evidence/phase10/determinism/2026-08-15-fedora-linux-x86_64-bootstrap`.
+  Both contain 122 checksum entries and bind 385 source files at revision
+  `6500f73a5d6b816fafa2faabf6cf9c2f06280f2e`, source digest
+  `631d864ce430fd6ffeb1d336135ca5b0188f4ab359a5e7b1f92598ba9fefc58e`,
+  and analyzer digest
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
+  All ten runs per workload produced one semantic fingerprint. Median wall time
+  was 810 ms for unit, 217060 ms for the real repository, and 35490 ms for the
+  release candidate; peak RSS maxima were 87776, 1304760, and 370796 KiB.
+  Calibration receipt/SHA256SUMS digests are
+  `1a9e3fa28ba8e9ca0c282185a9ea0451552ee415cd22cc8fc086fdc2ed16982b` /
+  `73004aa1abedbc143ec8a46295b85abb36e05ceb82531faec2bb571c0806ed0e`;
+  bootstrap qualification receipt/SHA256SUMS digests are
+  `4c0f2e462f6f82b2ffdeb4172716a277d23b43f07d000b9de61d56a2e697d3e7` /
+  `7bd10a90f60e5dcf59d495a826df65bdc9d8b75e128e9d5386e6ac7a84e551de`.
+  The pinned baseline digest is
+  `dac79f782cc4e495c3ecad4e601a8d49ddbc23470396c3d76de8368dd5c45c8c`.
+  An independent post-baseline run, full regression, final evidence audit,
+  commit/push, and exact-head hosted CI remain pending; this checkpoint does
+  not close `CS-P10-07` or write protected `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
