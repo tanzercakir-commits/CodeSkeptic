@@ -1,0 +1,164 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start   72: BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets
+1/4 Test   #72: BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets ...***Failed    0.70 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BudgetedAnalysisTest
+[ RUN      ] BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] translation unit worker-failed: C:\Users\runneradmin\AppData\Local\Temp\codeskeptic-budgeted-analysis-test-ed1b83\mcp-clean.cpp (command_sha256=0019f212022dd6b66388d9808d6ab3212544637b1b8666c8c125f1c823fee936, ordinal=0, phase=analysis)
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1322): error: Expected equality of these values:
+  payload_object->getInteger("exit_code")
+    Which is: (2)
+  0
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1323): error: Expected equality of these values:
+  payload_object->getBoolean("complete")
+    Which is: (false)
+  true
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1329): error: Expected equality of these values:
+  unit->getString("status")
+    Which is: ({ 'w' (119, 0x77), 'o' (111, 0x6F), 'r' (114, 0x72), 'k' (107, 0x6B), 'e' (101, 0x65), 'r' (114, 0x72), '-' (45, 0x2D), 'f' (102, 0x66), 'a' (97, 0x61), 'i' (105, 0x69), 'l' (108, 0x6C), 'e' (101, 0x65), 'd' (100, 0x64) })
+  "completed"
+    Which is: 00007FF6B637B258
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1333): error: Expected equality of these values:
+  unit->getString("checkpoint_key_sha256")->size()
+    Which is: 0
+  64u
+    Which is: 64
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1334): error: Expected equality of these values:
+  unit->getString("payload_sha256")->size()
+    Which is: 0
+  64u
+    Which is: 64
+
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] translation unit worker-failed: C:\Users\runneradmin\AppData\Local\Temp\codeskeptic-budgeted-analysis-test-ed1b83\mcp-clean.cpp (command_sha256=0019f212022dd6b66388d9808d6ab3212544637b1b8666c8c125f1c823fee936, ordinal=0, phase=analysis)
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1338): error: Expected: (resumed_response.find("\\\"origin\\\":\\\"checkpoint\\\"")) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+{"id":80,"jsonrpc":"2.0","result":{"content":[{"text":"{\"blocking_count\":0,\"complete\":false,\"count\":0,\"coverage\":{\"analyzed_tus\":1,\"attempted_tus\":1,\"broken_tus\":0,\"incomplete_functions\":0},\"evidence\":{\"compile_database_failed\":false,\"summary_load_failed\":false,\"summary_stale\":false,\"tool_failed\":true},\"exit_code\":2,\"findings\":[],\"report_only_count\":0,\"status\":\"failed\",\"translation_units\":[{\"checkpoint_key_sha256\":\"\",\"command_ordinal\":0,\"compile_command_sha256\":\"0019f212022dd6b66388d9808d6ab3212544637b1b8666c8c125f1c823fee936\",\"duration_ms\":149,\"memory_mib\":512,\"origin\":\"executed\",\"path\":\"C:\\\\Users\\\\runneradmin\\\\AppData\\\\Local\\\\Temp\\\\codeskeptic-budgeted-analysis-test-ed1b83\\\\mcp-clean.cpp\",\"payload_sha256\":\"\",\"peak_memory_kib\":14716,\"phase\":\"analysis\",\"status\":\"worker-failed\",\"timeout_seconds\":5}]}","type":"text"}],"isError":true}}
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BudgetedAnalysisTest.cpp(1346): error: Expected: (path_position) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+{"id":80,"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"build_path":"C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\codeskeptic-budgeted-analysis-test-ed1b83","path":"C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\codeskeptic-budgeted-analysis-test-ed1b83\\mcp-clean.cpp","tu_memory_mib":512,"tu_timeout_seconds":5},"name":"analyze"}}
+
+[  FAILED  ] BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets (679 ms)
+[----------] 1 test from BudgetedAnalysisTest (679 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (679 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets
+
+ 1 FAILED TEST
+
+    Start 1067: BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand
+2/4 Test #1067: BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand ................***Failed    0.02 sec
+Running main() from D:\a\CodeSkeptic\CodeSkeptic\build\_deps\googletest-src\googletest\src\gtest_main.cc
+Note: Google Test filter = BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BrokenTuTest
+[ RUN      ] BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand
+YAML:1:217: error: Unrecognized escape code
+[{"directory":"C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command","arguments":["clang++","-DVALUE=1","C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command\multi.cpp"],"file":"C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command\multi.cpp"},{"directory":"C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command","arguments":["clang++","-DVALUE=2","C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command\multi.cpp"],"file":"C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command\multi.cpp"}]
+                                                                                                                                                                                                                        ^
+Skipping C:\Users\RUNNER~1\AppData\Local\Temp\cs_warm_ast_multi_command\multi.cpp. Compile command not found.
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(287): error: Expected equality of these values:
+  manager.processAll( [&](clang::ASTContext&) { ++callbacks; })
+    Which is: 2
+  0
+
+D:\a\CodeSkeptic\CodeSkeptic\tests\BrokenTuTest.cpp(288): error: Expected equality of these values:
+  callbacks
+    Which is: 0
+  2u
+    Which is: 2
+
+[  FAILED  ] BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand (4 ms)
+[----------] 1 test from BrokenTuTest (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand
+
+ 1 FAILED TEST
+
+    Start 1277: RealworldCampaignContract
+3/4 Test #1277: RealworldCampaignContract ...............................................***Failed    0.77 sec
+.REALWORLD_CAMPAIGN_FAIL project alpha missing repetition 1
+....F.......REALWORLD_CAMPAIGN_FAIL analyzer unavailable: C:\Users\runneradmin\AppData\Local\Temp\tmpey_ryl8u\missing-analyzer
+............
+======================================================================
+FAIL: test_analyzer_checkpoint_directory_is_stable_and_parent_scoped (__main__.EvidenceContractTest.test_analyzer_checkpoint_directory_is_stable_and_parent_scoped)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\RealworldCampaignTest.py", line 804, in test_analyzer_checkpoint_directory_is_stable_and_parent_scoped
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        campaign.analyzer_checkpoint_arguments(checkpoint),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ["--checkpoint-dir", "root/project/repeat-1/unit-evidence"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: Lists differ: ['--checkpoint-dir', 'root\\project\\repeat-1\\unit-evidence'] != ['--checkpoint-dir', 'root/project/repeat-1/unit-evidence']
+
+First differing element 1:
+'root\\project\\repeat-1\\unit-evidence'
+'root/project/repeat-1/unit-evidence'
+
+- ['--checkpoint-dir', 'root\\project\\repeat-1\\unit-evidence']
+?                           ^^       ^^        ^^
+
++ ['--checkpoint-dir', 'root/project/repeat-1/unit-evidence']
+?                           ^       ^        ^
+
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.586s
+
+FAILED (failures=1)
+
+    Start 1284: StressMatrixContract
+4/4 Test #1284: StressMatrixContract ....................................................***Failed    3.99 sec
+....F.
+======================================================================
+FAIL: test_retained_receipt_binds_current_source_and_complete_matrix (__main__.StressMatrixContractTest.test_retained_receipt_binds_current_source_and_complete_matrix)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StressMatrixTest.py", line 100, in test_retained_receipt_binds_current_source_and_complete_matrix
+    self.assertEqual(receipt["source"]["manifest"],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     matrix.source_manifest())
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'alg[15 chars]6', 'digest': '21fcebaf569ca40c281ee07fdd170f2[49 chars] 380} != {'alg[15 chars]6', 'file_count': 380, 'digest': 'e5d91b50e93b[49 chars]74a'}
+  {'algorithm': 'sha256',
+-  'digest': '21fcebaf569ca40c281ee07fdd170f2a0609be802ff3c66b8eb7b3df8767acc7',
++  'digest': 'e5d91b50e93baa5809c7c37de238f47a6da9ef7861540206bf3763bb70b5574a',
+   'file_count': 380}
+
+----------------------------------------------------------------------
+Ran 6 tests in 3.870s
+
+FAILED (failures=1)
+
+
+0% tests passed, 4 tests failed out of 4
+
+Total Test time (real) =   5.52 sec
+
+The following tests FAILED:
+	 72 - BudgetedAnalysisTest.McpRequestUsesProductionWorkerAndResolvedBudgets (Failed)
+	1067 - BrokenTuTest.LegacyWarmCachePreservesEveryCompileCommand (Failed)
+	1277 - RealworldCampaignContract (Failed)
+	1284 - StressMatrixContract (Failed)
+Errors while running CTest
