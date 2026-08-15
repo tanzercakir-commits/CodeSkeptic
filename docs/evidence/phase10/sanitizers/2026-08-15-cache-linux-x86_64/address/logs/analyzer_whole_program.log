@@ -1,8 +1,8 @@
 [CodeSkeptic] Analysis starting... (2 files, 12 rules)
 [CodeSkeptic] Whole-program pass: collecting summaries from 2 file(s)...
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-801a5f/merged-summary.csk
+[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-861688/merged-summary.csk
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-801a5f/merged-summary.csk
+[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-861688/merged-summary.csk
 CodeSkeptic: Clean! No issues found.
 CODESKEPTIC_SANITIZER_GATE_OK analyzer_whole_program

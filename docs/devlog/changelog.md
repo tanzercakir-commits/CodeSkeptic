@@ -68,36 +68,45 @@
   no-follow writes; checksum-first publication from an empty pair makes either
   regular crash orphan recoverable through the per-TU store, while symlink or
   other non-regular state remains fail-closed.
+- Made the accepted-shard revalidation regression portable to macOS by
+  canonicalizing its temporary analyzer fixture before command matching.
+  macOS exposes the same temporary directory through `/var` and
+  `/private/var`; the production campaign path was already canonical and the
+  fixture now tests that path instead of rejecting a valid analyzer invocation.
+- Removed a long-diff race from the offline changelog guard. Its `pipefail`
+  pipeline previously let `grep -q` close early and turn the producer's
+  `SIGPIPE` into a false "changelog missing" result; direct here-string
+  matching preserves the exact file-list checks without a producer process.
 - Exact-source local qualification passes `1279/1279` direct C++ tests,
   `1296/1296` repository-aware CTest entries, `67/67` focused cache/worker/MCP
   cases, `52/52` status-automation cases, `25/25` real-world campaign cases,
   and `21/21` upstream-evidence compatibility cases. The bound source manifest
   contains `380` files with SHA-256
-  `20b38fff3e75ce2e5bd6fa2ea9f6714cee60b995a30c082b94a245879eb7bab5`;
+  `21fcebaf569ca40c281ee07fdd170f2a0609be802ff3c66b8eb7b3df8767acc7`;
   the independent source-stage audit passed.
 - Retained the exact-source frontend stress replay at
   `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`: all nine
   cases passed two deterministic repetitions with zero timeout/crash in
-  `712` ms. Its receipt SHA-256 is
-  `f84fb0c9b8b959f68dd4d9eedd778a5eb4e1e89073040be82334006498bf35aa`;
+  `709` ms. Its receipt SHA-256 is
+  `07273a9eaee1ec8b009958bc26aee8a5837f172074dd5c13397fdafa92d595e4`;
   the 37-entry tree manifest SHA-256 is
-  `055c33cf525b5667be7913a7a84d7a3b4be54ac38443c54b9c95cbd04841ccef`.
+  `fe6694e1d8d7f6d936f44e33f2fb9d5265b6e9c0dec2efa09f25c8db2d280151`.
 - Retained independent ASAN and UBSAN trees at
   `docs/evidence/phase10/sanitizers/2026-08-15-cache-linux-x86_64`.
   Each passed all ten runtime gates, `1296/1296` CTest entries,
   `1279/1279` direct C++ tests, representative analyzer/MCP paths, and four
-  fuzz targets against the same source manifest. ASAN completed in `399032`
+  fuzz targets against the same source manifest. ASAN completed in `157876`
   ms with receipt SHA-256
-  `8230227a3d39f89e778e10cb10b17b0f657bcf823eb7b64a2fccaf534a67458c`;
-  UBSAN completed in `368520` ms with receipt SHA-256
-  `e36826543179e91361c65663a6c02c38c3047f4ebe4ef1d32a7afbcb3676163f`.
+  `42263633fc03f8bd58b85dcc2cc292213bf951700d32cf60d243e6e958b0d4df`;
+  UBSAN completed in `129201` ms with receipt SHA-256
+  `c10f22153ad15a5470b31a9819851ff09b2e41f185ed3f776e9bfc0bdd891ba6`.
   Both verify-only passes and the materialized `13/13` sanitizer contract
   succeeded without skips; the `6/6` stress contract also passed without a
   skip, and the 40-entry tree manifest SHA-256 is
-  `3808f18532ceee6b9f3dfc53fba126ef20d8826ef7815954b0ac873bfe444efc`.
-  The independent final evidence audit passed. Commit/push and hosted CI remain
-  pending; this checkpoint does not close `CS-P10-06` or write protected
-  `main`.
+  `6a138ac43cd09d4c51ee3d9b75f6ea879335d811be021936bdf740743613ab64`.
+  The fresh independent final evidence audit passed. Commit/push and exact-head
+  hosted CI remain pending; this checkpoint does not close `CS-P10-06` or
+  write protected `main`.
 
 ## 2026-08-15 — Phase 10.5 per-TU resource budgets locally complete
 

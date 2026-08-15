@@ -1,12 +1,12 @@
 [CodeSkeptic] Analysis starting... (2 files, 12 rules)
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-/tmp/codeskeptic-stress-4p9jm8se/mixed-clean-broken/repeat-1/mixed_broken.cpp:1:10: fatal error: 'codeskeptic_stress_missing_header.h' file not found
+/tmp/codeskeptic-stress-t0w8logq/mixed-clean-broken/repeat-1/mixed_broken.cpp:1:10: fatal error: 'codeskeptic_stress_missing_header.h' file not found
     1 | #include "codeskeptic_stress_missing_header.h"
       |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 error generated.
-Error while processing /tmp/codeskeptic-stress-4p9jm8se/mixed-clean-broken/repeat-1/mixed_broken.cpp.
+Error while processing /tmp/codeskeptic-stress-t0w8logq/mixed-clean-broken/repeat-1/mixed_broken.cpp.
 [CodeSkeptic] 1 translation unit(s) failed to COMPILE. Findings from an error-recovery AST are non-verdict evidence. Fix the include paths/flags; --analyze-broken-tus may inspect the recovered AST but the verdict remains unavailable:
-  - /tmp/codeskeptic-stress-4p9jm8se/mixed-clean-broken/repeat-1/mixed_broken.cpp
+  - /tmp/codeskeptic-stress-t0w8logq/mixed-clean-broken/repeat-1/mixed_broken.cpp
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-4p9jm8se/mixed-clean-broken/repeat-1/mixed_broken.cpp (command_sha256=b17161040d94a68973420fd9fe0fbb713109967fbcb122427d66996c5106b207, ordinal=0, phase=analysis)
+[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-t0w8logq/mixed-clean-broken/repeat-1/mixed_broken.cpp (command_sha256=6735a0442cbd9a519ecc961553bef76d89de9f091ebd6ffd182e6186f2d6af8a, ordinal=0, phase=analysis)
 [CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

@@ -7,7 +7,7 @@
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
   "translation_units": [
-    { "path": "/tmp/codeskeptic-stress-4p9jm8se/template-malformed/repeat-1/template_malformed.cpp", "compile_command_sha256": "ba17b969319f9be290f913b78123d987de0392200afd4f8d49e52fa5e09397a4", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 21, "peak_memory_kib": 76428, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+    { "path": "/tmp/codeskeptic-stress-t0w8logq/template-malformed/repeat-1/template_malformed.cpp", "compile_command_sha256": "8dc7639507d9d14341007cf989660ed7ac8d00a32796c5a8e870b3ddf73cafa9", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 22, "peak_memory_kib": 76912, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
   ],
   "total": 0,
   "diagnostics": [

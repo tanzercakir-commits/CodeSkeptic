@@ -820,6 +820,7 @@ class EvidenceContractTest(unittest.TestCase):
             root = Path(directory)
             analyzer = root / "codeskeptic"
             analyzer.write_bytes(b"fixture analyzer")
+            analyzer = analyzer.resolve()
             analyzer_sha = campaign.file_digest(analyzer)
             checkpoint = root / "checkpoint" / "receipt.json"
             prior = accepted_receipt(manifest, 1, analyzer_sha=analyzer_sha)
