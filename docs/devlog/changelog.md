@@ -1,5 +1,74 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.7 determinism and performance qualification (in progress)
+
+- Added an exact three-workload qualification contract for the 24-TU thesis
+  corpus, the 55-TU CodeSkeptic `src/` build, and a pinned 12-TU llama.cpp
+  release-candidate slice. Each workload runs ten times and binds canonical
+  input bytes, every selected compile command and ordinal, analyzer limits,
+  source revision, toolchain, build cache, hardware inventory, and four bounded
+  raw artifacts per repetition. Receipt verification recomputes semantic
+  projections and wall/CPU/RSS claims from raw analyzer and GNU time bytes;
+  missing, partial, malformed, oversized, timed-out, or drifting evidence is
+  retained as rejected evidence and cannot manufacture a verdict.
+- Added protected baseline authority and promotion checks. Initial publication
+  has an explicit seven-path infrastructure revision, including the generated
+  TODO state, followed only by the pinned baseline, changelog, determinism
+  calibration, and independently verified Phase 10 stress evidence. Later
+  profiles bind the exact predecessor baseline/profile and source revision.
+  Candidate deletion, evidence drift, changed hardware/toolchain identity, or
+  an admitted source change fails closed.
+- RED-first production campaigns exposed and fixed two authority bugs. The
+  release-candidate receipt now always binds `$REPO` as well as its release
+  source/build roots. Receipt verification now binds the recorded revision as
+  an ancestor and separately proves both its committed source bytes and the
+  current admitted source bytes; committing an ignored evidence transaction no
+  longer invalidates itself, while any actual source drift is still rejected.
+  The new focused regressions pass with the full `21/21` qualification and
+  `2/2` workflow contracts, followed by a fresh independent source-stage PASS.
+- Retained the final Fedora Linux x86_64 calibration at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
+  Its 122-entry tree binds 385 source files at revision
+  `b1ee2914624f1e6e2741c11a540bb9823ae05aa8`, source digest
+  `150f6bfc2f17b5f734c28a7aa52bad2031ae9baaf913b2954ece2c9bd01e6288`,
+  and analyzer digest
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
+  All ten runs per workload produced one semantic fingerprint. Median wall
+  time was 830 ms for unit, 236745 ms for the real repository, and 36010 ms
+  for the release candidate; peak RSS maxima were 87888, 1304284, and 371552
+  KiB. Receipt/SHA256SUMS digests are
+  `9ae2b7c6a298f29eb48b960b7a54679824d96f9dc85c5a6cbad55b05b7553894` /
+  `6fdbd766bdcfabda9244d5fac4552b4041016f5b03080c98a48113f3eb8e7f81`.
+  The pinned baseline digest is
+  `ef79efb8643f383be9c36672227d156e08e913af80bb2223d7248dda849fffbf`.
+- Regenerated the retained stress matrix after baseline materialization so its
+  exact-source identity also binds the new baseline bytes. All nine cases pass
+  twice in 687 ms with zero timeout or crash. Its 37-entry tree binds 386
+  source files at digest
+  `12790745befd8f56a30838071f7e5e51a55b14f8ab80539798edf87dffbcc3e4`;
+  receipt/SHA256SUMS digests are
+  `831dec7f3b665ddd98cef0a124e374584af0639e60e82b8f33e7560c25f15770` /
+  `dcd8eb9ffc9978d77c8260f49688e42c0aa5315de347bcf34317f61e4b1ce27b`.
+- Retained a separate required-mode confirmation against the pinned baseline
+  at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
+  Its 122-entry tree binds the same 385-file source digest at authority
+  revision `b690b965859f4d52b070c9277c23cff2f3470140`. All semantic and performance
+  gates pass with no regression. Unit, repository, and release-candidate wall
+  medians are 825, 234000, and 35525 ms; peak RSS maxima are 87704, 1304576,
+  and 370584 KiB. Receipt/SHA256SUMS digests are
+  `3307dac87db2c914bee6d23f3374d7cb1bb0bfe9fe4ce5320b8e709019c6f4b0` /
+  `3e847bd5bfd80215dcb2f5993fb590583e3b0650fe5190544da8ef9b1018292f`.
+  Exact-container verify-only accepted all three workloads and all ten
+  repetitions. The final admitted-source binary then passed `1280/1280`
+  direct C++ tests and `1299/1299` CTest cases; the repository status contract
+  passed `52/52`.
+  The isolated P10.7 worktree does not materialize the prior sanitizer and
+  dedicated stress build directories, so their three plus one runtime checks
+  remain explicit contract skips; exact-head hosted sanitizer/stress jobs are
+  mandatory. Final independent audit, push, and hosted CI remain pending; this
+  checkpoint does not close `CS-P10-07` or write protected `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
