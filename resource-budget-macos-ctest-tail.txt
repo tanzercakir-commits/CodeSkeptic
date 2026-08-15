@@ -1,0 +1,42 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1297: DeterminismQualificationContract
+1/1 Test #1297: DeterminismQualificationContract ...***Failed    5.68 sec
+../opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1139: ResourceWarning: subprocess 37315 is still running
+  _warn("subprocess %s is still running" % self.pid,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+E..................
+======================================================================
+ERROR: test_bounded_process_kills_timeout_process_group_and_log_flood (__main__.DeterminismQualificationTest.test_bounded_process_kills_timeout_process_group_and_log_flood)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1277, in test_bounded_process_kills_timeout_process_group_and_log_flood
+    qualification._run_bounded_process(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        [sys.executable, "-c", child_program],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        os.environ.copy(), 0.2, stdout, stderr, [], 1024,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_determinism_qualification.py", line 2708, in _run_bounded_process
+    _terminate_process_group(process)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_determinism_qualification.py", line 2660, in _terminate_process_group
+    os.killpg(process.pid, signal.SIGKILL)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted
+
+----------------------------------------------------------------------
+Ran 21 tests in 5.567s
+
+FAILED (errors=1)
+DETERMINISM_REJECTED_EVIDENCE_OK mode=verify
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   5.71 sec
+
+The following tests FAILED:
+	1297 - DeterminismQualificationContract (Failed)
+Errors while running CTest
