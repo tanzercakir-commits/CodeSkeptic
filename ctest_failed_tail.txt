@@ -1,0 +1,68 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+Problem reading file: D:/a/CodeSkeptic/CodeSkeptic/build/Testing/Temporary/ while generating list of previously failed tests.
+      Start  1: codeskeptic_tests_NOT_BUILT
+Could not find executable codeskeptic_tests_NOT_BUILT
+Looked in the following places:
+codeskeptic_tests_NOT_BUILT
+codeskeptic_tests_NOT_BUILT.exe
+Release/codeskeptic_tests_NOT_BUILT
+Release/codeskeptic_tests_NOT_BUILT.exe
+Debug/codeskeptic_tests_NOT_BUILT
+Debug/codeskeptic_tests_NOT_BUILT.exe
+MinSizeRel/codeskeptic_tests_NOT_BUILT
+MinSizeRel/codeskeptic_tests_NOT_BUILT.exe
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT
+RelWithDebInfo/codeskeptic_tests_NOT_BUILT.exe
+Deployment/codeskeptic_tests_NOT_BUILT
+Deployment/codeskeptic_tests_NOT_BUILT.exe
+Development/codeskeptic_tests_NOT_BUILT
+Development/codeskeptic_tests_NOT_BUILT.exe
+Unable to find executable: codeskeptic_tests_NOT_BUILT
+ 1/11 Test  #1: codeskeptic_tests_NOT_BUILT .........***Not Run   0.00 sec
+      Start  2: StatusAutomationContract
+ 2/11 Test  #2: StatusAutomationContract ............   Passed   43.75 sec
+      Start  3: RealworldCampaignContract
+ 3/11 Test  #3: RealworldCampaignContract ...........   Passed    0.42 sec
+      Start  4: Phase83QualificationContract
+ 4/11 Test  #4: Phase83QualificationContract ........   Passed    0.23 sec
+      Start  5: UpstreamValidationContract
+ 5/11 Test  #5: UpstreamValidationContract ..........   Passed    0.44 sec
+      Start  6: UpstreamCandidateManifestContract
+ 6/11 Test  #6: UpstreamCandidateManifestContract ...   Passed    0.59 sec
+      Start  7: UpstreamCandidateEvidenceContract
+ 7/11 Test  #7: UpstreamCandidateEvidenceContract ...   Passed    5.94 sec
+      Start  8: FuzzingContract
+ 8/11 Test  #8: FuzzingContract .....................   Passed    0.39 sec
+      Start  9: SanitizerContract
+ 9/11 Test  #9: SanitizerContract ...................   Passed   12.85 sec
+      Start 10: StressMatrixContract
+10/11 Test #10: StressMatrixContract ................***Failed    0.19 sec
+..E.
+======================================================================
+ERROR: test_production_matrix_is_repeatable_and_receipt_verifies (__main__.StressMatrixContractTest.test_production_matrix_is_repeatable_and_receipt_verifies)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StressMatrixTest.py", line 69, in test_production_matrix_is_repeatable_and_receipt_verifies
+    receipt = matrix.run_matrix(BINARY, output=output)
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_stress_matrix.py", line 348, in run_matrix
+    identity = _binary_identity(binary)
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_stress_matrix.py", line 254, in _binary_identity
+    raise MatrixError(f"missing analyzer binary: {binary}")
+run_stress_matrix.MatrixError: missing analyzer binary: D:\a\CodeSkeptic\CodeSkeptic\build\src\codeskeptic.exe
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.066s
+
+FAILED (errors=1)
+
+      Start 11: ResourceBudgetWorkflowContract
+11/11 Test #11: ResourceBudgetWorkflowContract ......   Passed    0.10 sec
+
+82% tests passed, 2 tests failed out of 11
+
+Total Test time (real) =  65.02 sec
+
+The following tests FAILED:
+	  1 - codeskeptic_tests_NOT_BUILT (Not Run)
+	 10 - StressMatrixContract (Failed)
+Errors while running CTest
