@@ -25,10 +25,8 @@
   `20/20` qualification and `2/2` workflow regressions plus a fresh independent
   audit passed before the campaign was restarted from zero.
 - Retained the initial Fedora Linux x86_64 calibration at
-  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64` and its
-  accepted bootstrap qualification at
-  `docs/evidence/phase10/determinism/2026-08-15-fedora-linux-x86_64-bootstrap`.
-  Both contain 122 checksum entries and bind 385 source files at revision
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
+  It contains 122 checksum entries and binds 385 source files at revision
   `6500f73a5d6b816fafa2faabf6cf9c2f06280f2e`, source digest
   `631d864ce430fd6ffeb1d336135ca5b0188f4ab359a5e7b1f92598ba9fefc58e`,
   and analyzer digest
@@ -36,12 +34,12 @@
   All ten runs per workload produced one semantic fingerprint. Median wall time
   was 810 ms for unit, 217060 ms for the real repository, and 35490 ms for the
   release candidate; peak RSS maxima were 87776, 1304760, and 370796 KiB.
-  Calibration receipt/SHA256SUMS digests are
+  Receipt/SHA256SUMS digests are
   `1a9e3fa28ba8e9ca0c282185a9ea0451552ee415cd22cc8fc086fdc2ed16982b` /
-  `73004aa1abedbc143ec8a46295b85abb36e05ceb82531faec2bb571c0806ed0e`;
-  bootstrap qualification receipt/SHA256SUMS digests are
-  `4c0f2e462f6f82b2ffdeb4172716a277d23b43f07d000b9de61d56a2e697d3e7` /
-  `7bd10a90f60e5dcf59d495a826df65bdc9d8b75e128e9d5386e6ac7a84e551de`.
+  `73004aa1abedbc143ec8a46295b85abb36e05ceb82531faec2bb571c0806ed0e`.
+  The same-run accepted qualification copy also passed verify-only but remains
+  outside protected authority because the bootstrap boundary admits only the
+  baseline, its calibration evidence, and changelog.
   The pinned baseline digest is
   `dac79f782cc4e495c3ecad4e601a8d49ddbc23470396c3d76de8368dd5c45c8c`.
   An independent post-baseline run, full regression, final evidence audit,
