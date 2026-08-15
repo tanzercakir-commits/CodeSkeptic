@@ -42,9 +42,20 @@
   baseline, its calibration evidence, and changelog.
   The pinned baseline digest is
   `dac79f782cc4e495c3ecad4e601a8d49ddbc23470396c3d76de8368dd5c45c8c`.
-  An independent post-baseline run, full regression, final evidence audit,
-  commit/push, and exact-head hosted CI remain pending; this checkpoint does
-  not close `CS-P10-07` or write protected `main`.
+- Retained a separate required-mode confirmation against that pinned baseline
+  at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
+  Its 122-entry tree binds source revision
+  `e318b144396310e14d8e4a1bcc7febc024d7a65d`; all three semantic gates and
+  every wall/CPU/RSS budget pass with no regression recorded. Unit, repository,
+  and release-candidate wall medians are 795, 211065, and 31605 ms; peak RSS
+  maxima are 88000, 1304572, and 370620 KiB. Receipt/SHA256SUMS digests are
+  `07c0c22ad2da05a3c04b4142ae2b53024e29fc87b86428b832a13d30e943076e` /
+  `79b75c88d350bb63acb9400167cd40e48fda1b333e3065f038e97399ae3b0727`.
+  Exact-container checksum verification accepted all 122 entries and the
+  independent verify-only path accepted all 3 x 10 runs. Full regression,
+  final evidence audit, commit/push, and exact-head hosted CI remain pending;
+  this checkpoint does not close `CS-P10-07` or write protected `main`.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 

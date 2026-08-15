@@ -1,0 +1,23 @@
+	Command being timed: "/work/build-p10-07-contracts/src/codeskeptic /work/src --policy no-absolute-paths --build-path /work/build-p10-07-contracts --tu-timeout-seconds 300 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-f7n7i4f1/real-repository-07.json"
+	User time (seconds): 199.42
+	System time (seconds): 16.49
+	Percent of CPU this job got: 103%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:29.37
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1303940
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 6782283
+	Voluntary context switches: 183883
+	Involuntary context switches: 2664
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 13856
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
