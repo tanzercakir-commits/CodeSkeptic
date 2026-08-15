@@ -1,0 +1,28 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1281: RealworldCampaignContract
+1/1 Test #1281: RealworldCampaignContract ........***Failed    0.11 sec
+FREALWORLD_CAMPAIGN_FAIL project alpha missing repetition 1
+............REALWORLD_CAMPAIGN_FAIL analyzer unavailable: /private/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmp0r549gpb/missing-analyzer
+............
+======================================================================
+FAIL: test_accepted_shard_receipt_revalidates_current_execution_plan (__main__.EvidenceContractTest.test_accepted_shard_receipt_revalidates_current_execution_plan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/RealworldCampaignTest.py", line 890, in test_accepted_shard_receipt_revalidates_current_execution_plan
+    self.assertEqual(code, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^
+AssertionError: 2 != 0
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.030s
+
+FAILED (failures=1)
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.13 sec
+
+The following tests FAILED:
+	1281 - RealworldCampaignContract (Failed)
+Errors while running CTest
