@@ -53,9 +53,24 @@
   `07c0c22ad2da05a3c04b4142ae2b53024e29fc87b86428b832a13d30e943076e` /
   `79b75c88d350bb63acb9400167cd40e48fda1b333e3065f038e97399ae3b0727`.
   Exact-container checksum verification accepted all 122 entries and the
-  independent verify-only path accepted all 3 x 10 runs. Full regression,
-  final evidence audit, commit/push, and exact-head hosted CI remain pending;
-  this checkpoint does not close `CS-P10-07` or write protected `main`.
+  independent verify-only path accepted all 3 x 10 runs. At that checkpoint,
+  full regression, final evidence audit, commit/push, and exact-head hosted CI
+  remained pending; it did not close `CS-P10-07` or write protected `main`.
+- Final local regression passed `1280/1280` direct C++ tests and `1299/1299`
+  CTest cases in the pinned LLVM 20 container. The repository status contract
+  passed `52/52`; the determinism qualification/workflow contracts remain
+  `20/20` and `2/2`. Because the P10.7 source surface changed the exact-source
+  identity, the retained stress matrix was regenerated from zero: all nine
+  cases passed twice in 731 ms with zero timeout or crash. Its 37-entry tree
+  binds 386 source files at digest
+  `4d0de295bf8b715ced32827b4505e50ce5df860c21882399ddf740f4c210cc2a`;
+  receipt/SHA256SUMS digests are
+  `1fd03442c821e7fe67c65698dc8a7626cc8a7458ff7ba065ac2ebd9cc78c8366` /
+  `f58bf58f65750e92c64542dcbe933efc36b334e571cec7be377cb62a3d0ea180`.
+  The isolated P10.7 worktree does not materialize the prior sanitizer build
+  directories, so three sanitizer runtime checks and one stress runtime check
+  remain explicit contract skips; exact-head hosted sanitizer/stress jobs are
+  still mandatory before closure.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
