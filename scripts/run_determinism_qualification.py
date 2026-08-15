@@ -1111,8 +1111,10 @@ def verify_receipt(
         raise QualificationError("outer SHA256SUMS manifest mismatch")
     if receipt.get("schema") == REJECTED_SCHEMA:
         _validate_rejected_payload(receipt, manifest)
-        if repo_root is not None and receipt["source"] != source_manifest(repo_root.resolve()):
-            raise QualificationError("rejected receipt source bytes differ from current repository")
+        if repo_root is not None:
+            _verify_source_authority(
+                receipt["source"], repo_root.resolve(), "rejected receipt"
+            )
         if repo_root is not None:
             _validate_manifest_inputs(
                 receipt["inputs"], manifest, repo_root.resolve(),
@@ -1121,8 +1123,10 @@ def verify_receipt(
         return receipt
     if receipt.get("schema") == CALIBRATION_SCHEMA:
         _validate_calibration_payload(receipt, manifest)
-        if repo_root is not None and receipt["source"] != source_manifest(repo_root.resolve()):
-            raise QualificationError("calibration source bytes differ from current repository")
+        if repo_root is not None:
+            _verify_source_authority(
+                receipt["source"], repo_root.resolve(), "calibration"
+            )
         if repo_root is not None:
             _validate_manifest_inputs(
                 receipt["inputs"], manifest, repo_root.resolve(),
@@ -1140,8 +1144,10 @@ def verify_receipt(
     if receipt.get("baseline", {}).get("sha256") != sha256_file(baseline_path):
         raise QualificationError("receipt baseline file identity drift")
     validate_receipt_payload(receipt, manifest, baseline)
-    if repo_root is not None and receipt["source"] != source_manifest(repo_root.resolve()):
-        raise QualificationError("receipt source bytes differ from current repository")
+    if repo_root is not None:
+        _verify_source_authority(
+            receipt["source"], repo_root.resolve(), "receipt"
+        )
     if repo_root is not None:
         _validate_manifest_inputs(
             receipt["inputs"], manifest, repo_root.resolve(),
@@ -1253,6 +1259,7 @@ def verify_bootstrap_promotion(
             )
     infrastructure_paths = {
         ".github/workflows/determinism.yml",
+        "docs/TODO.md",
         "scripts/determinism_workloads.json",
         "scripts/run_determinism_qualification.py",
         "tests/CMakeLists.txt",
@@ -1307,6 +1314,9 @@ def verify_bootstrap_promotion(
             path != "docs/devlog/changelog.md" and
             not path.startswith(
                 "docs/evidence/phase10/determinism/calibrations/"
+            ) and
+            not path.startswith(
+                "docs/evidence/phase10/stress/"
             )
             for path in authority_changes):
         raise QualificationError(
@@ -1456,6 +1466,26 @@ def source_manifest(repo: Path) -> dict[str, Any]:
         "manifest_sha256": digest_json(entries),
         "file_count": len(entries),
     }
+
+
+def _verify_source_authority(
+    recorded: dict[str, Any], repo: Path, label: str,
+) -> None:
+    revision = recorded["revision"]
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", revision, "HEAD"],
+        cwd=repo, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if ancestry.returncode != 0:
+        raise QualificationError(f"{label} source revision is not an ancestor")
+    if source_manifest_at_revision(repo, revision) != recorded:
+        raise QualificationError(f"{label} source bytes differ from recorded revision")
+    current = source_manifest(repo)
+    if (
+        current["manifest_sha256"] != recorded["manifest_sha256"] or
+        current["file_count"] != recorded["file_count"]
+    ):
+        raise QualificationError(f"{label} source bytes differ from current repository")
 
 
 def _git_output(repo: Path, arguments: list[str]) -> str:

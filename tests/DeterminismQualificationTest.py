@@ -282,6 +282,7 @@ def initialize_source_repo(path: Path) -> dict:
         ("fuzz/fixture.cpp", "int fuzz_fixture;\n"),
         ("tests/CMakeLists.txt", "# fixture tests\n"),
         ("docs/fixture.md", "fixture\n"),
+        ("docs/TODO.md", "# Queue\n\nbase\n"),
         ("profiles/fixture.txt", "fixture\n"),
     ):
         (path / relative).write_text(content, encoding="utf-8")
@@ -340,6 +341,10 @@ def write_determinism_infrastructure(repo: Path, raw_manifest: dict) -> None:
             path.write_text(content, encoding="utf-8")
     (repo / "tests" / "CMakeLists.txt").write_text(
         "# fixture tests\n# determinism contracts\n", encoding="utf-8"
+    )
+    (repo / "docs" / "TODO.md").write_text(
+        "# Queue\n\nphase-determinism-performance-qualification\n",
+        encoding="utf-8",
     )
 
 
@@ -975,6 +980,12 @@ class DeterminismQualificationTest(unittest.TestCase):
             )
             baseline_path = repo / "scripts" / "determinism_baseline.json"
             baseline_path.write_bytes(qualification.canonical_json(pinned))
+            stress_receipt = (
+                repo / "docs" / "evidence" / "phase10" / "stress" /
+                "bootstrap" / "receipt.json"
+            )
+            stress_receipt.parent.mkdir(parents=True)
+            stress_receipt.write_text("retained stress evidence\n", encoding="utf-8")
             changelog.write_text("# Changelog\n\nBaseline promoted.\n", encoding="utf-8")
             git_commit(repo, "promote baseline")
             qualification.verify_bootstrap_promotion(
@@ -989,6 +1000,48 @@ class DeterminismQualificationTest(unittest.TestCase):
             ):
                 qualification.verify_bootstrap_promotion(
                     repo, base_revision, baseline_path, manifest_path
+                )
+
+    def test_receipt_source_revision_survives_ignored_authority_commit(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            source = initialize_source_repo(repo)
+            source_revision = source["revision"]
+            payload = calibration_receipt(
+                manifest_sha, repo_root=repo,
+                source_revision=source_revision, source=source,
+            )
+            evidence = Path(directory) / "calibration"
+            qualification.write_receipt(
+                evidence, payload, artifact_bytes(payload)
+            )
+            manifest_path = Path(directory) / "manifest.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+
+            ignored = (
+                repo / "docs" / "evidence" / "phase10" / "stress" /
+                "later" / "receipt.json"
+            )
+            ignored.parent.mkdir(parents=True)
+            ignored.write_text("later authority\n", encoding="utf-8")
+            git_commit(repo, "retain ignored authority")
+
+            qualification.verify_receipt(
+                evidence, manifest_path, Path(directory) / "unused.json", repo
+            )
+
+            (repo / "src" / "sample.cpp").write_text(
+                "int changed;\n", encoding="utf-8"
+            )
+            git_commit(repo, "change admitted source")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "source bytes differ"
+            ):
+                qualification.verify_receipt(
+                    evidence, manifest_path,
+                    Path(directory) / "unused.json", repo,
                 )
 
     def test_baseline_update_requires_exact_predecessor_and_authority_only_diff(self) -> None:
