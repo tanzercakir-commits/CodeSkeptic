@@ -1,11 +1,11 @@
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
 [CodeSkeptic] Analysis starting... (1 files, 12 rules)
-/tmp/codeskeptic-stress-jpen1jlc/broken-recovery-opt-in/repeat-2/recovery_broken.cpp:1:10: fatal error: 'codeskeptic_recovery_missing_header.h' file not found
+/tmp/codeskeptic-stress-3pygu6i4/broken-recovery-opt-in/repeat-2/recovery_broken.cpp:1:10: fatal error: 'codeskeptic_recovery_missing_header.h' file not found
     1 | #include "codeskeptic_recovery_missing_header.h"
       |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 error generated.
-Error while processing /tmp/codeskeptic-stress-jpen1jlc/broken-recovery-opt-in/repeat-2/recovery_broken.cpp.
+Error while processing /tmp/codeskeptic-stress-3pygu6i4/broken-recovery-opt-in/repeat-2/recovery_broken.cpp.
 [CodeSkeptic] 1 translation unit(s) failed to COMPILE. Findings from an error-recovery AST are non-verdict evidence. Fix the include paths/flags; --analyze-broken-tus may inspect the recovered AST but the verdict remains unavailable:
-  - /tmp/codeskeptic-stress-jpen1jlc/broken-recovery-opt-in/repeat-2/recovery_broken.cpp
-[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-jpen1jlc/broken-recovery-opt-in/repeat-2/recovery_broken.cpp (command_sha256=85dbecf7f563bf0d24c58fe5188191c10e239c44320abc7ee744de2362dfd975, ordinal=0, phase=analysis)
+  - /tmp/codeskeptic-stress-3pygu6i4/broken-recovery-opt-in/repeat-2/recovery_broken.cpp
+[CodeSkeptic] translation unit broken: /tmp/codeskeptic-stress-3pygu6i4/broken-recovery-opt-in/repeat-2/recovery_broken.cpp (command_sha256=27f2a71782be7317ed01083c9e67d70532063cb1e018d0e194060101184ac7be, ordinal=0, phase=analysis)
 [CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

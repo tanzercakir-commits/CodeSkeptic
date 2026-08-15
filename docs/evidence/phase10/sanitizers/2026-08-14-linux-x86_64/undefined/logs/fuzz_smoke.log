@@ -1,2 +1,2 @@
-fuzz campaign accepted: /workspace/build/p10-05-sampling-final-undefined/fuzz-smoke
+fuzz campaign accepted: /workspace/build/p10-05-windows-final-undefined/fuzz-smoke
 CODESKEPTIC_SANITIZER_GATE_OK fuzz_smoke

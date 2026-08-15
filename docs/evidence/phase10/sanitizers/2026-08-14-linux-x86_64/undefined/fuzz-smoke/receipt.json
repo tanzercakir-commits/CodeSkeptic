@@ -11,7 +11,7 @@
   "corpus_manifest_sha256": "1a0dfa35e82342e7d043b64d216a46a405962a03ae4c1bf74e5e3d3dc99db343",
   "duration_ms": 852,
   "failures": [],
-  "finished_at": "2026-08-15T00:46:24.438190+00:00",
+  "finished_at": "2026-08-15T02:27:48.376438+00:00",
   "host": {
     "machine": "x86_64",
     "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.39",
@@ -20,14 +20,14 @@
   "mode": "smoke",
   "schema": "codeskeptic-fuzz-receipt-v1",
   "source": {
-    "commit": "a83958c72ff5cb339e0ebe1a68c042759550f54a",
+    "commit": "767187a92552714a34c1a228e65a5ab48ff5aa55",
     "manifest": {
       "algorithm": "sha256",
-      "digest": "6cc614dd84c250a79d66f2fbe23bd6f19a63b95d961bef40a80ef78fcbbb33ff",
+      "digest": "0e84867fce9a26744cbe21eb58f1e79c9d77e34c85ea9ddaa985741036b1109b",
       "file_count": 137
     }
   },
-  "started_at": "2026-08-15T00:46:23.585911+00:00",
+  "started_at": "2026-08-15T02:27:47.524446+00:00",
   "status": "accepted",
   "targets": [
     {
@@ -47,7 +47,7 @@
       "exit_code": 0,
       "id": "config",
       "log": "logs/config.log",
-      "log_sha256": "dc81e39f946fd24da28451166da2b4bcbb5869aa9a3f0409854a935c93cc1e0b"
+      "log_sha256": "73da20b6ca2b3768842b3919be60d0e6ae04d2feebc46275d1f0bec561316c26"
     },
     {
       "artifacts": [],
@@ -66,7 +66,7 @@
       "exit_code": 0,
       "id": "compile_database",
       "log": "logs/compile_database.log",
-      "log_sha256": "e6033742663b2f34d3c7c195d2156b9dd10e45500de2d7b8cbebe39614bcb492"
+      "log_sha256": "b2d19625121204632c76f9478a5575ea7e64fbe8b588230ad876df68693aed0e"
     },
     {
       "artifacts": [],
@@ -85,11 +85,11 @@
       "exit_code": 0,
       "id": "summary",
       "log": "logs/summary.log",
-      "log_sha256": "8f2406639f7892b70775f8fa3d30605605d3d425890830af4b554819957f36a0"
+      "log_sha256": "345b411e69452a0c00eccc3501c85b933bf5ef4469cf3505821b67d819e198ab"
     },
     {
       "artifacts": [],
-      "binary_sha256": "b783d40c18437d99fe618e8cfbb71bc7d17de08376b205ebcfd91dac41b43533",
+      "binary_sha256": "05a3e2ce819e37d2a1407b7872732b684fa4fe3ba939036b38b5a990df625c87",
       "command": [
         "$BUILD_DIR/fuzz/codeskeptic_fuzz_mcp_json_rpc",
         "-seed=1004",
@@ -104,7 +104,7 @@
       "exit_code": 0,
       "id": "mcp_json_rpc",
       "log": "logs/mcp_json_rpc.log",
-      "log_sha256": "0c5358458db7223cce81fd42651f3d1931d4316a1890f53a7ba85ade228c2511"
+      "log_sha256": "6929045deeddc8fd2aa74cd789585a6967f76da76ee491359556c2e7d5ca6b64"
     }
   ],
   "toolchain": {

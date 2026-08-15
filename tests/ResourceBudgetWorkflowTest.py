@@ -10,6 +10,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+ROOT_CMAKE = ROOT / "CMakeLists.txt"
+RESOURCE_SUPERVISOR = ROOT / "src" / "core" / "ResourceSupervisor.cpp"
 
 
 def job(name: str) -> str:
@@ -46,6 +48,32 @@ class ResourceBudgetWorkflowTest(unittest.TestCase):
             gate,
         )
         self.assertNotIn("continue-on-error", gate)
+
+    def test_all_apple_builds_use_the_sdk_as_a_sysroot(self) -> None:
+        cmake = ROOT_CMAKE.read_text(encoding="utf-8")
+        sysroot_guard = "if(APPLE)\n    if(NOT CMAKE_OSX_SYSROOT)"
+        imported_include_guard = (
+            "if(APPLE)\n    # Homebrew LLVM's imported dependency targets"
+        )
+        self.assertIn(sysroot_guard, cmake)
+        self.assertIn(imported_include_guard, cmake)
+        self.assertNotIn(
+            "if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR", cmake
+        )
+        self.assertLess(cmake.index(sysroot_guard),
+                        cmake.index("find_package(LLVM REQUIRED CONFIG)"))
+
+    def test_windows_headers_cannot_rewrite_standard_minmax_calls(self) -> None:
+        source = RESOURCE_SUPERVISOR.read_text(encoding="utf-8")
+        self.assertIn("#define NOMINMAX", source)
+        self.assertLess(source.index("#define NOMINMAX"),
+                        source.index("#include <windows.h>"))
+
+    def test_worker_control_inherits_the_llvm_selected_msvc_crt(self) -> None:
+        cmake = ROOT_CMAKE.read_text(encoding="utf-8")
+        worker_target = "add_library(codeskeptic_resource_worker_control"
+        self.assertGreater(cmake.index(worker_target),
+                           cmake.index("find_package(Clang REQUIRED CONFIG)"))
 
 
 if __name__ == "__main__":

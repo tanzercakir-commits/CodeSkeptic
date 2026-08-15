@@ -1,14 +1,14 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1004
-INFO: Loaded 1 modules   (961590 inline 8-bit counters): 961590 [0x55907a91ea40, 0x55907aa09676), 
-INFO: Loaded 1 PC tables (961590 PCs): 961590 [0x55907aa09678,0x55907b8b59d8), 
-INFO:        3 files found in /workspace/build/p10-05-sampling-final-undefined/codeskeptic-fuzz-fxfzmnj9/corpus/mcp_json_rpc
+INFO: Loaded 1 modules   (961590 inline 8-bit counters): 961590 [0x56492713fa40, 0x56492722a676), 
+INFO: Loaded 1 PC tables (961590 PCs): 961590 [0x56492722a678,0x5649280d69d8), 
+INFO:        3 files found in /workspace/build/p10-05-windows-final-undefined/codeskeptic-fuzz-9gjymzx7/corpus/mcp_json_rpc
 INFO: seed corpus: files: 3 min: 34b max: 153b total: 228b rss: 135Mb
-#4	INITED cov: 331 ft: 415 corp: 3/228b exec/s: 0 rss: 136Mb
-#5	NEW    cov: 333 ft: 417 corp: 4/269b lim: 153 exec/s: 0 rss: 136Mb L: 41/153 MS: 1 ChangeBit-
-#34	REDUCE cov: 333 ft: 417 corp: 4/266b lim: 153 exec/s: 0 rss: 136Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
-#35	NEW    cov: 347 ft: 458 corp: 5/399b lim: 153 exec/s: 0 rss: 136Mb L: 133/153 MS: 1 EraseBytes-
-	NEW_FUNC[1/1]: 0x559075d7b328 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
+#4	INITED cov: 331 ft: 415 corp: 3/228b exec/s: 0 rss: 135Mb
+#5	NEW    cov: 333 ft: 417 corp: 4/269b lim: 153 exec/s: 0 rss: 135Mb L: 41/153 MS: 1 ChangeBit-
+#34	REDUCE cov: 333 ft: 417 corp: 4/266b lim: 153 exec/s: 0 rss: 135Mb L: 31/153 MS: 4 CMP-ChangeBinInt-ShuffleBytes-EraseBytes- DE: "\011\000"-
+#35	NEW    cov: 347 ft: 458 corp: 5/399b lim: 153 exec/s: 0 rss: 135Mb L: 133/153 MS: 1 EraseBytes-
+	NEW_FUNC[1/1]: 0x56492259c328 in std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> std::operator+<char, std::char_traits<char>, std::allocator<char>>(char const*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>&&) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/basic_string.h:3676
 #46	NEW    cov: 351 ft: 468 corp: 6/533b lim: 153 exec/s: 0 rss: 138Mb L: 134/153 MS: 1 InsertByte-
 #47	REDUCE cov: 351 ft: 468 corp: 6/529b lim: 153 exec/s: 0 rss: 138Mb L: 27/153 MS: 1 EraseBytes-
 #58	NEW    cov: 351 ft: 469 corp: 7/677b lim: 153 exec/s: 0 rss: 138Mb L: 148/153 MS: 1 InsertRepeatedBytes-

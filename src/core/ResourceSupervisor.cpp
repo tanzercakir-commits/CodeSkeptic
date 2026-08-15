@@ -17,6 +17,9 @@
 #include <vector>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #define PSAPI_VERSION 1
 #include <windows.h>
 #include <psapi.h>

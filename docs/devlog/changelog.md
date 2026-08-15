@@ -32,26 +32,34 @@
   semantics. The current Linux Clang 20 source passes `1237/1237` direct C++
   tests and `1254/1254` CTest entries.
 - Added a contract-pinned `resource-budget-macos` PR/push lane using native
-  macOS 14 and Homebrew LLVM 20; its workflow contract is `2/2`. The final
+  macOS 14 and Homebrew LLVM 20. Its first hosted build exposed Homebrew
+  Clang receiving an SDK `/usr/include` without the matching `-isysroot`;
+  Apple sysroot discovery and imported SDK-include cleanup now apply to every
+  Apple build while preserving a caller-supplied sysroot. The same hosted head
+  exposed Win32 `max` macro expansion at the supervisor peak calculation and
+  an `/MD` worker-control library linked into its `/MT` probe. `NOMINMAX` is
+  now defined before `windows.h`, and the worker-control target is created
+  only after LLVM selects the MSVC CRT model for the downstream target
+  graph. The workflow contract is `5/5`. The final
   sanitizer and stress source manifests agree on 377 files with digest
-  `dc98bc14cca3d76174c602d447aef271413637a84cc8866e25a8c793ef8d72c6`.
+  `50d451974d957b35de7db78597459f26277b263f950c1169583d80c00b5ccab8`.
 - Refreshed the retained stress matrix after the final supervisor regression
   changed the bound source bytes. It accepts `9/9` cases and `18/18`
-  executions in `682` ms; receipt SHA-256 is
-  `819916f2ef010b0e25657e88e92bcf3b420efe9d03933c28f2860bb082df235b`,
+  executions in `676` ms; receipt SHA-256 is
+  `b94ab622fb06a04fcab22ecd46c5066067abf55ab2e941c34f92d9380b619d73`,
   and the 37-entry outer manifest SHA-256 is
-  `1e4ac4fb6340809176e60b6187f4e1dade9c4df852bb2cac677c931ab880cc7d`.
+  `17a1afeb55894a378064dce14efdd48d573a6f3478ffb6059208a5a1bdd4e6bb`.
   Its verifier, `StressMatrixContract` `4/4`, and all manifest entries pass.
 - Retained final Linux x86_64 ASAN and UBSAN trees bind those exact source
   bytes. Both pass all ten runtime gates, `1254/1254` CTest entries,
   `1237/1237` direct C++ tests, representative clean/finding/invalid/
   whole-program and sequential MCP paths, and four fuzz smoke targets. ASAN
-  completed in `76301` ms with receipt SHA-256
-  `faee6c87fb7f98ca95ddaef037f8fcfccf5595c507d4f174c9eec68396c6f3d4`;
-  UBSAN completed in `48856` ms with receipt SHA-256
-  `71000669e5fcbd8235017751cc4e9cdbf56a2137744ff04ebfc7ab4bea7ec45e`.
+  completed in `76692` ms with receipt SHA-256
+  `cb4d50b40a41353eae11635e97225d9de682b82de38d4d6d5d68153935dd3d07`;
+  UBSAN completed in `49157` ms with receipt SHA-256
+  `de79fca27695a7b54995496d60e710751fd58d6642b0b93e03a1b3b7586ce1a1`.
   The 40-entry outer manifest SHA-256 is
-  `be02be953463b3153daf25d675d4aafc99e102fee53d3584207f779d59e63477`;
+  `6c7cbcdba66a4e865334bf487e06555c5c39c761289d357cd80e8272795fe64b`;
   both retained verifier modes pass and `SanitizerContract` is `13/13` with
   no skips.
 - Independent read-only pre-evidence, narrow lifecycle, and final evidence
