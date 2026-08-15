@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace codeskeptic {
 
@@ -18,6 +21,39 @@ enum class AnalysisStatus {
     Failed,
 };
 
+enum class TranslationUnitStatus {
+    Completed,
+    Broken,
+    Missing,
+    TimedOut,
+    MemoryExceeded,
+    WorkerFailed,
+};
+
+inline const char* translationUnitStatusName(TranslationUnitStatus status) {
+    switch (status) {
+        case TranslationUnitStatus::Completed: return "completed";
+        case TranslationUnitStatus::Broken: return "broken";
+        case TranslationUnitStatus::Missing: return "missing";
+        case TranslationUnitStatus::TimedOut: return "timed-out";
+        case TranslationUnitStatus::MemoryExceeded: return "memory-exceeded";
+        case TranslationUnitStatus::WorkerFailed: return "worker-failed";
+    }
+    return "worker-failed";
+}
+
+struct TranslationUnitReceipt {
+    std::string canonical_path;
+    std::string compile_command_sha256;
+    std::size_t command_ordinal = 0;
+    std::string phase;
+    TranslationUnitStatus status = TranslationUnitStatus::WorkerFailed;
+    std::uint64_t duration_ms = 0;
+    std::uint64_t peak_memory_kib = 0;
+    unsigned timeout_seconds = 0;
+    unsigned memory_mib = 0;
+};
+
 struct AnalysisResult {
     std::size_t attempted_tus = 0;
     std::size_t analyzed_tus = 0;
@@ -29,6 +65,7 @@ struct AnalysisResult {
     // historical all-findings-block behavior.
     std::size_t findings = 0;
     std::size_t report_only_findings = 0;
+    std::vector<TranslationUnitReceipt> tu_receipts;
 
     // These flags can request additional diagnostic evidence, but they never
     // turn a broken or skipped requested TU into a trustworthy verdict.
@@ -51,15 +88,42 @@ struct AnalysisResult {
             attempted_tus > 0 && analyzed_tus == 0;
         return no_inputs || no_rules || compile_database_failed ||
                tool_failed || nothing_analyzed ||
+               hasResourceFailure() ||
                summary_save_failed || baseline_load_failed ||
                baseline_write_failed || report_write_failed;
+    }
+
+    bool hasResourceFailure() const {
+        return std::any_of(
+            tu_receipts.begin(), tu_receipts.end(),
+            [](const TranslationUnitReceipt& receipt) {
+                return receipt.status == TranslationUnitStatus::TimedOut ||
+                       receipt.status ==
+                           TranslationUnitStatus::MemoryExceeded ||
+                       receipt.status ==
+                           TranslationUnitStatus::WorkerFailed;
+            });
+    }
+
+    std::size_t completedReceiptCount() const {
+        return static_cast<std::size_t>(std::count_if(
+            tu_receipts.begin(), tu_receipts.end(),
+            [](const TranslationUnitReceipt& receipt) {
+                return receipt.status == TranslationUnitStatus::Completed;
+            }));
     }
 
     bool hasIncompleteEvidence() const {
         const bool partial_tu_coverage = broken_tus > 0;
         const bool unaccounted_tus =
             analyzed_tus + broken_tus < attempted_tus;
-        return partial_tu_coverage || unaccounted_tus ||
+        const bool incomplete_receipt = std::any_of(
+            tu_receipts.begin(), tu_receipts.end(),
+            [](const TranslationUnitReceipt& receipt) {
+                return receipt.status == TranslationUnitStatus::Broken ||
+                       receipt.status == TranslationUnitStatus::Missing;
+            });
+        return partial_tu_coverage || unaccounted_tus || incomplete_receipt ||
                incomplete_functions > 0 ||
                summary_load_failed || summary_stale;
     }

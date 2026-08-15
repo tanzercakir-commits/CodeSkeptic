@@ -6,6 +6,9 @@
   "coverage": { "attempted_tus": 1, "analyzed_tus": 1, "broken_tus": 1, "incomplete_functions": 0 },
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/tmp/codeskeptic-stress-3pygu6i4/broken-recovery-opt-in/repeat-2/recovery_broken.cpp", "compile_command_sha256": "27f2a71782be7317ed01083c9e67d70532063cb1e018d0e194060101184ac7be", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 20, "peak_memory_kib": 79680, "timeout_seconds": 300, "memory_mib": 4096 }
+  ],
   "total": 0,
   "diagnostics": [
   ]

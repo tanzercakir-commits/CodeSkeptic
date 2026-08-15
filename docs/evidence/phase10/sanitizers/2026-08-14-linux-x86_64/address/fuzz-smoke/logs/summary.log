@@ -1,8 +1,8 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1003
-INFO: Loaded 1 modules   (207622 inline 8-bit counters): 207622 [0x55fb387c8b80, 0x55fb387fb686), 
-INFO: Loaded 1 PC tables (207622 PCs): 207622 [0x55fb387fb688,0x55fb38b266e8), 
-INFO:        2 files found in /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/address/codeskeptic-fuzz-g97nrozz/corpus/summary
+INFO: Loaded 1 modules   (207622 inline 8-bit counters): 207622 [0x563b98ef8b80, 0x563b98f2b686), 
+INFO: Loaded 1 PC tables (207622 PCs): 207622 [0x563b98f2b688,0x563b992566e8), 
+INFO:        2 files found in /workspace/build/p10-05-windows-final-address/codeskeptic-fuzz-hk8s_rgo/corpus/summary
 INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 99Mb
 #3	INITED cov: 140 ft: 160 corp: 2/141b exec/s: 0 rss: 100Mb
 #5	NEW    cov: 142 ft: 197 corp: 3/205b lim: 79 exec/s: 0 rss: 100Mb L: 64/79 MS: 2 InsertByte-CrossOver-
@@ -17,7 +17,7 @@ INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 99Mb
 #34	REDUCE cov: 151 ft: 222 corp: 11/748b lim: 79 exec/s: 0 rss: 100Mb L: 35/79 MS: 2 ChangeByte-EraseBytes-
 #45	NEW    cov: 151 ft: 228 corp: 12/814b lim: 79 exec/s: 0 rss: 100Mb L: 66/79 MS: 1 EraseBytes-
 #67	REDUCE cov: 151 ft: 228 corp: 12/797b lim: 79 exec/s: 0 rss: 100Mb L: 18/79 MS: 2 ChangeBit-EraseBytes-
-	NEW_FUNC[1/1]: 0x55fb3702a7c0 in codeskeptic::SummaryRegistry::parseSummaryText(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, std::map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, codeskeptic::SummaryRegistry::FunctionSummary, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, codeskeptic::SummaryRegistry::FunctionSummary>>>&)::$_0::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, int*) const /workspace/src/engine/FunctionSummary.cpp:4211
+	NEW_FUNC[1/1]: 0x563b9775a7c0 in codeskeptic::SummaryRegistry::parseSummaryText(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, std::map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, codeskeptic::SummaryRegistry::FunctionSummary, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, codeskeptic::SummaryRegistry::FunctionSummary>>>&)::$_0::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, int*) const /workspace/src/engine/FunctionSummary.cpp:4211
 #68	NEW    cov: 156 ft: 235 corp: 13/871b lim: 79 exec/s: 0 rss: 101Mb L: 74/79 MS: 1 InsertRepeatedBytes-
 #75	REDUCE cov: 156 ft: 235 corp: 13/870b lim: 79 exec/s: 0 rss: 101Mb L: 78/79 MS: 2 ChangeByte-CrossOver-
 #76	REDUCE cov: 157 ft: 237 corp: 14/949b lim: 79 exec/s: 0 rss: 101Mb L: 79/79 MS: 1 CrossOver-

@@ -76,3 +76,29 @@ TEST(JsonReporterTest, PublishesPerFindingCapabilityMetadata) {
     EXPECT_NE(json.find("\"fingerprint\": \"csf1-"),
               std::string::npos);
 }
+
+TEST(JsonReporterTest, PublishesExactTranslationUnitReceipts) {
+    AnalysisResult result;
+    result.attempted_tus = 2;
+    result.analyzed_tus = 1;
+    result.tu_receipts.push_back(TranslationUnitReceipt{
+        "/project/a.cpp", std::string(64, 'a'), 3, "analysis",
+        TranslationUnitStatus::TimedOut, 1005, 24576, 1, 96});
+
+    const std::string json = readJsonReport(result);
+
+    EXPECT_NE(json.find("\"translation_units\""), std::string::npos);
+    EXPECT_NE(json.find("\"path\": \"/project/a.cpp\""),
+              std::string::npos);
+    EXPECT_NE(json.find("\"compile_command_sha256\": \"" +
+                        std::string(64, 'a') + "\""),
+              std::string::npos);
+    EXPECT_NE(json.find("\"command_ordinal\": 3"), std::string::npos);
+    EXPECT_NE(json.find("\"status\": \"timed-out\""),
+              std::string::npos);
+    EXPECT_NE(json.find("\"duration_ms\": 1005"), std::string::npos);
+    EXPECT_NE(json.find("\"peak_memory_kib\": 24576"),
+              std::string::npos);
+    EXPECT_NE(json.find("\"timeout_seconds\": 1"), std::string::npos);
+    EXPECT_NE(json.find("\"memory_mib\": 96"), std::string::npos);
+}

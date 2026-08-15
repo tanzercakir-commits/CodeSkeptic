@@ -102,6 +102,7 @@ if(NOT CODESKEPTIC_SANITIZER STREQUAL "none")
     target_link_options(codeskeptic_sanitizer_flags INTERFACE
                         ${CODESKEPTIC_SANITIZER_FLAGS})
 endif()
+
 if(CODESKEPTIC_BUILD_FUZZERS AND CODESKEPTIC_BUILD_TESTS)
     message(FATAL_ERROR
         "Fuzzer builds are dedicated: set CODESKEPTIC_BUILD_TESTS=OFF")
@@ -110,33 +111,43 @@ if(CODESKEPTIC_BUILD_FUZZERS AND
    NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "CodeSkeptic fuzz targets require Clang/libFuzzer")
 endif()
-if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
-              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+if(APPLE)
     if(NOT CMAKE_OSX_SYSROOT)
         execute_process(
             COMMAND xcrun --show-sdk-path
-            OUTPUT_VARIABLE CODESKEPTIC_FUZZ_SDK
+            OUTPUT_VARIABLE CODESKEPTIC_APPLE_SDK
             OUTPUT_STRIP_TRAILING_WHITESPACE
-            RESULT_VARIABLE CODESKEPTIC_FUZZ_SDK_RESULT
+            RESULT_VARIABLE CODESKEPTIC_APPLE_SDK_RESULT
         )
-        if(NOT CODESKEPTIC_FUZZ_SDK_RESULT EQUAL 0 OR
-           NOT CODESKEPTIC_FUZZ_SDK)
+        if(NOT CODESKEPTIC_APPLE_SDK_RESULT EQUAL 0 OR
+           NOT CODESKEPTIC_APPLE_SDK)
             message(FATAL_ERROR
-                "macOS fuzz builds require an Xcode SDK sysroot")
+                "macOS builds require an Xcode SDK sysroot")
         endif()
-        set(CMAKE_OSX_SYSROOT "${CODESKEPTIC_FUZZ_SDK}" CACHE PATH
-            "SDK used by the dedicated fuzz build" FORCE)
+        set(CMAKE_OSX_SYSROOT "${CODESKEPTIC_APPLE_SDK}" CACHE PATH
+            "Xcode SDK used by macOS builds" FORCE)
     endif()
 endif()
 
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang REQUIRED CONFIG)
 
+# Tiny, dependency-free child-side half of the resource-supervision
+# handshake. Keeping it separate lets the dedicated probe use the exact
+# production handshake without linking the Clang-heavy analyzer core. Define
+# it after LLVM discovery so LLVM's selected MSVC CRT model is inherited by
+# both this library and its later executable consumers.
+add_library(codeskeptic_resource_worker_control STATIC
+    src/core/ResourceWorkerControl.cpp)
+target_include_directories(codeskeptic_resource_worker_control
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(codeskeptic_resource_worker_control
+    PUBLIC codeskeptic_sanitizer_flags)
+
 message(STATUS "LLVM version: ${LLVM_VERSION}")
 message(STATUS "Clang include dirs: ${CLANG_INCLUDE_DIRS}")
 
-if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
-              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+if(APPLE)
     # Homebrew LLVM's imported dependency targets publish the SDK's root C
     # include directory as a consumer include. Clang already reaches it via
     # -isysroot; publishing it explicitly places C headers before libc++ and
@@ -169,8 +180,7 @@ if(CODESKEPTIC_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-if(APPLE AND (CODESKEPTIC_BUILD_FUZZERS OR
-              NOT CODESKEPTIC_SANITIZER STREQUAL "none"))
+if(APPLE)
     # FetchContent's test dependency discovery can revisit SDK-backed
     # imported packages after the first cleanup above. Re-apply the exact
     # property normalization after every subdirectory has been configured;

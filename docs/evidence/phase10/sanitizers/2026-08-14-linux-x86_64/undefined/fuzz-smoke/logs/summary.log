@@ -1,8 +1,8 @@
 INFO: Running with entropic power schedule (0xFF, 100).
 INFO: Seed: 1003
-INFO: Loaded 1 modules   (351969 inline 8-bit counters): 351969 [0x560dd18a0648, 0x560dd18f6529), 
-INFO: Loaded 1 PC tables (351969 PCs): 351969 [0x560dd18f6530,0x560dd1e55340), 
-INFO:        2 files found in /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/undefined/codeskeptic-fuzz-oncxhll9/corpus/summary
+INFO: Loaded 1 modules   (351969 inline 8-bit counters): 351969 [0x563552edb648, 0x563552f31529), 
+INFO: Loaded 1 PC tables (351969 PCs): 351969 [0x563552f31530,0x563553490340), 
+INFO:        2 files found in /workspace/build/p10-05-windows-final-undefined/codeskeptic-fuzz-9gjymzx7/corpus/summary
 INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 100Mb
 #3	INITED cov: 226 ft: 264 corp: 2/141b exec/s: 0 rss: 100Mb
 #4	NEW    cov: 226 ft: 266 corp: 3/204b lim: 79 exec/s: 0 rss: 100Mb L: 63/79 MS: 1 InsertByte-
@@ -12,14 +12,14 @@ INFO: seed corpus: files: 2 min: 62b max: 79b total: 141b rss: 100Mb
 #16	NEW    cov: 230 ft: 364 corp: 7/471b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 3 CrossOver-CrossOver-ChangeBinInt-
 #20	NEW    cov: 231 ft: 365 corp: 8/533b lim: 79 exec/s: 0 rss: 100Mb L: 62/79 MS: 4 ChangeByte-CrossOver-CrossOver-ChangeBinInt-
 #26	NEW    cov: 232 ft: 368 corp: 9/596b lim: 79 exec/s: 0 rss: 100Mb L: 63/79 MS: 1 ChangeByte-
-	NEW_FUNC[1/2]: 0x560dcfc4e7b0 in std::vector<codeskeptic::SummaryRegistry::ParamEffect, std::allocator<codeskeptic::SummaryRegistry::ParamEffect>>::reserve(unsigned long) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/vector.tcc:69
-	NEW_FUNC[2/2]: 0x560dcfc4ea18 in codeskeptic::(anonymous namespace)::peFromChar(char, codeskeptic::SummaryRegistry::ParamEffect&) /workspace/src/engine/FunctionSummary.cpp:3860
+	NEW_FUNC[1/2]: 0x5635512897b0 in std::vector<codeskeptic::SummaryRegistry::ParamEffect, std::allocator<codeskeptic::SummaryRegistry::ParamEffect>>::reserve(unsigned long) /usr/lib/gcc/x86_64-linux-gnu/13/../../../../include/c++/13/bits/vector.tcc:69
+	NEW_FUNC[2/2]: 0x563551289a18 in codeskeptic::(anonymous namespace)::peFromChar(char, codeskeptic::SummaryRegistry::ParamEffect&) /workspace/src/engine/FunctionSummary.cpp:3860
 #33	NEW    cov: 240 ft: 378 corp: 10/659b lim: 79 exec/s: 0 rss: 102Mb L: 63/79 MS: 2 ChangeBit-ChangeByte-
 #43	REDUCE cov: 240 ft: 378 corp: 10/639b lim: 79 exec/s: 0 rss: 102Mb L: 59/79 MS: 5 ShuffleBytes-ChangeASCIIInt-ChangeBit-CopyPart-EraseBytes-
 #45	NEW    cov: 241 ft: 379 corp: 11/718b lim: 79 exec/s: 0 rss: 102Mb L: 79/79 MS: 2 CrossOver-ChangeBit-
 #51	NEW    cov: 242 ft: 384 corp: 12/781b lim: 79 exec/s: 0 rss: 102Mb L: 63/79 MS: 1 ChangeBinInt-
 #64	REDUCE cov: 242 ft: 384 corp: 12/751b lim: 79 exec/s: 0 rss: 102Mb L: 49/79 MS: 3 CMP-CopyPart-EraseBytes- DE: "N10__cxxabiv"-
-	NEW_FUNC[1/1]: 0x560dcfc4e100 in codeskeptic::SummaryRegistry::parseSummaryText(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, std::map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, codeskeptic::SummaryRegistry::FunctionSummary, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, codeskeptic::SummaryRegistry::FunctionSummary>>>&)::$_0::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, int*) const /workspace/src/engine/FunctionSummary.cpp:4211
+	NEW_FUNC[1/1]: 0x563551289100 in codeskeptic::SummaryRegistry::parseSummaryText(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, std::map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, codeskeptic::SummaryRegistry::FunctionSummary, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, codeskeptic::SummaryRegistry::FunctionSummary>>>&)::$_0::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const&, int*) const /workspace/src/engine/FunctionSummary.cpp:4211
 #70	NEW    cov: 247 ft: 390 corp: 13/815b lim: 79 exec/s: 0 rss: 102Mb L: 64/79 MS: 1 InsertByte-
 #81	NEW    cov: 248 ft: 393 corp: 14/879b lim: 79 exec/s: 0 rss: 102Mb L: 64/79 MS: 1 InsertByte-
 #89	NEW    cov: 251 ft: 399 corp: 15/887b lim: 79 exec/s: 0 rss: 102Mb L: 8/79 MS: 3 ChangeASCIIInt-InsertRepeatedBytes-CrossOver-

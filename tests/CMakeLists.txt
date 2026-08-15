@@ -13,6 +13,9 @@ add_executable(codeskeptic_tests
     TestHelper.cpp
     DiagnosticTest.cpp
     AnalysisResultTest.cpp
+    AnalysisCoordinatorTest.cpp
+    WorkerProtocolTest.cpp
+    BudgetedAnalysisTest.cpp
     CapabilitiesTest.cpp
     FindingFingerprintTest.cpp
     ConfigTest.cpp
@@ -51,7 +54,22 @@ add_executable(codeskeptic_tests
     InterproceduralTest.cpp
     MacSdkPathTest.cpp
     ResourceDirTest.cpp
+    ResourceSupervisorTest.cpp
 )
+
+add_executable(codeskeptic_resource_probe resource_budget_probe.cpp)
+target_link_libraries(codeskeptic_resource_probe PRIVATE
+                      codeskeptic_resource_worker_control)
+add_executable(codeskeptic_budget_worker_probe budget_worker_probe.cpp)
+target_link_libraries(codeskeptic_budget_worker_probe PRIVATE
+                      codeskeptic_core)
+add_dependencies(codeskeptic_tests codeskeptic
+                 codeskeptic_resource_probe
+                 codeskeptic_budget_worker_probe)
+target_compile_definitions(codeskeptic_tests PRIVATE
+    CODESKEPTIC_BINARY="$<TARGET_FILE:codeskeptic>"
+    CODESKEPTIC_RESOURCE_PROBE="$<TARGET_FILE:codeskeptic_resource_probe>"
+    CODESKEPTIC_BUDGET_WORKER_PROBE="$<TARGET_FILE:codeskeptic_budget_worker_probe>")
 
 target_include_directories(codeskeptic_tests
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -113,6 +131,9 @@ add_test(NAME StressMatrixContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/StressMatrixTest.py
                  $<TARGET_FILE:codeskeptic>)
+add_test(NAME ResourceBudgetWorkflowContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/ResourceBudgetWorkflowTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta

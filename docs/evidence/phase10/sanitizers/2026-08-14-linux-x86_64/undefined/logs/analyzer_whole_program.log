@@ -1,8 +1,8 @@
 [CodeSkeptic] Analysis starting... (2 files, 12 rules)
 [CodeSkeptic] Whole-program pass: collecting summaries from 2 file(s)...
-[1/2] Processing file /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/undefined/fixture/whole/first.cpp.
-[2/2] Processing file /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/undefined/fixture/whole/second.cpp.
-[1/2] Processing file /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/undefined/fixture/whole/first.cpp.
-[2/2] Processing file /workspace/docs/evidence/phase10/sanitizers/2026-08-15-final/undefined/fixture/whole/second.cpp.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-d58a5a/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2 function summaries loaded from /tmp/codeskeptic-tu-run-d58a5a/merged-summary.csk
 CodeSkeptic: Clean! No issues found.
 CODESKEPTIC_SANITIZER_GATE_OK analyzer_whole_program

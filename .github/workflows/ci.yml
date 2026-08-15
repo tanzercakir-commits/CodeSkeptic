@@ -146,6 +146,55 @@ jobs:
           git push --force origin \
             "HEAD:refs/status/${{ github.sha }}/build-and-test/${{ job.status }}"
 
+  resource-budget-macos:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned LLVM 20 toolchain
+        run: brew install llvm@20 cmake ninja
+
+      - name: Configure native resource-budget build
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang"
+          -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++"
+          -DCMAKE_PREFIX_PATH="$(brew --prefix llvm@20)"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Test (single process)
+        run: ./build/tests/codeskeptic_tests
+
+      - name: Failure diagnostics -> refs/ci-logs/*
+        if: failure()
+        run: |
+          ctest --test-dir build --rerun-failed --output-on-failure \
+            > /tmp/resource-budget-macos-ctest.txt 2>&1 || true
+          tail -c 30000 /tmp/resource-budget-macos-ctest.txt \
+            > resource-budget-macos-ctest-tail.txt || true
+          git config user.name "ci-logs"
+          git config user.email "ci-logs@localhost"
+          git checkout --detach -q
+          git add -f resource-budget-macos-ctest-tail.txt
+          git commit -qm "macOS resource-budget diagnostics @ ${{ github.sha }}"
+          git push --force origin \
+            "HEAD:refs/ci-logs/${{ github.sha }}/resource-budget-macos"
+
+      - name: Mirror job status to refs/status/*
+        if: always()
+        run: |
+          git push --force origin \
+            "HEAD:refs/status/${{ github.sha }}/resource-budget-macos/${{ job.status }}"
+
   fuzz-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 20

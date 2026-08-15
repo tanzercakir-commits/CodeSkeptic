@@ -4,6 +4,8 @@
 
 using codeskeptic::AnalysisResult;
 using codeskeptic::AnalysisStatus;
+using codeskeptic::TranslationUnitReceipt;
+using codeskeptic::TranslationUnitStatus;
 
 TEST(AnalysisResultTest, CompleteCleanAndFindingsHaveStableExitCodes) {
     AnalysisResult clean;
@@ -72,6 +74,18 @@ TEST(AnalysisResultTest, MissingRequestedTusCannotBeAcceptedAsAVerdict) {
     EXPECT_EQ(result.exitCode(), 2);
 }
 
+TEST(AnalysisResultTest, IncompleteReceiptCannotBeMaskedByCounts) {
+    AnalysisResult result;
+    result.attempted_tus = result.analyzed_tus = 1;
+    result.tu_receipts.push_back(TranslationUnitReceipt{
+        "/src/missing.cpp", "", 0, "analysis",
+        TranslationUnitStatus::Missing, 0, 0, 300, 4096});
+
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Incomplete);
+    EXPECT_EQ(result.exitCode(), 2);
+}
+
 TEST(AnalysisResultTest, ZeroAnalyzedCannotBeAcceptedAsClean) {
     AnalysisResult result;
     result.attempted_tus = 3;
@@ -117,4 +131,49 @@ TEST(AnalysisResultTest, SuccessfulBaselineRecordingIsZero) {
     result.baseline_recorded = true;
     EXPECT_EQ(result.status(), AnalysisStatus::Recorded);
     EXPECT_EQ(result.exitCode(), 0);
+}
+
+TEST(AnalysisResultTest, ResourceFailurePreservesCompletedReceiptsButNoVerdict) {
+    AnalysisResult result;
+    result.attempted_tus = 3;
+    result.analyzed_tus = 2;
+    result.findings = 1;
+    result.tu_receipts = {
+        TranslationUnitReceipt{"/src/a.cpp", "sha-a", 0,
+                               "analysis", TranslationUnitStatus::Completed,
+                               120, 64000, 300, 4096},
+        TranslationUnitReceipt{"/src/b.cpp", "sha-b", 0,
+                               "analysis", TranslationUnitStatus::TimedOut,
+                               1001, 70000, 1, 4096},
+        TranslationUnitReceipt{"/src/c.cpp", "sha-c", 0,
+                               "analysis", TranslationUnitStatus::Completed,
+                               80, 62000, 300, 4096},
+    };
+
+    EXPECT_EQ(result.completedReceiptCount(), 2u);
+    EXPECT_TRUE(result.hasResourceFailure());
+    EXPECT_FALSE(result.complete());
+    EXPECT_EQ(result.status(), AnalysisStatus::Failed);
+    EXPECT_EQ(result.exitCode(), 2);
+    EXPECT_EQ(result.findings, 1u);
+}
+
+TEST(AnalysisResultTest, TuIdentityIncludesCompileCommandAndOrdinal) {
+    AnalysisResult result;
+    result.tu_receipts = {
+        TranslationUnitReceipt{"/src/shared.cpp", "sha-command-1", 0,
+                               "analysis", TranslationUnitStatus::Completed,
+                               10, 1000, 300, 4096},
+        TranslationUnitReceipt{"/src/shared.cpp", "sha-command-2", 1,
+                               "analysis", TranslationUnitStatus::Completed,
+                               12, 1100, 300, 4096},
+    };
+
+    ASSERT_EQ(result.tu_receipts.size(), 2u);
+    EXPECT_EQ(result.tu_receipts[0].canonical_path,
+              result.tu_receipts[1].canonical_path);
+    EXPECT_NE(result.tu_receipts[0].compile_command_sha256,
+              result.tu_receipts[1].compile_command_sha256);
+    EXPECT_NE(result.tu_receipts[0].command_ordinal,
+              result.tu_receipts[1].command_ordinal);
 }
