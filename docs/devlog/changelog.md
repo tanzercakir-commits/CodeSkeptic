@@ -49,9 +49,20 @@
   receipt/SHA256SUMS digests are
   `831dec7f3b665ddd98cef0a124e374584af0639e60e82b8f33e7560c25f15770` /
   `dcd8eb9ffc9978d77c8260f49688e42c0aa5315de347bcf34317f61e4b1ce27b`.
-  Required-mode confirmation, full regression, final audit, commit/push, and
-  exact-head hosted CI remain pending; this checkpoint does not close
-  `CS-P10-07` or write protected `main`.
+- Retained a separate required-mode confirmation against the pinned baseline
+  at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
+  Its 122-entry tree binds the same 385-file source digest at authority
+  revision `b690b965859f4d52b070c9277c23cff2f3470140`. All semantic and performance
+  gates pass with no regression. Unit, repository, and release-candidate wall
+  medians are 825, 234000, and 35525 ms; peak RSS maxima are 87704, 1304576,
+  and 370584 KiB. Receipt/SHA256SUMS digests are
+  `3307dac87db2c914bee6d23f3374d7cb1bb0bfe9fe4ce5320b8e709019c6f4b0` /
+  `3e847bd5bfd80215dcb2f5993fb590583e3b0650fe5190544da8ef9b1018292f`.
+  Exact-container verify-only accepted all three workloads and all ten
+  repetitions. Full regression, final audit, commit/push, and exact-head
+  hosted CI remain pending; this checkpoint does not close `CS-P10-07` or
+  write protected `main`.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
