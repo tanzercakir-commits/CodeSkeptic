@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import copy
+import contextlib
 import datetime as dt
 import hashlib
+import io
 import json
 import os
 import signal
@@ -26,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import run_determinism_qualification as qualification  # noqa: E402
+import run_in_measurement_cgroup as measurement_wrapper  # noqa: E402
 
 
 KINDS = ("unit", "real-repository", "release-candidate")
@@ -60,11 +63,15 @@ def manifest() -> dict:
         "repetitions": 10,
         "performance_regression_limit_percent": 10,
         "environment_policy": {
-            "affinity_external_cpu_limit_basis_points": 200,
-            "host_external_cpu_limit_basis_points": 50,
-            "cpu_pressure_some_limit_basis_points": 200,
-            "memory_pressure_full_limit_basis_points": 0,
-            "io_pressure_full_limit_basis_points": 0,
+            "batch_max_overhead_ms": 60000,
+            "idle_seconds": 30,
+            "idle_max_overshoot_ms": 2000,
+            "idle_host_external_cpu_limit_basis_points": 50,
+            "idle_affinity_external_cpu_limit_basis_points": 200,
+            "idle_cpu_pressure_some_limit_basis_points": 200,
+            "idle_memory_pressure_full_limit_basis_points": 0,
+            "idle_io_pressure_full_limit_basis_points": 0,
+            "runtime_affinity_external_cpu_limit_basis_points": 200,
             "thermal_throttle_limit_ms": 0,
         },
         "workloads": [
@@ -255,18 +262,49 @@ def time_log(value: int) -> bytes:
     ).encode()
 
 
-def environment_evidence(value: int) -> tuple[dict, bytes]:
-    ticks = value // 10
-    before = {
+def environment_snapshot(
+    *, host_cpus: int = 4, affinity: list[int] | None = None,
+    host_busy_ticks: int = 1000, affinity_busy_ticks: int = 1000,
+    owned_usage_us: int = 1_000_000,
+) -> dict:
+    affinity = [0, 1] if affinity is None else affinity
+    controller = [
+        cpu for cpu in range(host_cpus) if cpu not in set(affinity)
+    ][:max(1, len(affinity))]
+    pressure = {
+        name: {"some_total_us": 100, "full_total_us": 10}
+        for name in ("cpu", "memory", "io")
+    }
+    return {
         "cpu": {
             "clock_ticks_per_second": 100,
-            "host_logical_cpus": 2,
-            "host_busy_ticks": 1000,
-            "affinity_busy_ticks": 1000,
+            "host_logical_cpus": host_cpus,
+            "host_busy_ticks": host_busy_ticks,
+            "affinity_busy_ticks": affinity_busy_ticks,
         },
-        "pressure": {
-            name: {"some_total_us": 100, "full_total_us": 10}
-            for name in ("cpu", "memory", "io")
+        "global_pressure": copy.deepcopy(pressure),
+        "system_uclamp": {
+            "minimum_limit": 1024,
+            "maximum_limit": 1024,
+        },
+        "measurement_cgroup": {
+            "mode": qualification.MEASUREMENT_ENVIRONMENT_EXCLUSIVE,
+            "controller_cpu_affinity": controller,
+            "effective_cpu_affinity": list(affinity),
+            "exclusive_cpu_affinity": list(affinity),
+            "partition": "isolated",
+            "uclamp_min": 1024,
+            "uclamp_max": 1024,
+            "ancestor_uclamp_max": [],
+            "populated": 0,
+            "frozen": 0,
+            "cpu_usage_us": owned_usage_us,
+            "nr_throttled": 0,
+            "throttled_us": 0,
+            "memory_oom": 0,
+            "memory_oom_kill": 0,
+            "memory_oom_group_kill": 0,
+            "pressure": copy.deepcopy(pressure),
         },
         "cpufreq": [
             {
@@ -274,26 +312,55 @@ def environment_evidence(value: int) -> tuple[dict, bytes]:
                 "governor": "powersave", "minimum_khz": 400000,
                 "maximum_khz": 4400000, "current_khz": 4000000,
             }
-            for cpu in (0, 1)
+            for cpu in affinity
         ],
         "thermal": [
             {
                 "cpu": cpu, "core_count": 1, "core_total_ms": 2,
                 "package_count": 3, "package_total_ms": 4,
             }
-            for cpu in (0, 1)
+            for cpu in affinity
         ],
     }
+
+
+def environment_evidence(
+    value: int, *, scope: str = "inner-record-only", required: bool = False,
+) -> tuple[dict, bytes]:
+    ticks = value // 10
+    before = environment_snapshot()
     after = copy.deepcopy(before)
     after["cpu"]["host_busy_ticks"] += ticks
     after["cpu"]["affinity_busy_ticks"] += ticks
-    decision = qualification._evaluate_environment(
-        before, after, value, value, [0, 1],
-        2,
-        qualification.ENVIRONMENT_POLICY, True,
+    after["measurement_cgroup"]["cpu_usage_us"] += value * 1000
+    decision = qualification._evaluate_runtime_environment(
+        before, after, value, [0, 1], 4,
+        qualification.ENVIRONMENT_POLICY, required,
     )
     payload = {
-        "schema": "codeskeptic-determinism-environment-v1",
+        "schema": qualification.ENVIRONMENT_SCHEMA,
+        "scope": scope,
+        "wall_ms": value,
+        "before": before,
+        "after": after,
+        "decision": decision,
+    }
+    if scope == "performance-batch":
+        payload["gated_wall_ms"] = value
+    return decision, qualification.canonical_json(payload)
+
+
+def idle_preflight_evidence(*, required: bool = True) -> tuple[dict, bytes]:
+    before = environment_snapshot()
+    after = copy.deepcopy(before)
+    decision = qualification._evaluate_idle_environment(
+        before, after, 30_000, [0, 1], 4,
+        qualification.ENVIRONMENT_POLICY, required,
+    )
+    payload = {
+        "schema": qualification.ENVIRONMENT_SCHEMA,
+        "scope": "idle-preflight",
+        "wall_ms": 30_000,
         "before": before,
         "after": after,
         "decision": decision,
@@ -301,8 +368,68 @@ def environment_evidence(value: int) -> tuple[dict, bytes]:
     return decision, qualification.canonical_json(payload)
 
 
+def hardware_identity() -> dict:
+    return {
+        "architecture": "x86_64",
+        "cpu_model": "test cpu",
+        "logical_cpus": 2,
+        "host_logical_cpus": 4,
+        "cpu_affinity_source": qualification.AFFINITY_SOURCE_CGROUP,
+        "cpu_affinity": [0, 1],
+        "cpu_uclamp_source": qualification.UCLAMP_SOURCE_CGROUP,
+        "cpu_uclamp_min": 1024,
+        "cpu_uclamp_max": 1024,
+        "cpu_uclamp_ancestor_max": [],
+        "system_uclamp_min_limit": 1024,
+        "system_uclamp_max_limit": 1024,
+        "controller_cpu_affinity": [2, 3],
+        "measurement_environment": (
+            qualification.MEASUREMENT_ENVIRONMENT_EXCLUSIVE
+        ),
+        "measurement_cgroup_populated": 0,
+        "measurement_cgroup_frozen": 0,
+        "memory_bytes": 8 * 1024 * 1024 * 1024,
+    }
+
+
+def measurement_cgroup_fixture(
+    authority: Path, *, effective: str = "0-1",
+    exclusive: str = "0-1", partition: str = "isolated",
+    members: str = "", uclamp_min: str = "100.00",
+    uclamp_max: str = "100.00",
+) -> Path:
+    group = authority / "codeskeptic.measurement"
+    group.mkdir(parents=True)
+    values = {
+        "cpuset.cpus.effective": effective,
+        "cpuset.cpus.exclusive.effective": exclusive,
+        "cpuset.cpus.partition": partition,
+        "cgroup.procs": members,
+        "cgroup.events": "populated 0\nfrozen 0\n",
+        "cpu.uclamp.min": uclamp_min,
+        "cpu.uclamp.max": uclamp_max,
+        "cpu.stat": (
+            "usage_usec 1000000\n"
+            "nr_throttled 0\n"
+            "throttled_usec 0\n"
+        ),
+        "memory.events": "oom 0\noom_kill 0\noom_group_kill 0\n",
+    }
+    pressure = (
+        "some avg10=0.00 avg60=0.00 avg300=0.00 total=100\n"
+        "full avg10=0.00 avg60=0.00 avg300=0.00 total=10\n"
+    )
+    for resource in ("cpu", "memory", "io"):
+        values[f"{resource}.pressure"] = pressure
+    for name, value in values.items():
+        (group / name).write_text(value, encoding="ascii")
+    return group
+
+
 def artifact_bytes(payload: dict) -> dict[str, bytes]:
-    result: dict[str, bytes] = {}
+    result: dict[str, bytes] = {
+        qualification._idle_preflight_artifact_path(): idle_preflight_evidence()[1]
+    }
     for workload in payload["workloads"]:
         kind = workload["kind"]
         input_value = payload["inputs"][kind]
@@ -319,6 +446,10 @@ def artifact_bytes(payload: dict) -> dict[str, bytes]:
                 result[paths[4]] = environment_evidence(
                     inner["metrics"]["wall_ms"]
                 )[1]
+            result[run["environment_artifact"]] = environment_evidence(
+                run["metrics"]["wall_ms"],
+                scope="performance-batch", required=True,
+            )[1]
     return result
 
 
@@ -393,6 +524,7 @@ def write_determinism_infrastructure(repo: Path, raw_manifest: dict) -> None:
             raw_manifest
         ),
         "scripts/run_determinism_qualification.py": "# fixture runner\n",
+        "scripts/run_in_measurement_cgroup.py": "# fixture cgroup entry\n",
         "tests/DeterminismQualificationTest.py": "# fixture contract\n",
         "tests/DeterminismWorkflowTest.py": "# fixture workflow contract\n",
     }
@@ -490,18 +622,7 @@ def baseline(
                         "previous_profile_sha256": None,
                     },
                 },
-                "hardware": {
-                    "architecture": "x86_64",
-                    "cpu_model": "test cpu",
-                    "logical_cpus": 2,
-                    "host_logical_cpus": 2,
-                    "cpu_affinity_source": "sched_getaffinity",
-                    "cpu_affinity": [0, 1],
-                    "cpu_uclamp_source": "proc-self-sched",
-                    "cpu_uclamp_min": 1024,
-                    "cpu_uclamp_max": 1024,
-                    "memory_bytes": 8 * 1024 * 1024 * 1024,
-                },
+                "hardware": hardware_identity(),
                 "workloads": {
                     kind: {
                         "semantic_sha256": semantics[kind],
@@ -596,7 +717,12 @@ def receipt(
 ) -> dict:
     inputs = {kind: input_receipt(kind, repo_root) for kind in KINDS}
     workloads = []
-    artifacts = []
+    _, preflight_raw = idle_preflight_evidence()
+    artifacts = [{
+        "path": qualification._idle_preflight_artifact_path(),
+        "sha256": sha256(preflight_raw),
+        "size": len(preflight_raw),
+    }]
     for kind in KINDS:
         runs = []
         semantic = semantic_sha(kind, repo_root)
@@ -639,6 +765,18 @@ def receipt(
                 "cpu_ms": inner_value * iterations,
                 "peak_rss_kib": inner_value,
             }
+            batch_environment, batch_raw = environment_evidence(
+                run_metrics["wall_ms"],
+                scope="performance-batch", required=True,
+            )
+            batch_path = qualification._batch_environment_artifact_path(
+                kind, repetition
+            )
+            artifacts.append({
+                "path": batch_path,
+                "sha256": sha256(batch_raw),
+                "size": len(batch_raw),
+            })
             runs.append(
                 {
                     "repetition": repetition,
@@ -647,7 +785,9 @@ def receipt(
                     "metrics": run_metrics,
                     "measurement_iterations": iterations,
                     "batch_valid": True,
-                    "environment_valid": True,
+                    "environment_valid": batch_environment["valid"],
+                    "environment": batch_environment,
+                    "environment_artifact": batch_path,
                     "inner_runs": inner_runs,
                     "artifacts": qualification._run_artifact_paths(
                         kind, repetition, iterations
@@ -686,16 +826,7 @@ def receipt(
         "host": {
             "class_id": "test-linux-x86_64",
             "os": "Linux",
-            "architecture": "x86_64",
-            "cpu_model": "test cpu",
-            "logical_cpus": 2,
-            "host_logical_cpus": 2,
-            "cpu_affinity_source": "sched_getaffinity",
-            "cpu_affinity": [0, 1],
-            "cpu_uclamp_source": "proc-self-sched",
-            "cpu_uclamp_min": 1024,
-            "cpu_uclamp_max": 1024,
-            "memory_bytes": 8 * 1024 * 1024 * 1024,
+            **hardware_identity(),
         },
         "toolchain": toolchain_identity(),
         "inputs": {
@@ -719,27 +850,677 @@ def receipt(
 
 
 class DeterminismQualificationTest(unittest.TestCase):
-    def test_batched_environment_evidence_uses_a_distinct_v5_schema(self) -> None:
+    def test_exclusive_batch_environment_uses_distinct_v6_schemas(self) -> None:
         self.assertEqual(
             qualification.MANIFEST_SCHEMA,
-            "codeskeptic-determinism-workloads-v2",
+            "codeskeptic-determinism-workloads-v3",
         )
         self.assertEqual(
             qualification.BASELINE_SCHEMA,
-            "codeskeptic-determinism-baseline-v5",
+            "codeskeptic-determinism-baseline-v6",
         )
         self.assertEqual(
             qualification.RECEIPT_SCHEMA,
-            "codeskeptic-determinism-qualification-v5",
+            "codeskeptic-determinism-qualification-v6",
         )
         self.assertEqual(
             qualification.REJECTED_SCHEMA,
-            "codeskeptic-determinism-rejected-v5",
+            "codeskeptic-determinism-rejected-v6",
         )
         self.assertEqual(
             qualification.CALIBRATION_SCHEMA,
-            "codeskeptic-determinism-calibration-v5",
+            "codeskeptic-determinism-calibration-v6",
         )
+        self.assertEqual(
+            qualification.ENVIRONMENT_SCHEMA,
+            "codeskeptic-determinism-environment-v2",
+        )
+        sample = receipt(qualification.digest_json(manifest()))
+        self.assertEqual(len(sample["artifacts"]), 631)
+        self.assertEqual(len(artifact_bytes(sample)), 631)
+        self.assertEqual(
+            [len(item["runs"]) for item in sample["workloads"]],
+            [10, 10, 10],
+        )
+        self.assertEqual(
+            [len(item["runs"][0]["inner_runs"])
+             for item in sample["workloads"]],
+            [10, 1, 1],
+        )
+        forged_policy = copy.deepcopy(sample)
+        forged_policy["configuration"]["environment_policy"][
+            "idle_io_pressure_full_limit_basis_points"
+        ] = False
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "configuration differs"
+        ):
+            qualification.validate_receipt_payload(
+                forged_policy, manifest(),
+                baseline(qualification.digest_json(manifest())),
+            )
+
+    def test_required_measurement_environment_rejects_v5_and_requires_cgroup(self) -> None:
+        self.assertEqual(
+            qualification._measurement_environment_mode("required", None),
+            "unavailable",
+        )
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "measurement cgroup"
+        ):
+            qualification._require_measurement_environment(
+                "required", None, [0, 2]
+            )
+
+    def test_v5_wire_formats_are_rejected_after_v6_authority_migration(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        old_manifest = copy.deepcopy(raw_manifest)
+        old_manifest["schema"] = "codeskeptic-determinism-workloads-v2"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "manifest schema"
+        ):
+            qualification.validate_manifest(old_manifest)
+
+        old_baseline = baseline(manifest_sha)
+        old_baseline["schema"] = "codeskeptic-determinism-baseline-v5"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "baseline schema"
+        ):
+            qualification.validate_baseline(old_baseline, manifest_sha)
+
+        old_receipt = receipt(manifest_sha)
+        old_receipt["schema"] = "codeskeptic-determinism-qualification-v5"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "not accepted"
+        ):
+            qualification.validate_receipt_payload(
+                old_receipt, raw_manifest, baseline(manifest_sha)
+            )
+
+        old_rejected = rejected_receipt(manifest_sha)
+        old_rejected["schema"] = "codeskeptic-determinism-rejected-v5"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "classification drift"
+        ):
+            qualification._validate_rejected_payload(old_rejected, raw_manifest)
+
+        old_calibration = calibration_receipt(manifest_sha)
+        old_calibration["schema"] = "codeskeptic-determinism-calibration-v5"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "classification drift"
+        ):
+            qualification._validate_calibration_payload(
+                old_calibration, raw_manifest
+            )
+
+    def test_record_only_runs_cannot_establish_performance_authority(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as error:
+                qualification.main([
+                    "--binary", "/fixture/codeskeptic",
+                    "--repo-root", "/fixture/repo",
+                    "--build-path", "/fixture/build",
+                    "--revision", "fixture-revision",
+                    "--output", "/fixture/output",
+                    "--hardware-class", "fixture-linux-x86_64",
+                    "--repetitions", "10",
+                    "--establish-baseline",
+                    "--calibration-output", "/fixture/calibration",
+                    "--calibration-evidence-path",
+                    "docs/evidence/phase10/determinism/calibrations/fixture",
+                    "--promotion-reason", "fixture",
+                    "--performance-policy", "record-only",
+                ])
+        self.assertEqual(error.exception.code, 2)
+
+    def test_measurement_cgroup_identity_is_exclusive_empty_and_pinned(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            authority = root / "cgroup"
+            authority.mkdir()
+            group = measurement_cgroup_fixture(authority)
+            identity = qualification._measurement_cgroup_identity(
+                group, [2, 3], authority
+            )
+            self.assertEqual(identity["cpus"], [0, 1])
+            self.assertEqual(identity["uclamp_min"], 1024)
+            self.assertEqual(identity["uclamp_max"], 1024)
+
+            cases = (
+                ("cpuset.cpus.exclusive.effective", "0\n", "exclusive CPU"),
+                ("cpuset.cpus.partition", "member\n", "partition"),
+                ("cgroup.procs", "123\n", "not empty"),
+                (
+                    "cgroup.events", "populated 1\nfrozen 0\n",
+                    "descendant is populated",
+                ),
+                ("cpu.uclamp.min", "0.00\n", "clamp"),
+            )
+            for relative, value, message in cases:
+                path = group / relative
+                original = path.read_bytes()
+                path.write_text(value, encoding="ascii")
+                with self.subTest(relative=relative):
+                    with self.assertRaisesRegex(
+                        qualification.QualificationError, message
+                    ):
+                        qualification._measurement_cgroup_identity(
+                            group, [2, 3], authority
+                        )
+                path.write_bytes(original)
+
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "overlaps isolated"
+            ):
+                qualification._measurement_cgroup_identity(
+                    group, [1, 2], authority
+                )
+
+            delegated = authority / "delegated"
+            delegated.mkdir()
+            (delegated / "cpu.uclamp.max").write_text(
+                "max\n", encoding="ascii"
+            )
+            nested = measurement_cgroup_fixture(delegated)
+            nested_identity = qualification._measurement_cgroup_identity(
+                nested, [2, 3], authority
+            )
+            self.assertEqual(
+                nested_identity["ancestor_uclamp_max"], [1024]
+            )
+            (delegated / "cpu.uclamp.max").write_text(
+                "50.00\n", encoding="ascii"
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "ancestor.*pinned|ancestor.*caps"
+            ):
+                qualification._measurement_cgroup_identity(
+                    nested, [2, 3], authority
+                )
+
+            outside_authority = root / "outside"
+            outside_authority.mkdir()
+            outside = measurement_cgroup_fixture(outside_authority)
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "unavailable"
+            ):
+                qualification._measurement_cgroup_identity(
+                    outside, [2, 3], authority
+                )
+
+    def test_cgroup_counters_are_recomputed_and_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            qualification.os, "sched_getaffinity", return_value={2, 3}
+        ):
+            authority = Path(directory) / "cgroup"
+            authority.mkdir()
+            group = measurement_cgroup_fixture(authority)
+            before_group = qualification._measurement_cgroup_snapshot(
+                group, [0, 1], authority
+            )
+            (group / "cpu.stat").write_text(
+                "usage_usec 2000000\nnr_throttled 1\nthrottled_usec 10\n",
+                encoding="ascii",
+            )
+            (group / "memory.events").write_text(
+                "oom 1\noom_kill 0\noom_group_kill 0\n",
+                encoding="ascii",
+            )
+            after_group = qualification._measurement_cgroup_snapshot(
+                group, [0, 1], authority
+            )
+            before = environment_snapshot()
+            after = copy.deepcopy(before)
+            before["measurement_cgroup"] = before_group
+            after["measurement_cgroup"] = after_group
+            after["cpu"]["host_busy_ticks"] += 100
+            after["cpu"]["affinity_busy_ticks"] += 100
+            decision = qualification._evaluate_runtime_environment(
+                before, after, 1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+            self.assertTrue(any("throttling" in item
+                                for item in decision["violations"]))
+            self.assertTrue(any("OOM" in item
+                                for item in decision["violations"]))
+
+            reset = copy.deepcopy(after)
+            reset["measurement_cgroup"]["cpu_usage_us"] = 1
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "counter reset"
+            ):
+                qualification._evaluate_runtime_environment(
+                    before, reset, 1000, [0, 1], 4,
+                    qualification.ENVIRONMENT_POLICY, True,
+                )
+
+    def test_measurement_wrapper_enters_only_the_bounded_cgroup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, \
+                contextlib.redirect_stderr(io.StringIO()):
+            root = Path(directory)
+            authority = root / "cgroup"
+            authority.mkdir()
+            group = authority / "measurement"
+            group.mkdir()
+            membership = group / "cgroup.procs"
+            membership.write_text("", encoding="ascii")
+            with (
+                mock.patch.object(
+                    measurement_wrapper.os, "getpid", return_value=4321
+                ),
+                mock.patch.object(
+                    measurement_wrapper.os, "sched_getaffinity",
+                    return_value={0, 1}, create=True,
+                ),
+            ):
+                observed = measurement_wrapper.enter_measurement_cgroup(
+                    group, [0, 1], authority
+                )
+            self.assertEqual(observed, group.resolve())
+            self.assertEqual(membership.read_text(encoding="ascii"), "4321\n")
+
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "cgroup.procs").write_text("", encoding="ascii")
+            with self.assertRaises(SystemExit) as error:
+                measurement_wrapper.enter_measurement_cgroup(
+                    outside, [0, 1], authority
+                )
+            self.assertEqual(error.exception.code, 125)
+
+            sentinel = root / "sentinel"
+            sentinel.write_text("preserve\n", encoding="ascii")
+            membership.unlink()
+            membership.symlink_to(sentinel)
+            with self.assertRaises(SystemExit) as error:
+                measurement_wrapper.enter_measurement_cgroup(
+                    group, [0, 1], authority
+                )
+            self.assertEqual(error.exception.code, 125)
+            self.assertEqual(sentinel.read_text(encoding="ascii"), "preserve\n")
+
+            for malformed in ("", "1,0", "0,0", "0-2", "x"):
+                with self.subTest(cpus=malformed):
+                    with self.assertRaises(SystemExit) as error:
+                        measurement_wrapper.parse_cpus(malformed)
+                    self.assertEqual(error.exception.code, 125)
+
+    def test_idle_preflight_rejection_is_checksummed_and_recomputed(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        accepted = receipt(manifest_sha)
+        before = environment_snapshot()
+        after = copy.deepcopy(before)
+        after["global_pressure"]["io"]["full_total_us"] += 1
+        decision = qualification._evaluate_idle_environment(
+            before, after, 30_000, [0, 1], 4,
+            qualification.ENVIRONMENT_POLICY, True,
+        )
+        self.assertFalse(decision["valid"])
+        raw = qualification.canonical_json({
+            "schema": qualification.ENVIRONMENT_SCHEMA,
+            "scope": "idle-preflight",
+            "wall_ms": 30_000,
+            "before": before,
+            "after": after,
+            "decision": decision,
+        })
+        path = qualification._idle_preflight_artifact_path()
+        artifacts = {path: raw}
+        rejected = qualification._rejected_payload(
+            accepted["source"], manifest_sha, "required",
+            accepted["host"], accepted["toolchain"], accepted["inputs"],
+            dt.datetime.now(dt.timezone.utc), time.monotonic_ns(),
+            qualification.QualificationPreflightError(decision["violations"]),
+            artifacts, None, None,
+        )
+        self.assertEqual(
+            rejected["decision"]["classification"],
+            "idle-preflight-rejection",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+            evidence = root / "rejected"
+            qualification.write_receipt(evidence, rejected, artifacts)
+            verified = qualification.verify_receipt(
+                evidence, manifest_path, root / "missing-baseline.json", None
+            )
+            self.assertEqual(
+                verified["decision"]["classification"],
+                "idle-preflight-rejection",
+            )
+
+            accepted_invalid = root / "accepted-invalid"
+            (accepted_invalid / "raw").mkdir(parents=True)
+            (accepted_invalid / path).write_bytes(raw)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "accepted evidence carries an invalid idle preflight",
+            ):
+                qualification._verify_idle_preflight_claim(
+                    accepted, accepted_invalid, raw_manifest
+                )
+
+            valid_root = root / "rejected-valid"
+            (valid_root / "raw").mkdir(parents=True)
+            valid_raw = idle_preflight_evidence()[1]
+            (valid_root / path).write_bytes(valid_raw)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "rejection carries a valid raw preflight",
+            ):
+                qualification._verify_idle_preflight_claim(
+                    rejected, valid_root, raw_manifest
+                )
+
+            wrong_failure = copy.deepcopy(rejected)
+            wrong_failure["decision"]["failures"][0]["message"] += " forged"
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "rejection differs from raw violations",
+            ):
+                qualification._verify_idle_preflight_claim(
+                    wrong_failure, accepted_invalid, raw_manifest
+                )
+
+            missing_raw = copy.deepcopy(rejected)
+            missing_raw["artifacts"] = []
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "artifact inventory is not canonical",
+            ):
+                qualification._validate_rejected_payload(
+                    missing_raw, raw_manifest
+                )
+
+            short_decision = qualification._evaluate_idle_environment(
+                before, copy.deepcopy(before), 1, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+            self.assertFalse(short_decision["valid"])
+            self.assertTrue(any("duration" in item
+                                for item in short_decision["violations"]))
+
+            incomplete = rejected_receipt(
+                qualification.digest_json(raw_manifest)
+            )
+            incomplete["artifacts"] = [{
+                "path": path,
+                "sha256": sha256(valid_raw),
+                "size": len(valid_raw),
+            }]
+            incomplete_root = root / "incomplete-valid"
+            qualification.write_receipt(
+                incomplete_root, incomplete, {path: valid_raw}
+            )
+            qualification.verify_receipt(
+                incomplete_root, manifest_path,
+                root / "missing-baseline.json", None,
+            )
+
+            invalid_late_payload = json.loads(valid_raw.decode("utf-8"))
+            invalid_late_payload["wall_ms"] = 1
+            invalid_late_payload["decision"] = (
+                qualification._evaluate_idle_environment(
+                    invalid_late_payload["before"],
+                    invalid_late_payload["after"], 1, [0, 1], 4,
+                    qualification.ENVIRONMENT_POLICY, True,
+                )
+            )
+            invalid_late_raw = qualification.canonical_json(
+                invalid_late_payload
+            )
+            forged_incomplete = copy.deepcopy(incomplete)
+            forged_incomplete["artifacts"] = [{
+                "path": path,
+                "sha256": sha256(invalid_late_raw),
+                "size": len(invalid_late_raw),
+            }]
+            forged_incomplete_root = root / "incomplete-invalid"
+            qualification.write_receipt(
+                forged_incomplete_root, forged_incomplete,
+                {path: invalid_late_raw},
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "accepted evidence carries an invalid idle preflight",
+            ):
+                qualification.verify_receipt(
+                    forged_incomplete_root, manifest_path,
+                    root / "missing-baseline.json", None,
+                )
+
+            tampered_raw = json.loads(raw.decode("utf-8"))
+            tampered_raw["decision"]["valid"] = True
+            forged_bytes = qualification.canonical_json(tampered_raw)
+            forged_artifacts = {path: forged_bytes}
+            forged = copy.deepcopy(rejected)
+            forged["artifacts"] = [{
+                "path": path,
+                "sha256": sha256(forged_bytes),
+                "size": len(forged_bytes),
+            }]
+            forged_root = root / "forged"
+            qualification.write_receipt(
+                forged_root, forged, forged_artifacts
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "idle preflight decision differs",
+            ):
+                qualification.verify_receipt(
+                    forged_root, manifest_path,
+                    root / "missing-baseline.json", None,
+                )
+
+            float_decision = json.loads(raw.decode("utf-8"))
+            float_decision["decision"]["metrics"][
+                "cgroup_nr_throttled_delta"
+            ] = 0.0
+            float_root = root / "float-decision"
+            (float_root / "raw").mkdir(parents=True)
+            (float_root / path).write_bytes(
+                qualification.canonical_json(float_decision)
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "decision differs from raw artifact",
+            ):
+                qualification._verify_idle_preflight_claim(
+                    rejected, float_root, raw_manifest
+                )
+
+    def test_global_runtime_pressure_is_record_only_but_idle_is_hard_gate(self) -> None:
+        before = environment_snapshot()
+        after = copy.deepcopy(before)
+        after["cpu"]["host_busy_ticks"] += 100
+        after["cpu"]["affinity_busy_ticks"] += 100
+        after["measurement_cgroup"]["cpu_usage_us"] += 1_000_000
+        after["global_pressure"]["cpu"]["some_total_us"] += 300_000
+        after["global_pressure"]["memory"]["full_total_us"] += 1
+        after["global_pressure"]["io"]["full_total_us"] += 1
+        runtime = qualification._evaluate_runtime_environment(
+            before, after, 1000, [0, 1], 4,
+            qualification.ENVIRONMENT_POLICY, True,
+        )
+        self.assertTrue(runtime["valid"])
+        self.assertEqual(runtime["violations"], [])
+        idle = qualification._evaluate_idle_environment(
+            before, after, 1000, [0, 1], 4,
+            qualification.ENVIRONMENT_POLICY, True,
+        )
+        self.assertFalse(idle["valid"])
+        self.assertTrue(any("global CPU pressure" in item
+                            for item in idle["violations"]))
+        self.assertTrue(any("memory full pressure" in item
+                            for item in idle["violations"]))
+        self.assertTrue(any("IO full pressure" in item
+                            for item in idle["violations"]))
+
+        extra = copy.deepcopy(before)
+        extra["ignored"] = 0
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "environment before fields"
+        ):
+            qualification._evaluate_runtime_environment(
+                extra, after, 1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+
+        unavailable = copy.deepcopy(before)
+        unavailable["measurement_cgroup"] = (
+            qualification._measurement_cgroup_snapshot(None, [0, 1])
+        )
+        malformed_unavailable = copy.deepcopy(unavailable)
+        malformed_unavailable["measurement_cgroup"]["nr_throttled"] = 0
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "unavailable measurement"
+        ):
+            qualification._evaluate_runtime_environment(
+                unavailable, malformed_unavailable, 1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, False,
+            )
+
+        numeric_identity_cases = (
+            ("effective_cpu_affinity", [0.0, 1.0]),
+            ("exclusive_cpu_affinity", [0.0, 1.0]),
+            ("uclamp_min", 1024.0),
+            ("uclamp_max", 1024.0),
+            ("ancestor_uclamp_max", [1024.0]),
+        )
+        for field, value in numeric_identity_cases:
+            forged_before = environment_snapshot()
+            forged_after = copy.deepcopy(forged_before)
+            forged_before["measurement_cgroup"][field] = value
+            forged_after["measurement_cgroup"][field] = copy.deepcopy(value)
+            with self.subTest(field=field), self.assertRaises(
+                qualification.QualificationError
+            ):
+                qualification._evaluate_runtime_environment(
+                    forged_before, forged_after, 1000, [0, 1], 4,
+                    qualification.ENVIRONMENT_POLICY, True,
+                )
+
+        thermal_before = environment_snapshot()
+        thermal_after = copy.deepcopy(thermal_before)
+        thermal_before["thermal"][0]["cpu"] = 0.0
+        thermal_after["thermal"][0]["cpu"] = 0.0
+        with self.assertRaises(qualification.QualificationError):
+            qualification._evaluate_runtime_environment(
+                thermal_before, thermal_after, 1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+
+        malformed_controller = environment_snapshot()
+        malformed_controller["measurement_cgroup"][
+            "controller_cpu_affinity"
+        ] = [2, "3"]
+        with self.assertRaises(qualification.QualificationError):
+            qualification._evaluate_runtime_environment(
+                malformed_controller, copy.deepcopy(malformed_controller),
+                1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+
+        for field in ("minimum_limit", "maximum_limit"):
+            forged_system = environment_snapshot()
+            forged_system["system_uclamp"][field] = 1024.0
+            with self.subTest(system_field=field), self.assertRaises(
+                qualification.QualificationError
+            ):
+                qualification._evaluate_runtime_environment(
+                    forged_system, copy.deepcopy(forged_system),
+                    1000, [0, 1], 4,
+                    qualification.ENVIRONMENT_POLICY, True,
+                )
+        capped_system = environment_snapshot()
+        capped_system["system_uclamp"]["minimum_limit"] = 512
+        capped_system["system_uclamp"]["maximum_limit"] = 512
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "system CPU.*not pinned"
+        ):
+            qualification._evaluate_runtime_environment(
+                capped_system, copy.deepcopy(capped_system),
+                1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+        drifting_system = environment_snapshot()
+        drifted_system = copy.deepcopy(drifting_system)
+        drifted_system["system_uclamp"]["minimum_limit"] = 512
+        drifted_system["system_uclamp"]["maximum_limit"] = 512
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "system CPU.*drift"
+        ):
+            qualification._evaluate_runtime_environment(
+                drifting_system, drifted_system, 1000, [0, 1], 4,
+                qualification.ENVIRONMENT_POLICY, True,
+            )
+
+    def test_batch_wall_gate_is_bound_to_inner_gnu_time_evidence(self) -> None:
+        raw_manifest = manifest()
+        payload = receipt(qualification.digest_json(raw_manifest))
+        retained = artifact_bytes(payload)
+        batch_path = qualification._batch_environment_artifact_path("unit", 1)
+        original = json.loads(retained[batch_path].decode("utf-8"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, data in retained.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+
+            forged = copy.deepcopy(original)
+            forged["gated_wall_ms"] += 60_000
+            (root / batch_path).write_bytes(
+                qualification.canonical_json(forged)
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "batch wall evidence differs from raw artifacts",
+            ):
+                qualification._verify_workload_raw_claims(
+                    payload, root, raw_manifest
+                )
+
+            forged = copy.deepcopy(original)
+            forged["wall_ms"] = (
+                forged["gated_wall_ms"] +
+                qualification.ENVIRONMENT_POLICY["batch_max_overhead_ms"] + 1
+            )
+            (root / batch_path).write_bytes(
+                qualification.canonical_json(forged)
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "batch wall evidence differs from the measured inner window",
+            ):
+                qualification._verify_workload_raw_claims(
+                    payload, root, raw_manifest
+                )
+
+    def test_runtime_global_activity_is_record_only_but_affinity_is_hard_gate(self) -> None:
+        before = environment_snapshot(
+            host_cpus=12, affinity=[0, 2], host_busy_ticks=1000,
+            affinity_busy_ticks=1000, owned_usage_us=1_000_000,
+        )
+        after = copy.deepcopy(before)
+        after["cpu"]["host_busy_ticks"] += 600
+        after["cpu"]["affinity_busy_ticks"] += 100
+        after["measurement_cgroup"]["cpu_usage_us"] += 900_000
+        decision = qualification._evaluate_runtime_environment(
+            before, after, wall_ms=1000, affinity=[0, 2],
+            logical_cpus=12, policy=qualification.ENVIRONMENT_POLICY,
+            required=True,
+        )
+        self.assertGreater(
+            decision["metrics"]["host_external_cpu_basis_points"], 50
+        )
+        self.assertFalse(any("host external" in value
+                             for value in decision["violations"]))
+        self.assertTrue(any("affinity external" in value
+                            for value in decision["violations"]))
 
     def test_manifest_requires_exact_three_workloads_ten_runs_and_ten_percent(self) -> None:
         valid = qualification.validate_manifest(manifest())
@@ -770,9 +1551,23 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.validate_manifest(changed)
 
         changed = manifest()
-        changed["environment_policy"]["host_external_cpu_limit_basis_points"] = 100
+        changed["environment_policy"][
+            "idle_host_external_cpu_limit_basis_points"
+        ] = 100
         with self.assertRaisesRegex(qualification.QualificationError, "environment policy"):
             qualification.validate_manifest(changed)
+
+        for field in (
+            "idle_memory_pressure_full_limit_basis_points",
+            "idle_io_pressure_full_limit_basis_points",
+            "thermal_throttle_limit_ms",
+        ):
+            changed = manifest()
+            changed["environment_policy"][field] = False
+            with self.subTest(field=field), self.assertRaises(
+                qualification.QualificationError
+            ):
+                qualification.validate_manifest(changed)
 
     def test_performance_regressions_are_complete_ordered_records(self) -> None:
         current = {
@@ -830,35 +1625,17 @@ class DeterminismQualificationTest(unittest.TestCase):
                 b"some avg10=0 avg60=0 avg300=0 total=1\n", "cpu"
             )
 
-        before = {
-            "cpu": {
-                "clock_ticks_per_second": 100,
-                "host_logical_cpus": 4,
-                "host_busy_ticks": 100,
-                "affinity_busy_ticks": 40,
-            },
-            "pressure": {
-                "cpu": {"some_total_us": 10, "full_total_us": 0},
-                "memory": {"some_total_us": 10, "full_total_us": 0},
-                "io": {"some_total_us": 10, "full_total_us": 0},
-            },
-            "cpufreq": [{
-                "cpu": 0, "driver": "intel_pstate", "governor": "powersave",
-                "minimum_khz": 400000, "maximum_khz": 4400000,
-                "current_khz": 4000000,
-            }],
-            "thermal": [{
-                "cpu": 0, "core_count": 1, "core_total_ms": 2,
-                "package_count": 3, "package_total_ms": 4,
-            }],
-        }
+        before = environment_snapshot(
+            host_cpus=4, affinity=[0], host_busy_ticks=100,
+            affinity_busy_ticks=40, owned_usage_us=1_000_000,
+        )
         after = copy.deepcopy(before)
         after["cpu"]["host_busy_ticks"] += 101
         after["cpu"]["affinity_busy_ticks"] += 100
+        after["measurement_cgroup"]["cpu_usage_us"] += 900_000
         after["thermal"][0]["package_total_ms"] += 1
-        decision = qualification._evaluate_environment(
-            before, after, child_cpu_ms=900, wall_ms=1000,
-            affinity=[0], logical_cpus=4,
+        decision = qualification._evaluate_idle_environment(
+            before, after, wall_ms=1000, affinity=[0], logical_cpus=4,
             policy=qualification.ENVIRONMENT_POLICY,
             required=True,
         )
@@ -872,10 +1649,10 @@ class DeterminismQualificationTest(unittest.TestCase):
         count_only_after = copy.deepcopy(before)
         count_only_after["cpu"]["host_busy_ticks"] += 90
         count_only_after["cpu"]["affinity_busy_ticks"] += 90
+        count_only_after["measurement_cgroup"]["cpu_usage_us"] += 900_000
         count_only_after["thermal"][0]["core_count"] += 1
-        count_only = qualification._evaluate_environment(
-            before, count_only_after, child_cpu_ms=900, wall_ms=1000,
-            affinity=[0], logical_cpus=4,
+        count_only = qualification._evaluate_idle_environment(
+            before, count_only_after, wall_ms=1000, affinity=[0], logical_cpus=4,
             policy=qualification.ENVIRONMENT_POLICY, required=True,
         )
         self.assertFalse(count_only["valid"])
@@ -883,24 +1660,23 @@ class DeterminismQualificationTest(unittest.TestCase):
         unavailable = copy.deepcopy(before)
         unavailable["cpufreq"] = []
         unavailable["thermal"] = []
-        required_unavailable = qualification._evaluate_environment(
-            unavailable, copy.deepcopy(unavailable), child_cpu_ms=0,
-            wall_ms=1000, affinity=[0], logical_cpus=4,
+        required_unavailable = qualification._evaluate_idle_environment(
+            unavailable, copy.deepcopy(unavailable), wall_ms=1000,
+            affinity=[0], logical_cpus=4,
             policy=qualification.ENVIRONMENT_POLICY, required=True,
         )
         self.assertFalse(required_unavailable["valid"])
-        record_only_unavailable = qualification._evaluate_environment(
-            unavailable, copy.deepcopy(unavailable), child_cpu_ms=0,
-            wall_ms=1000, affinity=[0], logical_cpus=4,
+        record_only_unavailable = qualification._evaluate_idle_environment(
+            unavailable, copy.deepcopy(unavailable), wall_ms=30_000,
+            affinity=[0], logical_cpus=4,
             policy=qualification.ENVIRONMENT_POLICY, required=False,
         )
         self.assertTrue(record_only_unavailable["valid"])
         with self.assertRaisesRegex(
-            qualification.QualificationError, "logical CPU identity"
+            qualification.QualificationError, "CPU topology"
         ):
-            qualification._evaluate_environment(
-                before, after, child_cpu_ms=900, wall_ms=1000,
-                affinity=[0], logical_cpus=8,
+            qualification._evaluate_idle_environment(
+                before, after, wall_ms=1000, affinity=[0], logical_cpus=8,
                 policy=qualification.ENVIRONMENT_POLICY, required=True,
             )
         malformed_frequency = copy.deepcopy(after)
@@ -908,8 +1684,8 @@ class DeterminismQualificationTest(unittest.TestCase):
         with self.assertRaisesRegex(
             qualification.QualificationError, "CPU frequency"
         ):
-            qualification._evaluate_environment(
-                before, malformed_frequency, child_cpu_ms=900, wall_ms=1000,
+            qualification._evaluate_idle_environment(
+                before, malformed_frequency, wall_ms=1000,
                 affinity=[0], logical_cpus=4,
                 policy=qualification.ENVIRONMENT_POLICY, required=True,
             )
@@ -920,9 +1696,9 @@ class DeterminismQualificationTest(unittest.TestCase):
         with self.assertRaisesRegex(
             qualification.QualificationError, "frequency identity"
         ):
-            qualification._evaluate_environment(
+            qualification._evaluate_idle_environment(
                 duplicate_frequency_before, duplicate_frequency_after,
-                child_cpu_ms=900, wall_ms=1000, affinity=[0], logical_cpus=4,
+                wall_ms=1000, affinity=[0], logical_cpus=4,
                 policy=qualification.ENVIRONMENT_POLICY, required=True,
             )
 
@@ -932,6 +1708,14 @@ class DeterminismQualificationTest(unittest.TestCase):
             proc_root = root / "proc"
             cpu_root = root / "cpu"
             (proc_root / "pressure").mkdir(parents=True)
+            kernel_sysctl = proc_root / "sys" / "kernel"
+            kernel_sysctl.mkdir(parents=True)
+            (kernel_sysctl / "sched_util_clamp_min").write_text(
+                "1024\n", encoding="ascii"
+            )
+            (kernel_sysctl / "sched_util_clamp_max").write_text(
+                "1024\n", encoding="ascii"
+            )
             proc_root.joinpath("stat").write_text(
                 "cpu 200 0 100 700 0 0 0 0 0 0\n"
                 "cpu0 200 0 100 700 0 0 0 0 0 0\n",
@@ -970,6 +1754,48 @@ class DeterminismQualificationTest(unittest.TestCase):
             self.assertEqual(captured["cpufreq"][0]["maximum_khz"], 4400000)
             self.assertEqual(captured["thermal"][0]["package_total_ms"], 4)
 
+            cgroup_authority = root / "cgroup"
+            cgroup = measurement_cgroup_fixture(
+                cgroup_authority, effective="0", exclusive="0"
+            )
+            with mock.patch.object(
+                qualification.os, "sched_getaffinity", return_value={1}
+            ):
+                captured_group = qualification._capture_environment(
+                    [0], proc_root, cpu_root, cgroup, cgroup_authority, [1]
+                )
+            self.assertEqual(
+                captured_group["measurement_cgroup"]["mode"],
+                "exclusive-cgroup-v2",
+            )
+            self.assertEqual(
+                captured_group["measurement_cgroup"]["cpu_usage_us"],
+                1_000_000,
+            )
+            self.assertEqual(
+                captured_group["system_uclamp"],
+                {"minimum_limit": 1024, "maximum_limit": 1024},
+            )
+            self.assertEqual(
+                captured_group["measurement_cgroup"][
+                    "controller_cpu_affinity"
+                ],
+                [1],
+            )
+
+            system_maximum = kernel_sysctl / "sched_util_clamp_max"
+            system_maximum.unlink()
+            with mock.patch.object(
+                qualification.os, "sched_getaffinity", return_value={1}
+            ), self.assertRaisesRegex(
+                qualification.QualificationError, "system CPU.*unavailable"
+            ):
+                qualification._capture_environment(
+                    [0], proc_root, cpu_root, cgroup,
+                    cgroup_authority, [1],
+                )
+            system_maximum.write_text("1024\n", encoding="ascii")
+
             outside = root / "outside-frequency"
             outside.mkdir()
             shutil.rmtree(frequency)
@@ -999,6 +1825,11 @@ class DeterminismQualificationTest(unittest.TestCase):
         environment_payload = json.loads(environment_evidence(500)[1])
         environment_payload["before"]["cpu"]["host_logical_cpus"] = 8
         environment_payload["after"]["cpu"]["host_logical_cpus"] = 8
+        batch_payload = json.loads(environment_evidence(
+            5000, scope="performance-batch", required=True
+        )[1])
+        batch_payload["before"]["cpu"]["host_logical_cpus"] = 8
+        batch_payload["after"]["cpu"]["host_logical_cpus"] = 8
 
         def run_process(
             command: list[str], _environment: dict[str, str], _timeout: int,
@@ -1016,17 +1847,22 @@ class DeterminismQualificationTest(unittest.TestCase):
             )
 
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(
-            qualification.os, "sched_getaffinity", return_value={0, 1}
+            qualification.os, "sched_getaffinity", return_value={2, 3}
         ), mock.patch.object(
             qualification, "_capture_environment",
-            side_effect=[
-                copy.deepcopy(environment_payload[side])
-                for _iteration in range(10)
-                for side in ("before", "after")
-            ],
+            side_effect=(
+                [copy.deepcopy(batch_payload["before"])] + [
+                    copy.deepcopy(environment_payload[side])
+                    for _iteration in range(10)
+                    for side in ("before", "after")
+                ] + [copy.deepcopy(batch_payload["after"])]
+            ),
         ) as capture, mock.patch.object(
             qualification, "_run_bounded_process", side_effect=run_process
-        ) as bounded:
+        ) as bounded, mock.patch.object(
+            qualification.time, "monotonic_ns",
+            side_effect=(0, 5_000_000_000),
+        ):
             run, artifacts = qualification.run_once(
                 Path("/fixture/codeskeptic"), Path("/usr/bin/time"),
                 prepared, 1, ROOT, Path(directory), "required",
@@ -1034,16 +1870,18 @@ class DeterminismQualificationTest(unittest.TestCase):
                     "cpu_affinity": [0, 1],
                     "logical_cpus": 2,
                     "host_logical_cpus": 8,
+                    "controller_cpu_affinity": [2, 3],
                 },
+                Path("/sys/fs/cgroup/codeskeptic-measurement"),
             )
         self.assertEqual(bounded.call_count, 10)
-        self.assertEqual(capture.call_count, 20)
+        self.assertEqual(capture.call_count, 22)
         self.assertEqual(run["measurement_iterations"], 10)
         self.assertEqual(len(run["inner_runs"]), 10)
         self.assertEqual(run["metrics"]["cpu_ms"], 5000)
         self.assertTrue(run["batch_valid"])
         self.assertTrue(run["environment_valid"])
-        self.assertEqual(len(artifacts), 50)
+        self.assertEqual(len(artifacts), 51)
 
     def test_semantic_projection_excludes_runtime_telemetry_but_not_findings(self) -> None:
         report = {
@@ -1262,7 +2100,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         current = receipt(manifest_sha)
         base = baseline(manifest_sha)
         current["host"]["cpu_affinity"] = [0, 2]
-        current["host"]["host_logical_cpus"] = 3
+        current["host"]["controller_cpu_affinity"] = [1, 3]
         with self.assertRaisesRegex(
             qualification.QualificationError, "hardware|toolchain|profile"
         ):
@@ -1278,12 +2116,51 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_host_identity_binds_the_effective_cpu_affinity(self) -> None:
         with (
             mock.patch.object(
+                qualification.os, "sched_getaffinity", return_value={2, 3},
+                create=True,
+            ),
+            mock.patch.object(
+                qualification, "_require_measurement_environment",
+                return_value={
+                    "path": Path("/sys/fs/cgroup/measurement"),
+                    "cpus": [0, 1],
+                    "uclamp_min": 1024,
+                    "uclamp_max": 1024,
+                    "ancestor_uclamp_max": [],
+                    "populated": 0,
+                    "frozen": 0,
+                },
+            ),
+            mock.patch.object(
+                qualification, "_system_uclamp_limits",
+                return_value=(1024, 1024),
+            ),
+            mock.patch.object(qualification.os, "cpu_count", return_value=4),
+        ):
+            required = qualification.host_identity(
+                "test-linux-x86_64", "required",
+                Path("/sys/fs/cgroup/measurement"),
+            )
+        self.assertEqual(required["cpu_affinity"], [0, 1])
+        self.assertEqual(required["controller_cpu_affinity"], [2, 3])
+        self.assertEqual(required["cpu_affinity_source"], "cgroup-v2-exclusive")
+        self.assertEqual(required["cpu_uclamp_source"], "cgroup-v2")
+        self.assertEqual(
+            required["measurement_environment"], "exclusive-cgroup-v2"
+        )
+
+        with (
+            mock.patch.object(
                 qualification.os, "sched_getaffinity", return_value={7, 3},
                 create=True,
             ),
             mock.patch.object(
                 qualification, "_cpu_uclamp_identity",
                 return_value=("proc-self-sched", 1024, 1024),
+            ),
+            mock.patch.object(
+                qualification, "_system_uclamp_limits",
+                return_value=(1024, 1024),
             ),
             mock.patch.object(qualification.os, "cpu_count", return_value=8),
         ):
@@ -1327,7 +2204,9 @@ class DeterminismQualificationTest(unittest.TestCase):
             with self.assertRaisesRegex(
                 qualification.QualificationError, "affinity is empty"
             ):
-                qualification.host_identity("test-linux-x86_64")
+                qualification.host_identity(
+                    "test-linux-x86_64", performance_policy="required"
+                )
 
     def test_malformed_affinity_is_rejected_without_raw_type_errors(self) -> None:
         raw_manifest = manifest()
@@ -1367,10 +2246,17 @@ class DeterminismQualificationTest(unittest.TestCase):
                     )
 
         current = receipt(manifest_sha)
-        current["host"]["cpu_affinity_source"] = "unavailable"
-        current["host"]["cpu_affinity"] = []
+        current["host"].update({
+            "cpu_affinity_source": "unavailable",
+            "cpu_affinity": [],
+            "cpu_uclamp_source": "proc-self-sched",
+            "controller_cpu_affinity": [],
+            "measurement_environment": "unavailable",
+            "measurement_cgroup_populated": None,
+            "measurement_cgroup_frozen": None,
+        })
         with self.assertRaisesRegex(
-            qualification.QualificationError, "CPU affinity is not measurable"
+            qualification.QualificationError, "measurement.*(?:cgroup|boundary)"
         ):
             qualification.validate_receipt_payload(
                 current, raw_manifest, baseline(manifest_sha)
@@ -1378,8 +2264,15 @@ class DeterminismQualificationTest(unittest.TestCase):
 
         current = receipt(manifest_sha)
         current["configuration"]["performance_policy"] = "record-only"
-        current["host"]["cpu_affinity_source"] = "unavailable"
-        current["host"]["cpu_affinity"] = []
+        current["host"].update({
+            "cpu_affinity_source": "unavailable",
+            "cpu_affinity": [],
+            "cpu_uclamp_source": "proc-self-sched",
+            "controller_cpu_affinity": [],
+            "measurement_environment": "unavailable",
+            "measurement_cgroup_populated": None,
+            "measurement_cgroup_frozen": None,
+        })
         current["baseline"]["profile"] = None
         current["baseline"]["performance_gate"] = "not-gated"
         qualification.validate_receipt_payload(
@@ -1390,9 +2283,14 @@ class DeterminismQualificationTest(unittest.TestCase):
         malformed_baseline["profiles"]["test-linux-x86_64"]["hardware"].update({
             "cpu_affinity_source": "unavailable",
             "cpu_affinity": [],
+            "cpu_uclamp_source": "proc-self-sched",
+            "controller_cpu_affinity": [],
+            "measurement_environment": "unavailable",
+            "measurement_cgroup_populated": None,
+            "measurement_cgroup_frozen": None,
         })
         with self.assertRaisesRegex(
-            qualification.QualificationError, "not measurable"
+            qualification.QualificationError, "measurement cgroup"
         ):
             qualification.validate_baseline(malformed_baseline, manifest_sha)
 
@@ -1400,9 +2298,14 @@ class DeterminismQualificationTest(unittest.TestCase):
         malformed_calibration["host"].update({
             "cpu_affinity_source": "unavailable",
             "cpu_affinity": [],
+            "cpu_uclamp_source": "proc-self-sched",
+            "controller_cpu_affinity": [],
+            "measurement_environment": "unavailable",
+            "measurement_cgroup_populated": None,
+            "measurement_cgroup_frozen": None,
         })
         with self.assertRaisesRegex(
-            qualification.QualificationError, "not measurable"
+            qualification.QualificationError, "measurement cgroup"
         ):
             qualification._validate_calibration_payload(
                 malformed_calibration, raw_manifest
@@ -1421,6 +2324,10 @@ class DeterminismQualificationTest(unittest.TestCase):
             "cpu_uclamp_source": "unavailable",
             "cpu_uclamp_min": None,
             "cpu_uclamp_max": None,
+            "controller_cpu_affinity": [],
+            "measurement_environment": "unavailable",
+            "measurement_cgroup_populated": None,
+            "measurement_cgroup_frozen": None,
         })
         qualification._validate_rejected_payload(rejected, raw_manifest)
 
@@ -1491,7 +2398,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
         current = receipt(manifest_sha)
         current["host"].update({
-            "cpu_uclamp_source": "proc-self-sched",
+            "cpu_uclamp_source": "cgroup-v2",
             "cpu_uclamp_min": 0,
             "cpu_uclamp_max": 1024,
         })
@@ -1517,7 +2424,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             set(provenance["toolchain"]),
             {
                 "analyzer", "clang", "gnu_time", "cmake", "ninja",
-                "c_compiler", "cxx_compiler",
+                "c_compiler", "cxx_compiler", "python",
             },
         )
         for tool in provenance["toolchain"].values():
@@ -2253,6 +3160,11 @@ class DeterminismQualificationTest(unittest.TestCase):
             run["metrics"] = {
                 "wall_ms": 6300, "cpu_ms": 6300, "peak_rss_kib": 630,
             }
+            batch = environment_evidence(
+                6300, scope="performance-batch", required=True
+            )[0]
+            run["environment"] = batch
+            run["environment_valid"] = batch["valid"]
         unit["statistics"] = {
             metric_name: qualification.metric_statistics(
                 [run["metrics"][metric_name] for run in unit["runs"]]
@@ -2267,6 +3179,11 @@ class DeterminismQualificationTest(unittest.TestCase):
         }
         release_inner["environment"] = environment_evidence(200)[0]
         release_run["metrics"] = dict(release_inner["metrics"])
+        release_batch = environment_evidence(
+            200, scope="performance-batch", required=True
+        )[0]
+        release_run["environment"] = release_batch
+        release_run["environment_valid"] = release_batch["valid"]
         release["statistics"] = {
             metric_name: qualification.metric_statistics(
                 [run["metrics"][metric_name] for run in release["runs"]]
@@ -2389,6 +3306,11 @@ class DeterminismQualificationTest(unittest.TestCase):
                 "peak_rss_kib": 400,
             }
             run["batch_valid"] = False
+            batch = environment_evidence(
+                4000, scope="performance-batch", required=True
+            )[0]
+            run["environment"] = batch
+            run["environment_valid"] = batch["valid"]
         unit["statistics"] = {
             metric_name: qualification.metric_statistics(
                 [run["metrics"][metric_name] for run in unit["runs"]]

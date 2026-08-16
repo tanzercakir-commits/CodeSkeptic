@@ -32,11 +32,16 @@ class DeterminismWorkflowTest(unittest.TestCase):
         self.assertIn("scripts/determinism_workloads.json", text)
         self.assertIn("--prepare-release-candidate", text)
         self.assertIn("--verify-receipt", text)
-        self.assertIn("--establish-baseline", text)
-        self.assertIn("--calibration-output", text)
-        self.assertIn("--calibration-evidence-path", text)
-        self.assertIn("--promotion-reason", text)
-        self.assertIn("Calibration evidence produced", text)
+        self.assertNotIn("--establish-baseline", text)
+        self.assertNotIn("--calibration-output", text)
+        self.assertNotIn("--calibration-evidence-path", text)
+        self.assertNotIn("--promotion-reason", text)
+        self.assertIn(
+            "Shared GitHub runners cannot establish or promote performance authority",
+            text,
+        )
+        self.assertNotIn("determinism-calibration", text)
+        self.assertNotIn("determinism-hosted-baseline.json", text)
         self.assertIn("exit 2", text)
         self.assertIn("llama-cpp", text)
         self.assertIn("CC=/usr/bin/clang-20", text)

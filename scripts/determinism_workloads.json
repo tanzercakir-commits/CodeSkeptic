@@ -1,15 +1,19 @@
 {
   "environment_policy": {
-    "affinity_external_cpu_limit_basis_points": 200,
-    "cpu_pressure_some_limit_basis_points": 200,
-    "host_external_cpu_limit_basis_points": 50,
-    "io_pressure_full_limit_basis_points": 0,
-    "memory_pressure_full_limit_basis_points": 0,
+    "batch_max_overhead_ms": 60000,
+    "idle_affinity_external_cpu_limit_basis_points": 200,
+    "idle_cpu_pressure_some_limit_basis_points": 200,
+    "idle_host_external_cpu_limit_basis_points": 50,
+    "idle_io_pressure_full_limit_basis_points": 0,
+    "idle_max_overshoot_ms": 2000,
+    "idle_memory_pressure_full_limit_basis_points": 0,
+    "idle_seconds": 30,
+    "runtime_affinity_external_cpu_limit_basis_points": 200,
     "thermal_throttle_limit_ms": 0
   },
   "performance_regression_limit_percent": 10,
   "repetitions": 10,
-  "schema": "codeskeptic-determinism-workloads-v2",
+  "schema": "codeskeptic-determinism-workloads-v3",
   "workloads": [
     {
       "analyzer_args": [],

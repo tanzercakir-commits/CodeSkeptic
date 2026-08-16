@@ -111,24 +111,18 @@ jobs:
         env:
           PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
         run: |
-          baseline_args=(--baseline "$PINNED_BASELINE")
           if test "${{ steps.baseline.outputs.available }}" != true; then
-            baseline_args+=(
-              --establish-baseline
-              --calibration-output determinism-calibration
-              --calibration-evidence-path \
-                docs/evidence/phase10/determinism/calibrations/github-ubuntu-24.04-x64
-              --promotion-reason "Initial protected-base determinism calibration"
-            )
-          else
-            baseline_args+=(
-              --baseline-authority-root \
-                "${{ steps.baseline.outputs.authority_root }}"
-            )
+            mkdir -p determinism-evidence
+            printf '%s\n' \
+              'Protected determinism baseline is absent. Shared GitHub runners cannot establish or promote performance authority.' \
+              > determinism-evidence/hosted-preflight.txt
+            exit 2
           fi
           python3 scripts/run_determinism_qualification.py \
             --manifest "$WORKLOAD_MANIFEST" \
-            "${baseline_args[@]}" \
+            --baseline "$PINNED_BASELINE" \
+            --baseline-authority-root \
+              "${{ steps.baseline.outputs.authority_root }}" \
             --binary build-determinism/src/codeskeptic \
             --repo-root "$GITHUB_WORKSPACE" \
             --build-path build-determinism \
@@ -146,15 +140,6 @@ jobs:
             --prepare-release-candidate \
             --release-workspace "$RUNNER_TEMP/determinism-release" \
             --jobs 2
-          if test "${{ steps.baseline.outputs.available }}" != true; then
-            cp "$PINNED_BASELINE" determinism-hosted-baseline.json
-            python3 scripts/run_determinism_qualification.py \
-              --manifest "$WORKLOAD_MANIFEST" \
-              --baseline "$PINNED_BASELINE" \
-              --verify-receipt determinism-calibration
-            echo "Calibration evidence produced; protected-base baseline is absent." >&2
-            exit 2
-          fi
           python3 scripts/run_determinism_qualification.py \
             --manifest "$WORKLOAD_MANIFEST" \
             --baseline "$PINNED_BASELINE" \
@@ -213,7 +198,5 @@ jobs:
           name: determinism-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             determinism-evidence
-            determinism-calibration
-            determinism-hosted-baseline.json
           if-no-files-found: error
           retention-days: 30

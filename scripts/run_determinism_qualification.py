@@ -30,27 +30,36 @@ except ImportError:  # pragma: no cover - unavailable on native Windows
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v2"
-BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v5"
-RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v5"
-REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v5"
-CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v5"
+MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v3"
+BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v6"
+RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v6"
+REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v6"
+CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v6"
+ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v2"
 CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v2"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
 TOOLCHAIN_NAMES = (
     "analyzer", "clang", "gnu_time", "cmake", "ninja",
-    "c_compiler", "cxx_compiler",
+    "c_compiler", "cxx_compiler", "python",
 )
 HARDWARE_FIELDS = (
     "architecture", "cpu_model", "logical_cpus", "host_logical_cpus",
     "cpu_affinity_source", "cpu_affinity", "cpu_uclamp_source",
-    "cpu_uclamp_min", "cpu_uclamp_max", "memory_bytes",
+    "cpu_uclamp_min", "cpu_uclamp_max", "cpu_uclamp_ancestor_max",
+    "system_uclamp_min_limit", "system_uclamp_max_limit",
+    "controller_cpu_affinity",
+    "measurement_environment", "measurement_cgroup_populated",
+    "measurement_cgroup_frozen", "memory_bytes",
 )
 AFFINITY_SOURCE_SCHED = "sched_getaffinity"
+AFFINITY_SOURCE_CGROUP = "cgroup-v2-exclusive"
 AFFINITY_SOURCE_UNAVAILABLE = "unavailable"
 UCLAMP_SOURCE_PROC = "proc-self-sched"
+UCLAMP_SOURCE_CGROUP = "cgroup-v2"
 UCLAMP_SOURCE_UNAVAILABLE = "unavailable"
+MEASUREMENT_ENVIRONMENT_EXCLUSIVE = "exclusive-cgroup-v2"
+MEASUREMENT_ENVIRONMENT_UNAVAILABLE = "unavailable"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 FINGERPRINT = re.compile(r"csf1-[0-9a-f]{16}")
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}")
@@ -58,11 +67,15 @@ MAX_JSON_BYTES = 64 << 20
 MAX_LOG_BYTES = 64 << 20
 MAX_BUNDLE_BYTES = 512 << 20
 ENVIRONMENT_POLICY = {
-    "affinity_external_cpu_limit_basis_points": 200,
-    "host_external_cpu_limit_basis_points": 50,
-    "cpu_pressure_some_limit_basis_points": 200,
-    "memory_pressure_full_limit_basis_points": 0,
-    "io_pressure_full_limit_basis_points": 0,
+    "idle_seconds": 30,
+    "idle_max_overshoot_ms": 2000,
+    "idle_host_external_cpu_limit_basis_points": 50,
+    "idle_affinity_external_cpu_limit_basis_points": 200,
+    "idle_cpu_pressure_some_limit_basis_points": 200,
+    "idle_memory_pressure_full_limit_basis_points": 0,
+    "idle_io_pressure_full_limit_basis_points": 0,
+    "runtime_affinity_external_cpu_limit_basis_points": 200,
+    "batch_max_overhead_ms": 60000,
     "thermal_throttle_limit_ms": 0,
 }
 SOURCE_FILE_RELATIVES = (
@@ -165,6 +178,19 @@ class QualificationDecisionError(QualificationError):
         self.workloads = workloads
 
 
+class QualificationPreflightError(QualificationError):
+    """The complete idle preflight rejected the measurement environment."""
+
+    def __init__(self, violations: list[str]) -> None:
+        if not violations:
+            raise ValueError("qualification preflight requires violations")
+        message = "idle preflight rejected the measurement environment: " + "; ".join(
+            violations
+        )
+        super().__init__(message)
+        self.violations = list(violations)
+
+
 def canonical_json(value: Any) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -201,7 +227,10 @@ def _validate_cpu_affinity(
     value: Any, logical_cpus: int, source: Any, label: str,
 ) -> list[int]:
     if (not isinstance(source, str) or
-            source not in {AFFINITY_SOURCE_SCHED, AFFINITY_SOURCE_UNAVAILABLE}):
+            source not in {
+                AFFINITY_SOURCE_SCHED, AFFINITY_SOURCE_CGROUP,
+                AFFINITY_SOURCE_UNAVAILABLE,
+            }):
         raise QualificationError(f"{label} source is malformed")
     if source == AFFINITY_SOURCE_UNAVAILABLE:
         if value != []:
@@ -217,6 +246,7 @@ def _validate_cpu_affinity(
 
 
 def _validate_cpu_topology(value: dict[str, Any], label: str) -> None:
+    source = value["cpu_affinity_source"]
     effective = _require_int(
         value["logical_cpus"], f"{label} effective logical CPU count",
         1, 65536,
@@ -226,19 +256,66 @@ def _validate_cpu_topology(value: dict[str, Any], label: str) -> None:
         1, 65536,
     )
     affinity = _validate_cpu_affinity(
-        value["cpu_affinity"], effective, value["cpu_affinity_source"],
+        value["cpu_affinity"], effective, source,
         f"{label} CPU affinity",
     )
     if effective > host_total or (
             affinity and affinity[-1] >= host_total):
         raise QualificationError(f"{label} CPU topology is malformed")
+    controller = value.get("controller_cpu_affinity")
+    if not isinstance(controller, list):
+        raise QualificationError(f"{label} controller CPU affinity is malformed")
+    for cpu in controller:
+        _require_int(cpu, f"{label} controller CPU affinity", 0, 65535)
+    if (controller != sorted(set(controller)) or
+            (controller and controller[-1] >= host_total)):
+        raise QualificationError(f"{label} controller CPU affinity is malformed")
+    mode = value.get("measurement_environment")
+    if mode not in {
+            MEASUREMENT_ENVIRONMENT_EXCLUSIVE,
+            MEASUREMENT_ENVIRONMENT_UNAVAILABLE}:
+        raise QualificationError(f"{label} measurement environment is malformed")
+    if mode == MEASUREMENT_ENVIRONMENT_EXCLUSIVE:
+        populated = _require_int(
+            value.get("measurement_cgroup_populated"),
+            f"{label} measurement cgroup populated", 0, 1,
+        )
+        frozen = _require_int(
+            value.get("measurement_cgroup_frozen"),
+            f"{label} measurement cgroup frozen", 0, 1,
+        )
+        if (not controller or source != AFFINITY_SOURCE_CGROUP or
+                value.get("cpu_uclamp_source") != UCLAMP_SOURCE_CGROUP or
+                set(controller) & set(affinity) or populated != 0 or
+                frozen != 0):
+            raise QualificationError(
+                f"{label} measurement/controller CPU boundary is malformed"
+            )
+    elif (source == AFFINITY_SOURCE_CGROUP or
+          value.get("cpu_uclamp_source") == UCLAMP_SOURCE_CGROUP or
+          value.get("measurement_cgroup_populated") is not None or
+          value.get("measurement_cgroup_frozen") is not None):
+        raise QualificationError(
+            f"{label} measurement/controller CPU boundary is malformed"
+        )
+    elif source == AFFINITY_SOURCE_SCHED and controller != affinity:
+        raise QualificationError(
+            f"{label} controller CPU affinity is malformed"
+        )
+    elif source == AFFINITY_SOURCE_UNAVAILABLE and controller:
+        raise QualificationError(
+            f"{label} controller CPU affinity is malformed"
+        )
 
 
 def _validate_cpu_uclamp(
     source: Any, minimum: Any, maximum: Any, label: str,
 ) -> None:
     if (not isinstance(source, str) or
-            source not in {UCLAMP_SOURCE_PROC, UCLAMP_SOURCE_UNAVAILABLE}):
+            source not in {
+                UCLAMP_SOURCE_PROC, UCLAMP_SOURCE_CGROUP,
+                UCLAMP_SOURCE_UNAVAILABLE,
+            }):
         raise QualificationError(f"{label} source is malformed")
     if source == UCLAMP_SOURCE_UNAVAILABLE:
         if minimum is not None or maximum is not None:
@@ -250,15 +327,55 @@ def _validate_cpu_uclamp(
         raise QualificationError(f"{label} is malformed")
 
 
+def _validate_cpu_uclamp_ancestor_max(
+    source: Any, values: Any, label: str,
+) -> None:
+    if not isinstance(values, list):
+        raise QualificationError(f"{label} is malformed")
+    for value in values:
+        _require_int(value, label, 0, 1024)
+    if source == UCLAMP_SOURCE_CGROUP:
+        if any(value != 1024 for value in values):
+            raise QualificationError(f"{label} is not pinned")
+    elif values:
+        raise QualificationError(f"{label} is malformed")
+
+
+def _validate_system_uclamp_limits(
+    minimum: Any, maximum: Any, label: str, required: bool,
+) -> None:
+    if minimum is None or maximum is None:
+        if minimum is not None or maximum is not None or required:
+            raise QualificationError(f"{label} is unavailable")
+        return
+    minimum_value = _require_int(minimum, f"{label} minimum", 0, 1024)
+    maximum_value = _require_int(maximum, f"{label} maximum", 0, 1024)
+    if minimum_value > maximum_value:
+        raise QualificationError(f"{label} is malformed")
+    if required and (minimum_value != 1024 or maximum_value != 1024):
+        raise QualificationError(f"{label} is not pinned")
+
+
 def _require_stable_cpu_controls(hardware: dict[str, Any], label: str) -> None:
-    if hardware["cpu_affinity_source"] != AFFINITY_SOURCE_SCHED:
-        raise QualificationError(f"{label} CPU affinity is not measurable")
-    if (hardware["cpu_uclamp_source"] != UCLAMP_SOURCE_PROC or
+    if (hardware["measurement_environment"] !=
+            MEASUREMENT_ENVIRONMENT_EXCLUSIVE or
+            hardware["cpu_affinity_source"] != AFFINITY_SOURCE_CGROUP):
+        raise QualificationError(
+            f"{label} measurement cgroup is not exclusive and isolated"
+        )
+    if (hardware["cpu_uclamp_source"] != UCLAMP_SOURCE_CGROUP or
             hardware["cpu_uclamp_min"] != 1024 or
-            hardware["cpu_uclamp_max"] != 1024):
+            hardware["cpu_uclamp_max"] != 1024 or
+            any(value != 1024 for value in
+                hardware["cpu_uclamp_ancestor_max"])):
         raise QualificationError(
             f"{label} CPU utilization clamp is not stable"
         )
+    _validate_system_uclamp_limits(
+        hardware["system_uclamp_min_limit"],
+        hardware["system_uclamp_max_limit"],
+        f"{label} system CPU utilization clamp", True,
+    )
 
 
 def _require_sha(value: Any, label: str) -> str:
@@ -370,7 +487,15 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
         raise QualificationError("determinism repetitions must be exactly ten")
     if raw["performance_regression_limit_percent"] != 10:
         raise QualificationError("performance regression limit must remain 10 percent")
-    if raw["environment_policy"] != ENVIRONMENT_POLICY:
+    environment_policy = _exact_dict(
+        raw["environment_policy"], set(ENVIRONMENT_POLICY),
+        "determinism environment policy",
+    )
+    for field, value in environment_policy.items():
+        _require_int(value, f"determinism environment policy {field}", 0, 1 << 31)
+    if environment_policy["idle_seconds"] == 0:
+        raise QualificationError("determinism idle duration is malformed")
+    if environment_policy != ENVIRONMENT_POLICY:
         raise QualificationError("determinism environment policy is not pinned")
     workloads = raw["workloads"]
     if not isinstance(workloads, list) or len(workloads) != 3:
@@ -534,38 +659,355 @@ def _basis_points(value: int, capacity: int) -> int:
     return (value * 10_000 + capacity - 1) // capacity
 
 
-def _evaluate_environment(
-    before: dict[str, Any], after: dict[str, Any], child_cpu_ms: int,
-    wall_ms: int, affinity: list[int], logical_cpus: int,
-    policy: dict[str, int], required: bool,
-) -> dict[str, Any]:
-    if policy != ENVIRONMENT_POLICY:
-        raise QualificationError("determinism environment policy is not pinned")
-    _require_int(child_cpu_ms, "environment child CPU", 0, 1 << 62)
+def _cgroup_delta(
+    before: dict[str, Any], after: dict[str, Any], field: str,
+) -> int:
+    left = _require_int(
+        before.get(field), f"measurement cgroup {field} before", 0, 1 << 62
+    )
+    right = _require_int(
+        after.get(field), f"measurement cgroup {field} after", 0, 1 << 62
+    )
+    if right < left:
+        raise QualificationError("measurement cgroup counter reset")
+    return right - left
+
+
+def _validate_v6_environment_inputs(
+    before: dict[str, Any], after: dict[str, Any], wall_ms: int,
+    affinity: list[int], logical_cpus: int,
+) -> None:
     _require_int(wall_ms, "environment wall time", 1, 1 << 62)
-    if not affinity or affinity != sorted(set(affinity)):
-        raise QualificationError("environment affinity is malformed")
     _require_int(logical_cpus, "environment logical CPU count", 1, 65536)
+    if (not isinstance(affinity, list) or not affinity or
+            len(affinity) > logical_cpus):
+        raise QualificationError("environment affinity is malformed")
+    for cpu in affinity:
+        _require_int(cpu, "environment affinity", 0, 65535)
+    if affinity != sorted(set(affinity)):
+        raise QualificationError("environment affinity is malformed")
+    fields = {
+        "cpu", "global_pressure", "measurement_cgroup", "cpufreq",
+        "thermal", "system_uclamp",
+    }
+    group_fields = {
+        "mode", "cpu_usage_us", "nr_throttled", "throttled_us",
+        "memory_oom", "memory_oom_kill", "memory_oom_group_kill",
+        "pressure", "controller_cpu_affinity", "effective_cpu_affinity",
+        "exclusive_cpu_affinity", "partition", "uclamp_min", "uclamp_max",
+        "ancestor_uclamp_max", "populated", "frozen",
+    }
+    for snapshot, side in ((before, "before"), (after, "after")):
+        exact = _exact_dict(snapshot, fields, f"environment {side}")
+        group = _exact_dict(
+            exact["measurement_cgroup"], group_fields,
+            f"measurement cgroup {side}",
+        )
+        system_uclamp = _exact_dict(
+            exact["system_uclamp"], {"minimum_limit", "maximum_limit"},
+            f"system uclamp {side}",
+        )
+        _validate_system_uclamp_limits(
+            system_uclamp["minimum_limit"], system_uclamp["maximum_limit"],
+            f"system uclamp {side}", False,
+        )
+        controller = group["controller_cpu_affinity"]
+        if not isinstance(controller, list):
+            raise QualificationError(
+                "measurement controller affinity is malformed"
+            )
+        for cpu in controller:
+            _require_int(cpu, "measurement controller affinity", 0, 65535)
+        if controller != sorted(set(controller)):
+            raise QualificationError(
+                "measurement controller affinity is malformed"
+            )
+        for field in (
+                "effective_cpu_affinity", "exclusive_cpu_affinity"):
+            value = group[field]
+            if not isinstance(value, list):
+                raise QualificationError(
+                    "measurement cgroup isolation identity is malformed"
+                )
+            for cpu in value:
+                _require_int(
+                    cpu, "measurement cgroup CPU identity", 0, 65535
+                )
+            if value != sorted(set(value)):
+                raise QualificationError(
+                    "measurement cgroup isolation identity is malformed"
+                )
+        ancestor_max = group["ancestor_uclamp_max"]
+        if not isinstance(ancestor_max, list):
+            raise QualificationError(
+                "measurement cgroup isolation identity is malformed"
+            )
+        for value in ancestor_max:
+            _require_int(
+                value, "measurement cgroup ancestor uclamp max", 0, 1024
+            )
+        if group["mode"] == MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
+            if (any(group[field] is not None for field in group_fields - {
+                    "mode", "pressure", "controller_cpu_affinity",
+                    "effective_cpu_affinity", "exclusive_cpu_affinity",
+                    "ancestor_uclamp_max",
+                    }) or group["pressure"] != {} or
+                    group["effective_cpu_affinity"] != [] or
+                    group["exclusive_cpu_affinity"] != [] or
+                    group["ancestor_uclamp_max"] != []):
+                raise QualificationError(
+                    "unavailable measurement cgroup evidence is malformed"
+                )
+        elif group["mode"] != MEASUREMENT_ENVIRONMENT_EXCLUSIVE:
+            raise QualificationError("measurement cgroup evidence is malformed")
+        else:
+            _require_int(
+                group["uclamp_min"], "measurement cgroup uclamp min", 0, 1024
+            )
+            _require_int(
+                group["uclamp_max"], "measurement cgroup uclamp max", 0, 1024
+            )
+            _require_int(
+                group["populated"], "measurement cgroup populated", 0, 1
+            )
+            _require_int(
+                group["frozen"], "measurement cgroup frozen", 0, 1
+            )
+        if group["mode"] == MEASUREMENT_ENVIRONMENT_EXCLUSIVE and (
+              not controller or set(controller) & set(affinity) or
+              group["effective_cpu_affinity"] != affinity or
+              group["exclusive_cpu_affinity"] != affinity or
+              group["partition"] != "isolated" or
+              group["uclamp_min"] != 1024 or group["uclamp_max"] != 1024 or
+              group["populated"] != 0 or group["frozen"] != 0 or
+              any(value != 1024 for value in ancestor_max)):
+            raise QualificationError(
+                "measurement cgroup isolation identity is malformed"
+            )
+
+
+def _v6_pressure_metrics(
+    before: dict[str, Any], after: dict[str, Any], wall_ms: int,
+) -> dict[str, int]:
+    metrics: dict[str, int] = {}
+    for scope, left_root, right_root in (
+        ("global", before.get("global_pressure"), after.get("global_pressure")),
+        ("cgroup", before.get("measurement_cgroup", {}).get("pressure"),
+         after.get("measurement_cgroup", {}).get("pressure")),
+    ):
+        if scope == "cgroup" and left_root == right_root == {}:
+            for resource in ("cpu", "memory", "io"):
+                for kind in ("some", "full"):
+                    metrics[f"{scope}_{resource}_{kind}_basis_points"] = 0
+            continue
+        left_map = _exact_dict(
+            left_root, {"cpu", "memory", "io"},
+            f"{scope} pressure before",
+        )
+        right_map = _exact_dict(
+            right_root, {"cpu", "memory", "io"},
+            f"{scope} pressure after",
+        )
+        for resource in ("cpu", "memory", "io"):
+            left = _exact_dict(
+                left_map[resource], {"some_total_us", "full_total_us"},
+                f"{scope} {resource} pressure before",
+            )
+            right = _exact_dict(
+                right_map[resource], {"some_total_us", "full_total_us"},
+                f"{scope} {resource} pressure after",
+            )
+            for kind in ("some", "full"):
+                field = f"{kind}_total_us"
+                lvalue = _require_int(
+                    left[field], f"{scope} pressure before", 0, 1 << 62
+                )
+                rvalue = _require_int(
+                    right[field], f"{scope} pressure after", 0, 1 << 62
+                )
+                if rvalue < lvalue:
+                    raise QualificationError(f"{scope} pressure counter reset")
+                metrics[f"{scope}_{resource}_{kind}_basis_points"] = (
+                    _basis_points(rvalue - lvalue, wall_ms * 1000)
+                )
+    return metrics
+
+
+def _v6_control_metrics(
+    before: dict[str, Any], after: dict[str, Any], affinity: list[int],
+    required: bool,
+) -> tuple[dict[str, int], list[str]]:
     violations: list[str] = []
+    before_group = before.get("measurement_cgroup")
+    after_group = after.get("measurement_cgroup")
+    if not isinstance(before_group, dict) or not isinstance(after_group, dict):
+        raise QualificationError("measurement cgroup evidence is malformed")
+    if before_group.get("mode") != after_group.get("mode"):
+        raise QualificationError("measurement cgroup identity drift")
+    if (before_group.get("controller_cpu_affinity") !=
+            after_group.get("controller_cpu_affinity")):
+        raise QualificationError("measurement controller affinity drift")
+    before_system = before.get("system_uclamp")
+    after_system = after.get("system_uclamp")
+    if before_system != after_system:
+        raise QualificationError("system CPU utilization clamp drift")
+    if not isinstance(before_system, dict):
+        raise QualificationError("system CPU utilization clamp is malformed")
+    system_minimum = before_system.get("minimum_limit")
+    system_maximum = before_system.get("maximum_limit")
+    _validate_system_uclamp_limits(
+        system_minimum, system_maximum,
+        "system CPU utilization clamp", required,
+    )
+    isolation_fields = (
+        "effective_cpu_affinity", "exclusive_cpu_affinity", "partition",
+        "uclamp_min", "uclamp_max",
+        "ancestor_uclamp_max",
+        "populated", "frozen",
+    )
+    if any(before_group.get(field) != after_group.get(field)
+           for field in isolation_fields):
+        raise QualificationError("measurement cgroup isolation identity drift")
+    counter_fields = (
+        "nr_throttled", "throttled_us", "memory_oom", "memory_oom_kill",
+        "memory_oom_group_kill",
+    )
+    if before_group.get("mode") == MEASUREMENT_ENVIRONMENT_EXCLUSIVE:
+        deltas = {
+            field: _cgroup_delta(before_group, after_group, field)
+            for field in counter_fields
+        }
+        if required and (deltas["nr_throttled"] or deltas["throttled_us"]):
+            violations.append("measurement cgroup CPU throttling occurred")
+        if required and any(
+                deltas[field] for field in (
+                    "memory_oom", "memory_oom_kill", "memory_oom_group_kill"
+                )):
+            violations.append("measurement cgroup OOM activity occurred")
+    elif before_group.get("mode") == MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
+        deltas = {field: 0 for field in counter_fields}
+        if required:
+            violations.append("exclusive measurement cgroup is unavailable")
+    else:
+        raise QualificationError("measurement cgroup evidence is malformed")
+
+    before_frequency = before.get("cpufreq")
+    after_frequency = after.get("cpufreq")
+    if not isinstance(before_frequency, list) or not isinstance(after_frequency, list):
+        raise QualificationError("CPU frequency evidence is malformed")
+    if required and (not before_frequency or not after_frequency):
+        violations.append("CPU frequency policy evidence is unavailable")
+    if len(before_frequency) != len(after_frequency):
+        raise QualificationError("CPU frequency evidence drift")
+    frequency_fields = {
+        "cpu", "driver", "governor", "minimum_khz", "maximum_khz",
+        "current_khz",
+    }
+    for left, right in zip(before_frequency, after_frequency):
+        _exact_dict(left, frequency_fields, "CPU frequency before")
+        _exact_dict(right, frequency_fields, "CPU frequency after")
+        for item in (left, right):
+            _require_int(item["cpu"], "CPU frequency index", 0, 65535)
+            for field in ("minimum_khz", "maximum_khz", "current_khz"):
+                _require_int(item[field], f"CPU frequency {field}", 1, 1 << 62)
+            if (not isinstance(item["driver"], str) or
+                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["driver"]) is None or
+                    not isinstance(item["governor"], str) or
+                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["governor"]) is None or
+                    item["maximum_khz"] < item["minimum_khz"]):
+                raise QualificationError("CPU frequency evidence is malformed")
+        if ({key: left[key] for key in frequency_fields if key != "current_khz"} !=
+                {key: right[key] for key in frequency_fields if key != "current_khz"}):
+            violations.append("CPU frequency policy changed during measurement")
+    if before_frequency and [item["cpu"] for item in before_frequency] != affinity:
+        raise QualificationError("CPU frequency identity drift")
+
+    before_thermal = before.get("thermal")
+    after_thermal = after.get("thermal")
+    if not isinstance(before_thermal, list) or not isinstance(after_thermal, list):
+        raise QualificationError("thermal evidence is malformed")
+    if required and (not before_thermal or not after_thermal):
+        violations.append("thermal throttle evidence is unavailable")
+    if len(before_thermal) != len(after_thermal):
+        raise QualificationError("thermal evidence drift")
+    thermal_ms = 0
+    thermal_count = 0
+    thermal_fields = {
+        "cpu", "core_count", "core_total_ms", "package_count",
+        "package_total_ms",
+    }
+    for left, right in zip(before_thermal, after_thermal):
+        _exact_dict(left, thermal_fields, "thermal evidence before")
+        _exact_dict(right, thermal_fields, "thermal evidence after")
+        left_cpu = _require_int(
+            left["cpu"], "thermal CPU before", 0, 65535
+        )
+        right_cpu = _require_int(
+            right["cpu"], "thermal CPU after", 0, 65535
+        )
+        if left_cpu != right_cpu:
+            raise QualificationError("thermal CPU identity drift")
+        for field in thermal_fields - {"cpu"}:
+            lvalue = _require_int(left[field], f"thermal {field}", 0, 1 << 62)
+            rvalue = _require_int(right[field], f"thermal {field}", 0, 1 << 62)
+            if rvalue < lvalue:
+                raise QualificationError("thermal counter reset")
+        thermal_ms = max(
+            thermal_ms,
+            right["core_total_ms"] - left["core_total_ms"],
+            right["package_total_ms"] - left["package_total_ms"],
+        )
+        thermal_count = max(
+            thermal_count,
+            right["core_count"] - left["core_count"],
+            right["package_count"] - left["package_count"],
+        )
+    if before_thermal and [item["cpu"] for item in before_thermal] != affinity:
+        raise QualificationError("thermal CPU identity drift")
+    if required and (thermal_ms or thermal_count):
+        violations.append("thermal throttle activity exceeds the pinned limit")
+    return {
+        **{f"cgroup_{field}_delta": value for field, value in deltas.items()},
+        "system_uclamp_min_limit": system_minimum,
+        "system_uclamp_max_limit": system_maximum,
+        "thermal_throttle_ms": thermal_ms,
+        "thermal_throttle_count": thermal_count,
+    }, violations
+
+
+def _v6_cpu_metrics(
+    before: dict[str, Any], after: dict[str, Any], wall_ms: int,
+    affinity: list[int], logical_cpus: int,
+) -> dict[str, int]:
     before_cpu = _exact_dict(before.get("cpu"), {
         "clock_ticks_per_second", "host_logical_cpus", "host_busy_ticks",
         "affinity_busy_ticks",
     }, "environment CPU before")
     after_cpu = _exact_dict(after.get("cpu"), set(before_cpu), "environment CPU after")
     for field in before_cpu:
-        _require_int(before_cpu[field], f"environment CPU before {field}", 0, 1 << 62)
-        _require_int(after_cpu[field], f"environment CPU after {field}", 0, 1 << 62)
+        _require_int(before_cpu[field], f"environment CPU {field}", 0, 1 << 62)
+        _require_int(after_cpu[field], f"environment CPU {field}", 0, 1 << 62)
     if (before_cpu["clock_ticks_per_second"] == 0 or
-            before_cpu["clock_ticks_per_second"] !=
-            after_cpu["clock_ticks_per_second"] or
-            before_cpu["host_logical_cpus"] == 0 or
-            before_cpu["host_logical_cpus"] != after_cpu["host_logical_cpus"]):
+            before_cpu["clock_ticks_per_second"] != after_cpu["clock_ticks_per_second"] or
+            before_cpu["host_logical_cpus"] != after_cpu["host_logical_cpus"] or
+            before_cpu["host_logical_cpus"] != logical_cpus):
         raise QualificationError("environment CPU topology drift")
-    if before_cpu["host_logical_cpus"] != logical_cpus:
-        raise QualificationError("environment logical CPU identity drift")
     for field in ("host_busy_ticks", "affinity_busy_ticks"):
         if after_cpu[field] < before_cpu[field]:
             raise QualificationError("environment CPU counter reset")
+    before_group = before.get("measurement_cgroup", {})
+    after_group = after.get("measurement_cgroup", {})
+    mode = before_group.get("mode")
+    if mode != after_group.get("mode"):
+        raise QualificationError("measurement cgroup identity drift")
+    if mode == MEASUREMENT_ENVIRONMENT_EXCLUSIVE:
+        owned_us = _cgroup_delta(before_group, after_group, "cpu_usage_us")
+    elif mode == MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
+        if before_group.get("cpu_usage_us") is not None or after_group.get("cpu_usage_us") is not None:
+            raise QualificationError("unavailable cgroup CPU evidence is malformed")
+        owned_us = 0
+    else:
+        raise QualificationError("measurement cgroup CPU evidence is malformed")
     tick_hz = before_cpu["clock_ticks_per_second"]
     host_busy_ms = (
         (after_cpu["host_busy_ticks"] - before_cpu["host_busy_ticks"])
@@ -575,169 +1017,115 @@ def _evaluate_environment(
         (after_cpu["affinity_busy_ticks"] - before_cpu["affinity_busy_ticks"])
         * 1000 // tick_hz
     )
+    owned_ms = owned_us // 1000
     tick_ms = (1000 + tick_hz - 1) // tick_hz
-    if (child_cpu_ms > host_busy_ms + tick_ms * logical_cpus or
-            child_cpu_ms > affinity_busy_ms + tick_ms * len(affinity)):
-        raise QualificationError("environment child CPU accounting drift")
-    host_external_ms = max(0, host_busy_ms - child_cpu_ms)
-    affinity_external_ms = max(0, affinity_busy_ms - child_cpu_ms)
-    host_external_bp = _basis_points(
-        host_external_ms, wall_ms * before_cpu["host_logical_cpus"]
-    )
-    affinity_external_bp = _basis_points(
-        affinity_external_ms, wall_ms * len(affinity)
-    )
-    if (required and host_external_bp >
-            policy["host_external_cpu_limit_basis_points"]):
-        violations.append(
-            "host external CPU activity exceeds the pinned environment limit"
-        )
-    if (required and affinity_external_bp >
-            policy["affinity_external_cpu_limit_basis_points"]):
-        violations.append(
-            "affinity external CPU activity exceeds the pinned environment limit"
-        )
-
-    pressure_metrics: dict[str, int] = {}
-    pressure_limits = {
-        ("cpu", "some"): "cpu_pressure_some_limit_basis_points",
-        ("memory", "full"): "memory_pressure_full_limit_basis_points",
-        ("io", "full"): "io_pressure_full_limit_basis_points",
+    if (owned_ms > host_busy_ms + tick_ms * logical_cpus or
+            owned_ms > affinity_busy_ms + tick_ms * len(affinity)):
+        raise QualificationError("measurement cgroup CPU accounting drift")
+    host_external_ms = max(0, host_busy_ms - owned_ms)
+    affinity_external_ms = max(0, affinity_busy_ms - owned_ms)
+    return {
+        "host_busy_ms": host_busy_ms,
+        "affinity_busy_ms": affinity_busy_ms,
+        "cgroup_owned_cpu_ms": owned_ms,
+        "host_external_cpu_ms": host_external_ms,
+        "affinity_external_cpu_ms": affinity_external_ms,
+        "host_external_cpu_basis_points": _basis_points(
+            host_external_ms, wall_ms * logical_cpus
+        ),
+        "affinity_external_cpu_basis_points": _basis_points(
+            affinity_external_ms, wall_ms * len(affinity)
+        ),
     }
-    before_pressure = _exact_dict(
-        before.get("pressure"), {"cpu", "memory", "io"},
-        "environment pressure before",
+
+
+def _evaluate_runtime_environment(
+    before: dict[str, Any], after: dict[str, Any], wall_ms: int,
+    affinity: list[int], logical_cpus: int, policy: dict[str, int],
+    required: bool,
+) -> dict[str, Any]:
+    if policy != ENVIRONMENT_POLICY:
+        raise QualificationError("determinism environment policy is not pinned")
+    _validate_v6_environment_inputs(
+        before, after, wall_ms, affinity, logical_cpus
     )
-    after_pressure = _exact_dict(
-        after.get("pressure"), {"cpu", "memory", "io"},
-        "environment pressure after",
+    cpu = _v6_cpu_metrics(before, after, wall_ms, affinity, logical_cpus)
+    pressure = _v6_pressure_metrics(before, after, wall_ms)
+    controls, violations = _v6_control_metrics(
+        before, after, affinity, required
     )
-    for resource_name in ("cpu", "memory", "io"):
-        left = _exact_dict(
-            before_pressure[resource_name], {"some_total_us", "full_total_us"},
-            f"environment {resource_name} pressure before",
+    if (required and cpu["affinity_external_cpu_basis_points"] >
+            policy["runtime_affinity_external_cpu_limit_basis_points"]):
+        violations.append(
+            "affinity external CPU activity exceeds the pinned runtime limit"
         )
-        right = _exact_dict(
-            after_pressure[resource_name], {"some_total_us", "full_total_us"},
-            f"environment {resource_name} pressure after",
-        )
-        for field in ("some_total_us", "full_total_us"):
-            _require_int(left[field], f"environment {resource_name} pressure", 0, 1 << 62)
-            _require_int(right[field], f"environment {resource_name} pressure", 0, 1 << 62)
-            if right[field] < left[field]:
-                raise QualificationError(
-                    f"environment {resource_name} pressure counter reset"
-                )
-        for pressure_kind in ("some", "full"):
-            key = f"{resource_name}_{pressure_kind}_basis_points"
-            pressure_metrics[key] = _basis_points(
-                right[f"{pressure_kind}_total_us"] -
-                left[f"{pressure_kind}_total_us"],
-                wall_ms * 1000,
-            )
-    for (resource_name, pressure_kind), limit_name in pressure_limits.items():
-        value = pressure_metrics[
-            f"{resource_name}_{pressure_kind}_basis_points"
-        ]
-        if required and value > policy[limit_name]:
-            violations.append(
-                f"{resource_name} {pressure_kind} pressure exceeds the pinned "
-                "environment limit"
-            )
-
-    before_frequency = before.get("cpufreq")
-    after_frequency = after.get("cpufreq")
-    if not isinstance(before_frequency, list) or not isinstance(after_frequency, list):
-        raise QualificationError("environment CPU frequency evidence is malformed")
-    if required and (not before_frequency or not after_frequency):
-        violations.append("CPU frequency policy evidence is unavailable")
-    if len(before_frequency) != len(after_frequency):
-        raise QualificationError("environment CPU frequency evidence drift")
-    for left, right in zip(before_frequency, after_frequency):
-        fields = {"cpu", "driver", "governor", "minimum_khz", "maximum_khz",
-                  "current_khz"}
-        _exact_dict(left, fields, "environment CPU frequency before")
-        _exact_dict(right, fields, "environment CPU frequency after")
-        for item, side in ((left, "before"), (right, "after")):
-            _require_int(
-                item["cpu"], f"environment CPU frequency {side} CPU",
-                0, 65535,
-            )
-            for field in ("minimum_khz", "maximum_khz", "current_khz"):
-                _require_int(
-                    item[field],
-                    f"environment CPU frequency {side} {field}",
-                    1, 1 << 62,
-                )
-            if (not isinstance(item["driver"], str) or
-                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["driver"]) is None or
-                    not isinstance(item["governor"], str) or
-                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["governor"]) is None or
-                    item["maximum_khz"] < item["minimum_khz"]):
-                raise QualificationError(
-                    "environment CPU frequency evidence is malformed"
-                )
-        if ({key: left[key] for key in fields if key != "current_khz"} !=
-                {key: right[key] for key in fields if key != "current_khz"}):
-            violations.append("CPU frequency policy changed during measurement")
-    if before_frequency and [item["cpu"] for item in before_frequency] != affinity:
-        raise QualificationError("environment CPU frequency identity drift")
-
-    before_thermal = before.get("thermal")
-    after_thermal = after.get("thermal")
-    if not isinstance(before_thermal, list) or not isinstance(after_thermal, list):
-        raise QualificationError("environment thermal evidence is malformed")
-    if required and (not before_thermal or not after_thermal):
-        violations.append("thermal throttle evidence is unavailable")
-    if len(before_thermal) != len(after_thermal):
-        raise QualificationError("environment thermal evidence drift")
-    thermal_delta = 0
-    thermal_count_delta = 0
-    thermal_fields = {
-        "cpu", "core_count", "core_total_ms", "package_count",
-        "package_total_ms",
-    }
-    for left, right in zip(before_thermal, after_thermal):
-        _exact_dict(left, thermal_fields, "environment thermal before")
-        _exact_dict(right, thermal_fields, "environment thermal after")
-        if left["cpu"] != right["cpu"]:
-            raise QualificationError("environment thermal CPU identity drift")
-        for field in thermal_fields - {"cpu"}:
-            _require_int(left[field], f"environment thermal {field}", 0, 1 << 62)
-            _require_int(right[field], f"environment thermal {field}", 0, 1 << 62)
-            if right[field] < left[field]:
-                raise QualificationError("environment thermal counter reset")
-        thermal_delta = max(
-            thermal_delta,
-            right["core_total_ms"] - left["core_total_ms"],
-            right["package_total_ms"] - left["package_total_ms"],
-        )
-        thermal_count_delta = max(
-            thermal_count_delta,
-            right["core_count"] - left["core_count"],
-            right["package_count"] - left["package_count"],
-        )
-    if before_thermal and [item["cpu"] for item in before_thermal] != affinity:
-        raise QualificationError("environment thermal CPU identity drift")
-    if required and (
-            thermal_delta > policy["thermal_throttle_limit_ms"] or
-            thermal_count_delta > 0):
-        violations.append("thermal throttle activity exceeds the pinned limit")
-
     return {
         "valid": not violations,
         "violations": violations,
-        "metrics": {
-            "host_busy_ms": host_busy_ms,
-            "affinity_busy_ms": affinity_busy_ms,
-            "host_external_cpu_ms": host_external_ms,
-            "affinity_external_cpu_ms": affinity_external_ms,
-            "host_external_cpu_basis_points": host_external_bp,
-            "affinity_external_cpu_basis_points": affinity_external_bp,
-            "thermal_throttle_ms": thermal_delta,
-            "thermal_throttle_count": thermal_count_delta,
-            **pressure_metrics,
-        },
+        "metrics": {**cpu, **pressure, **controls},
+    }
+
+
+def _validate_batch_wall_evidence(
+    observed_wall_ms: int, gated_wall_ms: int, measurement_iterations: int,
+    policy: dict[str, int],
+) -> None:
+    _require_int(observed_wall_ms, "batch observed wall time", 1, 1 << 62)
+    _require_int(gated_wall_ms, "batch gated wall time", 1, 1 << 62)
+    _require_int(measurement_iterations, "batch measurement count", 1, 100)
+    if (observed_wall_ms + measurement_iterations * 10 < gated_wall_ms or
+            observed_wall_ms >
+            gated_wall_ms + policy["batch_max_overhead_ms"]):
+        raise QualificationError(
+            "batch wall evidence differs from the measured inner window"
+        )
+
+
+def _evaluate_idle_environment(
+    before: dict[str, Any], after: dict[str, Any], wall_ms: int,
+    affinity: list[int], logical_cpus: int, policy: dict[str, int],
+    required: bool,
+) -> dict[str, Any]:
+    if policy != ENVIRONMENT_POLICY:
+        raise QualificationError("determinism environment policy is not pinned")
+    _validate_v6_environment_inputs(
+        before, after, wall_ms, affinity, logical_cpus
+    )
+    cpu = _v6_cpu_metrics(before, after, wall_ms, affinity, logical_cpus)
+    pressure = _v6_pressure_metrics(before, after, wall_ms)
+    controls, violations = _v6_control_metrics(
+        before, after, affinity, required
+    )
+    idle_minimum_ms = policy["idle_seconds"] * 1000
+    if not (
+            idle_minimum_ms <= wall_ms <=
+            idle_minimum_ms + policy["idle_max_overshoot_ms"]):
+        violations.append(
+            "idle preflight duration differs from the pinned window"
+        )
+    gates = (
+        (cpu["host_external_cpu_basis_points"],
+         policy["idle_host_external_cpu_limit_basis_points"],
+         "host external CPU activity exceeds the pinned idle limit"),
+        (cpu["affinity_external_cpu_basis_points"],
+         policy["idle_affinity_external_cpu_limit_basis_points"],
+         "affinity external CPU activity exceeds the pinned idle limit"),
+        (pressure["global_cpu_some_basis_points"],
+         policy["idle_cpu_pressure_some_limit_basis_points"],
+         "global CPU pressure exceeds the pinned idle limit"),
+        (pressure["global_memory_full_basis_points"],
+         policy["idle_memory_pressure_full_limit_basis_points"],
+         "global memory full pressure exceeds the pinned idle limit"),
+        (pressure["global_io_full_basis_points"],
+         policy["idle_io_pressure_full_limit_basis_points"],
+         "global IO full pressure exceeds the pinned idle limit"),
+    )
+    if required:
+        violations.extend(message for value, limit, message in gates if value > limit)
+    return {
+        "valid": not violations,
+        "violations": violations,
+        "metrics": {**cpu, **pressure, **controls},
     }
 
 
@@ -766,6 +1154,29 @@ def _telemetry_uint(path: Path, label: str) -> int:
     return int(value)
 
 
+def _system_uclamp_limits(
+    proc_root: Path, allow_unavailable: bool = False,
+) -> tuple[int | None, int | None]:
+    kernel = proc_root / "sys" / "kernel"
+    minimum_path = kernel / "sched_util_clamp_min"
+    maximum_path = kernel / "sched_util_clamp_max"
+    kinds = (_regular_kind(minimum_path), _regular_kind(maximum_path))
+    if kinds == ("missing", "missing") and allow_unavailable:
+        return None, None
+    if kinds != ("regular", "regular"):
+        raise QualificationError("system CPU utilization clamp is unavailable")
+    minimum = _telemetry_uint(
+        minimum_path, "system uclamp min"
+    )
+    maximum = _telemetry_uint(
+        maximum_path, "system uclamp max"
+    )
+    _validate_system_uclamp_limits(
+        minimum, maximum, "system CPU utilization clamp", False
+    )
+    return minimum, maximum
+
+
 def _telemetry_directory(path: Path, root: Path, label: str) -> Path | None:
     try:
         resolved = path.resolve(strict=True)
@@ -782,9 +1193,117 @@ def _telemetry_directory(path: Path, root: Path, label: str) -> Path | None:
     return resolved
 
 
+def _parse_named_counters(
+    raw: bytes, label: str, required: set[str],
+) -> dict[str, int]:
+    if not raw or len(raw) > 64 * 1024:
+        raise QualificationError(f"{label} is malformed")
+    try:
+        text = raw.decode("ascii", errors="strict")
+    except UnicodeError as error:
+        raise QualificationError(f"{label} is malformed") from error
+    values: dict[str, int] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(r"([a-z][a-z0-9_.-]{0,63}) ([0-9]{1,20})", line)
+        if match is None or match.group(1) in values:
+            raise QualificationError(f"{label} is malformed")
+        values[match.group(1)] = int(match.group(2))
+    if not required <= set(values):
+        raise QualificationError(f"{label} is incomplete")
+    return values
+
+
+def _measurement_cgroup_snapshot(
+    measurement_cgroup: Path | None, affinity: list[int],
+    authority_root: Path = Path("/sys/fs/cgroup"),
+    expected_controller_affinity: list[int] | None = None,
+) -> dict[str, Any]:
+    try:
+        controller = sorted(os.sched_getaffinity(0))
+    except AttributeError:
+        controller = []
+    except OSError as error:
+        raise QualificationError(
+            "cannot read measurement controller affinity"
+        ) from error
+    if (expected_controller_affinity is not None and
+            controller != expected_controller_affinity):
+        raise QualificationError("measurement controller affinity drift")
+    if measurement_cgroup is None:
+        return {
+            "mode": MEASUREMENT_ENVIRONMENT_UNAVAILABLE,
+            "cpu_usage_us": None,
+            "nr_throttled": None,
+            "throttled_us": None,
+            "memory_oom": None,
+            "memory_oom_kill": None,
+            "memory_oom_group_kill": None,
+            "pressure": {},
+            "controller_cpu_affinity": controller,
+            "effective_cpu_affinity": [],
+            "exclusive_cpu_affinity": [],
+            "partition": None,
+            "uclamp_min": None,
+            "uclamp_max": None,
+            "ancestor_uclamp_max": [],
+            "populated": None,
+            "frozen": None,
+        }
+    identity = _measurement_cgroup_identity(
+        measurement_cgroup, controller, authority_root
+    )
+    if identity["cpus"] != affinity:
+        raise QualificationError("measurement cgroup CPU identity drift")
+    root = identity["path"]
+    cpu = _parse_named_counters(
+        _telemetry_bytes(root / "cpu.stat", 64 * 1024, "cgroup CPU counters"),
+        "cgroup CPU counters",
+        {"usage_usec", "nr_throttled", "throttled_usec"},
+    )
+    memory = _parse_named_counters(
+        _telemetry_bytes(
+            root / "memory.events", 64 * 1024, "cgroup memory counters"
+        ),
+        "cgroup memory counters",
+        {"oom", "oom_kill", "oom_group_kill"},
+    )
+    pressure = {
+        resource: _parse_pressure(
+            _telemetry_bytes(
+                root / f"{resource}.pressure", 64 * 1024,
+                f"cgroup {resource} pressure",
+            ),
+            f"cgroup {resource}",
+        )
+        for resource in ("cpu", "memory", "io")
+    }
+    return {
+        "mode": MEASUREMENT_ENVIRONMENT_EXCLUSIVE,
+        "cpu_usage_us": cpu["usage_usec"],
+        "nr_throttled": cpu["nr_throttled"],
+        "throttled_us": cpu["throttled_usec"],
+        "memory_oom": memory["oom"],
+        "memory_oom_kill": memory["oom_kill"],
+        "memory_oom_group_kill": memory["oom_group_kill"],
+        "pressure": pressure,
+        "controller_cpu_affinity": controller,
+        "effective_cpu_affinity": identity["cpus"],
+        "exclusive_cpu_affinity": identity["exclusive_cpus"],
+        "partition": identity["partition"],
+        "uclamp_min": identity["uclamp_min"],
+        "uclamp_max": identity["uclamp_max"],
+        "ancestor_uclamp_max": identity["ancestor_uclamp_max"],
+        "populated": identity["populated"],
+        "frozen": identity["frozen"],
+    }
+
+
 def _capture_environment(
     affinity: list[int], proc_root: Path = Path("/proc"),
     cpu_root: Path = Path("/sys/devices/system/cpu"),
+    measurement_cgroup: Path | None = None,
+    cgroup_authority_root: Path = Path("/sys/fs/cgroup"),
+    expected_controller_affinity: list[int] | None = None,
 ) -> dict[str, Any]:
     if not affinity or affinity != sorted(set(affinity)):
         raise QualificationError("environment affinity is malformed")
@@ -796,7 +1315,7 @@ def _capture_environment(
         _telemetry_bytes(proc_root / "stat", 1024 * 1024, "CPU accounting"),
         affinity, int(clock_ticks),
     )
-    pressure = {
+    global_pressure = {
         resource_name: _parse_pressure(
             _telemetry_bytes(
                 proc_root / "pressure" / resource_name, 64 * 1024,
@@ -806,6 +1325,9 @@ def _capture_environment(
         )
         for resource_name in ("cpu", "memory", "io")
     }
+    system_uclamp_minimum, system_uclamp_maximum = _system_uclamp_limits(
+        proc_root, allow_unavailable=measurement_cgroup is None
+    )
 
     frequency: list[dict[str, Any]] = []
     frequency_missing = 0
@@ -877,7 +1399,15 @@ def _capture_environment(
         raise QualificationError("thermal throttle evidence is incomplete")
     return {
         "cpu": cpu,
-        "pressure": pressure,
+        "global_pressure": global_pressure,
+        "system_uclamp": {
+            "minimum_limit": system_uclamp_minimum,
+            "maximum_limit": system_uclamp_maximum,
+        },
+        "measurement_cgroup": _measurement_cgroup_snapshot(
+            measurement_cgroup, affinity, cgroup_authority_root,
+            expected_controller_affinity,
+        ),
         "cpufreq": frequency,
         "thermal": thermal,
     }
@@ -993,6 +1523,11 @@ def validate_baseline(raw: dict[str, Any], manifest_sha256: str) -> dict[str, An
         _validate_cpu_uclamp(
             hardware["cpu_uclamp_source"], hardware["cpu_uclamp_min"],
             hardware["cpu_uclamp_max"], "baseline CPU utilization clamp",
+        )
+        _validate_cpu_uclamp_ancestor_max(
+            hardware["cpu_uclamp_source"],
+            hardware["cpu_uclamp_ancestor_max"],
+            "baseline CPU utilization clamp ancestor maximum",
         )
         _require_stable_cpu_controls(hardware, "baseline")
         _require_int(hardware["memory_bytes"], "baseline memory", 1, 1 << 62)
@@ -1243,8 +1778,10 @@ def validate_receipt_payload(
     if (configuration["manifest_sha256"] != manifest_sha or
             configuration["repetitions"] != 10 or
             configuration["performance_regression_limit_percent"] != 10 or
+            not isinstance(configuration["performance_policy"], str) or
             configuration["performance_policy"] not in {"required", "record-only"} or
-            configuration["environment_policy"] != manifest["environment_policy"]):
+            canonical_json(configuration["environment_policy"]) !=
+            canonical_json(manifest["environment_policy"])):
         raise QualificationError("receipt configuration differs from manifest")
     host = _exact_dict(
         receipt["host"], {"class_id", "os", *HARDWARE_FIELDS},
@@ -1258,6 +1795,14 @@ def validate_receipt_payload(
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "host CPU utilization clamp",
+    )
+    _validate_cpu_uclamp_ancestor_max(
+        host["cpu_uclamp_source"], host["cpu_uclamp_ancestor_max"],
+        "host CPU utilization clamp ancestor maximum",
+    )
+    _validate_system_uclamp_limits(
+        host["system_uclamp_min_limit"], host["system_uclamp_max_limit"],
+        "host system CPU utilization clamp", False,
     )
     _require_int(host["memory_bytes"], "host memory", 1, 1 << 62)
     toolchain = _validate_toolchain(receipt["toolchain"], "receipt toolchain")
@@ -1294,7 +1839,7 @@ def validate_receipt_payload(
         raise QualificationError(
             f"baseline hardware or toolchain inventory drift for {profile_id}"
         )
-    used_artifacts: list[str] = []
+    used_artifacts: list[str] = [_idle_preflight_artifact_path()]
     regressions: list[str] = []
     for workload in workloads:
         _exact_dict(workload, {
@@ -1313,7 +1858,8 @@ def validate_receipt_payload(
             _exact_dict(run, {
                 "repetition", "semantic_sha256", "exit_code", "metrics",
                 "measurement_iterations", "batch_valid", "environment_valid",
-                "inner_runs", "artifacts",
+                "environment", "environment_artifact", "inner_runs",
+                "artifacts",
             }, f"{kind} run")
             if run["repetition"] != repetition:
                 raise QualificationError(f"{kind} repetition sequence is invalid")
@@ -1328,7 +1874,6 @@ def validate_receipt_payload(
             if not isinstance(inner_runs, list) or len(inner_runs) != expected_iterations:
                 raise QualificationError(f"{kind} inner measurement set is incomplete")
             inner_values = {metric_name: [] for metric_name in METRICS}
-            environment_valid = True
             for iteration, inner in enumerate(inner_runs, 1):
                 _exact_dict(inner, {
                     "iteration", "semantic_sha256", "exit_code", "metrics",
@@ -1366,7 +1911,6 @@ def validate_receipt_payload(
                     raise QualificationError(
                         f"{kind} environment decision is malformed"
                     )
-                environment_valid = environment_valid and environment["valid"]
                 expected_inner_artifacts = _iteration_artifact_paths(
                     kind, repetition, iteration
                 )
@@ -1395,10 +1939,31 @@ def validate_receipt_payload(
             expected_batch_valid = (
                 metrics["cpu_ms"] >= manifest_workload["minimum_batch_cpu_ms"]
             )
+            environment = _exact_dict(
+                run["environment"], {"valid", "violations", "metrics"},
+                f"{kind} batch environment decision",
+            )
+            if (not isinstance(environment["valid"], bool) or
+                    not isinstance(environment["violations"], list) or
+                    any(not isinstance(value, str) or not value
+                        for value in environment["violations"]) or
+                    environment["valid"] != (not environment["violations"]) or
+                    not isinstance(environment["metrics"], dict)):
+                raise QualificationError(
+                    f"{kind} batch environment decision is malformed"
+                )
+            expected_environment_artifact = _batch_environment_artifact_path(
+                kind, repetition
+            )
+            if run["environment_artifact"] != expected_environment_artifact:
+                raise QualificationError(
+                    f"{kind} batch environment artifact is invalid"
+                )
+            used_artifacts.append(expected_environment_artifact)
             if (not isinstance(run["batch_valid"], bool) or
                     run["batch_valid"] != expected_batch_valid or
                     not isinstance(run["environment_valid"], bool) or
-                    run["environment_valid"] != environment_valid):
+                    run["environment_valid"] != environment["valid"]):
                 raise QualificationError(f"{kind} measurement validity drift")
             if not run["batch_valid"] and not observed_rejection:
                 raise QualificationError(f"{kind} measurement batch CPU is too short")
@@ -1516,7 +2081,8 @@ def _validate_calibration_payload(
     if (configuration["manifest_sha256"] != manifest_sha or
             configuration["repetitions"] != 10 or
             configuration["performance_regression_limit_percent"] != 10 or
-            configuration["environment_policy"] != manifest["environment_policy"]):
+            canonical_json(configuration["environment_policy"]) !=
+            canonical_json(manifest["environment_policy"])):
         raise QualificationError("calibration configuration differs from manifest")
     source = _exact_dict(receipt["source"], {
         "revision", "manifest_sha256", "file_count"
@@ -1538,6 +2104,10 @@ def _validate_calibration_payload(
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "calibration CPU utilization clamp",
+    )
+    _validate_cpu_uclamp_ancestor_max(
+        host["cpu_uclamp_source"], host["cpu_uclamp_ancestor_max"],
+        "calibration CPU utilization clamp ancestor maximum",
     )
     _require_stable_cpu_controls(host, "calibration")
     _require_int(host["memory_bytes"], "calibration memory", 1, 1 << 62)
@@ -1620,9 +2190,14 @@ def _rejected_payload(
     baseline_profile: str | None,
 ) -> dict[str, Any]:
     complete = isinstance(error, QualificationDecisionError)
+    preflight_rejection = isinstance(error, QualificationPreflightError)
     failures = (
         error.failures if complete else [
-            _failure_record("qualification-error", str(error))
+            _failure_record(
+                "environment-preflight-invalid"
+                if preflight_rejection else "qualification-error",
+                str(error),
+            )
         ]
     )
     for index, failure in enumerate(failures, 1):
@@ -1656,6 +2231,7 @@ def _rejected_payload(
                 "complete-measurement-rejection"
                 if measurement_rejection
                 else "complete-gate-rejection" if complete
+                else "idle-preflight-rejection" if preflight_rejection
                 else "incomplete"
             ),
             "failures": failures,
@@ -1696,8 +2272,10 @@ def _validate_rejected_payload(
     if (configuration["manifest_sha256"] != digest_json(manifest) or
             configuration["repetitions"] != 10 or
             configuration["performance_regression_limit_percent"] != 10 or
+            not isinstance(configuration["performance_policy"], str) or
             configuration["performance_policy"] not in {"required", "record-only"} or
-            configuration["environment_policy"] != manifest["environment_policy"]):
+            canonical_json(configuration["environment_policy"]) !=
+            canonical_json(manifest["environment_policy"])):
         raise QualificationError("rejected configuration differs from manifest")
     source = _exact_dict(receipt["source"], {
         "revision", "manifest_sha256", "file_count"
@@ -1719,6 +2297,15 @@ def _validate_rejected_payload(
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "rejected CPU utilization clamp",
+    )
+    _validate_cpu_uclamp_ancestor_max(
+        host["cpu_uclamp_source"], host["cpu_uclamp_ancestor_max"],
+        "rejected CPU utilization clamp ancestor maximum",
+    )
+    _validate_system_uclamp_limits(
+        host["system_uclamp_min_limit"], host["system_uclamp_max_limit"],
+        "rejected system CPU utilization clamp",
+        configuration["performance_policy"] == "required",
     )
     _require_int(host["memory_bytes"], "rejected memory", 1, 1 << 62)
     _validate_toolchain(receipt["toolchain"], "rejected toolchain")
@@ -1829,7 +2416,15 @@ def _validate_rejected_payload(
                 "rejected decision differs from recomputed gate failures"
             )
     else:
-        if (decision["classification"] != "incomplete" or
+        preflight_rejection = (
+            len(failures) == 1 and
+            failures[0]["type"] == "environment-preflight-invalid"
+        )
+        expected_classification = (
+            "idle-preflight-rejection" if preflight_rejection
+            else "incomplete"
+        )
+        if (decision["classification"] != expected_classification or
                 observations["workloads"] != [] or performance_failures):
             raise QualificationError("incomplete rejected decision is malformed")
     if not isinstance(receipt["artifacts"], list):
@@ -1846,6 +2441,11 @@ def _validate_rejected_payload(
         raise QualificationError(
             "rejected artifact inventory is not sorted and unique"
         )
+    if (decision["classification"] == "idle-preflight-rejection" and
+            rejected_artifact_paths != [_idle_preflight_artifact_path()]):
+        raise QualificationError(
+            "idle preflight rejection artifact inventory is not canonical"
+        )
     if not observations["complete"]:
         allowed_artifacts = {
             path
@@ -1856,6 +2456,12 @@ def _validate_rejected_payload(
                 definition["kind"], repetition, iteration
             )
         }
+        allowed_artifacts.add(_idle_preflight_artifact_path())
+        allowed_artifacts.update(
+            _batch_environment_artifact_path(definition["kind"], repetition)
+            for definition in manifest["workloads"]
+            for repetition in range(1, 11)
+        )
         if any(
                 item["path"] not in allowed_artifacts
                 for item in receipt["artifacts"]):
@@ -1895,6 +2501,108 @@ def _root_for_marker(input_receipt: dict[str, Any], marker: str) -> Path:
 def _verify_raw_claims(
     receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
 ) -> None:
+    _verify_idle_preflight_claim(receipt, root, manifest)
+    _verify_workload_raw_claims(receipt, root, manifest)
+
+
+def _verify_idle_preflight_claim(
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+) -> None:
+    preflight = _load_json(root / _idle_preflight_artifact_path())
+    _exact_dict(
+        preflight, {"schema", "scope", "wall_ms", "before", "after", "decision"},
+        "idle preflight artifact",
+    )
+    if (preflight["schema"] != ENVIRONMENT_SCHEMA or
+            preflight["scope"] != "idle-preflight"):
+        raise QualificationError("idle preflight artifact schema is unsupported")
+    _verify_controller_snapshot_claim(
+        preflight["before"], receipt["host"], "idle preflight before"
+    )
+    _verify_controller_snapshot_claim(
+        preflight["after"], receipt["host"], "idle preflight after"
+    )
+    expected_preflight = _evaluate_idle_environment(
+        preflight["before"], preflight["after"], preflight["wall_ms"],
+        receipt["host"]["cpu_affinity"],
+        receipt["host"]["host_logical_cpus"],
+        manifest["environment_policy"],
+        receipt["configuration"].get("performance_policy") == "required",
+    )
+    if canonical_json(preflight["decision"]) != canonical_json(expected_preflight):
+        raise QualificationError("idle preflight decision differs from raw artifact")
+    classification = receipt.get("decision", {}).get("classification")
+    is_idle_rejection = (
+        receipt.get("schema") == REJECTED_SCHEMA and
+        classification == "idle-preflight-rejection"
+    )
+    if is_idle_rejection:
+        if expected_preflight["valid"]:
+            raise QualificationError(
+                "idle preflight rejection carries a valid raw preflight"
+            )
+        error = QualificationPreflightError(
+            expected_preflight["violations"]
+        )
+        expected_failures = [
+            _failure_record("environment-preflight-invalid", str(error))
+        ]
+        if receipt.get("decision", {}).get("failures") != expected_failures:
+            raise QualificationError(
+                "idle preflight rejection differs from raw violations"
+            )
+    elif not expected_preflight["valid"]:
+        raise QualificationError(
+            "accepted evidence carries an invalid idle preflight"
+        )
+
+
+def _verify_controller_snapshot_claim(
+    snapshot: Any, host: dict[str, Any], label: str,
+) -> None:
+    if not isinstance(snapshot, dict) or not isinstance(
+            snapshot.get("measurement_cgroup"), dict):
+        raise QualificationError(f"{label} measurement identity is malformed")
+    group = snapshot["measurement_cgroup"]
+    expected_system = {
+        "minimum_limit": host["system_uclamp_min_limit"],
+        "maximum_limit": host["system_uclamp_max_limit"],
+    }
+    if canonical_json(snapshot.get("system_uclamp")) != canonical_json(
+            expected_system):
+        raise QualificationError(
+            f"{label} system clamp differs from host identity"
+        )
+    if (group.get("controller_cpu_affinity") !=
+            host["controller_cpu_affinity"]):
+        raise QualificationError(
+            f"{label} controller affinity differs from host identity"
+        )
+    if host["measurement_environment"] == MEASUREMENT_ENVIRONMENT_EXCLUSIVE:
+        expected = {
+            "mode": MEASUREMENT_ENVIRONMENT_EXCLUSIVE,
+            "effective_cpu_affinity": host["cpu_affinity"],
+            "exclusive_cpu_affinity": host["cpu_affinity"],
+            "partition": "isolated",
+            "uclamp_min": host["cpu_uclamp_min"],
+            "uclamp_max": host["cpu_uclamp_max"],
+            "ancestor_uclamp_max": host["cpu_uclamp_ancestor_max"],
+            "populated": host["measurement_cgroup_populated"],
+            "frozen": host["measurement_cgroup_frozen"],
+        }
+        if any(group.get(field) != value for field, value in expected.items()):
+            raise QualificationError(
+                f"{label} measurement identity differs from host identity"
+            )
+    elif group.get("mode") != MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
+        raise QualificationError(
+            f"{label} measurement identity differs from host identity"
+        )
+
+
+def _verify_workload_raw_claims(
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+) -> None:
     definitions = {item["kind"]: item for item in manifest["workloads"]}
     for workload in receipt["workloads"]:
         kind = workload["kind"]
@@ -1907,6 +2615,7 @@ def _verify_raw_claims(
         definition = definitions[kind]
         for run in workload["runs"]:
             repetition = run["repetition"]
+            gated_wall_ms = 0
             for inner in run["inner_runs"]:
                 iteration = inner["iteration"]
                 paths = _iteration_artifact_paths(kind, repetition, iteration)
@@ -1914,13 +2623,25 @@ def _verify_raw_claims(
                 time_raw = _read_regular(root / paths[3], MAX_LOG_BYTES)
                 environment = _load_json(root / paths[4])
                 _exact_dict(
-                    environment, {"schema", "before", "after", "decision"},
+                    environment, {
+                        "schema", "scope", "wall_ms", "before", "after",
+                        "decision",
+                    },
                     f"{kind} environment artifact",
                 )
-                if environment["schema"] != "codeskeptic-determinism-environment-v1":
+                if (environment["schema"] != ENVIRONMENT_SCHEMA or
+                        environment["scope"] != "inner-record-only"):
                     raise QualificationError(
                         f"{kind} environment artifact schema is unsupported"
                     )
+                _verify_controller_snapshot_claim(
+                    environment["before"], receipt["host"],
+                    f"{kind} inner environment before",
+                )
+                _verify_controller_snapshot_claim(
+                    environment["after"], receipt["host"],
+                    f"{kind} inner environment after",
+                )
                 try:
                     report = json.loads(report_raw.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -1932,6 +2653,11 @@ def _verify_raw_claims(
                         f"{kind} repetition {repetition} raw report is malformed"
                     )
                 wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
+                gated_wall_ms += wall_ms
+                if environment["wall_ms"] != wall_ms:
+                    raise QualificationError(
+                        f"{kind} environment wall time differs from raw artifact"
+                    )
                 if inner["metrics"] != {
                     "wall_ms": wall_ms,
                     "cpu_ms": cpu_ms,
@@ -1954,19 +2680,67 @@ def _verify_raw_claims(
                     raise QualificationError(
                         f"{kind} repetition {repetition} semantic differs from raw report"
                     )
-                expected_decision = _evaluate_environment(
-                    environment["before"], environment["after"], cpu_ms,
-                    wall_ms, receipt["host"]["cpu_affinity"],
+                expected_decision = _evaluate_runtime_environment(
+                    environment["before"], environment["after"], wall_ms,
+                    receipt["host"]["cpu_affinity"],
                     receipt["host"]["host_logical_cpus"],
-                    manifest["environment_policy"],
-                    receipt["configuration"].get("performance_policy") == "required",
+                    manifest["environment_policy"], False,
                 )
-                if (environment["decision"] != expected_decision or
-                        inner["environment"] != expected_decision):
+                if (canonical_json(environment["decision"]) !=
+                        canonical_json(expected_decision) or
+                        canonical_json(inner["environment"]) !=
+                        canonical_json(expected_decision)):
                     raise QualificationError(
                         f"{kind} repetition {repetition} environment decision "
                         "differs from raw artifact"
                     )
+            batch_path = _batch_environment_artifact_path(kind, repetition)
+            batch = _load_json(root / batch_path)
+            _exact_dict(
+                batch, {
+                    "schema", "scope", "wall_ms", "gated_wall_ms",
+                    "before", "after", "decision",
+                },
+                f"{kind} batch environment artifact",
+            )
+            if (batch["schema"] != ENVIRONMENT_SCHEMA or
+                    batch["scope"] != "performance-batch"):
+                raise QualificationError(
+                    f"{kind} batch environment artifact schema is unsupported"
+                )
+            _verify_controller_snapshot_claim(
+                batch["before"], receipt["host"],
+                f"{kind} batch environment before",
+            )
+            _verify_controller_snapshot_claim(
+                batch["after"], receipt["host"],
+                f"{kind} batch environment after",
+            )
+            if (batch["gated_wall_ms"] != gated_wall_ms or
+                    run["metrics"]["wall_ms"] != gated_wall_ms):
+                raise QualificationError(
+                    f"{kind} batch wall evidence differs from raw artifacts"
+                )
+            _validate_batch_wall_evidence(
+                batch["wall_ms"], gated_wall_ms,
+                definition["measurement_iterations"],
+                manifest["environment_policy"],
+            )
+            expected_batch = _evaluate_runtime_environment(
+                batch["before"], batch["after"], gated_wall_ms,
+                receipt["host"]["cpu_affinity"],
+                receipt["host"]["host_logical_cpus"],
+                manifest["environment_policy"],
+                receipt["configuration"].get("performance_policy") == "required",
+            )
+            if (canonical_json(batch["decision"]) !=
+                    canonical_json(expected_batch) or
+                    canonical_json(run["environment"]) !=
+                    canonical_json(expected_batch) or
+                    run["environment_artifact"] != batch_path):
+                raise QualificationError(
+                    f"{kind} batch environment decision differs from raw artifact"
+                )
 
 
 def verify_receipt(
@@ -2050,6 +2824,8 @@ def verify_receipt(
                 "workloads": observations["workloads"],
             }
             _verify_raw_claims(observed, root, manifest)
+        elif _idle_preflight_artifact_path() in artifact_paths:
+            _verify_idle_preflight_claim(receipt, root, manifest)
         return receipt
     if receipt.get("schema") == CALIBRATION_SCHEMA:
         _validate_calibration_payload(receipt, manifest)
@@ -2192,6 +2968,7 @@ def verify_bootstrap_promotion(
         "docs/TODO.md",
         "scripts/determinism_workloads.json",
         "scripts/run_determinism_qualification.py",
+        "scripts/run_in_measurement_cgroup.py",
         "tests/CMakeLists.txt",
         "tests/DeterminismQualificationTest.py",
         "tests/DeterminismWorkflowTest.py",
@@ -2525,6 +3302,7 @@ def toolchain_identity(
         "ninja": _tool_identity(ninja, "Ninja"),
         "c_compiler": _tool_identity(c_compiler, "C compiler"),
         "cxx_compiler": _tool_identity(cxx_compiler, "C++ compiler"),
+        "python": _tool_identity(Path(sys.executable).resolve(), "Python"),
     }
     _validate_toolchain(value, "toolchain")
     return value
@@ -2769,7 +3547,190 @@ def _cpu_uclamp_identity(
     return UCLAMP_SOURCE_PROC, minimum, maximum
 
 
-def host_identity(class_id: str) -> dict[str, Any]:
+def _parse_cpu_list(value: str, label: str) -> list[int]:
+    if not isinstance(value, str) or not value or len(value) > 4096:
+        raise QualificationError(f"{label} is malformed")
+    cpus: list[int] = []
+    for item in value.split(","):
+        if re.fullmatch(r"[0-9]{1,5}(?:-[0-9]{1,5})?", item) is None:
+            raise QualificationError(f"{label} is malformed")
+        bounds = [int(part) for part in item.split("-", 1)]
+        start = bounds[0]
+        finish = bounds[-1]
+        if finish < start or finish > 65535:
+            raise QualificationError(f"{label} is malformed")
+        cpus.extend(range(start, finish + 1))
+        if len(cpus) > 65536:
+            raise QualificationError(f"{label} is malformed")
+    if cpus != sorted(set(cpus)):
+        raise QualificationError(f"{label} is malformed")
+    return cpus
+
+
+def _parse_cgroup_uclamp(
+    value: str, label: str, allow_maximum_token: bool = False,
+) -> int:
+    if allow_maximum_token and value == "max":
+        return 1024
+    if re.fullmatch(r"(?:0|100)\.00", value) is None:
+        raise QualificationError(f"{label} is not pinned")
+    return 1024 if value == "100.00" else 0
+
+
+def _measurement_environment_mode(
+    performance_policy: str, measurement_cgroup: Path | None,
+) -> str:
+    if performance_policy not in {"required", "record-only"}:
+        raise QualificationError("performance policy is malformed")
+    return (
+        MEASUREMENT_ENVIRONMENT_EXCLUSIVE
+        if measurement_cgroup is not None
+        else MEASUREMENT_ENVIRONMENT_UNAVAILABLE
+    )
+
+
+def _measurement_cgroup_identity(
+    measurement_cgroup: Path, controller_affinity: list[int],
+    authority_root: Path = Path("/sys/fs/cgroup"),
+) -> dict[str, Any]:
+    try:
+        authority = authority_root.resolve(strict=True)
+        resolved = measurement_cgroup.resolve(strict=True)
+        resolved.relative_to(authority)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        raise QualificationError("measurement cgroup is unavailable") from error
+    if resolved == authority or not resolved.is_dir():
+        raise QualificationError("measurement cgroup is not a dedicated child")
+    effective = _parse_cpu_list(
+        _telemetry_text(
+            resolved / "cpuset.cpus.effective",
+            "measurement effective CPU set",
+        ),
+        "measurement effective CPU set",
+    )
+    exclusive = _parse_cpu_list(
+        _telemetry_text(
+            resolved / "cpuset.cpus.exclusive.effective",
+            "measurement exclusive CPU set",
+        ),
+        "measurement exclusive CPU set",
+    )
+    if effective != exclusive:
+        raise QualificationError(
+            "measurement cgroup exclusive CPU set differs from effective set"
+        )
+    partition = _telemetry_text(
+            resolved / "cpuset.cpus.partition",
+            "measurement cpuset partition",
+            128,
+    )
+    if partition != "isolated":
+        raise QualificationError(
+            "measurement cgroup partition is not isolated"
+        )
+    controller = sorted(controller_affinity)
+    if (not controller or controller != sorted(set(controller)) or
+            set(controller) & set(effective)):
+        raise QualificationError(
+            "measurement controller affinity overlaps isolated CPUs"
+        )
+    membership_raw = _telemetry_bytes(
+        resolved / "cgroup.procs", 64 * 1024,
+        "measurement cgroup membership",
+    )
+    try:
+        membership = membership_raw.decode("ascii", errors="strict").strip()
+    except UnicodeError as error:
+        raise QualificationError(
+            "measurement cgroup membership is malformed"
+        ) from error
+    if membership:
+        raise QualificationError("measurement cgroup is not empty")
+    events = _parse_named_counters(
+        _telemetry_bytes(
+            resolved / "cgroup.events", 64 * 1024,
+            "measurement cgroup events",
+        ),
+        "measurement cgroup events", {"populated", "frozen"},
+    )
+    if events["populated"] != 0 or events["frozen"] != 0:
+        raise QualificationError(
+            "measurement cgroup or descendant is populated or frozen"
+        )
+    uclamp_minimum = _parse_cgroup_uclamp(
+        _telemetry_text(
+            resolved / "cpu.uclamp.min", "measurement cgroup uclamp min",
+            128,
+        ),
+        "measurement cgroup uclamp min",
+    )
+    uclamp_maximum = _parse_cgroup_uclamp(
+        _telemetry_text(
+            resolved / "cpu.uclamp.max", "measurement cgroup uclamp max",
+            128,
+        ),
+        "measurement cgroup uclamp max", True,
+    )
+    if uclamp_minimum != 1024 or uclamp_maximum != 1024:
+        raise QualificationError(
+            "measurement cgroup CPU utilization clamp is not pinned"
+        )
+    ancestor_uclamp_max: list[int] = []
+    ancestor = resolved.parent
+    while ancestor != authority:
+        try:
+            ancestor.relative_to(authority)
+        except ValueError as error:
+            raise QualificationError(
+                "measurement cgroup ancestor escapes its authority root"
+            ) from error
+        maximum = _parse_cgroup_uclamp(
+            _telemetry_text(
+                ancestor / "cpu.uclamp.max",
+                "measurement cgroup ancestor uclamp max", 128,
+            ),
+            "measurement cgroup ancestor uclamp max", True,
+        )
+        if maximum != 1024:
+            raise QualificationError(
+                "measurement cgroup ancestor caps CPU utilization"
+            )
+        ancestor_uclamp_max.append(maximum)
+        ancestor = ancestor.parent
+    return {
+        "path": resolved,
+        "cpus": effective,
+        "exclusive_cpus": exclusive,
+        "partition": partition,
+        "uclamp_min": uclamp_minimum,
+        "uclamp_max": uclamp_maximum,
+        "ancestor_uclamp_max": ancestor_uclamp_max,
+        "populated": events["populated"],
+        "frozen": events["frozen"],
+    }
+
+
+def _require_measurement_environment(
+    performance_policy: str, measurement_cgroup: Path | None,
+    controller_affinity: list[int],
+) -> dict[str, Any] | None:
+    mode = _measurement_environment_mode(performance_policy, measurement_cgroup)
+    if mode == MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
+        if performance_policy == "required":
+            raise QualificationError(
+                "required performance evidence needs an exclusive measurement cgroup"
+            )
+        return None
+    assert measurement_cgroup is not None
+    return _measurement_cgroup_identity(
+        measurement_cgroup, controller_affinity
+    )
+
+
+def host_identity(
+    class_id: str, performance_policy: str = "record-only",
+    measurement_cgroup: Path | None = None,
+) -> dict[str, Any]:
     if IDENTIFIER.fullmatch(class_id) is None:
         raise QualificationError("hardware class id is invalid")
     cpu_model = platform.processor().strip()
@@ -2797,24 +3758,52 @@ def host_identity(class_id: str) -> dict[str, Any]:
         except (OSError, ValueError):
             memory_bytes = 1
     try:
-        cpu_affinity = sorted(os.sched_getaffinity(0))
+        controller_affinity = sorted(os.sched_getaffinity(0))
     except AttributeError:
-        cpu_affinity = []
-        affinity_source = AFFINITY_SOURCE_UNAVAILABLE
+        controller_affinity = []
     except OSError as error:
         raise QualificationError(
             "cannot read effective CPU affinity"
         ) from error
-    else:
-        affinity_source = AFFINITY_SOURCE_SCHED
-    if affinity_source == AFFINITY_SOURCE_SCHED and not cpu_affinity:
+    if not controller_affinity and performance_policy == "required":
         raise QualificationError("effective CPU affinity is empty")
+    measurement = _require_measurement_environment(
+        performance_policy, measurement_cgroup, controller_affinity
+    )
+    system_uclamp_minimum, system_uclamp_maximum = _system_uclamp_limits(
+        Path("/proc"), allow_unavailable=measurement is None
+    )
+    _validate_system_uclamp_limits(
+        system_uclamp_minimum, system_uclamp_maximum,
+        "host system CPU utilization clamp",
+        performance_policy == "required",
+    )
+    if measurement is None:
+        cpu_affinity = controller_affinity
+        affinity_source = (
+            AFFINITY_SOURCE_SCHED if controller_affinity
+            else AFFINITY_SOURCE_UNAVAILABLE
+        )
+        measurement_environment = MEASUREMENT_ENVIRONMENT_UNAVAILABLE
+        uclamp_source, uclamp_minimum, uclamp_maximum = _cpu_uclamp_identity()
+        uclamp_ancestor_max: list[int] = []
+        measurement_populated = None
+        measurement_frozen = None
+    else:
+        cpu_affinity = measurement["cpus"]
+        affinity_source = AFFINITY_SOURCE_CGROUP
+        measurement_environment = MEASUREMENT_ENVIRONMENT_EXCLUSIVE
+        uclamp_source = UCLAMP_SOURCE_CGROUP
+        uclamp_minimum = measurement["uclamp_min"]
+        uclamp_maximum = measurement["uclamp_max"]
+        uclamp_ancestor_max = measurement["ancestor_uclamp_max"]
+        measurement_populated = measurement["populated"]
+        measurement_frozen = measurement["frozen"]
     logical_cpus = len(cpu_affinity) if cpu_affinity else (os.cpu_count() or 1)
     host_logical_cpus = os.cpu_count() or logical_cpus
     if (logical_cpus > host_logical_cpus or
             (cpu_affinity and cpu_affinity[-1] >= host_logical_cpus)):
         raise QualificationError("effective CPU topology is malformed")
-    uclamp_source, uclamp_minimum, uclamp_maximum = _cpu_uclamp_identity()
     return {
         "class_id": class_id,
         "os": f"{platform.system()} {platform.release()}",
@@ -2827,6 +3816,13 @@ def host_identity(class_id: str) -> dict[str, Any]:
         "cpu_uclamp_source": uclamp_source,
         "cpu_uclamp_min": uclamp_minimum,
         "cpu_uclamp_max": uclamp_maximum,
+        "cpu_uclamp_ancestor_max": uclamp_ancestor_max,
+        "system_uclamp_min_limit": system_uclamp_minimum,
+        "system_uclamp_max_limit": system_uclamp_maximum,
+        "controller_cpu_affinity": controller_affinity,
+        "measurement_environment": measurement_environment,
+        "measurement_cgroup_populated": measurement_populated,
+        "measurement_cgroup_frozen": measurement_frozen,
         "memory_bytes": int(memory_bytes),
     }
 
@@ -3750,7 +4746,15 @@ def _run_artifact_paths(
         path
         for iteration in range(1, measurement_iterations + 1)
         for path in _iteration_artifact_paths(kind, repetition, iteration)
-    ]
+    ] + [_batch_environment_artifact_path(kind, repetition)]
+
+
+def _batch_environment_artifact_path(kind: str, repetition: int) -> str:
+    return f"raw/{kind}/run-{repetition:02d}/batch-environment.json"
+
+
+def _idle_preflight_artifact_path() -> str:
+    return "raw/environment-idle-preflight.json"
 
 
 def _artifact(path: str, data: bytes) -> dict[str, Any]:
@@ -3933,6 +4937,39 @@ def _collect_failed_run_artifacts(
     return retained
 
 
+def run_idle_preflight(
+    host: dict[str, Any], performance_policy: str,
+    measurement_cgroup: Path | None,
+) -> tuple[dict[str, Any], bytes]:
+    affinity = host["cpu_affinity"]
+    before = _capture_environment(
+        affinity, measurement_cgroup=measurement_cgroup,
+        expected_controller_affinity=host["controller_cpu_affinity"],
+    )
+    started = time.monotonic_ns()
+    time.sleep(ENVIRONMENT_POLICY["idle_seconds"])
+    after = _capture_environment(
+        affinity, measurement_cgroup=measurement_cgroup,
+        expected_controller_affinity=host["controller_cpu_affinity"],
+    )
+    wall_ms = max(
+        1, (time.monotonic_ns() - started + 999_999) // 1_000_000
+    )
+    decision = _evaluate_idle_environment(
+        before, after, wall_ms, affinity, host["host_logical_cpus"],
+        ENVIRONMENT_POLICY, performance_policy == "required",
+    )
+    raw = canonical_json({
+        "schema": ENVIRONMENT_SCHEMA,
+        "scope": "idle-preflight",
+        "wall_ms": wall_ms,
+        "before": before,
+        "after": after,
+        "decision": decision,
+    })
+    return decision, raw
+
+
 def run_once(
     binary: Path,
     time_binary: Path,
@@ -3942,6 +4979,7 @@ def run_once(
     scratch: Path,
     performance_policy: str,
     host: dict[str, Any],
+    measurement_cgroup: Path | None,
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     definition = prepared["definition"]
     kind = definition["kind"]
@@ -3949,6 +4987,11 @@ def run_once(
     artifact_data: dict[str, bytes] = {}
     inner_runs: list[dict[str, Any]] = []
     affinity = host["cpu_affinity"]
+    batch_before = _capture_environment(
+        affinity, measurement_cgroup=measurement_cgroup,
+        expected_controller_affinity=host["controller_cpu_affinity"],
+    )
+    batch_started = time.monotonic_ns()
     for iteration in range(1, iterations + 1):
         prefix = f"{kind}-{repetition:02d}-{iteration:02d}"
         report_path = scratch / f"{prefix}.json"
@@ -3960,11 +5003,25 @@ def run_once(
             str(time_binary), "-v", "-o", str(time_path), "--",
             str(binary), *prepared["args"], "--json", str(report_path),
         ]
+        if measurement_cgroup is not None:
+            command = [
+                sys.executable,
+                str(ROOT / "scripts" / "run_in_measurement_cgroup.py"),
+                "--cgroup", str(measurement_cgroup),
+                "--cpus", ",".join(str(cpu) for cpu in affinity),
+                "--", *command,
+            ]
         environment = os.environ.copy()
         environment.update({"LC_ALL": "C", "LANG": "C", "TZ": "UTC"})
-        if sorted(os.sched_getaffinity(0)) != affinity:
-            raise QualificationError("measurement CPU affinity drift")
-        before = _capture_environment(affinity)
+        if (performance_policy == "required" and
+                set(os.sched_getaffinity(0)) & set(affinity)):
+            raise QualificationError(
+                "measurement controller affinity overlaps isolated CPUs"
+            )
+        before = _capture_environment(
+            affinity, measurement_cgroup=measurement_cgroup,
+            expected_controller_affinity=host["controller_cpu_affinity"],
+        )
         try:
             completed = _run_bounded_process(
                 command, environment, definition["wall_timeout_seconds"],
@@ -3974,9 +5031,15 @@ def run_once(
             raise QualificationError(
                 f"{kind} repetition {repetition} iteration {iteration} {error}"
             ) from error
-        if sorted(os.sched_getaffinity(0)) != affinity:
-            raise QualificationError("measurement CPU affinity drift")
-        after = _capture_environment(affinity)
+        if (performance_policy == "required" and
+                set(os.sched_getaffinity(0)) & set(affinity)):
+            raise QualificationError(
+                "measurement controller affinity overlaps isolated CPUs"
+            )
+        after = _capture_environment(
+            affinity, measurement_cgroup=measurement_cgroup,
+            expected_controller_affinity=host["controller_cpu_affinity"],
+        )
         if completed.returncode not in (0, 1):
             raise QualificationError(
                 f"{kind} repetition {repetition} iteration {iteration} analyzer "
@@ -4010,13 +5073,14 @@ def run_once(
             (definition["tu_timeout_seconds"], definition["tu_memory_mib"]),
         )
         semantic_sha = digest_json(projection)
-        decision = _evaluate_environment(
-            before, after, cpu_ms, wall_ms,
-            affinity, host["host_logical_cpus"], ENVIRONMENT_POLICY,
-            performance_policy == "required",
+        decision = _evaluate_runtime_environment(
+            before, after, wall_ms, affinity,
+            host["host_logical_cpus"], ENVIRONMENT_POLICY, False,
         )
         environment_raw = canonical_json({
-            "schema": "codeskeptic-determinism-environment-v1",
+            "schema": ENVIRONMENT_SCHEMA,
+            "scope": "inner-record-only",
+            "wall_ms": wall_ms,
             "before": before,
             "after": after,
             "decision": decision,
@@ -4046,8 +5110,36 @@ def run_once(
         raise QualificationError(
             f"{kind} repetition {repetition} inner measurement drift"
         )
+    batch_after = _capture_environment(
+        affinity, measurement_cgroup=measurement_cgroup,
+        expected_controller_affinity=host["controller_cpu_affinity"],
+    )
+    batch_wall_ms = max(
+        1, (time.monotonic_ns() - batch_started + 999_999) // 1_000_000
+    )
+    gated_wall_ms = sum(
+        item["metrics"]["wall_ms"] for item in inner_runs
+    )
+    _validate_batch_wall_evidence(
+        batch_wall_ms, gated_wall_ms, iterations, ENVIRONMENT_POLICY
+    )
+    batch_decision = _evaluate_runtime_environment(
+        batch_before, batch_after, gated_wall_ms, affinity,
+        host["host_logical_cpus"], ENVIRONMENT_POLICY,
+        performance_policy == "required",
+    )
+    batch_path = _batch_environment_artifact_path(kind, repetition)
+    artifact_data[batch_path] = canonical_json({
+        "schema": ENVIRONMENT_SCHEMA,
+        "scope": "performance-batch",
+        "wall_ms": batch_wall_ms,
+        "gated_wall_ms": gated_wall_ms,
+        "before": batch_before,
+        "after": batch_after,
+        "decision": batch_decision,
+    })
     metrics = {
-        "wall_ms": sum(item["metrics"]["wall_ms"] for item in inner_runs),
+        "wall_ms": gated_wall_ms,
         "cpu_ms": sum(item["metrics"]["cpu_ms"] for item in inner_runs),
         "peak_rss_kib": max(
             item["metrics"]["peak_rss_kib"] for item in inner_runs
@@ -4061,9 +5153,9 @@ def run_once(
         "metrics": metrics,
         "measurement_iterations": iterations,
         "batch_valid": batch_valid,
-        "environment_valid": all(
-            item["environment"]["valid"] for item in inner_runs
-        ),
+        "environment_valid": batch_decision["valid"],
+        "environment": batch_decision,
+        "environment_artifact": batch_path,
         "inner_runs": inner_runs,
         "artifacts": _run_artifact_paths(kind, repetition, iterations),
     }, artifact_data
@@ -4155,12 +5247,11 @@ def _measurement_failures(
                     metric="cpu_ms", statistic="batch",
                     current=run["metrics"]["cpu_ms"], baseline=minimum_cpu,
                 ))
-            for inner in run["inner_runs"]:
-                for message in inner["environment"]["violations"]:
-                    failures.append(_failure_record(
-                        "environment-invalid", message, workload=kind,
-                        repetition=repetition, iteration=inner["iteration"],
-                    ))
+            for message in run["environment"]["violations"]:
+                failures.append(_failure_record(
+                    "environment-invalid", message, workload=kind,
+                    repetition=repetition,
+                ))
     return failures
 
 
@@ -4447,7 +5538,13 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
         raise QualificationError("requested revision differs from repository HEAD")
     if _git_output(repo, ["status", "--porcelain"]):
         raise QualificationError("tracked repository state is dirty")
-    host = host_identity(args.hardware_class)
+    measurement_cgroup = (
+        args.measurement_cgroup.resolve()
+        if args.measurement_cgroup is not None else None
+    )
+    host = host_identity(
+        args.hardware_class, args.performance_policy, measurement_cgroup
+    )
     toolchain = toolchain_identity(
         binary, clang, time_binary, cmake, ninja, c_compiler, cxx_compiler
     )
@@ -4492,6 +5589,15 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
                 workload["definition"]["kind"]: workload["input"]
                 for workload in prepared
             }
+            preflight, preflight_raw = run_idle_preflight(
+                host, args.performance_policy, measurement_cgroup
+            )
+            _add_artifacts_bounded(
+                artifacts,
+                {_idle_preflight_artifact_path(): preflight_raw},
+            )
+            if not preflight["valid"]:
+                raise QualificationPreflightError(preflight["violations"])
             runs_by_kind: dict[str, list[dict[str, Any]]] = {
                 kind: [] for kind in KINDS
             }
@@ -4502,6 +5608,7 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
                         run, run_artifacts = run_once(
                             binary, time_binary, workload, repetition, repo,
                             scratch, args.performance_policy, host,
+                            measurement_cgroup,
                         )
                     except QualificationError:
                         _add_artifacts_bounded(
@@ -4574,6 +5681,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--revision")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--hardware-class")
+    parser.add_argument("--measurement-cgroup", type=Path)
     parser.add_argument("--repetitions", type=int)
     parser.add_argument("--clang", type=Path, default=Path("/usr/bin/clang-20"))
     parser.add_argument("--time-binary", type=Path, default=Path("/usr/bin/time"))
@@ -4609,7 +5717,8 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("baseline promotion verification is an exclusive mode")
             run_only = (
                 args.binary, args.build_path, args.revision, args.output,
-                args.hardware_class, args.repetitions, args.release_workspace,
+                args.hardware_class, args.measurement_cgroup, args.repetitions,
+                args.release_workspace,
                 args.release_source, args.release_build,
                 args.candidate_baseline_output, args.calibration_output,
                 args.calibration_evidence_path, args.promotion_reason,
@@ -4638,7 +5747,8 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("bootstrap promotion verification is an exclusive mode")
             run_only = (
                 args.binary, args.build_path, args.revision, args.output,
-                args.hardware_class, args.repetitions, args.release_workspace,
+                args.hardware_class, args.measurement_cgroup, args.repetitions,
+                args.release_workspace,
                 args.release_source, args.release_build,
                 args.candidate_baseline_output, args.calibration_output,
                 args.calibration_evidence_path, args.promotion_reason,
@@ -4666,7 +5776,8 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("baseline-authority and receipt verification are exclusive")
             run_only = (
                 args.binary, args.repo_root, args.build_path, args.revision,
-                args.output, args.hardware_class, args.repetitions,
+                args.output, args.hardware_class, args.measurement_cgroup,
+                args.repetitions,
                 args.release_workspace, args.release_source, args.release_build,
                 args.candidate_baseline_output, args.calibration_output,
                 args.calibration_evidence_path, args.promotion_reason,
@@ -4694,7 +5805,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.verify_receipt is not None:
             run_only = (
                 args.binary, args.build_path, args.revision,
-                args.output, args.hardware_class, args.repetitions,
+                args.output, args.hardware_class, args.measurement_cgroup,
+                args.repetitions,
                 args.release_workspace, args.release_source, args.release_build,
                 args.candidate_baseline_output, args.calibration_output,
                 args.calibration_evidence_path, args.promotion_reason,
@@ -4756,6 +5868,10 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("calibration/promotion options require a baseline promotion mode")
         if args.establish_baseline and args.candidate_baseline_output is not None:
             parser.error("initial establishment and candidate promotion are exclusive")
+        if promotion_mode and args.performance_policy != "required":
+            parser.error(
+                "baseline establishment or promotion requires required performance policy"
+            )
         if not args.establish_baseline and args.baseline_authority_root is None:
             parser.error("qualification requires --baseline-authority-root")
         receipt = run_qualification(args)
