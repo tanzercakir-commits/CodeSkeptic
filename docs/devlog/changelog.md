@@ -76,7 +76,10 @@
 - Integrated exact-source local validation passes `30/30` determinism
   contracts, `4/4` workflow contracts, `6/6` stress contracts,
   `1280/1280` direct C++ tests, and `1299/1299` full CTest tests without
-  skips or failures.
+  CTest failures. Nested local contract suites report seven expected skips
+  (`SanitizerContract` three and `FuzzingContract` four) because their retained
+  evidence/build directories are not materialized in this integration worktree;
+  hosted exact-head sanitizer and fuzz jobs remain required.
   Independent final review, publication to the feature branch, and exact-head
   hosted Linux, sanitizer, Windows, macOS, and determinism gates remain
   required; this checkpoint does not close `CS-P10-07` or write protected
