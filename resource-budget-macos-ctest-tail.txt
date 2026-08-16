@@ -1,0 +1,36 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1297: DeterminismQualificationContract
+1/1 Test #1297: DeterminismQualificationContract ...***Failed    6.30 sec
+...F......................
+======================================================================
+FAIL: test_build_cache_identity_is_workspace_independent_and_config_sensitive (__main__.DeterminismQualificationTest.test_build_cache_identity_is_workspace_independent_and_config_sensitive)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 934, in test_build_cache_identity_is_workspace_independent_and_config_sensitive
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        first["cmake_cache_canonical_sha256"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        relocated["cmake_cache_canonical_sha256"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 'f3f975c823d5545c8f965940e32231060f995c4fbc011998755907879bb20765' != 'ad76a9251a60526d39f8871edcb33d18745bca4c088444932c328e4acc758ecf'
+- f3f975c823d5545c8f965940e32231060f995c4fbc011998755907879bb20765
++ ad76a9251a60526d39f8871edcb33d18745bca4c088444932c328e4acc758ecf
+
+
+----------------------------------------------------------------------
+Ran 26 tests in 6.196s
+
+FAILED (failures=1)
+DETERMINISM_REJECTED_EVIDENCE_OK mode=verify
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   6.32 sec
+
+The following tests FAILED:
+	1297 - DeterminismQualificationContract (Failed)
+Errors while running CTest
