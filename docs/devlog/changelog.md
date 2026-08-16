@@ -73,12 +73,10 @@
   `109708657f8af0b84cf4effc19adeaeba5d73e0625de3a0ec38fa6e134258bdc`,
   and the 37-entry outer manifest SHA-256 is
   `63e22e4c521e725b7a2574918fe6232933d32394900b34900d0f06dd302b166b`.
-- Pre-integration exact-source validation passes `30/30` determinism
-  contracts, `4/4` workflow contracts, `6/6` stress contracts, and
-  `1280/1280` direct C++ tests. The first 1299-entry CTest pass reached
-  `1298/1299` and correctly rejected only the temporary source-authority branch
-  name as absent from generator-owned TODO state; final integration into the
-  already-listed feature branch and a fresh full CTest remain required.
+- Integrated exact-source local validation passes `30/30` determinism
+  contracts, `4/4` workflow contracts, `6/6` stress contracts,
+  `1280/1280` direct C++ tests, and `1299/1299` full CTest tests without
+  skips or failures.
   Independent final review, publication to the feature branch, and exact-head
   hosted Linux, sanitizer, Windows, macOS, and determinism gates remain
   required; this checkpoint does not close `CS-P10-07` or write protected
