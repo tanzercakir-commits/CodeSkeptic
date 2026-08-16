@@ -12,14 +12,14 @@
       "provenance": {
         "calibration": {
           "evidence_path": "docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64",
-          "receipt_sha256": "431743012f5be8fa9b39e2cc132611b449e8534dc246d121e4e07b8516209c6e"
+          "receipt_sha256": "09b6abf1c9e28b1826e988ce36d6da4ef5d4542e3550577c42b15ad096deb6c1"
         },
         "promotion": {
           "previous_baseline_sha256": null,
           "previous_profile_sha256": null,
-          "reason": "Initial Fedora LLVM 20 determinism and performance baseline on final source authority"
+          "reason": "Initial Fedora LLVM 20 canonical-cache determinism and performance baseline"
         },
-        "source_revision": "aeec85100006517b6b6028e99d326fb9f78dbafc",
+        "source_revision": "faa58c912f72e4e13df50290c5531641b3cccc68",
         "toolchain": {
           "analyzer": {
             "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
@@ -53,61 +53,61 @@
       },
       "workloads": {
         "real-repository": {
-          "input_identity_sha256": "7edb80606435e65ddfb00751bb168fac3c9ed778a9735fb7487162ce62b60a14",
+          "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 215630,
-              "median": 214555,
-              "min": 209660,
-              "p90": 215490
+              "max": 215740,
+              "median": 214975,
+              "min": 213190,
+              "p90": 215540
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 1304744,
-              "median": 1304058,
-              "min": 1303644,
-              "p90": 1304292
+              "max": 1304792,
+              "median": 1304364,
+              "min": 1303756,
+              "p90": 1304696
             },
             "wall_ms": {
               "count": 10,
-              "max": 209480,
-              "median": 208090,
-              "min": 203830,
-              "p90": 209090
+              "max": 209420,
+              "median": 208385,
+              "min": 207060,
+              "p90": 208940
             }
           },
           "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
           "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
         },
         "release-candidate": {
-          "input_identity_sha256": "0e466db722c4537e89532ba616f63c2d969918a62c31b540b238db3f9b52c230",
+          "input_identity_sha256": "3160e812602e101def583510cf363b928b102943721197a81d1fba1998706148",
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 32600,
-              "median": 32255,
-              "min": 31600,
+              "max": 32580,
+              "median": 32330,
+              "min": 31470,
               "p90": 32560
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 370692,
-              "median": 370540,
-              "min": 369840,
-              "p90": 370608
+              "max": 371896,
+              "median": 370286,
+              "min": 369956,
+              "p90": 370700
             },
             "wall_ms": {
               "count": 10,
-              "max": 31540,
-              "median": 31350,
-              "min": 30420,
-              "p90": 31510
+              "max": 31630,
+              "median": 31415,
+              "min": 30670,
+              "p90": 31610
             }
           },
-          "translation_unit_plan_sha256": "dbc05a469483a0f3120c63115ebce5778373bb12836e05b245723aaa8d148a2b",
+          "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
           "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
         },
         "unit": {
@@ -116,24 +116,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 750,
-              "median": 730,
-              "min": 680,
-              "p90": 750
+              "max": 770,
+              "median": 715,
+              "min": 690,
+              "p90": 740
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 88004,
-              "median": 87824,
-              "min": 87644,
-              "p90": 88000
+              "max": 88204,
+              "median": 87628,
+              "min": 87184,
+              "p90": 87912
             },
             "wall_ms": {
               "count": 10,
-              "max": 810,
-              "median": 790,
-              "min": 750,
-              "p90": 810
+              "max": 820,
+              "median": 780,
+              "min": 760,
+              "p90": 800
             }
           },
           "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
@@ -142,18 +142,18 @@
       }
     }
   },
-  "schema": "codeskeptic-determinism-baseline-v1",
+  "schema": "codeskeptic-determinism-baseline-v2",
   "semantic_reference": {
     "real-repository": {
-      "input_identity_sha256": "7edb80606435e65ddfb00751bb168fac3c9ed778a9735fb7487162ce62b60a14",
+      "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
       "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
       "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
       "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
     },
     "release-candidate": {
-      "input_identity_sha256": "0e466db722c4537e89532ba616f63c2d969918a62c31b540b238db3f9b52c230",
+      "input_identity_sha256": "3160e812602e101def583510cf363b928b102943721197a81d1fba1998706148",
       "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
-      "translation_unit_plan_sha256": "dbc05a469483a0f3120c63115ebce5778373bb12836e05b245723aaa8d148a2b",
+      "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
       "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
     },
     "unit": {

@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "path": "raw/real-repository/run-01/report.json",
-      "sha256": "9e2eb18ff12ac4b1ed056e022bd5cc34c1aa72de9018ce0be4eb6150fb470ac4",
+      "sha256": "aa52979b3777bb35df67aad7a8bff577a5e5e084d3b7e43b61a3eec4cf218b33",
       "size": 21484
     },
     {
@@ -17,12 +17,12 @@
     },
     {
       "path": "raw/real-repository/run-01/time.txt",
-      "sha256": "49bf18c2f906be09d08f7ced57e37a690d3804446e1b22ab7205dbf1ae02e8b4",
-      "size": 975
+      "sha256": "ec9bc9be340fc13f7822e382d22c73cbc3ad870682eb81b7c6b872d4113041d9",
+      "size": 966
     },
     {
       "path": "raw/real-repository/run-02/report.json",
-      "sha256": "e901fde48079fcba95ba6678b0c2909166248df0e63e8062b852e65a9a14b5c9",
+      "sha256": "39e13a2a9abd94d56b5f058af74f80855ef557cf952791303c5db9ca6398b680",
       "size": 21484
     },
     {
@@ -37,12 +37,12 @@
     },
     {
       "path": "raw/real-repository/run-02/time.txt",
-      "sha256": "46c6762cc5189cc2fd152bcb9505806d26eeb7c7ed273062355e2e251e4046d6",
-      "size": 974
+      "sha256": "5d3da128787ae485a8178a9ebcaec9fd6dc70d42684e9e1e6652c6b660eed643",
+      "size": 967
     },
     {
       "path": "raw/real-repository/run-03/report.json",
-      "sha256": "36cff4f84250eef88b727a0549fcd3820acda46edbc14c8f1be02bddfc225367",
+      "sha256": "c2335fbb3b23ada32a59394615ed3066f3a8826a7fce7831e53ef1dc8ac07f54",
       "size": 21483
     },
     {
@@ -57,13 +57,13 @@
     },
     {
       "path": "raw/real-repository/run-03/time.txt",
-      "sha256": "de86fc718b889c0a0f58a7f82549e84dadb6a72ac72305d3b3e49fdaa81b0155",
-      "size": 974
+      "sha256": "fb0b70507b81e6947ad9dcd1ed71145210f137b9245851c712fd22d28d80dfaf",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-04/report.json",
-      "sha256": "78178b508c32342f516ef68f98432dc291d27b1966be7b0b0c57acf03ead92af",
-      "size": 21485
+      "sha256": "8156b5025549c34748c7a7cc9a7d261b6f93cf28ead57214b0bd0e94cdd204e8",
+      "size": 21484
     },
     {
       "path": "raw/real-repository/run-04/stderr.log",
@@ -77,12 +77,12 @@
     },
     {
       "path": "raw/real-repository/run-04/time.txt",
-      "sha256": "64242a85c967ef97319b2e745bd8ca10c88970f51e19b1f20ffe82b397a2d6fd",
-      "size": 974
+      "sha256": "303af748d4948f6ddafde11b449cca8c533fe996fcccfd0879e9366814e192e2",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-05/report.json",
-      "sha256": "4ffa4cc0e9962c25cc4ae0bcceb268c9a1bcf0c567978a74ac74b7c85fc6f015",
+      "sha256": "e075fc346f4c9d5b012fcd103c9ba9e48e77b79452dcaf5626b5f11ace0feeb7",
       "size": 21483
     },
     {
@@ -97,12 +97,12 @@
     },
     {
       "path": "raw/real-repository/run-05/time.txt",
-      "sha256": "a3f285d5716f041a5d0cf21e37aa94ff27d4b477fa29050bd598026ed114516d",
-      "size": 974
+      "sha256": "e03eacc17b0566c5babc47d677d353aaf826cd5c56c2b1b8ee818f069a3c56e9",
+      "size": 969
     },
     {
       "path": "raw/real-repository/run-06/report.json",
-      "sha256": "fda0ed8ded5cbc730965e6455b3cf58b13050a0817ccfeeff6b36007b45ce93c",
+      "sha256": "1acb3309ac76ff4f0105695d07f5881df13e48ae5b6da777a98f91556d80145c",
       "size": 21484
     },
     {
@@ -117,12 +117,12 @@
     },
     {
       "path": "raw/real-repository/run-06/time.txt",
-      "sha256": "4e3fce0e0b6012fddd0866d2ec6f059d4169d99043938e27efd7299501638f3e",
-      "size": 974
+      "sha256": "cecf96cc3d8082976e620c6a3d2651e89c9f5e6e2ce610fe1e7c97dba23adb12",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-07/report.json",
-      "sha256": "f6af4934eef06e3acb6218a466557e10c93fa1b92122be4b96ee71b0ff42cce8",
+      "sha256": "846db52fed5025fba5d6cb19873d23006c20523a8caec13fd488b3c1e7053901",
       "size": 21484
     },
     {
@@ -137,12 +137,12 @@
     },
     {
       "path": "raw/real-repository/run-07/time.txt",
-      "sha256": "27aa32443a501ae9e6b277e98a86b690cdea142df177eb4f8b8aec75a6bbd040",
-      "size": 974
+      "sha256": "e025d43be574ffba330530fe6e01c09c71da6397e2dddf63125b470a749ab2bb",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-08/report.json",
-      "sha256": "0d8bfa2ea66dddbed81802ec45cf9bc7530eb574a9c348e33c08bee4380c39ff",
+      "sha256": "1f2d82197633e32ef8cc7325eacddeec51290fd582e868a579e917508464400b",
       "size": 21484
     },
     {
@@ -157,12 +157,12 @@
     },
     {
       "path": "raw/real-repository/run-08/time.txt",
-      "sha256": "c7fecf1d10ebd08169cb541c2a4c6e8d90880827e2a6e318a1307e77c076c269",
-      "size": 974
+      "sha256": "e9440ec5310dda7f70fab90e34a0531575f63543ec0e688b2eee66d0826f6776",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-09/report.json",
-      "sha256": "bd0da32511fab770b02542ec65db6e894b2e1dd38a8bf2a00e4253320d3a684c",
+      "sha256": "f68d580e495241aa25f719e6252d0ae0f7323a60e4c7e2e1f21635a1d29357ff",
       "size": 21484
     },
     {
@@ -177,12 +177,12 @@
     },
     {
       "path": "raw/real-repository/run-09/time.txt",
-      "sha256": "e78b13cb6088df6e6f869f4899914f85f84ca87b174d83390da89395ccfe5f0c",
-      "size": 974
+      "sha256": "42315a2c797f12720fa1a7b2e509e8638a2fae6c9d3319e230edb619a180cf71",
+      "size": 964
     },
     {
       "path": "raw/real-repository/run-10/report.json",
-      "sha256": "b16f7bc404ebe786000c6905167805e15d890425a3b8232c1694b7bb686409d0",
+      "sha256": "083567a370033f37e2bf42e56cbdffecc70ca4702263801543047dd63f4b5fa4",
       "size": 21484
     },
     {
@@ -197,13 +197,13 @@
     },
     {
       "path": "raw/real-repository/run-10/time.txt",
-      "sha256": "d69cf5df833a789d86fb3dc396ac52b32b4bdd1cdf06d3316070b123d0c9cfb4",
-      "size": 974
+      "sha256": "bcc375291d6338bd6bf91aed5f35fdae0734da41a37679768abd2109a9946783",
+      "size": 964
     },
     {
       "path": "raw/release-candidate/run-01/report.json",
-      "sha256": "15faeedf461f15094fe0b46563e2b7309dc049d86dd56302db06cf6913ccb828",
-      "size": 23843
+      "sha256": "cee9f69fefd21a976ea8ceed727aaeeabf9ee25c27c78e3aaa16dfc250d03142",
+      "size": 29042
     },
     {
       "path": "raw/release-candidate/run-01/stderr.log",
@@ -217,13 +217,13 @@
     },
     {
       "path": "raw/release-candidate/run-01/time.txt",
-      "sha256": "3230b6c509616a54b73edc55c7bb31103648a7fbfc254654fb30bbb7896a0ee9",
-      "size": 1060
+      "sha256": "2dd765b46e4aa059403b0f5abc5fea2fa97b28584097660e8a91d11b8913443a",
+      "size": 1205
     },
     {
       "path": "raw/release-candidate/run-02/report.json",
-      "sha256": "96828fe2462cf343594ab19bb81c3ab96a6e23b21035dd2a6d419a3e6905e8be",
-      "size": 23841
+      "sha256": "f9e5927eaba3790ed764f77a09619e4424f59bd98fa4a4a91e18a2c113ce5c8e",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-02/stderr.log",
@@ -237,13 +237,13 @@
     },
     {
       "path": "raw/release-candidate/run-02/time.txt",
-      "sha256": "349b3ad7dce6dc1ee0ccca9c7330cd8f54e744590463a9bd4860680268862775",
-      "size": 1058
+      "sha256": "cf49b4fd044bd33907b11cc12176cf957afa34c7fe0f8f2992a2437d7a9bf143",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-03/report.json",
-      "sha256": "239db3ce0c703ac5eb04b5ff478c4f1914280f1fe9b6605cbd3bb56ce41df8b5",
-      "size": 23843
+      "sha256": "8eb38a2efcae5d4d15afc56b683153270da305e6def05d6ca7a28f83d1c0de56",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-03/stderr.log",
@@ -257,13 +257,13 @@
     },
     {
       "path": "raw/release-candidate/run-03/time.txt",
-      "sha256": "7e7c018e482eabc679f97a5750570b51acb8e385f47e62ed4fb6bfd9f9e4612d",
-      "size": 1058
+      "sha256": "170c1dedd69cd124ed33034e0c0255145ccb6eb6ad460a562df9a59efd9b1a3f",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-04/report.json",
-      "sha256": "ce903397da2c8d6335de3d4e31503098d2d6353eb0765bb0039644c0a77e1457",
-      "size": 23843
+      "sha256": "f08134472bc4bc3b4dff2356de3ff09e4b7a88c0564cf8947c19cba4d5445957",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-04/stderr.log",
@@ -277,13 +277,13 @@
     },
     {
       "path": "raw/release-candidate/run-04/time.txt",
-      "sha256": "1fe44d1bde2f4e2e1e88afa811eb875d3749ae64b203654a3078ea262c5c61c2",
-      "size": 1058
+      "sha256": "9147f918be78528bd0048c2463cc72bd72ae4c6f277f001d5abde1244937270b",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-05/report.json",
-      "sha256": "f57aa1cecd9642930ee18c4f151da0e7c88759c7ea1d577212c58b606e83bd83",
-      "size": 23843
+      "sha256": "9e7f1a27986dcb53cd0ffe842a5d3c8db34facaca14623bff77b4a3941922000",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-05/stderr.log",
@@ -297,13 +297,13 @@
     },
     {
       "path": "raw/release-candidate/run-05/time.txt",
-      "sha256": "c117afddd0498792215d5f472ad8960b34d08d67bb273c47a496669166bb3ddc",
-      "size": 1058
+      "sha256": "973bf2ed6327cf51676f4acbd053d2ec4e743207e3ad59f5ca0d928d3387f500",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-06/report.json",
-      "sha256": "35f56a65ee02853efe43f2ed1994fd1e2e980eacf37d78e3bbd79e07365bc21f",
-      "size": 23844
+      "sha256": "060f1df24570f34e989977a6dd48d84319d06f2703464ad0608c18280990d63a",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-06/stderr.log",
@@ -317,13 +317,13 @@
     },
     {
       "path": "raw/release-candidate/run-06/time.txt",
-      "sha256": "152c627ab52289c25d5ad23747415daa31745e852b3ef5890861cb376a636fa9",
-      "size": 1058
+      "sha256": "7032f4e63829185f280322d85470500ba40bbb14a5c13a8af52f2fdf295cbfa3",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-07/report.json",
-      "sha256": "1c60b028bff2872b92d8145031e32a9f2e938bb77b9c9a0dd78485e559261881",
-      "size": 23843
+      "sha256": "9def3c97c261e96e5c73012caf3dc5b229855cb46299cf5660821cdfbf18ac3d",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-07/stderr.log",
@@ -337,13 +337,13 @@
     },
     {
       "path": "raw/release-candidate/run-07/time.txt",
-      "sha256": "458160b4897481831463a27028445a460c525e66d057f539a9586679ac8b5076",
-      "size": 1058
+      "sha256": "44b4ccde8520f36f597ec23e8a7e89ca075eff3198cbf8793fa5d5d746a96603",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-08/report.json",
-      "sha256": "4c80269d77a3b48e1609dc724c564e72038fd4fe8b29e41acd6ef0e0039809c8",
-      "size": 23843
+      "sha256": "f8672bf567333e0d42bec02a4b3115f00cc6afac2ba25c2f0a81dcb2a47219ed",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-08/stderr.log",
@@ -357,13 +357,13 @@
     },
     {
       "path": "raw/release-candidate/run-08/time.txt",
-      "sha256": "eeb11b70d608dd2960f6a47d72f5bb342fa1ce19db526290b939b032c1b98c81",
-      "size": 1058
+      "sha256": "0b612b71d47846f96536ba6031aff18ea5a8e1e3709b969f9128b56201ef2349",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-09/report.json",
-      "sha256": "489547684bdfb88615603632b17e0e6742110d647dd5733df7d167ebb4903261",
-      "size": 23843
+      "sha256": "f9c898147a14d8175e1a5c57265af75fbc4f567bb4a8a9b3234bdd2f8a50cc10",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-09/stderr.log",
@@ -377,13 +377,13 @@
     },
     {
       "path": "raw/release-candidate/run-09/time.txt",
-      "sha256": "46baa4f434282b6c9d286d7a734a91f3eb4efc2d49862531fdd09fff324976ec",
-      "size": 1058
+      "sha256": "4ec9cf7b4aaddc376f4e69b11d0bfbb55c9ea80b9f5f7699a38cbff0cfdb27b6",
+      "size": 1203
     },
     {
       "path": "raw/release-candidate/run-10/report.json",
-      "sha256": "aff46a7d858f9f0236c09f75e3f085fcda4ee7907f460cc09faac24fca8f1426",
-      "size": 23843
+      "sha256": "434fac9deebbc55b8733c735a6cf20151e157410cb2e02f961afcf6f7a02b464",
+      "size": 29043
     },
     {
       "path": "raw/release-candidate/run-10/stderr.log",
@@ -397,12 +397,12 @@
     },
     {
       "path": "raw/release-candidate/run-10/time.txt",
-      "sha256": "a604b74c8235b457c1a7f60a825686d940abc654cb5eb18976a5655cd0c54c3d",
-      "size": 1058
+      "sha256": "84a8c13cf80b3a5da80d370ee246b95d84b337a5d3446c018202104d41b2b506",
+      "size": 1203
     },
     {
       "path": "raw/unit/run-01/report.json",
-      "sha256": "2c597e8cd9e93c825a695f46e76715eecd9ec7cc8bb56535777177363a6d5c3d",
+      "sha256": "43145e70a56632e367346353b13f1b31d2508c62956dc65327c7d79b8f209830",
       "size": 16698
     },
     {
@@ -417,12 +417,12 @@
     },
     {
       "path": "raw/unit/run-01/time.txt",
-      "sha256": "88ac23ac607364f138fdfc59500f1f36f1a84cebc4dcafb98535c54285fa186a",
-      "size": 1052
+      "sha256": "1198b5f1d8f566bc3a6bbf897715b42807c89dfe75ce9febb984bc3d70368dd6",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-02/report.json",
-      "sha256": "031a65501ac47b152dd5450e1f12fd9f5b0d07c1e84da95ae197b6ee9dd2703f",
+      "sha256": "a56e80359bc8af9c7fdedea9bf19a1bb54e0e329a4405ec2fef8444e542ff90d",
       "size": 16698
     },
     {
@@ -437,12 +437,12 @@
     },
     {
       "path": "raw/unit/run-02/time.txt",
-      "sha256": "1396c91fc5f305ee6918843e8808fddcb57398fc5f734ea8dacea24bd6ead1c9",
-      "size": 1052
+      "sha256": "6a3f15085ab99e5c24c043b9d99a66ccb635981ebfe713ae465b00c994a441f6",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-03/report.json",
-      "sha256": "015f893b35cc04b0839c122ac4f217fb764d66dd4dae161d8c277d1a4e394a67",
+      "sha256": "6b65ea0fc7f35ab383a6fce40ecd3101b587a5cbe23105f5851626ff8eaf2d81",
       "size": 16698
     },
     {
@@ -457,12 +457,12 @@
     },
     {
       "path": "raw/unit/run-03/time.txt",
-      "sha256": "1bdc9aed3b04aa0707549617dd54074e8eb8f24bddd2dff4a51930a751ff79b6",
-      "size": 1052
+      "sha256": "f137beb50982572a05b61e97fede3a27830cd1ade3489503835eba1679b2b60e",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-04/report.json",
-      "sha256": "82db68208605783d786581b0a00f3be60e9e379965209bb129688d7ebd7eb31c",
+      "sha256": "c133ddc9d85e9fc08c25ae0dc7a12786388e83e9f54d5b30a9df542b9b2f429e",
       "size": 16698
     },
     {
@@ -477,12 +477,12 @@
     },
     {
       "path": "raw/unit/run-04/time.txt",
-      "sha256": "622b956f9d1a3370f20049595186511da21410c686cc31ed3687ed138917da0e",
-      "size": 1052
+      "sha256": "8431d87fa072c65894bb5e867c595243ef779c15a9c49e0f7699111d4e2e9948",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-05/report.json",
-      "sha256": "68935177c4481098c71f5dc3806c7a7c03b61b0775fd7a9ef95b5873560a45e2",
+      "sha256": "b31151024d3a9418b422e9940a4aa8d5003fec820cd614b1f312b0a805bae070",
       "size": 16698
     },
     {
@@ -497,12 +497,12 @@
     },
     {
       "path": "raw/unit/run-05/time.txt",
-      "sha256": "4cbadddcefa16b6ade7a004443fd9d177213fefb1c08176e8e896f63e407b366",
-      "size": 1052
+      "sha256": "eba217aff59ecb01dd7725c7c8fec42d13652ecf941a5d8d8ffc68d77287923d",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-06/report.json",
-      "sha256": "869b3a7aa5bbe368a261abb5baee2f511ec8f348e76f2ce5514cd97fc9f3bb0e",
+      "sha256": "0128d56de078fc952227c33953725dcaa37617159bf34924bc5d8076ce48ced2",
       "size": 16698
     },
     {
@@ -517,12 +517,12 @@
     },
     {
       "path": "raw/unit/run-06/time.txt",
-      "sha256": "f6fe6e19aef624176b04ef2dd92392c591679c053a105763b05be66374a1479a",
-      "size": 1052
+      "sha256": "f13ad19c11d16ca46bf221551271c227da186834cf36d7909c699496db94cbf8",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-07/report.json",
-      "sha256": "0679d942451931d4dc703698476fb4d3b35f7541984cb77acaba92a5ee5428db",
+      "sha256": "ef6a03c3f9854ba9ba93d473fde7446d32746c1d2f4e5ad66a55b4eb8237b125",
       "size": 16698
     },
     {
@@ -537,12 +537,12 @@
     },
     {
       "path": "raw/unit/run-07/time.txt",
-      "sha256": "2410dbc53e54e316d27867ebf91d4cb18e62e17b79b861a6e9d4cfc572c3d429",
-      "size": 1052
+      "sha256": "bad9188020f508aba0a4b7ca58ca4b9ae86fda7318dc0898a65988a7d4ff34f2",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-08/report.json",
-      "sha256": "2380caa62c0f4c105b43b4a3db75dcb91145c38818d8e0c2a93d1945b879c9ef",
+      "sha256": "b8c468e09f6d1d825970144c6c58fbfafcfe7aaad56ff8c87729239a0e8593f7",
       "size": 16698
     },
     {
@@ -557,12 +557,12 @@
     },
     {
       "path": "raw/unit/run-08/time.txt",
-      "sha256": "e8fb6f178bfd17eeb7166aa14d1ed214868e72f10d65ebe7c9993bee85933944",
-      "size": 1052
+      "sha256": "04b268be9d89f8ebd5969ab38744e606726f79992ae77884dffd60e35fd14b79",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-09/report.json",
-      "sha256": "94233a917af29830b9e1d4777cd0c1a3f9a13fc7f20e68189a25610515dc435d",
+      "sha256": "8650eb2dc22deffa679b5e9436acb633449aeb93e695267c5d0958619693fa7a",
       "size": 16698
     },
     {
@@ -577,12 +577,12 @@
     },
     {
       "path": "raw/unit/run-09/time.txt",
-      "sha256": "2a44eddd9cb3b1dc1c233aca610291ba445113d415ea288bb93cb59a60d46d56",
-      "size": 1052
+      "sha256": "1a1e340d393f03ff02e9f278617e7940be5f70acd2a901a87a32e665857691df",
+      "size": 1047
     },
     {
       "path": "raw/unit/run-10/report.json",
-      "sha256": "697031c578dc4a64c9c2e1277fded66de727156ca684f750707ecb13f24bdefb",
+      "sha256": "7a20f221fdb61f7b7d3b27428b0a3eca92d875c49ecbfb64b397d5745bf0ed19",
       "size": 16698
     },
     {
@@ -597,8 +597,8 @@
     },
     {
       "path": "raw/unit/run-10/time.txt",
-      "sha256": "ca82d19deb199342976d602f0efad55d0ef66ef15d0baa5ffeba0680139954dd",
-      "size": 1052
+      "sha256": "288023184ad45462859460e5b254cd13ad71e564b2e717e51b0f1c49d37b2bf5",
+      "size": 1047
     }
   ],
   "configuration": {
@@ -606,8 +606,8 @@
     "performance_regression_limit_percent": 10,
     "repetitions": 10
   },
-  "duration_ms": 2400720,
-  "finished_at": "2026-08-16T02:16:13.548022+00:00",
+  "duration_ms": 2526849,
+  "finished_at": "2026-08-16T05:51:11.694187+00:00",
   "host": {
     "architecture": "x86_64",
     "class_id": "fedora-linux-x86_64",
@@ -621,7 +621,7 @@
       "commands": [
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "532de0a8f5ca4c168bd0c49ae6e5971c62426fa5af31efd800a04d8ae091f97b",
+          "compile_command_sha256": "54d4a7fc27752a3f1463dcc8d4894e21973fe27c4abb2dedf904ce3c0568ccd0",
           "execution": {
             "canonical_path": "/work/src/analyzer/AnalysisCoordinator.cpp",
             "command_line": [
@@ -644,7 +644,7 @@
               "/work/src/analyzer/AnalysisCoordinator.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/AnalysisCoordinator.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/AnalysisCoordinator.cpp",
@@ -675,7 +675,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "220107dca554fe2a35a90e5696bdf32a86166771649c7801d38eee97c2bc37d2",
+          "compile_command_sha256": "08a6ae885f0f48d4dd41e81f3ceeb6064eaa1fd7dbd94f8c3cb8a2a139e3c786",
           "execution": {
             "canonical_path": "/work/src/analyzer/Baseline.cpp",
             "command_line": [
@@ -698,7 +698,7 @@
               "/work/src/analyzer/Baseline.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/Baseline.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/Baseline.cpp",
@@ -729,7 +729,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "4e1b839f2d178fbeb5c5a4c226358eb2636ecbf39ff352505f3182265b822c64",
+          "compile_command_sha256": "cead39de73830ad8e17699c7a6fa240455ff0639e58166713594daa3a125e156",
           "execution": {
             "canonical_path": "/work/src/analyzer/DefaultRules.cpp",
             "command_line": [
@@ -752,7 +752,7 @@
               "/work/src/analyzer/DefaultRules.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/DefaultRules.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/DefaultRules.cpp",
@@ -783,7 +783,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "25ad27df1b70b884db5988e5aca77305b168d76fe949460c52c65b02518be2af",
+          "compile_command_sha256": "41670f62390021c683bb6d3a77436e3d4418064d194c2665c8770923d59eaa86",
           "execution": {
             "canonical_path": "/work/src/analyzer/StaticAnalyzer.cpp",
             "command_line": [
@@ -806,7 +806,7 @@
               "/work/src/analyzer/StaticAnalyzer.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/StaticAnalyzer.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/StaticAnalyzer.cpp",
@@ -837,7 +837,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "d7560376f03eda7b70e55e338320920f726d17e47b918843da797272b92f07be",
+          "compile_command_sha256": "0fe3abadfa5696d87955acce4522f3a623e17ac09101b7fe536f2889e0517a5b",
           "execution": {
             "canonical_path": "/work/src/analyzer/SuppressionFilter.cpp",
             "command_line": [
@@ -860,7 +860,7 @@
               "/work/src/analyzer/SuppressionFilter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/SuppressionFilter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/SuppressionFilter.cpp",
@@ -891,7 +891,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "3c1484ca0da23f9f713b22e23789ffc247fe29396d6e217ddb95f701a49fe9c8",
+          "compile_command_sha256": "d6d363e416b8fb5917f0b63e48cde6cb9df85b2512dc3849a2a9247353241a0b",
           "execution": {
             "canonical_path": "/work/src/analyzer/UnitEvidenceStore.cpp",
             "command_line": [
@@ -914,7 +914,7 @@
               "/work/src/analyzer/UnitEvidenceStore.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/UnitEvidenceStore.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/UnitEvidenceStore.cpp",
@@ -945,7 +945,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "1603f91866c690d4b1e034993312ac6e6c410799dac6c07d8507f1efa347d0ae",
+          "compile_command_sha256": "e778bad23883a4146445aa123fb4aa14125968ce23ef65052ad6001ca3296823",
           "execution": {
             "canonical_path": "/work/src/analyzer/WorkerProtocol.cpp",
             "command_line": [
@@ -968,7 +968,7 @@
               "/work/src/analyzer/WorkerProtocol.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/WorkerProtocol.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/WorkerProtocol.cpp",
@@ -999,7 +999,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "900a68c735c7750e62a36c85bcb7cacd291e0fb78b88963e5253d72eb217eb6f",
+          "compile_command_sha256": "252112ae14af09c38e442f9881232e04d205427c04562e92d64fd292d748eae9",
           "execution": {
             "canonical_path": "/work/src/analyzer/WorkerRuntime.cpp",
             "command_line": [
@@ -1022,7 +1022,7 @@
               "/work/src/analyzer/WorkerRuntime.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/analyzer/WorkerRuntime.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/analyzer/WorkerRuntime.cpp",
@@ -1053,7 +1053,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "de04362e225ba8fb146c5349617cf39d9b757d5f40bfa14e282f92cef83d5378",
+          "compile_command_sha256": "4b29b079d00e4ad27704dd20b9437f7964e0eec6ff655c7afe736a158b865a16",
           "execution": {
             "canonical_path": "/work/src/config/Config.cpp",
             "command_line": [
@@ -1076,7 +1076,7 @@
               "/work/src/config/Config.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/config/Config.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/config/Config.cpp",
@@ -1107,7 +1107,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "072851de9ec8ef7be9d6c121998e302a9f69831b029034023f62ad88df4b6c19",
+          "compile_command_sha256": "4a764e27b3cb816c2902f4a94b976feb877ff5835098840be3185777428b6b18",
           "execution": {
             "canonical_path": "/work/src/contracts/ContractInfo.cpp",
             "command_line": [
@@ -1130,7 +1130,7 @@
               "/work/src/contracts/ContractInfo.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/contracts/ContractInfo.cpp",
@@ -1161,7 +1161,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "6f99ac1b9a1951d65af2df4ccabdcefa828d0b4db1af511623691b4f90327f93",
+          "compile_command_sha256": "9f22a5c8ee4981b8b70c34e3f0150135aec7805e1e4cb94cf832798a66acaf6e",
           "execution": {
             "canonical_path": "/work/src/contracts/ContractParser.cpp",
             "command_line": [
@@ -1184,7 +1184,7 @@
               "/work/src/contracts/ContractParser.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/contracts/ContractParser.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/contracts/ContractParser.cpp",
@@ -1215,7 +1215,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "bfc11a9d576ff27be0a7ea9ceb5fcc593325b5be255614d6c4a8d0007ce36583",
+          "compile_command_sha256": "a3717ef15d701fe11cdc1109cb25f29b1803f210604c461da953314293b2b5c2",
           "execution": {
             "canonical_path": "/work/src/contracts/GuardContracts.cpp",
             "command_line": [
@@ -1238,7 +1238,7 @@
               "/work/src/contracts/GuardContracts.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/contracts/GuardContracts.cpp",
@@ -1269,7 +1269,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "5e53df678803cacfddb61c622b3d2536f75b43642ee15b7e43227313dd2e33ab",
+          "compile_command_sha256": "c6677fb52a4c7a697302e7e1957ec5af54e134fdef33573006a6fc7fcf0bb232",
           "execution": {
             "canonical_path": "/work/src/contracts/Policy.cpp",
             "command_line": [
@@ -1292,7 +1292,7 @@
               "/work/src/contracts/Policy.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/contracts/Policy.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/contracts/Policy.cpp",
@@ -1323,7 +1323,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "f3b5f7720fcee2963fe49472713ca388fb8e4068e2c8e12a409938e10c16fd42",
+          "compile_command_sha256": "2086904293c902fe86e6d86b78dc15361b29e0176bb13c39fbafb71e9e6f6406",
           "execution": {
             "canonical_path": "/work/src/contracts/Sidecar.cpp",
             "command_line": [
@@ -1346,7 +1346,7 @@
               "/work/src/contracts/Sidecar.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/contracts/Sidecar.cpp",
@@ -1377,7 +1377,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "c2f3837c3156a7e191658ecfcabfe5f70f2a82f9ff341bbdaed4efa27f902b12",
+          "compile_command_sha256": "0b762ad21a0f7ca83dfe6bad20651ff934c0154324b1ef681e864068df7cf8a2",
           "execution": {
             "canonical_path": "/work/src/core/Capabilities.cpp",
             "command_line": [
@@ -1400,7 +1400,7 @@
               "/work/src/core/Capabilities.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/core/Capabilities.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/Capabilities.cpp",
@@ -1431,7 +1431,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "f922c1c8e19526c958bb93d00e291d2aa7b2ddcf93dca1e05a20b865d7fbb99c",
+          "compile_command_sha256": "223cf5c8fe65fc1dec8651b0873d7c461d02681e5c43b255a2b0a64afaf913b2",
           "execution": {
             "canonical_path": "/work/src/core/FindingFingerprint.cpp",
             "command_line": [
@@ -1454,7 +1454,7 @@
               "/work/src/core/FindingFingerprint.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/core/FindingFingerprint.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/FindingFingerprint.cpp",
@@ -1485,7 +1485,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "362a22af7d52de94e2ceb0dad7ce4e382474f35456102ce49e454f098a5cd95e",
+          "compile_command_sha256": "806f2bfb1659b95dc1438575cf9f23ab1030ab779fdfdac2ce0185433a556f1b",
           "execution": {
             "canonical_path": "/work/src/core/FunctionFilter.cpp",
             "command_line": [
@@ -1508,7 +1508,7 @@
               "/work/src/core/FunctionFilter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/core/FunctionFilter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/FunctionFilter.cpp",
@@ -1539,7 +1539,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "d5400506b9acfc1f034cee581e74ba93ae0389bafe2c760809e6a44763a70834",
+          "compile_command_sha256": "c180555440f02fee8a8d8a7d08189c7669ac87a5c02818644b1a2d283cd96a25",
           "execution": {
             "canonical_path": "/work/src/core/Messages.cpp",
             "command_line": [
@@ -1562,7 +1562,7 @@
               "/work/src/core/Messages.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/core/Messages.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/Messages.cpp",
@@ -1593,7 +1593,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "0ddf6d55081d7422e9ab5b97954aa493585e177a80e36f852b903a750c55e7f3",
+          "compile_command_sha256": "8a0d577aac1fb381e5f206e0f0dd804f7391e97689802d6f3ccdaab0bb7b7216",
           "execution": {
             "canonical_path": "/work/src/core/ResourceSupervisor.cpp",
             "command_line": [
@@ -1616,7 +1616,7 @@
               "/work/src/core/ResourceSupervisor.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/core/ResourceSupervisor.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/ResourceSupervisor.cpp",
@@ -1647,7 +1647,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "cface4c9497ba7ebb75b985d461cfacfa4ace8358e1693cca9ecd4bf30c22853",
+          "compile_command_sha256": "1611727324520701550cf09638e8ccbc517c6dc18493713ba2c007db3d5a2486",
           "execution": {
             "canonical_path": "/work/src/core/ResourceWorkerControl.cpp",
             "command_line": [
@@ -1662,7 +1662,7 @@
               "/work/src/core/ResourceWorkerControl.cpp"
             ],
             "output": "CMakeFiles/codeskeptic_resource_worker_control.dir/src/core/ResourceWorkerControl.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/core/ResourceWorkerControl.cpp",
@@ -1685,7 +1685,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "2af220633516438b3f108592a5e50cac2a0e4a6d5b2f00dd5c9ca2d201e2ba83",
+          "compile_command_sha256": "806e669d20a8d807f3d7de2168d2d0d7a979cc495e0a091992a1636b2cf5f0f4",
           "execution": {
             "canonical_path": "/work/src/engine/AllocFunctions.cpp",
             "command_line": [
@@ -1708,7 +1708,7 @@
               "/work/src/engine/AllocFunctions.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/AllocFunctions.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/AllocFunctions.cpp",
@@ -1739,7 +1739,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "fe89de15667b3249876566387d3c756a2e4eb559557f8cef95cc52db9a939159",
+          "compile_command_sha256": "446f656be95a93683374c5b21410f65321a6b08c8733031061b6d08278d2c621",
           "execution": {
             "canonical_path": "/work/src/engine/AssertGuards.cpp",
             "command_line": [
@@ -1762,7 +1762,7 @@
               "/work/src/engine/AssertGuards.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/AssertGuards.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/AssertGuards.cpp",
@@ -1793,7 +1793,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "f1a46689616cbafc84866d4fd057c6705454c48254f02ef03a85371f03af22b8",
+          "compile_command_sha256": "d1dfa3c86562edf0618cd4bb34adef42c02c9eb30d1c24bb2dd2802f3f9baf11",
           "execution": {
             "canonical_path": "/work/src/engine/AssumptionMode.cpp",
             "command_line": [
@@ -1816,7 +1816,7 @@
               "/work/src/engine/AssumptionMode.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/AssumptionMode.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/AssumptionMode.cpp",
@@ -1847,7 +1847,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "0dd9787ef94b5c98ff94038501525a7e63c076a8b17c9876009a29896d870b76",
+          "compile_command_sha256": "d134ec1354a3902a1e91c2621eef8bd797871053f572b7d93b8cad3ed96af83f",
           "execution": {
             "canonical_path": "/work/src/engine/CfgCache.cpp",
             "command_line": [
@@ -1870,7 +1870,7 @@
               "/work/src/engine/CfgCache.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/CfgCache.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/CfgCache.cpp",
@@ -1901,7 +1901,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "75e24f7e6f0c0f388d6055ffd759a4b6513d41199d58dbace3237b045f2fc0a1",
+          "compile_command_sha256": "8cbc368c3d2f99898e3bb8476919b25deec0531032ae6c6548cfe374b4c93af6",
           "execution": {
             "canonical_path": "/work/src/engine/CoverageReport.cpp",
             "command_line": [
@@ -1924,7 +1924,7 @@
               "/work/src/engine/CoverageReport.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/CoverageReport.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/CoverageReport.cpp",
@@ -1955,7 +1955,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "11cd2731f11332105a08f1ec095f8fdd028d43ee3e9786f959acb2bec55010b5",
+          "compile_command_sha256": "2cc5c1b16e3eb0670e5e164b6f611a7f62b50bc5c90acdb52a72a62167c6b4c4",
           "execution": {
             "canonical_path": "/work/src/engine/ExtentMap.cpp",
             "command_line": [
@@ -1978,7 +1978,7 @@
               "/work/src/engine/ExtentMap.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/ExtentMap.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/ExtentMap.cpp",
@@ -2009,7 +2009,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "7bfacd3bd378b5d554cf345b45b45237e69f2fd36c59aeb416fc9441799a69aa",
+          "compile_command_sha256": "5393c562af6861d2631c4290c1065103b907a43750e4a6d2303d6458379a0bee",
           "execution": {
             "canonical_path": "/work/src/engine/FatalCalls.cpp",
             "command_line": [
@@ -2032,7 +2032,7 @@
               "/work/src/engine/FatalCalls.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/FatalCalls.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/FatalCalls.cpp",
@@ -2063,7 +2063,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "e473ce61f4ec1d6ffbe9ce93a88f43af973a967cb17af4c54e9702ab82a37feb",
+          "compile_command_sha256": "d3111ad813627cf8e7a7d67d8ed1b65939ecec2201db119c2d1e6ca446d578ec",
           "execution": {
             "canonical_path": "/work/src/engine/FunctionSummary.cpp",
             "command_line": [
@@ -2086,7 +2086,7 @@
               "/work/src/engine/FunctionSummary.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/FunctionSummary.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/FunctionSummary.cpp",
@@ -2117,7 +2117,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "37a81ee620446ff1f92861e4db8b16f5ecb28800662da32a8664d4ebd21bf507",
+          "compile_command_sha256": "8b46022a2c80b1bfd3303bc2b8807f5a785cba5e7360d6f2f63946063f57f89e",
           "execution": {
             "canonical_path": "/work/src/engine/ImmutableFlags.cpp",
             "command_line": [
@@ -2140,7 +2140,7 @@
               "/work/src/engine/ImmutableFlags.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/ImmutableFlags.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/ImmutableFlags.cpp",
@@ -2171,7 +2171,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "8d5d08d8f4ba79dbf0564f8904136c600bd38680e2f708b9ac767335dbcda0ac",
+          "compile_command_sha256": "ebe47e639f39a41b1ae369742c09791dd41ff83cd0fd53e9934386b4844b2d98",
           "execution": {
             "canonical_path": "/work/src/engine/Interval.cpp",
             "command_line": [
@@ -2194,7 +2194,7 @@
               "/work/src/engine/Interval.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/Interval.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/Interval.cpp",
@@ -2225,7 +2225,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "6ac4b479ef308f779b25983d00acb5b93b6c5d04a8c231543623326c222915d9",
+          "compile_command_sha256": "00327a2fc9ff2c4cf0ff689ee09236673a5f3f2fc1f990e33db42e5391bbb83f",
           "execution": {
             "canonical_path": "/work/src/engine/IntervalEval.cpp",
             "command_line": [
@@ -2248,7 +2248,7 @@
               "/work/src/engine/IntervalEval.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/IntervalEval.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/IntervalEval.cpp",
@@ -2279,7 +2279,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "c526dac7aea3ba6534283e03fcfccb59ee248cd728a4b4981788fda6c2bd9580",
+          "compile_command_sha256": "027e5405ba324d51f274e6865ddbee38ba3f0e5a5dfe84668e16f659101e52f0",
           "execution": {
             "canonical_path": "/work/src/engine/ParamIntervals.cpp",
             "command_line": [
@@ -2302,7 +2302,7 @@
               "/work/src/engine/ParamIntervals.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/ParamIntervals.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/ParamIntervals.cpp",
@@ -2333,7 +2333,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "aa441737811a802f8c397a82cd2cc27071d69e1b0ec82f9f75aca57d66a173c3",
+          "compile_command_sha256": "b027234654a2c66bb113620e580b100d07271fb436ce9dec21071ca6e62f4d8a",
           "execution": {
             "canonical_path": "/work/src/engine/PathFacts.cpp",
             "command_line": [
@@ -2356,7 +2356,7 @@
               "/work/src/engine/PathFacts.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/PathFacts.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/PathFacts.cpp",
@@ -2387,7 +2387,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "5de09d305a7b85d22be84cd48357f69c8b276cdbdbc4f43f0171f3c5b46374dd",
+          "compile_command_sha256": "ab28e55fea1edecc6cb7aaaa1d9d614df8d75b639ff15d1f6cd71db554c2fff8",
           "execution": {
             "canonical_path": "/work/src/engine/RuleEngine.cpp",
             "command_line": [
@@ -2410,7 +2410,7 @@
               "/work/src/engine/RuleEngine.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/RuleEngine.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/RuleEngine.cpp",
@@ -2441,7 +2441,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "fb224f8f6170fc5692a1c44bd2f2da6f87193cff12b723c38853b841ae92b80f",
+          "compile_command_sha256": "1b9d993bb7917c4b1533c03eea179725f358fda05b8ff9b1ae54eb195064c0fa",
           "execution": {
             "canonical_path": "/work/src/engine/SummaryDiff.cpp",
             "command_line": [
@@ -2464,7 +2464,7 @@
               "/work/src/engine/SummaryDiff.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/engine/SummaryDiff.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/engine/SummaryDiff.cpp",
@@ -2495,7 +2495,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "3d89a7191f4899b6e00581d36de424d841fad33548a3f62741d45ab319ab093e",
+          "compile_command_sha256": "ebabd9565f03f44f8ce8627aa1c0e9a853ef48606b4bb45de0162c004f0a411f",
           "execution": {
             "canonical_path": "/work/src/main.cpp",
             "command_line": [
@@ -2517,7 +2517,7 @@
               "/work/src/main.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic.dir/main.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/main.cpp",
@@ -2547,7 +2547,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "27faca421430bdf8f54a7903928e4ce7ea260af501c0f08c6c191d25fa6eda3d",
+          "compile_command_sha256": "61d0ec3a0ebeffe6309bc188f373744b2ad5f93c730c91a85157fcec3a328100",
           "execution": {
             "canonical_path": "/work/src/reporter/ConsoleReporter.cpp",
             "command_line": [
@@ -2570,7 +2570,7 @@
               "/work/src/reporter/ConsoleReporter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/reporter/ConsoleReporter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/reporter/ConsoleReporter.cpp",
@@ -2601,7 +2601,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "890a5bf10938c63a9075c32406946488c501c69bb946d420f64bb6c9531d3bbb",
+          "compile_command_sha256": "5baf8710f59db0bf766b554509d832d9d2c19e224b122898b23c969026f9d986",
           "execution": {
             "canonical_path": "/work/src/reporter/HtmlReporter.cpp",
             "command_line": [
@@ -2624,7 +2624,7 @@
               "/work/src/reporter/HtmlReporter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/reporter/HtmlReporter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/reporter/HtmlReporter.cpp",
@@ -2655,7 +2655,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "23f0c791cb223eb32b1aa2d7cd287f6eebd4202a645ef79b1853e17709c6fba3",
+          "compile_command_sha256": "4326a3ee41a2924f8e0729fac79c0d5ce8dd070fa6b5a21a8ca287a1cfa63925",
           "execution": {
             "canonical_path": "/work/src/reporter/JsonReporter.cpp",
             "command_line": [
@@ -2678,7 +2678,7 @@
               "/work/src/reporter/JsonReporter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/reporter/JsonReporter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/reporter/JsonReporter.cpp",
@@ -2709,7 +2709,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "75591c590814460d818459ace1659882bcfb35f04482cd959db4a88faccba610",
+          "compile_command_sha256": "0a8b7fca2ec705a9e0c192bf624fe4a72ff0948c72eec809f291eb2034a42708",
           "execution": {
             "canonical_path": "/work/src/reporter/SarifReporter.cpp",
             "command_line": [
@@ -2732,7 +2732,7 @@
               "/work/src/reporter/SarifReporter.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/reporter/SarifReporter.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/reporter/SarifReporter.cpp",
@@ -2763,7 +2763,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "7f13e97f3127fbc877e12f10a838f91216864ff49bd25de2aef8d9f6d0b6660e",
+          "compile_command_sha256": "45e9cf1b9cc3b3e03bfb6f0c24163f7dd7ce87a130b16b5c235f493f79a1fbb7",
           "execution": {
             "canonical_path": "/work/src/rules/AllocSizeOverflowRule.cpp",
             "command_line": [
@@ -2786,7 +2786,7 @@
               "/work/src/rules/AllocSizeOverflowRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/AllocSizeOverflowRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/AllocSizeOverflowRule.cpp",
@@ -2817,7 +2817,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "6524646493a1442954b175d12e34c79273aed99e2e5a2efac48e18c04c428322",
+          "compile_command_sha256": "7832e73e5c0909a74cd7a1f82b91eba02ee1fc9c97aa4b9e3560753e6044f488",
           "execution": {
             "canonical_path": "/work/src/rules/AssumptionRule.cpp",
             "command_line": [
@@ -2840,7 +2840,7 @@
               "/work/src/rules/AssumptionRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/AssumptionRule.cpp",
@@ -2871,7 +2871,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "a1b90fa05087a8e95944787ac172f8fe867f87a6bce2ff5c7fb1a24c36ed32d2",
+          "compile_command_sha256": "755d80146fa743e58dffbc6bacbd44542c854f0c4e79f57899aa2efd5c6f31aa",
           "execution": {
             "canonical_path": "/work/src/rules/BoundsRule.cpp",
             "command_line": [
@@ -2894,7 +2894,7 @@
               "/work/src/rules/BoundsRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/BoundsRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/BoundsRule.cpp",
@@ -2925,7 +2925,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "2ece1cf125de2085b431ba9ca5ee3f6aaec5f130923763f36e34ac1974dda421",
+          "compile_command_sha256": "69046479f6ba968e8565597a2194bd9c6984354faa2855aa064c50787848dc50",
           "execution": {
             "canonical_path": "/work/src/rules/ContractRule.cpp",
             "command_line": [
@@ -2948,7 +2948,7 @@
               "/work/src/rules/ContractRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/ContractRule.cpp",
@@ -2979,7 +2979,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "c20df26fc26b46c6318fb0bb7c349e9e7e70c6a7c5f1c6d2d3f93d8852b8fe1d",
+          "compile_command_sha256": "2ff6be286a59e6c87625ed8b5aec167988c5639685f7818962965fb3f9c9eb1a",
           "execution": {
             "canonical_path": "/work/src/rules/DivByZeroRule.cpp",
             "command_line": [
@@ -3002,7 +3002,7 @@
               "/work/src/rules/DivByZeroRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/DivByZeroRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/DivByZeroRule.cpp",
@@ -3033,7 +3033,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "5d2401c6acec897c21bb8c3413f017bd802e1488e608f4b373e03c518771ea93",
+          "compile_command_sha256": "898389ad9cb8f119e9f529db941e173d08286f213d642a1a5b03ae0c97febdcb",
           "execution": {
             "canonical_path": "/work/src/rules/FdResourceRule.cpp",
             "command_line": [
@@ -3056,7 +3056,7 @@
               "/work/src/rules/FdResourceRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/FdResourceRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/FdResourceRule.cpp",
@@ -3087,7 +3087,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "4a3184d92d6d4c9f6306d8e3f0c748154601152117650e4604c2768866e0f5f0",
+          "compile_command_sha256": "de0f95047eac5b6e347b54898c3feca0f0a0ad013ef684fc106b87b074818c73",
           "execution": {
             "canonical_path": "/work/src/rules/IntOverflowRule.cpp",
             "command_line": [
@@ -3110,7 +3110,7 @@
               "/work/src/rules/IntOverflowRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/IntOverflowRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/IntOverflowRule.cpp",
@@ -3141,7 +3141,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "c3689fbb344523cf9bd0e72f221225a2748c74b864a4d2030da0b7ab7f125586",
+          "compile_command_sha256": "ea8592187a15de849f7bf98ec75f4d9c9bc83dca57907cd2a72ad303d03f7f04",
           "execution": {
             "canonical_path": "/work/src/rules/MemoryLeakRule_Ex.cpp",
             "command_line": [
@@ -3164,7 +3164,7 @@
               "/work/src/rules/MemoryLeakRule_Ex.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/MemoryLeakRule_Ex.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/MemoryLeakRule_Ex.cpp",
@@ -3195,7 +3195,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "4ab395ba7594a5e3fb6adcaad1729049d7b4206d34ea5822bff4a8365073c78c",
+          "compile_command_sha256": "0a39a385fbaa3032c8131696844d43f5a9510b10d62b73655d3c3242eeb698a4",
           "execution": {
             "canonical_path": "/work/src/rules/NullDerefRule.cpp",
             "command_line": [
@@ -3218,7 +3218,7 @@
               "/work/src/rules/NullDerefRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/NullDerefRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/NullDerefRule.cpp",
@@ -3249,7 +3249,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "0cb718f0b0b23a2cd921d13f35a156d757e90add4df8dbb715d0ea136c8bfd92",
+          "compile_command_sha256": "f89fd010eb212ebafbe1c7d7883c98b9303732a711a5b54d3feb398d520283f5",
           "execution": {
             "canonical_path": "/work/src/rules/PolicyRule.cpp",
             "command_line": [
@@ -3272,7 +3272,7 @@
               "/work/src/rules/PolicyRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/PolicyRule.cpp",
@@ -3303,7 +3303,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "1ed8695057ad6f7e83276bcb246f12e61ef30345a7eb4ccccce56e1181f57e38",
+          "compile_command_sha256": "2189abdfc3fa299771263c8075f878ee5024c2ee61130d8161717d6db3d22b76",
           "execution": {
             "canonical_path": "/work/src/rules/SignConversionRule.cpp",
             "command_line": [
@@ -3326,7 +3326,7 @@
               "/work/src/rules/SignConversionRule.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/SignConversionRule.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/SignConversionRule.cpp",
@@ -3357,7 +3357,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "5383c805ff36164b1b5f023fc327e311349485f0d2bf638b61c7c3760b975fba",
+          "compile_command_sha256": "3555654ea42a2b8c031851f838eae5072620cdc55cd9ca2dc6b8269b583fa2e1",
           "execution": {
             "canonical_path": "/work/src/rules/UninitPointerRule_Ex.cpp",
             "command_line": [
@@ -3380,7 +3380,7 @@
               "/work/src/rules/UninitPointerRule_Ex.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/rules/UninitPointerRule_Ex.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/rules/UninitPointerRule_Ex.cpp",
@@ -3411,7 +3411,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "1f7583308b1f8fda222ebb0895ea861e9851bc92b7af7b907c9027e87b13844d",
+          "compile_command_sha256": "517ea1792766d82f01652605c6db8d3aa7c133631eaebc2673e4b8f3937e470d",
           "execution": {
             "canonical_path": "/work/src/server/McpServer.cpp",
             "command_line": [
@@ -3434,7 +3434,7 @@
               "/work/src/server/McpServer.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/server/McpServer.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/server/McpServer.cpp",
@@ -3465,7 +3465,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "6ed3fcb3de907d421a53f1be33f0ad518b38845b0ce5da7126ed40cdbd90d36e",
+          "compile_command_sha256": "b2c993f3010469a9443eee37534ed9866beba04ec0c565d64cdd8f8fa9b00bdf",
           "execution": {
             "canonical_path": "/work/src/source_manager/ResourceDir.cpp",
             "command_line": [
@@ -3488,7 +3488,7 @@
               "/work/src/source_manager/ResourceDir.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/source_manager/ResourceDir.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/source_manager/ResourceDir.cpp",
@@ -3519,7 +3519,7 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "b2ddc20c9ecf6f43a88f36ea5718b5c737b289d96414cf90df6949edb91da6d7",
+          "compile_command_sha256": "069c6637b9dc85d88f1f3c76a3511e2595317439e60e271c67b9ba5652310a5e",
           "execution": {
             "canonical_path": "/work/src/source_manager/SourceManager.cpp",
             "command_line": [
@@ -3542,7 +3542,7 @@
               "/work/src/source_manager/SourceManager.cpp"
             ],
             "output": "src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o",
-            "working_directory": "/work/build-p10-07-contracts"
+            "working_directory": "/work/build-determinism"
           },
           "normalized_execution": {
             "canonical_path": "$REPO/src/source_manager/SourceManager.cpp",
@@ -3576,7 +3576,8 @@
         "build_toolchain": {
           "c_compiler": "/usr/lib/llvm-20/bin/clang",
           "cmake": "/usr/bin/cmake",
-          "cmake_cache_sha256": "ddbf7f1925ea47c3e64ac73d0cddc80fcdcbeea5700fe15ff4608bd7964ef5e0",
+          "cmake_cache_canonical_sha256": "9e99750dc93c7cf8b783d3fc6ed018421d1f20597e360c6cfe9963313dbbbef0",
+          "cmake_cache_schema": "codeskeptic-cmake-cache-v1",
           "cxx_compiler": "/usr/lib/llvm-20/bin/clang",
           "generator": "Ninja",
           "ninja": "/usr/bin/ninja"
@@ -3807,12 +3808,12 @@
           "sha256": "d4794d83325fc61b830d7f7fe6618bbb34c05c7a3de5e8141c4ceec16898a89a"
         }
       ],
-      "identity_sha256": "7edb80606435e65ddfb00751bb168fac3c9ed778a9735fb7487162ce62b60a14",
+      "identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
       "kind": "real-repository",
       "roots": [
         {
           "marker": "$BUILD",
-          "path": "/work/build-p10-07-contracts"
+          "path": "/work/build-determinism"
         },
         {
           "marker": "$REPO",
@@ -3828,21 +3829,21 @@
       "commands": [
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "0b6645016f72105f045cbfbfbba236cb09ada1084ec924f2d3959f33157dbb6e",
+          "compile_command_sha256": "617312dbe3f36f5c18fb330b733bb9ad0a0b8a02a89440239d9fbd244ae8638a",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml-backend.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-backend.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_base_EXPORTS",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu++17",
@@ -3861,17 +3862,17 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-base.dir/ggml-backend.cpp.o",
               "-c",
-              "/rc/ggml/src/ggml-backend.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-backend.cpp"
             ],
             "output": "ggml/src/CMakeFiles/ggml-base.dir/ggml-backend.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml-backend.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
@@ -3908,11 +3909,11 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "2e10eb20ef2ee5c4de3044daead83176c8e944485bbd972f161ad280a7a57980",
+          "compile_command_sha256": "45a44d4b1981bf5dc4a43543c799ffc1cced7552522dad3fd6b4a1a0df41d5e9",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml-cpu/ggml-cpu.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu/ggml-cpu.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_AVX",
               "-DGGML_AVX2",
               "-DGGML_BACKEND_BUILD",
@@ -3928,10 +3929,10 @@
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_cpu_EXPORTS",
-              "-I/rc/ggml/src/..",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/ggml-cpu",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/..",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu++17",
@@ -3956,15 +3957,15 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o",
               "-c",
-              "/rc/ggml/src/ggml-cpu/ggml-cpu.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu/ggml-cpu.cpp"
             ],
             "output": "ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml-cpu/ggml-cpu.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_AVX",
               "-DGGML_AVX2",
               "-DGGML_BACKEND_BUILD",
@@ -4018,11 +4019,11 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "ede3b3098f1de0db768bf6a4761bef77126679f003ba0d0b7c989cd4aef5849a",
+          "compile_command_sha256": "47dfc1f4633e37f5f67251d6bd49213c4417b2d8a43615d5d0dc3cf40dcc797a",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml-cpu/ops.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu/ops.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_AVX",
               "-DGGML_AVX2",
               "-DGGML_BACKEND_BUILD",
@@ -4038,10 +4039,10 @@
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_cpu_EXPORTS",
-              "-I/rc/ggml/src/..",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/ggml-cpu",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/..",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu++17",
@@ -4066,15 +4067,15 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o",
               "-c",
-              "/rc/ggml/src/ggml-cpu/ops.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-cpu/ops.cpp"
             ],
             "output": "ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml-cpu/ops.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_AVX",
               "-DGGML_AVX2",
               "-DGGML_BACKEND_BUILD",
@@ -4128,21 +4129,21 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "5a24d11281b43690d9f486c29c62014609f896d5ec57deebac15b51198b0647b",
+          "compile_command_sha256": "9ea09161c362fdf39fc4444862001d27769061888993f73445bca45321775a76",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml-quants.c",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-quants.c",
             "command_line": [
-              "/usr/bin/clang-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_base_EXPORTS",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu11",
@@ -4164,17 +4165,17 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-base.dir/ggml-quants.c.o",
               "-c",
-              "/rc/ggml/src/ggml-quants.c"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml-quants.c"
             ],
             "output": "ggml/src/CMakeFiles/ggml-base.dir/ggml-quants.c.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml-quants.c",
             "command_line": [
-              "/usr/bin/clang-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
@@ -4214,21 +4215,21 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "c586665edabd361bf80424bf1c414ff98e65bb4bb0f2985c9ef5875b82fc49dd",
+          "compile_command_sha256": "4e10fb8121c4ccec1cea8e291a8aa29687f9f90f9c88c64184a2bce07a561f68",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml.c",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml.c",
             "command_line": [
-              "/usr/bin/clang-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_base_EXPORTS",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu11",
@@ -4250,17 +4251,17 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o",
               "-c",
-              "/rc/ggml/src/ggml.c"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml.c"
             ],
             "output": "ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml.c",
             "command_line": [
-              "/usr/bin/clang-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
@@ -4300,21 +4301,21 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "970ed426de04f4f0bb8409845598d7b5d5d965430a06b0e8ed9190465dff1197",
+          "compile_command_sha256": "f553273ea0cb55a8181707d48c5130ea0da42282df9af134bce23e3cb3567f26",
           "execution": {
-            "canonical_path": "/rc/ggml/src/ggml.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
               "-D_GNU_SOURCE",
               "-D_XOPEN_SOURCE=600",
               "-Dggml_base_EXPORTS",
-              "-I/rc/ggml/src/.",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-std=gnu++17",
@@ -4333,17 +4334,17 @@
               "-o",
               "ggml/src/CMakeFiles/ggml-base.dir/ggml.cpp.o",
               "-c",
-              "/rc/ggml/src/ggml.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/ggml/src/ggml.cpp"
             ],
             "output": "ggml/src/CMakeFiles/ggml-base.dir/ggml.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/ggml/src/ggml.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BUILD",
-              "-DGGML_COMMIT=\"4dee52f82-dirty\"",
+              "-DGGML_COMMIT=\"4dee52f\"",
               "-DGGML_SCHED_MAX_COPIES=4",
               "-DGGML_SHARED",
               "-DGGML_VERSION=\"0.19.0\"",
@@ -4380,20 +4381,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "dacb9707a03729d4b8bbe993b72381fe9ac98313c6aebf6007d49473ac6dac44",
+          "compile_command_sha256": "de094f38a6548cb289c5042e211fb9afb86783a52366b20c8263beff6efe0664",
           "execution": {
-            "canonical_path": "/rc/src/llama-context.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/llama-context.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4411,15 +4412,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/llama-context.cpp.o",
               "-c",
-              "/rc/src/llama-context.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/llama-context.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/llama-context.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/llama-context.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4456,20 +4457,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "0b462752e6b56efa082eb6367b8134abc62a526c485e513ba70b7016e552da5f",
+          "compile_command_sha256": "5e92c24687759c7bb07691858cc4c9344e70195de18672075fbab50c4009f760",
           "execution": {
-            "canonical_path": "/rc/src/llama-grammar.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/llama-grammar.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4487,15 +4488,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/llama-grammar.cpp.o",
               "-c",
-              "/rc/src/llama-grammar.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/llama-grammar.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/llama-grammar.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/llama-grammar.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4532,20 +4533,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "8a98e80b4d204f7812d6885425e0c93944613eded7dfea3f3cb78628a3765bff",
+          "compile_command_sha256": "7794686f77a78a6d871006c9d625960923ab327ef7c67c13dbe0c3bd5597b8c2",
           "execution": {
-            "canonical_path": "/rc/src/llama-model-loader.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/llama-model-loader.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4563,15 +4564,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/llama-model-loader.cpp.o",
               "-c",
-              "/rc/src/llama-model-loader.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/llama-model-loader.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/llama-model-loader.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/llama-model-loader.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4608,20 +4609,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "2ba8d41ff92b618d73a2357ceaa60d2387be5defeeb79c6dc6364447d118edc1",
+          "compile_command_sha256": "4b9c37956dca8506104873796af51e4d2667625c413df4f49b4cc5874de37f16",
           "execution": {
-            "canonical_path": "/rc/src/llama-model.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/llama-model.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4639,15 +4640,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/llama-model.cpp.o",
               "-c",
-              "/rc/src/llama-model.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/llama-model.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/llama-model.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/llama-model.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4684,20 +4685,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "3d43fb6cc598ae881ca89acb14c17a2e53a530c2a206a8e3104c84dad0e44781",
+          "compile_command_sha256": "bf392ba05e4998e263eb33b143de627e85cb1366506a100b7c253cd4b69d655b",
           "execution": {
-            "canonical_path": "/rc/src/llama.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/llama.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4715,15 +4716,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/llama.cpp.o",
               "-c",
-              "/rc/src/llama.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/llama.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/llama.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/llama.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4760,20 +4761,20 @@
         },
         {
           "command_ordinal": 0,
-          "compile_command_sha256": "13b06948d8545361e40981b33b818bf518fef6ef2368c63806eb3a5092c2a2b7",
+          "compile_command_sha256": "9a898b0d01b671742a8aaeccbed0b3f57bf4b1cd14ad4f4ecb5f9e1210f074c5",
           "execution": {
-            "canonical_path": "/rc/src/models/llama.cpp",
+            "canonical_path": "/work/build-determinism-release-calibration/llama-cpp/src/models/llama.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
               "-DLLAMA_BUILD",
               "-DLLAMA_SHARED",
               "-Dllama_EXPORTS",
-              "-I/rc/src/.",
-              "-I/rc/src/../include",
-              "-I/rc/ggml/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/.",
+              "-I/work/build-determinism-release-calibration/llama-cpp/src/../include",
+              "-I/work/build-determinism-release-calibration/llama-cpp/ggml/src/../include",
               "-O3",
               "-DNDEBUG",
               "-fPIC",
@@ -4791,15 +4792,15 @@
               "-o",
               "src/CMakeFiles/llama.dir/models/llama.cpp.o",
               "-c",
-              "/rc/src/models/llama.cpp"
+              "/work/build-determinism-release-calibration/llama-cpp/src/models/llama.cpp"
             ],
             "output": "src/CMakeFiles/llama.dir/models/llama.cpp.o",
-            "working_directory": "/rc-build"
+            "working_directory": "/work/build-determinism-release-calibration/llama-cpp-build"
           },
           "normalized_execution": {
             "canonical_path": "$RELEASE_SOURCE/src/models/llama.cpp",
             "command_line": [
-              "/usr/bin/clang++-20",
+              "/usr/lib/llvm-20/bin/clang",
               "-DGGML_BACKEND_SHARED",
               "-DGGML_SHARED",
               "-DGGML_USE_CPU",
@@ -4839,7 +4840,8 @@
         "build_toolchain": {
           "c_compiler": "/usr/lib/llvm-20/bin/clang",
           "cmake": "/usr/bin/cmake",
-          "cmake_cache_sha256": "c0eaa06836f2b78c37f2d6b9ef59f3affb47832ba2ae07f2b43c6e6a15cbfcee",
+          "cmake_cache_canonical_sha256": "b24841e24f4475fa4f53ce0521eb4952ba58baf5b1d56b02a69ad71d0dc04d14",
+          "cmake_cache_schema": "codeskeptic-cmake-cache-v1",
           "cxx_compiler": "/usr/lib/llvm-20/bin/clang",
           "generator": "Ninja",
           "ninja": "/usr/bin/ninja"
@@ -4849,7 +4851,7 @@
         "recipe_sha256": "8ed47eb20b89f5aec290e392437203c44619b8d13719ca54d8d8c70469bd5275",
         "repository": "https://github.com/ggml-org/llama.cpp.git",
         "revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454",
-        "selected_compile_commands_sha256": "dbc05a469483a0f3120c63115ebce5778373bb12836e05b245723aaa8d148a2b"
+        "selected_compile_commands_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd"
       },
       "files": [
         {
@@ -4901,16 +4903,16 @@
           "sha256": "10af5226730900378be77318691f4acbfccb46809c41a81a195a0ca0d5d48109"
         }
       ],
-      "identity_sha256": "0e466db722c4537e89532ba616f63c2d969918a62c31b540b238db3f9b52c230",
+      "identity_sha256": "3160e812602e101def583510cf363b928b102943721197a81d1fba1998706148",
       "kind": "release-candidate",
       "roots": [
         {
           "marker": "$RELEASE_BUILD",
-          "path": "/rc-build"
+          "path": "/work/build-determinism-release-calibration/llama-cpp-build"
         },
         {
           "marker": "$RELEASE_SOURCE",
-          "path": "/rc"
+          "path": "/work/build-determinism-release-calibration/llama-cpp"
         },
         {
           "marker": "$REPO",
@@ -4918,7 +4920,7 @@
         }
       ],
       "source_marker": "$RELEASE_SOURCE",
-      "translation_unit_plan_sha256": "dbc05a469483a0f3120c63115ebce5778373bb12836e05b245723aaa8d148a2b",
+      "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
       "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e",
       "translation_units": 12
     },
@@ -5708,7 +5710,7 @@
         },
         {
           "marker": "$UNIT_BUILD",
-          "path": "/tmp/codeskeptic-determinism-_onn3n9d/inputs/unit-build"
+          "path": "/tmp/codeskeptic-determinism-y7hfj9k2/inputs/unit-build"
         }
       ],
       "source_marker": "$REPO",
@@ -5717,13 +5719,13 @@
       "translation_units": 24
     }
   },
-  "schema": "codeskeptic-determinism-calibration-v1",
+  "schema": "codeskeptic-determinism-calibration-v2",
   "source": {
     "file_count": 385,
-    "manifest_sha256": "3321d22243b8f95d92836b3f0b5bdae8d6f0270513440b8fe48d465b44be6900",
-    "revision": "aeec85100006517b6b6028e99d326fb9f78dbafc"
+    "manifest_sha256": "c586d285598ac6b624e3993ef350b69b1c9a8dc0b63d468228fa6e582a77a842",
+    "revision": "faa58c912f72e4e13df50290c5531641b3cccc68"
   },
-  "started_at": "2026-08-16T01:36:12.827578+00:00",
+  "started_at": "2026-08-16T05:09:04.845232+00:00",
   "status": "calibration",
   "toolchain": {
     "analyzer": {
@@ -5769,9 +5771,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 720,
-            "peak_rss_kib": 88004,
-            "wall_ms": 790
+            "cpu_ms": 740,
+            "peak_rss_kib": 87616,
+            "wall_ms": 800
           },
           "repetition": 1,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5785,9 +5787,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 730,
-            "peak_rss_kib": 87776,
-            "wall_ms": 790
+            "cpu_ms": 690,
+            "peak_rss_kib": 88204,
+            "wall_ms": 760
           },
           "repetition": 2,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5801,9 +5803,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 720,
-            "peak_rss_kib": 87980,
-            "wall_ms": 770
+            "cpu_ms": 710,
+            "peak_rss_kib": 87528,
+            "wall_ms": 780
           },
           "repetition": 3,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5817,9 +5819,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 750,
-            "peak_rss_kib": 87848,
-            "wall_ms": 810
+            "cpu_ms": 690,
+            "peak_rss_kib": 87640,
+            "wall_ms": 760
           },
           "repetition": 4,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5833,9 +5835,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 680,
-            "peak_rss_kib": 87720,
-            "wall_ms": 750
+            "cpu_ms": 770,
+            "peak_rss_kib": 87440,
+            "wall_ms": 820
           },
           "repetition": 5,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5849,9 +5851,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 750,
-            "peak_rss_kib": 88000,
-            "wall_ms": 810
+            "cpu_ms": 700,
+            "peak_rss_kib": 87696,
+            "wall_ms": 770
           },
           "repetition": 6,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5865,9 +5867,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 730,
-            "peak_rss_kib": 87844,
-            "wall_ms": 780
+            "cpu_ms": 710,
+            "peak_rss_kib": 87496,
+            "wall_ms": 770
           },
           "repetition": 7,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5881,8 +5883,8 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 740,
-            "peak_rss_kib": 87804,
+            "cpu_ms": 730,
+            "peak_rss_kib": 87912,
             "wall_ms": 800
           },
           "repetition": 8,
@@ -5897,9 +5899,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 700,
-            "peak_rss_kib": 87644,
-            "wall_ms": 770
+            "cpu_ms": 720,
+            "peak_rss_kib": 87716,
+            "wall_ms": 780
           },
           "repetition": 9,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5914,8 +5916,8 @@
           "exit_code": 1,
           "metrics": {
             "cpu_ms": 730,
-            "peak_rss_kib": 87768,
-            "wall_ms": 790
+            "peak_rss_kib": 87184,
+            "wall_ms": 800
           },
           "repetition": 10,
           "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
@@ -5925,24 +5927,24 @@
       "statistics": {
         "cpu_ms": {
           "count": 10,
-          "max": 750,
-          "median": 730,
-          "min": 680,
-          "p90": 750
+          "max": 770,
+          "median": 715,
+          "min": 690,
+          "p90": 740
         },
         "peak_rss_kib": {
           "count": 10,
-          "max": 88004,
-          "median": 87824,
-          "min": 87644,
-          "p90": 88000
+          "max": 88204,
+          "median": 87628,
+          "min": 87184,
+          "p90": 87912
         },
         "wall_ms": {
           "count": 10,
-          "max": 810,
-          "median": 790,
-          "min": 750,
-          "p90": 810
+          "max": 820,
+          "median": 780,
+          "min": 760,
+          "p90": 800
         }
       }
     },
@@ -5959,9 +5961,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 209660,
-            "peak_rss_kib": 1304084,
-            "wall_ms": 203830
+            "cpu_ms": 215540,
+            "peak_rss_kib": 1304180,
+            "wall_ms": 208900
           },
           "repetition": 1,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -5975,9 +5977,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 214720,
-            "peak_rss_kib": 1304240,
-            "wall_ms": 208290
+            "cpu_ms": 214890,
+            "peak_rss_kib": 1304696,
+            "wall_ms": 208130
           },
           "repetition": 2,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -5991,9 +5993,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 213650,
-            "peak_rss_kib": 1303732,
-            "wall_ms": 207720
+            "cpu_ms": 215490,
+            "peak_rss_kib": 1304792,
+            "wall_ms": 208940
           },
           "repetition": 3,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6007,9 +6009,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 214100,
-            "peak_rss_kib": 1303996,
-            "wall_ms": 207480
+            "cpu_ms": 214120,
+            "peak_rss_kib": 1304300,
+            "wall_ms": 208060
           },
           "repetition": 4,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6023,9 +6025,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 214390,
-            "peak_rss_kib": 1303644,
-            "wall_ms": 207750
+            "cpu_ms": 213190,
+            "peak_rss_kib": 1304408,
+            "wall_ms": 207060
           },
           "repetition": 5,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6039,9 +6041,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 215630,
-            "peak_rss_kib": 1303980,
-            "wall_ms": 209090
+            "cpu_ms": 215060,
+            "peak_rss_kib": 1304392,
+            "wall_ms": 208770
           },
           "repetition": 6,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6055,9 +6057,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 215490,
-            "peak_rss_kib": 1304292,
-            "wall_ms": 209480
+            "cpu_ms": 215210,
+            "peak_rss_kib": 1304336,
+            "wall_ms": 208640
           },
           "repetition": 7,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6071,9 +6073,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 215490,
-            "peak_rss_kib": 1304292,
-            "wall_ms": 208720
+            "cpu_ms": 215740,
+            "peak_rss_kib": 1303756,
+            "wall_ms": 209420
           },
           "repetition": 8,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6087,9 +6089,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 213940,
-            "peak_rss_kib": 1304744,
-            "wall_ms": 207890
+            "cpu_ms": 213890,
+            "peak_rss_kib": 1303816,
+            "wall_ms": 207760
           },
           "repetition": 9,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6103,9 +6105,9 @@
           ],
           "exit_code": 0,
           "metrics": {
-            "cpu_ms": 214890,
-            "peak_rss_kib": 1304032,
-            "wall_ms": 208730
+            "cpu_ms": 214720,
+            "peak_rss_kib": 1304552,
+            "wall_ms": 207920
           },
           "repetition": 10,
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
@@ -6115,24 +6117,24 @@
       "statistics": {
         "cpu_ms": {
           "count": 10,
-          "max": 215630,
-          "median": 214555,
-          "min": 209660,
-          "p90": 215490
+          "max": 215740,
+          "median": 214975,
+          "min": 213190,
+          "p90": 215540
         },
         "peak_rss_kib": {
           "count": 10,
-          "max": 1304744,
-          "median": 1304058,
-          "min": 1303644,
-          "p90": 1304292
+          "max": 1304792,
+          "median": 1304364,
+          "min": 1303756,
+          "p90": 1304696
         },
         "wall_ms": {
           "count": 10,
-          "max": 209480,
-          "median": 208090,
-          "min": 203830,
-          "p90": 209090
+          "max": 209420,
+          "median": 208385,
+          "min": 207060,
+          "p90": 208940
         }
       }
     },
@@ -6149,9 +6151,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32380,
-            "peak_rss_kib": 370328,
-            "wall_ms": 31540
+            "cpu_ms": 31470,
+            "peak_rss_kib": 370588,
+            "wall_ms": 30670
           },
           "repetition": 1,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6165,9 +6167,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 31600,
-            "peak_rss_kib": 370116,
-            "wall_ms": 30420
+            "cpu_ms": 32480,
+            "peak_rss_kib": 370272,
+            "wall_ms": 31410
           },
           "repetition": 2,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6181,9 +6183,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 31930,
-            "peak_rss_kib": 369840,
-            "wall_ms": 30950
+            "cpu_ms": 32290,
+            "peak_rss_kib": 370280,
+            "wall_ms": 31420
           },
           "repetition": 3,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6197,9 +6199,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 31870,
-            "peak_rss_kib": 370568,
-            "wall_ms": 31090
+            "cpu_ms": 32340,
+            "peak_rss_kib": 371896,
+            "wall_ms": 31520
           },
           "repetition": 4,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6213,9 +6215,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32260,
-            "peak_rss_kib": 370464,
-            "wall_ms": 31360
+            "cpu_ms": 32070,
+            "peak_rss_kib": 370032,
+            "wall_ms": 31060
           },
           "repetition": 5,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6230,8 +6232,8 @@
           "exit_code": 1,
           "metrics": {
             "cpu_ms": 32560,
-            "peak_rss_kib": 370608,
-            "wall_ms": 31470
+            "peak_rss_kib": 370700,
+            "wall_ms": 31630
           },
           "repetition": 6,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6245,9 +6247,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32600,
-            "peak_rss_kib": 370520,
-            "wall_ms": 31340
+            "cpu_ms": 32320,
+            "peak_rss_kib": 370612,
+            "wall_ms": 31360
           },
           "repetition": 7,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6261,9 +6263,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32240,
-            "peak_rss_kib": 370580,
-            "wall_ms": 31510
+            "cpu_ms": 32530,
+            "peak_rss_kib": 369956,
+            "wall_ms": 31610
           },
           "repetition": 8,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6277,9 +6279,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32250,
-            "peak_rss_kib": 370692,
-            "wall_ms": 31460
+            "cpu_ms": 31790,
+            "peak_rss_kib": 370140,
+            "wall_ms": 31000
           },
           "repetition": 9,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6293,9 +6295,9 @@
           ],
           "exit_code": 1,
           "metrics": {
-            "cpu_ms": 32540,
-            "peak_rss_kib": 370560,
-            "wall_ms": 31340
+            "cpu_ms": 32580,
+            "peak_rss_kib": 370292,
+            "wall_ms": 31570
           },
           "repetition": 10,
           "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
@@ -6305,24 +6307,24 @@
       "statistics": {
         "cpu_ms": {
           "count": 10,
-          "max": 32600,
-          "median": 32255,
-          "min": 31600,
+          "max": 32580,
+          "median": 32330,
+          "min": 31470,
           "p90": 32560
         },
         "peak_rss_kib": {
           "count": 10,
-          "max": 370692,
-          "median": 370540,
-          "min": 369840,
-          "p90": 370608
+          "max": 371896,
+          "median": 370286,
+          "min": 369956,
+          "p90": 370700
         },
         "wall_ms": {
           "count": 10,
-          "max": 31540,
-          "median": 31350,
-          "min": 30420,
-          "p90": 31510
+          "max": 31630,
+          "median": 31415,
+          "min": 30670,
+          "p90": 31610
         }
       }
     }

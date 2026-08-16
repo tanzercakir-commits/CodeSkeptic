@@ -42,61 +42,67 @@
   No semantic or promotion normalizer was weakened. CMake now gives an
   explicit cache override first priority, a non-empty environment override
   second priority, and tag/Git identity otherwise. The hosted build step pins
-  the complete configure/build lifecycle to `0.4.9-dev` without changing the
-  raw CMake cache. Preflight reproduced the existing authority exactly:
-  CMakeCache digest `ddbf7f1925ea47c3e64ac73d0cddc80fcdcbeea5700fe15ff4608bd7964ef5e0`,
-  real-repository input digest
-  `7edb80606435e65ddfb00751bb168fac3c9ed778a9735fb7487162ce62b60a14`,
-  TU digest `c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8`,
-  and plan digest
-  `db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278`.
+  the complete configure/build lifecycle to `0.4.9-dev`.
+- The following hosted qualification exposed two further provenance defects:
+  raw CMake cache bytes encoded workspace spelling and the retained
+  release-candidate build had been reused after its checkout changed. The
+  `codeskeptic-cmake-cache-v1` identity now parses the complete typed cache,
+  rejects duplicate, malformed, NUL-bearing, wrong-root, or wrong-tool entries,
+  preserves every option and type, and canonicalizes only boundary-safe source,
+  build, and verified tool roles. Release qualification requires a missing or
+  empty workspace, a clean exact checkout, and a fresh configure/build. The
+  hosted tests-off recipe and the Fedora calibration now produce identical
+  real-repository cache identity
+  `9e99750dc93c7cf8b783d3fc6ed018421d1f20597e360c6cfe9963313dbbbef0`;
+  the release plan is the clean exact-revision digest
+  `f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd`.
 - The next exact-head hosted run correctly rejected those post-calibration
   infrastructure repairs at the initial-baseline bootstrap boundary. The
   bootstrap allowlist now treats the root CMake version authority as the
   eighth infrastructure file while continuing to reject any workflow,
   runner, CMake, or test change made after the calibrated source revision.
   The final eight-file source state is recorded by ancestry-only source commit
-  `aeec85100006517b6b6028e99d326fb9f78dbafc` from the P10.6 base and joined
-  by merge commit `fd387aa3fa67aa25edaea87b7b40175cf5610eaf`, followed by fresh
+  `faa58c912f72e4e13df50290c5531641b3cccc68` from the P10.6 base and joined
+  by merge commit `a2e97519c0da8d2a233c9b4fa93fdfc225c9b999`, followed by fresh
   calibration, baseline, confirmation, and stress evidence. No authority-path
   relaxation or history rewrite was used.
 - Retained the final Fedora Linux x86_64 calibration at
   `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
   Its 122-entry tree binds 385 source files at revision
-  `aeec85100006517b6b6028e99d326fb9f78dbafc`, source digest
-  `3321d22243b8f95d92836b3f0b5bdae8d6f0270513440b8fe48d465b44be6900`,
+  `faa58c912f72e4e13df50290c5531641b3cccc68`, source digest
+  `c586d285598ac6b624e3993ef350b69b1c9a8dc0b63d468228fa6e582a77a842`,
   and analyzer digest
   `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
   All ten runs per workload produced one semantic fingerprint. Median wall
-  time was 790 ms for unit, 208090 ms for the real repository, and 31350 ms
-  for the release candidate; peak RSS maxima were 88004, 1304744, and 370692
+  time was 780 ms for unit, 208385 ms for the real repository, and 31415 ms
+  for the release candidate; peak RSS maxima were 88204, 1304792, and 371896
   KiB. Receipt/SHA256SUMS digests are
-  `431743012f5be8fa9b39e2cc132611b449e8534dc246d121e4e07b8516209c6e` /
-  `ea9e0075b7a6aae89c24575ce6c3b23d294ae6f2d089872fd79bd68a195424d9`.
+  `09b6abf1c9e28b1826e988ce36d6da4ef5d4542e3550577c42b15ad096deb6c1` /
+  `099f8ba9cb2a5694bf23ccdb12867539720094392de50fce719e2b8754528adb`.
   The pinned baseline digest is
-  `470987163a78f087375bfbc1d8c77a67db38596b128d65586ee754930e5d3125`.
-  The complete campaign duration was 2400720 ms.
+  `7f6e214d9921f59d131bebee528d642c7b7d06cfdca813ac949b5c9b0b11a810`.
+  The complete campaign duration was 2526849 ms.
 - Regenerated the retained stress matrix after the final source-authority
-  bridge. All nine cases pass twice in 705 ms with zero timeout or
+  bridge. All nine cases pass twice in 717 ms with zero timeout or
   crash. Its 37-entry tree binds 386 source files at revision
-  `fd387aa3fa67aa25edaea87b7b40175cf5610eaf`, digest
-  `74a8ff98b89592d5cc36313528ab066e5e4a5ba988aaa501b00f507289b26d21`;
+  `a2e97519c0da8d2a233c9b4fa93fdfc225c9b999`, digest
+  `fe90c23a0ea56f4be13f8a3246793669b8cdbe5cbcd1bea0b91cf38abfcbc353`;
   receipt/SHA256SUMS digests are
-  `b3948659077feda268f6d401697124daca786d8b5a18781aa6307cea3a0c4784` /
-  `f899de07165db0209e4dab3cabddfe2fa193217c0a16f9754a4ff9d13b77f836`.
+  `70115dc32a6180c4e117e2ae8e1811c2bafaaf075be8c547e69222944aa4d17c` /
+  `588644753e6d8a88299c50567b67a3ab9bde2a3d1a47858808c48ae337eb4a90`.
 - Retained a separate required-mode confirmation against the pinned baseline
   at
   `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
   Its 122-entry tree binds 385 source files at authority revision
-  `aeec85100006517b6b6028e99d326fb9f78dbafc`, source digest
-  `3321d22243b8f95d92836b3f0b5bdae8d6f0270513440b8fe48d465b44be6900`.
+  `9880a8b2fa0f5bbba2ed715084b6d57e17d34b6c`, source digest
+  `c586d285598ac6b624e3993ef350b69b1c9a8dc0b63d468228fa6e582a77a842`.
   All semantic and performance gates pass with no regression. Unit,
-  repository, and release-candidate wall medians are 790, 207745, and 31465
-  ms; peak RSS maxima are 88072, 1304824, and 370948 KiB. The complete
-  campaign duration was 2400740 ms.
+  repository, and release-candidate wall medians are 790, 207610, and 31365
+  ms; peak RSS maxima are 87928, 1304636, and 370812 KiB. The complete
+  campaign duration was 2399634 ms.
   Receipt/SHA256SUMS digests are
-  `9c9e4bac7ab3aa3ec2c175469124d422f0347d9335bb2c6aa22be14134aa93d7` /
-  `63c30b147446a1be1d030ca5a8758a98957d227c55e3a76c73eccf3108ffecb4`.
+  `37b59336c9f9938f260545525e5f7e847288ba94c17815eee496aa86a306980d` /
+  `2d6e45dd2161289ed8edffbdadab9df03a7619330af1d23657e24d83a150d6d1`.
   Exact-container verify-only accepted all three workloads and all ten
   repetitions, and the retained stress receipt plus both external manifests
   were rechecked in the same LLVM 20 environment. The exact-source final

@@ -1,22 +1,22 @@
 Command exited with non-zero status 1
-	Command being timed: "/work/build-p10-07-contracts/src/codeskeptic --files /tmp/codeskeptic-determinism-_onn3n9d/inputs/release-files.txt --report-paths /rc/src,/rc/ggml/src --build-path /rc-build --tu-timeout-seconds 600 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-_onn3n9d/release-candidate-10.json"
-	User time (seconds): 30.58
-	System time (seconds): 1.96
+	Command being timed: "/work/build-determinism/src/codeskeptic --files /tmp/codeskeptic-determinism-y7hfj9k2/inputs/release-files.txt --report-paths /work/build-determinism-release-calibration/llama-cpp/src,/work/build-determinism-release-calibration/llama-cpp/ggml/src --build-path /work/build-determinism-release-calibration/llama-cpp-build --tu-timeout-seconds 600 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-y7hfj9k2/release-candidate-10.json"
+	User time (seconds): 30.73
+	System time (seconds): 1.85
 	Percent of CPU this job got: 103%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:31.34
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:31.57
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 370560
+	Maximum resident set size (kbytes): 370292
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 576240
-	Voluntary context switches: 27170
-	Involuntary context switches: 366
+	Minor (reclaiming a frame) page faults: 575397
+	Voluntary context switches: 27594
+	Involuntary context switches: 392
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2336
+	File system outputs: 2352
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
