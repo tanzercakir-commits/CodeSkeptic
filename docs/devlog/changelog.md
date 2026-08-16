@@ -1,115 +1,88 @@
 # CodeSkeptic — Changelog
 
-## 2026-08-15 — Phase 10.7 determinism and performance qualification (in progress)
+## 2026-08-16 — Phase 10.7 deterministic performance qualification (in progress)
 
-- Added an exact three-workload qualification contract for the 24-TU thesis
-  corpus, the 55-TU CodeSkeptic `src/` build, and a pinned 12-TU llama.cpp
-  release-candidate slice. Each workload runs ten times and binds canonical
-  input bytes, every selected compile command and ordinal, analyzer limits,
-  source revision, toolchain, build cache, hardware inventory, and four bounded
-  raw artifacts per repetition. Receipt verification recomputes semantic
-  projections and wall/CPU/RSS claims from raw analyzer and GNU time bytes;
-  missing, partial, malformed, oversized, timed-out, or drifting evidence is
-  retained as rejected evidence and cannot manufacture a verdict.
-- Added protected baseline authority and promotion checks. Initial publication
-  has an explicit eight-path infrastructure revision, including the generated
-  TODO state, followed only by the pinned baseline, changelog, determinism
-  calibration, and independently verified Phase 10 stress evidence. Later
-  profiles bind the exact predecessor baseline/profile and source revision.
-  Candidate deletion, evidence drift, changed hardware/toolchain identity, or
-  an admitted source change fails closed.
-- RED-first production campaigns exposed and fixed two authority bugs. The
-  release-candidate receipt now always binds `$REPO` as well as its release
-  source/build roots. Receipt verification now binds the recorded revision as
-  an ancestor and separately proves both its committed source bytes and the
-  current admitted source bytes; committing an ignored evidence transaction no
-  longer invalidates itself, while any actual source drift is still rejected.
-  The new focused regressions pass with the full qualification and workflow
-  contracts, followed by a fresh independent source-stage PASS.
-- Hosted exact-head evidence then exposed two independent portability defects:
-  job-level use of the GitHub `runner` context prevented the determinism
-  workflow from creating a job, while macOS could raise `EPERM` during
-  process-group cleanup. The workflow now scopes temporary paths to the steps
-  that consume them. Timeout cleanup separately reaps the leader and proves
-  the process group absent after bounded TERM/KILL phases; `EPERM` or a group
-  that survives SIGKILL remains a fail-closed qualification error that retains
-  the original timeout reason. The production heartbeat regression forces the
-  SIGTERM-resistant descendant path, and bounded macOS process discovery no
-  longer turns an unverifiable cleanup into success.
-- The first Fedora refresh correctly rejected a compile-plan identity drift:
-  the original calibration build had no visible Git metadata and recorded
-  `0.4.9-dev`, while the exact-head build recorded a commit-suffixed identity.
-  No semantic or promotion normalizer was weakened. CMake now gives an
-  explicit cache override first priority, a non-empty environment override
-  second priority, and tag/Git identity otherwise. The hosted build step pins
-  the complete configure/build lifecycle to `0.4.9-dev`.
-- The following hosted qualification exposed two further provenance defects:
-  raw CMake cache bytes encoded workspace spelling and the retained
-  release-candidate build had been reused after its checkout changed. The
-  `codeskeptic-cmake-cache-v1` identity now parses the complete typed cache,
-  rejects duplicate, malformed, NUL-bearing, wrong-root, or wrong-tool entries,
-  preserves every option and type, and canonicalizes only boundary-safe source,
-  build, and verified tool roles. Release qualification requires a missing or
-  empty workspace, a clean exact checkout, and a fresh configure/build. The
-  hosted tests-off recipe and the Fedora calibration now produce identical
-  real-repository cache identity
-  `9e99750dc93c7cf8b783d3fc6ed018421d1f20597e360c6cfe9963313dbbbef0`;
-  the release plan is the clean exact-revision digest
-  `f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd`.
-- The next exact-head hosted run correctly rejected those post-calibration
-  infrastructure repairs at the initial-baseline bootstrap boundary. The
-  bootstrap allowlist now treats the root CMake version authority as the
-  eighth infrastructure file while continuing to reject any workflow,
-  runner, CMake, or test change made after the calibrated source revision.
-  The final eight-file source state is recorded by ancestry-only source commit
-  `faa58c912f72e4e13df50290c5531641b3cccc68` from the P10.6 base and joined
-  by merge commit `a2e97519c0da8d2a233c9b4fa93fdfc225c9b999`, followed by fresh
-  calibration, baseline, confirmation, and stress evidence. No authority-path
-  relaxation or history rewrite was used.
-- Retained the final Fedora Linux x86_64 calibration at
-  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
-  Its 122-entry tree binds 385 source files at revision
-  `faa58c912f72e4e13df50290c5531641b3cccc68`, source digest
-  `c586d285598ac6b624e3993ef350b69b1c9a8dc0b63d468228fa6e582a77a842`,
-  and analyzer digest
-  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
-  All ten runs per workload produced one semantic fingerprint. Median wall
-  time was 780 ms for unit, 208385 ms for the real repository, and 31415 ms
-  for the release candidate; peak RSS maxima were 88204, 1304792, and 371896
-  KiB. Receipt/SHA256SUMS digests are
-  `09b6abf1c9e28b1826e988ce36d6da4ef5d4542e3550577c42b15ad096deb6c1` /
-  `099f8ba9cb2a5694bf23ccdb12867539720094392de50fce719e2b8754528adb`.
-  The pinned baseline digest is
-  `7f6e214d9921f59d131bebee528d642c7b7d06cfdca813ac949b5c9b0b11a810`.
-  The complete campaign duration was 2526849 ms.
-- Regenerated the retained stress matrix after the final source-authority
-  bridge. All nine cases pass twice in 717 ms with zero timeout or
-  crash. Its 37-entry tree binds 386 source files at revision
-  `a2e97519c0da8d2a233c9b4fa93fdfc225c9b999`, digest
-  `fe90c23a0ea56f4be13f8a3246793669b8cdbe5cbcd1bea0b91cf38abfcbc353`;
-  receipt/SHA256SUMS digests are
-  `70115dc32a6180c4e117e2ae8e1811c2bafaaf075be8c547e69222944aa4d17c` /
-  `588644753e6d8a88299c50567b67a3ab9bde2a3d1a47858808c48ae337eb4a90`.
-- Retained a separate required-mode confirmation against the pinned baseline
-  at
-  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
-  Its 122-entry tree binds 385 source files at authority revision
-  `9880a8b2fa0f5bbba2ed715084b6d57e17d34b6c`, source digest
-  `c586d285598ac6b624e3993ef350b69b1c9a8dc0b63d468228fa6e582a77a842`.
-  All semantic and performance gates pass with no regression. Unit,
-  repository, and release-candidate wall medians are 790, 207610, and 31365
-  ms; peak RSS maxima are 87928, 1304636, and 370812 KiB. The complete
-  campaign duration was 2399634 ms.
-  Receipt/SHA256SUMS digests are
-  `37b59336c9f9938f260545525e5f7e847288ba94c17815eee496aa86a306980d` /
-  `2d6e45dd2161289ed8edffbdadab9df03a7619330af1d23657e24d83a150d6d1`.
-  Exact-container verify-only accepted all three workloads and all ten
-  repetitions, and the retained stress receipt plus both external manifests
-  were rechecked in the same LLVM 20 environment. The exact-source final
-  regression passed `1280/1280` direct C++ tests and `1299/1299`
-  repository-aware CTest entries. Independent audit, push, and hosted
-  exact-head CI remain pending; this checkpoint does not close `CS-P10-07` or
-  write protected `main`.
+- Added fail-closed CPU execution identity to the determinism/performance
+  authority. Performance-required Linux evidence now binds the exact
+  `sched_getaffinity` mask and effective scheduler utilization clamps; the
+  accepted Fedora profile is restricted to separate P-core logical CPUs
+  `[0, 2]` with `uclamp.min=1024` and `uclamp.max=1024`. The subprocess tree
+  inherits those process-local controls without modifying the host-wide power
+  policy. Baseline, calibration, accepted/rejected qualification, and retained
+  verification schemas advance to V4 so the new wire format cannot be confused
+  with the earlier affinity-only V3 evidence.
+- Made `/proc/self/sched` evidence bounded and strict: reads stop at one MiB
+  plus the overflow sentinel, require ASCII, accept exactly one min and max
+  field, bound decimal width before conversion, and reject missing, duplicate,
+  conflicting, malformed, non-regular, unavailable, or out-of-range state.
+  Affinity and uclamp fields validate types before set/range operations, so
+  adversarial JSON produces a controlled qualification failure instead of a
+  raw Python exception. Record-only/rejected evidence may describe unavailable
+  controls, but cannot manufacture a performance PASS.
+- Preserved the preceding Phase 10.7 authority and hosted-portability
+  hardening. Qualification still binds the exact three workload plans, ten
+  repetitions, raw analyzer/time artifacts, semantic projections, toolchain,
+  canonical typed CMake cache, clean release workspace, and committed source
+  ancestry. Initial baseline publication remains source-first and permits only
+  the pinned eight infrastructure paths before calibration; later workflow,
+  runner, CMake, or contract drift fails closed. GitHub temporary paths remain
+  step-scoped, CMake version identity remains stable across configure/build,
+  and POSIX timeout cleanup still proves both the leader and process group
+  absent through bounded TERM/KILL phases without treating `EPERM` as success.
+  V4 supersedes only the affinity-only evidence format and retained baseline,
+  not these earlier controls.
+- The first affinity-only independent confirmation honestly rejected a release
+  candidate whose wall/CPU maxima exceeded the unchanged 10 percent ceiling.
+  No retry or threshold relaxation was used. The V4 source was frozen at
+  `a1eca13d28e29cd63d26a9bdadb3e4343560b5c5`, independently source-audited,
+  and rebuilt in the pinned LLVM 20 image before any new performance authority
+  was created.
+- Retained the CPU-controlled 3-workload x 10-repetition calibration under
+  `docs/evidence/phase10/determinism/calibrations/2026-08-16-uclamp-fedora-linux-x86_64`.
+  It binds 385 source files with digest
+  `be021bd3847e22d2cd63cf7d49bfa5289697b0f71ac98a1304af57b57710a5e0`,
+  analyzer SHA-256
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`,
+  and calibration receipt SHA-256
+  `010359fe8e0ecf1d6fdb2d58bd83c32d244485004462b2f6c56dd41614c686d2`.
+  Its baseline SHA-256 is
+  `6aab27131d9dc7d4d9ace46ffd559b631a41a4f3376af220b98a7246e22d6af7`;
+  the 122-entry calibration manifest SHA-256 is
+  `50b089a092c0a6d7c0cfcbe1e9317731133902aa50073cbc87c5010c896f6621`.
+  Worst-case calibration wall/CPU/RSS values are `1490 ms / 1400 ms /
+  88300 KiB` for the unit workload, `235990 ms / 240370 ms / 1305092 KiB`
+  for the real repository, and `39460 ms / 40660 ms / 371072 KiB` for the
+  release candidate.
+- Retained an independent clean-workspace confirmation at
+  `.../2026-08-16-uclamp-fedora-linux-x86_64-confirmation`. All three semantic
+  hashes match calibration and all performance gates pass without retry.
+  Worst-case confirmation wall/CPU/RSS values are `770 ms / 690 ms /
+  88200 KiB`, `227570 ms / 232190 ms / 1305032 KiB`, and `38150 ms /
+  38830 ms / 370924 KiB`, respectively. The confirmation receipt SHA-256 is
+  `ec57bae16cda287c798951854f990e373737e4c0c93145958e308f7cea42d3d2`;
+  its 122-entry manifest SHA-256 is
+  `a91d804ce18b1d21d8e92ed247b68f84c12e5f62b56f21f6d6366fcc4d398b68`.
+  Pinned verify-only passes accept the baseline authority, calibration, initial
+  qualification, and independent confirmation.
+- Refreshed the exact-source stress tree at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`. All nine cases
+  pass two repetitions with zero timeout/crash in `545` ms. It binds 386 files
+  with source digest
+  `acda6f65f187132a1fb64154801af2b057118c681a7bbe6b0c56b947a59b3c51`;
+  receipt SHA-256 is
+  `109708657f8af0b84cf4effc19adeaeba5d73e0625de3a0ec38fa6e134258bdc`,
+  and the 37-entry outer manifest SHA-256 is
+  `63e22e4c521e725b7a2574918fe6232933d32394900b34900d0f06dd302b166b`.
+- Pre-integration exact-source validation passes `30/30` determinism
+  contracts, `4/4` workflow contracts, `6/6` stress contracts, and
+  `1280/1280` direct C++ tests. The first 1299-entry CTest pass reached
+  `1298/1299` and correctly rejected only the temporary source-authority branch
+  name as absent from generator-owned TODO state; final integration into the
+  already-listed feature branch and a fresh full CTest remain required.
+  Independent final review, publication to the feature branch, and exact-head
+  hosted Linux, sanitizer, Windows, macOS, and determinism gates remain
+  required; this checkpoint does not close `CS-P10-07` or write protected
+  `main`.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 

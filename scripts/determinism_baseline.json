@@ -5,21 +5,29 @@
     "fedora-linux-x86_64": {
       "hardware": {
         "architecture": "x86_64",
+        "cpu_affinity": [
+          0,
+          2
+        ],
+        "cpu_affinity_source": "sched_getaffinity",
         "cpu_model": "12th Gen Intel(R) Core(TM) i5-1235U",
-        "logical_cpus": 12,
+        "cpu_uclamp_max": 1024,
+        "cpu_uclamp_min": 1024,
+        "cpu_uclamp_source": "proc-self-sched",
+        "logical_cpus": 2,
         "memory_bytes": 16425553920
       },
       "provenance": {
         "calibration": {
-          "evidence_path": "docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64",
-          "receipt_sha256": "09b6abf1c9e28b1826e988ce36d6da4ef5d4542e3550577c42b15ad096deb6c1"
+          "evidence_path": "docs/evidence/phase10/determinism/calibrations/2026-08-16-uclamp-fedora-linux-x86_64",
+          "receipt_sha256": "010359fe8e0ecf1d6fdb2d58bd83c32d244485004462b2f6c56dd41614c686d2"
         },
         "promotion": {
           "previous_baseline_sha256": null,
           "previous_profile_sha256": null,
-          "reason": "Initial Fedora LLVM 20 canonical-cache determinism and performance baseline"
+          "reason": "Initial CPU-affinity and uclamp-bound Fedora performance baseline"
         },
-        "source_revision": "faa58c912f72e4e13df50290c5531641b3cccc68",
+        "source_revision": "a1eca13d28e29cd63d26a9bdadb3e4343560b5c5",
         "toolchain": {
           "analyzer": {
             "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
@@ -58,24 +66,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 215740,
-              "median": 214975,
-              "min": 213190,
-              "p90": 215540
+              "max": 240370,
+              "median": 223470,
+              "min": 215630,
+              "p90": 239650
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 1304792,
-              "median": 1304364,
-              "min": 1303756,
-              "p90": 1304696
+              "max": 1305092,
+              "median": 1304652,
+              "min": 1303916,
+              "p90": 1304872
             },
             "wall_ms": {
               "count": 10,
-              "max": 209420,
-              "median": 208385,
-              "min": 207060,
-              "p90": 208940
+              "max": 235990,
+              "median": 218885,
+              "min": 211250,
+              "p90": 235000
             }
           },
           "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
@@ -87,24 +95,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 32580,
-              "median": 32330,
-              "min": 31470,
-              "p90": 32560
+              "max": 40660,
+              "median": 33375,
+              "min": 32130,
+              "p90": 37360
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 371896,
-              "median": 370286,
-              "min": 369956,
-              "p90": 370700
+              "max": 371072,
+              "median": 370652,
+              "min": 369936,
+              "p90": 371032
             },
             "wall_ms": {
               "count": 10,
-              "max": 31630,
-              "median": 31415,
-              "min": 30670,
-              "p90": 31610
+              "max": 39460,
+              "median": 32665,
+              "min": 31470,
+              "p90": 36560
             }
           },
           "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
@@ -116,24 +124,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 770,
-              "median": 715,
-              "min": 690,
-              "p90": 740
+              "max": 1400,
+              "median": 610,
+              "min": 560,
+              "p90": 710
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 88204,
-              "median": 87628,
-              "min": 87184,
-              "p90": 87912
+              "max": 88300,
+              "median": 87852,
+              "min": 87712,
+              "p90": 88200
             },
             "wall_ms": {
               "count": 10,
-              "max": 820,
-              "median": 780,
-              "min": 760,
-              "p90": 800
+              "max": 1490,
+              "median": 670,
+              "min": 630,
+              "p90": 790
             }
           },
           "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
@@ -142,7 +150,7 @@
       }
     }
   },
-  "schema": "codeskeptic-determinism-baseline-v2",
+  "schema": "codeskeptic-determinism-baseline-v4",
   "semantic_reference": {
     "real-repository": {
       "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",

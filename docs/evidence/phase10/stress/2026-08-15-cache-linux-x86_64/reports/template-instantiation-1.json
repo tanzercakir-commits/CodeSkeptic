@@ -7,7 +7,7 @@
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 1, "blocking": 1, "report_only": 0 },
   "translation_units": [
-    { "path": "/tmp/codeskeptic-stress-inah63a3/template-instantiation/repeat-1/template_matrix.cpp", "compile_command_sha256": "518317954f0f6bdd0e266f24d85dba98e8ee550b411f37508189a61ec95b5726", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 25, "peak_memory_kib": 82792, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+    { "path": "/tmp/codeskeptic-stress-ehh_f8ht/template-instantiation/repeat-1/template_matrix.cpp", "compile_command_sha256": "85d388660663887fe676d034e68d2dff16d5af616a40d02d876384ba208ffe9d", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 17, "peak_memory_kib": 82628, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
   ],
   "total": 1,
   "diagnostics": [
@@ -17,13 +17,13 @@
       "capability_tier": "supported",
       "blocks_verdict": true,
       "fingerprint": "csf1-d5936227ae0ea163",
-      "file": "/tmp/codeskeptic-stress-inah63a3/template-instantiation/repeat-1/template_matrix.cpp",
+      "file": "/tmp/codeskeptic-stress-ehh_f8ht/template-instantiation/repeat-1/template_matrix.cpp",
       "line": 10,
       "column": 24,
       "function": "template_seeded",
       "message": "Division by zero: 'divisor' is definitely zero",
       "notes": [
-        { "file": "/tmp/codeskeptic-stress-inah63a3/template-instantiation/repeat-1/template_matrix.cpp", "line": 9, "column": 5, "message": "'divisor' assigned zero here" }
+        { "file": "/tmp/codeskeptic-stress-ehh_f8ht/template-instantiation/repeat-1/template_matrix.cpp", "line": 9, "column": 5, "message": "'divisor' assigned zero here" }
       ]
     }
   ]

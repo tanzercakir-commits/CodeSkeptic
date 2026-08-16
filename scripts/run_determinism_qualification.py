@@ -31,10 +31,10 @@ except ImportError:  # pragma: no cover - unavailable on native Windows
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v1"
-BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v2"
-RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v2"
-REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v2"
-CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v2"
+BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v4"
+RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v4"
+REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v4"
+CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v4"
 CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v1"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
@@ -42,6 +42,15 @@ TOOLCHAIN_NAMES = (
     "analyzer", "clang", "gnu_time", "cmake", "ninja",
     "c_compiler", "cxx_compiler",
 )
+HARDWARE_FIELDS = (
+    "architecture", "cpu_model", "logical_cpus", "cpu_affinity_source",
+    "cpu_affinity", "cpu_uclamp_source", "cpu_uclamp_min",
+    "cpu_uclamp_max", "memory_bytes",
+)
+AFFINITY_SOURCE_SCHED = "sched_getaffinity"
+AFFINITY_SOURCE_UNAVAILABLE = "unavailable"
+UCLAMP_SOURCE_PROC = "proc-self-sched"
+UCLAMP_SOURCE_UNAVAILABLE = "unavailable"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 FINGERPRINT = re.compile(r"csf1-[0-9a-f]{16}")
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}")
@@ -114,6 +123,52 @@ def _require_int(value: Any, label: str, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
         raise QualificationError(f"{label} is outside the admitted range")
     return value
+
+
+def _validate_cpu_affinity(
+    value: Any, logical_cpus: int, source: Any, label: str,
+) -> list[int]:
+    if (not isinstance(source, str) or
+            source not in {AFFINITY_SOURCE_SCHED, AFFINITY_SOURCE_UNAVAILABLE}):
+        raise QualificationError(f"{label} source is malformed")
+    if source == AFFINITY_SOURCE_UNAVAILABLE:
+        if value != []:
+            raise QualificationError(f"{label} is malformed")
+        return value
+    if not isinstance(value, list) or not value or len(value) != logical_cpus:
+        raise QualificationError(f"{label} is malformed")
+    for cpu in value:
+        _require_int(cpu, label, 0, 65535)
+    if value != sorted(set(value)):
+        raise QualificationError(f"{label} is malformed")
+    return value
+
+
+def _validate_cpu_uclamp(
+    source: Any, minimum: Any, maximum: Any, label: str,
+) -> None:
+    if (not isinstance(source, str) or
+            source not in {UCLAMP_SOURCE_PROC, UCLAMP_SOURCE_UNAVAILABLE}):
+        raise QualificationError(f"{label} source is malformed")
+    if source == UCLAMP_SOURCE_UNAVAILABLE:
+        if minimum is not None or maximum is not None:
+            raise QualificationError(f"{label} is malformed")
+        return
+    _require_int(minimum, f"{label} minimum", 0, 1024)
+    _require_int(maximum, f"{label} maximum", 0, 1024)
+    if minimum > maximum:
+        raise QualificationError(f"{label} is malformed")
+
+
+def _require_stable_cpu_controls(hardware: dict[str, Any], label: str) -> None:
+    if hardware["cpu_affinity_source"] != AFFINITY_SOURCE_SCHED:
+        raise QualificationError(f"{label} CPU affinity is not measurable")
+    if (hardware["cpu_uclamp_source"] != UCLAMP_SOURCE_PROC or
+            hardware["cpu_uclamp_min"] != 1024 or
+            hardware["cpu_uclamp_max"] != 1024):
+        raise QualificationError(
+            f"{label} CPU utilization clamp is not stable"
+        )
 
 
 def _require_sha(value: Any, label: str) -> str:
@@ -386,13 +441,24 @@ def validate_baseline(raw: dict[str, Any], manifest_sha256: str) -> dict[str, An
             raise QualificationError(
                 "baseline promotion profile predecessor lacks a baseline identity"
             )
-        hardware = _exact_dict(profile["hardware"], {
-            "architecture", "cpu_model", "logical_cpus", "memory_bytes"
-        }, f"baseline hardware {class_id}")
+        hardware = _exact_dict(
+            profile["hardware"], set(HARDWARE_FIELDS),
+            f"baseline hardware {class_id}",
+        )
         if any(not isinstance(hardware[field], str) or not hardware[field]
                for field in ("architecture", "cpu_model")):
             raise QualificationError("baseline hardware identity is invalid")
         _require_int(hardware["logical_cpus"], "baseline logical CPU count", 1, 65536)
+        _validate_cpu_affinity(
+            hardware["cpu_affinity"], hardware["logical_cpus"],
+            hardware["cpu_affinity_source"],
+            "baseline CPU affinity",
+        )
+        _validate_cpu_uclamp(
+            hardware["cpu_uclamp_source"], hardware["cpu_uclamp_min"],
+            hardware["cpu_uclamp_max"], "baseline CPU utilization clamp",
+        )
+        _require_stable_cpu_controls(hardware, "baseline")
         _require_int(hardware["memory_bytes"], "baseline memory", 1, 1 << 62)
         workloads = profile["workloads"]
         if not isinstance(workloads, dict) or set(workloads) != set(KINDS):
@@ -470,10 +536,7 @@ def _profile_matches(
 ) -> bool:
     if profile is None:
         return False
-    hardware = {
-        field: host[field]
-        for field in ("architecture", "cpu_model", "logical_cpus", "memory_bytes")
-    }
+    hardware = {field: host[field] for field in HARDWARE_FIELDS}
     return (
         profile["hardware"] == hardware and
         profile["provenance"]["toolchain"] == toolchain
@@ -632,14 +695,23 @@ def validate_receipt_payload(
             configuration["performance_regression_limit_percent"] != 10 or
             configuration["performance_policy"] not in {"required", "record-only"}):
         raise QualificationError("receipt configuration differs from manifest")
-    host = _exact_dict(receipt["host"], {
-        "class_id", "os", "architecture", "cpu_model", "logical_cpus", "memory_bytes"
-    }, "receipt host")
+    host = _exact_dict(
+        receipt["host"], {"class_id", "os", *HARDWARE_FIELDS},
+        "receipt host",
+    )
     if (not isinstance(host["class_id"], str) or IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("receipt host identity is invalid")
     _require_int(host["logical_cpus"], "host logical CPU count", 1, 65536)
+    _validate_cpu_affinity(
+        host["cpu_affinity"], host["logical_cpus"],
+        host["cpu_affinity_source"], "host CPU affinity"
+    )
+    _validate_cpu_uclamp(
+        host["cpu_uclamp_source"], host["cpu_uclamp_min"],
+        host["cpu_uclamp_max"], "host CPU utilization clamp",
+    )
     _require_int(host["memory_bytes"], "host memory", 1, 1 << 62)
     toolchain = _validate_toolchain(receipt["toolchain"], "receipt toolchain")
     inputs = receipt["inputs"]
@@ -665,6 +737,8 @@ def validate_receipt_payload(
     profile_id = host["class_id"]
     profile = baseline["profiles"].get(profile_id)
     profile_matches = _profile_matches(profile, host, toolchain)
+    if configuration["performance_policy"] == "required":
+        _require_stable_cpu_controls(host, "required performance evidence")
     if configuration["performance_policy"] == "required" and not profile_matches:
         if profile is None:
             raise QualificationError(f"baseline profile is unavailable for {profile_id}")
@@ -814,16 +888,26 @@ def _validate_calibration_payload(
         raise QualificationError("calibration source revision is malformed")
     _require_sha(source["manifest_sha256"], "calibration source manifest")
     _require_int(source["file_count"], "calibration source file count", 1, 1_000_000)
-    host = _exact_dict(receipt["host"], {
-        "class_id", "os", "architecture", "cpu_model", "logical_cpus",
-        "memory_bytes",
-    }, "calibration host")
+    host = _exact_dict(
+        receipt["host"], {"class_id", "os", *HARDWARE_FIELDS},
+        "calibration host",
+    )
     if (not isinstance(host["class_id"], str) or
             IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("calibration host identity is malformed")
     _require_int(host["logical_cpus"], "calibration logical CPU count", 1, 65536)
+    _validate_cpu_affinity(
+        host["cpu_affinity"], host["logical_cpus"],
+        host["cpu_affinity_source"],
+        "calibration CPU affinity",
+    )
+    _validate_cpu_uclamp(
+        host["cpu_uclamp_source"], host["cpu_uclamp_min"],
+        host["cpu_uclamp_max"], "calibration CPU utilization clamp",
+    )
+    _require_stable_cpu_controls(host, "calibration")
     _require_int(host["memory_bytes"], "calibration memory", 1, 1 << 62)
     _validate_toolchain(receipt["toolchain"], "calibration toolchain")
     if (not isinstance(receipt["inputs"], dict) or
@@ -955,16 +1039,25 @@ def _validate_rejected_payload(receipt: dict[str, Any], manifest: dict[str, Any]
         raise QualificationError("rejected source revision is malformed")
     _require_sha(source["manifest_sha256"], "rejected source manifest")
     _require_int(source["file_count"], "rejected source file count", 1, 1_000_000)
-    host = _exact_dict(receipt["host"], {
-        "class_id", "os", "architecture", "cpu_model", "logical_cpus",
-        "memory_bytes",
-    }, "rejected host")
+    host = _exact_dict(
+        receipt["host"], {"class_id", "os", *HARDWARE_FIELDS},
+        "rejected host",
+    )
     if (not isinstance(host["class_id"], str) or
             IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("rejected host identity is malformed")
     _require_int(host["logical_cpus"], "rejected logical CPU count", 1, 65536)
+    _validate_cpu_affinity(
+        host["cpu_affinity"], host["logical_cpus"],
+        host["cpu_affinity_source"],
+        "rejected CPU affinity",
+    )
+    _validate_cpu_uclamp(
+        host["cpu_uclamp_source"], host["cpu_uclamp_min"],
+        host["cpu_uclamp_max"], "rejected CPU utilization clamp",
+    )
     _require_int(host["memory_bytes"], "rejected memory", 1, 1 << 62)
     _validate_toolchain(receipt["toolchain"], "rejected toolchain")
     if (not isinstance(receipt["inputs"], dict) or
@@ -1195,8 +1288,7 @@ def verify_baseline_authority(
                 f"baseline profile {class_id} calibration receipt identity drift"
             )
         expected_hardware = {
-            field: calibration["host"][field]
-            for field in ("architecture", "cpu_model", "logical_cpus", "memory_bytes")
+            field: calibration["host"][field] for field in HARDWARE_FIELDS
         }
         if (calibration["host"]["class_id"] != class_id or
                 expected_hardware != profile["hardware"] or
@@ -1760,6 +1852,58 @@ def _validate_build_toolchain_identity(
     return identity
 
 
+def _cpu_uclamp_identity(
+    sched_path: Path = Path("/proc/self/sched"),
+) -> tuple[str, int | None, int | None]:
+    kind = _regular_kind(sched_path)
+    if kind == "missing":
+        return UCLAMP_SOURCE_UNAVAILABLE, None, None
+    if kind != "regular":
+        raise QualificationError("CPU utilization clamp evidence is not regular")
+    try:
+        with sched_path.open("rb") as stream:
+            raw = stream.read(1024 * 1024 + 1)
+    except OSError as error:
+        raise QualificationError(
+            "cannot read effective CPU utilization clamp"
+        ) from error
+    if len(raw) > 1024 * 1024:
+        raise QualificationError("CPU utilization clamp evidence is oversized")
+    try:
+        text = raw.decode("ascii", errors="strict")
+    except UnicodeError as error:
+        raise QualificationError(
+            "effective CPU utilization clamp is malformed"
+        ) from error
+    minimum_lines = re.findall(
+        r"^effective uclamp\.min.*$", text, re.MULTILINE,
+    )
+    maximum_lines = re.findall(
+        r"^effective uclamp\.max.*$", text, re.MULTILINE,
+    )
+    if not minimum_lines and not maximum_lines:
+        return UCLAMP_SOURCE_UNAVAILABLE, None, None
+    if len(minimum_lines) != 1 or len(maximum_lines) != 1:
+        raise QualificationError("effective CPU utilization clamp is malformed")
+    minimum_match = re.fullmatch(
+        r"effective uclamp\.min\s*:\s*([0-9]{1,4})\s*",
+        minimum_lines[0],
+    )
+    maximum_match = re.fullmatch(
+        r"effective uclamp\.max\s*:\s*([0-9]{1,4})\s*",
+        maximum_lines[0],
+    )
+    if minimum_match is None or maximum_match is None:
+        raise QualificationError("effective CPU utilization clamp is malformed")
+    minimum = int(minimum_match.group(1))
+    maximum = int(maximum_match.group(1))
+    _validate_cpu_uclamp(
+        UCLAMP_SOURCE_PROC, minimum, maximum,
+        "effective CPU utilization clamp",
+    )
+    return UCLAMP_SOURCE_PROC, minimum, maximum
+
+
 def host_identity(class_id: str) -> dict[str, Any]:
     if IDENTIFIER.fullmatch(class_id) is None:
         raise QualificationError("hardware class id is invalid")
@@ -1787,12 +1931,32 @@ def host_identity(class_id: str) -> dict[str, Any]:
             memory_bytes = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
         except (OSError, ValueError):
             memory_bytes = 1
+    try:
+        cpu_affinity = sorted(os.sched_getaffinity(0))
+    except AttributeError:
+        cpu_affinity = []
+        affinity_source = AFFINITY_SOURCE_UNAVAILABLE
+    except OSError as error:
+        raise QualificationError(
+            "cannot read effective CPU affinity"
+        ) from error
+    else:
+        affinity_source = AFFINITY_SOURCE_SCHED
+    if affinity_source == AFFINITY_SOURCE_SCHED and not cpu_affinity:
+        raise QualificationError("effective CPU affinity is empty")
+    logical_cpus = len(cpu_affinity) if cpu_affinity else (os.cpu_count() or 1)
+    uclamp_source, uclamp_minimum, uclamp_maximum = _cpu_uclamp_identity()
     return {
         "class_id": class_id,
         "os": f"{platform.system()} {platform.release()}",
         "architecture": platform.machine() or "unknown-architecture",
         "cpu_model": cpu_model,
-        "logical_cpus": os.cpu_count() or 1,
+        "logical_cpus": logical_cpus,
+        "cpu_affinity_source": affinity_source,
+        "cpu_affinity": cpu_affinity,
+        "cpu_uclamp_source": uclamp_source,
+        "cpu_uclamp_min": uclamp_minimum,
+        "cpu_uclamp_max": uclamp_maximum,
         "memory_bytes": int(memory_bytes),
     }
 
@@ -3003,12 +3167,7 @@ def build_baseline(
                         "previous_profile_sha256": previous_profile_sha256,
                     },
                 },
-                "hardware": {
-                    field: host[field]
-                    for field in (
-                        "architecture", "cpu_model", "logical_cpus", "memory_bytes"
-                    )
-                },
+                "hardware": {field: host[field] for field in HARDWARE_FIELDS},
                 "workloads": {
                     item["kind"]: {
                         "semantic_sha256": item["semantic_sha256"],

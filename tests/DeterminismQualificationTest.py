@@ -434,6 +434,11 @@ def baseline(
                     "architecture": "x86_64",
                     "cpu_model": "test cpu",
                     "logical_cpus": 2,
+                    "cpu_affinity_source": "sched_getaffinity",
+                    "cpu_affinity": [0, 1],
+                    "cpu_uclamp_source": "proc-self-sched",
+                    "cpu_uclamp_min": 1024,
+                    "cpu_uclamp_max": 1024,
                     "memory_bytes": 8 * 1024 * 1024 * 1024,
                 },
                 "workloads": {
@@ -559,6 +564,11 @@ def receipt(
             "architecture": "x86_64",
             "cpu_model": "test cpu",
             "logical_cpus": 2,
+            "cpu_affinity_source": "sched_getaffinity",
+            "cpu_affinity": [0, 1],
+            "cpu_uclamp_source": "proc-self-sched",
+            "cpu_uclamp_min": 1024,
+            "cpu_uclamp_max": 1024,
             "memory_bytes": 8 * 1024 * 1024 * 1024,
         },
         "toolchain": toolchain_identity(),
@@ -583,6 +593,24 @@ def receipt(
 
 
 class DeterminismQualificationTest(unittest.TestCase):
+    def test_affinity_and_uclamp_evidence_uses_a_distinct_v4_schema(self) -> None:
+        self.assertEqual(
+            qualification.BASELINE_SCHEMA,
+            "codeskeptic-determinism-baseline-v4",
+        )
+        self.assertEqual(
+            qualification.RECEIPT_SCHEMA,
+            "codeskeptic-determinism-qualification-v4",
+        )
+        self.assertEqual(
+            qualification.REJECTED_SCHEMA,
+            "codeskeptic-determinism-rejected-v4",
+        )
+        self.assertEqual(
+            qualification.CALIBRATION_SCHEMA,
+            "codeskeptic-determinism-calibration-v4",
+        )
+
     def test_manifest_requires_exact_three_workloads_ten_runs_and_ten_percent(self) -> None:
         valid = qualification.validate_manifest(manifest())
         self.assertEqual([item["kind"] for item in valid["workloads"]], list(KINDS))
@@ -825,6 +853,264 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.QualificationError, "hardware|toolchain|profile"
         ):
             qualification.validate_receipt_payload(current, raw_manifest, base)
+
+        current = receipt(manifest_sha)
+        base = baseline(manifest_sha)
+        current["host"]["cpu_affinity"] = [0, 2]
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "hardware|toolchain|profile"
+        ):
+            qualification.validate_receipt_payload(current, raw_manifest, base)
+
+        current = receipt(manifest_sha)
+        current["host"]["cpu_affinity"] = [0, 0]
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU affinity"
+        ):
+            qualification.validate_receipt_payload(current, raw_manifest, base)
+
+    def test_host_identity_binds_the_effective_cpu_affinity(self) -> None:
+        with (
+            mock.patch.object(
+                qualification.os, "sched_getaffinity", return_value={7, 3},
+                create=True,
+            ),
+            mock.patch.object(
+                qualification, "_cpu_uclamp_identity",
+                return_value=("proc-self-sched", 1024, 1024),
+            ),
+        ):
+            identity = qualification.host_identity("test-linux-x86_64")
+
+        self.assertEqual(identity["cpu_affinity"], [3, 7])
+        self.assertEqual(identity["cpu_affinity_source"], "sched_getaffinity")
+        self.assertEqual(identity["logical_cpus"], 2)
+        self.assertEqual(identity["cpu_uclamp_source"], "proc-self-sched")
+        self.assertEqual(identity["cpu_uclamp_min"], 1024)
+        self.assertEqual(identity["cpu_uclamp_max"], 1024)
+
+        with (
+            mock.patch.object(
+                qualification.os, "sched_getaffinity",
+                side_effect=AttributeError, create=True,
+            ),
+            mock.patch.object(qualification.os, "cpu_count", return_value=3),
+        ):
+            fallback = qualification.host_identity("test-linux-x86_64")
+        self.assertEqual(fallback["cpu_affinity"], [])
+        self.assertEqual(fallback["cpu_affinity_source"], "unavailable")
+        self.assertEqual(fallback["logical_cpus"], 3)
+
+        with mock.patch.object(
+            qualification.os, "sched_getaffinity",
+            side_effect=OSError("denied"), create=True,
+        ):
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "cannot read effective CPU affinity",
+            ):
+                qualification.host_identity("test-linux-x86_64")
+
+        with mock.patch.object(
+            qualification.os, "sched_getaffinity", return_value=set(),
+            create=True,
+        ):
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "affinity is empty"
+            ):
+                qualification.host_identity("test-linux-x86_64")
+
+    def test_malformed_affinity_is_rejected_without_raw_type_errors(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        for malformed in (
+            [0, "1"], [{}], [1, 0], [0, 0], [], [-1, 0], [0, 65536],
+        ):
+            current = receipt(manifest_sha)
+            current["host"]["cpu_affinity"] = malformed
+            current["host"]["logical_cpus"] = len(malformed) or 1
+            with self.subTest(malformed=malformed):
+                with self.assertRaisesRegex(
+                    qualification.QualificationError, "CPU affinity"
+                ):
+                    qualification.validate_receipt_payload(
+                        current, raw_manifest, baseline(manifest_sha)
+                    )
+
+        current = receipt(manifest_sha)
+        current["host"]["cpu_affinity"] = [0]
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU affinity"
+        ):
+            qualification.validate_receipt_payload(
+                current, raw_manifest, baseline(manifest_sha)
+            )
+
+        for malformed_source in ([], {}, 7, None, "invented"):
+            current = receipt(manifest_sha)
+            current["host"]["cpu_affinity_source"] = malformed_source
+            with self.subTest(malformed_source=malformed_source):
+                with self.assertRaisesRegex(
+                    qualification.QualificationError, "source is malformed"
+                ):
+                    qualification.validate_receipt_payload(
+                        current, raw_manifest, baseline(manifest_sha)
+                    )
+
+        current = receipt(manifest_sha)
+        current["host"]["cpu_affinity_source"] = "unavailable"
+        current["host"]["cpu_affinity"] = []
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU affinity is not measurable"
+        ):
+            qualification.validate_receipt_payload(
+                current, raw_manifest, baseline(manifest_sha)
+            )
+
+        current = receipt(manifest_sha)
+        current["configuration"]["performance_policy"] = "record-only"
+        current["host"]["cpu_affinity_source"] = "unavailable"
+        current["host"]["cpu_affinity"] = []
+        current["baseline"]["profile"] = None
+        current["baseline"]["performance_gate"] = "not-gated"
+        qualification.validate_receipt_payload(
+            current, raw_manifest, baseline(manifest_sha)
+        )
+
+        malformed_baseline = baseline(manifest_sha)
+        malformed_baseline["profiles"]["test-linux-x86_64"]["hardware"].update({
+            "cpu_affinity_source": "unavailable",
+            "cpu_affinity": [],
+        })
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "not measurable"
+        ):
+            qualification.validate_baseline(malformed_baseline, manifest_sha)
+
+        malformed_calibration = calibration_receipt(manifest_sha)
+        malformed_calibration["host"].update({
+            "cpu_affinity_source": "unavailable",
+            "cpu_affinity": [],
+        })
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "not measurable"
+        ):
+            qualification._validate_calibration_payload(
+                malformed_calibration, raw_manifest
+            )
+
+        rejected = calibration_receipt(manifest_sha)
+        rejected.pop("workloads")
+        rejected.update({
+            "schema": qualification.REJECTED_SCHEMA,
+            "status": "rejected",
+            "configuration": {
+                **rejected["configuration"],
+                "performance_policy": "required",
+            },
+            "inputs": {},
+            "failure": "controlled rejection",
+            "artifacts": [],
+        })
+        rejected["host"]["cpu_affinity"] = [0, "1"]
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU affinity"
+        ):
+            qualification._validate_rejected_payload(rejected, raw_manifest)
+
+        rejected["host"].update({
+            "cpu_affinity_source": "unavailable",
+            "cpu_affinity": [],
+            "cpu_uclamp_source": "unavailable",
+            "cpu_uclamp_min": None,
+            "cpu_uclamp_max": None,
+        })
+        qualification._validate_rejected_payload(rejected, raw_manifest)
+
+    def test_uclamp_identity_and_required_performance_are_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sched = Path(directory) / "sched"
+            sched.write_text(
+                "effective uclamp.min : 1024\n"
+                "effective uclamp.max : 1024\n",
+                encoding="ascii",
+            )
+            self.assertEqual(
+                qualification._cpu_uclamp_identity(sched),
+                ("proc-self-sched", 1024, 1024),
+            )
+            self.assertEqual(
+                qualification._cpu_uclamp_identity(Path(directory) / "missing"),
+                ("unavailable", None, None),
+            )
+            sched.write_text("effective uclamp.min : 1024\n", encoding="ascii")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "malformed"
+            ):
+                qualification._cpu_uclamp_identity(sched)
+            for malformed in (
+                "effective uclamp.min : nope\n"
+                "effective uclamp.max : nope\n",
+                "effective uclamp.min : 00000\n"
+                "effective uclamp.max : 1024\n",
+                "effective uclamp.min : 0\n"
+                "effective uclamp.max : 999999999999999999999999\n",
+                "effective uclamp.min : 1024\n"
+                "effective uclamp.min : 1024\n"
+                "effective uclamp.max : 1024\n",
+            ):
+                sched.write_text(malformed, encoding="ascii")
+                with self.subTest(sched=malformed):
+                    with self.assertRaisesRegex(
+                        qualification.QualificationError, "malformed"
+                    ):
+                        qualification._cpu_uclamp_identity(sched)
+
+            sched.write_bytes(b"x" * (1024 * 1024 + 1))
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "oversized"
+            ):
+                qualification._cpu_uclamp_identity(sched)
+
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        for malformed in (
+            ([], 1024, 1024),
+            ("invented", 1024, 1024),
+            ("proc-self-sched", "1024", 1024),
+            ("proc-self-sched", 1024, 1025),
+            ("proc-self-sched", 1024, 512),
+            ("unavailable", 0, 1024),
+        ):
+            current = receipt(manifest_sha)
+            (current["host"]["cpu_uclamp_source"],
+             current["host"]["cpu_uclamp_min"],
+             current["host"]["cpu_uclamp_max"]) = malformed
+            with self.subTest(malformed=malformed):
+                with self.assertRaises(qualification.QualificationError):
+                    qualification.validate_receipt_payload(
+                        current, raw_manifest, baseline(manifest_sha)
+                    )
+
+        current = receipt(manifest_sha)
+        current["host"].update({
+            "cpu_uclamp_source": "proc-self-sched",
+            "cpu_uclamp_min": 0,
+            "cpu_uclamp_max": 1024,
+        })
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "not stable"
+        ):
+            qualification.validate_receipt_payload(
+                current, raw_manifest, baseline(manifest_sha)
+            )
+
+        current["configuration"]["performance_policy"] = "record-only"
+        current["baseline"]["profile"] = None
+        current["baseline"]["performance_gate"] = "not-gated"
+        qualification.validate_receipt_payload(
+            current, raw_manifest, baseline(manifest_sha)
+        )
 
     def test_pinned_baseline_records_full_toolchain_identity(self) -> None:
         raw_manifest = manifest()
