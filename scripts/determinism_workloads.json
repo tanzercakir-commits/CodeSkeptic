@@ -1,0 +1,62 @@
+{
+  "performance_regression_limit_percent": 10,
+  "repetitions": 10,
+  "schema": "codeskeptic-determinism-workloads-v1",
+  "workloads": [
+    {
+      "analyzer_args": [],
+      "id": "unit",
+      "input": {
+        "manifest": "tests/thesis_corpus/thesis_expected.txt",
+        "mode": "thesis-corpus"
+      },
+      "kind": "unit",
+      "tu_memory_mib": 4096,
+      "tu_timeout_seconds": 300,
+      "wall_timeout_seconds": 1800
+    },
+    {
+      "analyzer_args": [],
+      "id": "real-repository",
+      "input": {
+        "mode": "repository",
+        "path": "src",
+        "policy": "no-absolute-paths"
+      },
+      "kind": "real-repository",
+      "tu_memory_mib": 4096,
+      "tu_timeout_seconds": 300,
+      "wall_timeout_seconds": 3600
+    },
+    {
+      "analyzer_args": [
+        "--report-paths",
+        "{release_source}/src,{release_source}/ggml/src"
+      ],
+      "id": "release-candidate",
+      "input": {
+        "mode": "release-candidate",
+        "project": "llama-cpp",
+        "realworld_manifest": "scripts/realworld_manifest.json",
+        "translation_units": [
+          "ggml/src/ggml-backend.cpp",
+          "ggml/src/ggml-cpu/ggml-cpu.cpp",
+          "ggml/src/ggml-cpu/ops.cpp",
+          "ggml/src/ggml-quants.c",
+          "ggml/src/ggml.c",
+          "ggml/src/ggml.cpp",
+          "src/llama-context.cpp",
+          "src/llama-grammar.cpp",
+          "src/llama-model-loader.cpp",
+          "src/llama-model.cpp",
+          "src/llama.cpp",
+          "src/models/llama.cpp"
+        ]
+      },
+      "kind": "release-candidate",
+      "tu_memory_mib": 4096,
+      "tu_timeout_seconds": 600,
+      "wall_timeout_seconds": 3600
+    }
+  ]
+}

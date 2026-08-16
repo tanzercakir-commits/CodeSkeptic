@@ -1,0 +1,174 @@
+{
+  "manifest_sha256": "6b2b1985ae6750bf37285b1380361a526bf9ef4e5633fb7fce3cb122f75c3eb4",
+  "performance_regression_limit_percent": 10,
+  "profiles": {
+    "fedora-linux-x86_64": {
+      "hardware": {
+        "architecture": "x86_64",
+        "cpu_affinity": [
+          0,
+          2
+        ],
+        "cpu_affinity_source": "sched_getaffinity",
+        "cpu_model": "12th Gen Intel(R) Core(TM) i5-1235U",
+        "cpu_uclamp_max": 1024,
+        "cpu_uclamp_min": 1024,
+        "cpu_uclamp_source": "proc-self-sched",
+        "logical_cpus": 2,
+        "memory_bytes": 16425553920
+      },
+      "provenance": {
+        "calibration": {
+          "evidence_path": "docs/evidence/phase10/determinism/calibrations/2026-08-16-uclamp-fedora-linux-x86_64",
+          "receipt_sha256": "010359fe8e0ecf1d6fdb2d58bd83c32d244485004462b2f6c56dd41614c686d2"
+        },
+        "promotion": {
+          "previous_baseline_sha256": null,
+          "previous_profile_sha256": null,
+          "reason": "Initial CPU-affinity and uclamp-bound Fedora performance baseline"
+        },
+        "source_revision": "a1eca13d28e29cd63d26a9bdadb3e4343560b5c5",
+        "toolchain": {
+          "analyzer": {
+            "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+            "version": "CodeSkeptic 0.4.9-dev"
+          },
+          "c_compiler": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "clang": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "cmake": {
+            "sha256": "1c5227af4edd22d8d689def545e18ee458260c0fd579eba2187967f38817e638",
+            "version": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+          },
+          "cxx_compiler": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "gnu_time": {
+            "sha256": "3b11dec50514a8473e9f6efa7a34d584d0657538c09988f61b72d38ad4991a10",
+            "version": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon."
+          },
+          "ninja": {
+            "sha256": "5965527e09fe2b3787772aa4f711d6a36b393e7f2fcaa744a7a96c5a4ddf59cb",
+            "version": "1.11.1"
+          }
+        }
+      },
+      "workloads": {
+        "real-repository": {
+          "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
+          "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 240370,
+              "median": 223470,
+              "min": 215630,
+              "p90": 239650
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 1305092,
+              "median": 1304652,
+              "min": 1303916,
+              "p90": 1304872
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 235990,
+              "median": 218885,
+              "min": 211250,
+              "p90": 235000
+            }
+          },
+          "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
+          "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
+        },
+        "release-candidate": {
+          "input_identity_sha256": "3160e812602e101def583510cf363b928b102943721197a81d1fba1998706148",
+          "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 40660,
+              "median": 33375,
+              "min": 32130,
+              "p90": 37360
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 371072,
+              "median": 370652,
+              "min": 369936,
+              "p90": 371032
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 39460,
+              "median": 32665,
+              "min": 31470,
+              "p90": 36560
+            }
+          },
+          "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
+          "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
+        },
+        "unit": {
+          "input_identity_sha256": "d52ec53c1dc859d1c5f9ef9beda2748002f020215d65608d888e862485aa55b7",
+          "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 1400,
+              "median": 610,
+              "min": 560,
+              "p90": 710
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 88300,
+              "median": 87852,
+              "min": 87712,
+              "p90": 88200
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 1490,
+              "median": 670,
+              "min": 630,
+              "p90": 790
+            }
+          },
+          "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
+          "translation_unit_sha256": "ff8299a13a3e0291ede210f1b3c9a523484a41359f93834a719351244647f241"
+        }
+      }
+    }
+  },
+  "schema": "codeskeptic-determinism-baseline-v4",
+  "semantic_reference": {
+    "real-repository": {
+      "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
+      "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
+      "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
+      "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
+    },
+    "release-candidate": {
+      "input_identity_sha256": "3160e812602e101def583510cf363b928b102943721197a81d1fba1998706148",
+      "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
+      "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
+      "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
+    },
+    "unit": {
+      "input_identity_sha256": "d52ec53c1dc859d1c5f9ef9beda2748002f020215d65608d888e862485aa55b7",
+      "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54",
+      "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
+      "translation_unit_sha256": "ff8299a13a3e0291ede210f1b3c9a523484a41359f93834a719351244647f241"
+    }
+  }
+}
