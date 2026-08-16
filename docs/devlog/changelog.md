@@ -1,5 +1,98 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-15 — Phase 10.7 determinism and performance qualification (in progress)
+
+- Added an exact three-workload qualification contract for the 24-TU thesis
+  corpus, the 55-TU CodeSkeptic `src/` build, and a pinned 12-TU llama.cpp
+  release-candidate slice. Each workload runs ten times and binds canonical
+  input bytes, every selected compile command and ordinal, analyzer limits,
+  source revision, toolchain, build cache, hardware inventory, and four bounded
+  raw artifacts per repetition. Receipt verification recomputes semantic
+  projections and wall/CPU/RSS claims from raw analyzer and GNU time bytes;
+  missing, partial, malformed, oversized, timed-out, or drifting evidence is
+  retained as rejected evidence and cannot manufacture a verdict.
+- Added protected baseline authority and promotion checks. Initial publication
+  has an explicit seven-path infrastructure revision, including the generated
+  TODO state, followed only by the pinned baseline, changelog, determinism
+  calibration, and independently verified Phase 10 stress evidence. Later
+  profiles bind the exact predecessor baseline/profile and source revision.
+  Candidate deletion, evidence drift, changed hardware/toolchain identity, or
+  an admitted source change fails closed.
+- RED-first production campaigns exposed and fixed two authority bugs. The
+  release-candidate receipt now always binds `$REPO` as well as its release
+  source/build roots. Receipt verification now binds the recorded revision as
+  an ancestor and separately proves both its committed source bytes and the
+  current admitted source bytes; committing an ignored evidence transaction no
+  longer invalidates itself, while any actual source drift is still rejected.
+  The new focused regressions pass with the full qualification and workflow
+  contracts, followed by a fresh independent source-stage PASS.
+- Hosted exact-head evidence then exposed two independent portability defects:
+  job-level use of the GitHub `runner` context prevented the determinism
+  workflow from creating a job, while macOS could raise `EPERM` during
+  process-group cleanup. The workflow now scopes temporary paths to the steps
+  that consume them. Timeout cleanup separately reaps the leader and proves
+  the process group absent after bounded TERM/KILL phases; `EPERM` or a group
+  that survives SIGKILL remains a fail-closed qualification error that retains
+  the original timeout reason. The production heartbeat regression forces the
+  SIGTERM-resistant descendant path, and bounded macOS process discovery no
+  longer turns an unverifiable cleanup into success.
+- The first Fedora refresh correctly rejected a compile-plan identity drift:
+  the original calibration build had no visible Git metadata and recorded
+  `0.4.9-dev`, while the exact-head build recorded a commit-suffixed identity.
+  No semantic or promotion normalizer was weakened. CMake now gives an
+  explicit cache override first priority, a non-empty environment override
+  second priority, and tag/Git identity otherwise. The hosted build step pins
+  the complete configure/build lifecycle to `0.4.9-dev` without changing the
+  raw CMake cache. Preflight reproduced the existing authority exactly:
+  CMakeCache digest `ddbf7f1925ea47c3e64ac73d0cddc80fcdcbeea5700fe15ff4608bd7964ef5e0`,
+  real-repository input digest
+  `7edb80606435e65ddfb00751bb168fac3c9ed778a9735fb7487162ce62b60a14`,
+  TU digest `c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8`,
+  and plan digest
+  `db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278`.
+- Retained the final Fedora Linux x86_64 calibration at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
+  Its 122-entry tree binds 385 source files at revision
+  `b1ee2914624f1e6e2741c11a540bb9823ae05aa8`, source digest
+  `150f6bfc2f17b5f734c28a7aa52bad2031ae9baaf913b2954ece2c9bd01e6288`,
+  and analyzer digest
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
+  All ten runs per workload produced one semantic fingerprint. Median wall
+  time was 830 ms for unit, 236745 ms for the real repository, and 36010 ms
+  for the release candidate; peak RSS maxima were 87888, 1304284, and 371552
+  KiB. Receipt/SHA256SUMS digests are
+  `9ae2b7c6a298f29eb48b960b7a54679824d96f9dc85c5a6cbad55b05b7553894` /
+  `6fdbd766bdcfabda9244d5fac4552b4041016f5b03080c98a48113f3eb8e7f81`.
+  The pinned baseline digest is
+  `ef79efb8643f383be9c36672227d156e08e913af80bb2223d7248dda849fffbf`.
+- Regenerated the retained stress matrix after the hosted lifecycle and build
+  identity fixes. All nine cases pass twice in 707 ms with zero timeout or
+  crash. Its 37-entry tree binds 386 source files at revision
+  `0fc0cc8fe755df5c34a182210d7e050dfa7dc85b`, digest
+  `1fe9b8a3c105c2309d48aa00136dcce5267345c2627de241c6c6e4887f6acde8`;
+  receipt/SHA256SUMS digests are
+  `98dcefe19e1b26ede55f64c15ec6d4b2154cb29c0850c92c3eb3b11220b8d354` /
+  `2e925e23aa227d16ce021ae88914c12f948ab32225fdbbf48045addfa89d9c83`.
+- Retained a separate required-mode confirmation against the pinned baseline
+  at
+  `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
+  Its 122-entry tree binds 385 source files at authority revision
+  `0fc0cc8fe755df5c34a182210d7e050dfa7dc85b`, source digest
+  `b0fb893a4606c894f269385a2f8da563b6fa09be81b62a7d9342682121fea191`.
+  All semantic and performance gates pass with no regression. Unit,
+  repository, and release-candidate wall medians are 790, 211665, and 31995
+  ms; peak RSS maxima are 87984, 1304796, and 370740 KiB.
+  Receipt/SHA256SUMS digests are
+  `aa74f022ec98dbe8bd68fcf49b019212fcba7ef8657fd591b93e091cd07873b3` /
+  `257bd5078a26990778b4fe8806223fe8cab3f2743449511cc069a0c564e1afb9`.
+  Exact-container verify-only accepted all three workloads and all ten
+  repetitions, and the retained stress receipt plus both external manifests
+  were rechecked in the same LLVM 20 environment. The exact-source final
+  regression passed `1280/1280` direct C++ tests and `1299/1299`
+  repository-aware CTest entries. Independent audit, push, and hosted
+  exact-head CI remain pending; this checkpoint does not close `CS-P10-07` or
+  write protected `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
