@@ -12,7 +12,7 @@
   missing, partial, malformed, oversized, timed-out, or drifting evidence is
   retained as rejected evidence and cannot manufacture a verdict.
 - Added protected baseline authority and promotion checks. Initial publication
-  has an explicit seven-path infrastructure revision, including the generated
+  has an explicit eight-path infrastructure revision, including the generated
   TODO state, followed only by the pinned baseline, changelog, determinism
   calibration, and independently verified Phase 10 stress evidence. Later
   profiles bind the exact predecessor baseline/profile and source revision.
@@ -55,45 +55,48 @@
   bootstrap allowlist now treats the root CMake version authority as the
   eighth infrastructure file while continuing to reject any workflow,
   runner, CMake, or test change made after the calibrated source revision.
-  The final eight-file source state will be introduced as an ancestry-only
-  source commit from the P10.6 base, followed by fresh calibration, baseline,
-  confirmation, and stress evidence; no authority-path relaxation or history
-  rewrite is used.
+  The final eight-file source state is recorded by ancestry-only source commit
+  `aeec85100006517b6b6028e99d326fb9f78dbafc` from the P10.6 base and joined
+  by merge commit `fd387aa3fa67aa25edaea87b7b40175cf5610eaf`, followed by fresh
+  calibration, baseline, confirmation, and stress evidence. No authority-path
+  relaxation or history rewrite was used.
 - Retained the final Fedora Linux x86_64 calibration at
   `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
   Its 122-entry tree binds 385 source files at revision
-  `b1ee2914624f1e6e2741c11a540bb9823ae05aa8`, source digest
-  `150f6bfc2f17b5f734c28a7aa52bad2031ae9baaf913b2954ece2c9bd01e6288`,
+  `aeec85100006517b6b6028e99d326fb9f78dbafc`, source digest
+  `3321d22243b8f95d92836b3f0b5bdae8d6f0270513440b8fe48d465b44be6900`,
   and analyzer digest
   `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
   All ten runs per workload produced one semantic fingerprint. Median wall
-  time was 830 ms for unit, 236745 ms for the real repository, and 36010 ms
-  for the release candidate; peak RSS maxima were 87888, 1304284, and 371552
+  time was 790 ms for unit, 208090 ms for the real repository, and 31350 ms
+  for the release candidate; peak RSS maxima were 88004, 1304744, and 370692
   KiB. Receipt/SHA256SUMS digests are
-  `9ae2b7c6a298f29eb48b960b7a54679824d96f9dc85c5a6cbad55b05b7553894` /
-  `6fdbd766bdcfabda9244d5fac4552b4041016f5b03080c98a48113f3eb8e7f81`.
+  `431743012f5be8fa9b39e2cc132611b449e8534dc246d121e4e07b8516209c6e` /
+  `ea9e0075b7a6aae89c24575ce6c3b23d294ae6f2d089872fd79bd68a195424d9`.
   The pinned baseline digest is
-  `ef79efb8643f383be9c36672227d156e08e913af80bb2223d7248dda849fffbf`.
-- Regenerated the retained stress matrix after the hosted lifecycle and build
-  identity fixes. All nine cases pass twice in 707 ms with zero timeout or
+  `470987163a78f087375bfbc1d8c77a67db38596b128d65586ee754930e5d3125`.
+  The complete campaign duration was 2400720 ms.
+- Regenerated the retained stress matrix after the final source-authority
+  bridge. All nine cases pass twice in 705 ms with zero timeout or
   crash. Its 37-entry tree binds 386 source files at revision
-  `0fc0cc8fe755df5c34a182210d7e050dfa7dc85b`, digest
-  `1fe9b8a3c105c2309d48aa00136dcce5267345c2627de241c6c6e4887f6acde8`;
+  `fd387aa3fa67aa25edaea87b7b40175cf5610eaf`, digest
+  `74a8ff98b89592d5cc36313528ab066e5e4a5ba988aaa501b00f507289b26d21`;
   receipt/SHA256SUMS digests are
-  `98dcefe19e1b26ede55f64c15ec6d4b2154cb29c0850c92c3eb3b11220b8d354` /
-  `2e925e23aa227d16ce021ae88914c12f948ab32225fdbbf48045addfa89d9c83`.
+  `b3948659077feda268f6d401697124daca786d8b5a18781aa6307cea3a0c4784` /
+  `f899de07165db0209e4dab3cabddfe2fa193217c0a16f9754a4ff9d13b77f836`.
 - Retained a separate required-mode confirmation against the pinned baseline
   at
   `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64-confirmation`.
   Its 122-entry tree binds 385 source files at authority revision
-  `0fc0cc8fe755df5c34a182210d7e050dfa7dc85b`, source digest
-  `b0fb893a4606c894f269385a2f8da563b6fa09be81b62a7d9342682121fea191`.
+  `aeec85100006517b6b6028e99d326fb9f78dbafc`, source digest
+  `3321d22243b8f95d92836b3f0b5bdae8d6f0270513440b8fe48d465b44be6900`.
   All semantic and performance gates pass with no regression. Unit,
-  repository, and release-candidate wall medians are 790, 211665, and 31995
-  ms; peak RSS maxima are 87984, 1304796, and 370740 KiB.
+  repository, and release-candidate wall medians are 790, 207745, and 31465
+  ms; peak RSS maxima are 88072, 1304824, and 370948 KiB. The complete
+  campaign duration was 2400740 ms.
   Receipt/SHA256SUMS digests are
-  `aa74f022ec98dbe8bd68fcf49b019212fcba7ef8657fd591b93e091cd07873b3` /
-  `257bd5078a26990778b4fe8806223fe8cab3f2743449511cc069a0c564e1afb9`.
+  `9c9e4bac7ab3aa3ec2c175469124d422f0347d9335bb2c6aa22be14134aa93d7` /
+  `63c30b147446a1be1d030ca5a8758a98957d227c55e3a76c73eccf3108ffecb4`.
   Exact-container verify-only accepted all three workloads and all ten
   repetitions, and the retained stress receipt plus both external manifests
   were rechecked in the same LLVM 20 environment. The exact-source final

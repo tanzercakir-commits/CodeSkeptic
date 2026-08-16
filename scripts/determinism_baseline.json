@@ -12,14 +12,14 @@
       "provenance": {
         "calibration": {
           "evidence_path": "docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64",
-          "receipt_sha256": "9ae2b7c6a298f29eb48b960b7a54679824d96f9dc85c5a6cbad55b05b7553894"
+          "receipt_sha256": "431743012f5be8fa9b39e2cc132611b449e8534dc246d121e4e07b8516209c6e"
         },
         "promotion": {
           "previous_baseline_sha256": null,
           "previous_profile_sha256": null,
-          "reason": "Initial Fedora LLVM 20 determinism and performance baseline"
+          "reason": "Initial Fedora LLVM 20 determinism and performance baseline on final source authority"
         },
-        "source_revision": "b1ee2914624f1e6e2741c11a540bb9823ae05aa8",
+        "source_revision": "aeec85100006517b6b6028e99d326fb9f78dbafc",
         "toolchain": {
           "analyzer": {
             "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
@@ -58,24 +58,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 264130,
-              "median": 245800,
-              "min": 216860,
-              "p90": 257370
+              "max": 215630,
+              "median": 214555,
+              "min": 209660,
+              "p90": 215490
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 1304284,
-              "median": 1304024,
-              "min": 1303584,
-              "p90": 1304284
+              "max": 1304744,
+              "median": 1304058,
+              "min": 1303644,
+              "p90": 1304292
             },
             "wall_ms": {
               "count": 10,
-              "max": 253710,
-              "median": 236745,
-              "min": 210080,
-              "p90": 247590
+              "max": 209480,
+              "median": 208090,
+              "min": 203830,
+              "p90": 209090
             }
           },
           "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
@@ -87,24 +87,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 38910,
-              "median": 37325,
-              "min": 32150,
-              "p90": 38510
+              "max": 32600,
+              "median": 32255,
+              "min": 31600,
+              "p90": 32560
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 371552,
-              "median": 370156,
-              "min": 369472,
-              "p90": 370568
+              "max": 370692,
+              "median": 370540,
+              "min": 369840,
+              "p90": 370608
             },
             "wall_ms": {
               "count": 10,
-              "max": 37430,
-              "median": 36010,
-              "min": 30970,
-              "p90": 37020
+              "max": 31540,
+              "median": 31350,
+              "min": 30420,
+              "p90": 31510
             }
           },
           "translation_unit_plan_sha256": "dbc05a469483a0f3120c63115ebce5778373bb12836e05b245723aaa8d148a2b",
@@ -116,24 +116,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 980,
-              "median": 765,
+              "max": 750,
+              "median": 730,
               "min": 680,
-              "p90": 860
+              "p90": 750
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 87888,
-              "median": 87690,
-              "min": 87248,
-              "p90": 87848
+              "max": 88004,
+              "median": 87824,
+              "min": 87644,
+              "p90": 88000
             },
             "wall_ms": {
               "count": 10,
-              "max": 1030,
-              "median": 830,
-              "min": 740,
-              "p90": 910
+              "max": 810,
+              "median": 790,
+              "min": 750,
+              "p90": 810
             }
           },
           "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",

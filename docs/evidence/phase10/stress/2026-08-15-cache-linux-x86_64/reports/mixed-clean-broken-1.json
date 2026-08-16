@@ -7,8 +7,8 @@
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
   "translation_units": [
-    { "path": "/tmp/codeskeptic-stress-wgda4o2w/mixed-clean-broken/repeat-1/mixed_broken.cpp", "compile_command_sha256": "d2f34c861ddd1af869a62246e739eab65de8d5bf308fa0cf9d9928596fcdbef3", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 22, "peak_memory_kib": 75636, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
-    { "path": "/tmp/codeskeptic-stress-wgda4o2w/mixed-clean-broken/repeat-1/mixed_clean.cpp", "compile_command_sha256": "c6b2f76e574286ca252c8b660fe78a729c247f1a8e4a5d8cd1438c3a946235b8", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 22, "peak_memory_kib": 81252, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+    { "path": "/tmp/codeskeptic-stress-3vuf16v3/mixed-clean-broken/repeat-1/mixed_broken.cpp", "compile_command_sha256": "67582bf0559caf7f5513490739d38d9eedbf4fac906f130e6a1ea3c405ed42e4", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 21, "peak_memory_kib": 76380, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/tmp/codeskeptic-stress-3vuf16v3/mixed-clean-broken/repeat-1/mixed_clean.cpp", "compile_command_sha256": "43ddd2c0517d248bc463223cb7020b65421b476449cc83a996c63cb923aa776c", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 22, "peak_memory_kib": 80864, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
   ],
   "total": 0,
   "diagnostics": [

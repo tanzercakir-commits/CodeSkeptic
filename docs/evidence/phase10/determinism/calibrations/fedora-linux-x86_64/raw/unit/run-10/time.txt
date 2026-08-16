@@ -1,19 +1,19 @@
 Command exited with non-zero status 1
-	Command being timed: "/work/build-p10-07-contracts/src/codeskeptic --files /tmp/codeskeptic-determinism-ci6bpnkv/inputs/unit-build/files.txt --build-path /tmp/codeskeptic-determinism-ci6bpnkv/inputs/unit-build --tu-timeout-seconds 300 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-ci6bpnkv/unit-10.json"
-	User time (seconds): 0.38
-	System time (seconds): 0.34
+	Command being timed: "/work/build-p10-07-contracts/src/codeskeptic --files /tmp/codeskeptic-determinism-_onn3n9d/inputs/unit-build/files.txt --build-path /tmp/codeskeptic-determinism-_onn3n9d/inputs/unit-build --tu-timeout-seconds 300 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-_onn3n9d/unit-10.json"
+	User time (seconds): 0.37
+	System time (seconds): 0.36
 	Percent of CPU this job got: 92%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.78
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.79
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 87848
+	Maximum resident set size (kbytes): 87768
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 111979
-	Voluntary context switches: 808
-	Involuntary context switches: 68
+	Minor (reclaiming a frame) page faults: 111970
+	Voluntary context switches: 822
+	Involuntary context switches: 58
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2768
