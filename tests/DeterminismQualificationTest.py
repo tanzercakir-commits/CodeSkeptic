@@ -904,6 +904,32 @@ class DeterminismQualificationTest(unittest.TestCase):
                 first_build, first_source,
                 cmake, ninja, c_compiler, cxx_compiler,
             )
+            lexical_source = first_source / ".." / "source"
+            lexical_build = lexical_source / "build"
+            cache_path = first_build / "CMakeCache.txt"
+            cache_lines = cache_path.read_text(encoding="utf-8").splitlines()
+            lexical_values = {
+                "CMAKE_HOME_DIRECTORY:": lexical_source,
+                "CMAKE_CACHEFILE_DIR:": lexical_build,
+                "CodeSkeptic_SOURCE_DIR:": lexical_source,
+                "CodeSkeptic_BINARY_DIR:": lexical_build,
+            }
+
+            def lexicalize_cache_line(line: str) -> str:
+                for prefix, value in lexical_values.items():
+                    if line.startswith(prefix):
+                        return f"{line.split('=', 1)[0]}={value}"
+                return line
+
+            cache_path.write_text(
+                "\n".join(lexicalize_cache_line(line) for line in cache_lines) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            lexical = qualification._build_toolchain_identity(
+                lexical_build, lexical_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
             relocated_source, relocated_build = write_cache(
                 "relocated", "OFF", True, alias_tools
             )
@@ -934,6 +960,10 @@ class DeterminismQualificationTest(unittest.TestCase):
             self.assertEqual(
                 first["cmake_cache_canonical_sha256"],
                 relocated["cmake_cache_canonical_sha256"],
+            )
+            self.assertEqual(
+                first["cmake_cache_canonical_sha256"],
+                lexical["cmake_cache_canonical_sha256"],
             )
             self.assertNotEqual(
                 first["cmake_cache_canonical_sha256"],

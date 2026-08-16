@@ -1607,8 +1607,9 @@ def _canonical_cmake_cache_value(
 ) -> list[dict[str, str]]:
     normalized = value.replace("\\", "/")
     spellings = sorted({
-        (str(root.resolve()).replace("\\", "/"), marker)
+        (spelling.replace("\\", "/"), marker)
         for root, marker in roots
+        for spelling in (str(root), str(root.resolve()))
     }, key=lambda item: len(item[0]), reverse=True)
     segments: list[dict[str, str]] = []
     literal_start = 0
@@ -1701,8 +1702,8 @@ def _build_toolchain_identity(
             recorded_build.resolve() != build.resolve()):
         raise QualificationError("build CMake cache build root identity drift")
     roots = [
-        (recorded_build.resolve(), "$BUILD"),
-        (source_root.resolve(), "$SOURCE"),
+        (recorded_build, "$BUILD"),
+        (source_root, "$SOURCE"),
     ]
     tool_roles = {
         "CMAKE_COMMAND": "$CMAKE",
