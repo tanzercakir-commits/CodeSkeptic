@@ -31,10 +31,11 @@ except ImportError:  # pragma: no cover - unavailable on native Windows
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v1"
-BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v1"
-RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v1"
-REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v1"
-CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v1"
+BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v2"
+RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v2"
+REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v2"
+CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v2"
+CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v1"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
 TOOLCHAIN_NAMES = (
@@ -1601,8 +1602,44 @@ def toolchain_identity(
     return value
 
 
+def _canonical_cmake_cache_value(
+    value: str, roots: list[tuple[Path, str]],
+) -> list[dict[str, str]]:
+    normalized = value.replace("\\", "/")
+    spellings = sorted({
+        (str(root.resolve()).replace("\\", "/"), marker)
+        for root, marker in roots
+    }, key=lambda item: len(item[0]), reverse=True)
+    segments: list[dict[str, str]] = []
+    literal_start = 0
+    cursor = 0
+    while cursor < len(normalized):
+        match = next(
+            ((spelling, marker) for spelling, marker in spellings
+             if normalized.startswith(spelling, cursor)
+             and (cursor == 0 or normalized[cursor - 1] in " \t;:=,([{\"'")
+             and (cursor + len(spelling) == len(normalized)
+                  or normalized[cursor + len(spelling)] in " /\t;:,)]}\"'")),
+            None,
+        )
+        if match is None:
+            cursor += 1
+            continue
+        if literal_start < cursor:
+            segments.append({"literal": normalized[literal_start:cursor]})
+        spelling, marker = match
+        segments.append({"root": marker})
+        cursor += len(spelling)
+        literal_start = cursor
+    if literal_start < len(normalized):
+        segments.append({"literal": normalized[literal_start:]})
+    if not segments:
+        segments.append({"literal": ""})
+    return segments
+
+
 def _build_toolchain_identity(
-    build: Path, cmake: Path, ninja: Path,
+    build: Path, source: Path, cmake: Path, ninja: Path,
     c_compiler: Path, cxx_compiler: Path,
 ) -> dict[str, Any]:
     cache_path = build / "CMakeCache.txt"
@@ -1613,17 +1650,30 @@ def _build_toolchain_identity(
         text = raw.decode("utf-8")
     except UnicodeDecodeError as error:
         raise QualificationError("build CMake cache is not UTF-8") from error
+    entries: list[dict[str, Any]] = []
     values: dict[str, str] = {}
-    for line in text.splitlines():
-        if not line or line.startswith(("#", "//")) or "=" not in line:
+    for line_number, line in enumerate(text.splitlines(), 1):
+        if not line or line.startswith(("#", "//")):
             continue
+        if "=" not in line:
+            raise QualificationError(
+                f"build CMake cache entry {line_number} has no value"
+            )
         left, value = line.split("=", 1)
-        key = left.split(":", 1)[0]
-        if key in {
-            "CMAKE_COMMAND", "CMAKE_MAKE_PROGRAM", "CMAKE_C_COMPILER",
-            "CMAKE_CXX_COMPILER", "CMAKE_GENERATOR",
-        }:
-            values[key] = value
+        if ":" not in left:
+            raise QualificationError(
+                f"build CMake cache entry {line_number} has no type"
+            )
+        key, entry_type = left.split(":", 1)
+        if (not key or not entry_type or "\x00" in key or
+                "\x00" in entry_type or "\x00" in value):
+            raise QualificationError(
+                f"build CMake cache entry {line_number} is malformed"
+            )
+        if key in values:
+            raise QualificationError(f"build CMake cache duplicates {key}")
+        values[key] = value
+        entries.append({"key": key, "type": entry_type, "value": value})
     expected = {
         "CMAKE_COMMAND": cmake,
         "CMAKE_MAKE_PROGRAM": ninja,
@@ -1637,8 +1687,38 @@ def _build_toolchain_identity(
             raise QualificationError(f"build toolchain drift for {key}")
     if values.get("CMAKE_GENERATOR") != "Ninja":
         raise QualificationError("build generator is not pinned to Ninja")
+    source_value = values.get("CMAKE_HOME_DIRECTORY")
+    build_value = values.get("CMAKE_CACHEFILE_DIR")
+    if source_value is None or build_value is None:
+        raise QualificationError("build CMake cache omits source or build root")
+    source_root = Path(source_value)
+    recorded_build = Path(build_value)
+    if (not source_root.is_absolute() or not recorded_build.is_absolute() or
+            _regular_kind(source_root) != "directory" or
+            source_root.resolve() != source.resolve()):
+        raise QualificationError("build CMake cache source root identity drift")
+    if (_regular_kind(recorded_build) != "directory" or
+            recorded_build.resolve() != build.resolve()):
+        raise QualificationError("build CMake cache build root identity drift")
+    roots = [
+        (recorded_build.resolve(), "$BUILD"),
+        (source_root.resolve(), "$SOURCE"),
+    ]
+    tool_roles = {
+        "CMAKE_COMMAND": "$CMAKE",
+        "CMAKE_MAKE_PROGRAM": "$NINJA",
+        "CMAKE_C_COMPILER": "$C_COMPILER",
+        "CMAKE_CXX_COMPILER": "$CXX_COMPILER",
+    }
+    for entry in entries:
+        if entry["key"] in tool_roles:
+            entry["value"] = [{"tool": tool_roles[entry["key"]]}]
+        else:
+            entry["value"] = _canonical_cmake_cache_value(entry["value"], roots)
+    entries.sort(key=lambda item: (item["key"], item["type"]))
     return {
-        "cmake_cache_sha256": sha256_bytes(raw),
+        "cmake_cache_schema": CMAKE_CACHE_IDENTITY_SCHEMA,
+        "cmake_cache_canonical_sha256": digest_json(entries),
         "cmake": str(cmake.resolve()),
         "ninja": str(ninja.resolve()),
         "c_compiler": str(c_compiler.resolve()),
@@ -1651,10 +1731,14 @@ def _validate_build_toolchain_identity(
     value: Any, label: str, toolchain: dict[str, Any] | None,
 ) -> dict[str, Any]:
     identity = _exact_dict(value, {
-        "cmake_cache_sha256", "cmake", "ninja", "c_compiler",
-        "cxx_compiler", "generator",
+        "cmake_cache_schema", "cmake_cache_canonical_sha256", "cmake",
+        "ninja", "c_compiler", "cxx_compiler", "generator",
     }, label)
-    _require_sha(identity["cmake_cache_sha256"], f"{label} CMake cache")
+    if identity["cmake_cache_schema"] != CMAKE_CACHE_IDENTITY_SCHEMA:
+        raise QualificationError(f"{label} CMake cache schema drift")
+    _require_sha(
+        identity["cmake_cache_canonical_sha256"], f"{label} CMake cache"
+    )
     for field in ("cmake", "ninja", "c_compiler", "cxx_compiler"):
         path = identity[field]
         if (not isinstance(path, str) or not Path(path).is_absolute() or
@@ -2050,36 +2134,35 @@ def prepare_release_candidate(
     if _regular_kind(workspace) != "directory":
         raise QualificationError("release workspace is not a real directory")
     workspace = workspace.resolve()
+    try:
+        if next(workspace.iterdir(), None) is not None:
+            raise QualificationError("release workspace must be empty")
+    except OSError as error:
+        raise QualificationError("cannot inspect release workspace") from error
     source = workspace / project["id"]
     build = workspace / f"{project['id']}-build"
-    if _regular_kind(build) not in {"missing", "directory"}:
-        raise QualificationError("release build path is not a real directory")
-    if source.exists():
-        if _regular_kind(source) != "directory":
-            raise QualificationError("release-candidate source path is not a directory")
-        revision = _git_output(source, ["rev-parse", "HEAD"])
-        remote = _git_output(source, ["remote", "get-url", "origin"])
-        if revision != project["revision"] or remote != project["repository"]:
-            raise QualificationError("existing release-candidate checkout identity drift")
-    else:
-        commands = (
-            ["git", "init", "--quiet", str(source)],
-            ["git", "-C", str(source), "remote", "add", "origin", project["repository"]],
-            ["git", "-C", str(source), "fetch", "--quiet", "--depth", "1", "origin", project["revision"]],
-            ["git", "-C", str(source), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
-        )
-        for command in commands:
-            completed = subprocess.run(command, check=False, stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT)
-            if completed.returncode != 0:
-                raise QualificationError(
-                    f"release-candidate checkout failed: {completed.stdout[-2000:]!r}"
-                )
+    commands = (
+        ["git", "init", "--quiet", str(source)],
+        ["git", "-C", str(source), "remote", "add", "origin", project["repository"]],
+        ["git", "-C", str(source), "fetch", "--quiet", "--depth", "1", "origin", project["revision"]],
+        ["git", "-C", str(source), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
+    )
+    for command in commands:
+        completed = subprocess.run(command, check=False, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            raise QualificationError(
+                f"release-candidate checkout failed: {completed.stdout[-2000:]!r}"
+            )
     for operation in project["copies"]:
         source_file = _inside(repo, operation["from"], "release copy source")
         destination = _inside(source, operation["to"], "release copy destination")
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source_file, destination)
+    if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
+        raise QualificationError(
+            "release-candidate source is dirty before configuration"
+        )
     values = {"source": str(source), "build": str(build), "jobs": str(jobs)}
     deadline = time.monotonic() + project["timeout_minutes"] * 60
     for group in ("configure", "build"):
@@ -2108,7 +2191,7 @@ def prepare_release_candidate(
     if _regular_kind(compile_database) != "regular":
         raise QualificationError("release-candidate compile database is missing")
     _build_toolchain_identity(
-        build, cmake, ninja, c_compiler, cxx_compiler
+        build, source, cmake, ninja, c_compiler, cxx_compiler
     )
     if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
         raise QualificationError("release-candidate checkout became dirty during preparation")
@@ -2263,8 +2346,12 @@ def _validate_manifest_inputs(
             build_root = _root_for_marker(item, marker)
             if _regular_kind(build_root) == "directory":
                 identity = extra["build_toolchain"]
+                source_root = (
+                    repo if kind == "real-repository"
+                    else _root_for_marker(item, "$RELEASE_SOURCE")
+                )
                 current = _build_toolchain_identity(
-                    build_root,
+                    build_root, source_root,
                     Path(identity["cmake"]), Path(identity["ninja"]),
                     Path(identity["c_compiler"]), Path(identity["cxx_compiler"]),
                 )
@@ -2322,7 +2409,7 @@ def prepare_workloads(
                     _path_manifest(sources, repo)
                 ),
                 "build_toolchain": _build_toolchain_identity(
-                    build, cmake, ninja, c_compiler, cxx_compiler
+                    build, repo, cmake, ninja, c_compiler, cxx_compiler
                 ),
             }
             build_path = build
@@ -2341,7 +2428,8 @@ def prepare_workloads(
             extra = _release_identity(repo, workload, source_root)
             extra["selected_compile_commands_sha256"] = compile_identity
             extra["build_toolchain"] = _build_toolchain_identity(
-                release_build, cmake, ninja, c_compiler, cxx_compiler
+                release_build, source_root,
+                cmake, ninja, c_compiler, cxx_compiler
             )
             build_path = release_build
             file_list = work / "release-files.txt"

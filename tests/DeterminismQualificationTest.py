@@ -93,7 +93,8 @@ def workload_source_root(kind: str, repo_root: Path = ROOT) -> Path:
 
 def fixture_build_toolchain() -> dict:
     return {
-        "cmake_cache_sha256": "d" * 64,
+        "cmake_cache_schema": qualification.CMAKE_CACHE_IDENTITY_SCHEMA,
+        "cmake_cache_canonical_sha256": "d" * 64,
         "cmake": "/fixture/cmake",
         "ninja": "/fixture/ninja",
         "c_compiler": "/fixture/clang-20",
@@ -839,6 +840,207 @@ class DeterminismQualificationTest(unittest.TestCase):
         for tool in provenance["toolchain"].values():
             self.assertRegex(tool["sha256"], r"^[0-9a-f]{64}$")
             self.assertTrue(tool["version"])
+
+    def test_build_cache_identity_is_workspace_independent_and_config_sensitive(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tools = root / "tools"
+            tools.mkdir()
+            cmake = tools / "cmake"
+            ninja = tools / "ninja"
+            c_compiler = tools / "clang-20"
+            cxx_compiler = tools / "clang++-20"
+            for tool in (cmake, ninja, c_compiler, cxx_compiler):
+                tool.write_bytes(b"fixture\n")
+            aliases = root / "aliases"
+            aliases.mkdir()
+            alias_tools = tuple(aliases / tool.name for tool in (
+                cmake, ninja, c_compiler, cxx_compiler
+            ))
+            for alias, tool in zip(alias_tools, (
+                cmake, ninja, c_compiler, cxx_compiler
+            )):
+                alias.symlink_to(tool)
+
+            def write_cache(
+                name: str, option: str, reverse: bool,
+                recorded_tools: tuple[Path, Path, Path, Path] | None = None,
+                option_type: str = "BOOL", unknown_option: str = "alpha",
+            ) -> tuple[Path, Path]:
+                workspace = root / name
+                source = workspace / "source"
+                build = source / "build"
+                source.mkdir(parents=True)
+                build.mkdir()
+                recorded_cmake, recorded_ninja, recorded_c, recorded_cxx = (
+                    recorded_tools or (cmake, ninja, c_compiler, cxx_compiler)
+                )
+                entries = [
+                    f"CMAKE_COMMAND:INTERNAL={recorded_cmake}",
+                    f"CMAKE_MAKE_PROGRAM:FILEPATH={recorded_ninja}",
+                    f"CMAKE_C_COMPILER:FILEPATH={recorded_c}",
+                    f"CMAKE_CXX_COMPILER:FILEPATH={recorded_cxx}",
+                    "CMAKE_GENERATOR:INTERNAL=Ninja",
+                    f"CMAKE_HOME_DIRECTORY:INTERNAL={source}",
+                    f"CMAKE_CACHEFILE_DIR:INTERNAL={build}",
+                    f"CodeSkeptic_SOURCE_DIR:STATIC={source}",
+                    f"CodeSkeptic_BINARY_DIR:STATIC={build}",
+                    f"CODESKEPTIC_BUILD_TESTS:{option_type}={option}",
+                    f"UNKNOWN_FUTURE_OPTION:STRING={unknown_option}",
+                ]
+                if reverse:
+                    entries.reverse()
+                (build / "CMakeCache.txt").write_text(
+                    "// generated cache\n" + "\n".join(entries) + "\n",
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                return source, build
+
+            first_source, first_build = write_cache("first", "OFF", False)
+            first = qualification._build_toolchain_identity(
+                first_build, first_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
+            relocated_source, relocated_build = write_cache(
+                "relocated", "OFF", True, alias_tools
+            )
+            relocated = qualification._build_toolchain_identity(
+                relocated_build, relocated_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
+            changed_source, changed_build = write_cache("changed", "ON", False)
+            changed = qualification._build_toolchain_identity(
+                changed_build, changed_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
+            typed_source, typed_build = write_cache(
+                "typed", "OFF", False, option_type="STRING"
+            )
+            typed = qualification._build_toolchain_identity(
+                typed_build, typed_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
+            unknown_source, unknown_build = write_cache(
+                "unknown", "OFF", False, unknown_option="beta"
+            )
+            unknown = qualification._build_toolchain_identity(
+                unknown_build, unknown_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
+
+            self.assertEqual(
+                first["cmake_cache_canonical_sha256"],
+                relocated["cmake_cache_canonical_sha256"],
+            )
+            self.assertNotEqual(
+                first["cmake_cache_canonical_sha256"],
+                changed["cmake_cache_canonical_sha256"],
+            )
+            self.assertNotEqual(
+                first["cmake_cache_canonical_sha256"],
+                typed["cmake_cache_canonical_sha256"],
+            )
+            self.assertNotEqual(
+                first["cmake_cache_canonical_sha256"],
+                unknown["cmake_cache_canonical_sha256"],
+            )
+            self.assertEqual(
+                first["cmake_cache_schema"],
+                qualification.CMAKE_CACHE_IDENTITY_SCHEMA,
+            )
+
+            duplicate_source, duplicate = write_cache("duplicate", "OFF", False)
+            with (duplicate / "CMakeCache.txt").open(
+                "a", encoding="utf-8", newline="\n"
+            ) as stream:
+                stream.write("CMAKE_GENERATOR:INTERNAL=Ninja\n")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "duplicates CMAKE_GENERATOR"
+            ):
+                qualification._build_toolchain_identity(
+                    duplicate, duplicate_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            malformed_source, malformed = write_cache("malformed", "OFF", False)
+            with (malformed / "CMakeCache.txt").open(
+                "a", encoding="utf-8", newline="\n"
+            ) as stream:
+                stream.write("MALFORMED_CACHE_RECORD\n")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "has no value"
+            ):
+                qualification._build_toolchain_identity(
+                    malformed, malformed_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            nul_source, nul = write_cache("nul", "OFF", False)
+            with (nul / "CMakeCache.txt").open(
+                "a", encoding="utf-8", newline="\n"
+            ) as stream:
+                stream.write("NUL_VALUE:STRING=bad\x00value\n")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "is malformed"
+            ):
+                qualification._build_toolchain_identity(
+                    nul, nul_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            other_source = root / "other-source"
+            other_source.mkdir()
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "source root identity drift"
+            ):
+                qualification._build_toolchain_identity(
+                    first_build, other_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            boundary_roots = [(Path("/work"), "$SOURCE")]
+            self.assertEqual(
+                qualification._canonical_cmake_cache_value(
+                    "/work/include", boundary_roots
+                ),
+                [{"root": "$SOURCE"}, {"literal": "/include"}],
+            )
+            self.assertEqual(
+                qualification._canonical_cmake_cache_value(
+                    "/work-evil/include", boundary_roots
+                ),
+                [{"literal": "/work-evil/include"}],
+            )
+            self.assertEqual(
+                qualification._canonical_cmake_cache_value(
+                    "https://example.test/work/include", boundary_roots
+                ),
+                [{"literal": "https://example.test/work/include"}],
+            )
+
+    def test_release_preparation_rejects_reusable_workspace_state(self) -> None:
+        release_workload = manifest()["workloads"][2]
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "release"
+            source = workspace / "llama-cpp"
+            build = workspace / "llama-cpp-build"
+            source.mkdir(parents=True)
+            build.mkdir()
+            (build / "compile_commands.json").write_text(
+                "[]\n", encoding="utf-8", newline="\n"
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "release workspace must be empty",
+            ):
+                qualification.prepare_release_candidate(
+                    ROOT, release_workload, workspace, 1,
+                    Path("/usr/bin/cmake"), Path("/usr/bin/ninja"),
+                    Path("/usr/bin/clang-20"), Path("/usr/bin/clang++-20"),
+                )
 
     def test_pinned_baseline_is_bound_to_raw_calibration_and_promotion(self) -> None:
         raw_manifest = manifest()
