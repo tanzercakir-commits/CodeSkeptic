@@ -9,6 +9,9 @@ set(CODESKEPTIC_VERSION_OVERRIDE "" CACHE STRING
     "Explicit version identity for source archives/reproducible packagers")
 if(CODESKEPTIC_VERSION_OVERRIDE)
     set(CODESKEPTIC_VERSION_STRING "${CODESKEPTIC_VERSION_OVERRIDE}")
+elseif(DEFINED ENV{CODESKEPTIC_VERSION_OVERRIDE} AND
+       NOT "$ENV{CODESKEPTIC_VERSION_OVERRIDE}" STREQUAL "")
+    set(CODESKEPTIC_VERSION_STRING "$ENV{CODESKEPTIC_VERSION_OVERRIDE}")
 else()
     execute_process(
         COMMAND git describe --tags --exact-match HEAD

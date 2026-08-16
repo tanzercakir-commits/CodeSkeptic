@@ -7,7 +7,7 @@
   "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
   "finding_counts": { "total": 1, "blocking": 1, "report_only": 0 },
   "translation_units": [
-    { "path": "/tmp/codeskeptic-stress-ja2klmo_/nested-macro-expansion/repeat-1/macro_matrix.cpp", "compile_command_sha256": "afc126d9dcc613c5f78dcd34944efcf93ce9beba08a733ca3443ba52c057dc62", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 20, "peak_memory_kib": 81280, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+    { "path": "/tmp/codeskeptic-stress-3vuf16v3/nested-macro-expansion/repeat-1/macro_matrix.cpp", "compile_command_sha256": "c1463174907fa8cd0b9a62046a83b02ae77fe6e4c10385b5465f8c581ddb1cfe", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 20, "peak_memory_kib": 81064, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
   ],
   "total": 1,
   "diagnostics": [
@@ -17,13 +17,13 @@
       "capability_tier": "supported",
       "blocks_verdict": true,
       "fingerprint": "csf1-14556966e3f07cfd",
-      "file": "/tmp/codeskeptic-stress-ja2klmo_/nested-macro-expansion/repeat-1/macro_matrix.cpp",
+      "file": "/tmp/codeskeptic-stress-3vuf16v3/nested-macro-expansion/repeat-1/macro_matrix.cpp",
       "line": 9,
       "column": 12,
       "function": "macro_seeded",
       "message": "Division by zero: 'divisor' is definitely zero",
       "notes": [
-        { "file": "/tmp/codeskeptic-stress-ja2klmo_/nested-macro-expansion/repeat-1/macro_matrix.cpp", "line": 8, "column": 5, "message": "'divisor' assigned zero here" }
+        { "file": "/tmp/codeskeptic-stress-3vuf16v3/nested-macro-expansion/repeat-1/macro_matrix.cpp", "line": 8, "column": 5, "message": "'divisor' assigned zero here" }
       ]
     }
   ]
