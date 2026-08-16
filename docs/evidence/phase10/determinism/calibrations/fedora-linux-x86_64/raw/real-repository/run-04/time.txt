@@ -1,21 +1,21 @@
-	Command being timed: "/work/build-p10-07-contracts/src/codeskeptic /work/src --policy no-absolute-paths --build-path /work/build-p10-07-contracts --tu-timeout-seconds 300 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-p9bzm3je/real-repository-04.json"
-	User time (seconds): 199.08
-	System time (seconds): 15.96
-	Percent of CPU this job got: 102%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:28.98
+	Command being timed: "/work/build-p10-07-determinism/src/codeskeptic /work/src --policy no-absolute-paths --build-path /work/build-p10-07-determinism --tu-timeout-seconds 300 --tu-memory-mib 4096 --json /tmp/codeskeptic-determinism-4_vvjbd9/real-repository-04.json"
+	User time (seconds): 223.87
+	System time (seconds): 20.19
+	Percent of CPU this job got: 104%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:54.60
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1304268
+	Maximum resident set size (kbytes): 1304080
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 6780821
-	Voluntary context switches: 184090
-	Involuntary context switches: 2826
+	Minor (reclaiming a frame) page faults: 6787345
+	Voluntary context switches: 207135
+	Involuntary context switches: 3953
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 13856
+	File system outputs: 13960
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0

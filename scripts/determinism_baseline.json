@@ -12,7 +12,7 @@
       "provenance": {
         "calibration": {
           "evidence_path": "docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64",
-          "receipt_sha256": "313e2886f790a322f5a387bafd939cf09a263e5046da3eb7eeaa242d24b8d837"
+          "receipt_sha256": "41666150ba94e348a69ebc5f24a4f831f7b6e71ea1aa0df6c00566bd9eed1ed2"
         },
         "promotion": {
           "previous_baseline_sha256": null,
@@ -53,29 +53,29 @@
       },
       "workloads": {
         "real-repository": {
-          "input_identity_sha256": "637ffb2ffbe9fe373e2cf2920bc2cd32bed8b633812821d2d25ac73fe3196993",
+          "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
           "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 215190,
-              "median": 214920,
-              "min": 213950,
-              "p90": 215070
+              "max": 244060,
+              "median": 242285,
+              "min": 214440,
+              "p90": 243800
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 1304724,
-              "median": 1304036,
-              "min": 1303072,
-              "p90": 1304724
+              "max": 1304652,
+              "median": 1304138,
+              "min": 1303436,
+              "p90": 1304628
             },
             "wall_ms": {
               "count": 10,
-              "max": 209640,
-              "median": 208920,
-              "min": 207880,
-              "p90": 209260
+              "max": 234600,
+              "median": 232955,
+              "min": 207710,
+              "p90": 234260
             }
           },
           "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
@@ -87,24 +87,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 33260,
-              "median": 32440,
-              "min": 31930,
-              "p90": 32910
+              "max": 38090,
+              "median": 36210,
+              "min": 32350,
+              "p90": 37430
             },
             "peak_rss_kib": {
               "count": 10,
-              "max": 370836,
-              "median": 370484,
-              "min": 369480,
-              "p90": 370732
+              "max": 371072,
+              "median": 370502,
+              "min": 369900,
+              "p90": 370944
             },
             "wall_ms": {
               "count": 10,
-              "max": 32190,
-              "median": 31410,
-              "min": 30910,
-              "p90": 31950
+              "max": 36590,
+              "median": 34865,
+              "min": 31410,
+              "p90": 35940
             }
           },
           "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
@@ -116,24 +116,24 @@
           "statistics": {
             "cpu_ms": {
               "count": 10,
-              "max": 740,
-              "median": 725,
-              "min": 690,
-              "p90": 730
+              "max": 900,
+              "median": 760,
+              "min": 710,
+              "p90": 830
             },
             "peak_rss_kib": {
               "count": 10,
               "max": 88048,
-              "median": 87790,
-              "min": 87416,
-              "p90": 88032
+              "median": 87668,
+              "min": 87496,
+              "p90": 87904
             },
             "wall_ms": {
               "count": 10,
-              "max": 810,
-              "median": 785,
-              "min": 760,
-              "p90": 800
+              "max": 960,
+              "median": 815,
+              "min": 780,
+              "p90": 890
             }
           },
           "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
@@ -145,7 +145,7 @@
   "schema": "codeskeptic-determinism-baseline-v2",
   "semantic_reference": {
     "real-repository": {
-      "input_identity_sha256": "637ffb2ffbe9fe373e2cf2920bc2cd32bed8b633812821d2d25ac73fe3196993",
+      "input_identity_sha256": "a5c0c1270657fe003463792e3642b1938128d439d6eb03730a3a30d4cd588ec5",
       "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
       "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
       "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
