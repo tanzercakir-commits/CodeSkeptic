@@ -1,0 +1,45 @@
+CodeSkeptic CS-P10-07 affinity-bound performance preflight
+captured_at_utc=2026-08-16
+source_revision=10dc597d340808bff6728f1f61f6fdf0f60f11eb
+source_worktree=/home/tanzer/Projects/CodeSkeptic/build/p10-07-hosted-source
+source_worktree_status=clean
+qualification_runner_sha256=53157408a4b96508de359ede97c30a5adf91f293b7af1420a364dd1e475f6cbe
+qualification_contract_sha256=ca6ddd8c33fa7e3257af241484524e39bf32b7b1bf3d50a1ee11ab0db8411bc1
+analyzer_sha256=2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562
+analyzer_version=CodeSkeptic 0.4.9-dev
+container_image=localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca
+container_image_id=sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5
+host_os=Fedora Linux 44 (KDE Plasma Desktop Edition)
+host_kernel=Linux 6.19.10-300.fc44.x86_64
+host_cpu_model=12th Gen Intel(R) Core(TM) i5-1235U
+requested_affinity=0,2
+observed_taskset=pid 1's current affinity list: 0,2
+observed_sched_getaffinity=[0, 2]
+
+Topology evidence (lscpu -p=CPU,CORE,SOCKET,MAXMHZ,MINMHZ):
+0,0,0,4400.0000,400.0000
+1,0,0,4400.0000,400.0000
+2,1,0,4400.0000,400.0000
+3,1,0,4400.0000,400.0000
+4,2,0,3300.0000,400.0000
+5,3,0,3300.0000,400.0000
+6,4,0,3300.0000,400.0000
+7,5,0,3300.0000,400.0000
+8,6,0,3300.0000,400.0000
+9,7,0,3300.0000,400.0000
+10,8,0,3300.0000,400.0000
+11,9,0,3300.0000,400.0000
+
+Selected CPU sysfs evidence:
+cpu0.thread_siblings_list=0-1
+cpu0.core_id=0
+cpu0.cpuinfo_max_freq=4400000
+cpu2.thread_siblings_list=2-3
+cpu2.core_id=4
+cpu2.cpuinfo_max_freq=4400000
+
+The disjoint thread-sibling sets and equal 4.4 GHz maximum frequencies establish
+that logical CPUs 0 and 2 are separate homogeneous P-core execution resources.
+
+Exact calibration container command:
+podman run --rm -e CODESKEPTIC_VERSION_OVERRIDE=0.4.9-dev -v /home/tanzer/Projects/CodeSkeptic/build/p10-07-hosted-source:/work:Z -v /home/tanzer/Projects/CodeSkeptic/build/pr142-sanitizer-work/.git:/home/tanzer/Projects/CodeSkeptic/build/pr142-sanitizer-work/.git:Z -v /tmp/codeskeptic-p10-07-affinity-calibration.jf9SJx:/evidence:Z -w /work sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5 taskset -c 0,2 bash -lc 'taskset -pc $$ && /usr/bin/python3 -c "import os; print(sorted(os.sched_getaffinity(0)))" && /usr/bin/python3 scripts/run_determinism_qualification.py --manifest scripts/determinism_workloads.json --baseline /evidence/baseline.json --binary build-p10-07-determinism/src/codeskeptic --repo-root /work --build-path /work/build-p10-07-determinism --revision 10dc597d340808bff6728f1f61f6fdf0f60f11eb --output /evidence/qualification --hardware-class fedora-linux-x86_64 --performance-policy required --repetitions 10 --clang /usr/bin/clang-20 --c-compiler /usr/bin/clang-20 --cxx-compiler /usr/bin/clang++-20 --cmake /usr/bin/cmake --ninja /usr/bin/ninja --time-binary /usr/bin/time --prepare-release-candidate --release-workspace /evidence/release-workspace --jobs 2 --establish-baseline --calibration-output /evidence/calibration --calibration-evidence-path docs/evidence/phase10/determinism/calibrations/2026-08-16-affinity-fedora-linux-x86_64 --promotion-reason "Initial affinity-bound Fedora performance baseline"'
