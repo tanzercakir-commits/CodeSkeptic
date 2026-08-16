@@ -1,5 +1,77 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-16 — Phase 10.7 deterministic performance qualification (in progress)
+
+- Added fail-closed CPU execution identity to the determinism/performance
+  authority. Performance-required Linux evidence now binds the exact
+  `sched_getaffinity` mask and effective scheduler utilization clamps; the
+  accepted Fedora profile is restricted to separate P-core logical CPUs
+  `[0, 2]` with `uclamp.min=1024` and `uclamp.max=1024`. The subprocess tree
+  inherits those process-local controls without modifying the host-wide power
+  policy. Baseline, calibration, accepted/rejected qualification, and retained
+  verification schemas advance to V4 so the new wire format cannot be confused
+  with the earlier affinity-only V3 evidence.
+- Made `/proc/self/sched` evidence bounded and strict: reads stop at one MiB
+  plus the overflow sentinel, require ASCII, accept exactly one min and max
+  field, bound decimal width before conversion, and reject missing, duplicate,
+  conflicting, malformed, non-regular, unavailable, or out-of-range state.
+  Affinity and uclamp fields validate types before set/range operations, so
+  adversarial JSON produces a controlled qualification failure instead of a
+  raw Python exception. Record-only/rejected evidence may describe unavailable
+  controls, but cannot manufacture a performance PASS.
+- The first affinity-only independent confirmation honestly rejected a release
+  candidate whose wall/CPU maxima exceeded the unchanged 10 percent ceiling.
+  No retry or threshold relaxation was used. The V4 source was frozen at
+  `a1eca13d28e29cd63d26a9bdadb3e4343560b5c5`, independently source-audited,
+  and rebuilt in the pinned LLVM 20 image before any new performance authority
+  was created.
+- Retained the CPU-controlled 3-workload x 10-repetition calibration under
+  `docs/evidence/phase10/determinism/calibrations/2026-08-16-uclamp-fedora-linux-x86_64`.
+  It binds 385 source files with digest
+  `be021bd3847e22d2cd63cf7d49bfa5289697b0f71ac98a1304af57b57710a5e0`,
+  analyzer SHA-256
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`,
+  and calibration receipt SHA-256
+  `010359fe8e0ecf1d6fdb2d58bd83c32d244485004462b2f6c56dd41614c686d2`.
+  Its baseline SHA-256 is
+  `6aab27131d9dc7d4d9ace46ffd559b631a41a4f3376af220b98a7246e22d6af7`;
+  the 122-entry calibration manifest SHA-256 is
+  `50b089a092c0a6d7c0cfcbe1e9317731133902aa50073cbc87c5010c896f6621`.
+  Worst-case calibration wall/CPU/RSS values are `1490 ms / 1400 ms /
+  88300 KiB` for the unit workload, `235990 ms / 240370 ms / 1305092 KiB`
+  for the real repository, and `39460 ms / 40660 ms / 371072 KiB` for the
+  release candidate.
+- Retained an independent clean-workspace confirmation at
+  `.../2026-08-16-uclamp-fedora-linux-x86_64-confirmation`. All three semantic
+  hashes match calibration and all performance gates pass without retry.
+  Worst-case confirmation wall/CPU/RSS values are `770 ms / 690 ms /
+  88200 KiB`, `227570 ms / 232190 ms / 1305032 KiB`, and `38150 ms /
+  38830 ms / 370924 KiB`, respectively. The confirmation receipt SHA-256 is
+  `ec57bae16cda287c798951854f990e373737e4c0c93145958e308f7cea42d3d2`;
+  its 122-entry manifest SHA-256 is
+  `a91d804ce18b1d21d8e92ed247b68f84c12e5f62b56f21f6d6366fcc4d398b68`.
+  Pinned verify-only passes accept the baseline authority, calibration, initial
+  qualification, and independent confirmation.
+- Refreshed the exact-source stress tree at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`. All nine cases
+  pass two repetitions with zero timeout/crash in `545` ms. It binds 386 files
+  with source digest
+  `acda6f65f187132a1fb64154801af2b057118c681a7bbe6b0c56b947a59b3c51`;
+  receipt SHA-256 is
+  `109708657f8af0b84cf4effc19adeaeba5d73e0625de3a0ec38fa6e134258bdc`,
+  and the 37-entry outer manifest SHA-256 is
+  `63e22e4c521e725b7a2574918fe6232933d32394900b34900d0f06dd302b166b`.
+- Pre-integration exact-source validation passes `30/30` determinism
+  contracts, `4/4` workflow contracts, `6/6` stress contracts, and
+  `1280/1280` direct C++ tests. The first 1299-entry CTest pass reached
+  `1298/1299` and correctly rejected only the temporary source-authority branch
+  name as absent from generator-owned TODO state; final integration into the
+  already-listed feature branch and a fresh full CTest remain required.
+  Independent final review, publication to the feature branch, and exact-head
+  hosted Linux, sanitizer, Windows, macOS, and determinism gates remain
+  required; this checkpoint does not close `CS-P10-07` or write protected
+  `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
