@@ -176,7 +176,16 @@ jobs:
           print(f"Hardware class: `{receipt['host']['class_id']}`")
           if receipt["status"] == "rejected":
               print()
-              print(f"Failure: `{receipt['failure']}`")
+              print(f"Decision: `{receipt['decision']['classification']}`")
+              print()
+              print("Failures:")
+              for failure in receipt["decision"]["failures"]:
+                  print(f"- `{failure['type']}`: {failure['message']}")
+              observations = receipt["observations"]
+              print(
+                  "Complete measured observations: "
+                  f"`{str(observations['complete']).lower()}`"
+              )
               print(f"Retained raw artifacts: {len(receipt['artifacts'])}")
               raise SystemExit(0)
           print()

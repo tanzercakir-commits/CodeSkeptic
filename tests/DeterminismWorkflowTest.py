@@ -84,6 +84,10 @@ class DeterminismWorkflowTest(unittest.TestCase):
         self.assertIn("retention-days:", text)
         self.assertNotIn("continue-on-error", text)
         self.assertNotIn("pull_request_target", text)
+        self.assertIn("receipt['decision']['classification']", text)
+        self.assertIn('receipt["decision"]["failures"]', text)
+        self.assertIn('receipt["observations"]', text)
+        self.assertNotIn("receipt['failure']", text)
 
     def test_runner_context_is_only_used_after_a_step_starts(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")

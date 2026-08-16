@@ -30,11 +30,11 @@ except ImportError:  # pragma: no cover - unavailable on native Windows
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v1"
-BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v4"
-RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v4"
-REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v4"
-CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v4"
+MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v2"
+BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v5"
+RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v5"
+REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v5"
+CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v5"
 CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v2"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
@@ -43,9 +43,9 @@ TOOLCHAIN_NAMES = (
     "c_compiler", "cxx_compiler",
 )
 HARDWARE_FIELDS = (
-    "architecture", "cpu_model", "logical_cpus", "cpu_affinity_source",
-    "cpu_affinity", "cpu_uclamp_source", "cpu_uclamp_min",
-    "cpu_uclamp_max", "memory_bytes",
+    "architecture", "cpu_model", "logical_cpus", "host_logical_cpus",
+    "cpu_affinity_source", "cpu_affinity", "cpu_uclamp_source",
+    "cpu_uclamp_min", "cpu_uclamp_max", "memory_bytes",
 )
 AFFINITY_SOURCE_SCHED = "sched_getaffinity"
 AFFINITY_SOURCE_UNAVAILABLE = "unavailable"
@@ -57,6 +57,14 @@ IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}")
 MAX_JSON_BYTES = 64 << 20
 MAX_LOG_BYTES = 64 << 20
 MAX_BUNDLE_BYTES = 512 << 20
+ENVIRONMENT_POLICY = {
+    "affinity_external_cpu_limit_basis_points": 200,
+    "host_external_cpu_limit_basis_points": 50,
+    "cpu_pressure_some_limit_basis_points": 200,
+    "memory_pressure_full_limit_basis_points": 0,
+    "io_pressure_full_limit_basis_points": 0,
+    "thermal_throttle_limit_ms": 0,
+}
 SOURCE_FILE_RELATIVES = (
     "CMakeLists.txt", ".gitattributes", "Dockerfile", "action.yml",
 )
@@ -91,6 +99,70 @@ EVIDENCE_FIELDS = {
 
 class QualificationError(RuntimeError):
     """The qualification cannot produce or accept authoritative evidence."""
+
+
+FAILURE_FIELDS = {
+    "type", "message", "workload", "repetition", "iteration", "metric",
+    "statistic", "current", "baseline", "limit_percent",
+}
+
+
+def _failure_record(
+    failure_type: str, message: str, *, workload: str | None = None,
+    repetition: int | None = None, iteration: int | None = None,
+    metric: str | None = None, statistic: str | None = None,
+    current: int | None = None, baseline: int | None = None,
+    limit_percent: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "type": failure_type,
+        "message": message,
+        "workload": workload,
+        "repetition": repetition,
+        "iteration": iteration,
+        "metric": metric,
+        "statistic": statistic,
+        "current": current,
+        "baseline": baseline,
+        "limit_percent": limit_percent,
+    }
+
+
+def _validate_failure_record(value: Any, label: str) -> dict[str, Any]:
+    record = _exact_dict(value, FAILURE_FIELDS, label)
+    if (not isinstance(record["type"], str) or
+            IDENTIFIER.fullmatch(record["type"]) is None or
+            not isinstance(record["message"], str) or
+            not record["message"] or "\x00" in record["message"] or
+            len(record["message"].encode("utf-8")) > 8192):
+        raise QualificationError(f"{label} is malformed")
+    if record["workload"] is not None and record["workload"] not in KINDS:
+        raise QualificationError(f"{label} workload is malformed")
+    for field in ("repetition", "iteration"):
+        if record[field] is not None:
+            _require_int(record[field], f"{label} {field}", 1, 100)
+    for field in ("current", "baseline", "limit_percent"):
+        if record[field] is not None:
+            _require_int(record[field], f"{label} {field}", 0, 1 << 62)
+    for field in ("metric", "statistic"):
+        if record[field] is not None and (
+                not isinstance(record[field], str) or
+                IDENTIFIER.fullmatch(record[field]) is None):
+            raise QualificationError(f"{label} {field} is malformed")
+    return record
+
+
+class QualificationDecisionError(QualificationError):
+    """A complete measurement was rejected by one or more exact gates."""
+
+    def __init__(
+        self, failures: list[dict[str, Any]], workloads: list[dict[str, Any]],
+    ) -> None:
+        if not failures:
+            raise ValueError("qualification decision requires failures")
+        super().__init__(failures[0]["message"])
+        self.failures = failures
+        self.workloads = workloads
 
 
 def canonical_json(value: Any) -> bytes:
@@ -142,6 +214,24 @@ def _validate_cpu_affinity(
     if value != sorted(set(value)):
         raise QualificationError(f"{label} is malformed")
     return value
+
+
+def _validate_cpu_topology(value: dict[str, Any], label: str) -> None:
+    effective = _require_int(
+        value["logical_cpus"], f"{label} effective logical CPU count",
+        1, 65536,
+    )
+    host_total = _require_int(
+        value["host_logical_cpus"], f"{label} host logical CPU count",
+        1, 65536,
+    )
+    affinity = _validate_cpu_affinity(
+        value["cpu_affinity"], effective, value["cpu_affinity_source"],
+        f"{label} CPU affinity",
+    )
+    if effective > host_total or (
+            affinity and affinity[-1] >= host_total):
+        raise QualificationError(f"{label} CPU topology is malformed")
 
 
 def _validate_cpu_uclamp(
@@ -271,7 +361,8 @@ def _load_json(path: Path, maximum: int = MAX_JSON_BYTES) -> dict[str, Any]:
 
 def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     _exact_dict(raw, {
-        "schema", "repetitions", "performance_regression_limit_percent", "workloads"
+        "schema", "repetitions", "performance_regression_limit_percent",
+        "environment_policy", "workloads"
     }, "determinism manifest")
     if raw["schema"] != MANIFEST_SCHEMA:
         raise QualificationError("unsupported determinism manifest schema")
@@ -279,6 +370,8 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
         raise QualificationError("determinism repetitions must be exactly ten")
     if raw["performance_regression_limit_percent"] != 10:
         raise QualificationError("performance regression limit must remain 10 percent")
+    if raw["environment_policy"] != ENVIRONMENT_POLICY:
+        raise QualificationError("determinism environment policy is not pinned")
     workloads = raw["workloads"]
     if not isinstance(workloads, list) or len(workloads) != 3:
         raise QualificationError("workload kinds must contain exactly three entries")
@@ -288,7 +381,8 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     for item in workloads:
         _exact_dict(item, {
             "id", "kind", "input", "analyzer_args", "wall_timeout_seconds",
-            "tu_timeout_seconds", "tu_memory_mib",
+            "tu_timeout_seconds", "tu_memory_mib", "measurement_iterations",
+            "minimum_batch_cpu_ms",
         }, "workload")
         identifier = item["id"]
         if not isinstance(identifier, str) or IDENTIFIER.fullmatch(identifier) is None or identifier in seen:
@@ -297,6 +391,19 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
         _require_int(item["wall_timeout_seconds"], f"{identifier} wall timeout", 60, 21600)
         _require_int(item["tu_timeout_seconds"], f"{identifier} TU timeout", 1, 86400)
         _require_int(item["tu_memory_mib"], f"{identifier} TU memory", 64, 131072)
+        _require_int(
+            item["measurement_iterations"],
+            f"{identifier} measurement iterations", 1, 100,
+        )
+        _require_int(
+            item["minimum_batch_cpu_ms"],
+            f"{identifier} minimum batch CPU", 0, 1 << 31,
+        )
+        expected_batch = (10, 5000) if item["kind"] == "unit" else (1, 0)
+        if (item["measurement_iterations"], item["minimum_batch_cpu_ms"]) != expected_batch:
+            raise QualificationError(
+                f"{identifier} measurement batch policy is not pinned"
+            )
         arguments = item["analyzer_args"]
         if (not isinstance(arguments, list) or
                 any(not isinstance(token, str) or not token or "\x00" in token for token in arguments)):
@@ -340,6 +447,440 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
 
 def load_manifest(path: Path) -> dict[str, Any]:
     return validate_manifest(_load_json(path))
+
+
+def _parse_proc_stat(
+    raw: bytes, affinity: list[int], clock_ticks_per_second: int,
+) -> dict[str, int]:
+    if (not raw or len(raw) > 1024 * 1024 or
+            isinstance(clock_ticks_per_second, bool) or
+            not isinstance(clock_ticks_per_second, int) or
+            clock_ticks_per_second <= 0):
+        raise QualificationError("CPU accounting evidence is malformed")
+    try:
+        text = raw.decode("ascii", errors="strict")
+    except UnicodeError as error:
+        raise QualificationError("CPU accounting evidence is malformed") from error
+    wanted = {"cpu", *(f"cpu{cpu}" for cpu in affinity)}
+    rows: dict[str, list[int]] = {}
+    logical_labels: set[str] = set()
+    for line in text.splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        label = fields[0]
+        if re.fullmatch(r"cpu[0-9]+", label):
+            if label in logical_labels:
+                raise QualificationError("CPU accounting evidence is malformed")
+            logical_labels.add(label)
+        if label not in wanted:
+            continue
+        if label in rows or len(fields) != 11 or any(
+                re.fullmatch(r"[0-9]{1,20}", field) is None
+                for field in fields[1:]):
+            raise QualificationError("CPU accounting evidence is malformed")
+        values = [int(field) for field in fields[1:]]
+        if values[0] < values[8] or values[1] < values[9]:
+            raise QualificationError("CPU accounting evidence is malformed")
+        rows[label] = values
+    if set(rows) != wanted:
+        raise QualificationError("CPU accounting evidence is incomplete")
+
+    def busy(values: list[int]) -> int:
+        user, nice, system, _idle, _iowait, irq, softirq, steal, guest, guest_nice = values
+        return user - guest + nice - guest_nice + system + irq + softirq + steal
+
+    return {
+        "clock_ticks_per_second": clock_ticks_per_second,
+        "host_logical_cpus": len(logical_labels),
+        "host_busy_ticks": busy(rows["cpu"]),
+        "affinity_busy_ticks": sum(
+            busy(rows[f"cpu{cpu}"]) for cpu in affinity
+        ),
+    }
+
+
+def _parse_pressure(raw: bytes, label: str) -> dict[str, int]:
+    if not raw or len(raw) > 64 * 1024:
+        raise QualificationError(f"{label} pressure evidence is malformed")
+    try:
+        text = raw.decode("ascii", errors="strict")
+    except UnicodeError as error:
+        raise QualificationError(
+            f"{label} pressure evidence is malformed"
+        ) from error
+    values: dict[str, int] = {}
+    pattern = re.compile(
+        r"^(some|full) avg10=[0-9]+\.[0-9]{2} "
+        r"avg60=[0-9]+\.[0-9]{2} avg300=[0-9]+\.[0-9]{2} "
+        r"total=([0-9]{1,20})$"
+    )
+    for line in text.splitlines():
+        match = pattern.fullmatch(line)
+        if match is None or match.group(1) in values:
+            raise QualificationError(f"{label} pressure evidence is malformed")
+        values[match.group(1)] = int(match.group(2))
+    if set(values) != {"some", "full"}:
+        raise QualificationError(f"{label} pressure evidence is incomplete")
+    return {
+        "some_total_us": values["some"],
+        "full_total_us": values["full"],
+    }
+
+
+def _basis_points(value: int, capacity: int) -> int:
+    if value < 0 or capacity <= 0:
+        raise QualificationError("environment accounting is malformed")
+    return (value * 10_000 + capacity - 1) // capacity
+
+
+def _evaluate_environment(
+    before: dict[str, Any], after: dict[str, Any], child_cpu_ms: int,
+    wall_ms: int, affinity: list[int], logical_cpus: int,
+    policy: dict[str, int], required: bool,
+) -> dict[str, Any]:
+    if policy != ENVIRONMENT_POLICY:
+        raise QualificationError("determinism environment policy is not pinned")
+    _require_int(child_cpu_ms, "environment child CPU", 0, 1 << 62)
+    _require_int(wall_ms, "environment wall time", 1, 1 << 62)
+    if not affinity or affinity != sorted(set(affinity)):
+        raise QualificationError("environment affinity is malformed")
+    _require_int(logical_cpus, "environment logical CPU count", 1, 65536)
+    violations: list[str] = []
+    before_cpu = _exact_dict(before.get("cpu"), {
+        "clock_ticks_per_second", "host_logical_cpus", "host_busy_ticks",
+        "affinity_busy_ticks",
+    }, "environment CPU before")
+    after_cpu = _exact_dict(after.get("cpu"), set(before_cpu), "environment CPU after")
+    for field in before_cpu:
+        _require_int(before_cpu[field], f"environment CPU before {field}", 0, 1 << 62)
+        _require_int(after_cpu[field], f"environment CPU after {field}", 0, 1 << 62)
+    if (before_cpu["clock_ticks_per_second"] == 0 or
+            before_cpu["clock_ticks_per_second"] !=
+            after_cpu["clock_ticks_per_second"] or
+            before_cpu["host_logical_cpus"] == 0 or
+            before_cpu["host_logical_cpus"] != after_cpu["host_logical_cpus"]):
+        raise QualificationError("environment CPU topology drift")
+    if before_cpu["host_logical_cpus"] != logical_cpus:
+        raise QualificationError("environment logical CPU identity drift")
+    for field in ("host_busy_ticks", "affinity_busy_ticks"):
+        if after_cpu[field] < before_cpu[field]:
+            raise QualificationError("environment CPU counter reset")
+    tick_hz = before_cpu["clock_ticks_per_second"]
+    host_busy_ms = (
+        (after_cpu["host_busy_ticks"] - before_cpu["host_busy_ticks"])
+        * 1000 // tick_hz
+    )
+    affinity_busy_ms = (
+        (after_cpu["affinity_busy_ticks"] - before_cpu["affinity_busy_ticks"])
+        * 1000 // tick_hz
+    )
+    tick_ms = (1000 + tick_hz - 1) // tick_hz
+    if (child_cpu_ms > host_busy_ms + tick_ms * logical_cpus or
+            child_cpu_ms > affinity_busy_ms + tick_ms * len(affinity)):
+        raise QualificationError("environment child CPU accounting drift")
+    host_external_ms = max(0, host_busy_ms - child_cpu_ms)
+    affinity_external_ms = max(0, affinity_busy_ms - child_cpu_ms)
+    host_external_bp = _basis_points(
+        host_external_ms, wall_ms * before_cpu["host_logical_cpus"]
+    )
+    affinity_external_bp = _basis_points(
+        affinity_external_ms, wall_ms * len(affinity)
+    )
+    if (required and host_external_bp >
+            policy["host_external_cpu_limit_basis_points"]):
+        violations.append(
+            "host external CPU activity exceeds the pinned environment limit"
+        )
+    if (required and affinity_external_bp >
+            policy["affinity_external_cpu_limit_basis_points"]):
+        violations.append(
+            "affinity external CPU activity exceeds the pinned environment limit"
+        )
+
+    pressure_metrics: dict[str, int] = {}
+    pressure_limits = {
+        ("cpu", "some"): "cpu_pressure_some_limit_basis_points",
+        ("memory", "full"): "memory_pressure_full_limit_basis_points",
+        ("io", "full"): "io_pressure_full_limit_basis_points",
+    }
+    before_pressure = _exact_dict(
+        before.get("pressure"), {"cpu", "memory", "io"},
+        "environment pressure before",
+    )
+    after_pressure = _exact_dict(
+        after.get("pressure"), {"cpu", "memory", "io"},
+        "environment pressure after",
+    )
+    for resource_name in ("cpu", "memory", "io"):
+        left = _exact_dict(
+            before_pressure[resource_name], {"some_total_us", "full_total_us"},
+            f"environment {resource_name} pressure before",
+        )
+        right = _exact_dict(
+            after_pressure[resource_name], {"some_total_us", "full_total_us"},
+            f"environment {resource_name} pressure after",
+        )
+        for field in ("some_total_us", "full_total_us"):
+            _require_int(left[field], f"environment {resource_name} pressure", 0, 1 << 62)
+            _require_int(right[field], f"environment {resource_name} pressure", 0, 1 << 62)
+            if right[field] < left[field]:
+                raise QualificationError(
+                    f"environment {resource_name} pressure counter reset"
+                )
+        for pressure_kind in ("some", "full"):
+            key = f"{resource_name}_{pressure_kind}_basis_points"
+            pressure_metrics[key] = _basis_points(
+                right[f"{pressure_kind}_total_us"] -
+                left[f"{pressure_kind}_total_us"],
+                wall_ms * 1000,
+            )
+    for (resource_name, pressure_kind), limit_name in pressure_limits.items():
+        value = pressure_metrics[
+            f"{resource_name}_{pressure_kind}_basis_points"
+        ]
+        if required and value > policy[limit_name]:
+            violations.append(
+                f"{resource_name} {pressure_kind} pressure exceeds the pinned "
+                "environment limit"
+            )
+
+    before_frequency = before.get("cpufreq")
+    after_frequency = after.get("cpufreq")
+    if not isinstance(before_frequency, list) or not isinstance(after_frequency, list):
+        raise QualificationError("environment CPU frequency evidence is malformed")
+    if required and (not before_frequency or not after_frequency):
+        violations.append("CPU frequency policy evidence is unavailable")
+    if len(before_frequency) != len(after_frequency):
+        raise QualificationError("environment CPU frequency evidence drift")
+    for left, right in zip(before_frequency, after_frequency):
+        fields = {"cpu", "driver", "governor", "minimum_khz", "maximum_khz",
+                  "current_khz"}
+        _exact_dict(left, fields, "environment CPU frequency before")
+        _exact_dict(right, fields, "environment CPU frequency after")
+        for item, side in ((left, "before"), (right, "after")):
+            _require_int(
+                item["cpu"], f"environment CPU frequency {side} CPU",
+                0, 65535,
+            )
+            for field in ("minimum_khz", "maximum_khz", "current_khz"):
+                _require_int(
+                    item[field],
+                    f"environment CPU frequency {side} {field}",
+                    1, 1 << 62,
+                )
+            if (not isinstance(item["driver"], str) or
+                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["driver"]) is None or
+                    not isinstance(item["governor"], str) or
+                    re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", item["governor"]) is None or
+                    item["maximum_khz"] < item["minimum_khz"]):
+                raise QualificationError(
+                    "environment CPU frequency evidence is malformed"
+                )
+        if ({key: left[key] for key in fields if key != "current_khz"} !=
+                {key: right[key] for key in fields if key != "current_khz"}):
+            violations.append("CPU frequency policy changed during measurement")
+    if before_frequency and [item["cpu"] for item in before_frequency] != affinity:
+        raise QualificationError("environment CPU frequency identity drift")
+
+    before_thermal = before.get("thermal")
+    after_thermal = after.get("thermal")
+    if not isinstance(before_thermal, list) or not isinstance(after_thermal, list):
+        raise QualificationError("environment thermal evidence is malformed")
+    if required and (not before_thermal or not after_thermal):
+        violations.append("thermal throttle evidence is unavailable")
+    if len(before_thermal) != len(after_thermal):
+        raise QualificationError("environment thermal evidence drift")
+    thermal_delta = 0
+    thermal_count_delta = 0
+    thermal_fields = {
+        "cpu", "core_count", "core_total_ms", "package_count",
+        "package_total_ms",
+    }
+    for left, right in zip(before_thermal, after_thermal):
+        _exact_dict(left, thermal_fields, "environment thermal before")
+        _exact_dict(right, thermal_fields, "environment thermal after")
+        if left["cpu"] != right["cpu"]:
+            raise QualificationError("environment thermal CPU identity drift")
+        for field in thermal_fields - {"cpu"}:
+            _require_int(left[field], f"environment thermal {field}", 0, 1 << 62)
+            _require_int(right[field], f"environment thermal {field}", 0, 1 << 62)
+            if right[field] < left[field]:
+                raise QualificationError("environment thermal counter reset")
+        thermal_delta = max(
+            thermal_delta,
+            right["core_total_ms"] - left["core_total_ms"],
+            right["package_total_ms"] - left["package_total_ms"],
+        )
+        thermal_count_delta = max(
+            thermal_count_delta,
+            right["core_count"] - left["core_count"],
+            right["package_count"] - left["package_count"],
+        )
+    if before_thermal and [item["cpu"] for item in before_thermal] != affinity:
+        raise QualificationError("environment thermal CPU identity drift")
+    if required and (
+            thermal_delta > policy["thermal_throttle_limit_ms"] or
+            thermal_count_delta > 0):
+        violations.append("thermal throttle activity exceeds the pinned limit")
+
+    return {
+        "valid": not violations,
+        "violations": violations,
+        "metrics": {
+            "host_busy_ms": host_busy_ms,
+            "affinity_busy_ms": affinity_busy_ms,
+            "host_external_cpu_ms": host_external_ms,
+            "affinity_external_cpu_ms": affinity_external_ms,
+            "host_external_cpu_basis_points": host_external_bp,
+            "affinity_external_cpu_basis_points": affinity_external_bp,
+            "thermal_throttle_ms": thermal_delta,
+            "thermal_throttle_count": thermal_count_delta,
+            **pressure_metrics,
+        },
+    }
+
+
+def _telemetry_bytes(path: Path, maximum: int, label: str) -> bytes:
+    try:
+        return _read_regular(path, maximum)
+    except QualificationError as error:
+        raise QualificationError(f"cannot read {label}") from error
+
+
+def _telemetry_text(path: Path, label: str, maximum: int = 4096) -> str:
+    raw = _telemetry_bytes(path, maximum, label)
+    try:
+        value = raw.decode("ascii", errors="strict").strip()
+    except UnicodeError as error:
+        raise QualificationError(f"{label} is malformed") from error
+    if not value or "\x00" in value or "\n" in value:
+        raise QualificationError(f"{label} is malformed")
+    return value
+
+
+def _telemetry_uint(path: Path, label: str) -> int:
+    value = _telemetry_text(path, label)
+    if re.fullmatch(r"[0-9]{1,20}", value) is None:
+        raise QualificationError(f"{label} is malformed")
+    return int(value)
+
+
+def _telemetry_directory(path: Path, root: Path, label: str) -> Path | None:
+    try:
+        resolved = path.resolve(strict=True)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise QualificationError(f"{label} is malformed") from error
+    try:
+        resolved.relative_to(root.resolve(strict=True))
+    except (ValueError, FileNotFoundError, OSError) as error:
+        raise QualificationError(f"{label} escapes its authority root") from error
+    if not resolved.is_dir():
+        raise QualificationError(f"{label} is malformed")
+    return resolved
+
+
+def _capture_environment(
+    affinity: list[int], proc_root: Path = Path("/proc"),
+    cpu_root: Path = Path("/sys/devices/system/cpu"),
+) -> dict[str, Any]:
+    if not affinity or affinity != sorted(set(affinity)):
+        raise QualificationError("environment affinity is malformed")
+    try:
+        clock_ticks = os.sysconf("SC_CLK_TCK")
+    except (OSError, ValueError) as error:
+        raise QualificationError("cannot read CPU accounting clock") from error
+    cpu = _parse_proc_stat(
+        _telemetry_bytes(proc_root / "stat", 1024 * 1024, "CPU accounting"),
+        affinity, int(clock_ticks),
+    )
+    pressure = {
+        resource_name: _parse_pressure(
+            _telemetry_bytes(
+                proc_root / "pressure" / resource_name, 64 * 1024,
+                f"{resource_name} pressure",
+            ),
+            resource_name,
+        )
+        for resource_name in ("cpu", "memory", "io")
+    }
+
+    frequency: list[dict[str, Any]] = []
+    frequency_missing = 0
+    for cpu_index in affinity:
+        root = cpu_root / f"cpu{cpu_index}" / "cpufreq"
+        resolved_root = _telemetry_directory(
+            root, cpu_root, "CPU frequency evidence"
+        )
+        if resolved_root is None:
+            frequency_missing += 1
+            continue
+        root = resolved_root
+        driver = _telemetry_text(root / "scaling_driver", "CPU frequency driver")
+        governor = _telemetry_text(
+            root / "scaling_governor", "CPU frequency governor"
+        )
+        if (re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", driver) is None or
+                re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", governor) is None):
+            raise QualificationError("CPU frequency policy is malformed")
+        minimum = _telemetry_uint(
+            root / "scaling_min_freq", "CPU minimum frequency"
+        )
+        maximum = _telemetry_uint(
+            root / "scaling_max_freq", "CPU maximum frequency"
+        )
+        current = _telemetry_uint(
+            root / "scaling_cur_freq", "CPU current frequency"
+        )
+        if minimum == 0 or maximum < minimum or current == 0:
+            raise QualificationError("CPU frequency policy is malformed")
+        frequency.append({
+            "cpu": cpu_index,
+            "driver": driver,
+            "governor": governor,
+            "minimum_khz": minimum,
+            "maximum_khz": maximum,
+            "current_khz": current,
+        })
+    if frequency_missing not in {0, len(affinity)}:
+        raise QualificationError("CPU frequency evidence is incomplete")
+
+    thermal: list[dict[str, int]] = []
+    thermal_missing = 0
+    thermal_names = (
+        "core_throttle_count", "core_throttle_total_time_ms",
+        "package_throttle_count", "package_throttle_total_time_ms",
+    )
+    for cpu_index in affinity:
+        root = cpu_root / f"cpu{cpu_index}" / "thermal_throttle"
+        resolved_root = _telemetry_directory(
+            root, cpu_root, "thermal throttle evidence"
+        )
+        if resolved_root is None:
+            thermal_missing += 1
+            continue
+        root = resolved_root
+        values = {
+            name: _telemetry_uint(root / name, f"thermal throttle {name}")
+            for name in thermal_names
+        }
+        thermal.append({
+            "cpu": cpu_index,
+            "core_count": values["core_throttle_count"],
+            "core_total_ms": values["core_throttle_total_time_ms"],
+            "package_count": values["package_throttle_count"],
+            "package_total_ms": values["package_throttle_total_time_ms"],
+        })
+    if thermal_missing not in {0, len(affinity)}:
+        raise QualificationError("thermal throttle evidence is incomplete")
+    return {
+        "cpu": cpu,
+        "pressure": pressure,
+        "cpufreq": frequency,
+        "thermal": thermal,
+    }
 
 
 def metric_statistics(values: list[int]) -> dict[str, int]:
@@ -448,12 +989,7 @@ def validate_baseline(raw: dict[str, Any], manifest_sha256: str) -> dict[str, An
         if any(not isinstance(hardware[field], str) or not hardware[field]
                for field in ("architecture", "cpu_model")):
             raise QualificationError("baseline hardware identity is invalid")
-        _require_int(hardware["logical_cpus"], "baseline logical CPU count", 1, 65536)
-        _validate_cpu_affinity(
-            hardware["cpu_affinity"], hardware["logical_cpus"],
-            hardware["cpu_affinity_source"],
-            "baseline CPU affinity",
-        )
+        _validate_cpu_topology(hardware, "baseline")
         _validate_cpu_uclamp(
             hardware["cpu_uclamp_source"], hardware["cpu_uclamp_min"],
             hardware["cpu_uclamp_max"], "baseline CPU utilization clamp",
@@ -506,26 +1042,39 @@ def performance_regressions(
     current: dict[str, Any],
     baseline: dict[str, Any],
     limit_percent: int,
-) -> list[str]:
+) -> list[dict[str, Any]]:
     checks = (("wall_ms", "median"), ("wall_ms", "p90"),
               ("wall_ms", "max"),
               ("cpu_ms", "median"), ("cpu_ms", "p90"),
               ("cpu_ms", "max"),
               ("peak_rss_kib", "max"))
-    failures: list[str] = []
+    failures: list[dict[str, Any]] = []
     for metric_name, statistic in checks:
         current_value = current[metric_name][statistic]
         baseline_value = baseline[metric_name][statistic]
         if baseline_value == 0:
             if current_value != 0:
-                failures.append(
+                message = (
                     f"{workload_id} {metric_name}.{statistic} baseline is zero"
                 )
+                failures.append(_failure_record(
+                    "performance-regression", message,
+                    workload=workload_id, metric=metric_name,
+                    statistic=statistic, current=current_value,
+                    baseline=baseline_value, limit_percent=limit_percent,
+                ))
         elif current_value * 100 > baseline_value * (100 + limit_percent):
-            failures.append(
+            message = (
                 f"{workload_id} {metric_name}.{statistic} exceeds "
-                f"{limit_percent} percent baseline ({current_value} > {baseline_value})"
+                f"{limit_percent} percent baseline "
+                f"({current_value} > {baseline_value})"
             )
+            failures.append(_failure_record(
+                "performance-regression", message,
+                workload=workload_id, metric=metric_name,
+                statistic=statistic, current=current_value,
+                baseline=baseline_value, limit_percent=limit_percent,
+            ))
     return failures
 
 
@@ -667,7 +1216,8 @@ def _validate_input_receipt(value: Any, kind: str) -> None:
 
 
 def validate_receipt_payload(
-    receipt: dict[str, Any], manifest: dict[str, Any], baseline: dict[str, Any]
+    receipt: dict[str, Any], manifest: dict[str, Any], baseline: dict[str, Any],
+    observed_rejection: bool = False,
 ) -> dict[str, Any]:
     validate_manifest(manifest)
     manifest_sha = digest_json(manifest)
@@ -688,12 +1238,13 @@ def validate_receipt_payload(
     _require_int(source["file_count"], "receipt source file count", 1, 1_000_000)
     configuration = _exact_dict(receipt["configuration"], {
         "manifest_sha256", "repetitions", "performance_regression_limit_percent",
-        "performance_policy",
+        "performance_policy", "environment_policy",
     }, "receipt configuration")
     if (configuration["manifest_sha256"] != manifest_sha or
             configuration["repetitions"] != 10 or
             configuration["performance_regression_limit_percent"] != 10 or
-            configuration["performance_policy"] not in {"required", "record-only"}):
+            configuration["performance_policy"] not in {"required", "record-only"} or
+            configuration["environment_policy"] != manifest["environment_policy"]):
         raise QualificationError("receipt configuration differs from manifest")
     host = _exact_dict(
         receipt["host"], {"class_id", "os", *HARDWARE_FIELDS},
@@ -703,11 +1254,7 @@ def validate_receipt_payload(
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("receipt host identity is invalid")
-    _require_int(host["logical_cpus"], "host logical CPU count", 1, 65536)
-    _validate_cpu_affinity(
-        host["cpu_affinity"], host["logical_cpus"],
-        host["cpu_affinity_source"], "host CPU affinity"
-    )
+    _validate_cpu_topology(host, "host")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "host CPU utilization clamp",
@@ -739,7 +1286,9 @@ def validate_receipt_payload(
     profile_matches = _profile_matches(profile, host, toolchain)
     if configuration["performance_policy"] == "required":
         _require_stable_cpu_controls(host, "required performance evidence")
-    if configuration["performance_policy"] == "required" and not profile_matches:
+    if (not observed_rejection and
+            configuration["performance_policy"] == "required" and
+            not profile_matches):
         if profile is None:
             raise QualificationError(f"baseline profile is unavailable for {profile_id}")
         raise QualificationError(
@@ -762,7 +1311,9 @@ def validate_receipt_payload(
         values = {metric_name: [] for metric_name in METRICS}
         for repetition, run in enumerate(runs, 1):
             _exact_dict(run, {
-                "repetition", "semantic_sha256", "exit_code", "metrics", "artifacts"
+                "repetition", "semantic_sha256", "exit_code", "metrics",
+                "measurement_iterations", "batch_valid", "environment_valid",
+                "inner_runs", "artifacts",
             }, f"{kind} run")
             if run["repetition"] != repetition:
                 raise QualificationError(f"{kind} repetition sequence is invalid")
@@ -770,34 +1321,117 @@ def validate_receipt_payload(
                 raise QualificationError(f"{kind} semantic drift at repetition {repetition}")
             if run["exit_code"] not in (0, 1):
                 raise QualificationError(f"{kind} repetition has unavailable verdict")
+            expected_iterations = manifest_workload["measurement_iterations"]
+            if run["measurement_iterations"] != expected_iterations:
+                raise QualificationError(f"{kind} measurement iteration drift")
+            inner_runs = run["inner_runs"]
+            if not isinstance(inner_runs, list) or len(inner_runs) != expected_iterations:
+                raise QualificationError(f"{kind} inner measurement set is incomplete")
+            inner_values = {metric_name: [] for metric_name in METRICS}
+            environment_valid = True
+            for iteration, inner in enumerate(inner_runs, 1):
+                _exact_dict(inner, {
+                    "iteration", "semantic_sha256", "exit_code", "metrics",
+                    "environment", "artifacts",
+                }, f"{kind} inner measurement")
+                if inner["iteration"] != iteration:
+                    raise QualificationError(
+                        f"{kind} inner measurement sequence is invalid"
+                    )
+                if (inner["semantic_sha256"] != semantic or
+                        inner["exit_code"] != run["exit_code"]):
+                    raise QualificationError(
+                        f"{kind} inner measurement semantic or exit drift"
+                    )
+                inner_metrics = _exact_dict(
+                    inner["metrics"], set(METRICS),
+                    f"{kind} inner measurement metrics",
+                )
+                for metric_name in METRICS:
+                    minimum = 1 if metric_name != "cpu_ms" else 0
+                    inner_values[metric_name].append(_require_int(
+                        inner_metrics[metric_name],
+                        f"{kind} inner {metric_name}", minimum, 1 << 62,
+                    ))
+                environment = _exact_dict(
+                    inner["environment"], {"valid", "violations", "metrics"},
+                    f"{kind} environment decision",
+                )
+                if (not isinstance(environment["valid"], bool) or
+                        not isinstance(environment["violations"], list) or
+                        any(not isinstance(value, str) or not value
+                            for value in environment["violations"]) or
+                        environment["valid"] != (not environment["violations"]) or
+                        not isinstance(environment["metrics"], dict)):
+                    raise QualificationError(
+                        f"{kind} environment decision is malformed"
+                    )
+                environment_valid = environment_valid and environment["valid"]
+                expected_inner_artifacts = _iteration_artifact_paths(
+                    kind, repetition, iteration
+                )
+                if inner["artifacts"] != expected_inner_artifacts:
+                    raise QualificationError(
+                        f"{kind} inner measurement artifact set is invalid"
+                    )
+                used_artifacts.extend(expected_inner_artifacts)
             metrics = _exact_dict(run["metrics"], set(METRICS), f"{kind} metrics")
             for metric_name in METRICS:
                 minimum = 1 if metric_name != "cpu_ms" else 0
-                values[metric_name].append(
-                    _require_int(metrics[metric_name], f"{kind} {metric_name}", minimum, 1 << 62)
+                observed = _require_int(
+                    metrics[metric_name], f"{kind} {metric_name}",
+                    minimum, 1 << 62,
                 )
+                expected_metric = (
+                    max(inner_values[metric_name])
+                    if metric_name == "peak_rss_kib"
+                    else sum(inner_values[metric_name])
+                )
+                if observed != expected_metric:
+                    raise QualificationError(
+                        f"{kind} batch metrics differ from inner measurements"
+                    )
+                values[metric_name].append(observed)
+            expected_batch_valid = (
+                metrics["cpu_ms"] >= manifest_workload["minimum_batch_cpu_ms"]
+            )
+            if (not isinstance(run["batch_valid"], bool) or
+                    run["batch_valid"] != expected_batch_valid or
+                    not isinstance(run["environment_valid"], bool) or
+                    run["environment_valid"] != environment_valid):
+                raise QualificationError(f"{kind} measurement validity drift")
+            if not run["batch_valid"] and not observed_rejection:
+                raise QualificationError(f"{kind} measurement batch CPU is too short")
+            if not run["environment_valid"] and not observed_rejection:
+                raise QualificationError(f"{kind} measurement environment is invalid")
             run_artifacts = run["artifacts"]
-            if run_artifacts != _run_artifact_paths(kind, repetition):
+            if run_artifacts != _run_artifact_paths(
+                    kind, repetition, expected_iterations):
                 raise QualificationError(
-                    f"{kind} run must bind exactly four raw artifacts"
+                    f"{kind} run artifact set is invalid"
                 )
             if any(path not in artifact_paths for path in run_artifacts):
                 raise QualificationError(f"{kind} run artifact references are invalid")
-            used_artifacts.extend(run_artifacts)
         statistics = _exact_dict(workload["statistics"], set(METRICS), f"{kind} statistics")
         for metric_name in METRICS:
             _validate_statistics(statistics[metric_name], f"{kind} {metric_name}")
             if statistics[metric_name] != metric_statistics(values[metric_name]):
                 raise QualificationError(f"{kind} {metric_name} statistics differ from raw runs")
         semantic_reference = baseline["semantic_reference"][kind]
-        if inputs[kind]["identity_sha256"] != semantic_reference["input_identity_sha256"]:
+        if (not observed_rejection and
+                inputs[kind]["identity_sha256"] !=
+                semantic_reference["input_identity_sha256"]):
             raise QualificationError(f"{kind} baseline input identity drift")
-        if inputs[kind]["translation_unit_sha256"] != semantic_reference["translation_unit_sha256"]:
+        if (not observed_rejection and
+                inputs[kind]["translation_unit_sha256"] !=
+                semantic_reference["translation_unit_sha256"]):
             raise QualificationError(f"{kind} baseline translation-unit identity drift")
-        if (inputs[kind]["translation_unit_plan_sha256"] !=
+        if (not observed_rejection and
+                inputs[kind]["translation_unit_plan_sha256"] !=
                 semantic_reference["translation_unit_plan_sha256"]):
             raise QualificationError(f"{kind} baseline translation-unit plan drift")
-        if semantic != semantic_reference["semantic_sha256"]:
+        if (not observed_rejection and
+                semantic != semantic_reference["semantic_sha256"]):
             raise QualificationError(f"{kind} baseline semantic fingerprint drift")
         if profile_matches:
             baseline_workload = profile["workloads"][kind]
@@ -810,15 +1444,16 @@ def validate_receipt_payload(
         "profile", "sha256", "semantic_gate", "performance_gate", "regressions"
     }, "receipt baseline")
     _require_sha(baseline_record["sha256"], "baseline file")
-    expected_performance_gate = "pass" if profile_matches else "not-gated"
-    expected_profile = profile_id if profile_matches else None
-    if (baseline_record["profile"] != expected_profile or
-            baseline_record["semantic_gate"] != "pass" or
-            baseline_record["performance_gate"] != expected_performance_gate or
-            baseline_record["regressions"] != []):
-        raise QualificationError("receipt baseline decision is not accepted")
-    if regressions:
-        raise QualificationError(regressions[0])
+    if not observed_rejection:
+        expected_performance_gate = "pass" if profile_matches else "not-gated"
+        expected_profile = profile_id if profile_matches else None
+        if (baseline_record["profile"] != expected_profile or
+                baseline_record["semantic_gate"] != "pass" or
+                baseline_record["performance_gate"] != expected_performance_gate or
+                baseline_record["regressions"] != []):
+            raise QualificationError("receipt baseline decision is not accepted")
+    if regressions and not observed_rejection:
+        raise QualificationError(regressions[0]["message"])
     for field in ("started_at", "finished_at"):
         if not isinstance(receipt[field], str):
             raise QualificationError(f"receipt {field} is invalid")
@@ -844,6 +1479,7 @@ def _calibration_payload(
             "manifest_sha256": manifest_sha,
             "repetitions": 10,
             "performance_regression_limit_percent": 10,
+            "environment_policy": ENVIRONMENT_POLICY,
         },
         "host": host,
         "toolchain": toolchain,
@@ -874,12 +1510,13 @@ def _validate_calibration_payload(
         raise QualificationError("determinism calibration classification drift")
     configuration = _exact_dict(receipt["configuration"], {
         "manifest_sha256", "repetitions",
-        "performance_regression_limit_percent",
+        "performance_regression_limit_percent", "environment_policy",
     }, "calibration configuration")
     manifest_sha = digest_json(manifest)
     if (configuration["manifest_sha256"] != manifest_sha or
             configuration["repetitions"] != 10 or
-            configuration["performance_regression_limit_percent"] != 10):
+            configuration["performance_regression_limit_percent"] != 10 or
+            configuration["environment_policy"] != manifest["environment_policy"]):
         raise QualificationError("calibration configuration differs from manifest")
     source = _exact_dict(receipt["source"], {
         "revision", "manifest_sha256", "file_count"
@@ -897,12 +1534,7 @@ def _validate_calibration_payload(
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("calibration host identity is malformed")
-    _require_int(host["logical_cpus"], "calibration logical CPU count", 1, 65536)
-    _validate_cpu_affinity(
-        host["cpu_affinity"], host["logical_cpus"],
-        host["cpu_affinity_source"],
-        "calibration CPU affinity",
-    )
+    _validate_cpu_topology(host, "calibration")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "calibration CPU utilization clamp",
@@ -983,11 +1615,24 @@ def write_receipt(root: Path, payload: dict[str, Any], artifacts: dict[str, byte
 def _rejected_payload(
     source: dict[str, Any], manifest_sha: str, performance_policy: str,
     host: dict[str, Any], toolchain: dict[str, Any], inputs: dict[str, Any],
-    started_at: dt.datetime, started_ns: int, failure: str,
-    artifacts: dict[str, bytes],
+    started_at: dt.datetime, started_ns: int, error: QualificationError,
+    artifacts: dict[str, bytes], baseline_sha256: str | None,
+    baseline_profile: str | None,
 ) -> dict[str, Any]:
-    if not failure or len(failure.encode("utf-8")) > 8192:
-        failure = failure.encode("utf-8")[:8192].decode("utf-8", errors="replace")
+    complete = isinstance(error, QualificationDecisionError)
+    failures = (
+        error.failures if complete else [
+            _failure_record("qualification-error", str(error))
+        ]
+    )
+    for index, failure in enumerate(failures, 1):
+        _validate_failure_record(failure, f"rejected failure {index}")
+    measurement_rejection = complete and any(
+        failure["type"] in {
+            "measurement-batch-too-short", "environment-invalid"
+        }
+        for failure in failures
+    )
     return {
         "schema": REJECTED_SCHEMA,
         "status": "rejected",
@@ -997,11 +1642,32 @@ def _rejected_payload(
             "repetitions": 10,
             "performance_regression_limit_percent": 10,
             "performance_policy": performance_policy,
+            "environment_policy": ENVIRONMENT_POLICY,
         },
         "host": host,
         "toolchain": toolchain,
         "inputs": inputs,
-        "failure": failure,
+        "baseline": {
+            "sha256": baseline_sha256,
+            "profile": baseline_profile,
+        },
+        "decision": {
+            "classification": (
+                "complete-measurement-rejection"
+                if measurement_rejection
+                else "complete-gate-rejection" if complete
+                else "incomplete"
+            ),
+            "failures": failures,
+            "performance_regressions": [
+                failure for failure in failures
+                if failure["type"] == "performance-regression"
+            ],
+        },
+        "observations": {
+            "complete": complete,
+            "workloads": error.workloads if complete else [],
+        },
         "started_at": started_at.isoformat(),
         "finished_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "duration_ms": max(0, round((time.monotonic_ns() - started_ns) / 1_000_000)),
@@ -1012,25 +1678,26 @@ def _rejected_payload(
     }
 
 
-def _validate_rejected_payload(receipt: dict[str, Any], manifest: dict[str, Any]) -> None:
+def _validate_rejected_payload(
+    receipt: dict[str, Any], manifest: dict[str, Any],
+    baseline: dict[str, Any] | None = None,
+) -> None:
     _exact_dict(receipt, {
         "schema", "status", "source", "configuration", "host", "toolchain",
-        "inputs", "failure", "started_at", "finished_at", "duration_ms",
-        "artifacts",
+        "inputs", "baseline", "decision", "observations", "started_at",
+        "finished_at", "duration_ms", "artifacts",
     }, "rejected determinism receipt")
     if receipt["schema"] != REJECTED_SCHEMA or receipt["status"] != "rejected":
         raise QualificationError("rejected determinism receipt classification drift")
-    if (not isinstance(receipt["failure"], str) or not receipt["failure"] or
-            len(receipt["failure"].encode("utf-8")) > 8192):
-        raise QualificationError("rejected determinism failure is malformed")
     configuration = _exact_dict(receipt["configuration"], {
         "manifest_sha256", "repetitions", "performance_regression_limit_percent",
-        "performance_policy",
+        "performance_policy", "environment_policy",
     }, "rejected configuration")
     if (configuration["manifest_sha256"] != digest_json(manifest) or
             configuration["repetitions"] != 10 or
             configuration["performance_regression_limit_percent"] != 10 or
-            configuration["performance_policy"] not in {"required", "record-only"}):
+            configuration["performance_policy"] not in {"required", "record-only"} or
+            configuration["environment_policy"] != manifest["environment_policy"]):
         raise QualificationError("rejected configuration differs from manifest")
     source = _exact_dict(receipt["source"], {
         "revision", "manifest_sha256", "file_count"
@@ -1048,12 +1715,7 @@ def _validate_rejected_payload(receipt: dict[str, Any], manifest: dict[str, Any]
             any(not isinstance(host[field], str) or not host[field]
                 for field in ("os", "architecture", "cpu_model"))):
         raise QualificationError("rejected host identity is malformed")
-    _require_int(host["logical_cpus"], "rejected logical CPU count", 1, 65536)
-    _validate_cpu_affinity(
-        host["cpu_affinity"], host["logical_cpus"],
-        host["cpu_affinity_source"],
-        "rejected CPU affinity",
-    )
+    _validate_cpu_topology(host, "rejected")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
         host["cpu_uclamp_max"], "rejected CPU utilization clamp",
@@ -1065,13 +1727,141 @@ def _validate_rejected_payload(receipt: dict[str, Any], manifest: dict[str, Any]
         raise QualificationError("rejected input set is malformed")
     for kind, input_receipt in receipt["inputs"].items():
         _validate_input_receipt(input_receipt, kind)
+    baseline_record = _exact_dict(
+        receipt["baseline"], {"sha256", "profile"}, "rejected baseline"
+    )
+    if baseline_record["sha256"] is not None:
+        _require_sha(baseline_record["sha256"], "rejected baseline")
+    if (baseline_record["profile"] is not None and
+            (not isinstance(baseline_record["profile"], str) or
+             IDENTIFIER.fullmatch(baseline_record["profile"]) is None or
+             baseline_record["profile"] != host["class_id"])):
+        raise QualificationError("rejected baseline profile is malformed")
+    if ((baseline_record["sha256"] is None) != (baseline is None)):
+        raise QualificationError("rejected baseline authority is incomplete")
+    decision = _exact_dict(
+        receipt["decision"], {
+            "classification", "failures", "performance_regressions"
+        }, "rejected decision",
+    )
+    failures = decision["failures"]
+    if not isinstance(failures, list) or not failures:
+        raise QualificationError("rejected decision has no failures")
+    for index, failure in enumerate(failures, 1):
+        _validate_failure_record(failure, f"rejected failure {index}")
+    performance_failures = [
+        failure for failure in failures
+        if failure["type"] == "performance-regression"
+    ]
+    if decision["performance_regressions"] != performance_failures:
+        raise QualificationError("rejected performance regressions are incomplete")
+    observations = _exact_dict(
+        receipt["observations"], {"complete", "workloads"},
+        "rejected observations",
+    )
+    if not isinstance(observations["complete"], bool):
+        raise QualificationError("rejected observation completeness is malformed")
+    if observations["complete"]:
+        if set(receipt["inputs"]) != set(KINDS):
+            raise QualificationError("complete rejected decision is malformed")
+        if baseline is not None:
+            validate_baseline(baseline, digest_json(manifest))
+        elif baseline_record["profile"] is not None:
+            raise QualificationError("complete rejected baseline profile is malformed")
+        validation_baseline = baseline or build_baseline(
+            digest_json(manifest), host, source["revision"],
+            receipt["toolchain"],
+            [
+                {
+                    "kind": kind,
+                    "semantic_sha256": "0" * 64,
+                    "statistics": {
+                        metric_name: {
+                            "count": 10, "min": 0, "median": 0,
+                            "p90": 0, "max": 0,
+                        }
+                        for metric_name in METRICS
+                    },
+                }
+                for kind in KINDS
+            ],
+            receipt["inputs"],
+            "docs/evidence/phase10/determinism/calibrations/validation-only",
+            "0" * 64, "Validate baseline-free rejected observations",
+            None, None,
+        )
+        synthetic = {
+            **receipt,
+            "schema": RECEIPT_SCHEMA,
+            "status": "accepted",
+            "workloads": observations["workloads"],
+            "baseline": {
+                "profile": baseline_record["profile"],
+                "sha256": baseline_record["sha256"] or "0" * 64,
+                "semantic_gate": "rejected",
+                "performance_gate": "rejected",
+                "regressions": performance_failures,
+            },
+            "failures": [],
+        }
+        for field in ("decision", "observations"):
+            synthetic.pop(field)
+        validate_receipt_payload(
+            synthetic, manifest, validation_baseline, observed_rejection=True
+        )
+        measurement_failures = _measurement_failures(
+            manifest, observations["workloads"]
+        )
+        expected_classification = (
+            "complete-measurement-rejection"
+            if measurement_failures else "complete-gate-rejection"
+        )
+        if decision["classification"] != expected_classification:
+            raise QualificationError("complete rejected decision is malformed")
+        expected_failures = measurement_failures or (
+            _baseline_gate_failures(
+                baseline, host, receipt["toolchain"], receipt["inputs"],
+                observations["workloads"], configuration["performance_policy"],
+            ) if baseline is not None else []
+        )
+        if failures != expected_failures:
+            raise QualificationError(
+                "rejected decision differs from recomputed gate failures"
+            )
+    else:
+        if (decision["classification"] != "incomplete" or
+                observations["workloads"] != [] or performance_failures):
+            raise QualificationError("incomplete rejected decision is malformed")
     if not isinstance(receipt["artifacts"], list):
         raise QualificationError("rejected artifact inventory is malformed")
+    rejected_artifact_paths: list[str] = []
     for item in receipt["artifacts"]:
         _exact_dict(item, {"path", "sha256", "size"}, "rejected artifact")
-        _relative(item["path"], "rejected artifact")
+        rejected_artifact_paths.append(
+            _relative(item["path"], "rejected artifact")
+        )
         _require_sha(item["sha256"], "rejected artifact")
         _require_int(item["size"], "rejected artifact size", 0, MAX_LOG_BYTES)
+    if rejected_artifact_paths != sorted(set(rejected_artifact_paths)):
+        raise QualificationError(
+            "rejected artifact inventory is not sorted and unique"
+        )
+    if not observations["complete"]:
+        allowed_artifacts = {
+            path
+            for definition in manifest["workloads"]
+            for repetition in range(1, 11)
+            for iteration in range(1, definition["measurement_iterations"] + 1)
+            for path in _iteration_artifact_paths(
+                definition["kind"], repetition, iteration
+            )
+        }
+        if any(
+                item["path"] not in allowed_artifacts
+                for item in receipt["artifacts"]):
+            raise QualificationError(
+                "incomplete rejected artifact inventory is not canonical"
+            )
     for field in ("started_at", "finished_at"):
         if not isinstance(receipt[field], str):
             raise QualificationError(f"rejected {field} is malformed")
@@ -1117,40 +1907,66 @@ def _verify_raw_claims(
         definition = definitions[kind]
         for run in workload["runs"]:
             repetition = run["repetition"]
-            paths = _run_artifact_paths(kind, repetition)
-            report_raw = _read_regular(root / paths[0], MAX_JSON_BYTES)
-            time_raw = _read_regular(root / paths[3], MAX_LOG_BYTES)
-            try:
-                report = json.loads(report_raw.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as error:
-                raise QualificationError(
-                    f"{kind} repetition {repetition} raw report is malformed"
-                ) from error
-            if not isinstance(report, dict):
-                raise QualificationError(
-                    f"{kind} repetition {repetition} raw report is malformed"
+            for inner in run["inner_runs"]:
+                iteration = inner["iteration"]
+                paths = _iteration_artifact_paths(kind, repetition, iteration)
+                report_raw = _read_regular(root / paths[0], MAX_JSON_BYTES)
+                time_raw = _read_regular(root / paths[3], MAX_LOG_BYTES)
+                environment = _load_json(root / paths[4])
+                _exact_dict(
+                    environment, {"schema", "before", "after", "decision"},
+                    f"{kind} environment artifact",
                 )
-            wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
-            if run["metrics"] != {
-                "wall_ms": wall_ms,
-                "cpu_ms": cpu_ms,
-                "peak_rss_kib": peak_rss,
-            }:
-                raise QualificationError(
-                    f"{kind} repetition {repetition} metrics differ from raw artifact"
+                if environment["schema"] != "codeskeptic-determinism-environment-v1":
+                    raise QualificationError(
+                        f"{kind} environment artifact schema is unsupported"
+                    )
+                try:
+                    report = json.loads(report_raw.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} raw report is malformed"
+                    ) from error
+                if not isinstance(report, dict):
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} raw report is malformed"
+                    )
+                wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
+                if inner["metrics"] != {
+                    "wall_ms": wall_ms,
+                    "cpu_ms": cpu_ms,
+                    "peak_rss_kib": peak_rss,
+                }:
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} inner metrics differ "
+                        "from raw artifact"
+                    )
+                if (report.get("exit_code") != inner["exit_code"] or
+                        time_exit != inner["exit_code"]):
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} exit differs from raw artifact"
+                    )
+                projection = semantic_projection(
+                    report, repo, release_source, input_receipt,
+                    (definition["tu_timeout_seconds"], definition["tu_memory_mib"]),
                 )
-            if report.get("exit_code") != run["exit_code"] or time_exit != run["exit_code"]:
-                raise QualificationError(
-                    f"{kind} repetition {repetition} exit differs from raw artifact"
+                if digest_json(projection) != inner["semantic_sha256"]:
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} semantic differs from raw report"
+                    )
+                expected_decision = _evaluate_environment(
+                    environment["before"], environment["after"], cpu_ms,
+                    wall_ms, receipt["host"]["cpu_affinity"],
+                    receipt["host"]["host_logical_cpus"],
+                    manifest["environment_policy"],
+                    receipt["configuration"].get("performance_policy") == "required",
                 )
-            projection = semantic_projection(
-                report, repo, release_source, input_receipt,
-                (definition["tu_timeout_seconds"], definition["tu_memory_mib"]),
-            )
-            if digest_json(projection) != run["semantic_sha256"]:
-                raise QualificationError(
-                    f"{kind} repetition {repetition} semantic differs from raw report"
-                )
+                if (environment["decision"] != expected_decision or
+                        inner["environment"] != expected_decision):
+                    raise QualificationError(
+                        f"{kind} repetition {repetition} environment decision "
+                        "differs from raw artifact"
+                    )
 
 
 def verify_receipt(
@@ -1204,7 +2020,21 @@ def verify_receipt(
     if _read_regular(root / "SHA256SUMS", MAX_JSON_BYTES) != checksum_lines:
         raise QualificationError("outer SHA256SUMS manifest mismatch")
     if receipt.get("schema") == REJECTED_SCHEMA:
-        _validate_rejected_payload(receipt, manifest)
+        baseline = None
+        baseline_record = receipt.get("baseline")
+        if (isinstance(baseline_record, dict) and
+                baseline_record.get("sha256") is not None):
+            baseline = load_baseline(baseline_path, digest_json(manifest))
+            if baseline_record.get("sha256") != sha256_file(baseline_path):
+                raise QualificationError("rejected receipt baseline file identity drift")
+            if baseline_authority_root is not None:
+                authority = baseline_authority_root.resolve()
+                verify_baseline_authority(
+                    baseline, authority,
+                    authority / "scripts" / "determinism_workloads.json",
+                )
+        _validate_rejected_payload(receipt, manifest, baseline)
+        observations = receipt.get("observations")
         if repo_root is not None:
             _verify_source_authority(
                 receipt["source"], repo_root.resolve(), "rejected receipt"
@@ -1214,6 +2044,12 @@ def verify_receipt(
                 receipt["inputs"], manifest, repo_root.resolve(),
                 receipt["toolchain"], receipt["source"]["revision"],
             )
+        if isinstance(observations, dict) and observations.get("complete") is True:
+            observed = {
+                **receipt,
+                "workloads": observations["workloads"],
+            }
+            _verify_raw_claims(observed, root, manifest)
         return receipt
     if receipt.get("schema") == CALIBRATION_SCHEMA:
         _validate_calibration_payload(receipt, manifest)
@@ -1974,6 +2810,10 @@ def host_identity(class_id: str) -> dict[str, Any]:
     if affinity_source == AFFINITY_SOURCE_SCHED and not cpu_affinity:
         raise QualificationError("effective CPU affinity is empty")
     logical_cpus = len(cpu_affinity) if cpu_affinity else (os.cpu_count() or 1)
+    host_logical_cpus = os.cpu_count() or logical_cpus
+    if (logical_cpus > host_logical_cpus or
+            (cpu_affinity and cpu_affinity[-1] >= host_logical_cpus)):
+        raise QualificationError("effective CPU topology is malformed")
     uclamp_source, uclamp_minimum, uclamp_maximum = _cpu_uclamp_identity()
     return {
         "class_id": class_id,
@@ -1981,6 +2821,7 @@ def host_identity(class_id: str) -> dict[str, Any]:
         "architecture": platform.machine() or "unknown-architecture",
         "cpu_model": cpu_model,
         "logical_cpus": logical_cpus,
+        "host_logical_cpus": host_logical_cpus,
         "cpu_affinity_source": affinity_source,
         "cpu_affinity": cpu_affinity,
         "cpu_uclamp_source": uclamp_source,
@@ -2886,13 +3727,29 @@ def _parse_time_log(raw: bytes) -> tuple[int, int, int, int]:
     return wall_ms, cpu_ms, peak_rss, exit_status
 
 
-def _run_artifact_paths(kind: str, repetition: int) -> list[str]:
-    root = f"raw/{kind}/run-{repetition:02d}"
+def _iteration_artifact_paths(
+    kind: str, repetition: int, iteration: int,
+) -> list[str]:
+    root = (
+        f"raw/{kind}/run-{repetition:02d}/"
+        f"iteration-{iteration:02d}"
+    )
     return [
         f"{root}/report.json",
         f"{root}/stderr.log",
         f"{root}/stdout.log",
         f"{root}/time.txt",
+        f"{root}/environment.json",
+    ]
+
+
+def _run_artifact_paths(
+    kind: str, repetition: int, measurement_iterations: int,
+) -> list[str]:
+    return [
+        path
+        for iteration in range(1, measurement_iterations + 1)
+        for path in _iteration_artifact_paths(kind, repetition, iteration)
     ]
 
 
@@ -3062,20 +3919,18 @@ def _read_failure_prefix(path: Path) -> bytes:
 
 
 def _collect_failed_run_artifacts(
-    scratch: Path, kind: str, repetition: int
+    scratch: Path, kind: str, repetition: int, measurement_iterations: int,
 ) -> dict[str, bytes]:
-    canonical = _run_artifact_paths(kind, repetition)
-    scratch_paths = [
-        scratch / f"{kind}-{repetition:02d}.json",
-        scratch / f"{kind}-{repetition:02d}.stderr.log",
-        scratch / f"{kind}-{repetition:02d}.stdout.log",
-        scratch / f"{kind}-{repetition:02d}.time.txt",
-    ]
-    return {
-        relative: _read_failure_prefix(path)
-        for relative, path in zip(canonical, scratch_paths)
-        if _regular_kind(path) == "regular"
-    }
+    retained: dict[str, bytes] = {}
+    suffixes = ("json", "stderr.log", "stdout.log", "time.txt", "environment.json")
+    for iteration in range(1, measurement_iterations + 1):
+        prefix = f"{kind}-{repetition:02d}-{iteration:02d}"
+        canonical = _iteration_artifact_paths(kind, repetition, iteration)
+        scratch_paths = [scratch / f"{prefix}.{suffix}" for suffix in suffixes]
+        for relative, path in zip(canonical, scratch_paths):
+            if _regular_kind(path) == "regular":
+                retained[relative] = _read_failure_prefix(path)
+    return retained
 
 
 def run_once(
@@ -3085,73 +3940,132 @@ def run_once(
     repetition: int,
     repo: Path,
     scratch: Path,
+    performance_policy: str,
+    host: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, bytes]]:
     definition = prepared["definition"]
     kind = definition["kind"]
-    run_root = f"raw/{kind}/run-{repetition:02d}"
-    report_path = scratch / f"{kind}-{repetition:02d}.json"
-    time_path = scratch / f"{kind}-{repetition:02d}.time.txt"
-    stdout_path = scratch / f"{kind}-{repetition:02d}.stdout.log"
-    stderr_path = scratch / f"{kind}-{repetition:02d}.stderr.log"
-    command = [
-        str(time_binary), "-v", "-o", str(time_path), "--",
-        str(binary), *prepared["args"], "--json", str(report_path),
-    ]
-    environment = os.environ.copy()
-    environment.update({"LC_ALL": "C", "LANG": "C", "TZ": "UTC"})
-    try:
-        completed = _run_bounded_process(
-            command, environment, definition["wall_timeout_seconds"],
-            stdout_path, stderr_path, [report_path, time_path],
+    iterations = definition["measurement_iterations"]
+    artifact_data: dict[str, bytes] = {}
+    inner_runs: list[dict[str, Any]] = []
+    affinity = host["cpu_affinity"]
+    for iteration in range(1, iterations + 1):
+        prefix = f"{kind}-{repetition:02d}-{iteration:02d}"
+        report_path = scratch / f"{prefix}.json"
+        time_path = scratch / f"{prefix}.time.txt"
+        stdout_path = scratch / f"{prefix}.stdout.log"
+        stderr_path = scratch / f"{prefix}.stderr.log"
+        environment_path = scratch / f"{prefix}.environment.json"
+        command = [
+            str(time_binary), "-v", "-o", str(time_path), "--",
+            str(binary), *prepared["args"], "--json", str(report_path),
+        ]
+        environment = os.environ.copy()
+        environment.update({"LC_ALL": "C", "LANG": "C", "TZ": "UTC"})
+        if sorted(os.sched_getaffinity(0)) != affinity:
+            raise QualificationError("measurement CPU affinity drift")
+        before = _capture_environment(affinity)
+        try:
+            completed = _run_bounded_process(
+                command, environment, definition["wall_timeout_seconds"],
+                stdout_path, stderr_path, [report_path, time_path],
+            )
+        except QualificationError as error:
+            raise QualificationError(
+                f"{kind} repetition {repetition} iteration {iteration} {error}"
+            ) from error
+        if sorted(os.sched_getaffinity(0)) != affinity:
+            raise QualificationError("measurement CPU affinity drift")
+        after = _capture_environment(affinity)
+        if completed.returncode not in (0, 1):
+            raise QualificationError(
+                f"{kind} repetition {repetition} iteration {iteration} analyzer "
+                f"exit {completed.returncode}: {completed.stderr[-2000:]!r}"
+            )
+        if _regular_kind(report_path) != "regular":
+            raise QualificationError(
+                f"{kind} repetition {repetition} iteration {iteration} produced "
+                f"no report: {completed.stderr[-2000:]!r}"
+            )
+        report_raw = _read_regular(report_path, MAX_JSON_BYTES)
+        try:
+            report = json.loads(report_raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise QualificationError(f"{kind} analyzer report is malformed") from error
+        if (not isinstance(report, dict) or
+                report.get("exit_code") != completed.returncode):
+            raise QualificationError(
+                f"{kind} process/report exit classification mismatch"
+            )
+        time_raw = _read_regular(time_path, MAX_LOG_BYTES)
+        wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
+        if time_exit != completed.returncode:
+            raise QualificationError(
+                f"{kind} GNU time/process exit classification mismatch"
+            )
+        projection = semantic_projection(
+            report, repo,
+            prepared["release_source"] if kind == "release-candidate" else None,
+            prepared["input"],
+            (definition["tu_timeout_seconds"], definition["tu_memory_mib"]),
         )
-    except QualificationError as error:
-        raise QualificationError(
-            f"{kind} repetition {repetition} {error}"
-        ) from error
-    if completed.returncode not in (0, 1):
-        raise QualificationError(
-            f"{kind} repetition {repetition} analyzer exit {completed.returncode}: "
-            f"{completed.stderr[-2000:]!r}"
+        semantic_sha = digest_json(projection)
+        decision = _evaluate_environment(
+            before, after, cpu_ms, wall_ms,
+            affinity, host["host_logical_cpus"], ENVIRONMENT_POLICY,
+            performance_policy == "required",
         )
-    if _regular_kind(report_path) != "regular":
-        raise QualificationError(
-            f"{kind} repetition {repetition} produced no report: "
-            f"{completed.stderr[-2000:]!r}"
+        environment_raw = canonical_json({
+            "schema": "codeskeptic-determinism-environment-v1",
+            "before": before,
+            "after": after,
+            "decision": decision,
+        })
+        _write_new(environment_path, environment_raw)
+        paths = _iteration_artifact_paths(kind, repetition, iteration)
+        values = (
+            report_raw, completed.stderr, completed.stdout, time_raw,
+            environment_raw,
         )
-    report_raw = _read_regular(report_path, MAX_JSON_BYTES)
-    try:
-        report = json.loads(report_raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise QualificationError(f"{kind} analyzer report is malformed") from error
-    if not isinstance(report, dict) or report.get("exit_code") != completed.returncode:
-        raise QualificationError(f"{kind} process/report exit classification mismatch")
-    time_raw = _read_regular(time_path, MAX_LOG_BYTES)
-    wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
-    if time_exit != completed.returncode:
-        raise QualificationError(f"{kind} GNU time/process exit classification mismatch")
-    projection = semantic_projection(
-        report, repo,
-        prepared["release_source"] if kind == "release-candidate" else None,
-        prepared["input"],
-        (definition["tu_timeout_seconds"], definition["tu_memory_mib"]),
-    )
-    semantic_sha = digest_json(projection)
-    artifact_data = {
-        f"{run_root}/report.json": report_raw,
-        f"{run_root}/stdout.log": completed.stdout,
-        f"{run_root}/stderr.log": completed.stderr,
-        f"{run_root}/time.txt": time_raw,
+        artifact_data.update(dict(zip(paths, values)))
+        inner_runs.append({
+            "iteration": iteration,
+            "semantic_sha256": semantic_sha,
+            "exit_code": completed.returncode,
+            "metrics": {
+                "wall_ms": wall_ms,
+                "cpu_ms": cpu_ms,
+                "peak_rss_kib": peak_rss,
+            },
+            "environment": decision,
+            "artifacts": paths,
+        })
+    semantics = {item["semantic_sha256"] for item in inner_runs}
+    exits = {item["exit_code"] for item in inner_runs}
+    if len(semantics) != 1 or len(exits) != 1:
+        raise QualificationError(
+            f"{kind} repetition {repetition} inner measurement drift"
+        )
+    metrics = {
+        "wall_ms": sum(item["metrics"]["wall_ms"] for item in inner_runs),
+        "cpu_ms": sum(item["metrics"]["cpu_ms"] for item in inner_runs),
+        "peak_rss_kib": max(
+            item["metrics"]["peak_rss_kib"] for item in inner_runs
+        ),
     }
+    batch_valid = metrics["cpu_ms"] >= definition["minimum_batch_cpu_ms"]
     return {
         "repetition": repetition,
-        "semantic_sha256": semantic_sha,
-        "exit_code": completed.returncode,
-        "metrics": {
-            "wall_ms": wall_ms,
-            "cpu_ms": cpu_ms,
-            "peak_rss_kib": peak_rss,
-        },
-        "artifacts": _run_artifact_paths(kind, repetition),
+        "semantic_sha256": next(iter(semantics)),
+        "exit_code": next(iter(exits)),
+        "metrics": metrics,
+        "measurement_iterations": iterations,
+        "batch_valid": batch_valid,
+        "environment_valid": all(
+            item["environment"]["valid"] for item in inner_runs
+        ),
+        "inner_runs": inner_runs,
+        "artifacts": _run_artifact_paths(kind, repetition, iterations),
     }, artifact_data
 
 
@@ -3217,6 +4131,78 @@ def _write_baseline_new(path: Path, baseline: dict[str, Any]) -> None:
     if _regular_kind(path) != "missing":
         raise QualificationError("baseline establishment refuses to overwrite a path")
     _write_new(path, canonical_json(baseline))
+
+
+def _measurement_failures(
+    manifest: dict[str, Any], workload_receipts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    definitions = {item["kind"]: item for item in manifest["workloads"]}
+    for workload in workload_receipts:
+        kind = workload["kind"]
+        minimum_cpu = definitions[kind]["minimum_batch_cpu_ms"]
+        for run in workload["runs"]:
+            repetition = run["repetition"]
+            if not run["batch_valid"]:
+                message = (
+                    f"{kind} repetition {repetition} measurement batch CPU "
+                    f"is below the pinned minimum "
+                    f"({run['metrics']['cpu_ms']} < {minimum_cpu})"
+                )
+                failures.append(_failure_record(
+                    "measurement-batch-too-short", message,
+                    workload=kind, repetition=repetition,
+                    metric="cpu_ms", statistic="batch",
+                    current=run["metrics"]["cpu_ms"], baseline=minimum_cpu,
+                ))
+            for inner in run["inner_runs"]:
+                for message in inner["environment"]["violations"]:
+                    failures.append(_failure_record(
+                        "environment-invalid", message, workload=kind,
+                        repetition=repetition, iteration=inner["iteration"],
+                    ))
+    return failures
+
+
+def _baseline_gate_failures(
+    baseline: dict[str, Any], host: dict[str, Any],
+    toolchain: dict[str, Any], inputs: dict[str, Any],
+    workload_receipts: list[dict[str, Any]], performance_policy: str,
+) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    profile = baseline["profiles"].get(host["class_id"])
+    profile_matches = _profile_matches(profile, host, toolchain)
+    if not profile_matches and performance_policy == "required":
+        failures.append(_failure_record(
+            "profile-unavailable",
+            f"baseline performance profile is unavailable for {host['class_id']}",
+        ))
+    for workload in workload_receipts:
+        kind = workload["kind"]
+        reference = baseline["semantic_reference"][kind]
+        checks = (
+            ("semantic_sha256", workload["semantic_sha256"],
+             "semantic-drift", "baseline semantic fingerprint drift"),
+            ("input_identity_sha256", inputs[kind]["identity_sha256"],
+             "input-identity-drift", "baseline input identity drift"),
+            ("translation_unit_sha256", inputs[kind]["translation_unit_sha256"],
+             "translation-unit-drift", "baseline translation-unit identity drift"),
+            ("translation_unit_plan_sha256",
+             inputs[kind]["translation_unit_plan_sha256"],
+             "translation-unit-plan-drift",
+             "baseline translation-unit plan drift"),
+        )
+        for field, current, failure_type, message in checks:
+            if current != reference[field]:
+                failures.append(_failure_record(
+                    failure_type, f"{kind} {message}", workload=kind,
+                ))
+        if profile_matches:
+            failures.extend(performance_regressions(
+                workload["id"], workload["statistics"],
+                profile["workloads"][kind]["statistics"], 10,
+            ))
+    return failures
 
 
 def _materialize_calibration_and_baseline(
@@ -3298,11 +4284,20 @@ def _persist_rejection(
         )
     if output_kind not in {"missing", "directory"}:
         raise QualificationError("cannot persist rejected evidence at non-directory output")
+    baseline = None
+    baseline_sha = None
+    baseline_profile = None
+    if _regular_kind(baseline_path) == "regular":
+        baseline = load_baseline(baseline_path, digest_json(manifest))
+        baseline_sha = sha256_file(baseline_path)
+        if host["class_id"] in baseline["profiles"]:
+            baseline_profile = host["class_id"]
     payload = _rejected_payload(
         source, digest_json(manifest), performance_policy, host, toolchain,
-        inputs, started_at, started_ns, str(error), artifacts,
+        inputs, started_at, started_ns, error, artifacts,
+        baseline_sha, baseline_profile,
     )
-    _validate_rejected_payload(payload, manifest)
+    _validate_rejected_payload(payload, manifest, baseline)
     write_receipt(output, payload, artifacts)
     verified = verify_receipt(output, manifest_path, baseline_path, repo)
     if verified.get("status") != "rejected":
@@ -3316,6 +4311,11 @@ def _finalize_qualification(
     inputs: dict[str, Any], workload_receipts: list[dict[str, Any]],
     artifacts: dict[str, bytes], started_at: dt.datetime, started_ns: int,
 ) -> dict[str, Any]:
+    measurement_failures = _measurement_failures(manifest, workload_receipts)
+    if measurement_failures:
+        raise QualificationDecisionError(
+            measurement_failures, workload_receipts
+        )
     if args.establish_baseline:
         baseline = _materialize_calibration_and_baseline(
             args, manifest, manifest_sha, manifest_path, repo, source, host,
@@ -3335,29 +4335,10 @@ def _finalize_qualification(
         )
     profile = baseline["profiles"].get(host["class_id"])
     profile_matches = _profile_matches(profile, host, toolchain)
-    regressions: list[str] = []
-    gate_failures: list[str] = []
-    if not profile_matches and args.performance_policy == "required":
-        gate_failures.append(
-            f"baseline performance profile is unavailable for {host['class_id']}"
-        )
-    for workload in workload_receipts:
-        kind = workload["kind"]
-        semantic_reference = baseline["semantic_reference"][kind]
-        if workload["semantic_sha256"] != semantic_reference["semantic_sha256"]:
-            gate_failures.append(f"{kind} baseline semantic fingerprint drift")
-        if inputs[kind]["identity_sha256"] != semantic_reference["input_identity_sha256"]:
-            gate_failures.append(f"{kind} baseline input identity drift")
-        if inputs[kind]["translation_unit_sha256"] != semantic_reference["translation_unit_sha256"]:
-            gate_failures.append(f"{kind} baseline translation-unit identity drift")
-        if inputs[kind]["translation_unit_plan_sha256"] != semantic_reference["translation_unit_plan_sha256"]:
-            gate_failures.append(f"{kind} baseline translation-unit plan drift")
-        if profile_matches:
-            regressions.extend(performance_regressions(
-                workload["id"], workload["statistics"],
-                profile["workloads"][kind]["statistics"], 10,
-            ))
-    gate_failures.extend(regressions)
+    gate_failures = _baseline_gate_failures(
+        baseline, host, toolchain, inputs, workload_receipts,
+        args.performance_policy,
+    )
     promotion_needed = bool(gate_failures) or (
         args.candidate_baseline_output is not None and not profile_matches
     )
@@ -3366,20 +4347,34 @@ def _finalize_qualification(
             raise QualificationError(
                 "candidate baseline requested but the pinned baseline already passes"
             )
+        if any(record["type"] not in {
+                "performance-regression", "profile-unavailable"
+        } for record in gate_failures):
+            raise QualificationDecisionError(gate_failures, workload_receipts)
         _materialize_calibration_and_baseline(
             args, manifest, manifest_sha, manifest_path, repo, source, host,
             toolchain, inputs, workload_receipts, artifacts, started_at,
             started_ns, args.candidate_baseline_output.resolve(), baseline,
             baseline_path,
         )
-        detail = gate_failures[0] if gate_failures else (
-            f"baseline performance profile is unavailable for {host['class_id']}"
-        )
-        raise QualificationError(
-            f"{detail}; review and promote the generated candidate baseline"
-        )
+        if gate_failures:
+            gate_failures[0] = {
+                **gate_failures[0],
+                "message": (
+                    f"{gate_failures[0]['message']}; review and promote the "
+                    "generated candidate baseline"
+                ),
+            }
+        else:
+            gate_failures.append(_failure_record(
+                "profile-unavailable",
+                f"baseline performance profile is unavailable for "
+                f"{host['class_id']}; review and promote the generated "
+                "candidate baseline",
+            ))
+        raise QualificationDecisionError(gate_failures, workload_receipts)
     if gate_failures:
-        raise QualificationError(gate_failures[0])
+        raise QualificationDecisionError(gate_failures, workload_receipts)
     finished_at = dt.datetime.now(dt.timezone.utc)
     inventory = sorted(
         (_artifact(path, data) for path, data in artifacts.items()),
@@ -3394,6 +4389,7 @@ def _finalize_qualification(
             "repetitions": 10,
             "performance_regression_limit_percent": 10,
             "performance_policy": args.performance_policy,
+            "environment_policy": ENVIRONMENT_POLICY,
         },
         "host": host,
         "toolchain": toolchain,
@@ -3505,13 +4501,14 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
                     try:
                         run, run_artifacts = run_once(
                             binary, time_binary, workload, repetition, repo,
-                            scratch,
+                            scratch, args.performance_policy, host,
                         )
                     except QualificationError:
                         _add_artifacts_bounded(
                             artifacts,
                             _collect_failed_run_artifacts(
-                                scratch, kind, repetition
+                                scratch, kind, repetition,
+                                workload["definition"]["measurement_iterations"],
                             ),
                         )
                         raise

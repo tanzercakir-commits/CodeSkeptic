@@ -59,6 +59,14 @@ def manifest() -> dict:
         "schema": qualification.MANIFEST_SCHEMA,
         "repetitions": 10,
         "performance_regression_limit_percent": 10,
+        "environment_policy": {
+            "affinity_external_cpu_limit_basis_points": 200,
+            "host_external_cpu_limit_basis_points": 50,
+            "cpu_pressure_some_limit_basis_points": 200,
+            "memory_pressure_full_limit_basis_points": 0,
+            "io_pressure_full_limit_basis_points": 0,
+            "thermal_throttle_limit_ms": 0,
+        },
         "workloads": [
             {
                 "id": kind,
@@ -68,6 +76,8 @@ def manifest() -> dict:
                 "wall_timeout_seconds": 1800,
                 "tu_timeout_seconds": 300,
                 "tu_memory_mib": 4096,
+                "measurement_iterations": 10 if kind == "unit" else 1,
+                "minimum_batch_cpu_ms": 5000 if kind == "unit" else 0,
             }
             for kind in KINDS
         ],
@@ -245,6 +255,52 @@ def time_log(value: int) -> bytes:
     ).encode()
 
 
+def environment_evidence(value: int) -> tuple[dict, bytes]:
+    ticks = value // 10
+    before = {
+        "cpu": {
+            "clock_ticks_per_second": 100,
+            "host_logical_cpus": 2,
+            "host_busy_ticks": 1000,
+            "affinity_busy_ticks": 1000,
+        },
+        "pressure": {
+            name: {"some_total_us": 100, "full_total_us": 10}
+            for name in ("cpu", "memory", "io")
+        },
+        "cpufreq": [
+            {
+                "cpu": cpu, "driver": "intel_pstate",
+                "governor": "powersave", "minimum_khz": 400000,
+                "maximum_khz": 4400000, "current_khz": 4000000,
+            }
+            for cpu in (0, 1)
+        ],
+        "thermal": [
+            {
+                "cpu": cpu, "core_count": 1, "core_total_ms": 2,
+                "package_count": 3, "package_total_ms": 4,
+            }
+            for cpu in (0, 1)
+        ],
+    }
+    after = copy.deepcopy(before)
+    after["cpu"]["host_busy_ticks"] += ticks
+    after["cpu"]["affinity_busy_ticks"] += ticks
+    decision = qualification._evaluate_environment(
+        before, after, value, value, [0, 1],
+        2,
+        qualification.ENVIRONMENT_POLICY, True,
+    )
+    payload = {
+        "schema": "codeskeptic-determinism-environment-v1",
+        "before": before,
+        "after": after,
+        "decision": decision,
+    }
+    return decision, qualification.canonical_json(payload)
+
+
 def artifact_bytes(payload: dict) -> dict[str, bytes]:
     result: dict[str, bytes] = {}
     for workload in payload["workloads"]:
@@ -252,13 +308,17 @@ def artifact_bytes(payload: dict) -> dict[str, bytes]:
         input_value = payload["inputs"][kind]
         repo_root = qualification._root_for_marker(input_value, "$REPO")
         for run in workload["runs"]:
-            paths = qualification._run_artifact_paths(kind, run["repetition"])
-            result[paths[0]] = qualification.canonical_json(
-                analyzer_report(kind, repo_root, input_value)
-            )
-            result[paths[1]] = b""
-            result[paths[2]] = b""
-            result[paths[3]] = time_log(run["metrics"]["wall_ms"])
+            for inner in run["inner_runs"]:
+                paths = inner["artifacts"]
+                result[paths[0]] = qualification.canonical_json(
+                    analyzer_report(kind, repo_root, input_value)
+                )
+                result[paths[1]] = b""
+                result[paths[2]] = b""
+                result[paths[3]] = time_log(inner["metrics"]["wall_ms"])
+                result[paths[4]] = environment_evidence(
+                    inner["metrics"]["wall_ms"]
+                )[1]
     return result
 
 
@@ -434,6 +494,7 @@ def baseline(
                     "architecture": "x86_64",
                     "cpu_model": "test cpu",
                     "logical_cpus": 2,
+                    "host_logical_cpus": 2,
                     "cpu_affinity_source": "sched_getaffinity",
                     "cpu_affinity": [0, 1],
                     "cpu_uclamp_source": "proc-self-sched",
@@ -448,9 +509,9 @@ def baseline(
                         "translation_unit_sha256": inputs[kind]["translation_unit_sha256"],
                         "translation_unit_plan_sha256": inputs[kind]["translation_unit_plan_sha256"],
                         "statistics": {
-                            "wall_ms": metric(value),
-                            "cpu_ms": metric(value),
-                            "peak_rss_kib": metric(value),
+                            "wall_ms": metric(5000 if kind == "unit" else value),
+                            "cpu_ms": metric(5000 if kind == "unit" else value),
+                            "peak_rss_kib": metric(500 if kind == "unit" else value),
                         },
                     }
                     for kind in KINDS
@@ -479,6 +540,7 @@ def calibration_receipt(
             "manifest_sha256": manifest_sha,
             "repetitions": 10,
             "performance_regression_limit_percent": 10,
+            "environment_policy": qualification.ENVIRONMENT_POLICY,
         },
         "host": accepted["host"],
         "toolchain": accepted["toolchain"],
@@ -488,6 +550,40 @@ def calibration_receipt(
         "finished_at": accepted["finished_at"],
         "duration_ms": accepted["duration_ms"],
         "artifacts": accepted["artifacts"],
+    }
+
+
+def rejected_receipt(
+    manifest_sha: str,
+    message: str = "controlled rejection",
+    repo_root: Path = ROOT,
+    source_revision: str = "head-revision",
+    source: dict | None = None,
+) -> dict:
+    accepted = receipt(
+        manifest_sha, repo_root=repo_root,
+        source_revision=source_revision, source=source,
+    )
+    failure = qualification._failure_record("qualification-error", message)
+    return {
+        "schema": qualification.REJECTED_SCHEMA,
+        "status": "rejected",
+        "source": accepted["source"],
+        "configuration": accepted["configuration"],
+        "host": accepted["host"],
+        "toolchain": accepted["toolchain"],
+        "inputs": {},
+        "baseline": {"sha256": None, "profile": None},
+        "decision": {
+            "classification": "incomplete",
+            "failures": [failure],
+            "performance_regressions": [],
+        },
+        "observations": {"complete": False, "workloads": []},
+        "started_at": accepted["started_at"],
+        "finished_at": accepted["finished_at"],
+        "duration_ms": accepted["duration_ms"],
+        "artifacts": [],
     }
 
 
@@ -504,33 +600,61 @@ def receipt(
     for kind in KINDS:
         runs = []
         semantic = semantic_sha(kind, repo_root)
+        iterations = 10 if kind == "unit" else 1
+        inner_value = 500 if kind == "unit" else value
         for repetition in range(1, 11):
-            paths = qualification._run_artifact_paths(kind, repetition)
-            data_by_path = {
-                paths[0]: qualification.canonical_json(
-                    analyzer_report(kind, repo_root, inputs[kind])
-                ),
-                paths[1]: b"",
-                paths[2]: b"",
-                paths[3]: time_log(value),
+            inner_runs = []
+            for iteration in range(1, iterations + 1):
+                paths = qualification._iteration_artifact_paths(
+                    kind, repetition, iteration
+                )
+                environment, environment_raw = environment_evidence(inner_value)
+                data_by_path = {
+                    paths[0]: qualification.canonical_json(
+                        analyzer_report(kind, repo_root, inputs[kind])
+                    ),
+                    paths[1]: b"",
+                    paths[2]: b"",
+                    paths[3]: time_log(inner_value),
+                    paths[4]: environment_raw,
+                }
+                artifacts.extend(
+                    {"path": path, "sha256": sha256(data), "size": len(data)}
+                    for path, data in data_by_path.items()
+                )
+                inner_runs.append({
+                    "iteration": iteration,
+                    "semantic_sha256": semantic,
+                    "exit_code": 0,
+                    "metrics": {
+                        "wall_ms": inner_value,
+                        "cpu_ms": inner_value,
+                        "peak_rss_kib": inner_value,
+                    },
+                    "environment": environment,
+                    "artifacts": paths,
+                })
+            run_metrics = {
+                "wall_ms": inner_value * iterations,
+                "cpu_ms": inner_value * iterations,
+                "peak_rss_kib": inner_value,
             }
-            artifacts.extend(
-                {"path": path, "sha256": sha256(data), "size": len(data)}
-                for path, data in data_by_path.items()
-            )
             runs.append(
                 {
                     "repetition": repetition,
                     "semantic_sha256": semantic,
                     "exit_code": 0,
-                    "metrics": {
-                        "wall_ms": value,
-                        "cpu_ms": value,
-                        "peak_rss_kib": value,
-                    },
-                    "artifacts": paths,
+                    "metrics": run_metrics,
+                    "measurement_iterations": iterations,
+                    "batch_valid": True,
+                    "environment_valid": True,
+                    "inner_runs": inner_runs,
+                    "artifacts": qualification._run_artifact_paths(
+                        kind, repetition, iterations
+                    ),
                 }
             )
+        outer_wall_cpu = inner_value * iterations
         workloads.append(
             {
                 "id": kind,
@@ -538,9 +662,9 @@ def receipt(
                 "semantic_sha256": semantic,
                 "runs": runs,
                 "statistics": {
-                    "wall_ms": metric(value),
-                    "cpu_ms": metric(value),
-                    "peak_rss_kib": metric(value),
+                    "wall_ms": metric(outer_wall_cpu),
+                    "cpu_ms": metric(outer_wall_cpu),
+                    "peak_rss_kib": metric(inner_value),
                 },
             }
         )
@@ -557,6 +681,7 @@ def receipt(
             "repetitions": 10,
             "performance_regression_limit_percent": 10,
             "performance_policy": "required",
+            "environment_policy": qualification.ENVIRONMENT_POLICY,
         },
         "host": {
             "class_id": "test-linux-x86_64",
@@ -564,6 +689,7 @@ def receipt(
             "architecture": "x86_64",
             "cpu_model": "test cpu",
             "logical_cpus": 2,
+            "host_logical_cpus": 2,
             "cpu_affinity_source": "sched_getaffinity",
             "cpu_affinity": [0, 1],
             "cpu_uclamp_source": "proc-self-sched",
@@ -593,22 +719,26 @@ def receipt(
 
 
 class DeterminismQualificationTest(unittest.TestCase):
-    def test_affinity_and_uclamp_evidence_uses_a_distinct_v4_schema(self) -> None:
+    def test_batched_environment_evidence_uses_a_distinct_v5_schema(self) -> None:
+        self.assertEqual(
+            qualification.MANIFEST_SCHEMA,
+            "codeskeptic-determinism-workloads-v2",
+        )
         self.assertEqual(
             qualification.BASELINE_SCHEMA,
-            "codeskeptic-determinism-baseline-v4",
+            "codeskeptic-determinism-baseline-v5",
         )
         self.assertEqual(
             qualification.RECEIPT_SCHEMA,
-            "codeskeptic-determinism-qualification-v4",
+            "codeskeptic-determinism-qualification-v5",
         )
         self.assertEqual(
             qualification.REJECTED_SCHEMA,
-            "codeskeptic-determinism-rejected-v4",
+            "codeskeptic-determinism-rejected-v5",
         )
         self.assertEqual(
             qualification.CALIBRATION_SCHEMA,
-            "codeskeptic-determinism-calibration-v4",
+            "codeskeptic-determinism-calibration-v5",
         )
 
     def test_manifest_requires_exact_three_workloads_ten_runs_and_ten_percent(self) -> None:
@@ -634,12 +764,286 @@ class DeterminismQualificationTest(unittest.TestCase):
         with self.assertRaisesRegex(qualification.QualificationError, "input authority"):
             qualification.validate_manifest(changed)
 
+        changed = manifest()
+        changed["workloads"][0]["measurement_iterations"] = 1
+        with self.assertRaisesRegex(qualification.QualificationError, "measurement batch"):
+            qualification.validate_manifest(changed)
+
+        changed = manifest()
+        changed["environment_policy"]["host_external_cpu_limit_basis_points"] = 100
+        with self.assertRaisesRegex(qualification.QualificationError, "environment policy"):
+            qualification.validate_manifest(changed)
+
+    def test_performance_regressions_are_complete_ordered_records(self) -> None:
+        current = {
+            "wall_ms": metric(100),
+            "cpu_ms": metric(100),
+            "peak_rss_kib": metric(100),
+        }
+        current["cpu_ms"]["p90"] = 111
+        current["cpu_ms"]["max"] = 112
+        current["peak_rss_kib"]["max"] = 113
+        failures = qualification.performance_regressions(
+            "unit", current,
+            {
+                "wall_ms": metric(100),
+                "cpu_ms": metric(100),
+                "peak_rss_kib": metric(100),
+            },
+            10,
+        )
+        self.assertEqual(
+            [(item["metric"], item["statistic"]) for item in failures],
+            [("cpu_ms", "p90"), ("cpu_ms", "max"),
+             ("peak_rss_kib", "max")],
+        )
+        self.assertTrue(all(item["type"] == "performance-regression"
+                            for item in failures))
+        self.assertEqual(failures[0]["current"], 111)
+        self.assertEqual(failures[0]["baseline"], 100)
+        self.assertEqual(failures[0]["limit_percent"], 10)
+
+    def test_environment_snapshot_delta_is_bounded_and_fail_closed(self) -> None:
+        proc_stat = (
+            "cpu  200 0 100 700 0 0 0 0 0 0\n"
+            "cpu0 100 0 50 350 0 0 0 0 0 0\n"
+            "cpu2 100 0 50 350 0 0 0 0 0 0\n"
+        ).encode()
+        parsed = qualification._parse_proc_stat(proc_stat, [0, 2], 100)
+        self.assertEqual(parsed["host_busy_ticks"], 300)
+        self.assertEqual(parsed["affinity_busy_ticks"], 300)
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU accounting"
+        ):
+            qualification._parse_proc_stat(
+                proc_stat + b"cpu0 100 0 50 350 0 0 0 0 0 0\n",
+                [0, 2], 100,
+            )
+        pressure = qualification._parse_pressure(
+            b"some avg10=0.00 avg60=0.00 avg300=0.00 total=12\n"
+            b"full avg10=0.00 avg60=0.00 avg300=0.00 total=3\n",
+            "cpu",
+        )
+        self.assertEqual(pressure, {"some_total_us": 12, "full_total_us": 3})
+        with self.assertRaisesRegex(qualification.QualificationError, "pressure"):
+            qualification._parse_pressure(
+                b"some avg10=0 avg60=0 avg300=0 total=1\n", "cpu"
+            )
+
+        before = {
+            "cpu": {
+                "clock_ticks_per_second": 100,
+                "host_logical_cpus": 4,
+                "host_busy_ticks": 100,
+                "affinity_busy_ticks": 40,
+            },
+            "pressure": {
+                "cpu": {"some_total_us": 10, "full_total_us": 0},
+                "memory": {"some_total_us": 10, "full_total_us": 0},
+                "io": {"some_total_us": 10, "full_total_us": 0},
+            },
+            "cpufreq": [{
+                "cpu": 0, "driver": "intel_pstate", "governor": "powersave",
+                "minimum_khz": 400000, "maximum_khz": 4400000,
+                "current_khz": 4000000,
+            }],
+            "thermal": [{
+                "cpu": 0, "core_count": 1, "core_total_ms": 2,
+                "package_count": 3, "package_total_ms": 4,
+            }],
+        }
+        after = copy.deepcopy(before)
+        after["cpu"]["host_busy_ticks"] += 101
+        after["cpu"]["affinity_busy_ticks"] += 100
+        after["thermal"][0]["package_total_ms"] += 1
+        decision = qualification._evaluate_environment(
+            before, after, child_cpu_ms=900, wall_ms=1000,
+            affinity=[0], logical_cpus=4,
+            policy=qualification.ENVIRONMENT_POLICY,
+            required=True,
+        )
+        self.assertFalse(decision["valid"])
+        self.assertEqual(decision["metrics"]["host_external_cpu_ms"], 110)
+        self.assertEqual(decision["metrics"]["thermal_throttle_ms"], 1)
+        self.assertTrue(any("host external CPU" in item
+                            for item in decision["violations"]))
+        self.assertTrue(any("thermal throttle" in item
+                            for item in decision["violations"]))
+        count_only_after = copy.deepcopy(before)
+        count_only_after["cpu"]["host_busy_ticks"] += 90
+        count_only_after["cpu"]["affinity_busy_ticks"] += 90
+        count_only_after["thermal"][0]["core_count"] += 1
+        count_only = qualification._evaluate_environment(
+            before, count_only_after, child_cpu_ms=900, wall_ms=1000,
+            affinity=[0], logical_cpus=4,
+            policy=qualification.ENVIRONMENT_POLICY, required=True,
+        )
+        self.assertFalse(count_only["valid"])
+        self.assertEqual(count_only["metrics"]["thermal_throttle_count"], 1)
+        unavailable = copy.deepcopy(before)
+        unavailable["cpufreq"] = []
+        unavailable["thermal"] = []
+        required_unavailable = qualification._evaluate_environment(
+            unavailable, copy.deepcopy(unavailable), child_cpu_ms=0,
+            wall_ms=1000, affinity=[0], logical_cpus=4,
+            policy=qualification.ENVIRONMENT_POLICY, required=True,
+        )
+        self.assertFalse(required_unavailable["valid"])
+        record_only_unavailable = qualification._evaluate_environment(
+            unavailable, copy.deepcopy(unavailable), child_cpu_ms=0,
+            wall_ms=1000, affinity=[0], logical_cpus=4,
+            policy=qualification.ENVIRONMENT_POLICY, required=False,
+        )
+        self.assertTrue(record_only_unavailable["valid"])
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "logical CPU identity"
+        ):
+            qualification._evaluate_environment(
+                before, after, child_cpu_ms=900, wall_ms=1000,
+                affinity=[0], logical_cpus=8,
+                policy=qualification.ENVIRONMENT_POLICY, required=True,
+            )
+        malformed_frequency = copy.deepcopy(after)
+        malformed_frequency["cpufreq"][0]["current_khz"] = []
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "CPU frequency"
+        ):
+            qualification._evaluate_environment(
+                before, malformed_frequency, child_cpu_ms=900, wall_ms=1000,
+                affinity=[0], logical_cpus=4,
+                policy=qualification.ENVIRONMENT_POLICY, required=True,
+            )
+        duplicate_frequency_before = copy.deepcopy(before)
+        duplicate_frequency_after = copy.deepcopy(after)
+        duplicate_frequency_before["cpufreq"] *= 2
+        duplicate_frequency_after["cpufreq"] *= 2
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "frequency identity"
+        ):
+            qualification._evaluate_environment(
+                duplicate_frequency_before, duplicate_frequency_after,
+                child_cpu_ms=900, wall_ms=1000, affinity=[0], logical_cpus=4,
+                policy=qualification.ENVIRONMENT_POLICY, required=True,
+            )
+
+    def test_environment_capture_is_exact_and_rejects_authority_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc_root = root / "proc"
+            cpu_root = root / "cpu"
+            (proc_root / "pressure").mkdir(parents=True)
+            proc_root.joinpath("stat").write_text(
+                "cpu 200 0 100 700 0 0 0 0 0 0\n"
+                "cpu0 200 0 100 700 0 0 0 0 0 0\n",
+                encoding="ascii",
+            )
+            for resource_name in ("cpu", "memory", "io"):
+                proc_root.joinpath("pressure", resource_name).write_text(
+                    "some avg10=0.00 avg60=0.00 avg300=0.00 total=12\n"
+                    "full avg10=0.00 avg60=0.00 avg300=0.00 total=3\n",
+                    encoding="ascii",
+                )
+            frequency = cpu_root / "cpu0" / "cpufreq"
+            thermal = cpu_root / "cpu0" / "thermal_throttle"
+            frequency.mkdir(parents=True)
+            thermal.mkdir(parents=True)
+            for name, value in (
+                ("scaling_driver", "intel_pstate"),
+                ("scaling_governor", "powersave"),
+                ("scaling_min_freq", "400000"),
+                ("scaling_max_freq", "4400000"),
+                ("scaling_cur_freq", "4000000"),
+            ):
+                frequency.joinpath(name).write_text(value + "\n", encoding="ascii")
+            for name, value in (
+                ("core_throttle_count", "1"),
+                ("core_throttle_total_time_ms", "2"),
+                ("package_throttle_count", "3"),
+                ("package_throttle_total_time_ms", "4"),
+            ):
+                thermal.joinpath(name).write_text(value + "\n", encoding="ascii")
+
+            captured = qualification._capture_environment(
+                [0], proc_root, cpu_root
+            )
+            self.assertEqual(captured["cpu"]["host_logical_cpus"], 1)
+            self.assertEqual(captured["cpufreq"][0]["maximum_khz"], 4400000)
+            self.assertEqual(captured["thermal"][0]["package_total_ms"], 4)
+
+            outside = root / "outside-frequency"
+            outside.mkdir()
+            shutil.rmtree(frequency)
+            frequency.symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "escapes its authority root"
+            ):
+                qualification._capture_environment([0], proc_root, cpu_root)
+
     def test_statistics_are_integer_nearest_rank_and_complete(self) -> None:
         values = [9, 1, 7, 3, 2, 10, 6, 8, 4, 5]
         self.assertEqual(
             qualification.metric_statistics(values),
             {"count": 10, "min": 1, "median": 6, "p90": 9, "max": 10},
         )
+
+    def test_run_once_executes_and_binds_every_pinned_inner_measurement(self) -> None:
+        raw_manifest = manifest()
+        definition = raw_manifest["workloads"][0]
+        input_value = input_receipt("unit")
+        prepared = {
+            "definition": definition,
+            "input": input_value,
+            "args": [],
+            "release_source": None,
+        }
+        environment_payload = json.loads(environment_evidence(500)[1])
+        environment_payload["before"]["cpu"]["host_logical_cpus"] = 8
+        environment_payload["after"]["cpu"]["host_logical_cpus"] = 8
+
+        def run_process(
+            command: list[str], _environment: dict[str, str], _timeout: int,
+            _stdout_path: Path, _stderr_path: Path,
+            _required_outputs: list[Path],
+        ) -> subprocess.CompletedProcess:
+            time_path = Path(command[command.index("-o") + 1])
+            report_path = Path(command[-1])
+            time_path.write_bytes(time_log(500))
+            report_path.write_bytes(
+                qualification.canonical_json(analyzer_report("unit"))
+            )
+            return subprocess.CompletedProcess(
+                command, 0, stdout=b"", stderr=b""
+            )
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            qualification.os, "sched_getaffinity", return_value={0, 1}
+        ), mock.patch.object(
+            qualification, "_capture_environment",
+            side_effect=[
+                copy.deepcopy(environment_payload[side])
+                for _iteration in range(10)
+                for side in ("before", "after")
+            ],
+        ) as capture, mock.patch.object(
+            qualification, "_run_bounded_process", side_effect=run_process
+        ) as bounded:
+            run, artifacts = qualification.run_once(
+                Path("/fixture/codeskeptic"), Path("/usr/bin/time"),
+                prepared, 1, ROOT, Path(directory), "required",
+                {
+                    "cpu_affinity": [0, 1],
+                    "logical_cpus": 2,
+                    "host_logical_cpus": 8,
+                },
+            )
+        self.assertEqual(bounded.call_count, 10)
+        self.assertEqual(capture.call_count, 20)
+        self.assertEqual(run["measurement_iterations"], 10)
+        self.assertEqual(len(run["inner_runs"]), 10)
+        self.assertEqual(run["metrics"]["cpu_ms"], 5000)
+        self.assertTrue(run["batch_valid"])
+        self.assertTrue(run["environment_valid"])
+        self.assertEqual(len(artifacts), 50)
 
     def test_semantic_projection_excludes_runtime_telemetry_but_not_findings(self) -> None:
         report = {
@@ -808,8 +1212,9 @@ class DeterminismQualificationTest(unittest.TestCase):
             )
             self.assertTrue(
                 any(
-                    f"{metric_name}.{statistic}" in failure
-                    and "10 percent" in failure
+                    failure["metric"] == metric_name
+                    and failure["statistic"] == statistic
+                    and "10 percent" in failure["message"]
                     for failure in failures
                 )
             )
@@ -857,6 +1262,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         current = receipt(manifest_sha)
         base = baseline(manifest_sha)
         current["host"]["cpu_affinity"] = [0, 2]
+        current["host"]["host_logical_cpus"] = 3
         with self.assertRaisesRegex(
             qualification.QualificationError, "hardware|toolchain|profile"
         ):
@@ -879,12 +1285,14 @@ class DeterminismQualificationTest(unittest.TestCase):
                 qualification, "_cpu_uclamp_identity",
                 return_value=("proc-self-sched", 1024, 1024),
             ),
+            mock.patch.object(qualification.os, "cpu_count", return_value=8),
         ):
             identity = qualification.host_identity("test-linux-x86_64")
 
         self.assertEqual(identity["cpu_affinity"], [3, 7])
         self.assertEqual(identity["cpu_affinity_source"], "sched_getaffinity")
         self.assertEqual(identity["logical_cpus"], 2)
+        self.assertEqual(identity["host_logical_cpus"], 8)
         self.assertEqual(identity["cpu_uclamp_source"], "proc-self-sched")
         self.assertEqual(identity["cpu_uclamp_min"], 1024)
         self.assertEqual(identity["cpu_uclamp_max"], 1024)
@@ -900,6 +1308,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         self.assertEqual(fallback["cpu_affinity"], [])
         self.assertEqual(fallback["cpu_affinity_source"], "unavailable")
         self.assertEqual(fallback["logical_cpus"], 3)
+        self.assertEqual(fallback["host_logical_cpus"], 3)
 
         with mock.patch.object(
             qualification.os, "sched_getaffinity",
@@ -999,19 +1408,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 malformed_calibration, raw_manifest
             )
 
-        rejected = calibration_receipt(manifest_sha)
-        rejected.pop("workloads")
-        rejected.update({
-            "schema": qualification.REJECTED_SCHEMA,
-            "status": "rejected",
-            "configuration": {
-                **rejected["configuration"],
-                "performance_policy": "required",
-            },
-            "inputs": {},
-            "failure": "controlled rejection",
-            "artifacts": [],
-        })
+        rejected = rejected_receipt(manifest_sha)
         rejected["host"]["cpu_affinity"] = [0, "1"]
         with self.assertRaisesRegex(
             qualification.QualificationError, "CPU affinity"
@@ -1517,7 +1914,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 time_log(101)
             )
             with self.assertRaisesRegex(
-                qualification.QualificationError, "checksum|raw|manifest"
+                qualification.QualificationError, "checksum|raw|manifest|file set"
             ):
                 qualification.verify_baseline_authority(
                     base, authority, manifest_path
@@ -1799,22 +2196,9 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_rejected_bundle_verifies_without_a_baseline_and_cli_is_status_aware(self) -> None:
         raw_manifest = manifest()
         manifest_sha = qualification.digest_json(raw_manifest)
-        rejected = calibration_receipt(manifest_sha)
-        rejected = {
-            key: value for key, value in rejected.items()
-            if key not in {"workloads"}
-        }
-        rejected.update({
-            "schema": qualification.REJECTED_SCHEMA,
-            "status": "rejected",
-            "configuration": {
-                **rejected["configuration"],
-                "performance_policy": "required",
-            },
-            "inputs": {},
-            "failure": "unit repetition 1 timed out",
-            "artifacts": [],
-        })
+        rejected = rejected_receipt(
+            manifest_sha, "unit repetition 1 timed out"
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source_repo = root / "source"
@@ -1836,6 +2220,227 @@ class DeterminismQualificationTest(unittest.TestCase):
                 ]),
                 0,
             )
+            noncanonical = copy.deepcopy(rejected)
+            noncanonical["artifacts"] = [{
+                "path": "attacker.log", "sha256": "0" * 64, "size": 0,
+            }]
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "not canonical"
+            ):
+                qualification._validate_rejected_payload(
+                    noncanonical, raw_manifest, None
+                )
+
+    def test_complete_rejection_binds_all_regressions_and_raw_observations(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        accepted = receipt(manifest_sha)
+        performance_baseline = baseline(manifest_sha)
+        profile = performance_baseline["profiles"]["test-linux-x86_64"]
+        profile["workloads"]["unit"]["statistics"]["wall_ms"] = metric(7000)
+        profile["workloads"]["unit"]["statistics"]["cpu_ms"] = metric(5700)
+        profile["workloads"]["unit"]["statistics"]["peak_rss_kib"] = metric(700)
+        release_stats = profile["workloads"]["release-candidate"]["statistics"]
+        release_stats["peak_rss_kib"] = metric(200)
+
+        unit = accepted["workloads"][0]
+        for run in unit["runs"][-2:]:
+            for inner in run["inner_runs"]:
+                inner["metrics"] = {
+                    "wall_ms": 630, "cpu_ms": 630, "peak_rss_kib": 630,
+                }
+                inner["environment"] = environment_evidence(630)[0]
+            run["metrics"] = {
+                "wall_ms": 6300, "cpu_ms": 6300, "peak_rss_kib": 630,
+            }
+        unit["statistics"] = {
+            metric_name: qualification.metric_statistics(
+                [run["metrics"][metric_name] for run in unit["runs"]]
+            )
+            for metric_name in qualification.METRICS
+        }
+        release = accepted["workloads"][2]
+        release_run = release["runs"][-1]
+        release_inner = release_run["inner_runs"][0]
+        release_inner["metrics"] = {
+            "wall_ms": 200, "cpu_ms": 200, "peak_rss_kib": 200,
+        }
+        release_inner["environment"] = environment_evidence(200)[0]
+        release_run["metrics"] = dict(release_inner["metrics"])
+        release["statistics"] = {
+            metric_name: qualification.metric_statistics(
+                [run["metrics"][metric_name] for run in release["runs"]]
+            )
+            for metric_name in qualification.METRICS
+        }
+        raw_artifacts = artifact_bytes(accepted)
+        accepted["artifacts"] = sorted(
+            (
+                {"path": path, "sha256": sha256(data), "size": len(data)}
+                for path, data in raw_artifacts.items()
+            ),
+            key=lambda item: item["path"],
+        )
+        failures = qualification._baseline_gate_failures(
+            performance_baseline, accepted["host"], accepted["toolchain"],
+            accepted["inputs"], accepted["workloads"], "required",
+        )
+        self.assertEqual(
+            [(item["workload"], item["metric"], item["statistic"])
+             for item in failures],
+            [
+                ("unit", "cpu_ms", "p90"),
+                ("unit", "cpu_ms", "max"),
+                ("release-candidate", "wall_ms", "max"),
+                ("release-candidate", "cpu_ms", "max"),
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            baseline_path = root / "baseline.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+            baseline_path.write_bytes(
+                qualification.canonical_json(performance_baseline)
+            )
+            rejected = {
+                "schema": qualification.REJECTED_SCHEMA,
+                "status": "rejected",
+                "source": accepted["source"],
+                "configuration": accepted["configuration"],
+                "host": accepted["host"],
+                "toolchain": accepted["toolchain"],
+                "inputs": accepted["inputs"],
+                "baseline": {
+                    "sha256": qualification.sha256_file(baseline_path),
+                    "profile": "test-linux-x86_64",
+                },
+                "decision": {
+                    "classification": "complete-gate-rejection",
+                    "failures": failures,
+                    "performance_regressions": failures,
+                },
+                "observations": {
+                    "complete": True,
+                    "workloads": accepted["workloads"],
+                },
+                "started_at": accepted["started_at"],
+                "finished_at": accepted["finished_at"],
+                "duration_ms": accepted["duration_ms"],
+                "artifacts": accepted["artifacts"],
+            }
+            evidence = root / "rejected"
+            qualification.write_receipt(evidence, rejected, raw_artifacts)
+            verified = qualification.verify_receipt(
+                evidence, manifest_path, baseline_path, None
+            )
+            self.assertEqual(
+                verified["decision"]["performance_regressions"], failures
+            )
+
+            tampered_artifacts = dict(raw_artifacts)
+            environment_path = qualification._iteration_artifact_paths(
+                "unit", 1, 1
+            )[4]
+            environment = json.loads(
+                tampered_artifacts[environment_path].decode("utf-8")
+            )
+            environment["decision"]["valid"] = False
+            tampered_artifacts[environment_path] = qualification.canonical_json(
+                environment
+            )
+            tampered = copy.deepcopy(rejected)
+            tampered["artifacts"] = sorted(
+                (
+                    {
+                        "path": path,
+                        "sha256": sha256(data),
+                        "size": len(data),
+                    }
+                    for path, data in tampered_artifacts.items()
+                ),
+                key=lambda item: item["path"],
+            )
+            forged = root / "forged-rejected"
+            qualification.write_receipt(forged, tampered, tampered_artifacts)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "environment decision differs from raw artifact",
+            ):
+                qualification.verify_receipt(
+                    forged, manifest_path, baseline_path, None
+                )
+
+    def test_complete_measurement_rejection_does_not_require_a_baseline(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        measured = receipt(manifest_sha)
+        unit = measured["workloads"][0]
+        for run in unit["runs"]:
+            for inner in run["inner_runs"]:
+                inner["metrics"] = {
+                    "wall_ms": 400, "cpu_ms": 400,
+                    "peak_rss_kib": 400,
+                }
+                inner["environment"] = environment_evidence(400)[0]
+            run["metrics"] = {
+                "wall_ms": 4000, "cpu_ms": 4000,
+                "peak_rss_kib": 400,
+            }
+            run["batch_valid"] = False
+        unit["statistics"] = {
+            metric_name: qualification.metric_statistics(
+                [run["metrics"][metric_name] for run in unit["runs"]]
+            )
+            for metric_name in qualification.METRICS
+        }
+        failures = qualification._measurement_failures(
+            raw_manifest, measured["workloads"]
+        )
+        artifacts = artifact_bytes(measured)
+        error = qualification.QualificationDecisionError(
+            failures, measured["workloads"]
+        )
+        rejected = qualification._rejected_payload(
+            measured["source"], manifest_sha, "required",
+            measured["host"], measured["toolchain"], measured["inputs"],
+            dt.datetime.now(dt.timezone.utc), time.monotonic_ns(), error,
+            artifacts, None, None,
+        )
+        self.assertEqual(
+            rejected["decision"]["classification"],
+            "complete-measurement-rejection",
+        )
+        qualification._validate_rejected_payload(
+            rejected, raw_manifest, None
+        )
+        existing_baseline = baseline(manifest_sha)
+        existing_baseline["profiles"]["test-linux-x86_64"]["workloads"][
+            "release-candidate"
+        ]["statistics"]["cpu_ms"] = metric(80)
+        rejected_with_baseline = qualification._rejected_payload(
+            measured["source"], manifest_sha, "required",
+            measured["host"], measured["toolchain"], measured["inputs"],
+            dt.datetime.now(dt.timezone.utc), time.monotonic_ns(), error,
+            artifacts, "7" * 64, "test-linux-x86_64",
+        )
+        self.assertEqual(
+            rejected_with_baseline["decision"]["failures"], failures
+        )
+        qualification._validate_rejected_payload(
+            rejected_with_baseline, raw_manifest, existing_baseline
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+            evidence = root / "rejected"
+            qualification.write_receipt(evidence, rejected, artifacts)
+            verified = qualification.verify_receipt(
+                evidence, manifest_path, root / "missing-baseline.json", None
+            )
+            self.assertTrue(verified["observations"]["complete"])
 
     def test_rejected_evidence_is_persisted_once_and_never_overwritten(self) -> None:
         raw_manifest = manifest()
@@ -1867,7 +2472,10 @@ class DeterminismQualificationTest(unittest.TestCase):
             verified = qualification.verify_receipt(
                 output, manifest_path, root / "missing-baseline.json", source_repo
             )
-            self.assertEqual(verified["failure"], "preparation failed")
+            self.assertEqual(
+                verified["decision"]["failures"][0]["message"],
+                "preparation failed",
+            )
             with self.assertRaisesRegex(
                 qualification.QualificationError, "refuses to overwrite"
             ):
@@ -1912,7 +2520,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.write_receipt(root, payload, artifact_bytes)
             with self.assertRaisesRegex(
                 qualification.QualificationError,
-                "raw artifact|report|four artifacts|GNU time",
+                "raw artifact|report|artifact|GNU time|canonical",
             ):
                 qualification.verify_receipt(
                     root, manifest_path, baseline_path, None

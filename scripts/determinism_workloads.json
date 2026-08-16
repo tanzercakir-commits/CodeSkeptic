@@ -1,7 +1,15 @@
 {
+  "environment_policy": {
+    "affinity_external_cpu_limit_basis_points": 200,
+    "cpu_pressure_some_limit_basis_points": 200,
+    "host_external_cpu_limit_basis_points": 50,
+    "io_pressure_full_limit_basis_points": 0,
+    "memory_pressure_full_limit_basis_points": 0,
+    "thermal_throttle_limit_ms": 0
+  },
   "performance_regression_limit_percent": 10,
   "repetitions": 10,
-  "schema": "codeskeptic-determinism-workloads-v1",
+  "schema": "codeskeptic-determinism-workloads-v2",
   "workloads": [
     {
       "analyzer_args": [],
@@ -11,6 +19,8 @@
         "mode": "thesis-corpus"
       },
       "kind": "unit",
+      "measurement_iterations": 10,
+      "minimum_batch_cpu_ms": 5000,
       "tu_memory_mib": 4096,
       "tu_timeout_seconds": 300,
       "wall_timeout_seconds": 1800
@@ -24,6 +34,8 @@
         "policy": "no-absolute-paths"
       },
       "kind": "real-repository",
+      "measurement_iterations": 1,
+      "minimum_batch_cpu_ms": 0,
       "tu_memory_mib": 4096,
       "tu_timeout_seconds": 300,
       "wall_timeout_seconds": 3600
@@ -54,6 +66,8 @@
         ]
       },
       "kind": "release-candidate",
+      "measurement_iterations": 1,
+      "minimum_batch_cpu_ms": 0,
       "tu_memory_mib": 4096,
       "tu_timeout_seconds": 600,
       "wall_timeout_seconds": 3600
