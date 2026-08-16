@@ -50,6 +50,15 @@
   TU digest `c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8`,
   and plan digest
   `db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278`.
+- The next exact-head hosted run correctly rejected those post-calibration
+  infrastructure repairs at the initial-baseline bootstrap boundary. The
+  bootstrap allowlist now treats the root CMake version authority as the
+  eighth infrastructure file while continuing to reject any workflow,
+  runner, CMake, or test change made after the calibrated source revision.
+  The final eight-file source state will be introduced as an ancestry-only
+  source commit from the P10.6 base, followed by fresh calibration, baseline,
+  confirmation, and stress evidence; no authority-path relaxation or history
+  rewrite is used.
 - Retained the final Fedora Linux x86_64 calibration at
   `docs/evidence/phase10/determinism/calibrations/fedora-linux-x86_64`.
   Its 122-entry tree binds 385 source files at revision

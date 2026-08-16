@@ -326,6 +326,7 @@ def git_commit(repo: Path, message: str) -> str:
 
 def write_determinism_infrastructure(repo: Path, raw_manifest: dict) -> None:
     files = {
+        "CMakeLists.txt": "# fixture project\n",
         ".github/workflows/determinism.yml": "name: fixture determinism\n",
         "scripts/determinism_workloads.json": qualification.canonical_json(
             raw_manifest
@@ -1021,9 +1022,9 @@ class DeterminismQualificationTest(unittest.TestCase):
                 repo, base_revision, baseline_path, manifest_path
             )
 
-            source = repo / "src" / "changed.cpp"
-            source.write_text("int changed;\n", encoding="utf-8")
-            git_commit(repo, "forbidden source")
+            cmake = repo / "CMakeLists.txt"
+            cmake.write_text("# post-authority repair\n", encoding="utf-8")
+            git_commit(repo, "forbidden post-authority infrastructure repair")
             with self.assertRaisesRegex(
                 qualification.QualificationError, "authority change set exceeds"
             ):

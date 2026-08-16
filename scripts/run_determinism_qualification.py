@@ -1258,6 +1258,7 @@ def verify_bootstrap_promotion(
                 f"bootstrap {label} is not an ancestor of the candidate"
             )
     infrastructure_paths = {
+        "CMakeLists.txt",
         ".github/workflows/determinism.yml",
         "docs/TODO.md",
         "scripts/determinism_workloads.json",
