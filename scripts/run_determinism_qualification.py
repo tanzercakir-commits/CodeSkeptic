@@ -35,7 +35,7 @@ BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v4"
 RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v4"
 REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v4"
 CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v4"
-CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v1"
+CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v2"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
 TOOLCHAIN_NAMES = (
@@ -1731,6 +1731,31 @@ def _canonical_cmake_cache_value(
     return segments
 
 
+def _canonical_git_discovery_value(
+    value: str, values: dict[str, str],
+) -> list[dict[str, str]]:
+    git_exe = values.get("GIT_EXE")
+    git_executable = values.get("GIT_EXECUTABLE")
+    if (git_exe is None or git_executable is None or
+            not Path(git_exe).is_absolute() or
+            not Path(git_executable).is_absolute() or
+            Path(git_exe).resolve() != Path(git_executable).resolve()):
+        raise QualificationError("build Git discovery identity drift")
+    match = re.fullmatch(
+        r"\[(.+)\]\[v([0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9._-]+)?)\(\)\]",
+        value,
+    )
+    if (match is None or not Path(match.group(1)).is_absolute() or
+            Path(match.group(1)).resolve() != Path(git_executable).resolve()):
+        raise QualificationError("build Git discovery details are malformed")
+    # CMake records the host Git version in this diagnostic-only cache field.
+    # llama.cpp uses Git to derive GGML_COMMIT, whose exact value is already
+    # bound by the selected compile-command plan.  Keeping the field and its
+    # executable relationship while removing only the version text permits
+    # equivalent native/container preparations to share an input identity.
+    return [{"git-discovery": "$GIT_VERSION_RECORD_ONLY"}]
+
+
 def _build_toolchain_identity(
     build: Path, source: Path, cmake: Path, ninja: Path,
     c_compiler: Path, cxx_compiler: Path,
@@ -1806,6 +1831,10 @@ def _build_toolchain_identity(
     for entry in entries:
         if entry["key"] in tool_roles:
             entry["value"] = [{"tool": tool_roles[entry["key"]]}]
+        elif entry["key"] == "FIND_PACKAGE_MESSAGE_DETAILS_Git":
+            entry["value"] = _canonical_git_discovery_value(
+                entry["value"], values
+            )
         else:
             entry["value"] = _canonical_cmake_cache_value(entry["value"], roots)
     entries.sort(key=lambda item: (item["key"], item["type"]))

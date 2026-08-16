@@ -1138,7 +1138,8 @@ class DeterminismQualificationTest(unittest.TestCase):
             ninja = tools / "ninja"
             c_compiler = tools / "clang-20"
             cxx_compiler = tools / "clang++-20"
-            for tool in (cmake, ninja, c_compiler, cxx_compiler):
+            git = tools / "git"
+            for tool in (cmake, ninja, c_compiler, cxx_compiler, git):
                 tool.write_bytes(b"fixture\n")
             aliases = root / "aliases"
             aliases.mkdir()
@@ -1154,6 +1155,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 name: str, option: str, reverse: bool,
                 recorded_tools: tuple[Path, Path, Path, Path] | None = None,
                 option_type: str = "BOOL", unknown_option: str = "alpha",
+                git_version: str = "2.43.0",
             ) -> tuple[Path, Path]:
                 workspace = root / name
                 source = workspace / "source"
@@ -1169,6 +1171,10 @@ class DeterminismQualificationTest(unittest.TestCase):
                     f"CMAKE_C_COMPILER:FILEPATH={recorded_c}",
                     f"CMAKE_CXX_COMPILER:FILEPATH={recorded_cxx}",
                     "CMAKE_GENERATOR:INTERNAL=Ninja",
+                    f"GIT_EXE:FILEPATH={git}",
+                    f"GIT_EXECUTABLE:FILEPATH={git}",
+                    f"FIND_PACKAGE_MESSAGE_DETAILS_Git:INTERNAL="
+                    f"[{git}][v{git_version}()]",
                     f"CMAKE_HOME_DIRECTORY:INTERNAL={source}",
                     f"CMAKE_CACHEFILE_DIR:INTERNAL={build}",
                     f"CodeSkeptic_SOURCE_DIR:STATIC={source}",
@@ -1242,6 +1248,13 @@ class DeterminismQualificationTest(unittest.TestCase):
                 unknown_build, unknown_source,
                 cmake, ninja, c_compiler, cxx_compiler,
             )
+            git_drift_source, git_drift_build = write_cache(
+                "git-drift", "OFF", False, git_version="2.54.0"
+            )
+            git_drift = qualification._build_toolchain_identity(
+                git_drift_build, git_drift_source,
+                cmake, ninja, c_compiler, cxx_compiler,
+            )
 
             self.assertEqual(
                 first["cmake_cache_canonical_sha256"],
@@ -1264,9 +1277,106 @@ class DeterminismQualificationTest(unittest.TestCase):
                 unknown["cmake_cache_canonical_sha256"],
             )
             self.assertEqual(
-                first["cmake_cache_schema"],
-                qualification.CMAKE_CACHE_IDENTITY_SCHEMA,
+                first["cmake_cache_canonical_sha256"],
+                git_drift["cmake_cache_canonical_sha256"],
             )
+            self.assertEqual(
+                first["cmake_cache_schema"],
+                "codeskeptic-cmake-cache-v2",
+            )
+            legacy_identity = dict(first)
+            legacy_identity["cmake_cache_schema"] = "codeskeptic-cmake-cache-v1"
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "CMake cache schema drift"
+            ):
+                qualification._validate_build_toolchain_identity(
+                    legacy_identity, "legacy build toolchain", None
+                )
+
+            mismatched_git_source, mismatched_git = write_cache(
+                "mismatched-git", "OFF", False
+            )
+            mismatched_git_cache = mismatched_git / "CMakeCache.txt"
+            mismatched_git_cache.write_text(
+                mismatched_git_cache.read_text(encoding="utf-8").replace(
+                    f"GIT_EXE:FILEPATH={git}",
+                    f"GIT_EXE:FILEPATH={cmake}",
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "Git discovery identity drift",
+            ):
+                qualification._build_toolchain_identity(
+                    mismatched_git, mismatched_git_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            missing_git_source, missing_git = write_cache(
+                "missing-git", "OFF", False
+            )
+            missing_git_cache = missing_git / "CMakeCache.txt"
+            missing_git_cache.write_text(
+                "\n".join(
+                    line for line in missing_git_cache.read_text(
+                        encoding="utf-8"
+                    ).splitlines()
+                    if not line.startswith("GIT_EXE:")
+                ) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "Git discovery identity drift",
+            ):
+                qualification._build_toolchain_identity(
+                    missing_git, missing_git_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            malformed_git_source, malformed_git = write_cache(
+                "malformed-git", "OFF", False
+            )
+            malformed_git_cache = malformed_git / "CMakeCache.txt"
+            malformed_git_cache.write_text(
+                malformed_git_cache.read_text(encoding="utf-8").replace(
+                    f"[{git}][v2.43.0()]",
+                    "[/unexpected/git][v2.43.0()]",
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "Git discovery details are malformed",
+            ):
+                qualification._build_toolchain_identity(
+                    malformed_git, malformed_git_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
+
+            malformed_version_source, malformed_version = write_cache(
+                "malformed-version", "OFF", False
+            )
+            malformed_version_cache = malformed_version / "CMakeCache.txt"
+            malformed_version_cache.write_text(
+                malformed_version_cache.read_text(encoding="utf-8").replace(
+                    "[v2.43.0()]", "[vnot-a-version()]"
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "Git discovery details are malformed",
+            ):
+                qualification._build_toolchain_identity(
+                    malformed_version, malformed_version_source,
+                    cmake, ninja, c_compiler, cxx_compiler,
+                )
 
             duplicate_source, duplicate = write_cache("duplicate", "OFF", False)
             with (duplicate / "CMakeCache.txt").open(
