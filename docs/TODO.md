@@ -9,7 +9,7 @@
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-cache-checkpoint-correctness phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-upstream-validation
+in_flight     = phase-cache-checkpoint-correctness phase-determinism-exclusive-cgroup-authority phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-upstream-validation
 verified_main = 7dfd375
 progress      = sha256:1b6edc7f100977936a6d77b2c3f357f67e42e975dcb1ba8d0faa0b40571cabdb
 ```
