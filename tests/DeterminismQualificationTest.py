@@ -986,6 +986,17 @@ class DeterminismQualificationTest(unittest.TestCase):
             self.assertEqual(identity["uclamp_min"], 1024)
             self.assertEqual(identity["uclamp_max"], 1024)
 
+            canonical_authority = root / "kernel-canonical-cgroup"
+            canonical_authority.mkdir()
+            kernel_canonical = measurement_cgroup_fixture(
+                canonical_authority, uclamp_min="max", uclamp_max="max",
+            )
+            canonical_identity = qualification._measurement_cgroup_identity(
+                kernel_canonical, [2, 3], canonical_authority
+            )
+            self.assertEqual(canonical_identity["uclamp_min"], 1024)
+            self.assertEqual(canonical_identity["uclamp_max"], 1024)
+
             cases = (
                 ("cpuset.cpus.exclusive.effective", "0\n", "exclusive CPU"),
                 ("cpuset.cpus.partition", "member\n", "partition"),

@@ -3662,7 +3662,7 @@ def _measurement_cgroup_identity(
             resolved / "cpu.uclamp.min", "measurement cgroup uclamp min",
             128,
         ),
-        "measurement cgroup uclamp min",
+        "measurement cgroup uclamp min", True,
     )
     uclamp_maximum = _parse_cgroup_uclamp(
         _telemetry_text(
