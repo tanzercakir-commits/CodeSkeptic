@@ -42,11 +42,29 @@
   the retained calibration and baseline authority. The establishment wrapper
   also accepted this newly generated baseline, but it intentionally reuses the
   calibration raw set and is not represented as an independent confirmation.
-- Focused local contracts pass `46/46` qualification and `4/4` workflow tests.
-  A separate fresh `3 × 10` confirmation, exact-source stress refresh, full
-  regression suites, independent final review, publication, and exact-head
-  hosted CI remain required. This checkpoint does not close `CS-P10-07` and
-  does not write or merge protected `main`.
+- Refreshed the retained frontend/CFG stress matrix at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64` from the same
+  immutable `62a8b30` source and analyzer. All nine cases completed both
+  repetitions in `741 ms` with zero timeout or crash; the stress-specific
+  source inventory binds `387` files at digest
+  `e337f9f05b4c4270bdd65d149af9d2cfb6e3a6fd811e2032fe40f3fc5a78041e`.
+  The accepted receipt SHA-256 is
+  `91d4c759131aa963e0e7734e41935487cd8da16b4856ac289e9d3b064a69713d`
+  and the 37-entry retained manifest SHA-256 is
+  `0f598f8077e45e569df0775825c25ca74b67370a70eb5965c7b665300b9a78d0`;
+  pinned-container receipt verification and the six stress contract tests pass.
+- Focused local contracts pass `46/46` qualification, `4/4` workflow, `6/6`
+  stress, and `52/52` status-automation tests. An exact-source LLVM 20 rebuild
+  reaches `ninja: no work to do`; its direct suite passes `1280/1280`, and
+  CTest passes `1299/1299` with no CTest-level skip or failure. The nested
+  sanitizer and fuzz contract runners report seven expected local skips
+  because their separate retained build directories were not mounted into
+  this normal-build container. The direct and CTest log SHA-256 values are
+  `e78ec474536ef1b8eb228030652761b10ff03a949e3661c13cda575eb9ee07ba`
+  and `9bc29a5db4effe461cb2d7369e37a37e406e6dd34080519da8d954668a644c35`.
+  A separate fresh `3 × 10` confirmation and its independent final review,
+  publication, and exact-head hosted CI remain required. This checkpoint does
+  not close `CS-P10-07` and does not write or merge protected `main`.
 
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
