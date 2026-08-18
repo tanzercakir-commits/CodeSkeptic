@@ -1,5 +1,71 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-18 — Phase 10.7 exclusive-core performance authority (in progress)
+
+- Advanced the determinism authority to its fail-closed V6 measurement
+  contract. Required Linux performance evidence now runs in a dedicated cgroup
+  v2 child with an exact isolated and exclusive CPU partition, a disjoint
+  controller partition, effective local/ancestor/system uclamp bounds, and
+  recursive empty/frozen membership checks. Cgroup-owned CPU, throttling, OOM,
+  thermal counters, and batch timing are checksummed and recomputed; host-wide
+  runtime PSI remains diagnostic while a fixed 30–32 second idle preflight
+  rejects external CPU or pressure before any authoritative measurement.
+  Workload, environment, baseline, calibration, qualification, and rejected
+  receipt schemas were advanced together so older evidence cannot be silently
+  reinterpreted.
+- Amplified the unit workload to ten deterministic inner executions per each
+  of ten outer repetitions while retaining ten outer measurements for the real
+  repository and release candidate. Every inner report, time record, semantic
+  fingerprint, translation-unit plan, and environment snapshot is bound once;
+  malformed, incomplete, over-counted, or self-inconsistent raw inventories
+  fail closed. Git/CMake tool identity, immutable source and release inputs,
+  exact analyzer bytes, and canonical build cache remain part of the authority.
+- Retained the first V6 calibration at
+  `docs/evidence/phase10/determinism/calibrations/2026-08-17-fedora44-i5-1235u-exclusive-pcores`.
+  The physical Fedora 44 host used the isolated P-core partition `[0,1,2,3]`
+  and controller CPUs `[4,5,6,7,8,9,10,11]`; all three workloads completed
+  `10/10` repetitions with stable semantic fingerprints. The receipt binds
+  `386` source files with digest
+  `947c3ccae50026f8c1a754b2700a1f996c0afd63bee268366c439a1d966bc8f6`
+  at source revision `68f2993a71a5d97374316165086d437c733610fd`, analyzer SHA-256
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`,
+  and calibration receipt SHA-256
+  `ad38ca1c441351df880ed169635507b43cfd0e8f9e07e576a4bd0dc22cec8341`.
+  The 633-entry manifest SHA-256 is
+  `c285ea2e143f47e3feef2c13b247ffed91881cb7f79e4a77e80c99808fa6ef2e`;
+  the generated baseline SHA-256 is
+  `0504d0f8b199c118fc835ae5dd315e1da971260aa2faa5be0ccde64fe0e589de`.
+- Worst-case calibration wall/CPU/RSS values are `6110 ms / 5260 ms /
+  88336 KiB` for the amplified unit workload, `209790 ms / 208620 ms /
+  1305108 KiB` for the real repository, and `31040 ms / 30900 ms /
+  371044 KiB` for the release candidate. Pinned-container verification accepts
+  the retained calibration and baseline authority. The establishment wrapper
+  also accepted this newly generated baseline, but it intentionally reuses the
+  calibration raw set and is not represented as an independent confirmation.
+- Refreshed the retained frontend/CFG stress matrix at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64` from the same
+  immutable `62a8b30` source and analyzer. All nine cases completed both
+  repetitions in `741 ms` with zero timeout or crash; the stress-specific
+  source inventory binds `387` files at digest
+  `e337f9f05b4c4270bdd65d149af9d2cfb6e3a6fd811e2032fe40f3fc5a78041e`.
+  The accepted receipt SHA-256 is
+  `91d4c759131aa963e0e7734e41935487cd8da16b4856ac289e9d3b064a69713d`
+  and the 37-entry retained manifest SHA-256 is
+  `0f598f8077e45e569df0775825c25ca74b67370a70eb5965c7b665300b9a78d0`;
+  pinned-container receipt verification and the six stress contract tests pass.
+- Focused local contracts pass `46/46` qualification, `4/4` workflow, `6/6`
+  stress, and `52/52` status-automation tests. An exact-source LLVM 20 rebuild
+  reaches `ninja: no work to do`; its direct suite passes `1280/1280`, and
+  CTest passes `1299/1299` with no CTest-level skip or failure. The nested
+  sanitizer and fuzz contract runners report seven expected local skips
+  because their separate retained build directories were not mounted into
+  this normal-build container. The direct and CTest log SHA-256 values are
+  `e78ec474536ef1b8eb228030652761b10ff03a949e3661c13cda575eb9ee07ba`
+  and `9bc29a5db4effe461cb2d7369e37a37e406e6dd34080519da8d954668a644c35`.
+  A separate fresh `3 × 10` confirmation and its independent final review,
+  publication, and exact-head hosted CI remain required. This checkpoint does
+  not close `CS-P10-07` and does not write or merge protected `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,

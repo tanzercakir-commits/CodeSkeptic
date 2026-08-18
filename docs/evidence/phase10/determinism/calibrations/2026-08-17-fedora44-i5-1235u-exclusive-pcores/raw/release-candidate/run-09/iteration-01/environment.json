@@ -1,0 +1,325 @@
+{
+  "after": {
+    "cpu": {
+      "affinity_busy_ticks": 322919,
+      "clock_ticks_per_second": 100,
+      "host_busy_ticks": 450679,
+      "host_logical_cpus": 12
+    },
+    "cpufreq": [
+      {
+        "cpu": 0,
+        "current_khz": 400000,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 1,
+        "current_khz": 400000,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 2,
+        "current_khz": 400000,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 3,
+        "current_khz": 461726,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      }
+    ],
+    "global_pressure": {
+      "cpu": {
+        "full_total_us": 0,
+        "some_total_us": 89064768
+      },
+      "io": {
+        "full_total_us": 13426363,
+        "some_total_us": 13810903
+      },
+      "memory": {
+        "full_total_us": 64,
+        "some_total_us": 116
+      }
+    },
+    "measurement_cgroup": {
+      "ancestor_uclamp_max": [
+        1024
+      ],
+      "controller_cpu_affinity": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "cpu_usage_us": 2194863258,
+      "effective_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "exclusive_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frozen": 0,
+      "memory_oom": 0,
+      "memory_oom_group_kill": 0,
+      "memory_oom_kill": 0,
+      "mode": "exclusive-cgroup-v2",
+      "nr_throttled": 0,
+      "partition": "isolated",
+      "populated": 0,
+      "pressure": {
+        "cpu": {
+          "full_total_us": 268692,
+          "some_total_us": 75556367
+        },
+        "io": {
+          "full_total_us": 168354,
+          "some_total_us": 174633
+        },
+        "memory": {
+          "full_total_us": 0,
+          "some_total_us": 0
+        }
+      },
+      "throttled_us": 0,
+      "uclamp_max": 1024,
+      "uclamp_min": 1024
+    },
+    "system_uclamp": {
+      "maximum_limit": 1024,
+      "minimum_limit": 1024
+    },
+    "thermal": [
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 0,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 1,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 2,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 3,
+        "package_count": 0,
+        "package_total_ms": 0
+      }
+    ]
+  },
+  "before": {
+    "cpu": {
+      "affinity_busy_ticks": 319823,
+      "clock_ticks_per_second": 100,
+      "host_busy_ticks": 447549,
+      "host_logical_cpus": 12
+    },
+    "cpufreq": [
+      {
+        "cpu": 0,
+        "current_khz": 1633417,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 1,
+        "current_khz": 789952,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 2,
+        "current_khz": 628652,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      },
+      {
+        "cpu": 3,
+        "current_khz": 400000,
+        "driver": "intel_pstate",
+        "governor": "powersave",
+        "maximum_khz": 4400000,
+        "minimum_khz": 400000
+      }
+    ],
+    "global_pressure": {
+      "cpu": {
+        "full_total_us": 0,
+        "some_total_us": 88354574
+      },
+      "io": {
+        "full_total_us": 13426346,
+        "some_total_us": 13810887
+      },
+      "memory": {
+        "full_total_us": 64,
+        "some_total_us": 116
+      }
+    },
+    "measurement_cgroup": {
+      "ancestor_uclamp_max": [
+        1024
+      ],
+      "controller_cpu_affinity": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "cpu_usage_us": 2164022425,
+      "effective_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "exclusive_cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "frozen": 0,
+      "memory_oom": 0,
+      "memory_oom_group_kill": 0,
+      "memory_oom_kill": 0,
+      "mode": "exclusive-cgroup-v2",
+      "nr_throttled": 0,
+      "partition": "isolated",
+      "populated": 0,
+      "pressure": {
+        "cpu": {
+          "full_total_us": 267834,
+          "some_total_us": 74841577
+        },
+        "io": {
+          "full_total_us": 168354,
+          "some_total_us": 174633
+        },
+        "memory": {
+          "full_total_us": 0,
+          "some_total_us": 0
+        }
+      },
+      "throttled_us": 0,
+      "uclamp_max": 1024,
+      "uclamp_min": 1024
+    },
+    "system_uclamp": {
+      "maximum_limit": 1024,
+      "minimum_limit": 1024
+    },
+    "thermal": [
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 0,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 1,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 2,
+        "package_count": 0,
+        "package_total_ms": 0
+      },
+      {
+        "core_count": 0,
+        "core_total_ms": 0,
+        "cpu": 3,
+        "package_count": 0,
+        "package_total_ms": 0
+      }
+    ]
+  },
+  "decision": {
+    "metrics": {
+      "affinity_busy_ms": 30960,
+      "affinity_external_cpu_basis_points": 10,
+      "affinity_external_cpu_ms": 120,
+      "cgroup_cpu_full_basis_points": 1,
+      "cgroup_cpu_some_basis_points": 231,
+      "cgroup_io_full_basis_points": 0,
+      "cgroup_io_some_basis_points": 0,
+      "cgroup_memory_full_basis_points": 0,
+      "cgroup_memory_oom_delta": 0,
+      "cgroup_memory_oom_group_kill_delta": 0,
+      "cgroup_memory_oom_kill_delta": 0,
+      "cgroup_memory_some_basis_points": 0,
+      "cgroup_nr_throttled_delta": 0,
+      "cgroup_owned_cpu_ms": 30840,
+      "cgroup_throttled_us_delta": 0,
+      "global_cpu_full_basis_points": 0,
+      "global_cpu_some_basis_points": 230,
+      "global_io_full_basis_points": 1,
+      "global_io_some_basis_points": 1,
+      "global_memory_full_basis_points": 0,
+      "global_memory_some_basis_points": 0,
+      "host_busy_ms": 31300,
+      "host_external_cpu_basis_points": 13,
+      "host_external_cpu_ms": 460,
+      "system_uclamp_max_limit": 1024,
+      "system_uclamp_min_limit": 1024,
+      "thermal_throttle_count": 0,
+      "thermal_throttle_ms": 0
+    },
+    "valid": true,
+    "violations": []
+  },
+  "schema": "codeskeptic-determinism-environment-v2",
+  "scope": "inner-record-only",
+  "wall_ms": 30970
+}

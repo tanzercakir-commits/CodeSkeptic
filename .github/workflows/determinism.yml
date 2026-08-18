@@ -1,0 +1,202 @@
+name: Determinism qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Protected/base revision that owns the pinned baseline
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: determinism-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      WORKLOAD_MANIFEST: scripts/determinism_workloads.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install LLVM 20 and qualification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
+            clang-20 cmake ninja-build time
+
+      - name: Build exact-head release analyzer
+        env:
+          CODESKEPTIC_VERSION_OVERRIDE: 0.4.9-dev
+        run: |
+          CC=/usr/bin/clang-20 CXX=/usr/bin/clang++-20 \
+            /usr/bin/cmake -S . -B build-determinism -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=/usr/lib/llvm-20 \
+            -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCODESKEPTIC_BUILD_TESTS=OFF
+          /usr/bin/cmake --build build-determinism --parallel 2
+
+      - name: Materialize protected-base performance authority
+        id: baseline
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_ref }}
+          PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
+          BASELINE_ROOT: ${{ runner.temp }}/pinned-base-worktree
+        run: |
+          git worktree add --detach "$BASELINE_ROOT" "$BASELINE_SHA"
+          if test -f "$BASELINE_ROOT/scripts/determinism_baseline.json"; then
+            if ! test -f scripts/determinism_baseline.json; then
+              echo "Candidate deletes the protected baseline authority." >&2
+              exit 2
+            fi
+            if ! cmp -s scripts/determinism_baseline.json \
+                  "$BASELINE_ROOT/scripts/determinism_baseline.json"; then
+              python3 scripts/run_determinism_qualification.py \
+                --manifest scripts/determinism_workloads.json \
+                --baseline scripts/determinism_baseline.json \
+                --repo-root "$GITHUB_WORKSPACE" \
+                --base-revision "$BASELINE_SHA" \
+                --verify-baseline-promotion
+              cp scripts/determinism_baseline.json "$PINNED_BASELINE"
+              echo "authority_root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
+              echo "origin=head-promotion" >> "$GITHUB_OUTPUT"
+            else
+              cp "$BASELINE_ROOT/scripts/determinism_baseline.json" "$PINNED_BASELINE"
+              python3 scripts/run_determinism_qualification.py \
+                --manifest "$BASELINE_ROOT/scripts/determinism_workloads.json" \
+                --baseline "$BASELINE_ROOT/scripts/determinism_baseline.json" \
+                --baseline-authority-root "$BASELINE_ROOT" \
+                --verify-baseline-authority
+              python3 scripts/run_determinism_qualification.py \
+                --manifest scripts/determinism_workloads.json \
+                --baseline scripts/determinism_baseline.json \
+                --baseline-authority-root "$GITHUB_WORKSPACE" \
+                --verify-baseline-authority
+              echo "authority_root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
+              echo "origin=protected-base" >> "$GITHUB_OUTPUT"
+            fi
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          elif test -f scripts/determinism_baseline.json; then
+            python3 scripts/run_determinism_qualification.py \
+              --manifest scripts/determinism_workloads.json \
+              --baseline scripts/determinism_baseline.json \
+              --repo-root "$GITHUB_WORKSPACE" \
+              --base-revision "$BASELINE_SHA" \
+              --verify-bootstrap-promotion
+            cp scripts/determinism_baseline.json "$PINNED_BASELINE"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "authority_root=$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
+            echo "origin=head-bootstrap" >> "$GITHUB_OUTPUT"
+          else
+            rm -f "$PINNED_BASELINE"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "origin=absent" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Qualify unit, real-repository, and llama-cpp release-candidate workloads
+        env:
+          PINNED_BASELINE: ${{ runner.temp }}/pinned-base-determinism-baseline.json
+        run: |
+          if test "${{ steps.baseline.outputs.available }}" != true; then
+            mkdir -p determinism-evidence
+            printf '%s\n' \
+              'Protected determinism baseline is absent. Shared GitHub runners cannot establish or promote performance authority.' \
+              > determinism-evidence/hosted-preflight.txt
+            exit 2
+          fi
+          python3 scripts/run_determinism_qualification.py \
+            --manifest "$WORKLOAD_MANIFEST" \
+            --baseline "$PINNED_BASELINE" \
+            --baseline-authority-root \
+              "${{ steps.baseline.outputs.authority_root }}" \
+            --binary build-determinism/src/codeskeptic \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --build-path build-determinism \
+            --revision "$QUALIFICATION_SHA" \
+            --output determinism-evidence \
+            --hardware-class github-ubuntu-24.04-x64 \
+            --performance-policy record-only \
+            --repetitions 10 \
+            --clang /usr/bin/clang-20 \
+            --c-compiler /usr/bin/clang-20 \
+            --cxx-compiler /usr/bin/clang++-20 \
+            --cmake /usr/bin/cmake \
+            --ninja /usr/bin/ninja \
+            --time-binary /usr/bin/time \
+            --prepare-release-candidate \
+            --release-workspace "$RUNNER_TEMP/determinism-release" \
+            --jobs 2
+          python3 scripts/run_determinism_qualification.py \
+            --manifest "$WORKLOAD_MANIFEST" \
+            --baseline "$PINNED_BASELINE" \
+            --baseline-authority-root \
+              "${{ steps.baseline.outputs.authority_root }}" \
+            --verify-receipt determinism-evidence
+
+      - name: Publish qualification summary
+        if: always()
+        run: |
+          if test -f determinism-evidence/receipt.json; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("determinism-evidence/receipt.json").read_text())
+          print("## Determinism qualification")
+          print()
+          print(f"Status: **{receipt['status'].upper()}**")
+          print(f"Hardware class: `{receipt['host']['class_id']}`")
+          if receipt["status"] == "rejected":
+              print()
+              print(f"Decision: `{receipt['decision']['classification']}`")
+              print()
+              print("Failures:")
+              for failure in receipt["decision"]["failures"]:
+                  print(f"- `{failure['type']}`: {failure['message']}")
+              observations = receipt["observations"]
+              print(
+                  "Complete measured observations: "
+                  f"`{str(observations['complete']).lower()}`"
+              )
+              print(f"Retained raw artifacts: {len(receipt['artifacts'])}")
+              raise SystemExit(0)
+          print()
+          print("| Workload | Runs | Semantic SHA-256 | Wall median / p90 | CPU median / p90 | RSS peak |")
+          print("|---|---:|---|---:|---:|---:|")
+          for workload in receipt["workloads"]:
+              stats = workload["statistics"]
+              print(
+                  f"| `{workload['id']}` | {len(workload['runs'])} | "
+                  f"`{workload['semantic_sha256']}` | "
+                  f"{stats['wall_ms']['median']} / {stats['wall_ms']['p90']} ms | "
+                  f"{stats['cpu_ms']['median']} / {stats['cpu_ms']['p90']} ms | "
+                  f"{stats['peak_rss_kib']['max']} KiB |"
+              )
+          PY
+          else
+            printf '## Determinism qualification\n\nNo accepted receipt was produced.\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload raw checksummed qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: determinism-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            determinism-evidence
+          if-no-files-found: error
+          retention-days: 30

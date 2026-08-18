@@ -165,6 +165,12 @@ if(NOT WIN32)
     add_test(NAME MeasurementWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/MeasurementWorkflowTest.py)
+    add_test(NAME DeterminismQualificationContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismQualificationTest.py)
+    add_test(NAME DeterminismWorkflowContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismWorkflowTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)
