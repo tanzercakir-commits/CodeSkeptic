@@ -1,0 +1,78 @@
+Test project /Users/runner/work/CodeSkeptic/CodeSkeptic/build
+    Start 1297: DeterminismQualificationContract
+1/1 Test #1297: DeterminismQualificationContract ...***Failed   12.46 sec
+......E...E...........................E.......
+======================================================================
+ERROR: test_cgroup_counters_are_recomputed_and_fail_closed (__main__.DeterminismQualificationTest.test_cgroup_counters_are_recomputed_and_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1063, in test_cgroup_counters_are_recomputed_and_fail_closed
+    with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+                                                     ~~~~~~~~~~~~~~~~~^
+        qualification.os, "sched_getaffinity", return_value={2, 3}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1510, in __enter__
+    original, local = self.get_original()
+                      ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1480, in get_original
+    raise AttributeError(
+        "%s does not have the attribute %r" % (target, name)
+    )
+AttributeError: <module 'os' (frozen)> does not have the attribute 'sched_getaffinity'
+
+======================================================================
+ERROR: test_environment_capture_is_exact_and_rejects_authority_escape (__main__.DeterminismQualificationTest.test_environment_capture_is_exact_and_rejects_authority_escape)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1772, in test_environment_capture_is_exact_and_rejects_authority_escape
+    with mock.patch.object(
+         ~~~~~~~~~~~~~~~~~^
+        qualification.os, "sched_getaffinity", return_value={1}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1510, in __enter__
+    original, local = self.get_original()
+                      ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1480, in get_original
+    raise AttributeError(
+        "%s does not have the attribute %r" % (target, name)
+    )
+AttributeError: <module 'os' (frozen)> does not have the attribute 'sched_getaffinity'
+
+======================================================================
+ERROR: test_run_once_executes_and_binds_every_pinned_inner_measurement (__main__.DeterminismQualificationTest.test_run_once_executes_and_binds_every_pinned_inner_measurement)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1860, in test_run_once_executes_and_binds_every_pinned_inner_measurement
+    with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+                                                     ~~~~~~~~~~~~~~~~~^
+        qualification.os, "sched_getaffinity", return_value={2, 3}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ), mock.patch.object(
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1510, in __enter__
+    original, local = self.get_original()
+                      ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1480, in get_original
+    raise AttributeError(
+        "%s does not have the attribute %r" % (target, name)
+    )
+AttributeError: <module 'os' (frozen)> does not have the attribute 'sched_getaffinity'
+
+----------------------------------------------------------------------
+Ran 46 tests in 12.322s
+
+FAILED (errors=3)
+DETERMINISM_REJECTED_EVIDENCE_OK mode=verify
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =  12.48 sec
+
+The following tests FAILED:
+	1297 - DeterminismQualificationContract (Failed)
+Errors while running CTest
