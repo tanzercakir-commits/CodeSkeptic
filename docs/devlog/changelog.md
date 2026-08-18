@@ -1,5 +1,49 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-18 — Phase 10.7 deterministic performance authority (in progress)
+
+- Rebuilt the determinism authority as a coordinated V6 contract. Required
+  performance runs use an exact cgroup-v2 isolated and exclusive CPU
+  partition, disjoint controller CPUs, pinned effective and ancestor uclamp,
+  system uclamp limits, cgroup-owned CPU accounting, bounded idle preflight,
+  throttle/OOM/thermal checks, and checksummed raw environment evidence.
+  Global runtime pressure remains observable without being misclassified as
+  external workload interference; the predeclared idle gate remains
+  fail-closed. Unit measurements retain ten outer repetitions and ten inner
+  invocations per repetition, while repository and release-candidate workloads
+  retain ten independent outer repetitions.
+- Made the affinity contract tests portable to hosted macOS. Four mocks now
+  explicitly create `os.sched_getaffinity` when that Linux-only attribute is
+  absent, preserving production strictness while exercising the same
+  deterministic test seam on Darwin. The frozen source authority is
+  `299c1aaf0c5e2d985d5e045f25d6b417ab4af3be`; its 386-file source manifest is
+  `06916e422e141187b1dbe78aedcb6b9a38e4a337a80d842fcf6910125c8763b2`.
+- Established the initial V6 baseline on the dedicated exclusive P-core
+  profile `fedora44-i5-1235u-exclusive-pcores-0-3`. All three workloads passed
+  ten repetitions; the unit workload additionally bound ten inner
+  measurements per repetition. The 44-minute campaign retained 631 raw
+  artifacts, 120 measured invocations, and 151 valid environment decisions.
+  Its calibration receipt SHA-256 is
+  `f836729558e8f5e91b05fed7412561ecff29470d6f8064867797404916160a8c`,
+  the 634-file evidence tree's 633-entry manifest SHA-256 is
+  `ee87c1a600974cd10f6f6f2d10f33b4eb1d4920d689bfba26cfcff413336dd53`,
+  and the baseline SHA-256 is
+  `045e5a6d446c582048b36161ce7c9728dbe108a6643f0e2a8737dfa6c3ba0bfd`.
+  Pinned no-network verification and an independent raw-recomputation audit
+  both passed; GUI, network, unit masks, cgroup state, and the Podman pause
+  process were restored and independently checked after the run.
+- Refreshed the exact-source frontend stress replay at
+  `docs/evidence/phase10/stress/2026-08-15-cache-linux-x86_64`: all nine cases
+  passed two deterministic repetitions in 769 ms with zero timeout or crash.
+  Its receipt SHA-256 is
+  `2b7739b5f20bc0aa0e5e91ecf12d31d66026079c7575365514cd88875d99828a`,
+  and its 37-entry manifest SHA-256 is
+  `02fa3dc87f6f106316ffeeebd63b41b144d2f5c9049ef9fff390181b40b8bc3e`.
+- This checkpoint does not close Phase 10.7. A separately executed 3×10
+  confirmation, exact-source full tests, final independent evidence audit, and
+  exact-head hosted CI remain mandatory; calibration and establishment views
+  over the same raw bytes are not counted as independent campaigns.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
