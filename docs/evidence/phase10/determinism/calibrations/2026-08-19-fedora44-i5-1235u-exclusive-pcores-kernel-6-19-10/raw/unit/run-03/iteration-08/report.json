@@ -1,0 +1,206 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "findings",
+  "complete": true,
+  "exit_code": 1,
+  "coverage": { "attempted_tus": 24, "analyzed_tus": 24, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 11, "blocking": 11, "report_only": 0 },
+  "translation_units": [
+    { "path": "/work/tests/thesis_corpus/alloc_fill.c", "compile_command_sha256": "a2a2033f34746ec57afbf289a62edb6fa3f6f2aa5d25059facb6b7c204eb27dd", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 85656, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/array_from_int.c", "compile_command_sha256": "3739ab392e3d8f15108502233410e80f847d732052afa5af77b0f35ca4d0c1b9", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 85124, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/avg_input.c", "compile_command_sha256": "b7349ee582311c48155b25131ae6a860d8b74c9e0e5430467caa72426e81474e", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 82472, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/cmd_args.c", "compile_command_sha256": "9cea90d46946fe2237c397c8b825b61401145247a5422c8b3f7296735d5317bb", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 23, "peak_memory_kib": 83492, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/concat_heap.c", "compile_command_sha256": "48d7a29497e7e76fa41a7b9e00bec258102d9f3bb9a917a2d332e0095a9a2c11", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 28, "peak_memory_kib": 86452, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/config_parse.c", "compile_command_sha256": "c8ad7e8224579558611711dd8a5e65f93758c07729009410933966ecbd4d89d6", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 23, "peak_memory_kib": 83340, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/csv_count.c", "compile_command_sha256": "630f049aa5a46a74dc9b58619010a0fbfcee35f48c99741e17cc7a7f194671f9", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 82884, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/dyn_buffer.c", "compile_command_sha256": "df714575e51b46f6e8c751ece43dd3ff8edada29d54b6ee696e16484bf498716", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 85616, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/format_bytes.c", "compile_command_sha256": "83810c397f822980b05678eb1853ed129eb25c08f248893190c82526128e0e94", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 83384, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/int_vector.c", "compile_command_sha256": "a96bf4e0cfcb6eb6bb0d89124af3e288a267bb5611e1b0b59c137e7a08425d62", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 85412, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/length_prefix.c", "compile_command_sha256": "1c17408030ebf278b9e693cc260902fc2dc4503a1d7ae7cc4ab8dd538c262e06", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 85416, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/list_builder.c", "compile_command_sha256": "10e5a0ba212c692eed07f8a2af84020da03a279b5b36b0a78681e5f2189af084", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 27, "peak_memory_kib": 85760, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/matrix_row_copy.c", "compile_command_sha256": "62aae84bb5d430a66e483ea8554a6c299f26a00670f012f3870d92e7a130bde2", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 29, "peak_memory_kib": 85740, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/mem_pool.c", "compile_command_sha256": "591c3ecf9a9259a93ae456521be68fc8d3aa047bb00a8ef5304b18d7f43f0454", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 28, "peak_memory_kib": 86068, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/pixel_buffer.c", "compile_command_sha256": "6985d028c5b0d3500902f713740cf2d7fd86a374faff3249a31f3829e5c3a472", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 27, "peak_memory_kib": 85200, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/port_parse.c", "compile_command_sha256": "2b6b23953236902ccf155af6bbc5c6757fffcc187e754632e90ef605ef5d5106", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 27, "peak_memory_kib": 85232, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/ring_buffer.c", "compile_command_sha256": "247c69c1631f3b6c133bfdaed5bf2e286fe1671eeddfd969e85165f3b8349d57", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 82608, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/running_product.c", "compile_command_sha256": "eaf532107ef6306c077c22cbbfa73f699a4052e395f4e040cc48ceb06d63ba8b", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 26, "peak_memory_kib": 84632, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/scale_numbers.c", "compile_command_sha256": "c3f404e1bc28fd99b5418efa20c399b6a5ca38581364791a9929617218e6a642", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 27, "peak_memory_kib": 85800, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/simple_hash.c", "compile_command_sha256": "5943a68b330a4429bf1da1ffef571d4b764a59a27f12e2e4097c6d7bf6f585eb", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 22, "peak_memory_kib": 83532, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/strdup_manual.c", "compile_command_sha256": "8cff1251adf38be201a03199b164f80243de615149dea386b29449b8334a6f17", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 29, "peak_memory_kib": 85376, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/temp_convert.c", "compile_command_sha256": "82096f674396583c009561945e5baa9f954927ae1b9075d3ac635e91af70a229", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 82392, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/tiny_stack.c", "compile_command_sha256": "94e8d543257190ae687686948c1fc67bbc0c9ed7f22f6fc54d0f954991d1541c", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 82980, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/work/tests/thesis_corpus/tokenize.c", "compile_command_sha256": "321abe983277e7ce9b8bac70e5e98dafccbdbb1a7692cb3e4f9a4263b0fe30c4", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 23, "peak_memory_kib": 83280, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 11,
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-c2c07114ff120bbf",
+      "file": "/work/tests/thesis_corpus/alloc_fill.c",
+      "line": 16,
+      "column": 16,
+      "function": "main",
+      "message": "Possible null dereference: 'arr' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/alloc_fill.c", "line": 10, "column": 5, "message": "'arr' assigned a possibly-null value here (callee may return null)" },
+        { "file": "/work/tests/thesis_corpus/alloc_fill.c", "line": 12, "column": 9, "message": "'arr' is also dereferenced here (same origin)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-a9847223de9eb5a6",
+      "file": "/work/tests/thesis_corpus/dyn_buffer.c",
+      "line": 19,
+      "column": 5,
+      "function": "main",
+      "message": "Possible null dereference: 'buf' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/dyn_buffer.c", "line": 8, "column": 5, "message": "'buf' assigned a possibly-null value here (callee may return null)" },
+        { "file": "/work/tests/thesis_corpus/dyn_buffer.c", "line": 16, "column": 9, "message": "'buf' is also dereferenced here (same origin)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-59ea71cf5fce9208",
+      "file": "/work/tests/thesis_corpus/int_vector.c",
+      "line": 18,
+      "column": 23,
+      "function": "main",
+      "message": "Possible null dereference: 'v' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/int_vector.c", "line": 6, "column": 5, "message": "'v' assigned a possibly-null value here (callee may return null)" },
+        { "file": "/work/tests/thesis_corpus/int_vector.c", "line": 14, "column": 9, "message": "'v' is also dereferenced here (same origin)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-7966325fd7fb8a6c",
+      "file": "/work/tests/thesis_corpus/list_builder.c",
+      "line": 10,
+      "column": 9,
+      "function": "build",
+      "message": "Possible null dereference: 'node' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/list_builder.c", "line": 11, "column": 9, "message": "'node' is also dereferenced here (same origin)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-31ddcf8d461a4a0b",
+      "file": "/work/tests/thesis_corpus/list_builder.c",
+      "line": 15,
+      "column": 13,
+      "function": "build",
+      "message": "Possible null dereference: 'tail' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/list_builder.c", "line": 7, "column": 25, "message": "'tail' assigned null here" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-e9fda5cbd1333b05",
+      "file": "/work/tests/thesis_corpus/matrix_row_copy.c",
+      "line": 10,
+      "column": 9,
+      "function": "main",
+      "message": "Possible null dereference: 'm' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/matrix_row_copy.c", "line": 8, "column": 5, "message": "'m' assigned a possibly-null value here (callee may return null)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-664bb9214af5f067",
+      "file": "/work/tests/thesis_corpus/matrix_row_copy.c",
+      "line": 17,
+      "column": 23,
+      "function": "main",
+      "message": "Possible null dereference: 'row' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/matrix_row_copy.c", "line": 13, "column": 5, "message": "'row' assigned a possibly-null value here (callee may return null)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-190de9564b23f386",
+      "file": "/work/tests/thesis_corpus/mem_pool.c",
+      "line": 25,
+      "column": 5,
+      "function": "main",
+      "message": "Possible null dereference: 'a' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/mem_pool.c", "line": 24, "column": 5, "message": "'a' assigned a possibly-null value here (callee may return null)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "int-overflow",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-628f92be234061ce",
+      "file": "/work/tests/thesis_corpus/pixel_buffer.c",
+      "line": 11,
+      "column": 39,
+      "function": "main",
+      "message": "possible integer overflow: this multiplication can exceed 'int'",
+      "notes": []
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-68669d3cb8bd90d0",
+      "file": "/work/tests/thesis_corpus/scale_numbers.c",
+      "line": 17,
+      "column": 24,
+      "function": "main",
+      "message": "Possible null dereference: 'nums' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/scale_numbers.c", "line": 10, "column": 5, "message": "'nums' assigned a possibly-null value here (callee may return null)" },
+        { "file": "/work/tests/thesis_corpus/scale_numbers.c", "line": 12, "column": 22, "message": "'nums' is also dereferenced here (same origin)" }
+      ]
+    },
+    {
+      "severity": "warning",
+      "rule_id": "null-deref",
+      "capability_tier": "supported",
+      "blocks_verdict": true,
+      "fingerprint": "csf1-c5651f322e8a1ffb",
+      "file": "/work/tests/thesis_corpus/strdup_manual.c",
+      "line": 10,
+      "column": 5,
+      "function": "my_strdup",
+      "message": "Possible null dereference: 'copy' may be null on some paths",
+      "notes": [
+        { "file": "/work/tests/thesis_corpus/strdup_manual.c", "line": 7, "column": 5, "message": "'copy' assigned a possibly-null value here (callee may return null)" },
+        { "file": "/work/tests/thesis_corpus/strdup_manual.c", "line": 9, "column": 9, "message": "'copy' is also dereferenced here (same origin)" }
+      ]
+    }
+  ]
+}

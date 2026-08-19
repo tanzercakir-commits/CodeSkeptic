@@ -1,5 +1,57 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-19 — Phase 10.7 kernel-bound determinism authority (in progress)
+
+- Advanced the determinism authority to coordinated V7 schemas that bind the
+  exact operating-system kernel, retain the failure-causing batch environment,
+  and reject earlier V6/V5 authority formats instead of silently interpreting
+  them under the new contract. The performance authority requires an exclusive
+  cgroup-v2 P-core partition, disjoint controller CPUs, exact effective and
+  exclusive cpusets, local/ancestor/system uclamp `1024`, recursive empty and
+  unfrozen cgroup state, cgroup-owned CPU accounting, thermal/throttle/OOM
+  counters, and a checksummed fixed idle preflight. Runtime global pressure is
+  retained as observation; predeclared idle gates remain fail-closed.
+- Established the initial kernel-bound profile
+  `fedora44-i5-1235u-exclusive-pcores-0-3` on
+  `Linux 6.19.10-300.fc44.x86_64`, using measurement CPUs `0-3` and controller
+  CPUs `4-11`. The bound source is revision
+  `4bd5e0bc8bafac6ac1b000e4107b3c6cfee11cdf`, with `386` files and source
+  manifest SHA-256
+  `1e1b565ef7637231bdc366eca64bd3bd8326ee25eaeca332be785fc3f451aa46`;
+  the analyzer SHA-256 is
+  `2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562`.
+- The retained calibration at
+  `docs/evidence/phase10/determinism/calibrations/2026-08-19-fedora44-i5-1235u-exclusive-pcores-kernel-6-19-10`
+  contains a 634-file evidence tree with a self-excluded 633-entry manifest.
+  Its receipt SHA-256 is
+  `6d616524b39696c1bd574ba021f6ea890c08c2def7e6f0210a4d77b1ed5d2b01`,
+  its manifest SHA-256 is
+  `34289524bcd07de5fd81f96b407d7849b2ebe615737d1ba06f88f84b5fbb699a`,
+  and the generated V7 baseline SHA-256 is
+  `5b8517de98074944b055949c0d17ade4525522a65b174ca359f1853ebe36b7b6`.
+  All three workloads completed ten outer repetitions; the unit workload also
+  retained ten inner invocations per repetition, for 120 measured invocations
+  and 631 raw artifacts. Median wall/CPU/RSS values were
+  `6040 ms / 5230 ms / 88138 KiB` for unit,
+  `209215 ms / 208030 ms / 1304776 KiB` for the real repository, and
+  `30925 ms / 30785 ms / 370686 KiB` for the release candidate.
+- Every retained inner and batch environment decision is valid, with no
+  violations, thermal-throttle delta, cgroup throttling, or OOM event. The
+  same-run establishment receipt passed semantic and performance gates with no
+  regression, and independent pinned-image, no-network verification recomputed
+  the calibration, baseline provenance, accepted receipt, workload statistics,
+  and artifact inventory. That establishment is a self-check over the
+  calibration samples, not the still-required independent confirmation.
+- The headless controller restored the network, unit states, process affinity,
+  masks, and cgroup authority with payload exit `0`. A later interactive sudo
+  prompt timed out while reopening the graphical target; the graphical session
+  was restored separately after all measurements and therefore does not affect
+  the calibration authority. The confirmation operator must harden this final
+  credential/GUI handoff before use. Independent confirmation, refreshed stress
+  evidence, full regression suites, exact-head hosted CI, and final independent
+  audit remain required; this checkpoint does not close `CS-P10-07` or write
+  protected `main`.
+
 ## 2026-08-15 — Phase 10.6 cache correctness and resume checkpoint (in progress)
 
 - Replaced the legacy timestamp/size AST shortcut with a parent-owned,
