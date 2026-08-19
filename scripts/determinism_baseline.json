@@ -1,0 +1,199 @@
+{
+  "manifest_sha256": "90cd7f03db2c50b851f4900ab628057a524045372d19c103258785b0d7861ac4",
+  "performance_regression_limit_percent": 10,
+  "profiles": {
+    "fedora44-i5-1235u-exclusive-pcores-0-3": {
+      "hardware": {
+        "architecture": "x86_64",
+        "controller_cpu_affinity": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "cpu_affinity": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "cpu_affinity_source": "cgroup-v2-exclusive",
+        "cpu_model": "12th Gen Intel(R) Core(TM) i5-1235U",
+        "cpu_uclamp_ancestor_max": [
+          1024
+        ],
+        "cpu_uclamp_max": 1024,
+        "cpu_uclamp_min": 1024,
+        "cpu_uclamp_source": "cgroup-v2",
+        "host_logical_cpus": 12,
+        "logical_cpus": 4,
+        "measurement_cgroup_frozen": 0,
+        "measurement_cgroup_populated": 0,
+        "measurement_environment": "exclusive-cgroup-v2",
+        "memory_bytes": 16425545728,
+        "system_uclamp_max_limit": 1024,
+        "system_uclamp_min_limit": 1024
+      },
+      "provenance": {
+        "calibration": {
+          "evidence_path": "docs/evidence/phase10/determinism/calibrations/2026-08-17-fedora44-i5-1235u-exclusive-pcores",
+          "receipt_sha256": "f836729558e8f5e91b05fed7412561ecff29470d6f8064867797404916160a8c"
+        },
+        "promotion": {
+          "previous_baseline_sha256": null,
+          "previous_profile_sha256": null,
+          "reason": "Initial V6 authority on a dedicated exclusive P-core partition"
+        },
+        "source_revision": "299c1aaf0c5e2d985d5e045f25d6b417ab4af3be",
+        "toolchain": {
+          "analyzer": {
+            "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+            "version": "CodeSkeptic 0.4.9-dev"
+          },
+          "c_compiler": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "clang": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "cmake": {
+            "sha256": "1c5227af4edd22d8d689def545e18ee458260c0fd579eba2187967f38817e638",
+            "version": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+          },
+          "cxx_compiler": {
+            "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+            "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+          },
+          "gnu_time": {
+            "sha256": "3b11dec50514a8473e9f6efa7a34d584d0657538c09988f61b72d38ad4991a10",
+            "version": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon."
+          },
+          "ninja": {
+            "sha256": "5965527e09fe2b3787772aa4f711d6a36b393e7f2fcaa744a7a96c5a4ddf59cb",
+            "version": "1.11.1"
+          },
+          "python": {
+            "sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+            "version": "Python 3.12.3"
+          }
+        }
+      },
+      "workloads": {
+        "real-repository": {
+          "input_identity_sha256": "5c5e44e428f968847e5f26fa319153d981e7cc71b6b20248a3678b1dbe4ac576",
+          "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 209000,
+              "median": 208675,
+              "min": 204280,
+              "p90": 208980
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 1305132,
+              "median": 1304836,
+              "min": 1304140,
+              "p90": 1304940
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 210200,
+              "median": 209850,
+              "min": 205380,
+              "p90": 210160
+            }
+          },
+          "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
+          "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
+        },
+        "release-candidate": {
+          "input_identity_sha256": "e5fb998aea7532e69f1dfc84ebe360ee5a6519b940f1e12cd8e9b7796be5574b",
+          "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 31360,
+              "median": 30905,
+              "min": 30770,
+              "p90": 30970
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 371244,
+              "median": 370784,
+              "min": 370272,
+              "p90": 371072
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 31490,
+              "median": 31040,
+              "min": 30900,
+              "p90": 31110
+            }
+          },
+          "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
+          "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
+        },
+        "unit": {
+          "input_identity_sha256": "d52ec53c1dc859d1c5f9ef9beda2748002f020215d65608d888e862485aa55b7",
+          "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54",
+          "statistics": {
+            "cpu_ms": {
+              "count": 10,
+              "max": 5270,
+              "median": 5215,
+              "min": 5030,
+              "p90": 5260
+            },
+            "peak_rss_kib": {
+              "count": 10,
+              "max": 88348,
+              "median": 88230,
+              "min": 88068,
+              "p90": 88332
+            },
+            "wall_ms": {
+              "count": 10,
+              "max": 6110,
+              "median": 6055,
+              "min": 5910,
+              "p90": 6100
+            }
+          },
+          "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
+          "translation_unit_sha256": "ff8299a13a3e0291ede210f1b3c9a523484a41359f93834a719351244647f241"
+        }
+      }
+    }
+  },
+  "schema": "codeskeptic-determinism-baseline-v6",
+  "semantic_reference": {
+    "real-repository": {
+      "input_identity_sha256": "5c5e44e428f968847e5f26fa319153d981e7cc71b6b20248a3678b1dbe4ac576",
+      "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e",
+      "translation_unit_plan_sha256": "db0e34e377772a3b30158bc817016a2aaca7006a7b66d08e9b13ee8196847278",
+      "translation_unit_sha256": "c7ff5f4ae89cc9609fd7e5a1419f3b69bdead58f06644d94aaa832025fc76ec8"
+    },
+    "release-candidate": {
+      "input_identity_sha256": "e5fb998aea7532e69f1dfc84ebe360ee5a6519b940f1e12cd8e9b7796be5574b",
+      "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862",
+      "translation_unit_plan_sha256": "f7c1d02ccf4f1babf0945dfc35d0a712e756911e1f26118a0eafd00dd2eecbbd",
+      "translation_unit_sha256": "9131fdfe960fdf8b13c9353ed966a9c4da94a25cdf1665cf5a7a67b4488ab54e"
+    },
+    "unit": {
+      "input_identity_sha256": "d52ec53c1dc859d1c5f9ef9beda2748002f020215d65608d888e862485aa55b7",
+      "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54",
+      "translation_unit_plan_sha256": "438cd3c553a23b9fcc126ce4a1ca6b3ed8649489a1e49f23c9535cd73475016b",
+      "translation_unit_sha256": "ff8299a13a3e0291ede210f1b3c9a523484a41359f93834a719351244647f241"
+    }
+  }
+}
