@@ -31,11 +31,11 @@ except ImportError:  # pragma: no cover - unavailable on native Windows
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_SCHEMA = "codeskeptic-determinism-workloads-v3"
-BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v6"
-RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v6"
-REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v6"
-CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v6"
-ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v2"
+BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v7"
+RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v7"
+REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v7"
+CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v7"
+ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v3"
 CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v2"
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
@@ -191,6 +191,19 @@ class QualificationPreflightError(QualificationError):
         self.violations = list(violations)
 
 
+class QualificationBatchEnvironmentError(QualificationError):
+    """A batch environment could not be evaluated from retained raw inputs."""
+
+    def __init__(self, message: str, workload: str, repetition: int) -> None:
+        if workload not in KINDS:
+            raise ValueError("batch environment error workload is invalid")
+        if isinstance(repetition, bool) or not 1 <= repetition <= 10:
+            raise ValueError("batch environment error repetition is invalid")
+        super().__init__(message)
+        self.workload = workload
+        self.repetition = repetition
+
+
 def canonical_json(value: Any) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -220,6 +233,14 @@ def _exact_dict(value: Any, fields: set[str], label: str) -> dict[str, Any]:
 def _require_int(value: Any, label: str, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
         raise QualificationError(f"{label} is outside the admitted range")
+    return value
+
+
+def _validate_os_identity(value: Any, label: str) -> str:
+    if (not isinstance(value, str) or not value.strip() or
+            value != value.strip() or "\x00" in value or "\n" in value or
+            len(value.encode("utf-8")) > 4096):
+        raise QualificationError(f"{label} OS identity is malformed")
     return value
 
 
@@ -483,10 +504,11 @@ def validate_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     }, "determinism manifest")
     if raw["schema"] != MANIFEST_SCHEMA:
         raise QualificationError("unsupported determinism manifest schema")
-    if raw["repetitions"] != 10:
-        raise QualificationError("determinism repetitions must be exactly ten")
-    if raw["performance_regression_limit_percent"] != 10:
-        raise QualificationError("performance regression limit must remain 10 percent")
+    _require_int(raw["repetitions"], "determinism repetitions", 10, 10)
+    _require_int(
+        raw["performance_regression_limit_percent"],
+        "performance regression limit", 10, 10,
+    )
     environment_policy = _exact_dict(
         raw["environment_policy"], set(ENVIRONMENT_POLICY),
         "determinism environment policy",
@@ -1444,8 +1466,10 @@ def validate_baseline(raw: dict[str, Any], manifest_sha256: str) -> dict[str, An
         raise QualificationError("unsupported determinism baseline schema")
     if raw["manifest_sha256"] != manifest_sha256:
         raise QualificationError("baseline manifest identity drift")
-    if raw["performance_regression_limit_percent"] != 10:
-        raise QualificationError("baseline regression limit must remain 10 percent")
+    _require_int(
+        raw["performance_regression_limit_percent"],
+        "baseline regression limit", 10, 10,
+    )
     semantic_reference = raw["semantic_reference"]
     if not isinstance(semantic_reference, dict) or set(semantic_reference) != set(KINDS):
         raise QualificationError("baseline semantic reference is incomplete")
@@ -1462,7 +1486,11 @@ def validate_baseline(raw: dict[str, Any], manifest_sha256: str) -> dict[str, An
     for class_id, profile in profiles.items():
         if not isinstance(class_id, str) or IDENTIFIER.fullmatch(class_id) is None:
             raise QualificationError("baseline hardware class is invalid")
-        _exact_dict(profile, {"provenance", "hardware", "workloads"}, f"baseline profile {class_id}")
+        _exact_dict(
+            profile, {"os", "provenance", "hardware", "workloads"},
+            f"baseline profile {class_id}",
+        )
+        _validate_os_identity(profile["os"], "baseline")
         provenance = _exact_dict(
             profile["provenance"], {
                 "source_revision", "toolchain", "calibration", "promotion"
@@ -1622,6 +1650,7 @@ def _profile_matches(
         return False
     hardware = {field: host[field] for field in HARDWARE_FIELDS}
     return (
+        profile["os"] == host["os"] and
         profile["hardware"] == hardware and
         profile["provenance"]["toolchain"] == toolchain
     )
@@ -1775,9 +1804,14 @@ def validate_receipt_payload(
         "manifest_sha256", "repetitions", "performance_regression_limit_percent",
         "performance_policy", "environment_policy",
     }, "receipt configuration")
+    _require_int(
+        configuration["repetitions"], "receipt repetitions", 10, 10
+    )
+    _require_int(
+        configuration["performance_regression_limit_percent"],
+        "receipt performance regression limit", 10, 10,
+    )
     if (configuration["manifest_sha256"] != manifest_sha or
-            configuration["repetitions"] != 10 or
-            configuration["performance_regression_limit_percent"] != 10 or
             not isinstance(configuration["performance_policy"], str) or
             configuration["performance_policy"] not in {"required", "record-only"} or
             canonical_json(configuration["environment_policy"]) !=
@@ -1789,8 +1823,9 @@ def validate_receipt_payload(
     )
     if (not isinstance(host["class_id"], str) or IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
-                for field in ("os", "architecture", "cpu_model"))):
+                for field in ("architecture", "cpu_model"))):
         raise QualificationError("receipt host identity is invalid")
+    _validate_os_identity(host["os"], "receipt host")
     _validate_cpu_topology(host, "host")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
@@ -1837,7 +1872,8 @@ def validate_receipt_payload(
         if profile is None:
             raise QualificationError(f"baseline profile is unavailable for {profile_id}")
         raise QualificationError(
-            f"baseline hardware or toolchain inventory drift for {profile_id}"
+            f"baseline OS, hardware, or toolchain inventory drift for "
+            f"{profile_id}"
         )
     used_artifacts: list[str] = [_idle_preflight_artifact_path()]
     regressions: list[str] = []
@@ -1861,14 +1897,20 @@ def validate_receipt_payload(
                 "environment", "environment_artifact", "inner_runs",
                 "artifacts",
             }, f"{kind} run")
-            if run["repetition"] != repetition:
+            if _require_int(
+                    run["repetition"], f"{kind} repetition", 1, 10
+                    ) != repetition:
                 raise QualificationError(f"{kind} repetition sequence is invalid")
             if run["semantic_sha256"] != semantic:
                 raise QualificationError(f"{kind} semantic drift at repetition {repetition}")
-            if run["exit_code"] not in (0, 1):
-                raise QualificationError(f"{kind} repetition has unavailable verdict")
+            _require_int(
+                run["exit_code"], f"{kind} repetition verdict", 0, 1
+            )
             expected_iterations = manifest_workload["measurement_iterations"]
-            if run["measurement_iterations"] != expected_iterations:
+            if _require_int(
+                    run["measurement_iterations"],
+                    f"{kind} measurement iteration count", 1, 100,
+                    ) != expected_iterations:
                 raise QualificationError(f"{kind} measurement iteration drift")
             inner_runs = run["inner_runs"]
             if not isinstance(inner_runs, list) or len(inner_runs) != expected_iterations:
@@ -1879,10 +1921,15 @@ def validate_receipt_payload(
                     "iteration", "semantic_sha256", "exit_code", "metrics",
                     "environment", "artifacts",
                 }, f"{kind} inner measurement")
-                if inner["iteration"] != iteration:
+                if _require_int(
+                        inner["iteration"], f"{kind} inner iteration", 1, 100
+                        ) != iteration:
                     raise QualificationError(
                         f"{kind} inner measurement sequence is invalid"
                     )
+                _require_int(
+                    inner["exit_code"], f"{kind} inner exit code", 0, 1
+                )
                 if (inner["semantic_sha256"] != semantic or
                         inner["exit_code"] != run["exit_code"]):
                     raise QualificationError(
@@ -2078,9 +2125,14 @@ def _validate_calibration_payload(
         "performance_regression_limit_percent", "environment_policy",
     }, "calibration configuration")
     manifest_sha = digest_json(manifest)
+    _require_int(
+        configuration["repetitions"], "calibration repetitions", 10, 10
+    )
+    _require_int(
+        configuration["performance_regression_limit_percent"],
+        "calibration performance regression limit", 10, 10,
+    )
     if (configuration["manifest_sha256"] != manifest_sha or
-            configuration["repetitions"] != 10 or
-            configuration["performance_regression_limit_percent"] != 10 or
             canonical_json(configuration["environment_policy"]) !=
             canonical_json(manifest["environment_policy"])):
         raise QualificationError("calibration configuration differs from manifest")
@@ -2098,8 +2150,9 @@ def _validate_calibration_payload(
     if (not isinstance(host["class_id"], str) or
             IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
-                for field in ("os", "architecture", "cpu_model"))):
+                for field in ("architecture", "cpu_model"))):
         raise QualificationError("calibration host identity is malformed")
+    _validate_os_identity(host["os"], "calibration host")
     _validate_cpu_topology(host, "calibration")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
@@ -2191,15 +2244,19 @@ def _rejected_payload(
 ) -> dict[str, Any]:
     complete = isinstance(error, QualificationDecisionError)
     preflight_rejection = isinstance(error, QualificationPreflightError)
-    failures = (
-        error.failures if complete else [
-            _failure_record(
-                "environment-preflight-invalid"
-                if preflight_rejection else "qualification-error",
-                str(error),
-            )
-        ]
-    )
+    if complete:
+        failures = error.failures
+    elif isinstance(error, QualificationBatchEnvironmentError):
+        failures = [_failure_record(
+            "batch-environment-error", str(error),
+            workload=error.workload, repetition=error.repetition,
+        )]
+    else:
+        failures = [_failure_record(
+            "environment-preflight-invalid"
+            if preflight_rejection else "qualification-error",
+            str(error),
+        )]
     for index, failure in enumerate(failures, 1):
         _validate_failure_record(failure, f"rejected failure {index}")
     measurement_rejection = complete and any(
@@ -2269,9 +2326,14 @@ def _validate_rejected_payload(
         "manifest_sha256", "repetitions", "performance_regression_limit_percent",
         "performance_policy", "environment_policy",
     }, "rejected configuration")
+    _require_int(
+        configuration["repetitions"], "rejected repetitions", 10, 10
+    )
+    _require_int(
+        configuration["performance_regression_limit_percent"],
+        "rejected performance regression limit", 10, 10,
+    )
     if (configuration["manifest_sha256"] != digest_json(manifest) or
-            configuration["repetitions"] != 10 or
-            configuration["performance_regression_limit_percent"] != 10 or
             not isinstance(configuration["performance_policy"], str) or
             configuration["performance_policy"] not in {"required", "record-only"} or
             canonical_json(configuration["environment_policy"]) !=
@@ -2291,8 +2353,9 @@ def _validate_rejected_payload(
     if (not isinstance(host["class_id"], str) or
             IDENTIFIER.fullmatch(host["class_id"]) is None or
             any(not isinstance(host[field], str) or not host[field]
-                for field in ("os", "architecture", "cpu_model"))):
+                for field in ("architecture", "cpu_model"))):
         raise QualificationError("rejected host identity is malformed")
+    _validate_os_identity(host["os"], "rejected host")
     _validate_cpu_topology(host, "rejected")
     _validate_cpu_uclamp(
         host["cpu_uclamp_source"], host["cpu_uclamp_min"],
@@ -2446,6 +2509,43 @@ def _validate_rejected_payload(
         raise QualificationError(
             "idle preflight rejection artifact inventory is not canonical"
         )
+    batch_failures = [
+        failure for failure in failures
+        if failure["type"] == "batch-environment-error"
+    ]
+    if batch_failures:
+        if (len(failures) != 1 or len(batch_failures) != 1 or
+                observations["complete"]):
+            raise QualificationError(
+                "batch environment rejection classification is malformed"
+            )
+        batch_failure = batch_failures[0]
+        kind = batch_failure["workload"]
+        repetition = batch_failure["repetition"]
+        if kind not in KINDS or repetition is None:
+            raise QualificationError(
+                "batch environment rejection identity is malformed"
+            )
+        definition = next(
+            item for item in manifest["workloads"] if item["kind"] == kind
+        )
+        required_paths = {
+            _idle_preflight_artifact_path(),
+            _batch_environment_artifact_path(kind, repetition),
+            *(
+                path
+                for iteration in range(
+                    1, definition["measurement_iterations"] + 1
+                )
+                for path in _iteration_artifact_paths(
+                    kind, repetition, iteration
+                )
+            ),
+        }
+        if not required_paths <= set(rejected_artifact_paths):
+            raise QualificationError(
+                "batch environment rejection artifact inventory is incomplete"
+            )
     if not observations["complete"]:
         allowed_artifacts = {
             path
@@ -2654,7 +2754,10 @@ def _verify_workload_raw_claims(
                     )
                 wall_ms, cpu_ms, peak_rss, time_exit = _parse_time_log(time_raw)
                 gated_wall_ms += wall_ms
-                if environment["wall_ms"] != wall_ms:
+                if _require_int(
+                        environment["wall_ms"],
+                        f"{kind} inner environment wall time", 1, 1 << 62,
+                        ) != wall_ms:
                     raise QualificationError(
                         f"{kind} environment wall time differs from raw artifact"
                     )
@@ -2716,7 +2819,13 @@ def _verify_workload_raw_claims(
                 batch["after"], receipt["host"],
                 f"{kind} batch environment after",
             )
-            if (batch["gated_wall_ms"] != gated_wall_ms or
+            _require_int(
+                batch["wall_ms"], f"{kind} batch wall time", 1, 1 << 62
+            )
+            if (_require_int(
+                    batch["gated_wall_ms"],
+                    f"{kind} batch gated wall time", 1, 1 << 62,
+                    ) != gated_wall_ms or
                     run["metrics"]["wall_ms"] != gated_wall_ms):
                 raise QualificationError(
                     f"{kind} batch wall evidence differs from raw artifacts"
@@ -2741,6 +2850,196 @@ def _verify_workload_raw_claims(
                 raise QualificationError(
                     f"{kind} batch environment decision differs from raw artifact"
                 )
+
+
+def _recompute_partial_batch_wall_ms(
+    root: Path, kind: str, repetition: int, measurement_iterations: int,
+) -> int:
+    gated_wall_ms = 0
+    for iteration in range(1, measurement_iterations + 1):
+        time_path = _iteration_artifact_paths(
+            kind, repetition, iteration
+        )[3]
+        wall_ms, _cpu_ms, _peak_rss, _exit = _parse_time_log(
+            _read_regular(root / time_path, MAX_LOG_BYTES)
+        )
+        gated_wall_ms += wall_ms
+    return gated_wall_ms
+
+
+def _verify_partial_normal_batch_environment_claim(
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any],
+    kind: str, repetition: int, batch: dict[str, Any],
+) -> None:
+    _exact_dict(
+        batch, {
+            "schema", "scope", "wall_ms", "gated_wall_ms", "before",
+            "after", "decision",
+        },
+        f"{kind} partial batch environment artifact",
+    )
+    definition = next(
+        item for item in manifest["workloads"] if item["kind"] == kind
+    )
+    _verify_controller_snapshot_claim(
+        batch["before"], receipt["host"],
+        f"{kind} partial batch environment before",
+    )
+    _verify_controller_snapshot_claim(
+        batch["after"], receipt["host"],
+        f"{kind} partial batch environment after",
+    )
+    _require_int(
+        batch["wall_ms"], "partial batch wall time", 1, 1 << 62
+    )
+    _require_int(
+        batch["gated_wall_ms"], "partial batch gated wall time", 1, 1 << 62
+    )
+    gated_wall_ms = _recompute_partial_batch_wall_ms(
+        root, kind, repetition, definition["measurement_iterations"]
+    )
+    if batch["gated_wall_ms"] != gated_wall_ms:
+        raise QualificationError(
+            "partial batch wall evidence differs from raw artifacts"
+        )
+    _validate_batch_wall_evidence(
+        batch["wall_ms"], gated_wall_ms,
+        definition["measurement_iterations"], manifest["environment_policy"],
+    )
+    expected = _evaluate_runtime_environment(
+        batch["before"], batch["after"], gated_wall_ms,
+        receipt["host"]["cpu_affinity"],
+        receipt["host"]["host_logical_cpus"],
+        manifest["environment_policy"],
+        receipt["configuration"]["performance_policy"] == "required",
+    )
+    if canonical_json(batch["decision"]) != canonical_json(expected):
+        raise QualificationError(
+            "partial batch environment decision differs from raw artifact"
+        )
+
+
+def _verify_rejected_batch_environment_claim(
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+) -> None:
+    batch_pattern = re.compile(
+        r"raw/(unit|real-repository|release-candidate)/"
+        r"run-(0[1-9]|10)/batch-environment\.json"
+    )
+    rejected_batch_paths: list[str] = []
+    for artifact in receipt["artifacts"]:
+        path = artifact["path"]
+        match = batch_pattern.fullmatch(path)
+        if match is None:
+            continue
+        observed = _load_json(root / path)
+        if (not isinstance(observed, dict) or
+                observed.get("schema") != ENVIRONMENT_SCHEMA or
+                observed.get("scope") not in {
+                    "performance-batch", "performance-batch-rejected"
+                }):
+            raise QualificationError(
+                "rejected receipt batch environment scope is unsupported"
+            )
+        if observed["scope"] == "performance-batch-rejected":
+            rejected_batch_paths.append(path)
+        else:
+            _verify_partial_normal_batch_environment_claim(
+                receipt, root, manifest, match.group(1), int(match.group(2)),
+                observed,
+            )
+    failures = [
+        failure for failure in receipt["decision"]["failures"]
+        if failure["type"] == "batch-environment-error"
+    ]
+    if not failures:
+        if rejected_batch_paths:
+            raise QualificationError(
+                "rejected batch environment artifact lacks its failure claim"
+            )
+        return
+    if len(failures) != 1:
+        raise QualificationError(
+            "batch environment rejection has multiple failure claims"
+        )
+    failure = failures[0]
+    kind = failure["workload"]
+    repetition = failure["repetition"]
+    if kind not in KINDS or repetition is None:
+        raise QualificationError(
+            "batch environment rejection identity is malformed"
+        )
+    definition = next(
+        item for item in manifest["workloads"] if item["kind"] == kind
+    )
+    batch_path = _batch_environment_artifact_path(kind, repetition)
+    if rejected_batch_paths != [batch_path]:
+        raise QualificationError(
+            "batch environment rejection artifact inventory is not canonical"
+        )
+    batch = _load_json(root / batch_path)
+    _exact_dict(
+        batch, {
+            "schema", "scope", "wall_ms", "gated_wall_ms", "before",
+            "after", "failure",
+        },
+        f"{kind} rejected batch environment artifact",
+    )
+    if (batch["schema"] != ENVIRONMENT_SCHEMA or
+            batch["scope"] != "performance-batch-rejected"):
+        raise QualificationError(
+            "rejected batch environment artifact schema is unsupported"
+        )
+    _validate_failure_record(
+        batch["failure"], "rejected batch environment failure"
+    )
+    if canonical_json(batch["failure"]) != canonical_json(failure):
+        raise QualificationError(
+            "rejected batch environment failure differs from receipt"
+        )
+    _verify_controller_snapshot_claim(
+        batch["before"], receipt["host"],
+        f"{kind} rejected batch environment before",
+    )
+    _verify_controller_snapshot_claim(
+        batch["after"], receipt["host"],
+        f"{kind} rejected batch environment after",
+    )
+    _require_int(
+        batch["wall_ms"], "rejected batch wall time", 1, 1 << 62
+    )
+    _require_int(
+        batch["gated_wall_ms"], "rejected batch gated wall time", 1, 1 << 62
+    )
+    gated_wall_ms = _recompute_partial_batch_wall_ms(
+        root, kind, repetition, definition["measurement_iterations"]
+    )
+    if batch["gated_wall_ms"] != gated_wall_ms:
+        raise QualificationError(
+            "rejected batch wall evidence differs from raw artifacts"
+        )
+    try:
+        _validate_batch_wall_evidence(
+            batch["wall_ms"], gated_wall_ms,
+            definition["measurement_iterations"],
+            manifest["environment_policy"],
+        )
+        _evaluate_runtime_environment(
+            batch["before"], batch["after"], gated_wall_ms,
+            receipt["host"]["cpu_affinity"],
+            receipt["host"]["host_logical_cpus"],
+            manifest["environment_policy"],
+            receipt["configuration"]["performance_policy"] == "required",
+        )
+    except QualificationError as error:
+        if str(error) != failure["message"]:
+            raise QualificationError(
+                "rejected batch environment failure differs from raw evidence"
+            ) from error
+    else:
+        raise QualificationError(
+            "batch environment failure was not reproduced"
+        )
 
 
 def verify_receipt(
@@ -2826,6 +3125,7 @@ def verify_receipt(
             _verify_raw_claims(observed, root, manifest)
         elif _idle_preflight_artifact_path() in artifact_paths:
             _verify_idle_preflight_claim(receipt, root, manifest)
+        _verify_rejected_batch_environment_claim(receipt, root, manifest)
         return receipt
     if receipt.get("schema") == CALIBRATION_SCHEMA:
         _validate_calibration_payload(receipt, manifest)
@@ -2903,6 +3203,7 @@ def verify_baseline_authority(
             field: calibration["host"][field] for field in HARDWARE_FIELDS
         }
         if (calibration["host"]["class_id"] != class_id or
+                calibration["host"]["os"] != profile["os"] or
                 expected_hardware != profile["hardware"] or
                 calibration["source"]["revision"] != provenance["source_revision"] or
                 calibration["toolchain"] != provenance["toolchain"]):
@@ -4522,8 +4823,9 @@ def semantic_projection(
     }, "analyzer report")
     if report["tool"] != "CodeSkeptic":
         raise QualificationError("analyzer report tool identity drift")
-    if report.get("complete") is not True or report.get("exit_code") not in (0, 1):
+    if report.get("complete") is not True:
         raise QualificationError("analyzer report has no complete verdict")
+    _require_int(report.get("exit_code"), "analyzer report exit code", 0, 1)
     coverage = report.get("coverage")
     coverage_fields = {
         "attempted_tus", "analyzed_tus", "broken_tus", "incomplete_functions"
@@ -4549,6 +4851,7 @@ def semantic_projection(
             counts["total"] != counts["blocking"] + counts["report_only"]):
         raise QualificationError("analyzer finding counts are malformed")
     diagnostics = report.get("diagnostics")
+    _require_int(report["total"], "analyzer diagnostic total", 0, 1 << 62)
     if (not isinstance(diagnostics, list) or len(diagnostics) != counts["total"] or
             report["total"] != counts["total"]):
         raise QualificationError("analyzer diagnostic inventory is malformed")
@@ -4753,6 +5056,12 @@ def _batch_environment_artifact_path(kind: str, repetition: int) -> str:
     return f"raw/{kind}/run-{repetition:02d}/batch-environment.json"
 
 
+def _batch_environment_scratch_path(
+    scratch: Path, kind: str, repetition: int,
+) -> Path:
+    return scratch / f"{kind}-{repetition:02d}-batch.environment.json"
+
+
 def _idle_preflight_artifact_path() -> str:
     return "raw/environment-idle-preflight.json"
 
@@ -4934,6 +5243,11 @@ def _collect_failed_run_artifacts(
         for relative, path in zip(canonical, scratch_paths):
             if _regular_kind(path) == "regular":
                 retained[relative] = _read_failure_prefix(path)
+    batch = _batch_environment_scratch_path(scratch, kind, repetition)
+    if _regular_kind(batch) == "regular":
+        retained[_batch_environment_artifact_path(kind, repetition)] = (
+            _read_failure_prefix(batch)
+        )
     return retained
 
 
@@ -5120,15 +5434,37 @@ def run_once(
     gated_wall_ms = sum(
         item["metrics"]["wall_ms"] for item in inner_runs
     )
-    _validate_batch_wall_evidence(
-        batch_wall_ms, gated_wall_ms, iterations, ENVIRONMENT_POLICY
-    )
-    batch_decision = _evaluate_runtime_environment(
-        batch_before, batch_after, gated_wall_ms, affinity,
-        host["host_logical_cpus"], ENVIRONMENT_POLICY,
-        performance_policy == "required",
-    )
     batch_path = _batch_environment_artifact_path(kind, repetition)
+    try:
+        _validate_batch_wall_evidence(
+            batch_wall_ms, gated_wall_ms, iterations, ENVIRONMENT_POLICY
+        )
+        batch_decision = _evaluate_runtime_environment(
+            batch_before, batch_after, gated_wall_ms, affinity,
+            host["host_logical_cpus"], ENVIRONMENT_POLICY,
+            performance_policy == "required",
+        )
+    except QualificationError as error:
+        batch_error = QualificationBatchEnvironmentError(
+            str(error), kind, repetition
+        )
+        failure = _failure_record(
+            "batch-environment-error", str(batch_error),
+            workload=kind, repetition=repetition,
+        )
+        _write_new(
+            _batch_environment_scratch_path(scratch, kind, repetition),
+            canonical_json({
+                "schema": ENVIRONMENT_SCHEMA,
+                "scope": "performance-batch-rejected",
+                "wall_ms": batch_wall_ms,
+                "gated_wall_ms": gated_wall_ms,
+                "before": batch_before,
+                "after": batch_after,
+                "failure": failure,
+            }),
+        )
+        raise batch_error from error
     artifact_data[batch_path] = canonical_json({
         "schema": ENVIRONMENT_SCHEMA,
         "scope": "performance-batch",
@@ -5189,6 +5525,7 @@ def build_baseline(
         },
         "profiles": {
             host["class_id"]: {
+                "os": host["os"],
                 "provenance": {
                     "source_revision": source_revision,
                     "toolchain": toolchain,

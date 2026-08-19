@@ -606,6 +606,7 @@ def baseline(
         },
         "profiles": {
             "test-linux-x86_64": {
+                "os": "Linux 6.19.10-300.fc44.x86_64",
                 "provenance": {
                     "source_revision": source_revision,
                     "toolchain": toolchain_identity(),
@@ -825,7 +826,7 @@ def receipt(
         },
         "host": {
             "class_id": "test-linux-x86_64",
-            "os": "Linux",
+            "os": "Linux 6.19.10-300.fc44.x86_64",
             **hardware_identity(),
         },
         "toolchain": toolchain_identity(),
@@ -850,30 +851,30 @@ def receipt(
 
 
 class DeterminismQualificationTest(unittest.TestCase):
-    def test_exclusive_batch_environment_uses_distinct_v6_schemas(self) -> None:
+    def test_exclusive_batch_environment_uses_distinct_v7_schemas(self) -> None:
         self.assertEqual(
             qualification.MANIFEST_SCHEMA,
             "codeskeptic-determinism-workloads-v3",
         )
         self.assertEqual(
             qualification.BASELINE_SCHEMA,
-            "codeskeptic-determinism-baseline-v6",
+            "codeskeptic-determinism-baseline-v7",
         )
         self.assertEqual(
             qualification.RECEIPT_SCHEMA,
-            "codeskeptic-determinism-qualification-v6",
+            "codeskeptic-determinism-qualification-v7",
         )
         self.assertEqual(
             qualification.REJECTED_SCHEMA,
-            "codeskeptic-determinism-rejected-v6",
+            "codeskeptic-determinism-rejected-v7",
         )
         self.assertEqual(
             qualification.CALIBRATION_SCHEMA,
-            "codeskeptic-determinism-calibration-v6",
+            "codeskeptic-determinism-calibration-v7",
         )
         self.assertEqual(
             qualification.ENVIRONMENT_SCHEMA,
-            "codeskeptic-determinism-environment-v2",
+            "codeskeptic-determinism-environment-v3",
         )
         sample = receipt(qualification.digest_json(manifest()))
         self.assertEqual(len(sample["artifacts"]), 631)
@@ -897,6 +898,96 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.validate_receipt_payload(
                 forged_policy, manifest(),
                 baseline(qualification.digest_json(manifest())),
+            )
+
+    def test_v7_baseline_profile_binds_exact_kernel_os_identity(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        current = receipt(manifest_sha)
+        pinned = baseline(manifest_sha)
+
+        self.assertTrue(qualification._profile_matches(
+            pinned["profiles"]["test-linux-x86_64"],
+            current["host"], current["toolchain"],
+        ))
+        current["host"]["os"] = "Linux 7.1.8-200.fc44.x86_64"
+        self.assertFalse(qualification._profile_matches(
+            pinned["profiles"]["test-linux-x86_64"],
+            current["host"], current["toolchain"],
+        ))
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "baseline OS.*inventory drift"
+        ):
+            qualification.validate_receipt_payload(
+                current, raw_manifest, pinned
+            )
+
+        missing_os = copy.deepcopy(pinned)
+        missing_os["profiles"]["test-linux-x86_64"].pop("os")
+        with self.assertRaises(qualification.QualificationError):
+            qualification.validate_baseline(missing_os, manifest_sha)
+        malformed_os = copy.deepcopy(pinned)
+        malformed_os["profiles"]["test-linux-x86_64"]["os"] = 7
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "baseline OS identity"
+        ):
+            qualification.validate_baseline(malformed_os, manifest_sha)
+
+        legacy = copy.deepcopy(pinned)
+        legacy["schema"] = "codeskeptic-determinism-baseline-v6"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "unsupported.*baseline schema"
+        ):
+            qualification.validate_baseline(legacy, manifest_sha)
+
+        malformed_receipt = receipt(manifest_sha)
+        malformed_receipt["host"]["os"] = "\n"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "receipt host OS identity"
+        ):
+            qualification.validate_receipt_payload(
+                malformed_receipt, raw_manifest, pinned
+            )
+        malformed_calibration = calibration_receipt(manifest_sha)
+        malformed_calibration["host"]["os"] = "\x00Linux"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "calibration host OS identity"
+        ):
+            qualification._validate_calibration_payload(
+                malformed_calibration, raw_manifest
+            )
+        malformed_rejected = rejected_receipt(manifest_sha)
+        malformed_rejected["host"]["os"] = []
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "rejected host OS identity"
+        ):
+            qualification._validate_rejected_payload(
+                malformed_rejected, raw_manifest, None
+            )
+
+        legacy_receipt = receipt(manifest_sha)
+        legacy_receipt["schema"] = "codeskeptic-determinism-qualification-v6"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "receipt is not accepted"
+        ):
+            qualification.validate_receipt_payload(
+                legacy_receipt, raw_manifest, pinned
+            )
+        legacy_calibration = calibration_receipt(manifest_sha)
+        legacy_calibration["schema"] = "codeskeptic-determinism-calibration-v6"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "classification drift"
+        ):
+            qualification._validate_calibration_payload(
+                legacy_calibration, raw_manifest
+            )
+        legacy_rejected = rejected_receipt(manifest_sha)
+        legacy_rejected["schema"] = "codeskeptic-determinism-rejected-v6"
+        with self.assertRaisesRegex(
+            qualification.QualificationError, "classification drift"
+        ):
+            qualification._validate_rejected_payload(
+                legacy_rejected, raw_manifest, None
             )
 
     def test_required_measurement_environment_rejects_v5_and_requires_cgroup(self) -> None:
@@ -1898,6 +1989,547 @@ class DeterminismQualificationTest(unittest.TestCase):
         self.assertTrue(run["environment_valid"])
         self.assertEqual(len(artifacts), 51)
 
+    def test_batch_accounting_failure_retains_and_recomputes_exact_raw(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        definition = raw_manifest["workloads"][0]
+        input_value = input_receipt("unit")
+        prepared = {
+            "definition": definition,
+            "input": input_value,
+            "args": [],
+            "release_source": None,
+        }
+        inner = json.loads(environment_evidence(500)[1])
+        inner["before"]["cpu"]["host_logical_cpus"] = 8
+        inner["after"]["cpu"]["host_logical_cpus"] = 8
+        batch_before = environment_snapshot(
+            host_cpus=8, affinity=[0, 1], host_busy_ticks=1000,
+            affinity_busy_ticks=1000, owned_usage_us=1_000_000,
+        )
+        batch_after = copy.deepcopy(batch_before)
+        batch_after["cpu"]["host_busy_ticks"] += 518
+        batch_after["cpu"]["affinity_busy_ticks"] += 518
+        batch_after["measurement_cgroup"]["cpu_usage_us"] += 5_239_000
+
+        def run_process(
+            command: list[str], _environment: dict[str, str], _timeout: int,
+            stdout_path: Path, stderr_path: Path,
+            _required_outputs: list[Path],
+        ) -> subprocess.CompletedProcess:
+            Path(command[command.index("-o") + 1]).write_bytes(time_log(500))
+            Path(command[-1]).write_bytes(
+                qualification.canonical_json(analyzer_report("unit"))
+            )
+            stdout_path.write_bytes(b"")
+            stderr_path.write_bytes(b"")
+            return subprocess.CompletedProcess(
+                command, 0, stdout=b"", stderr=b""
+            )
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            qualification.os, "sched_getaffinity", return_value={2, 3},
+            create=True,
+        ), mock.patch.object(
+            qualification, "_capture_environment",
+            side_effect=(
+                [copy.deepcopy(batch_before)] + [
+                    copy.deepcopy(inner[side])
+                    for _iteration in range(10)
+                    for side in ("before", "after")
+                ] + [copy.deepcopy(batch_after)]
+            ),
+        ), mock.patch.object(
+            qualification, "_run_bounded_process", side_effect=run_process
+        ), mock.patch.object(
+            qualification.time, "monotonic_ns",
+            side_effect=(0, 5_000_000_000),
+        ):
+            scratch = Path(directory)
+            with self.assertRaises(
+                qualification.QualificationBatchEnvironmentError
+            ) as raised:
+                qualification.run_once(
+                    Path("/fixture/codeskeptic"), Path("/usr/bin/time"),
+                    prepared, 1, ROOT, scratch, "required",
+                    {
+                        "cpu_affinity": [0, 1],
+                        "logical_cpus": 2,
+                        "host_logical_cpus": 8,
+                        "controller_cpu_affinity": [2, 3],
+                    },
+                    Path("/sys/fs/cgroup/codeskeptic-measurement"),
+                )
+            error = raised.exception
+            self.assertEqual(str(error), "measurement cgroup CPU accounting drift")
+            retained = qualification._collect_failed_run_artifacts(
+                scratch, "unit", 1, 10
+            )
+
+        batch_path = qualification._batch_environment_artifact_path("unit", 1)
+        self.assertIn(batch_path, retained)
+        batch = json.loads(retained[batch_path].decode("utf-8"))
+        self.assertEqual(batch["scope"], "performance-batch-rejected")
+        self.assertEqual(
+            batch["failure"]["message"],
+            "measurement cgroup CPU accounting drift",
+        )
+        self.assertEqual(batch["gated_wall_ms"], 5000)
+
+        host = receipt(manifest_sha)["host"]
+        host["host_logical_cpus"] = 8
+        idle_before = environment_snapshot(host_cpus=8)
+        idle_after = copy.deepcopy(idle_before)
+        idle_decision = qualification._evaluate_idle_environment(
+            idle_before, idle_after, 30_000, [0, 1], 8,
+            qualification.ENVIRONMENT_POLICY, True,
+        )
+        idle_raw = qualification.canonical_json({
+            "schema": qualification.ENVIRONMENT_SCHEMA,
+            "scope": "idle-preflight",
+            "wall_ms": 30_000,
+            "before": idle_before,
+            "after": idle_after,
+            "decision": idle_decision,
+        })
+        retained[qualification._idle_preflight_artifact_path()] = idle_raw
+        rejected = qualification._rejected_payload(
+            {
+                "revision": "head-revision",
+                "manifest_sha256": "2" * 64,
+                "file_count": 1,
+            },
+            manifest_sha, "required", host, toolchain_identity(),
+            {"unit": input_value}, dt.datetime.now(dt.timezone.utc),
+            time.monotonic_ns(), error, retained, None, None,
+        )
+        self.assertEqual(
+            rejected["decision"]["failures"][0]["type"],
+            "batch-environment-error",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+            evidence = root / "rejected"
+            qualification.write_receipt(evidence, rejected, retained)
+            qualification.verify_receipt(
+                evidence, manifest_path, root / "missing-baseline.json", None
+            )
+
+            forged_artifacts = dict(retained)
+            forged = copy.deepcopy(batch)
+            forged["after"]["measurement_cgroup"]["cpu_usage_us"] -= 100_000
+            forged_artifacts[batch_path] = qualification.canonical_json(forged)
+            forged_receipt = copy.deepcopy(rejected)
+            descriptor = next(
+                item for item in forged_receipt["artifacts"]
+                if item["path"] == batch_path
+            )
+            descriptor["sha256"] = sha256(forged_artifacts[batch_path])
+            descriptor["size"] = len(forged_artifacts[batch_path])
+            forged_evidence = root / "forged"
+            qualification.write_receipt(
+                forged_evidence, forged_receipt, forged_artifacts
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "batch environment failure was not reproduced",
+            ):
+                qualification.verify_receipt(
+                    forged_evidence, manifest_path,
+                    root / "missing-baseline.json", None,
+                )
+
+            relabeled_artifacts = dict(retained)
+            relabeled_batch = copy.deepcopy(batch)
+            relabeled_batch["failure"]["type"] = "qualification-error"
+            relabeled_batch["scope"] = "performance-batch"
+            relabeled_artifacts[batch_path] = qualification.canonical_json(
+                relabeled_batch
+            )
+            relabeled_receipt = copy.deepcopy(rejected)
+            relabeled_receipt["decision"]["failures"][0][
+                "type"
+            ] = "qualification-error"
+            descriptor = next(
+                item for item in relabeled_receipt["artifacts"]
+                if item["path"] == batch_path
+            )
+            descriptor["sha256"] = sha256(relabeled_artifacts[batch_path])
+            descriptor["size"] = len(relabeled_artifacts[batch_path])
+            relabeled_evidence = root / "relabeled"
+            qualification.write_receipt(
+                relabeled_evidence, relabeled_receipt, relabeled_artifacts
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "batch",
+            ):
+                qualification.verify_receipt(
+                    relabeled_evidence, manifest_path,
+                    root / "missing-baseline.json", None,
+                )
+
+    def test_batch_wall_failure_is_also_retained_before_rejection(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        definition = raw_manifest["workloads"][0]
+        input_value = input_receipt("unit")
+        prepared = {
+            "definition": definition,
+            "input": input_value,
+            "args": [],
+            "release_source": None,
+        }
+        inner = json.loads(environment_evidence(500)[1])
+        inner["before"]["cpu"]["host_logical_cpus"] = 8
+        inner["after"]["cpu"]["host_logical_cpus"] = 8
+        batch = json.loads(environment_evidence(
+            5000, scope="performance-batch", required=True
+        )[1])
+        batch["before"]["cpu"]["host_logical_cpus"] = 8
+        batch["after"]["cpu"]["host_logical_cpus"] = 8
+
+        def run_process(
+            command: list[str], _environment: dict[str, str], _timeout: int,
+            stdout_path: Path, stderr_path: Path,
+            _required_outputs: list[Path],
+        ) -> subprocess.CompletedProcess:
+            Path(command[command.index("-o") + 1]).write_bytes(time_log(500))
+            Path(command[-1]).write_bytes(
+                qualification.canonical_json(analyzer_report("unit"))
+            )
+            stdout_path.write_bytes(b"")
+            stderr_path.write_bytes(b"")
+            return subprocess.CompletedProcess(
+                command, 0, stdout=b"", stderr=b""
+            )
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            qualification.os, "sched_getaffinity", return_value={2, 3},
+            create=True,
+        ), mock.patch.object(
+            qualification, "_capture_environment",
+            side_effect=(
+                [copy.deepcopy(batch["before"])] + [
+                    copy.deepcopy(inner[side])
+                    for _iteration in range(10)
+                    for side in ("before", "after")
+                ] + [copy.deepcopy(batch["after"])]
+            ),
+        ), mock.patch.object(
+            qualification, "_run_bounded_process", side_effect=run_process
+        ), mock.patch.object(
+            qualification.time, "monotonic_ns",
+            side_effect=(0, 65_001_000_000),
+        ):
+            scratch = Path(directory)
+            with self.assertRaisesRegex(
+                qualification.QualificationBatchEnvironmentError,
+                "batch wall evidence differs",
+            ) as raised:
+                qualification.run_once(
+                    Path("/fixture/codeskeptic"), Path("/usr/bin/time"),
+                    prepared, 1, ROOT, scratch, "required",
+                    {
+                        "cpu_affinity": [0, 1],
+                        "logical_cpus": 2,
+                        "host_logical_cpus": 8,
+                        "controller_cpu_affinity": [2, 3],
+                    },
+                    Path("/sys/fs/cgroup/codeskeptic-measurement"),
+                )
+            retained = qualification._collect_failed_run_artifacts(
+                scratch, "unit", 1, 10
+            )
+            error = raised.exception
+        failed_batch = json.loads(retained[
+            qualification._batch_environment_artifact_path("unit", 1)
+        ].decode("utf-8"))
+        self.assertEqual(failed_batch["scope"], "performance-batch-rejected")
+        self.assertEqual(
+            failed_batch["failure"]["message"],
+            "batch wall evidence differs from the measured inner window",
+        )
+
+        host = receipt(manifest_sha)["host"]
+        host["host_logical_cpus"] = 8
+        idle_before = environment_snapshot(host_cpus=8)
+        idle_after = copy.deepcopy(idle_before)
+        idle_decision = qualification._evaluate_idle_environment(
+            idle_before, idle_after, 30_000, [0, 1], 8,
+            qualification.ENVIRONMENT_POLICY, True,
+        )
+        retained[qualification._idle_preflight_artifact_path()] = (
+            qualification.canonical_json({
+                "schema": qualification.ENVIRONMENT_SCHEMA,
+                "scope": "idle-preflight",
+                "wall_ms": 30_000,
+                "before": idle_before,
+                "after": idle_after,
+                "decision": idle_decision,
+            })
+        )
+        rejected = qualification._rejected_payload(
+            {
+                "revision": "head-revision",
+                "manifest_sha256": "2" * 64,
+                "file_count": 1,
+            },
+            manifest_sha, "required", host, toolchain_identity(),
+            {"unit": input_value}, dt.datetime.now(dt.timezone.utc),
+            time.monotonic_ns(), error, retained, None, None,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
+            evidence = root / "wall-rejected"
+            qualification.write_receipt(evidence, rejected, retained)
+            qualification.verify_receipt(
+                evidence, manifest_path, root / "missing-baseline.json", None
+            )
+
+    def test_rejected_batch_wall_values_require_strict_integers(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        accepted = receipt(manifest_sha, value=1)
+        all_artifacts = artifact_bytes(accepted)
+        kind = "release-candidate"
+        repetition = 1
+        batch_path = qualification._batch_environment_artifact_path(
+            kind, repetition
+        )
+        required = {
+            qualification._idle_preflight_artifact_path(),
+            batch_path,
+            *qualification._iteration_artifact_paths(kind, repetition, 1),
+        }
+        message = "batch gated wall time is outside the admitted range"
+        error = qualification.QualificationBatchEnvironmentError(
+            message, kind, repetition
+        )
+
+        for malformed in (True, 1.0):
+            with self.subTest(malformed=malformed), tempfile.TemporaryDirectory() as directory:
+                retained = {
+                    path: data for path, data in all_artifacts.items()
+                    if path in required
+                }
+                batch = json.loads(retained[batch_path].decode("utf-8"))
+                batch["scope"] = "performance-batch-rejected"
+                batch.pop("decision")
+                batch["gated_wall_ms"] = malformed
+                batch["failure"] = qualification._failure_record(
+                    "batch-environment-error", message,
+                    workload=kind, repetition=repetition,
+                )
+                retained[batch_path] = qualification.canonical_json(batch)
+                rejected = qualification._rejected_payload(
+                    accepted["source"], manifest_sha, "required",
+                    accepted["host"], accepted["toolchain"],
+                    {kind: accepted["inputs"][kind]},
+                    dt.datetime.now(dt.timezone.utc), time.monotonic_ns(),
+                    error, retained, None, None,
+                )
+                root = Path(directory)
+                manifest_path = root / "manifest.json"
+                manifest_path.write_bytes(
+                    qualification.canonical_json(raw_manifest)
+                )
+                evidence = root / "rejected"
+                qualification.write_receipt(evidence, rejected, retained)
+                with self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "batch gated wall time",
+                ):
+                    qualification.verify_receipt(
+                        evidence, manifest_path,
+                        root / "missing-baseline.json", None,
+                    )
+
+    def test_accepted_and_calibration_wire_integers_reject_bool_and_float(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        pinned = baseline(manifest_sha)
+
+        mutations = (
+            (lambda value: value["workloads"][0]["runs"][0].__setitem__(
+                "repetition", True
+            ), "repetition"),
+            (lambda value: value["workloads"][0]["runs"][0]["inner_runs"][0].__setitem__(
+                "iteration", 1.0
+            ), "iteration"),
+            (lambda value: value["workloads"][1]["runs"][0].__setitem__(
+                "measurement_iterations", True
+            ), "measurement"),
+            (lambda value: value["workloads"][0]["runs"][0].__setitem__(
+                "exit_code", False
+            ), "verdict"),
+            (lambda value: value["workloads"][0]["runs"][0]["inner_runs"][0].__setitem__(
+                "exit_code", 0.0
+            ), "exit"),
+        )
+        for mutate, label in mutations:
+            with self.subTest(label=label):
+                forged = receipt(manifest_sha)
+                mutate(forged)
+                with self.assertRaises(qualification.QualificationError):
+                    qualification.validate_receipt_payload(
+                        forged, raw_manifest, pinned
+                    )
+
+        calibration = calibration_receipt(manifest_sha)
+        calibration["workloads"][1]["runs"][0][
+            "measurement_iterations"
+        ] = True
+        with self.assertRaises(qualification.QualificationError):
+            qualification._validate_calibration_payload(
+                calibration, raw_manifest
+            )
+
+        accepted = receipt(manifest_sha, value=1)
+        original_artifacts = artifact_bytes(accepted)
+        for artifact_path, field in (
+            (
+                qualification._iteration_artifact_paths(
+                    "real-repository", 1, 1
+                )[4],
+                "wall_ms",
+            ),
+            (
+                qualification._batch_environment_artifact_path(
+                    "real-repository", 1
+                ),
+                "gated_wall_ms",
+            ),
+        ):
+            with self.subTest(raw_field=field), tempfile.TemporaryDirectory() as directory:
+                artifacts = dict(original_artifacts)
+                raw = json.loads(artifacts[artifact_path].decode("utf-8"))
+                raw[field] = True
+                artifacts[artifact_path] = qualification.canonical_json(raw)
+                forged = copy.deepcopy(accepted)
+                descriptor = next(
+                    item for item in forged["artifacts"]
+                    if item["path"] == artifact_path
+                )
+                descriptor["sha256"] = sha256(artifacts[artifact_path])
+                descriptor["size"] = len(artifacts[artifact_path])
+                root = Path(directory)
+                manifest_path = root / "manifest.json"
+                baseline_path = root / "baseline.json"
+                manifest_path.write_bytes(
+                    qualification.canonical_json(raw_manifest)
+                )
+                baseline_path.write_bytes(
+                    qualification.canonical_json(pinned)
+                )
+                forged["baseline"]["sha256"] = qualification.sha256_file(
+                    baseline_path
+                )
+                evidence = root / "accepted"
+                qualification.write_receipt(evidence, forged, artifacts)
+                with self.assertRaises(qualification.QualificationError):
+                    qualification.verify_receipt(
+                        evidence, manifest_path, baseline_path, None
+                    )
+
+    def test_pinned_ten_fields_are_strict_integers_in_every_v7_schema(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        pinned = baseline(manifest_sha)
+
+        cases = (
+            (
+                "manifest repetitions", lambda: manifest(),
+                lambda value, malformed: value.__setitem__(
+                    "repetitions", malformed
+                ),
+                lambda value: qualification.validate_manifest(value),
+            ),
+            (
+                "manifest limit", lambda: manifest(),
+                lambda value, malformed: value.__setitem__(
+                    "performance_regression_limit_percent", malformed
+                ),
+                lambda value: qualification.validate_manifest(value),
+            ),
+            (
+                "baseline limit", lambda: baseline(manifest_sha),
+                lambda value, malformed: value.__setitem__(
+                    "performance_regression_limit_percent", malformed
+                ),
+                lambda value: qualification.validate_baseline(
+                    value, manifest_sha
+                ),
+            ),
+            (
+                "accepted repetitions", lambda: receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "repetitions", malformed
+                ),
+                lambda value: qualification.validate_receipt_payload(
+                    value, raw_manifest, pinned
+                ),
+            ),
+            (
+                "accepted limit", lambda: receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "performance_regression_limit_percent", malformed
+                ),
+                lambda value: qualification.validate_receipt_payload(
+                    value, raw_manifest, pinned
+                ),
+            ),
+            (
+                "calibration repetitions",
+                lambda: calibration_receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "repetitions", malformed
+                ),
+                lambda value: qualification._validate_calibration_payload(
+                    value, raw_manifest
+                ),
+            ),
+            (
+                "calibration limit",
+                lambda: calibration_receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "performance_regression_limit_percent", malformed
+                ),
+                lambda value: qualification._validate_calibration_payload(
+                    value, raw_manifest
+                ),
+            ),
+            (
+                "rejected repetitions", lambda: rejected_receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "repetitions", malformed
+                ),
+                lambda value: qualification._validate_rejected_payload(
+                    value, raw_manifest, None
+                ),
+            ),
+            (
+                "rejected limit", lambda: rejected_receipt(manifest_sha),
+                lambda value, malformed: value["configuration"].__setitem__(
+                    "performance_regression_limit_percent", malformed
+                ),
+                lambda value: qualification._validate_rejected_payload(
+                    value, raw_manifest, None
+                ),
+            ),
+        )
+        for label, factory, mutate, validate in cases:
+            for malformed in (True, 10.0):
+                with self.subTest(label=label, malformed=malformed):
+                    value = factory()
+                    mutate(value, malformed)
+                    with self.assertRaises(qualification.QualificationError):
+                        validate(value)
+
     def test_semantic_projection_excludes_runtime_telemetry_but_not_findings(self) -> None:
         report = {
             "tool": "CodeSkeptic",
@@ -2824,6 +3456,18 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.verify_baseline_authority(
                 base, authority, manifest_path
             )
+
+            profile = base["profiles"]["test-linux-x86_64"]
+            profile["os"] = "Linux 7.1.8-200.fc44.x86_64"
+            qualification.validate_baseline(base, manifest_sha)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "calibration provenance drift",
+            ):
+                qualification.verify_baseline_authority(
+                    base, authority, manifest_path
+                )
+            profile["os"] = calibration["host"]["os"]
 
             provenance["promotion"]["reason"] = ""
             with self.assertRaisesRegex(
