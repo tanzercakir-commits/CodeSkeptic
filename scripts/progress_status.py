@@ -50,6 +50,14 @@ MIGRATION_PLAN_SHA256 = (
 MIGRATION_CATALOG_SHA256 = (
     "e99426c1790aee68ec838c851f8bc49219114f1f9e4c6abd36daa599b2357f8c"
 )
+POLICY_PLAN_SCHEMA = 2
+POLICY_PLAN_AUTHORITY_OID = "338be9c4db73f55b08b57b6b482d7d1045b55137"
+POLICY_PLAN_SHA256 = (
+    "8f9ae5587063e86862f49dd68497c4c69a2cd244d28128ffb12876199883d6ef"
+)
+POLICY_CATALOG_SHA256 = (
+    "1eb6055330dd0f0b3f7ef0eaf80c074870587278ea05b624fb4840ae3ba44d11"
+)
 MIGRATION_TASK_IDS = (
     "CS-P08-03",
     "CS-P08-04",
@@ -105,6 +113,7 @@ class WorkItem:
 
 @dataclass(frozen=True)
 class WorkCatalog:
+    schema: int
     program: str
     items: tuple[WorkItem, ...]
 
@@ -237,11 +246,8 @@ def _string_list(value: object, field: str, *, nonempty: bool) -> tuple[str, ...
     return result
 
 
-def _load_catalog(root: Path) -> WorkCatalog:
-    path = root / PLAN_REL
-    if not path.is_file():
-        raise ProgressStatusError(f"missing {PLAN_REL.as_posix()}")
-    plan = _decode_utf8_exact(path.read_bytes(), PLAN_REL.as_posix())
+def _parse_catalog(content: bytes, label: str) -> WorkCatalog:
+    plan = _decode_utf8_exact(content, label)
     matches = WORK_ITEMS_RE.findall(plan)
     if len(matches) != 1:
         raise ProgressStatusError(
@@ -253,7 +259,8 @@ def _load_catalog(root: Path) -> WorkCatalog:
         raise ProgressStatusError(f"invalid PLAN work-item JSON: {error}") from error
     if not isinstance(raw, dict) or set(raw) != {"schema", "program", "items"}:
         raise ProgressStatusError("PLAN work-item catalog has unexpected fields")
-    if raw["schema"] != 1:
+    schema = raw["schema"]
+    if not isinstance(schema, int) or isinstance(schema, bool) or schema not in {1, 2}:
         raise ProgressStatusError("unsupported PLAN work-item schema")
     program = _nonempty_string(raw["program"], "program")
     raw_items = raw["items"]
@@ -300,7 +307,14 @@ def _load_catalog(root: Path) -> WorkCatalog:
         )
         known.add(item_id)
         previous_key = item_key
-    return WorkCatalog(program=program, items=tuple(items))
+    return WorkCatalog(schema=schema, program=program, items=tuple(items))
+
+
+def _load_catalog(root: Path) -> WorkCatalog:
+    path = root / PLAN_REL
+    if not path.is_file():
+        raise ProgressStatusError(f"missing {PLAN_REL.as_posix()}")
+    return _parse_catalog(path.read_bytes(), PLAN_REL.as_posix())
 
 
 def _catalog_payload(plan: str) -> str:
@@ -330,36 +344,76 @@ def _enforce_fixed_plan(root: Path, base_ref: str) -> None:
         b"<!-- cs:work-items-begin -->" in completed.stdout
         or b"<!-- cs:work-items-end -->" in completed.stdout
     )
+    catalog = _load_catalog(root)
+    plan_digest = sha256(current_plan_bytes).hexdigest()
+    digest = sha256(current_payload.encode("utf-8")).hexdigest()
+    task_ids = tuple(item.id for item in catalog.items)
+
+    def current_is_legacy() -> bool:
+        return (
+            catalog.schema == 1
+            and plan_digest == MIGRATION_PLAN_SHA256
+            and digest == MIGRATION_CATALOG_SHA256
+            and task_ids == MIGRATION_TASK_IDS
+        )
+
+    def current_is_policy_revision() -> bool:
+        return (
+            catalog.schema == POLICY_PLAN_SCHEMA
+            and plan_digest == POLICY_PLAN_SHA256
+            and digest == POLICY_CATALOG_SHA256
+            and task_ids == MIGRATION_TASK_IDS
+        )
+
+    def require_policy_authority() -> None:
+        if not _is_ancestor(root, POLICY_PLAN_AUTHORITY_OID, "HEAD"):
+            raise ProgressStatusError(
+                "approved PLAN policy revision is allowed only on descendants "
+                f"of authority commit {POLICY_PLAN_AUTHORITY_OID}"
+            )
+
     if completed.returncode != 0 or not protected_has_catalog:
         # One-time migration from the last protected-main state without a
         # catalog. Pin both the authority commit and the exact catalog bytes;
         # otherwise a first migration branch could silently omit old work.
         base_oid = _resolve_commit(root, base_ref)
-        catalog = _load_catalog(root)
-        plan_digest = sha256(current_plan_bytes).hexdigest()
-        digest = sha256(current_payload.encode("utf-8")).hexdigest()
         if base_oid != MIGRATION_MAIN_OID:
             raise ProgressStatusError(
                 "catalog migration is allowed only from the pinned protected-main "
                 f"commit {MIGRATION_MAIN_OID}"
             )
-        if plan_digest != MIGRATION_PLAN_SHA256:
-            raise ProgressStatusError(
-                "PLAN migration differs from the pinned complete legacy plan"
-            )
-        if digest != MIGRATION_CATALOG_SHA256:
-            raise ProgressStatusError(
-                "PLAN migration catalog differs from the pinned complete catalog"
-            )
-        if tuple(item.id for item in catalog.items) != MIGRATION_TASK_IDS:
-            raise ProgressStatusError(
-                "PLAN migration catalog does not preserve every pinned task id"
-            )
-        return
-    if current_plan_bytes != completed.stdout:
+        if current_is_legacy():
+            return
+        if current_is_policy_revision():
+            require_policy_authority()
+            return
         raise ProgressStatusError(
-            "docs/PLAN.md work program is fixed and differs from protected main"
+            "PLAN migration differs from every pinned complete work program"
         )
+    if current_plan_bytes == completed.stdout:
+        return
+
+    protected_plan = _decode_utf8_exact(
+        completed.stdout, f"{base_ref}:{PLAN_REL.as_posix()}"
+    )
+    protected_catalog = _parse_catalog(
+        completed.stdout, f"{base_ref}:{PLAN_REL.as_posix()}"
+    )
+    protected_payload = _catalog_payload(protected_plan)
+    protected_is_legacy = (
+        protected_catalog.schema == 1
+        and sha256(completed.stdout).hexdigest() == MIGRATION_PLAN_SHA256
+        and sha256(protected_payload.encode("utf-8")).hexdigest()
+        == MIGRATION_CATALOG_SHA256
+        and tuple(item.id for item in protected_catalog.items)
+        == MIGRATION_TASK_IDS
+    )
+    if protected_is_legacy and current_is_policy_revision():
+        require_policy_authority()
+        return
+    raise ProgressStatusError(
+        "docs/PLAN.md work program is fixed and differs from protected main"
+    )
 
 
 def _commit_range(root: Path, anchor: str, tip: str) -> list[str]:

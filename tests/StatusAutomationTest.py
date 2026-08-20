@@ -701,10 +701,138 @@ class ProgressStatusTest(unittest.TestCase):
         catalog = progress_status._load_catalog(ROOT)
         by_id = {item.id: item for item in catalog.items}
 
+        self.assertEqual(catalog.schema, progress_status.POLICY_PLAN_SCHEMA)
         self.assertIn("CS-P08-03", by_id)
         self.assertIn("CS-P08-04", by_id)
         self.assertIn("CS-P09-01", by_id)
         self.assertIn("CS-P09-01", by_id["CS-P12-08"].depends_on)
+
+    def test_approved_policy_revision_requires_exact_bytes_and_authority(self) -> None:
+        missing_plan = subprocess.CompletedProcess(
+            args=["git", "show"],
+            returncode=128,
+            stdout=b"",
+            stderr=b"protected main has no work catalog",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "docs").mkdir()
+            plan_path = root / "docs" / "PLAN.md"
+            plan_path.write_bytes((ROOT / "docs" / "PLAN.md").read_bytes())
+            with mock.patch.object(
+                progress_status.subprocess, "run", return_value=missing_plan
+            ), mock.patch.object(
+                progress_status,
+                "_resolve_commit",
+                return_value=progress_status.MIGRATION_MAIN_OID,
+            ), mock.patch.object(
+                progress_status, "_is_ancestor", return_value=True
+            ):
+                progress_status._enforce_fixed_plan(root, "origin/main")
+
+                plan_path.write_text(
+                    plan_path.read_text(encoding="utf-8").replace(
+                        "three independent external projects",
+                        "two independent external projects",
+                        1,
+                    ),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                with self.assertRaises(progress_status.ProgressStatusError):
+                    progress_status._enforce_fixed_plan(root, "origin/main")
+
+                plan_path.write_bytes((ROOT / "docs" / "PLAN.md").read_bytes())
+                with mock.patch.object(
+                    progress_status, "_is_ancestor", return_value=False
+                ):
+                    with self.assertRaises(progress_status.ProgressStatusError):
+                        progress_status._enforce_fixed_plan(root, "origin/main")
+
+    def test_pinned_legacy_catalog_remains_valid_during_policy_transition(self) -> None:
+        legacy = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{progress_status.POLICY_PLAN_AUTHORITY_OID}:docs/PLAN.md",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertEqual(
+            progress_status.sha256(legacy).hexdigest(),
+            progress_status.MIGRATION_PLAN_SHA256,
+        )
+        missing_plan = subprocess.CompletedProcess(
+            args=["git", "show"],
+            returncode=128,
+            stdout=b"",
+            stderr=b"protected main has no work catalog",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "docs").mkdir()
+            (root / "docs" / "PLAN.md").write_bytes(legacy)
+            with mock.patch.object(
+                progress_status.subprocess, "run", return_value=missing_plan
+            ), mock.patch.object(
+                progress_status,
+                "_resolve_commit",
+                return_value=progress_status.MIGRATION_MAIN_OID,
+            ):
+                progress_status._enforce_fixed_plan(root, "origin/main")
+
+    def test_policy_revision_accepts_exact_protected_schema_one_predecessor(self) -> None:
+        legacy = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{progress_status.POLICY_PLAN_AUTHORITY_OID}:docs/PLAN.md",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout
+        protected = subprocess.CompletedProcess(
+            args=["git", "show"],
+            returncode=0,
+            stdout=legacy,
+            stderr=b"",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "docs").mkdir()
+            (root / "docs" / "PLAN.md").write_bytes(
+                (ROOT / "docs" / "PLAN.md").read_bytes()
+            )
+            with mock.patch.object(
+                progress_status.subprocess, "run", return_value=protected
+            ), mock.patch.object(
+                progress_status, "_is_ancestor", return_value=True
+            ):
+                progress_status._enforce_fixed_plan(root, "origin/main")
+
+            forged = legacy.replace(
+                b"# CodeSkeptic \xe2\x80\x94 PLAN (sabit referans, t\xc3\xbcm plan)",
+                b"# Forged protected PLAN narrative",
+                1,
+            )
+            self.assertNotEqual(forged, legacy)
+            with mock.patch.object(
+                progress_status.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess(
+                    args=["git", "show"],
+                    returncode=0,
+                    stdout=forged,
+                    stderr=b"",
+                ),
+            ), mock.patch.object(
+                progress_status, "_is_ancestor", return_value=True
+            ):
+                with self.assertRaises(progress_status.ProgressStatusError):
+                    progress_status._enforce_fixed_plan(root, "origin/main")
 
     def test_first_catalog_migration_is_pinned_byte_for_byte(self) -> None:
         missing_plan = subprocess.CompletedProcess(
@@ -724,6 +852,8 @@ class ProgressStatusTest(unittest.TestCase):
                 progress_status,
                 "_resolve_commit",
                 return_value=progress_status.MIGRATION_MAIN_OID,
+            ), mock.patch.object(
+                progress_status, "_is_ancestor", return_value=True
             ):
                 progress_status._enforce_fixed_plan(root, "origin/main")
 
@@ -742,8 +872,8 @@ class ProgressStatusTest(unittest.TestCase):
                 plan_path.write_bytes((ROOT / "docs" / "PLAN.md").read_bytes())
                 plan_path.write_text(
                     plan_path.read_text(encoding="utf-8").replace(
-                        "# CodeSkeptic — PLAN (sabit referans, tüm plan)",
-                        "# Deleted legacy plan narrative",
+                        "# CodeSkeptic — PLAN (sürüm kontrollü referans, tüm plan)",
+                        "# Deleted policy plan narrative",
                         1,
                     ),
                     encoding="utf-8",
