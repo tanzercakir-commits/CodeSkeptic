@@ -1,0 +1,323 @@
+{
+  "artifacts": [
+    {
+      "path": "raw/build-authority/SHA256SUMS",
+      "sha256": "0cf63440942df5a2e81a9a6c7783077134b6fa059465c3028fe788e0374c4168",
+      "size": 400
+    },
+    {
+      "path": "raw/build-authority/build.log",
+      "sha256": "59cdfe94b9379498166ef9f43e8d558b9c90b8c79c6a8b8e179fa8543b7c94f0",
+      "size": 5437
+    },
+    {
+      "path": "raw/build-authority/configure.log",
+      "sha256": "5cc816655fe4044bd50fa60f2c9299d9665ddcc1e0ca95e2daa827fbf6b47271",
+      "size": 1399
+    },
+    {
+      "path": "raw/build-authority/operator.log",
+      "sha256": "d59c263c8ebadf326d644fbe235cfbe4c12d0b0007967f5499a1221a3c8decfa",
+      "size": 127
+    },
+    {
+      "path": "raw/build-authority/receipt.json",
+      "sha256": "6af56351786e2bbcde1faf2be98ea9a8930304cd231f1577b89bd6a3b78c289f",
+      "size": 6360
+    },
+    {
+      "path": "raw/build-authority/receipt.json.sha256",
+      "sha256": "56ee60e7d5bfc38861aaba8b5aac876cddf21d8c9e1fc8baaa545bbc65e0ed4d",
+      "size": 79
+    },
+    {
+      "path": "raw/campaign-authority.json",
+      "sha256": "c561059f9a8e3b2873a8bb5d9465aeac2def91d818863014b9ef54477cdd131a",
+      "size": 9539
+    },
+    {
+      "path": "raw/campaign-launch-authority.json",
+      "sha256": "0cbc18d207835fcaa0512516e38f7bf91feeff8a139cff3a2cac4fbede8460f3",
+      "size": 8705
+    },
+    {
+      "path": "raw/thesis/tiny-stack/compile_commands.json",
+      "sha256": "bae541cfc4246a36986f7c98dbcfeb13b056a338cd38eb903eb89c72d9c90f77",
+      "size": 279
+    },
+    {
+      "path": "raw/thesis/tiny-stack/operator.json",
+      "sha256": "23b0d2c84e0386b96ceb79376cab843958a50bea90582ae25d02f20c8d0f1fc8",
+      "size": 8018
+    },
+    {
+      "path": "raw/thesis/tiny-stack/operator.log",
+      "sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+      "size": 110
+    },
+    {
+      "path": "raw/thesis/tiny-stack/report.json",
+      "sha256": "c829cc959405a59482fafcfef095a3950f9db59100753537591c74c8c60211e4",
+      "size": 1029
+    },
+    {
+      "path": "raw/thesis/tiny-stack/source.c",
+      "sha256": "825e96126a826de75234032bc844fb29c197ab8ee90ae613084fe433d8fa96c8",
+      "size": 398
+    }
+  ],
+  "authority": {
+    "analyzer": {
+      "binary_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+      "version": "CodeSkeptic 0.4.9-dev"
+    },
+    "analyzer_build_authority": {
+      "analyzer": {
+        "path": "src/codeskeptic",
+        "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+        "version": "CodeSkeptic 0.4.9-dev"
+      },
+      "build_identity_sha256": "31b991324f4dc01ff59033f6c8aee39f3b31de24adfdda47e5540ea9dfdfcbbb",
+      "bundle_sha256": "f9bf53cc27db4f0761e08ff2dfb86ee3dafed6dcd64931bb20f21ee6ef60c61f",
+      "file_count": 6,
+      "path": "build-authority",
+      "runtime": {
+        "image": {
+          "digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+          "id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+          "reference": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
+        },
+        "normalized_argv": [
+          "$PODMAN",
+          "--cgroup-manager=cgroupfs",
+          "--conmon=/usr/bin/conmon",
+          "--events-backend=none",
+          "--hooks-dir=/usr/share/empty",
+          "--runtime=/usr/bin/crun",
+          "run",
+          "--rm",
+          "--pull=never",
+          "--network=none",
+          "--http-proxy=false",
+          "--env-host=false",
+          "--image-volume=ignore",
+          "--read-only",
+          "--cap-drop=all",
+          "--security-opt",
+          "label=disable",
+          "--security-opt",
+          "no-new-privileges",
+          "--tmpfs",
+          "/tmp:rw,size=4g,mode=1777",
+          "--workdir",
+          "/source",
+          "-e",
+          "GIT_CONFIG_COUNT=1",
+          "-e",
+          "GIT_CONFIG_KEY_0=safe.directory",
+          "-e",
+          "GIT_CONFIG_VALUE_0=/source",
+          "-e",
+          "GIT_OPTIONAL_LOCKS=0",
+          "-e",
+          "HOME=/tmp/home",
+          "-e",
+          "LANG=C",
+          "-e",
+          "LC_ALL=C",
+          "-e",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "-e",
+          "XDG_CACHE_HOME=/tmp/xdg-cache",
+          "-v",
+          "$SOURCE:/source:ro",
+          "-v",
+          "$BUILD:/build:rw",
+          "-e",
+          "CODESKEPTIC_BUILD_AUTHORITY_LAUNCH_SHA256=$LAUNCH_SHA256",
+          "-v",
+          "$STAGE:/authority-stage:rw",
+          "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+          "/usr/bin/python3",
+          "/source/scripts/analyzer_build_authority.py",
+          "_inner-produce",
+          "--source",
+          "/source",
+          "--revision",
+          "$REVISION",
+          "--build-dir",
+          "/build",
+          "--output",
+          "/authority-stage/inner",
+          "--launch-authority",
+          "/authority-stage/launch-authority.json"
+        ],
+        "normalized_argv_sha256": "b7b64bf35933aa35d9324ba25cf9d97df59b047ca0ddbcbb009727182f5f3d3e",
+        "podman": {
+          "path": "/usr/bin/podman",
+          "sha256": "b1bac06f5e73ca1353738b58a2b1fd6e73d6d4a8eb67ed1dde3edf735a52e0c8",
+          "version": "podman version 5.8.4"
+        },
+        "schema": "codeskeptic-analyzer-build-runtime-v1"
+      },
+      "source": {
+        "file_count": 399,
+        "manifest_sha256": "b33320937d76ffef84543e9b3492dce34d2c1786ecdd91ff06477e0e59fbd3f8",
+        "revision": "837fd0d37aec528a01df13b155c45f40b9ab6f89"
+      }
+    },
+    "execution_authority": {
+      "action": "run",
+      "build_identity_sha256": "31b991324f4dc01ff59033f6c8aee39f3b31de24adfdda47e5540ea9dfdfcbbb",
+      "image": {
+        "digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+        "id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+        "reference": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
+      },
+      "jobs": 4,
+      "launch_sha256": "0cbc18d207835fcaa0512516e38f7bf91feeff8a139cff3a2cac4fbede8460f3",
+      "normalized_argv": [
+        "$PODMAN",
+        "--cgroup-manager=cgroupfs",
+        "--conmon=/usr/bin/conmon",
+        "--events-backend=none",
+        "--hooks-dir=/usr/share/empty",
+        "--runtime=/usr/bin/crun",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--http-proxy=false",
+        "--env-host=false",
+        "--image-volume=ignore",
+        "--read-only",
+        "--cap-drop=all",
+        "--security-opt",
+        "label=disable",
+        "--security-opt",
+        "no-new-privileges",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,size=256m,mode=1777",
+        "--workdir",
+        "/source",
+        "-e",
+        "CODESKEPTIC_QUALITY_FLOOR_LAUNCH_SHA256=$LAUNCH_SHA256",
+        "-e",
+        "CODESKEPTIC_QUALITY_FLOOR_ENV_SHA256=$ENV_SHA256",
+        "-e",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "-e",
+        "HOME=/scratch/home",
+        "-e",
+        "LANG=C",
+        "-e",
+        "LC_ALL=C",
+        "-e",
+        "TZ=UTC",
+        "-e",
+        "TMPDIR=/scratch",
+        "-e",
+        "XDG_CACHE_HOME=/scratch/xdg-cache",
+        "-e",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "-e",
+        "GIT_OPTIONAL_LOCKS=0",
+        "-e",
+        "GIT_CONFIG_GLOBAL=/dev/null",
+        "-e",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "-e",
+        "GIT_NO_REPLACE_OBJECTS=1",
+        "-e",
+        "GIT_CONFIG_COUNT=5",
+        "-e",
+        "GIT_CONFIG_KEY_0=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_0=/source",
+        "-e",
+        "GIT_CONFIG_KEY_1=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_1=/libarchive",
+        "-e",
+        "GIT_CONFIG_KEY_2=core.hooksPath",
+        "-e",
+        "GIT_CONFIG_VALUE_2=/dev/null",
+        "-e",
+        "GIT_CONFIG_KEY_3=core.fsmonitor",
+        "-e",
+        "GIT_CONFIG_VALUE_3=false",
+        "-e",
+        "GIT_CONFIG_KEY_4=core.commitGraph",
+        "-e",
+        "GIT_CONFIG_VALUE_4=false",
+        "-v",
+        "$SOURCE:/source:ro",
+        "-v",
+        "$BUILD:/build:ro",
+        "-v",
+        "$BUILD_AUTHORITY:/build-authority:ro",
+        "-v",
+        "$JULIET:/juliet:ro",
+        "-v",
+        "$JULIET_ARCHIVE:/juliet.zip:ro",
+        "-v",
+        "$LIBARCHIVE:/libarchive:ro",
+        "-v",
+        "$STAGE:/stage:rw",
+        "-v",
+        "$SCRATCH:/scratch:rw",
+        "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+        "/usr/bin/python3",
+        "/source/scripts/run_quality_floor_campaign.py",
+        "_inner-run",
+        "--source",
+        "/source",
+        "--build-authority",
+        "/build-authority",
+        "--build-dir",
+        "/build",
+        "--juliet-dir",
+        "/juliet",
+        "--juliet-archive",
+        "/juliet.zip",
+        "--libarchive-checkout",
+        "/libarchive",
+        "--output",
+        "/stage/package",
+        "--launch-authority",
+        "/stage/campaign-launch-authority.json",
+        "--jobs",
+        "4"
+      ],
+      "normalized_argv_sha256": "ff75effe82a65505e8d0cedeb55981bd26bbabac2d84696637c59b6a182744ca",
+      "podman": {
+        "path": "/usr/bin/podman",
+        "sha256": "b1bac06f5e73ca1353738b58a2b1fd6e73d6d4a8eb67ed1dde3edf735a52e0c8",
+        "version": "podman version 5.8.4"
+      },
+      "schema": "codeskeptic-quality-floor-execution-authority-v1"
+    },
+    "run_id": "896ff197-4a49-48a7-ac0f-8fa4ee58bcb5",
+    "schema": "codeskeptic-quality-floor-raw-authority-v1",
+    "source": {
+      "manifest_sha256": "b33320937d76ffef84543e9b3492dce34d2c1786ecdd91ff06477e0e59fbd3f8",
+      "revision": "837fd0d37aec528a01df13b155c45f40b9ab6f89"
+    }
+  },
+  "evidence_id": "tiny-stack",
+  "evidence_kind": "clean-case",
+  "observation": {
+    "complete": true,
+    "coverage": {
+      "analyzed_tus": 1,
+      "attempted_tus": 1,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "findings": 0,
+    "id": "tiny-stack",
+    "process_exit": 0,
+    "report_exit": 0
+  },
+  "schema": "codeskeptic-quality-floor-bundle-evidence-v1"
+}

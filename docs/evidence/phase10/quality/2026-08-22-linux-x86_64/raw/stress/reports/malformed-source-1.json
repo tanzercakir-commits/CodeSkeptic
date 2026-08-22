@@ -1,0 +1,15 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "failed",
+  "complete": false,
+  "exit_code": 2,
+  "coverage": { "attempted_tus": 1, "analyzed_tus": 0, "broken_tus": 1, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/scratch/codeskeptic-stress-m_vjiuen/malformed-source/repeat-1/malformed_source.cpp", "compile_command_sha256": "14c3fb61d6b7ac4ecab2ac17a98df69fe4eb58aba93f2bfb7499402537bd641f", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 18, "peak_memory_kib": 73960, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}

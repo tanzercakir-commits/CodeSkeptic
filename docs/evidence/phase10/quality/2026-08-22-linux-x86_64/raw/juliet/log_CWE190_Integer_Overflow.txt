@@ -1,0 +1,1444 @@
+[CodeSkeptic] Analysis starting... (402 files, 12 rules)
+[CodeSkeptic] Whole-program pass: collecting summaries from 402 file(s)...
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:59:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:59:13: note: use function 'labs' instead
+   59 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:77:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   77 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:77:13: note: use function 'labs' instead
+   77 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_51b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_51b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_67b.c:59:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_67b.c:59:9: note: use function 'labs' instead
+   59 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:78:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   78 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:78:13: note: use function 'labs' instead
+   78 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:103:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+  103 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:103:13: note: use function 'labs' instead
+  103 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_18.c:57:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   57 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_18.c:57:9: note: use function 'labs' instead
+   57 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_44.c:73:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   73 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_44.c:73:9: note: use function 'labs' instead
+   73 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_64b.c:63:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   63 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_64b.c:63:9: note: use function 'labs' instead
+   63 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:35:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:52:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:65:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_18.c:57:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   57 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_18.c:57:9: note: use function 'labs' instead
+   57 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_44.c:73:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   73 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_44.c:73:9: note: use function 'labs' instead
+   73 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_65b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_65b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:71:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   71 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:71:13: note: use function 'labs' instead
+   71 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:96:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   96 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:96:13: note: use function 'labs' instead
+   96 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_34.c:83:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   83 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_34.c:83:13: note: use function 'labs' instead
+   83 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_61a.c:67:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   67 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_61a.c:67:9: note: use function 'labs' instead
+   67 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:49:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   49 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:49:13: note: use function 'labs' instead
+   49 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:85:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   85 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:85:13: note: use function 'labs' instead
+   85 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:98:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   98 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:98:13: note: use function 'labs' instead
+   98 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_32.c:89:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   89 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_32.c:89:13: note: use function 'labs' instead
+   89 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_53d.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_53d.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:59:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:59:13: note: use function 'labs' instead
+   59 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:77:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   77 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:77:13: note: use function 'labs' instead
+   77 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_51b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_51b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_67b.c:59:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_67b.c:59:9: note: use function 'labs' instead
+   59 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_10.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:59:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:59:13: note: use function 'labs' instead
+   59 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:77:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   77 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_22b.c:77:13: note: use function 'labs' instead
+   77 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_51b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_51b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_67b.c:59:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_max_square_67b.c:59:9: note: use function 'labs' instead
+   59 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:78:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   78 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:78:13: note: use function 'labs' instead
+   78 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:103:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+  103 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_08.c:103:13: note: use function 'labs' instead
+  103 |         if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_18.c:57:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   57 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_18.c:57:9: note: use function 'labs' instead
+   57 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_44.c:73:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   73 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_44.c:73:9: note: use function 'labs' instead
+   73 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_64b.c:63:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   63 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_square_64b.c:63:9: note: use function 'labs' instead
+   63 |     if (abs((long)data) <= (long)sqrt((double)CHAR_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_add_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_add_82::CWE190_Integer_Overflow__int64_t_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s02/CWE190_Integer_Overflow__int64_t_rand_multiply_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__int64_t_rand_multiply_82::CWE190_Integer_Overflow__int64_t_rand_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:35:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:52:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__int_rand_add_82a.cpp:65:5: warning: delete called on 'CWE190_Integer_Overflow__int_rand_add_82::CWE190_Integer_Overflow__int_rand_add_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_09.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_18.c:57:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   57 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_18.c:57:9: note: use function 'labs' instead
+   57 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_44.c:73:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   73 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_44.c:73:9: note: use function 'labs' instead
+   73 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_65b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s04/CWE190_Integer_Overflow__short_max_square_65b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:71:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   71 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:71:13: note: use function 'labs' instead
+   71 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:96:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   96 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_04.c:96:13: note: use function 'labs' instead
+   96 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_14.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_34.c:83:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   83 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_34.c:83:13: note: use function 'labs' instead
+   83 |         if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |             ^~~
+      |             labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_61a.c:67:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   67 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__short_rand_square_61a.c:67:9: note: use function 'labs' instead
+   67 |     if (abs((long)data) <= (long)sqrt((double)SHRT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_multiply_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_multiply_82::CWE190_Integer_Overflow__unsigned_int_max_multiply_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_02.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:49:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   49 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:49:13: note: use function 'labs' instead
+   49 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:85:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   85 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:85:13: note: use function 'labs' instead
+   85 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:98:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   98 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_12.c:98:13: note: use function 'labs' instead
+   98 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_32.c:89:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   89 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_32.c:89:13: note: use function 'labs' instead
+   89 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_53d.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_53d.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:34:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   34 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:50:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   50 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_max_square_82a.cpp:62:5: warning: delete called on 'CWE190_Integer_Overflow__unsigned_int_max_square_82::CWE190_Integer_Overflow__unsigned_int_max_square_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   62 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:65:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:65:13: note: use function 'labs' instead
+   65 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:90:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_10.c:90:13: note: use function 'labs' instead
+   90 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:59:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:59:13: note: use function 'labs' instead
+   59 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:77:13: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   77 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_22b.c:77:13: note: use function 'labs' instead
+   77 |         if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |             ^~~
+      |             labs
+2 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_51b.c:51:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_51b.c:51:9: note: use function 'labs' instead
+   51 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_67b.c:59:9: warning: absolute value function 'abs' given an argument of type 'long' but has parameter of type 'int' which may cause truncation of value [-Wabsolute-value]
+   59 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^
+/juliet/C/testcases/CWE190_Integer_Overflow/s05/CWE190_Integer_Overflow__unsigned_int_rand_square_67b.c:59:9: note: use function 'labs' instead
+   59 |     if (abs((long)data) < (long)sqrt((double)UINT_MAX))
+      |         ^~~
+      |         labs
+1 warning generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2610 function summaries loaded from /scratch/codeskeptic-tu-run-501b3d/merged-summary.csk

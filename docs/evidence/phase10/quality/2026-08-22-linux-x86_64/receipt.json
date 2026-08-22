@@ -1,0 +1,165 @@
+{
+  "availability": "available",
+  "failures": [],
+  "identity": {
+    "analyzer": {
+      "binary_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+      "version": "CodeSkeptic 0.4.9-dev"
+    },
+    "capabilities": {
+      "registry_sha256": "9773ccbbf082a64c9eb7b1ca3ea2d639c9efc5737128f563008e5ca4ec6affd0",
+      "supported_quality_gated_default_rules": [
+        "memory-leak",
+        "double-free",
+        "use-after-free",
+        "resource-leak",
+        "div-by-zero",
+        "null-deref",
+        "int-overflow"
+      ]
+    },
+    "retained_artifacts": {
+      "file_count": 163,
+      "manifest_path": "RAW_SHA256SUMS",
+      "manifest_sha256": "2444c8facc3163c29bdad7851394cb8313d449f60ba39e48e01060bc1cc86390"
+    },
+    "source": {
+      "manifest_sha256": "b33320937d76ffef84543e9b3492dce34d2c1786ecdd91ff06477e0e59fbd3f8",
+      "revision": "837fd0d37aec528a01df13b155c45f40b9ab6f89"
+    }
+  },
+  "input": {
+    "bytes": 8817,
+    "schema": "codeskeptic-quality-floor-input-v1",
+    "sha256": "2fcb8b9ff23d59f917d1ad2c294e418e187fb303e5ecb5ca6fa93442f9275879"
+  },
+  "metrics": {
+    "addressable_recall": {
+      "addressable_false_negatives": 260,
+      "denominator": 898,
+      "numerator": 638,
+      "passed": true,
+      "threshold_percent": 70
+    },
+    "clean_corpus": {
+      "accepted_cases": 9,
+      "passed": true,
+      "required_cases": 9
+    },
+    "micro_precision": {
+      "denominator": 657,
+      "numerator": 643,
+      "passed": true,
+      "threshold_percent": 90
+    },
+    "requested_tu_negatives": {
+      "accepted_cases": 2,
+      "passed": true,
+      "required_kinds": [
+        "broken",
+        "missing"
+      ]
+    },
+    "rules": [
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 61,
+          "case_true_positives": 99
+        },
+        "diagnostic_precision": {
+          "denominator": 117,
+          "numerator": 103,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "memory-leak"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 20,
+          "case_true_positives": 119
+        },
+        "diagnostic_precision": {
+          "denominator": 119,
+          "numerator": 119,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "double-free"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 78,
+          "case_true_positives": 212
+        },
+        "diagnostic_precision": {
+          "denominator": 212,
+          "numerator": 212,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "use-after-free"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 0,
+          "case_true_positives": 3
+        },
+        "diagnostic_precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "resource-leak"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 10,
+          "case_true_positives": 43
+        },
+        "diagnostic_precision": {
+          "denominator": 43,
+          "numerator": 43,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "div-by-zero"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 35,
+          "case_true_positives": 139
+        },
+        "diagnostic_precision": {
+          "denominator": 140,
+          "numerator": 140,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "null-deref"
+      },
+      {
+        "case_recall_components": {
+          "addressable_false_negatives": 56,
+          "case_true_positives": 23
+        },
+        "diagnostic_precision": {
+          "denominator": 23,
+          "numerator": 23,
+          "passed": true,
+          "threshold_percent": 85
+        },
+        "id": "int-overflow"
+      }
+    ]
+  },
+  "retained_artifact_verification": {
+    "evidence_file_count": 18,
+    "file_count": 163,
+    "manifest_path": "RAW_SHA256SUMS",
+    "manifest_sha256": "2444c8facc3163c29bdad7851394cb8313d449f60ba39e48e01060bc1cc86390"
+  },
+  "schema": "codeskeptic-quality-floor-receipt-v1",
+  "status": "accepted"
+}

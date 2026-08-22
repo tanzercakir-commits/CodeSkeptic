@@ -1,0 +1,12 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang-20",
+      "-std=gnu11",
+      "-fsyntax-only",
+      "/stage/package/raw/thesis/concat-heap/source.c"
+    ],
+    "directory": "/stage/package/raw/thesis/concat-heap",
+    "file": "/stage/package/raw/thesis/concat-heap/source.c"
+  }
+]

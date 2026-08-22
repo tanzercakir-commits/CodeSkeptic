@@ -27,9 +27,7 @@
   both admitted compile commands in both whole-program phases instead of
   collapsing them to a unique path set. A failed container surfaces only its
   bounded, escaped final diagnostic while the private workspace is still
-  removed. The exact-head authoritative campaign and retained evidence are
-  still pending; this checkpoint does not close `CS-P10-08` and does not change
-  protected-main status.
+  removed.
 - Hardened the real-world corpus gate after a live cJSON/tinyxml2 run exposed
   a false green: the outer requested-surface banner was followed by nested
   one-file banners, producing a multiline arithmetic operand that skipped the
@@ -37,6 +35,21 @@
   now consumes only the deterministic top-level banner and a behavioral
   contract proves exact `23/23` and `2/2` coverage while rejecting missing or
   mismatched aggregate surfaces.
+- The exact-head authoritative campaign at source checkpoint
+  `837fd0d37aec528a01df13b155c45f40b9ab6f89` and build-authority seal
+  `31b991324f4dc01ff59033f6c8aee39f3b31de24adfdda47e5540ea9dfdfcbbb`
+  passed both producer and independent verifier paths. Micro precision is
+  `643/657`, addressable recall is `638/898`, every rule exceeds its precision
+  floor, all `9/9` clean cases have zero findings, and both requested-TU
+  unavailable negatives passed.
+- Retained the exact 167-file package under
+  `docs/evidence/phase10/quality/2026-08-22-linux-x86_64`. Its accepted receipt
+  SHA-256 is
+  `9aacf249426db439810439bc7d3f56a5f2b54adbec70248544b104eb9938554c`;
+  the sibling external manifest SHA-256 is
+  `517ddc1c1acc629430ff49338a5e7ee723ab4eedf16c439756d39c077ad52b2c`.
+  This evidence checkpoint does not close `CS-P10-08` and does not change
+  protected-main status.
 
 ## 2026-08-22 — Phase 10.7 accepted confirmation (branch checkpoint)
 

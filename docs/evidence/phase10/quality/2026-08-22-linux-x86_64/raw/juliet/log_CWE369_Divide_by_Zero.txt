@@ -1,0 +1,898 @@
+[CodeSkeptic] Analysis starting... (398 files, 12 rules)
+[CodeSkeptic] Whole-program pass: collecting summaries from 398 file(s)...
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:48:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   48 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:89:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   89 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:48:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   48 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:89:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   89 |     delete baseObject;
+      |     ^
+3 warnings generated.
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_rand_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__float_rand_82::CWE369_Divide_by_Zero__float_rand_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__float_zero_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__float_zero_82::CWE369_Divide_by_Zero__float_zero_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:48:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   48 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_divide_82a.cpp:89:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_divide_82::CWE369_Divide_by_Zero__int_fgets_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   89 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:48:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   48 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s01/CWE369_Divide_by_Zero__int_fgets_modulo_82a.cpp:89:5: warning: delete called on 'CWE369_Divide_by_Zero__int_fgets_modulo_82::CWE369_Divide_by_Zero__int_fgets_modulo_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   89 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:35:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   35 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:52:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   52 |     delete baseObject;
+      |     ^
+/juliet/C/testcases/CWE369_Divide_by_Zero/s02/CWE369_Divide_by_Zero__int_rand_divide_82a.cpp:65:5: warning: delete called on 'CWE369_Divide_by_Zero__int_rand_divide_82::CWE369_Divide_by_Zero__int_rand_divide_82_base' that is abstract but has non-virtual destructor [-Wdelete-abstract-non-virtual-dtor]
+   65 |     delete baseObject;
+      |     ^
+3 warnings generated.
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] 2581 function summaries loaded from /scratch/codeskeptic-tu-run-8d3781/merged-summary.csk

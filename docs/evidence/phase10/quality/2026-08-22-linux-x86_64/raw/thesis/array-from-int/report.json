@@ -1,0 +1,15 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "clean",
+  "complete": true,
+  "exit_code": 0,
+  "coverage": { "attempted_tus": 1, "analyzed_tus": 1, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/stage/package/raw/thesis/array-from-int/source.c", "compile_command_sha256": "d850b64c8fa7469477046eca2bbe66bbf9245e8ec4231f4552d6658db6a66750", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 32, "peak_memory_kib": 85176, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}

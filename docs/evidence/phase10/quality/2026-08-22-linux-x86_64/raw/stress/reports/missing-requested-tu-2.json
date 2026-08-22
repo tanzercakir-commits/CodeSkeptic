@@ -1,0 +1,16 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "incomplete",
+  "complete": false,
+  "exit_code": 2,
+  "coverage": { "attempted_tus": 2, "analyzed_tus": 1, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/scratch/codeskeptic-stress-m_vjiuen/missing-requested-tu/repeat-2/missing_absent.cpp", "compile_command_sha256": "d89537bbfecf82d6619f23a5c72ec83b9816fdbc38ace30e29a2e43e56b52a13", "command_ordinal": 0, "phase": "analysis", "status": "missing", "duration_ms": 0, "peak_memory_kib": 0, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/scratch/codeskeptic-stress-m_vjiuen/missing-requested-tu/repeat-2/missing_valid.cpp", "compile_command_sha256": "f0f491486c6122bf1039c323aa3144869f749469f81e825fffc5da9d9f38cd0d", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 20, "peak_memory_kib": 80044, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}

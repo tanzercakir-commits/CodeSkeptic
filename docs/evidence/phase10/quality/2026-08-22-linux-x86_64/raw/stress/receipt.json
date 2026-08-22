@@ -1,0 +1,809 @@
+{
+  "analyzer": {
+    "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+    "version": "CodeSkeptic 0.4.9-dev"
+  },
+  "cases": [
+    {
+      "category": "template",
+      "id": "template-instantiation",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 33,
+          "log": "logs/template-instantiation-1.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 24,
+                "function": "template_seeded",
+                "line": 10,
+                "rule_id": "div-by-zero",
+                "severity": "error"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 1,
+          "report": "reports/template-instantiation-1.json",
+          "report_sha256": "8817b456d68ad08ed6a1710bef42cdf2fa9b38d3cb282723b44b0dc7db2b13c3",
+          "semantic_sha256": "c7db7facc7494c0269921b4a170753fb673e09af8f36eebe555927345b859430"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 36,
+          "log": "logs/template-instantiation-2.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 24,
+                "function": "template_seeded",
+                "line": 10,
+                "rule_id": "div-by-zero",
+                "severity": "error"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 2,
+          "report": "reports/template-instantiation-2.json",
+          "report_sha256": "c5b4a1b5eeee68892b8c35236174dc8f257bc634383830e1c65e8543c738fce7",
+          "semantic_sha256": "c7db7facc7494c0269921b4a170753fb673e09af8f36eebe555927345b859430"
+        }
+      ],
+      "stable_semantic_sha256": "c7db7facc7494c0269921b4a170753fb673e09af8f36eebe555927345b859430"
+    },
+    {
+      "category": "template",
+      "id": "template-dependent-pattern",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 35,
+          "log": "logs/template-dependent-pattern-1.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 0,
+            "report_exit": 0,
+            "status": "clean"
+          },
+          "repetition": 1,
+          "report": "reports/template-dependent-pattern-1.json",
+          "report_sha256": "6a20af6630558a37fc7323de9d0a9428e5cb461b8aeba997026cc978f1b23877",
+          "semantic_sha256": "c9c0746900dce5c6c9b90e63ff4cf374d4a2418a814d92d317f67b93ad084514"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 32,
+          "log": "logs/template-dependent-pattern-2.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 0,
+            "report_exit": 0,
+            "status": "clean"
+          },
+          "repetition": 2,
+          "report": "reports/template-dependent-pattern-2.json",
+          "report_sha256": "0d9109775d2c0f72205dfed245164ea56d41f4586eb8dfed7fb62b29c2a1598e",
+          "semantic_sha256": "c9c0746900dce5c6c9b90e63ff4cf374d4a2418a814d92d317f67b93ad084514"
+        }
+      ],
+      "stable_semantic_sha256": "c9c0746900dce5c6c9b90e63ff4cf374d4a2418a814d92d317f67b93ad084514"
+    },
+    {
+      "category": "malformed-source",
+      "id": "template-malformed",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 31,
+          "log": "logs/template-malformed-1.log",
+          "log_sha256": "2803f16e71bfb79a10305173a03a962da45a6d27d48e2ce9dd3a01859ace6c5a",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 0,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "failed"
+          },
+          "repetition": 1,
+          "report": "reports/template-malformed-1.json",
+          "report_sha256": "4feef0f54ea9efe2c7796aa05fc63bddbe18bed422d6a5cb5c64dabfff94586b",
+          "semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 33,
+          "log": "logs/template-malformed-2.log",
+          "log_sha256": "ac9912a594b2195dcad59803c015115bd7e921e8cc3c037add691a5f5e65c0bc",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 0,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "failed"
+          },
+          "repetition": 2,
+          "report": "reports/template-malformed-2.json",
+          "report_sha256": "f014954c47fea448e79587afac1c1094a17436e311f1c573aa080958f764a8d0",
+          "semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+        }
+      ],
+      "stable_semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+    },
+    {
+      "category": "macro",
+      "id": "nested-macro-expansion",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 34,
+          "log": "logs/nested-macro-expansion-1.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 12,
+                "function": "macro_seeded",
+                "line": 9,
+                "rule_id": "div-by-zero",
+                "severity": "error"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 1,
+          "report": "reports/nested-macro-expansion-1.json",
+          "report_sha256": "32ff7aad5ca2cd1282890b050bb1d6612ff1fab95d043a6a0653cb3c2802a867",
+          "semantic_sha256": "8a252f8ac7260d12255def660a9409428961b08f7e88bcb64abd18ca04e9e60c"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 34,
+          "log": "logs/nested-macro-expansion-2.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 12,
+                "function": "macro_seeded",
+                "line": 9,
+                "rule_id": "div-by-zero",
+                "severity": "error"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 2,
+          "report": "reports/nested-macro-expansion-2.json",
+          "report_sha256": "5aead243351479d8ac1f06ce045a8e9d7ccb9f86ba394647b874013e235dfeaa",
+          "semantic_sha256": "8a252f8ac7260d12255def660a9409428961b08f7e88bcb64abd18ca04e9e60c"
+        }
+      ],
+      "stable_semantic_sha256": "8a252f8ac7260d12255def660a9409428961b08f7e88bcb64abd18ca04e9e60c"
+    },
+    {
+      "category": "high-cfg",
+      "id": "high-complexity-cfg",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 39,
+          "log": "logs/high-complexity-cfg-1.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 17,
+                "function": "high_cfg_seeded",
+                "line": 50,
+                "rule_id": "div-by-zero",
+                "severity": "warning"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 1,
+          "report": "reports/high-complexity-cfg-1.json",
+          "report_sha256": "0c80f256e3078d4b722a3af7986dca5bbb4ee72de48176c2c60f6e68006cb6e0",
+          "semantic_sha256": "072270d620572ea2794d9b119a2816e5ffe806e24bc3d60f9ceb93c4b6c082d9"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 34,
+          "log": "logs/high-complexity-cfg-2.log",
+          "log_sha256": "29ec2b444ad34fd8cb2ecf74744e3e4f0c163cf12b5f2beebfeda7df725e70e7",
+          "projection": {
+            "complete": true,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [
+              {
+                "blocks_verdict": true,
+                "column": 17,
+                "function": "high_cfg_seeded",
+                "line": 50,
+                "rule_id": "div-by-zero",
+                "severity": "warning"
+              }
+            ],
+            "finding_counts": {
+              "blocking": 1,
+              "report_only": 0,
+              "total": 1
+            },
+            "process_exit": 1,
+            "report_exit": 1,
+            "status": "findings"
+          },
+          "repetition": 2,
+          "report": "reports/high-complexity-cfg-2.json",
+          "report_sha256": "629016047881863a2dce5cc2fef4ef418db0053081f1db62523f57dfde68deeb",
+          "semantic_sha256": "072270d620572ea2794d9b119a2816e5ffe806e24bc3d60f9ceb93c4b6c082d9"
+        }
+      ],
+      "stable_semantic_sha256": "072270d620572ea2794d9b119a2816e5ffe806e24bc3d60f9ceb93c4b6c082d9"
+    },
+    {
+      "category": "malformed-source",
+      "id": "malformed-source",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 32,
+          "log": "logs/malformed-source-1.log",
+          "log_sha256": "2bea0b7f0fca54dfcc045dedfb348e7009d235f0095c139547a2a148ce70056b",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 0,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "failed"
+          },
+          "repetition": 1,
+          "report": "reports/malformed-source-1.json",
+          "report_sha256": "20056d0de96cc9122ed9e170b7468c1cda1bfa60d840f914934f2bb1cd1c3373",
+          "semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT"
+          ],
+          "duration_ms": 33,
+          "log": "logs/malformed-source-2.log",
+          "log_sha256": "4d26e10bf747f6f79b57f4cc749958d1cd8dc619a3400d87b48c4f278d1b0e16",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 0,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "failed"
+          },
+          "repetition": 2,
+          "report": "reports/malformed-source-2.json",
+          "report_sha256": "0e9229cde862588fbd15f993144870a59880b5f5862ec39a8075afffb1f70171",
+          "semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+        }
+      ],
+      "stable_semantic_sha256": "bbbecac8c0edbe1446d07029c2f897d46796f06af4e15c99f964d142726ad11d"
+    },
+    {
+      "category": "mixed-coverage",
+      "id": "mixed-clean-broken",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 57,
+          "log": "logs/mixed-clean-broken-1.log",
+          "log_sha256": "104ccd537b3a642df9185f1b207d40831329eae079ca205477c54c9177cd6dbf",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 2,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 1,
+          "report": "reports/mixed-clean-broken-1.json",
+          "report_sha256": "4d078c6df3e20d833ad9c9ff794aa0a44fbe903dd4a4abca5c787a91d1320fa8",
+          "semantic_sha256": "f6b3ed0bf841887cca808cc29186a806174704c03bd3fafdf9cae82d519dcdaa"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 58,
+          "log": "logs/mixed-clean-broken-2.log",
+          "log_sha256": "78dbf3ccbcfdb688663972548dad26e079c8209757a0c39d117742d64357ff58",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 2,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 2,
+          "report": "reports/mixed-clean-broken-2.json",
+          "report_sha256": "8422977b6a4545b648d14e42dbae8f44b932ae9d2baba51f0d92e1e75395a769",
+          "semantic_sha256": "f6b3ed0bf841887cca808cc29186a806174704c03bd3fafdf9cae82d519dcdaa"
+        }
+      ],
+      "stable_semantic_sha256": "f6b3ed0bf841887cca808cc29186a806174704c03bd3fafdf9cae82d519dcdaa"
+    },
+    {
+      "category": "broken-recovery",
+      "id": "broken-recovery-opt-in",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--analyze-broken-tus",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 32,
+          "log": "logs/broken-recovery-opt-in-1.log",
+          "log_sha256": "b2724e966eb5bc2bd1e4e9cacc153af7e9d21af6e843c782a4ab2f6557716bff",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 1,
+          "report": "reports/broken-recovery-opt-in-1.json",
+          "report_sha256": "5b92b86c90860cd81c05c09ae12cbe3129a18fa6685db10e2d52fd93b9c8fc54",
+          "semantic_sha256": "d09c09ff29d9d532a9964af3bd1ce75068a8f241b97ef76ff025a9f04d85ba95"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--analyze-broken-tus",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 37,
+          "log": "logs/broken-recovery-opt-in-2.log",
+          "log_sha256": "dfd68179f5da47bebbce322ae268121801ce8e1792ab6e1f4a80236e195115b5",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 1,
+              "broken_tus": 1,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 2,
+          "report": "reports/broken-recovery-opt-in-2.json",
+          "report_sha256": "51d981427aaf2b09415d474e3443f75e10c27fac9c9eba90284677259a2fdef0",
+          "semantic_sha256": "d09c09ff29d9d532a9964af3bd1ce75068a8f241b97ef76ff025a9f04d85ba95"
+        }
+      ],
+      "stable_semantic_sha256": "d09c09ff29d9d532a9964af3bd1ce75068a8f241b97ef76ff025a9f04d85ba95"
+    },
+    {
+      "category": "missing-request",
+      "id": "missing-requested-tu",
+      "runs": [
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 39,
+          "log": "logs/missing-requested-tu-1.log",
+          "log_sha256": "570ee1817eb89f0f4e68b529773bed0430e5a597eac321b9c68c85732e147750",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 2,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 1,
+          "report": "reports/missing-requested-tu-1.json",
+          "report_sha256": "1a62bbdb1e202482c4df20498881e5566e64dedb381d38d06d8b284c9b6e7c5d",
+          "semantic_sha256": "7b529add05aa5e899a07604fa3e4d71498afc23085756e562ddedefdfe1ae6f9"
+        },
+        {
+          "command": [
+            "$BINARY",
+            "--files",
+            "$WORK/files.txt",
+            "--build-path",
+            "$WORK",
+            "--json",
+            "$REPORT",
+            "--accept-partial-coverage"
+          ],
+          "duration_ms": 32,
+          "log": "logs/missing-requested-tu-2.log",
+          "log_sha256": "92b5b428ca87a72f89ae6ce3f50ddace3567a5f80b2a1dce7da9ba3daf1353c6",
+          "projection": {
+            "complete": false,
+            "coverage": {
+              "analyzed_tus": 1,
+              "attempted_tus": 2,
+              "broken_tus": 0,
+              "incomplete_functions": 0
+            },
+            "diagnostics": [],
+            "finding_counts": {
+              "blocking": 0,
+              "report_only": 0,
+              "total": 0
+            },
+            "process_exit": 2,
+            "report_exit": 2,
+            "status": "incomplete"
+          },
+          "repetition": 2,
+          "report": "reports/missing-requested-tu-2.json",
+          "report_sha256": "1adf10c352cb574cf55a90bc401c034c355202adcc0699f7fdc055f3d59d22c3",
+          "semantic_sha256": "7b529add05aa5e899a07604fa3e4d71498afc23085756e562ddedefdfe1ae6f9"
+        }
+      ],
+      "stable_semantic_sha256": "7b529add05aa5e899a07604fa3e4d71498afc23085756e562ddedefdfe1ae6f9"
+    }
+  ],
+  "duration_ms": 674,
+  "finished_at": "2026-08-22T21:02:46.237954+00:00",
+  "host": {
+    "machine": "x86_64",
+    "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "matrix": {
+    "path": "tests/stress_corpus/manifest.json",
+    "sha256": "a7ba4006d893726889293da68253ca832f255bf0ccd600ab051b39217153b864"
+  },
+  "schema": "codeskeptic-stress-receipt-v1",
+  "source": {
+    "base_commit": "837fd0d37aec528a01df13b155c45f40b9ab6f89",
+    "manifest": {
+      "algorithm": "sha256",
+      "digest": "e3f4b0a6ae440cbbde7a18a6fdd7c2b39c656111ce235a7849d3dafb6415b797",
+      "file_count": 400
+    }
+  },
+  "started_at": "2026-08-22T21:02:45.563681+00:00",
+  "status": "accepted",
+  "summary": {
+    "accepted_cases": 9,
+    "crashes": 0,
+    "repetitions_per_case": 2,
+    "timeouts": 0
+  }
+}

@@ -1,0 +1,62 @@
+[1/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/Messages.cpp.o
+[2/58] Building CXX object CMakeFiles/codeskeptic_resource_worker_control.dir/src/core/ResourceWorkerControl.cpp.o
+[3/58] Linking CXX static library libcodeskeptic_resource_worker_control.a
+[4/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/Capabilities.cpp.o
+[5/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/FindingFingerprint.cpp.o
+[6/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/ResourceSupervisor.cpp.o
+[7/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/core/FunctionFilter.cpp.o
+[8/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/ResourceDir.cpp.o
+[9/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AllocFunctions.cpp.o
+[10/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/source_manager/SourceManager.cpp.o
+/source/src/source_manager/SourceManager.cpp:451:13: warning: braces around scalar initializer [-Wbraced-scalar-init]
+  451 |             {"-fparse-all-comments"},
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[11/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AssertGuards.cpp.o
+[12/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/CfgCache.cpp.o
+[13/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FatalCalls.cpp.o
+[14/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/RuleEngine.cpp.o
+[15/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/SummaryDiff.cpp.o
+[16/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ImmutableFlags.cpp.o
+[17/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/PathFacts.cpp.o
+[18/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/Interval.cpp.o
+[19/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/IntervalEval.cpp.o
+[20/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ExtentMap.cpp.o
+[21/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/ParamIntervals.cpp.o
+[22/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/CoverageReport.cpp.o
+[23/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/AssumptionMode.cpp.o
+[24/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/ConsoleReporter.cpp.o
+[25/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/HtmlReporter.cpp.o
+[26/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/JsonReporter.cpp.o
+[27/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/reporter/SarifReporter.cpp.o
+[28/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/config/Config.cpp.o
+[29/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/StaticAnalyzer.cpp.o
+[30/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/AnalysisCoordinator.cpp.o
+[31/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/WorkerProtocol.cpp.o
+[32/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/UnitEvidenceStore.cpp.o
+[33/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/WorkerRuntime.cpp.o
+[34/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/DefaultRules.cpp.o
+[35/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/SuppressionFilter.cpp.o
+[36/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/analyzer/Baseline.cpp.o
+[37/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/server/McpServer.cpp.o
+[38/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/engine/FunctionSummary.cpp.o
+[39/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/UninitPointerRule_Ex.cpp.o
+[40/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/FdResourceRule.cpp.o
+[41/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/MemoryLeakRule_Ex.cpp.o
+[42/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/IntOverflowRule.cpp.o
+[43/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/DivByZeroRule.cpp.o
+[44/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/SignConversionRule.cpp.o
+[45/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AllocSizeOverflowRule.cpp.o
+[46/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/BoundsRule.cpp.o
+[47/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/AssumptionRule.cpp.o
+[48/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/NullDerefRule.cpp.o
+[49/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/ContractRule.cpp.o
+[50/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractParser.cpp.o
+[51/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/rules/PolicyRule.cpp.o
+[52/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/ContractInfo.cpp.o
+[53/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Policy.cpp.o
+[54/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/GuardContracts.cpp.o
+[55/58] Building CXX object src/CMakeFiles/codeskeptic_core.dir/contracts/Sidecar.cpp.o
+[56/58] Linking CXX static library src/libcodeskeptic_core.a
+[57/58] Building CXX object src/CMakeFiles/codeskeptic.dir/main.cpp.o
+[58/58] Linking CXX executable src/codeskeptic

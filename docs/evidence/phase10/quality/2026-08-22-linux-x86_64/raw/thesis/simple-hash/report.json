@@ -1,0 +1,15 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "clean",
+  "complete": true,
+  "exit_code": 0,
+  "coverage": { "attempted_tus": 1, "analyzed_tus": 1, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/stage/package/raw/thesis/simple-hash/source.c", "compile_command_sha256": "d123fb3e010cd7ae353d1c54191f45ea4171fa3200346b1af06237d2620a5e80", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 27, "peak_memory_kib": 83492, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}
