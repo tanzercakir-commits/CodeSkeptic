@@ -8,6 +8,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import platform
 import shutil
@@ -59,7 +60,33 @@ class MatrixError(RuntimeError):
 
 
 def canonical_json(payload: Any) -> bytes:
-    return (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+    return (
+        json.dumps(payload, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode()
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError(f"duplicate JSON key: {key}")
+        payload[key] = value
+    return payload
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON number: {value}")
+
+
+def _strict_json(raw: bytes, label: str) -> Any:
+    try:
+        return json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, ValueError) as error:
+        raise MatrixError(f"cannot load {label}: {error}") from error
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -103,6 +130,97 @@ def source_manifest() -> dict[str, Any]:
         }
         for path in _regular_files(SOURCE_ROOTS)
     ]
+    return {
+        "algorithm": "sha256",
+        "file_count": len(entries),
+        "digest": sha256_bytes(canonical_json(entries)),
+    }
+
+
+def _git_environment() -> dict[str, str]:
+    admitted = {
+        "COMSPEC", "LANG", "LC_ALL", "PATH", "PATHEXT", "SYSTEMROOT",
+        "SystemRoot", "TEMP", "TMP", "TZ", "WINDIR",
+    }
+    environment = {
+        key: value for key, value in os.environ.items() if key in admitted
+    }
+    environment.update({
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_CONFIG_COUNT": "4",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": str(ROOT.resolve()),
+        "GIT_CONFIG_KEY_1": "core.hooksPath",
+        "GIT_CONFIG_VALUE_1": os.devnull,
+        "GIT_CONFIG_KEY_2": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_2": "false",
+        "GIT_CONFIG_KEY_3": "core.commitGraph",
+        "GIT_CONFIG_VALUE_3": "false",
+    })
+    return environment
+
+
+def _manifest_path_admitted(relative: str) -> bool:
+    path = Path(relative)
+    if (
+        IGNORED_SOURCE_PARTS.intersection(path.parts)
+        or path.suffix in IGNORED_SOURCE_SUFFIXES
+        or any(relative.startswith(prefix) for prefix in IGNORED_SOURCE_PREFIXES)
+    ):
+        return False
+    roots = [path.relative_to(ROOT).as_posix() for path in SOURCE_ROOTS]
+    return any(relative == root or relative.startswith(root + "/") for root in roots)
+
+
+def source_manifest_at_revision(revision: str) -> dict[str, Any]:
+    """Re-derive a historical stress source manifest from immutable Git blobs."""
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise MatrixError("stress source revision is malformed")
+    environment = _git_environment()
+    tree = subprocess.run(
+        ["git", "ls-tree", "-r", "-z", "--full-tree", revision],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+    if tree.returncode != 0:
+        raise MatrixError("cannot enumerate stress source revision")
+    entries: list[dict[str, str]] = []
+    for record in tree.stdout.split(b"\0"):
+        if not record:
+            continue
+        try:
+            header, raw_path = record.split(b"\t", 1)
+            mode, kind, oid = header.decode("ascii").split(" ")
+            relative = raw_path.decode("utf-8")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise MatrixError("stress source tree entry is malformed") from error
+        if not _manifest_path_admitted(relative):
+            continue
+        if kind != "blob" or mode not in {"100644", "100755"}:
+            raise MatrixError(f"stress source entry is unsafe: {relative}")
+        blob = subprocess.run(
+            ["git", "cat-file", "blob", oid],
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+        )
+        if blob.returncode != 0:
+            raise MatrixError(f"cannot read stress source blob: {relative}")
+        entries.append({
+            "path": relative,
+            "sha256": sha256_bytes(blob.stdout),
+        })
+    entries.sort(key=lambda item: item["path"])
+    if not entries:
+        raise MatrixError("stress source revision has no admitted files")
     return {
         "algorithm": "sha256",
         "file_count": len(entries),
@@ -155,9 +273,10 @@ def load_manifest(path: Path = MANIFEST_PATH,
     root = root.resolve()
     path = path.resolve()
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        raw = path.read_bytes()
+    except OSError as error:
         raise MatrixError(f"cannot load stress manifest: {error}") from error
+    payload = _strict_json(raw, "stress manifest")
     if not isinstance(payload, dict) or set(payload) != {
             "schema", "repetitions", "timeout_seconds", "cases"}:
         raise MatrixError("unexpected stress manifest fields")
@@ -233,6 +352,7 @@ def _git_commit() -> str:
     completed = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, check=False,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        env=_git_environment(),
     )
     commit = completed.stdout.strip()
     if completed.returncode != 0 or len(commit) != 40:
@@ -244,8 +364,51 @@ def _git_commit_is_ancestor(base: str, head: str) -> bool:
     completed = subprocess.run(
         ["git", "merge-base", "--is-ancestor", base, head], cwd=ROOT,
         check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        env=_git_environment(),
     )
     return completed.returncode == 0
+
+
+def _resolve_source_manifest_revision(
+    base: str,
+    head: str,
+    manifest: Any,
+    *,
+    expected_revision: str | None = None,
+) -> str:
+    """Resolve the committed source snapshot represented by a stress receipt."""
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", base) is None
+        or re.fullmatch(r"[0-9a-f]{40}", head) is None
+        or not _git_commit_is_ancestor(base, head)
+    ):
+        raise MatrixError("stress source commit is not in current ancestry")
+    if expected_revision is not None:
+        if (
+            re.fullmatch(r"[0-9a-f]{40}", expected_revision) is None
+            or not _git_commit_is_ancestor(base, expected_revision)
+            or not _git_commit_is_ancestor(expected_revision, head)
+            or source_manifest_at_revision(expected_revision) != manifest
+        ):
+            raise MatrixError("stress source differs from expected campaign source")
+        return expected_revision
+
+    completed = subprocess.run(
+        ["git", "rev-list", "--ancestry-path", "--reverse", f"{base}..{head}"],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=_git_environment(),
+    )
+    if completed.returncode != 0:
+        raise MatrixError("cannot enumerate stress source ancestry")
+    candidates = [base, *completed.stdout.splitlines()]
+    for revision in candidates:
+        if source_manifest_at_revision(revision) == manifest:
+            return revision
+    raise MatrixError("stress source bytes are absent from current ancestry")
 
 
 def _binary_identity(binary: Path) -> dict[str, str]:
@@ -478,20 +641,45 @@ def _validated_receipt_duration(receipt: dict[str, Any]) -> None:
         raise MatrixError("invalid stress receipt duration")
 
 
-def verify_receipt(receipt_path: Path, binary: Path,
-                   manifest_path: Path = MANIFEST_PATH) -> dict[str, Any]:
+def _validated_analyzer_identity(value: Any) -> dict[str, str]:
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"sha256", "version"}
+        or not isinstance(value["sha256"], str)
+        or len(value["sha256"]) != 64
+        or any(character not in "0123456789abcdef" for character in value["sha256"])
+        or not isinstance(value["version"], str)
+        or not value["version"].startswith("CodeSkeptic ")
+        or "\x00" in value["version"]
+    ):
+        raise MatrixError("invalid analyzer identity")
+    return value
+
+
+def verify_receipt_with_identity(
+    receipt_path: Path,
+    analyzer_identity: dict[str, str],
+    manifest_path: Path = MANIFEST_PATH,
+    *,
+    expected_source_revision: str | None = None,
+) -> dict[str, Any]:
+    """Verify retained semantics against an externally authenticated analyzer."""
+    analyzer_identity = _validated_analyzer_identity(analyzer_identity)
     receipt_path = receipt_path.resolve()
     output = receipt_path.parent
     try:
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        receipt_raw = receipt_path.read_bytes()
+    except OSError as error:
         raise MatrixError(f"cannot load stress receipt: {error}") from error
+    receipt = _strict_json(receipt_raw, "stress receipt")
     required = {
         "schema", "status", "source", "matrix", "analyzer", "host",
         "started_at", "finished_at", "duration_ms", "summary", "cases",
     }
     if not isinstance(receipt, dict) or set(receipt) != required:
         raise MatrixError("invalid stress receipt fields")
+    if receipt_raw != canonical_json(receipt):
+        raise MatrixError("stress receipt is not canonical JSON")
     if receipt["schema"] != SCHEMA or receipt["status"] != "accepted":
         raise MatrixError("stress receipt is not accepted")
     _validated_receipt_duration(receipt)
@@ -510,11 +698,15 @@ def verify_receipt(receipt_path: Path, binary: Path,
     if not isinstance(source, dict) or set(source) != {"base_commit", "manifest"}:
         raise MatrixError("invalid stress source identity")
     current_commit = _git_commit()
-    if (not isinstance(source["base_commit"], str) or
-            not _git_commit_is_ancestor(source["base_commit"], current_commit) or
-            source["manifest"] != source_manifest()):
+    if not isinstance(source["base_commit"], str):
         raise MatrixError("stress source bytes differ from receipt")
-    if receipt["analyzer"] != _binary_identity(binary):
+    _resolve_source_manifest_revision(
+        source["base_commit"],
+        current_commit,
+        source["manifest"],
+        expected_revision=expected_source_revision,
+    )
+    if receipt["analyzer"] != analyzer_identity:
         raise MatrixError("stress analyzer identity drift")
     if receipt["summary"] != {
             "accepted_cases": len(EXPECTED_CASES),
@@ -560,9 +752,12 @@ def verify_receipt(receipt_path: Path, binary: Path,
                     sha256_file(report) != run["report_sha256"]):
                 raise MatrixError(f"{case_id}: retained evidence checksum mismatch")
             try:
-                report_payload = json.loads(report.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as error:
+                report_raw = report.read_bytes()
+            except OSError as error:
                 raise MatrixError(f"{case_id}: retained report is invalid") from error
+            report_payload = _strict_json(
+                report_raw, f"{case_id} retained report"
+            )
             projection = _projection(report_payload, run["projection"]["process_exit"])
             if projection != run["projection"]:
                 raise MatrixError(f"{case_id}: retained projection drift")
@@ -577,6 +772,15 @@ def verify_receipt(receipt_path: Path, binary: Path,
     if seen != set(EXPECTED_CASES):
         raise MatrixError("retained stress case set is incomplete")
     return receipt
+
+
+def verify_receipt(receipt_path: Path, binary: Path,
+                   manifest_path: Path = MANIFEST_PATH) -> dict[str, Any]:
+    return verify_receipt_with_identity(
+        receipt_path,
+        _binary_identity(binary),
+        manifest_path,
+    )
 
 
 def main() -> int:

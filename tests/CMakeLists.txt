@@ -135,6 +135,18 @@ add_test(NAME StressMatrixContract
 add_test(NAME ResourceBudgetWorkflowContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/ResourceBudgetWorkflowTest.py)
+add_test(NAME QualityFloorReceiptContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/QualityFloorReceiptTest.py)
+add_test(NAME QualityFloorCampaignContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/QualityFloorCampaignTest.py)
+add_test(NAME QualityFloorEvidenceContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/QualityFloorEvidenceTest.py)
+add_test(NAME AnalyzerBuildAuthorityContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/AnalyzerBuildAuthorityTest.py)
 
 # End-to-end diff-review flow (scripts/review_diff.sh + review_report.py):
 # hermetic git-repo fixture driven with the real binary. Pins the delta
@@ -165,6 +177,12 @@ if(NOT WIN32)
     add_test(NAME MeasurementWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/MeasurementWorkflowTest.py)
+    add_test(NAME JulietEvaluationContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/JulietEvaluationTest.py)
+    add_test(NAME ThesisWorkflowContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/ThesisWorkflowTest.py)
     add_test(NAME DeterminismQualificationContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismQualificationTest.py)
