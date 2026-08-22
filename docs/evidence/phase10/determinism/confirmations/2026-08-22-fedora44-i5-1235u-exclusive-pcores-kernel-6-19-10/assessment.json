@@ -1,0 +1,78 @@
+{
+  "assessed_at": "2026-08-22T16:27:37Z",
+  "classification": "qualification-accepted-guided-wrapper-false-negative",
+  "guided_result": {
+    "graphical_restore_exit": 0,
+    "payload_exit": 2,
+    "sha256": "df4d0c357b2e5b6bdac2bf30a46a862d6861b8497edfdff75a12251b29d91bc7",
+    "transaction_safe": true
+  },
+  "headless_terminal": {
+    "cleanup_failed": false,
+    "journal_sha256": "0fbf295b58009e7166652b57363fb08ba9a46dd30904f1de2f960246e898e163",
+    "payload_exit": 0,
+    "restoration_failed": false,
+    "sha256": "cf548ae43ed3815563a7996167ec12a9052fa214db119d90bb66394e989e804f"
+  },
+  "host": {
+    "coredump_inventory_sha256": "07e99c98540c0b6c24b099f8b88d2802b8f501737194bedaed888079fa6083b5",
+    "failed_system_units": 0,
+    "failed_user_units": 0,
+    "graphical_target": "active",
+    "multi_user_target": "active",
+    "plasmalogin_service": "active"
+  },
+  "orchestration_erratum": {
+    "attempt23_wrapper_sha256": "3eca12183c25015573c17c4f25cf45f35b2f8632ad93dcb448ad5114f66a3ee7",
+    "attempt24_corrected_wrapper_sha256": "5497722724fd987c04af9f6f0341a2aadda7631ed403191e7dc9d59c21b4851f",
+    "controller_counter_transition": {
+      "current": 160,
+      "previous": 160
+    },
+    "corrected_acceptance": [
+      "preserved-journal-value",
+      "zero-reset"
+    ],
+    "corrected_operator_tests": {
+      "passed": 65,
+      "total": 65
+    },
+    "counter_increase_remains_rejected": true,
+    "physical_rerun_required": false
+  },
+  "qualification": {
+    "artifact_count": 631,
+    "baseline_performance_gate": "pass",
+    "baseline_regressions": [],
+    "baseline_semantic_gate": "pass",
+    "duration_ms": 2670421,
+    "failures": [],
+    "inner_manifest_entries": 633,
+    "outer_manifest_entries": 636,
+    "receipt_sha256": "a7d8409199a22a2896d8486e2e7d95674ba254bdb9c6df84da9746f2a3c096f9",
+    "status": "accepted",
+    "workloads": [
+      {
+        "id": "unit",
+        "repetitions": 10,
+        "semantic_sha256": "383bef6a2b61b9745692eb9e696d40f4c719a508e292fd7faf1dcc13640d6c54"
+      },
+      {
+        "id": "real-repository",
+        "repetitions": 10,
+        "semantic_sha256": "22b4b6d506cff038ee753d13a11a89319931e03b4c15406636752428451f8a6e"
+      },
+      {
+        "id": "release-candidate",
+        "repetitions": 10,
+        "semantic_sha256": "ae2e427b1c6bce48d62d03c4eda0235413f13330f1c40d6ed05bc6fb6476e862"
+      }
+    ]
+  },
+  "schema": "codeskeptic-determinism-confirmation-assessment-v1",
+  "source": {
+    "file_count": 386,
+    "manifest_sha256": "b8c4b7235c1c8704304dd5fe4de90728e6cd0b4ab020526b76f1e4731b3e0d9b",
+    "revision": "88e369b21675e64e0a92842b0ce22f0c8148745e"
+  }
+}

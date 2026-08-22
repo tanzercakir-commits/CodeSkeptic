@@ -1,6 +1,6 @@
 # CodeSkeptic — Changelog
 
-## 2026-08-22 — Phase 10.7 confirmation profile hardening (in progress)
+## 2026-08-22 — Phase 10.7 accepted confirmation (branch checkpoint)
 
 - The first complete V7 confirmation produced all ten repetitions for the
   unit, real-repository, and release-candidate workloads, with every retained
@@ -24,11 +24,37 @@
   verifier retains only the narrow legacy rejection shape caused by a nonzero,
   in-tolerance memory delta; a fresh accepted confirmation is still required
   to close `CS-P10-07`.
-- Refreshed the retained frontend/CFG stress receipt against feature commit
-  `8290e814205e586620c0c456e3331838ec02e709` and the current analyzer after
-  the older receipt's source inventory had fallen behind this phase branch.
-  All nine cases passed twice with stable semantic projections; the refreshed
-  37-file bundle and its external checksum manifest verify independently.
+- Re-anchored the retained frontend/CFG stress receipt on feature base
+  `88e369b21675e64e0a92842b0ce22f0c8148745e` and the exact 388-file source
+  manifest after the confirmation evidence contract extended the inventory.
+  All nine cases passed twice with unchanged stable semantic projections; the
+  refreshed 37-file bundle and its external checksum manifest verify
+  independently. The receipt SHA-256 is
+  `5e2d13f4b5bf21b9289ee0fe3dde4ac659fd8e0a623f67bd93f4e9b737fa40a5`.
+- Completed a fresh independent V7 confirmation against feature revision
+  `88e369b21675e64e0a92842b0ce22f0c8148745e`. Unit, real-repository, and
+  release-candidate workloads each produced ten identical semantic
+  fingerprints; the required performance gate passed with no regressions.
+  The accepted receipt retains 631 raw artifacts and has SHA-256
+  `a7d8409199a22a2896d8486e2e7d95674ba254bdb9c6df84da9746f2a3c096f9`.
+- The headless controller and independent receipt verifier both exited `0`,
+  cleanup succeeded, and the coredump inventory remained unchanged. The
+  immutable guided result nevertheless recorded exit `2`: its outer wrapper
+  incorrectly required DrKonqi's accepted-connection counter to reset to zero
+  even though the already-tested controller contract permits either the
+  preserved journal value or a zero reset. A focused RED/GREEN regression
+  corrected that orchestration-only rule; the corrected operator passed
+  `65/65` checks and root-staging emulation. The accepted measurement matrix
+  therefore does not require another physical run.
+- Retained the complete confirmation, host receipts, immutable Attempt23
+  wrapper, and Attempt24 erratum under
+  `docs/evidence/phase10/determinism/confirmations/2026-08-22-fedora44-i5-1235u-exclusive-pcores-kernel-6-19-10`.
+  A self-excluded 678-entry manifest binds the bundle and an executable
+  repository contract revalidates every retained byte, receipt invariant,
+  10/10 workload cardinality, and the guided-wrapper distinction. This
+  satisfies the three `CS-P10-07` technical gates on the feature branch;
+  protected-main status automation remains unchanged until an authorized
+  integration occurs.
 
 ## 2026-08-19 — Phase 10.7 kernel-bound determinism authority (in progress)
 

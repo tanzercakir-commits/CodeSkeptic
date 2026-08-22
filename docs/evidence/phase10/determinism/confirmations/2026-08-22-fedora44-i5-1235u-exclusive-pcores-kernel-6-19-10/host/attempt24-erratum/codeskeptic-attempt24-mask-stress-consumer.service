@@ -1,0 +1,9 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable dependency consumer
+BindsTo=codeskeptic-attempt24-mask-stress.service codeskeptic-attempt24-mask-stress-manager.service
+After=codeskeptic-attempt24-mask-stress.service codeskeptic-attempt24-mask-stress-manager.service
+
+[Service]
+Type=simple
+ExecStart=/home/tanzer/Projects/CodeSkeptic/build/p10-07-v7-confirmation-operator-88e369b-attempt24/stress-dependency-service.sh consumer-start
+ExecStop=/home/tanzer/Projects/CodeSkeptic/build/p10-07-v7-confirmation-operator-88e369b-attempt24/stress-dependency-service.sh consumer-stop

@@ -1,0 +1,7 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable accepted socket instance
+
+[Service]
+Type=oneshot
+StandardInput=socket
+ExecStart=/usr/bin/true

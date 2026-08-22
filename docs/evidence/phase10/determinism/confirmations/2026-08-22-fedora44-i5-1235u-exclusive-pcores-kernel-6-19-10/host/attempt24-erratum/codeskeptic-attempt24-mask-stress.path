@@ -1,0 +1,6 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable stop-before-mask path
+
+[Path]
+PathExists=%t/codeskeptic-attempt24-mask-stress.trigger
+Unit=codeskeptic-attempt24-mask-stress-consumer.service

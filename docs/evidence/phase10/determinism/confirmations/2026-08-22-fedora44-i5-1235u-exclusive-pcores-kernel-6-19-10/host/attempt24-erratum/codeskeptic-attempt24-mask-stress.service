@@ -1,0 +1,8 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable dependency backend
+Before=codeskeptic-attempt24-mask-stress-manager.service
+
+[Service]
+Type=simple
+ExecStart=/home/tanzer/Projects/CodeSkeptic/build/p10-07-v7-confirmation-operator-88e369b-attempt24/stress-dependency-service.sh backend-start
+ExecStop=/home/tanzer/Projects/CodeSkeptic/build/p10-07-v7-confirmation-operator-88e369b-attempt24/stress-dependency-service.sh backend-stop

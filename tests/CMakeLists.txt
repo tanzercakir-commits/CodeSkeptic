@@ -171,6 +171,9 @@ if(NOT WIN32)
     add_test(NAME DeterminismWorkflowContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismWorkflowTest.py)
+    add_test(NAME DeterminismConfirmationEvidenceContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismConfirmationEvidenceTest.py)
     add_test(NAME ReviewDiffFlow
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)

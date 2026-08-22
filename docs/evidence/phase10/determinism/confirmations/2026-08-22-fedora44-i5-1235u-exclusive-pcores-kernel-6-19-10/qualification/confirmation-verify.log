@@ -1,0 +1,1 @@
+DETERMINISM_QUALIFICATION_OK mode=verify workloads=3 repetitions=10

@@ -1,0 +1,9 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable stop-before-mask socket
+
+[Socket]
+ListenStream=%t/codeskeptic-attempt24-mask-stress.sock
+SocketMode=0600
+Accept=yes
+MaxConnections=1
+RemoveOnStop=yes

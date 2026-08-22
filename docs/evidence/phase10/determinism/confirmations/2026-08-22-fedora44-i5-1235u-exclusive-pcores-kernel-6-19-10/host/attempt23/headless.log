@@ -1,0 +1,1147 @@
+CODESKEPTIC_HEADLESS_CONTROLLER_BEGIN=2026-08-22T15:06:45+00:00
+caller_tty=/dev/tty3
+feature_head=88e369b21675e64e0a92842b0ce22f0c8148745e
+main_head=7dfd37596414c9512316093ff4fb6b039673f55f
+cooldown_seconds=180
+kernel=Linux 6.19.10-300.fc44.x86_64 x86_64 GNU/Linux
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_wireplumber_candidate
+CODESKEPTIC_HEADLESS_GATE_PASS=require_wireplumber_candidate
+cmdline=BOOT_IMAGE=(hd0,gpt7)/vmlinuz-6.19.10-300.fc44.x86_64 root=UUID=d8326c54-d7ed-41da-8087-5b6758a8aaa6 ro rootflags=subvol=root rhgb quiet
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_local_tty_session
+session=2 name=tanzer type=unspecified class=manager state=active remote=no service=systemd-user tty=
+session=3 name=tanzer type=tty class=user state=active remote=no service=login tty=tty3
+CODESKEPTIC_HEADLESS_GATE_PASS=require_local_tty_session
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_system_headless
+CODESKEPTIC_HEADLESS_GATE_PASS=require_system_headless
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_no_failed_system_units
+CODESKEPTIC_HEADLESS_GATE_PASS=require_no_failed_system_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_no_failed_user_units
+CODESKEPTIC_HEADLESS_GATE_PASS=require_no_failed_user_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=establish_inherited_coredump_baseline
+CODESKEPTIC_HEADLESS_GATE_PASS=establish_inherited_coredump_baseline
+CODESKEPTIC_HEADLESS_GATE_BEGIN=drain_graphical_transients
+CODESKEPTIC_HEADLESS_STOP_GRAPHICAL_TRANSIENT=dbus-:1.493-org.a11y.atspi.Registry@0.service
+CODESKEPTIC_HEADLESS_STOP_GRAPHICAL_TRANSIENT=dbus-:1.680-org.a11y.atspi.Registry@0.service
+CODESKEPTIC_HEADLESS_STOP_GRAPHICAL_TRANSIENT=run-p163740-i163741.service
+CODESKEPTIC_HEADLESS_WAIT_GRAPHICAL_TRANSIENTS elapsed=30 remaining=210 count=1
+CODESKEPTIC_HEADLESS_WAIT_GRAPHICAL_TRANSIENTS elapsed=46 remaining=194 count=1
+CODESKEPTIC_HEADLESS_WAIT_GRAPHICAL_TRANSIENTS elapsed=62 remaining=178 count=1
+CODESKEPTIC_HEADLESS_GRAPHICAL_TRANSIENTS_DRAINED
+CODESKEPTIC_HEADLESS_GATE_PASS=drain_graphical_transients
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_no_active_user_transients
+CODESKEPTIC_HEADLESS_GATE_PASS=require_no_active_user_transients
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_coredump_unchanged_preplan
+CODESKEPTIC_HEADLESS_GATE_PASS=require_coredump_unchanged_preplan
+CODESKEPTIC_HEADLESS_GATE_BEGIN=install_recovery_copy
+CODESKEPTIC_HEADLESS_RECOVERY_COMMAND=sudo /usr/bin/flock --exclusive /run/codeskeptic-p10-07-headless.lock /var/lib/codeskeptic-p10-07/headless/recover-88e369b-confirmation-v7-23.sh recover
+CODESKEPTIC_HEADLESS_GATE_PASS=install_recovery_copy
+CODESKEPTIC_HEADLESS_GATE_BEGIN=prepare_system_units
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=atd.service load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=crond.service load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=dnf-makecache.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=dnf-makecache.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=fstrim.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=fstrim.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=graphical.target load=loaded unit_file=indirect state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=logrotate.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=logrotate.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=packagekit-offline-update.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=packagekit.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=plasmalogin.service load=loaded unit_file=enabled state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=plocate-updatedb.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=plocate-updatedb.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=raid-check.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=raid-check.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=systemd-tmpfiles-clean.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=systemd-tmpfiles-clean.timer load=loaded unit_file=static state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=unbound-anchor.service load=loaded unit_file=static state=inactive transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_SYSTEM_PLAN_UNIT=unbound-anchor.timer load=loaded unit_file=enabled state=active transient=no refuse_start=no refuse_stop=no
+CODESKEPTIC_HEADLESS_GATE_PASS=prepare_system_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=prepare_user_units
+CODESKEPTIC_HEADLESS_GATE_PASS=prepare_user_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=capture_pause_identity
+CODESKEPTIC_HEADLESS_GATE_PASS=capture_pause_identity
+CODESKEPTIC_HEADLESS_GATE_BEGIN=collect_authority_bash_ancestors
+CODESKEPTIC_HEADLESS_GATE_PASS=collect_authority_bash_ancestors
+CODESKEPTIC_HEADLESS_GATE_BEGIN=write_transaction_journal
+CODESKEPTIC_HEADLESS_TRANSACTION_JOURNAL=/var/lib/codeskeptic-p10-07/headless/88e369b-confirmation-v7-23.journal
+CODESKEPTIC_HEADLESS_GATE_PASS=write_transaction_journal
+CODESKEPTIC_HEADLESS_GATE_BEGIN=quiesce_system_units
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:stopped-snapshot
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:stopped-journal
+Created symlink '/run/systemd/system/atd.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/crond.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/dnf-makecache.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/dnf-makecache.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/fstrim.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/fstrim.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/graphical.target' -> '/dev/null'.
+Created symlink '/run/systemd/system/logrotate.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/logrotate.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/packagekit-offline-update.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/packagekit.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/plasmalogin.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/plocate-updatedb.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/plocate-updatedb.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/raid-check.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/raid-check.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/systemd-tmpfiles-clean.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/systemd-tmpfiles-clean.timer' -> '/dev/null'.
+Created symlink '/run/systemd/system/unbound-anchor.service' -> '/dev/null'.
+Created symlink '/run/systemd/system/unbound-anchor.timer' -> '/dev/null'.
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=atd.service load=masked epoch_mode=preserved epochs=6039245905/6039245905
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=crond.service load=masked epoch_mode=preserved epochs=6039260247/6039260247
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=dnf-makecache.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=dnf-makecache.timer load=masked epoch_mode=preserved epochs=6039266097/6039266097
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=fstrim.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=fstrim.timer load=masked epoch_mode=preserved epochs=6039268451/6039268451
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=graphical.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=logrotate.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=logrotate.timer load=masked epoch_mode=preserved epochs=6039269988/6039269988
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=packagekit-offline-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=packagekit.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=plasmalogin.service load=masked epoch_mode=preserved epochs=18977303729/18977284552
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=plocate-updatedb.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=plocate-updatedb.timer load=masked epoch_mode=preserved epochs=6039271507/6039271507
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=raid-check.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=raid-check.timer load=masked epoch_mode=preserved epochs=6039273232/6039273232
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039274813/6039274813
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=unbound-anchor.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=initial unit=unbound-anchor.timer load=masked epoch_mode=preserved epochs=6039276551/6039276551
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:masked-initial
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:masked-initial-journal
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=atd.service load=masked epoch_mode=preserved epochs=6039245905/6039245905
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=crond.service load=masked epoch_mode=preserved epochs=6039260247/6039260247
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.timer load=masked epoch_mode=preserved epochs=6039266097/6039266097
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.timer load=masked epoch_mode=preserved epochs=6039268451/6039268451
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=graphical.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.timer load=masked epoch_mode=preserved epochs=6039269988/6039269988
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit-offline-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plasmalogin.service load=masked epoch_mode=preserved epochs=18977303729/18977284552
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.timer load=masked epoch_mode=preserved epochs=6039271507/6039271507
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.timer load=masked epoch_mode=preserved epochs=6039273232/6039273232
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039274813/6039274813
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.timer load=masked epoch_mode=preserved epochs=6039276551/6039276551
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:masked-stable
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_system_units:masked-stable-journal
+CODESKEPTIC_HEADLESS_GATE_PASS=quiesce_system_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=quiesce_user_units
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:stopped-snapshot
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:stopped-journal
+Created symlink '/run/user/1000/systemd/user/dconf.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-coredump-cleanup.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-coredump-cleanup.timer' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-coredump-launcher.socket' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-sentry-postman.path' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-sentry-postman.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/drkonqi-sentry-postman.timer' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/graphical-session-pre.target' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/graphical-session.target' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/grub-boot-success.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/grub-boot-success.timer' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/obex.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/pipewire-pulse.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/pipewire-pulse.socket' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/pipewire.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/pipewire.socket' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/plasma-core.target' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/plasma-workspace-wayland.target' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/plasma-workspace.target' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/podman-auto-update.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/podman-auto-update.timer' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/ssh-agent.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/ssh-agent.socket' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/systemd-ask-password.socket' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/systemd-tmpfiles-clean.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/systemd-tmpfiles-clean.timer' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/wireplumber.service' -> '/dev/null'.
+Created symlink '/run/user/1000/systemd/user/xdg-desktop-autostart.target' -> '/dev/null'.
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=dconf.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-coredump-cleanup.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-coredump-cleanup.timer load=masked epoch_mode=preserved epochs=6039291622/6039291622
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-coredump-launcher.socket load=masked epoch_mode=preserved epochs=6039294200/6039293038
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-sentry-postman.path load=masked epoch_mode=preserved epochs=6039295640/6039295640
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-sentry-postman.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=drkonqi-sentry-postman.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=graphical-session-pre.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=graphical-session.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=grub-boot-success.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=grub-boot-success.timer load=masked epoch_mode=preserved epochs=6039296464/6039296464
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=obex.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=pipewire-pulse.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=pipewire-pulse.socket load=masked epoch_mode=preserved epochs=6039309689/6039309543
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=pipewire.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=pipewire.socket load=masked epoch_mode=preserved epochs=6039309941/6039309819
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=plasma-core.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=plasma-workspace-wayland.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=plasma-workspace.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=podman-auto-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=podman-auto-update.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=ssh-agent.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=ssh-agent.socket load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=systemd-ask-password.socket load=masked epoch_mode=preserved epochs=6039326559/6039325153
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039328927/6039328927
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=wireplumber.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=initial unit=xdg-desktop-autostart.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:masked-initial
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:masked-initial-journal
+CODESKEPTIC_HEADLESS_DRKONQI_COUNTER_TRANSITION previous=160 current=160
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=dconf.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.timer load=masked epoch_mode=preserved epochs=6039291622/6039291622
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-launcher.socket load=masked epoch_mode=preserved epochs=6039294200/6039293038
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.path load=masked epoch_mode=preserved epochs=6039295640/6039295640
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session-pre.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.timer load=masked epoch_mode=preserved epochs=6039296464/6039296464
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=obex.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.socket load=masked epoch_mode=preserved epochs=6039309689/6039309543
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.socket load=masked epoch_mode=preserved epochs=6039309941/6039309819
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-core.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace-wayland.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.socket load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-ask-password.socket load=masked epoch_mode=preserved epochs=6039326559/6039325153
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039328927/6039328927
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=wireplumber.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=xdg-desktop-autostart.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:masked-stable
+CODESKEPTIC_HEADLESS_SUBGATE_PASS=quiesce_user_units:masked-stable-journal
+CODESKEPTIC_HEADLESS_GATE_PASS=quiesce_user_units
+CODESKEPTIC_HEADLESS_GATE_BEGIN=pin_pause_identity
+CODESKEPTIC_HEADLESS_GATE_PASS=pin_pause_identity
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_quiet_authority_initial
+session=2 name=tanzer type=unspecified class=manager state=active remote=no service=systemd-user tty=
+session=3 name=tanzer type=tty class=user state=active remote=no service=login tty=tty3
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=local_tty_session
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_headless
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_failed_system_units
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_failed_user_units
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=coredump_unchanged
+CODESKEPTIC_HEADLESS_PLANNED_MASKED_SERVICE_INERT=drkonqi-coredump-cleanup.service
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_active_user_transients
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=minimal_user_units
+tanzer_process_inventory_begin
+   1778 systemd
+   1780 (sd-pam)
+   1797 dbus-broker-lau
+   1802 dbus-broker
+   3318 bash
+   3435 catatonit
+ 169029 bash
+tanzer_process_inventory_end
+podman_pause_pid=3435 original_affinity=0-11 ticks=0 cgroup=0::/user.slice/user-1000.slice/user@1000.service/user.slice/podman-pause-68ab6f1b.scope
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=minimal_user_processes
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=network_disabled
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_timers_empty
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_services_inactive
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_plan_quiescent
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=hardware_identity
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=authority_paths_clear
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=feature_repo_clean
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=primary_repo_clean
+20260817T150314Z-idle-preflight-68f2993/FORENSIC_SHA256SUMS: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=rejection_ledger
+calibration.log: OK
+stage/SHA256SUMS: OK
+stage/establishment/SHA256SUMS: OK
+stage/establishment/raw/environment-idle-preflight.json: OK
+stage/establishment/receipt.json: OK
+stage/establishment/receipt.json.sha256: OK
+stage/operator-exit-code.txt: OK
+stage/operator.log: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=rejection_bundle
+/run/codeskeptic-p10-07/snapshot-builder.sh: OK
+/run/codeskeptic-p10-07/tree-hash.py: OK
+/run/codeskeptic-p10-07/cgroup-launcher.sh: OK
+/run/codeskeptic-p10-07/run-static-preflight.sh: OK
+/run/codeskeptic-p10-07/container-entry.py: OK
+/run/codeskeptic-p10-07/cgroup-smoke.py: OK
+/run/codeskeptic-p10-07/static-preflight.py: OK
+/run/codeskeptic-p10-07/git-authority-entry.sh: OK
+/run/codeskeptic-p10-07/run-confirmation.sh: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=root_staging
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=atd.service load=masked epoch_mode=preserved epochs=6039245905/6039245905
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=crond.service load=masked epoch_mode=preserved epochs=6039260247/6039260247
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.timer load=masked epoch_mode=preserved epochs=6039266097/6039266097
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.timer load=masked epoch_mode=preserved epochs=6039268451/6039268451
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=graphical.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.timer load=masked epoch_mode=preserved epochs=6039269988/6039269988
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit-offline-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plasmalogin.service load=masked epoch_mode=preserved epochs=18977303729/18977284552
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.timer load=masked epoch_mode=preserved epochs=6039271507/6039271507
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.timer load=masked epoch_mode=preserved epochs=6039273232/6039273232
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039274813/6039274813
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.timer load=masked epoch_mode=preserved epochs=6039276551/6039276551
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_quiescence_recheck
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=dconf.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.timer load=masked epoch_mode=preserved epochs=6039291622/6039291622
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-launcher.socket load=masked epoch_mode=preserved epochs=6039294200/6039293038
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.path load=masked epoch_mode=preserved epochs=6039295640/6039295640
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session-pre.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.timer load=masked epoch_mode=preserved epochs=6039296464/6039296464
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=obex.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.socket load=masked epoch_mode=preserved epochs=6039309689/6039309543
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.socket load=masked epoch_mode=preserved epochs=6039309941/6039309819
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-core.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace-wayland.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.socket load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-ask-password.socket load=masked epoch_mode=preserved epochs=6039326559/6039325153
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039328927/6039328927
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=wireplumber.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=xdg-desktop-autostart.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=user_quiescence_recheck
+CODESKEPTIC_HEADLESS_GATE_PASS=require_quiet_authority_initial
+CODESKEPTIC_HEADLESS_COOLDOWN_BEGIN=2026-08-22T15:08:12+00:00
+CODESKEPTIC_HEADLESS_GATE_BEGIN=require_quiet_authority_post_cooldown
+session=2 name=tanzer type=unspecified class=manager state=active remote=no service=systemd-user tty=
+session=3 name=tanzer type=tty class=user state=active remote=no service=login tty=tty3
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=local_tty_session
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_headless
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_failed_system_units
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_failed_user_units
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=coredump_unchanged
+CODESKEPTIC_HEADLESS_PLANNED_MASKED_SERVICE_INERT=drkonqi-coredump-cleanup.service
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=no_active_user_transients
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=minimal_user_units
+tanzer_process_inventory_begin
+   1778 systemd
+   1780 (sd-pam)
+   1797 dbus-broker-lau
+   1802 dbus-broker
+   3318 bash
+   3435 catatonit
+ 169029 bash
+tanzer_process_inventory_end
+podman_pause_pid=3435 original_affinity=0-11 ticks=0 cgroup=0::/user.slice/user-1000.slice/user@1000.service/user.slice/podman-pause-68ab6f1b.scope
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=minimal_user_processes
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=network_disabled
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_timers_empty
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_services_inactive
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_plan_quiescent
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=hardware_identity
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=authority_paths_clear
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=feature_repo_clean
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=primary_repo_clean
+20260817T150314Z-idle-preflight-68f2993/FORENSIC_SHA256SUMS: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=rejection_ledger
+calibration.log: OK
+stage/SHA256SUMS: OK
+stage/establishment/SHA256SUMS: OK
+stage/establishment/raw/environment-idle-preflight.json: OK
+stage/establishment/receipt.json: OK
+stage/establishment/receipt.json.sha256: OK
+stage/operator-exit-code.txt: OK
+stage/operator.log: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=rejection_bundle
+/run/codeskeptic-p10-07/snapshot-builder.sh: OK
+/run/codeskeptic-p10-07/tree-hash.py: OK
+/run/codeskeptic-p10-07/cgroup-launcher.sh: OK
+/run/codeskeptic-p10-07/run-static-preflight.sh: OK
+/run/codeskeptic-p10-07/container-entry.py: OK
+/run/codeskeptic-p10-07/cgroup-smoke.py: OK
+/run/codeskeptic-p10-07/static-preflight.py: OK
+/run/codeskeptic-p10-07/git-authority-entry.sh: OK
+/run/codeskeptic-p10-07/run-confirmation.sh: OK
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=root_staging
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=atd.service load=masked epoch_mode=preserved epochs=6039245905/6039245905
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=crond.service load=masked epoch_mode=preserved epochs=6039260247/6039260247
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=dnf-makecache.timer load=masked epoch_mode=preserved epochs=6039266097/6039266097
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=fstrim.timer load=masked epoch_mode=preserved epochs=6039268451/6039268451
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=graphical.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=logrotate.timer load=masked epoch_mode=preserved epochs=6039269988/6039269988
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit-offline-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=packagekit.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plasmalogin.service load=masked epoch_mode=preserved epochs=18977303729/18977284552
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=plocate-updatedb.timer load=masked epoch_mode=preserved epochs=6039271507/6039271507
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=raid-check.timer load=masked epoch_mode=preserved epochs=6039273232/6039273232
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039274813/6039274813
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=system phase=masked sample=stable unit=unbound-anchor.timer load=masked epoch_mode=preserved epochs=6039276551/6039276551
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=system_quiescence_recheck
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=dconf.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-cleanup.timer load=masked epoch_mode=preserved epochs=6039291622/6039291622
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-coredump-launcher.socket load=masked epoch_mode=preserved epochs=6039294200/6039293038
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.path load=masked epoch_mode=preserved epochs=6039295640/6039295640
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=drkonqi-sentry-postman.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session-pre.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=graphical-session.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=grub-boot-success.timer load=masked epoch_mode=preserved epochs=6039296464/6039296464
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=obex.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire-pulse.socket load=masked epoch_mode=preserved epochs=6039309689/6039309543
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=pipewire.socket load=masked epoch_mode=preserved epochs=6039309941/6039309819
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-core.target load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace-wayland.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=plasma-workspace.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=podman-auto-update.timer load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=ssh-agent.socket load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-ask-password.socket load=masked epoch_mode=preserved epochs=6039326559/6039325153
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.service load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=systemd-tmpfiles-clean.timer load=masked epoch_mode=preserved epochs=6039328927/6039328927
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=wireplumber.service load=masked epoch_mode=gc-reset epochs=0/0
+CODESKEPTIC_HEADLESS_UNIT_QUIESCENT scope=user phase=masked sample=stable unit=xdg-desktop-autostart.target load=masked epoch_mode=preserved epochs=0/0
+CODESKEPTIC_HEADLESS_QUIET_SUBGATE_PASS=user_quiescence_recheck
+CODESKEPTIC_HEADLESS_GATE_PASS=require_quiet_authority_post_cooldown
+CODESKEPTIC_HEADLESS_CONFIRMATION_BEGIN=2026-08-22T15:11:14+00:00
+/run/codeskeptic-p10-07/static-preflight.py: OK
+/run/codeskeptic-p10-07/run-static-preflight.sh: OK
+/run/codeskeptic-p10-07/container-entry.py: OK
+/run/codeskeptic-p10-07/cgroup-smoke.py: OK
+/run/codeskeptic-p10-07/git-authority-entry.sh: OK
+/run/codeskeptic-p10-07/run-confirmation.sh: OK
+NOTICE: root cpuset controller was enabled and is retained for Phase 10 evidence runs
+{"analyzer_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562", "analyzer_version": "CodeSkeptic 0.4.9-dev", "build_identity_sha256": "e26f3b0001f9b89c60250612fe81fb6070cccead5f061f74e6a1d88ee0581c82", "manifest_sha256": "90cd7f03db2c50b851f4900ab628057a524045372d19c103258785b0d7861ac4", "mirror_revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454", "source": {"file_count": 386, "manifest_sha256": "b8c4b7235c1c8704304dd5fe4de90728e6cd0b4ab020526b76f1e4731b3e0d9b", "revision": "88e369b21675e64e0a92842b0ce22f0c8148745e"}, "toolchain_sha256": "63c01694379ed68b8aa875ac414a08718001fc67d6bf7594b21332cf55a88120"}
+DETERMINISM_QUALIFICATION_OK mode=run workloads=3 repetitions=10 hardware_class=fedora44-i5-1235u-exclusive-pcores-0-3
+DETERMINISM_QUALIFICATION_OK mode=verify workloads=3 repetitions=10
+./confirmation-verify.log: OK
+./confirmation/raw/environment-idle-preflight.json: OK
+./confirmation/raw/real-repository/run-01/batch-environment.json: OK
+./confirmation/raw/real-repository/run-01/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-01/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-01/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-01/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-01/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-02/batch-environment.json: OK
+./confirmation/raw/real-repository/run-02/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-02/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-02/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-02/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-02/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-03/batch-environment.json: OK
+./confirmation/raw/real-repository/run-03/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-03/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-03/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-03/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-03/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-04/batch-environment.json: OK
+./confirmation/raw/real-repository/run-04/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-04/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-04/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-04/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-04/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-05/batch-environment.json: OK
+./confirmation/raw/real-repository/run-05/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-05/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-05/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-05/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-05/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-06/batch-environment.json: OK
+./confirmation/raw/real-repository/run-06/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-06/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-06/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-06/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-06/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-07/batch-environment.json: OK
+./confirmation/raw/real-repository/run-07/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-07/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-07/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-07/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-07/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-08/batch-environment.json: OK
+./confirmation/raw/real-repository/run-08/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-08/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-08/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-08/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-08/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-09/batch-environment.json: OK
+./confirmation/raw/real-repository/run-09/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-09/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-09/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-09/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-09/iteration-01/time.txt: OK
+./confirmation/raw/real-repository/run-10/batch-environment.json: OK
+./confirmation/raw/real-repository/run-10/iteration-01/environment.json: OK
+./confirmation/raw/real-repository/run-10/iteration-01/report.json: OK
+./confirmation/raw/real-repository/run-10/iteration-01/stderr.log: OK
+./confirmation/raw/real-repository/run-10/iteration-01/stdout.log: OK
+./confirmation/raw/real-repository/run-10/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-01/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-01/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-01/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-01/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-01/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-01/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-02/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-02/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-02/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-02/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-02/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-02/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-03/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-03/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-03/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-03/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-03/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-03/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-04/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-04/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-04/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-04/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-04/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-04/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-05/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-05/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-05/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-05/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-05/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-05/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-06/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-06/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-06/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-06/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-06/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-06/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-07/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-07/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-07/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-07/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-07/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-07/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-08/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-08/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-08/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-08/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-08/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-08/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-09/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-09/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-09/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-09/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-09/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-09/iteration-01/time.txt: OK
+./confirmation/raw/release-candidate/run-10/batch-environment.json: OK
+./confirmation/raw/release-candidate/run-10/iteration-01/environment.json: OK
+./confirmation/raw/release-candidate/run-10/iteration-01/report.json: OK
+./confirmation/raw/release-candidate/run-10/iteration-01/stderr.log: OK
+./confirmation/raw/release-candidate/run-10/iteration-01/stdout.log: OK
+./confirmation/raw/release-candidate/run-10/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-01/batch-environment.json: OK
+./confirmation/raw/unit/run-01/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-01/report.json: OK
+./confirmation/raw/unit/run-01/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-02/report.json: OK
+./confirmation/raw/unit/run-01/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-03/report.json: OK
+./confirmation/raw/unit/run-01/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-04/report.json: OK
+./confirmation/raw/unit/run-01/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-05/report.json: OK
+./confirmation/raw/unit/run-01/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-06/report.json: OK
+./confirmation/raw/unit/run-01/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-07/report.json: OK
+./confirmation/raw/unit/run-01/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-08/report.json: OK
+./confirmation/raw/unit/run-01/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-09/report.json: OK
+./confirmation/raw/unit/run-01/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-01/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-01/iteration-10/report.json: OK
+./confirmation/raw/unit/run-01/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-01/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-01/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-02/batch-environment.json: OK
+./confirmation/raw/unit/run-02/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-01/report.json: OK
+./confirmation/raw/unit/run-02/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-02/report.json: OK
+./confirmation/raw/unit/run-02/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-03/report.json: OK
+./confirmation/raw/unit/run-02/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-04/report.json: OK
+./confirmation/raw/unit/run-02/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-05/report.json: OK
+./confirmation/raw/unit/run-02/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-06/report.json: OK
+./confirmation/raw/unit/run-02/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-07/report.json: OK
+./confirmation/raw/unit/run-02/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-08/report.json: OK
+./confirmation/raw/unit/run-02/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-09/report.json: OK
+./confirmation/raw/unit/run-02/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-02/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-02/iteration-10/report.json: OK
+./confirmation/raw/unit/run-02/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-02/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-02/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-03/batch-environment.json: OK
+./confirmation/raw/unit/run-03/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-01/report.json: OK
+./confirmation/raw/unit/run-03/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-02/report.json: OK
+./confirmation/raw/unit/run-03/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-03/report.json: OK
+./confirmation/raw/unit/run-03/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-04/report.json: OK
+./confirmation/raw/unit/run-03/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-05/report.json: OK
+./confirmation/raw/unit/run-03/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-06/report.json: OK
+./confirmation/raw/unit/run-03/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-07/report.json: OK
+./confirmation/raw/unit/run-03/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-08/report.json: OK
+./confirmation/raw/unit/run-03/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-09/report.json: OK
+./confirmation/raw/unit/run-03/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-03/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-03/iteration-10/report.json: OK
+./confirmation/raw/unit/run-03/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-03/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-03/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-04/batch-environment.json: OK
+./confirmation/raw/unit/run-04/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-01/report.json: OK
+./confirmation/raw/unit/run-04/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-02/report.json: OK
+./confirmation/raw/unit/run-04/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-03/report.json: OK
+./confirmation/raw/unit/run-04/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-04/report.json: OK
+./confirmation/raw/unit/run-04/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-05/report.json: OK
+./confirmation/raw/unit/run-04/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-06/report.json: OK
+./confirmation/raw/unit/run-04/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-07/report.json: OK
+./confirmation/raw/unit/run-04/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-08/report.json: OK
+./confirmation/raw/unit/run-04/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-09/report.json: OK
+./confirmation/raw/unit/run-04/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-04/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-04/iteration-10/report.json: OK
+./confirmation/raw/unit/run-04/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-04/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-04/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-05/batch-environment.json: OK
+./confirmation/raw/unit/run-05/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-01/report.json: OK
+./confirmation/raw/unit/run-05/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-02/report.json: OK
+./confirmation/raw/unit/run-05/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-03/report.json: OK
+./confirmation/raw/unit/run-05/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-04/report.json: OK
+./confirmation/raw/unit/run-05/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-05/report.json: OK
+./confirmation/raw/unit/run-05/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-06/report.json: OK
+./confirmation/raw/unit/run-05/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-07/report.json: OK
+./confirmation/raw/unit/run-05/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-08/report.json: OK
+./confirmation/raw/unit/run-05/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-09/report.json: OK
+./confirmation/raw/unit/run-05/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-05/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-05/iteration-10/report.json: OK
+./confirmation/raw/unit/run-05/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-05/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-05/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-06/batch-environment.json: OK
+./confirmation/raw/unit/run-06/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-01/report.json: OK
+./confirmation/raw/unit/run-06/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-02/report.json: OK
+./confirmation/raw/unit/run-06/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-03/report.json: OK
+./confirmation/raw/unit/run-06/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-04/report.json: OK
+./confirmation/raw/unit/run-06/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-05/report.json: OK
+./confirmation/raw/unit/run-06/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-06/report.json: OK
+./confirmation/raw/unit/run-06/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-07/report.json: OK
+./confirmation/raw/unit/run-06/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-08/report.json: OK
+./confirmation/raw/unit/run-06/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-09/report.json: OK
+./confirmation/raw/unit/run-06/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-06/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-06/iteration-10/report.json: OK
+./confirmation/raw/unit/run-06/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-06/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-06/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-07/batch-environment.json: OK
+./confirmation/raw/unit/run-07/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-01/report.json: OK
+./confirmation/raw/unit/run-07/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-02/report.json: OK
+./confirmation/raw/unit/run-07/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-03/report.json: OK
+./confirmation/raw/unit/run-07/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-04/report.json: OK
+./confirmation/raw/unit/run-07/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-05/report.json: OK
+./confirmation/raw/unit/run-07/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-06/report.json: OK
+./confirmation/raw/unit/run-07/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-07/report.json: OK
+./confirmation/raw/unit/run-07/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-08/report.json: OK
+./confirmation/raw/unit/run-07/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-09/report.json: OK
+./confirmation/raw/unit/run-07/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-07/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-07/iteration-10/report.json: OK
+./confirmation/raw/unit/run-07/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-07/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-07/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-08/batch-environment.json: OK
+./confirmation/raw/unit/run-08/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-01/report.json: OK
+./confirmation/raw/unit/run-08/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-02/report.json: OK
+./confirmation/raw/unit/run-08/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-03/report.json: OK
+./confirmation/raw/unit/run-08/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-04/report.json: OK
+./confirmation/raw/unit/run-08/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-05/report.json: OK
+./confirmation/raw/unit/run-08/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-06/report.json: OK
+./confirmation/raw/unit/run-08/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-07/report.json: OK
+./confirmation/raw/unit/run-08/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-08/report.json: OK
+./confirmation/raw/unit/run-08/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-09/report.json: OK
+./confirmation/raw/unit/run-08/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-08/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-08/iteration-10/report.json: OK
+./confirmation/raw/unit/run-08/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-08/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-08/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-09/batch-environment.json: OK
+./confirmation/raw/unit/run-09/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-01/report.json: OK
+./confirmation/raw/unit/run-09/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-02/report.json: OK
+./confirmation/raw/unit/run-09/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-03/report.json: OK
+./confirmation/raw/unit/run-09/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-04/report.json: OK
+./confirmation/raw/unit/run-09/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-05/report.json: OK
+./confirmation/raw/unit/run-09/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-06/report.json: OK
+./confirmation/raw/unit/run-09/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-07/report.json: OK
+./confirmation/raw/unit/run-09/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-08/report.json: OK
+./confirmation/raw/unit/run-09/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-09/report.json: OK
+./confirmation/raw/unit/run-09/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-09/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-09/iteration-10/report.json: OK
+./confirmation/raw/unit/run-09/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-09/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-09/iteration-10/time.txt: OK
+./confirmation/raw/unit/run-10/batch-environment.json: OK
+./confirmation/raw/unit/run-10/iteration-01/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-01/report.json: OK
+./confirmation/raw/unit/run-10/iteration-01/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-01/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-01/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-02/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-02/report.json: OK
+./confirmation/raw/unit/run-10/iteration-02/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-02/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-02/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-03/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-03/report.json: OK
+./confirmation/raw/unit/run-10/iteration-03/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-03/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-03/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-04/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-04/report.json: OK
+./confirmation/raw/unit/run-10/iteration-04/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-04/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-04/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-05/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-05/report.json: OK
+./confirmation/raw/unit/run-10/iteration-05/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-05/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-05/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-06/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-06/report.json: OK
+./confirmation/raw/unit/run-10/iteration-06/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-06/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-06/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-07/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-07/report.json: OK
+./confirmation/raw/unit/run-10/iteration-07/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-07/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-07/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-08/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-08/report.json: OK
+./confirmation/raw/unit/run-10/iteration-08/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-08/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-08/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-09/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-09/report.json: OK
+./confirmation/raw/unit/run-10/iteration-09/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-09/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-09/time.txt: OK
+./confirmation/raw/unit/run-10/iteration-10/environment.json: OK
+./confirmation/raw/unit/run-10/iteration-10/report.json: OK
+./confirmation/raw/unit/run-10/iteration-10/stderr.log: OK
+./confirmation/raw/unit/run-10/iteration-10/stdout.log: OK
+./confirmation/raw/unit/run-10/iteration-10/time.txt: OK
+./confirmation/receipt.json: OK
+./confirmation/receipt.json.sha256: OK
+./operator-exit-code.txt: OK
+./operator.log: OK
+{"analyzer_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562", "analyzer_version": "CodeSkeptic 0.4.9-dev", "build_identity_sha256": "e26f3b0001f9b89c60250612fe81fb6070cccead5f061f74e6a1d88ee0581c82", "manifest_sha256": "90cd7f03db2c50b851f4900ab628057a524045372d19c103258785b0d7861ac4", "mirror_revision": "4dee52f82dc455a035e900fed6a40cb45cd7a454", "source": {"file_count": 386, "manifest_sha256": "b8c4b7235c1c8704304dd5fe4de90728e6cd0b4ab020526b76f1e4731b3e0d9b", "revision": "88e369b21675e64e0a92842b0ce22f0c8148745e"}, "toolchain_sha256": "63c01694379ed68b8aa875ac414a08718001fc67d6bf7594b21332cf55a88120"}
+CODESKEPTIC_CONFIRMATION_RUN_OK
+tanzer_process_inventory_begin
+   1778 systemd
+   1780 (sd-pam)
+   1797 dbus-broker-lau
+   1802 dbus-broker
+   3318 bash
+   3435 catatonit
+ 169029 bash
+tanzer_process_inventory_end
+podman_pause_pid=3435 original_affinity=0-11 ticks=0 cgroup=0::/user.slice/user-1000.slice/user@1000.service/user.slice/podman-pause-68ab6f1b.scope
+Removed '/run/systemd/system/atd.service'.
+Removed '/run/systemd/system/crond.service'.
+Removed '/run/systemd/system/dnf-makecache.service'.
+Removed '/run/systemd/system/dnf-makecache.timer'.
+Removed '/run/systemd/system/fstrim.service'.
+Removed '/run/systemd/system/fstrim.timer'.
+Removed '/run/systemd/system/graphical.target'.
+Removed '/run/systemd/system/logrotate.service'.
+Removed '/run/systemd/system/logrotate.timer'.
+Removed '/run/systemd/system/packagekit-offline-update.service'.
+Removed '/run/systemd/system/packagekit.service'.
+Removed '/run/systemd/system/plasmalogin.service'.
+Removed '/run/systemd/system/plocate-updatedb.service'.
+Removed '/run/systemd/system/plocate-updatedb.timer'.
+Removed '/run/systemd/system/raid-check.service'.
+Removed '/run/systemd/system/raid-check.timer'.
+Removed '/run/systemd/system/systemd-tmpfiles-clean.service'.
+Removed '/run/systemd/system/systemd-tmpfiles-clean.timer'.
+Removed '/run/systemd/system/unbound-anchor.service'.
+Removed '/run/systemd/system/unbound-anchor.timer'.
+Removed '/run/user/1000/systemd/user/dconf.service'.
+Removed '/run/user/1000/systemd/user/drkonqi-coredump-cleanup.service'.
+Removed '/run/user/1000/systemd/user/drkonqi-coredump-cleanup.timer'.
+Removed '/run/user/1000/systemd/user/drkonqi-coredump-launcher.socket'.
+Removed '/run/user/1000/systemd/user/drkonqi-sentry-postman.path'.
+Removed '/run/user/1000/systemd/user/drkonqi-sentry-postman.service'.
+Removed '/run/user/1000/systemd/user/drkonqi-sentry-postman.timer'.
+Removed '/run/user/1000/systemd/user/graphical-session-pre.target'.
+Removed '/run/user/1000/systemd/user/graphical-session.target'.
+Removed '/run/user/1000/systemd/user/grub-boot-success.service'.
+Removed '/run/user/1000/systemd/user/grub-boot-success.timer'.
+Removed '/run/user/1000/systemd/user/obex.service'.
+Removed '/run/user/1000/systemd/user/pipewire-pulse.service'.
+Removed '/run/user/1000/systemd/user/pipewire-pulse.socket'.
+Removed '/run/user/1000/systemd/user/pipewire.service'.
+Removed '/run/user/1000/systemd/user/pipewire.socket'.
+Removed '/run/user/1000/systemd/user/plasma-core.target'.
+Removed '/run/user/1000/systemd/user/plasma-workspace-wayland.target'.
+Removed '/run/user/1000/systemd/user/plasma-workspace.target'.
+Removed '/run/user/1000/systemd/user/podman-auto-update.service'.
+Removed '/run/user/1000/systemd/user/podman-auto-update.timer'.
+Removed '/run/user/1000/systemd/user/ssh-agent.service'.
+Removed '/run/user/1000/systemd/user/ssh-agent.socket'.
+Removed '/run/user/1000/systemd/user/systemd-ask-password.socket'.
+Removed '/run/user/1000/systemd/user/systemd-tmpfiles-clean.service'.
+Removed '/run/user/1000/systemd/user/systemd-tmpfiles-clean.timer'.
+Removed '/run/user/1000/systemd/user/wireplumber.service'.
+Removed '/run/user/1000/systemd/user/xdg-desktop-autostart.target'.
+CODESKEPTIC_HEADLESS_TERMINAL_RECEIPT=/var/lib/codeskeptic-p10-07/headless/88e369b-confirmation-v7-23.terminal
+CODESKEPTIC_HEADLESS_CONTROLLER_CLEANUP_FAILED=0
+CODESKEPTIC_HEADLESS_CONTROLLER_EXIT=0
+CODESKEPTIC_HEADLESS_CONTROLLER_FINISH=2026-08-22T15:56:17+00:00

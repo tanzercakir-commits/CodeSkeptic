@@ -1,0 +1,7 @@
+[Unit]
+Description=CodeSkeptic Attempt24 disposable stop-before-mask timer
+
+[Timer]
+OnActiveSec=1h
+AccuracySec=1us
+Unit=codeskeptic-attempt24-mask-stress-consumer.service
