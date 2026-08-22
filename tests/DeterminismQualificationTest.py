@@ -990,6 +990,274 @@ class DeterminismQualificationTest(unittest.TestCase):
                 legacy_rejected, raw_manifest, None
             )
 
+    def test_v7_profile_tolerates_boot_page_accounting_not_capacity_drift(
+        self,
+    ) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        current = receipt(manifest_sha)
+        pinned = baseline(manifest_sha)
+        profile = pinned["profiles"]["test-linux-x86_64"]
+
+        current["host"]["memory_bytes"] -= 8192
+        self.assertTrue(qualification._profile_matches(
+            profile, current["host"], current["toolchain"],
+        ))
+        qualification.validate_receipt_payload(current, raw_manifest, pinned)
+
+        current["host"]["memory_bytes"] = (
+            profile["hardware"]["memory_bytes"]
+            + qualification.MEMORY_PROFILE_TOLERANCE_BYTES
+        )
+        self.assertTrue(qualification._profile_matches(
+            profile, current["host"], current["toolchain"],
+        ))
+        qualification.validate_receipt_payload(current, raw_manifest, pinned)
+
+        current["host"]["memory_bytes"] = (
+            profile["hardware"]["memory_bytes"]
+            + qualification.MEMORY_PROFILE_TOLERANCE_BYTES
+            + 4096
+        )
+        self.assertFalse(qualification._profile_matches(
+            profile, current["host"], current["toolchain"],
+        ))
+        with self.assertRaisesRegex(
+            qualification.QualificationError,
+            "baseline OS, hardware, or toolchain inventory drift",
+        ):
+            qualification.validate_receipt_payload(
+                current, raw_manifest, pinned
+            )
+
+        current["host"]["memory_bytes"] = profile["hardware"]["memory_bytes"]
+        current["host"]["cpu_model"] += " drift"
+        self.assertFalse(qualification._profile_matches(
+            profile, current["host"], current["toolchain"],
+        ))
+
+    def test_v7_verifier_preserves_narrow_legacy_exact_memory_rejection(
+        self,
+    ) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        current = receipt(manifest_sha)
+        pinned = baseline(manifest_sha)
+        current["host"]["memory_bytes"] -= 8192
+        failure = qualification._failure_record(
+            "profile-unavailable",
+            "baseline performance profile is unavailable for "
+            "test-linux-x86_64",
+        )
+        rejected = {
+            "schema": qualification.REJECTED_SCHEMA,
+            "status": "rejected",
+            "source": current["source"],
+            "configuration": current["configuration"],
+            "host": current["host"],
+            "toolchain": current["toolchain"],
+            "inputs": current["inputs"],
+            "baseline": {
+                "sha256": current["baseline"]["sha256"],
+                "profile": current["host"]["class_id"],
+            },
+            "decision": {
+                "classification": "complete-gate-rejection",
+                "failures": [failure],
+                "performance_regressions": [],
+            },
+            "observations": {
+                "complete": True,
+                "workloads": current["workloads"],
+            },
+            "started_at": current["started_at"],
+            "finished_at": current["finished_at"],
+            "duration_ms": current["duration_ms"],
+            "artifacts": current["artifacts"],
+        }
+
+        qualification._validate_rejected_payload(
+            rejected, raw_manifest, pinned
+        )
+        self.assertFalse(
+            qualification._legacy_exact_memory_rejection_matches(
+                [failure], [], None, current["host"], current["toolchain"],
+                "required",
+            )
+        )
+
+        forged = copy.deepcopy(rejected)
+        forged["host"]["memory_bytes"] = pinned["profiles"][
+            "test-linux-x86_64"
+        ]["hardware"]["memory_bytes"]
+        with self.assertRaisesRegex(
+            qualification.QualificationError,
+            "rejected decision differs from recomputed gate failures",
+        ):
+            qualification._validate_rejected_payload(
+                forged, raw_manifest, pinned
+            )
+
+    def test_required_baseline_preflight_precedes_release_preparation(
+        self,
+    ) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        pinned = baseline(manifest_sha)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            build = root / "build"
+            repo.mkdir()
+            build.mkdir()
+            binaries = {}
+            for name in (
+                "codeskeptic", "clang", "time", "cmake", "ninja",
+                "c-compiler", "cxx-compiler",
+            ):
+                path = root / name
+                path.write_bytes(b"fixture\n")
+                binaries[name] = path
+            args = mock.Mock(
+                repo_root=repo,
+                build_path=build,
+                binary=binaries["codeskeptic"],
+                clang=binaries["clang"],
+                time_binary=binaries["time"],
+                cmake=binaries["cmake"],
+                ninja=binaries["ninja"],
+                c_compiler=binaries["c-compiler"],
+                cxx_compiler=binaries["cxx-compiler"],
+                output=root / "evidence",
+                manifest=root / "manifest.json",
+                baseline=root / "baseline.json",
+                repetitions=10,
+                revision="head-revision",
+                measurement_cgroup=None,
+                hardware_class="test-linux-x86_64",
+                performance_policy="required",
+                prepare_release_candidate=True,
+                release_workspace=root / "release-workspace",
+                release_source=None,
+                release_build=None,
+                jobs=2,
+                establish_baseline=False,
+                candidate_baseline_output=None,
+                baseline_authority_root=repo,
+            )
+            events = []
+
+            def regular_kind(path: Path) -> str:
+                return "directory" if path in {repo, build} else "regular"
+
+            def load_pinned_baseline(*unused: object) -> dict:
+                events.append("baseline")
+                return pinned
+
+            drifted_hardware = hardware_identity()
+            drifted_hardware["memory_bytes"] += (
+                qualification.MEMORY_PROFILE_TOLERANCE_BYTES + 4096
+            )
+
+            with (
+                mock.patch.object(
+                    qualification, "_regular_kind", side_effect=regular_kind,
+                ),
+                mock.patch.object(
+                    qualification, "load_manifest", return_value=raw_manifest,
+                ),
+                mock.patch.object(
+                    qualification, "source_manifest", return_value={
+                        "revision": "head-revision",
+                        "manifest_sha256": "2" * 64,
+                        "file_count": 1,
+                    },
+                ),
+                mock.patch.object(
+                    qualification, "_git_output", return_value="",
+                ),
+                mock.patch.object(
+                    qualification, "host_identity", return_value={
+                        "class_id": "test-linux-x86_64",
+                        "os": "Linux 6.19.10-300.fc44.x86_64",
+                        **drifted_hardware,
+                    },
+                ),
+                mock.patch.object(
+                    qualification, "toolchain_identity",
+                    return_value=toolchain_identity(),
+                ),
+                mock.patch.object(
+                    qualification, "load_baseline",
+                    side_effect=load_pinned_baseline,
+                ),
+                mock.patch.object(
+                    qualification, "verify_baseline_authority",
+                    side_effect=lambda *unused: events.append("authority"),
+                ),
+                mock.patch.object(
+                    qualification, "prepare_release_candidate",
+                    side_effect=lambda *unused: events.append("release"),
+                ),
+                mock.patch.object(qualification, "_persist_rejection"),
+            ):
+                with self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "baseline OS, hardware, or toolchain inventory drift",
+                ):
+                    qualification.run_qualification(args)
+
+            self.assertEqual(events, ["baseline", "authority"])
+
+    def test_baseline_preflight_preserves_promotion_and_establishment(
+        self,
+    ) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        pinned = baseline(manifest_sha)
+        host = receipt(manifest_sha)["host"]
+        host["memory_bytes"] += (
+            qualification.MEMORY_PROFILE_TOLERANCE_BYTES + 4096
+        )
+        toolchain = toolchain_identity()
+
+        promotion_args = mock.Mock(
+            establish_baseline=False,
+            performance_policy="required",
+            candidate_baseline_output=Path("candidate.json"),
+            baseline_authority_root=Path("authority"),
+        )
+        with (
+            mock.patch.object(
+                qualification, "load_baseline", return_value=pinned,
+            ) as load,
+            mock.patch.object(
+                qualification, "verify_baseline_authority",
+            ) as verify,
+        ):
+            self.assertIs(
+                qualification._preflight_qualification_baseline(
+                    promotion_args, Path("baseline.json"), manifest_sha,
+                    host, toolchain,
+                ),
+                pinned,
+            )
+        load.assert_called_once()
+        verify.assert_called_once()
+
+        establishment_args = mock.Mock(establish_baseline=True)
+        with mock.patch.object(
+            qualification, "load_baseline",
+            side_effect=AssertionError("establishment loaded a baseline"),
+        ) as load:
+            self.assertIsNone(
+                qualification._preflight_qualification_baseline(
+                    establishment_args, Path("baseline.json"), manifest_sha,
+                    host, toolchain,
+                )
+            )
+        load.assert_not_called()
+
     def test_required_measurement_environment_rejects_v5_and_requires_cgroup(self) -> None:
         self.assertEqual(
             qualification._measurement_environment_mode("required", None),

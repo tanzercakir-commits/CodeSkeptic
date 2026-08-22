@@ -1,5 +1,30 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-22 — Phase 10.7 confirmation profile hardening (in progress)
+
+- The first complete V7 confirmation produced all ten repetitions for the
+  unit, real-repository, and release-candidate workloads, with every retained
+  inner and batch environment decision valid. All three semantic hashes match
+  the pinned baseline and the largest positive performance delta is `0.76%`,
+  below the `10%` gate. The sealed run nevertheless rejected at the final gate
+  because Linux reported `16425545728` memory bytes while the calibration boot
+  reported `16425553920`, an `8192`-byte difference on the same machine,
+  kernel, CPU partition, uclamp policy, and toolchain.
+- Profile matching now retains the exact observed `memory_bytes` in evidence
+  but tolerates at most `1 MiB` of Linux boot-page accounting movement. Every
+  other OS, hardware, affinity, cgroup, uclamp, and toolchain field remains
+  exact, and a memory-capacity drift beyond that narrow bound is rejected.
+- Baseline authority and required profile compatibility are now checked before
+  release-candidate preparation, idle waiting, or any measured workload. A
+  missing or materially incompatible profile therefore fails closed before an
+  expensive run instead of after the full confirmation matrix.
+- The original Attempt21 receipt remains an immutable rejected artifact; it is
+  not rewritten retroactively. Its raw observations recompute to zero gate
+  failures under the corrected policy and provide a regression oracle. The
+  verifier retains only the narrow legacy rejection shape caused by a nonzero,
+  in-tolerance memory delta; a fresh accepted confirmation is still required
+  to close `CS-P10-07`.
+
 ## 2026-08-19 — Phase 10.7 kernel-bound determinism authority (in progress)
 
 - Advanced the determinism authority to coordinated V7 schemas that bind the

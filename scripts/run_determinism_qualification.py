@@ -66,6 +66,11 @@ IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}")
 MAX_JSON_BYTES = 64 << 20
 MAX_LOG_BYTES = 64 << 20
 MAX_BUNDLE_BYTES = 512 << 20
+# Linux MemTotal can move by a few boot-reserved pages on unchanged hardware.
+# Keep the observed byte count in evidence, but do not turn page-accounting
+# jitter into a different performance profile. One MiB remains far below a
+# meaningful installed-memory capacity change.
+MEMORY_PROFILE_TOLERANCE_BYTES = 1 << 20
 ENVIRONMENT_POLICY = {
     "idle_seconds": 30,
     "idle_max_overshoot_ms": 2000,
@@ -1649,11 +1654,49 @@ def _profile_matches(
     if profile is None:
         return False
     hardware = {field: host[field] for field in HARDWARE_FIELDS}
+    baseline_hardware = profile["hardware"]
+    if set(baseline_hardware) != set(hardware):
+        return False
+    if any(
+        baseline_hardware[field] != hardware[field]
+        for field in HARDWARE_FIELDS if field != "memory_bytes"
+    ):
+        return False
+    baseline_memory = baseline_hardware["memory_bytes"]
+    observed_memory = hardware["memory_bytes"]
+    if (
+        isinstance(baseline_memory, bool)
+        or not isinstance(baseline_memory, int)
+        or isinstance(observed_memory, bool)
+        or not isinstance(observed_memory, int)
+        or abs(observed_memory - baseline_memory)
+            > MEMORY_PROFILE_TOLERANCE_BYTES
+    ):
+        return False
     return (
         profile["os"] == host["os"] and
-        profile["hardware"] == hardware and
         profile["provenance"]["toolchain"] == toolchain
     )
+
+
+def _legacy_exact_memory_rejection_matches(
+    failures: list[dict[str, Any]], current_failures: list[dict[str, Any]],
+    baseline: dict[str, Any] | None, host: dict[str, Any],
+    toolchain: dict[str, Any], performance_policy: str,
+) -> bool:
+    if baseline is None or performance_policy != "required" or current_failures:
+        return False
+    profile_id = host["class_id"]
+    profile = baseline["profiles"].get(profile_id)
+    if not _profile_matches(profile, host, toolchain):
+        return False
+    baseline_memory = profile["hardware"]["memory_bytes"]
+    if baseline_memory == host["memory_bytes"]:
+        return False
+    return failures == [_failure_record(
+        "profile-unavailable",
+        f"baseline performance profile is unavailable for {profile_id}",
+    )]
 
 
 def _normalized_command(command: dict[str, Any]) -> dict[str, Any]:
@@ -2474,7 +2517,13 @@ def _validate_rejected_payload(
                 observations["workloads"], configuration["performance_policy"],
             ) if baseline is not None else []
         )
-        if failures != expected_failures:
+        if (
+            failures != expected_failures
+            and not _legacy_exact_memory_rejection_matches(
+                failures, expected_failures, baseline, host,
+                receipt["toolchain"], configuration["performance_policy"],
+            )
+        ):
             raise QualificationError(
                 "rejected decision differs from recomputed gate failures"
             )
@@ -5732,6 +5781,40 @@ def _persist_rejection(
         raise QualificationError("rejected evidence verification drift")
 
 
+def _preflight_qualification_baseline(
+    args: argparse.Namespace, baseline_path: Path, manifest_sha: str,
+    host: dict[str, Any], toolchain: dict[str, Any],
+) -> dict[str, Any] | None:
+    if args.establish_baseline:
+        return None
+    baseline = load_baseline(baseline_path, manifest_sha)
+    if args.baseline_authority_root is None:
+        raise QualificationError(
+            "qualification requires --baseline-authority-root"
+        )
+    authority = args.baseline_authority_root.resolve()
+    verify_baseline_authority(
+        baseline, authority,
+        authority / "scripts" / "determinism_workloads.json",
+    )
+    profile_id = host["class_id"]
+    profile = baseline["profiles"].get(profile_id)
+    if (
+        args.performance_policy == "required"
+        and args.candidate_baseline_output is None
+        and not _profile_matches(profile, host, toolchain)
+    ):
+        if profile is None:
+            raise QualificationError(
+                f"baseline profile is unavailable for {profile_id}"
+            )
+        raise QualificationError(
+            f"baseline OS, hardware, or toolchain inventory drift for "
+            f"{profile_id}"
+        )
+    return baseline
+
+
 def _finalize_qualification(
     args: argparse.Namespace, manifest: dict[str, Any], manifest_sha: str,
     manifest_path: Path, baseline_path: Path, output: Path, repo: Path,
@@ -5891,6 +5974,9 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
     artifacts: dict[str, bytes] = {}
     inputs: dict[str, Any] = {}
     try:
+        _preflight_qualification_baseline(
+            args, baseline_path, manifest_sha, host, toolchain,
+        )
         release_workload = next(
             item for item in manifest["workloads"]
             if item["kind"] == "release-candidate"
