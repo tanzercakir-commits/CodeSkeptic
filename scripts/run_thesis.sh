@@ -72,8 +72,18 @@ while read -r file role floor; do
     src="$DIR/$file"
     [ -f "$src" ] || { echo "THESIS_FAIL manifest lists missing file: $file"; fail=1; continue; }
 
-    # Findings print to stderr; count the "file:line:col [sev]" lines.
-    out="$("$CS_BIN" "$src" --build-path "$DB_DIR" 2>&1 >/dev/null || true)"
+    # Findings print to stderr. Exit 0 (clean) and 1 (findings) are complete
+    # analyzer verdicts; every other exit makes the thesis verdict unavailable.
+    if out="$("$CS_BIN" "$src" --build-path "$DB_DIR" 2>&1 >/dev/null)"; then
+        analyzer_exit=0
+    else
+        analyzer_exit=$?
+    fi
+    if [ "$analyzer_exit" -ne 0 ] && [ "$analyzer_exit" -ne 1 ]; then
+        echo "THESIS_FAIL analyzer unavailable: $file exit $analyzer_exit"
+        fail=1
+        continue
+    fi
     n="$(printf '%s\n' "$out" | grep -cE '\.c:[0-9]+:[0-9]+ \[(warning|error|info)\]' || true)"
     total_findings=$((total_findings + n))
 
