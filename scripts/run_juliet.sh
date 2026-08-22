@@ -121,6 +121,12 @@ run_cwe() { # <cwe-name>
                 if (pick) { print; picked++ }
             }' "$list" "$list" > "$list.tmp" && mv "$list.tmp" "$list"
     fi
+    # These two suite-level driver TUs are helpers, not scored defect cases.
+    # Remove them only after strided sampling so their presence cannot shift
+    # the long-established deterministic sample to a different case surface.
+    awk 'BEGIN { FS="/" }
+         { base=$NF; if (base != "main.cpp" && base != "main_linux.cpp") print }' \
+        "$list" > "$list.tmp" && mv "$list.tmp" "$list"
     local count
     count=$(wc -l < "$list")
     [ "$count" -gt 0 ] || { echo "[juliet] $cwe: no eligible files"; return 0; }
