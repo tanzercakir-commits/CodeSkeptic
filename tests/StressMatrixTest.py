@@ -17,6 +17,14 @@ EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" / "stress" /
 
 
 class StressMatrixContractTest(unittest.TestCase):
+    def test_strict_json_rejects_duplicate_and_nonfinite_values(self):
+        for raw in (
+            b'{"schema":"first","schema":"second"}\n',
+            b'{"duration_ms":NaN}\n',
+        ):
+            with self.subTest(raw=raw), self.assertRaises(matrix.MatrixError):
+                matrix._strict_json(raw, "stress fixture")
+
     def test_source_manifest_binds_complete_stress_inputs_not_outputs(self):
         files = {
             path.relative_to(ROOT).as_posix()
@@ -72,6 +80,15 @@ class StressMatrixContractTest(unittest.TestCase):
             self.assertEqual(receipt["summary"]["accepted_cases"], 9)
             self.assertEqual(receipt["summary"]["repetitions_per_case"], 2)
             matrix.verify_receipt(output / "receipt.json", BINARY)
+            matrix.verify_receipt_with_identity(
+                output / "receipt.json", matrix._binary_identity(BINARY)
+            )
+            forged_identity = dict(matrix._binary_identity(BINARY))
+            forged_identity["sha256"] = "f" * 64
+            with self.assertRaisesRegex(matrix.MatrixError, "analyzer identity"):
+                matrix.verify_receipt_with_identity(
+                    output / "receipt.json", forged_identity
+                )
 
             receipt_path = output / "receipt.json"
             tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -92,13 +109,20 @@ class StressMatrixContractTest(unittest.TestCase):
             with self.assertRaises(matrix.MatrixError):
                 matrix.verify_receipt(receipt_path, BINARY)
 
-    def test_retained_receipt_binds_current_source_and_complete_matrix(self):
+    def test_retained_receipt_binds_committed_source_and_complete_matrix(self):
         receipt_path = EVIDENCE_ROOT / "receipt.json"
         if not receipt_path.is_file():
             self.skipTest("stress evidence is not materialized")
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        self.assertEqual(receipt["source"]["manifest"],
-                         matrix.source_manifest())
+        revision = matrix._resolve_source_manifest_revision(
+            receipt["source"]["base_commit"],
+            matrix._git_commit(),
+            receipt["source"]["manifest"],
+        )
+        self.assertEqual(
+            receipt["source"]["manifest"],
+            matrix.source_manifest_at_revision(revision),
+        )
         self.assertEqual(
             receipt["summary"],
             {

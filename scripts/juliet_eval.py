@@ -77,6 +77,14 @@ def relevant_rules(cwe: str) -> set:
 import re
 
 _FLOW_RE = re.compile(r"_(\d{2})[a-e]?\.(?:c|cpp)$")
+_CPP_SPLIT_FIXTURE_RE = re.compile(
+    r"_(?:81|82|83|84)_(?:bad|good[a-z0-9]*)\.cpp$", re.IGNORECASE
+)
+_CPP_OPERATOR_FIXTURE_RE = re.compile(
+    r"_(?:virtual_destructor|operator_equals)_\d{2}_"
+    r"(?:bad|good[a-z0-9]*)\.cpp$",
+    re.IGNORECASE,
+)
 
 # Binding Phase 2 decision map. Every miss belongs to exactly one product
 # decision class; detailed flow buckets remain available for engine work.
@@ -94,6 +102,13 @@ def classify_fn(basename: str) -> str:
         return "float"
     if "rand" in name or "socket" in name:
         return "opaque"
+    # Juliet's split C++ fixtures append a function-role suffix after the
+    # variant number (for example, _81_goodG2B.cpp), so they do not match the
+    # ordinary trailing-flow regex. The virtual-destructor/operator-equals
+    # fixtures use the same split-file convention with a numbered role suffix.
+    if (_CPP_SPLIT_FIXTURE_RE.search(basename) or
+            _CPP_OPERATOR_FIXTURE_RE.search(basename)):
+        return "cpp"
     m = _FLOW_RE.search(basename)
     flow = int(m.group(1)) if m else -1
     if flow in (54, 61):
@@ -117,6 +132,10 @@ def selftest() -> int:
         "CWE416_Use_After_Free__malloc_free_char_44.c": "flow",
         "CWE401_Memory_Leak__int64_t_calloc_67a.c": "flow",
         "CWE401_Memory_Leak__new_array_TwoIntsClass_72a.cpp": "cpp",
+        "CWE401_Memory_Leak__new_char_81_goodG2B.cpp": "cpp",
+        "CWE401_Memory_Leak__new_TwoIntsClass_"
+        "virtual_destructor_01_good1.cpp": "cpp",
+        "CWE415_Double_Free__new_delete_operator_equals_01_bad.cpp": "cpp",
         "CWE190_weird_name.c": "other",
     }
     bad = {n: (classify_fn(n), want) for n, want in cases.items()

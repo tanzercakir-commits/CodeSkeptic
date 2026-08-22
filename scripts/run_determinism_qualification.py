@@ -3525,6 +3525,38 @@ def source_manifest(repo: Path) -> dict[str, Any]:
     }
 
 
+def _git_authority_environment(repo: Path) -> dict[str, str]:
+    """Return a closed Git environment for source-authority operations."""
+    # Start from an OS-runtime allowlist instead of trying to enumerate every
+    # Git override.  In particular, GIT_CONFIG_PARAMETERS has higher priority
+    # than config-count entries and can otherwise inject executable fsmonitor
+    # hooks into an allegedly read-only authority check.
+    admitted_runtime = {
+        "COMSPEC", "LANG", "LC_ALL", "PATH", "PATHEXT", "SYSTEMROOT",
+        "SystemRoot", "TEMP", "TMP", "TZ", "WINDIR",
+    }
+    environment = {
+        key: value for key, value in os.environ.items()
+        if key in admitted_runtime
+    }
+    environment.update({
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_CONFIG_COUNT": "4",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": str(repo.resolve()),
+        "GIT_CONFIG_KEY_1": "core.hooksPath",
+        "GIT_CONFIG_VALUE_1": os.devnull,
+        "GIT_CONFIG_KEY_2": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_2": "false",
+        "GIT_CONFIG_KEY_3": "core.commitGraph",
+        "GIT_CONFIG_VALUE_3": "false",
+    })
+    return environment
+
+
 def _verify_source_authority(
     recorded: dict[str, Any], repo: Path, label: str,
 ) -> None:
@@ -3532,6 +3564,7 @@ def _verify_source_authority(
     ancestry = subprocess.run(
         ["git", "merge-base", "--is-ancestor", revision, "HEAD"],
         cwd=repo, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=_git_authority_environment(repo),
     )
     if ancestry.returncode != 0:
         raise QualificationError(f"{label} source revision is not an ancestor")
@@ -3547,7 +3580,8 @@ def _verify_source_authority(
 
 def _git_output(repo: Path, arguments: list[str]) -> str:
     completed = subprocess.run(
-        ["git", *arguments], cwd=repo, check=False, capture_output=True, text=True
+        ["git", *arguments], cwd=repo, check=False, capture_output=True,
+        text=True, env=_git_authority_environment(repo),
     )
     if completed.returncode != 0:
         raise QualificationError(
@@ -3570,6 +3604,7 @@ def _git_blob(repo: Path, revision: str, relative: str) -> bytes:
     completed = subprocess.run(
         ["git", "show", f"{revision}:{relative}"], cwd=repo, check=False,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=_git_authority_environment(repo),
     )
     if completed.returncode != 0:
         raise QualificationError(
@@ -3583,6 +3618,7 @@ def source_manifest_at_revision(repo: Path, revision: str) -> dict[str, Any]:
     completed = subprocess.run(
         ["git", "ls-tree", "-r", "-z", "--full-tree", resolved_revision],
         cwd=repo, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=_git_authority_environment(repo),
     )
     if completed.returncode != 0:
         raise QualificationError("cannot enumerate calibration source revision")

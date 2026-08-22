@@ -125,8 +125,21 @@ PYEOF
     # Name and prove the surface the count belongs to. The verdict is valid
     # only when every requested compile-DB translation unit was analyzed.
     local seen broke missing analysed
-    seen=$(grep -oE 'Analysis starting\.\.\. \([0-9]+ files' "out-$dir.txt" \
-           | grep -oE '[0-9]+' || true)
+    # A --files run emits one aggregate start line, then nested one-file
+    # starts while each requested TU is analyzed. Treating every match as
+    # one shell integer produces a multiline arithmetic expression and can
+    # skip this fail-closed coverage gate while the script still exits 0.
+    # The aggregate is the first advertised surface; if it is absent, the
+    # nested lines must not be summed into a fabricated complete verdict.
+    seen=$(awk '
+        /Analysis starting\.\.\. \([0-9]+ files/ {
+            value = $0
+            sub(/^.*Analysis starting\.\.\. \(/, "", value)
+            sub(/ files.*$/, "", value)
+            print value
+            exit
+        }
+    ' "out-$dir.txt")
     broke=$(grep -oE '[0-9]+ translation unit\(s\) failed to COMPILE' \
             "out-$dir.txt" | grep -oE '^[0-9]+' || true)
     missing=$(grep -cF 'Compile command not found.' "out-$dir.txt" || true)

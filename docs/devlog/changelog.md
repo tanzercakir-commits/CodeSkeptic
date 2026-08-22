@@ -1,5 +1,43 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
+
+- Added a fail-closed cumulative receipt for the exact seven supported default
+  rules. Acceptance requires at least `85%` precision for every rule, `90%`
+  micro precision, `70%` addressable recall, all nine clean-corpus cases with
+  zero findings, and both missing/broken requested-TU negatives returning
+  unavailable exit `2` without a project verdict.
+- Pinned the official Juliet 1.3 archive and sampled source manifest, the exact
+  libarchive revision and Linux translation-unit surface, three source-level
+  resource-leak mutations, analyzer capability registry, scripts, raw files,
+  and all 18 rule/clean/requested-TU evidence bundles. Stale, mixed, partial,
+  symlinked, duplicated, or inconsistently re-hashed/resealed derived layers
+  are rejected.
+- Added an exact LLVM 20 Release/Ninja analyzer-build authority in the retained
+  Phase 10 image. It binds the self-contained detached source checkout,
+  toolchain, CMake cache and compile database, analyzer, logs, Podman/image
+  identity, and a re-derived operator record; linked worktrees, replacement
+  refs, grafts, alternates, shallow/partial repositories, external Git config,
+  and ambient Git authority are not admitted.
+- The public quality-floor operator verifies that build authority before any
+  output is created, runs only inside the same pinned no-network/read-only
+  image, retains a separate campaign execution authority, independently
+  verifies staged output in a second container, and publishes by same-filesystem
+  atomic promotion. Resource receipts bind each logical libarchive source to
+  both admitted compile commands in both whole-program phases instead of
+  collapsing them to a unique path set. A failed container surfaces only its
+  bounded, escaped final diagnostic while the private workspace is still
+  removed. The exact-head authoritative campaign and retained evidence are
+  still pending; this checkpoint does not close `CS-P10-08` and does not change
+  protected-main status.
+- Hardened the real-world corpus gate after a live cJSON/tinyxml2 run exposed
+  a false green: the outer requested-surface banner was followed by nested
+  one-file banners, producing a multiline arithmetic operand that skipped the
+  coverage and finding-pin checks while Bash still returned success. The gate
+  now consumes only the deterministic top-level banner and a behavioral
+  contract proves exact `23/23` and `2/2` coverage while rejecting missing or
+  mismatched aggregate surfaces.
+
 ## 2026-08-22 — Phase 10.7 accepted confirmation (branch checkpoint)
 
 - The first complete V7 confirmation produced all ten repetitions for the

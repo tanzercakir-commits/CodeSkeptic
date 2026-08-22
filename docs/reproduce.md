@@ -21,6 +21,62 @@ uses 1600). The pinned floors CI enforces are in
 `scripts/juliet_expected.txt` — with the history of every floor move
 and its rationale in the comments.
 
+## Phase 10 cumulative quality-floor authority
+
+The release quality gate is stricter than the development Juliet command. It
+requires a clean, detached, self-contained source checkout; an analyzer built
+and re-derived in the pinned LLVM 20 image; the official pre-downloaded Juliet
+1.3 archive/tree; and the pinned clean libarchive checkout. A production source
+clone must have no remote, shallow/partial state, alternates, grafts,
+replacement refs, submodules, or external Git configuration.
+
+First create and verify the analyzer build authority:
+
+```bash
+python3 scripts/analyzer_build_authority.py produce \
+  --source /path/to/detached-source \
+  --revision <exact-40-hex-source-revision> \
+  --build-dir /path/to/empty-analyzer-build \
+  --output /path/to/empty-build-authority
+
+python3 scripts/analyzer_build_authority.py verify \
+  --source /path/to/detached-source \
+  --build-dir /path/to/analyzer-build \
+  --authority /path/to/build-authority
+```
+
+Then run and independently verify the offline campaign:
+
+```bash
+python3 scripts/run_quality_floor_campaign.py run \
+  --source /path/to/detached-source \
+  --build-authority /path/to/build-authority \
+  --build-dir /path/to/analyzer-build \
+  --juliet-dir /path/to/unpacked-juliet-1.3 \
+  --juliet-archive /path/to/juliet-v1.3.zip \
+  --libarchive-checkout /path/to/pinned-libarchive \
+  --output /path/to/absent-quality-package \
+  --jobs 4
+
+python3 scripts/run_quality_floor_campaign.py verify \
+  --source /path/to/detached-source \
+  --build-authority /path/to/build-authority \
+  --build-dir /path/to/analyzer-build \
+  --package /path/to/quality-package
+```
+
+The public `run` output path must not exist beforehand; atomic promotion creates
+it only after the independent verification pass succeeds.
+
+The public operator never executes the analyzer or compiler on the host. It
+verifies the build authority, launches the exact pinned image with no network
+and a read-only root, retains a separate execution authority, and uses a second
+container to verify staged output before atomic promotion. The accepted receipt
+requires all requested translation units or an unavailable exit `2`, at least
+`85%` precision for each of the seven supported default rules, `90%` micro
+precision, `70%` addressable recall, zero findings across all nine clean cases,
+and both missing/broken requested-TU negative controls.
+
 ## Real-world corpus (pinned finding counts)
 
 ```bash

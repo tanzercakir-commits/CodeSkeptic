@@ -16,3 +16,5 @@ tests/StressMatrixTest.py text eol=lf
 tests/stress_corpus/** text eol=lf
 docs/evidence/phase10/stress/** -text
 docs/evidence/phase10/stress/** -diff
+docs/evidence/phase10/quality/** -text
+docs/evidence/phase10/quality/** -diff
