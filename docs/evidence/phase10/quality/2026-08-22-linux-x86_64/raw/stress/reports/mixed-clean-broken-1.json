@@ -1,0 +1,16 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "incomplete",
+  "complete": false,
+  "exit_code": 2,
+  "coverage": { "attempted_tus": 2, "analyzed_tus": 1, "broken_tus": 1, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/scratch/codeskeptic-stress-otbbp_4z/mixed-clean-broken/repeat-1/mixed_broken.cpp", "compile_command_sha256": "f4005efb3acac93bd0599f35d26267cb89b807582fc81346fbb4c977e01db9ad", "command_ordinal": 0, "phase": "analysis", "status": "broken", "duration_ms": 21, "peak_memory_kib": 75696, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" },
+    { "path": "/scratch/codeskeptic-stress-otbbp_4z/mixed-clean-broken/repeat-1/mixed_clean.cpp", "compile_command_sha256": "6a8f13c1809ff9c32026054b69d80af40b48c6aeda96399b920d165ab9170106", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 22, "peak_memory_kib": 81216, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}

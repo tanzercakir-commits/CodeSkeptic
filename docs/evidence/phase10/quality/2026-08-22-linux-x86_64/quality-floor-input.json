@@ -1,0 +1,336 @@
+{
+  "clean_corpus": {
+    "cases": [
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "array-from-int",
+        "process_exit": 0,
+        "raw_sha256": "93cf1e5e983411535c92674daa2a3afc7fc45ee11b9da27e59502e0d5ce7b0d1",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "cmd-args",
+        "process_exit": 0,
+        "raw_sha256": "b4961c00d9ab6884c0c1b0783d548c3dff06fce30fc65d81fbba1ee490888c42",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "concat-heap",
+        "process_exit": 0,
+        "raw_sha256": "ac75c4e234415d55f43f54c09b380acb5533d46c0b9f573a28c6448d8b345c5d",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "config-parse",
+        "process_exit": 0,
+        "raw_sha256": "fd0e3c50945f0b146c39b1c0dd35bef5414117af1a891d1171fa3608e48bb18f",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "port-parse",
+        "process_exit": 0,
+        "raw_sha256": "526086a74b86fbfefea0c9791ee8fa6d3044a672f1593b6cc112e69bfd484079",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "running-product",
+        "process_exit": 0,
+        "raw_sha256": "2f1823395a2f05800b01c3ab10360edd7a50cd554e227bf473bd3ecdeff70f9c",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "simple-hash",
+        "process_exit": 0,
+        "raw_sha256": "6d797c22e2a7978f39c4b5214bdc100c49575cbad925f2668ae9e5dc7584b65f",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "tiny-stack",
+        "process_exit": 0,
+        "raw_sha256": "9a522014bba1f9aecb71b960e6f326e30b211e99d34e8d1d12fbc82b93ac72ce",
+        "report_exit": 0
+      },
+      {
+        "complete": true,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 1,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "findings": 0,
+        "id": "tokenize",
+        "process_exit": 0,
+        "raw_sha256": "c8a643a7da71ea6bc8fe7074eb9c8699ebbba0ff643dc6f3fd4df43ccd9bed3d",
+        "report_exit": 0
+      }
+    ]
+  },
+  "identity": {
+    "analyzer": {
+      "binary_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+      "version": "CodeSkeptic 0.4.9-dev"
+    },
+    "capabilities": {
+      "registry_sha256": "9773ccbbf082a64c9eb7b1ca3ea2d639c9efc5737128f563008e5ca4ec6affd0",
+      "supported_quality_gated_default_rules": [
+        "memory-leak",
+        "double-free",
+        "use-after-free",
+        "resource-leak",
+        "div-by-zero",
+        "null-deref",
+        "int-overflow"
+      ]
+    },
+    "retained_artifacts": {
+      "file_count": 163,
+      "manifest_path": "RAW_SHA256SUMS",
+      "manifest_sha256": "a17dba6679cc252af3077bf9b674b1b94c2fea240884f9582f9d62803179b051"
+    },
+    "source": {
+      "manifest_sha256": "bbe934c5cd7834b24eb6338bfe9d98cdffef7f8a32b86d0ccf40264f4b478c27",
+      "revision": "f7c9ea3125f1262409edff6e5559d9c4718b45af"
+    }
+  },
+  "requested_tu_negatives": {
+    "cases": [
+      {
+        "complete": false,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 2,
+          "broken_tus": 1,
+          "incomplete_functions": 0
+        },
+        "id": "broken-requested-tu",
+        "kind": "broken",
+        "process_exit": 2,
+        "raw_sha256": "4e96cface243f378ee33a912df4ca24b5e87f61691b54c95373b28c4a08bcf28",
+        "report_exit": 2,
+        "verdict": null
+      },
+      {
+        "complete": false,
+        "coverage": {
+          "analyzed_tus": 1,
+          "attempted_tus": 2,
+          "broken_tus": 0,
+          "incomplete_functions": 0
+        },
+        "id": "missing-requested-tu",
+        "kind": "missing",
+        "process_exit": 2,
+        "raw_sha256": "d7689bd61d60e4058e7be3c99040a75c932a098265d7e7612f53aa878ecb2457",
+        "report_exit": 2,
+        "verdict": null
+      }
+    ]
+  },
+  "rules": [
+    {
+      "cases": {
+        "files": 397,
+        "misses": {
+          "addressable": 61,
+          "model_gap": 237,
+          "out_of_scope": 0,
+          "total": 298
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 14,
+        "true_positives": 103
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "memory-leak",
+      "raw_sha256": "fe903492d353d476179ee8c1471af1f91ff8db0cf3f960ca3eca5362c435336d"
+    },
+    {
+      "cases": {
+        "files": 399,
+        "misses": {
+          "addressable": 20,
+          "model_gap": 260,
+          "out_of_scope": 0,
+          "total": 280
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 119
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "double-free",
+      "raw_sha256": "9ca221b1354787bc2e0aaf0845dd7efffa1ec2e1828a4693fab2c3569c9dd047"
+    },
+    {
+      "cases": {
+        "files": 397,
+        "misses": {
+          "addressable": 78,
+          "model_gap": 107,
+          "out_of_scope": 0,
+          "total": 185
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 212
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "use-after-free",
+      "raw_sha256": "aebd93ab06b397c3c4edf098569346f58ea4602e0b4c1b86e5fc7981b8226727"
+    },
+    {
+      "cases": {
+        "files": 3,
+        "misses": {
+          "addressable": 0,
+          "model_gap": 0,
+          "out_of_scope": 0,
+          "total": 0
+        }
+      },
+      "corpus": "resource-leak-mutation",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 3
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "resource-leak",
+      "raw_sha256": "a2a6894c597b015fd12f5d1d62bfa4d918738ecd442ec60a91be100f8b0c11b2"
+    },
+    {
+      "cases": {
+        "files": 397,
+        "misses": {
+          "addressable": 10,
+          "model_gap": 105,
+          "out_of_scope": 239,
+          "total": 354
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 43
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "div-by-zero",
+      "raw_sha256": "7c3302cb0fe0232ce75fa1fb7efbc651192f41759b8d9d81fc640753c296d3f7"
+    },
+    {
+      "cases": {
+        "files": 400,
+        "misses": {
+          "addressable": 35,
+          "model_gap": 226,
+          "out_of_scope": 0,
+          "total": 261
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 140
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "null-deref",
+      "raw_sha256": "7e927fedfd8e14e6118a601af9156f4bac0343c59a978260957ede2fa1171b60"
+    },
+    {
+      "cases": {
+        "files": 401,
+        "misses": {
+          "addressable": 56,
+          "model_gap": 143,
+          "out_of_scope": 179,
+          "total": 378
+        }
+      },
+      "corpus": "juliet",
+      "diagnostics": {
+        "false_positives": 0,
+        "true_positives": 23
+      },
+      "exact_head": true,
+      "fresh": true,
+      "id": "int-overflow",
+      "raw_sha256": "a4219d7a066e84ea4a70c0c40fec8c00badff57820995298d382ce1ea2032ac7"
+    }
+  ],
+  "schema": "codeskeptic-quality-floor-input-v1"
+}

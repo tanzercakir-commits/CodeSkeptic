@@ -1,0 +1,1005 @@
+{
+  "checkout": {
+    "commit_oid": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+    "commit_type": "commit",
+    "tree_oid": "7e56e62d504013b00eae01739d2fe01e45dbbe84",
+    "tree_type": "tree"
+  },
+  "clean_digest": "eb4f35dbaa89f184b37a9d65c178c72dd2ac7842e94015e475db4f81c421e6ea",
+  "clean_entries": [
+    {
+      "path": "libarchive/archive_acl.c",
+      "sha256": "9527cf8627062314802129e06c68235b56bf5ba0c1706765c9c025ebaddba5d3"
+    },
+    {
+      "path": "libarchive/archive_blake2s_ref.c",
+      "sha256": "bd4217c21aa970cea07fb0a1209fa5370daa2935927b7273317bfbe715e003ca"
+    },
+    {
+      "path": "libarchive/archive_blake2sp_ref.c",
+      "sha256": "c3891562aa2e1bd043a71a0c7f0cca46378644e384cd65f078efd1d3ea363631"
+    },
+    {
+      "path": "libarchive/archive_check_magic.c",
+      "sha256": "24bf7df9789dfdb3f346d5f851e8bcac72548f8a4bd663c8505e3c5af9a26a55"
+    },
+    {
+      "path": "libarchive/archive_cmdline.c",
+      "sha256": "1c7bc342f5eb98ec35caa84c07207ac45d25fa26e0f2944942f343681f0a1429"
+    },
+    {
+      "path": "libarchive/archive_cryptor.c",
+      "sha256": "afd5bec7461784ce367d88ed8979ab4af00d8e591cb0838eaaf61823c44da3e7"
+    },
+    {
+      "path": "libarchive/archive_digest.c",
+      "sha256": "487e12903ee725eb80da3c20bf2cbf0d96f6a72fb306d5b9065971119ec139a5"
+    },
+    {
+      "path": "libarchive/archive_entry.c",
+      "sha256": "eab5335759db21927c9b2997b96b825d35f9a0962adff7ec709ebf19e932f594"
+    },
+    {
+      "path": "libarchive/archive_entry_copy_stat.c",
+      "sha256": "2766d3fc8fd470d0bf1c9d84a325100d5d886ad054bb46f1c91a7c2404b742f6"
+    },
+    {
+      "path": "libarchive/archive_entry_link_resolver.c",
+      "sha256": "2dacfc484c2bba4e5244ba1b56600e5d109fc7c9ca2c3f730c3dfc05f67495cd"
+    },
+    {
+      "path": "libarchive/archive_entry_sparse.c",
+      "sha256": "82dc763f08cb3cfd2fe7be76b9500e0e96980ffffd63169732cde228bb10d8b1"
+    },
+    {
+      "path": "libarchive/archive_entry_stat.c",
+      "sha256": "7c9d521a1ccf18fea5696cfc249f9c603c3f30aa0c87c3c30d875b37dc6efb2d"
+    },
+    {
+      "path": "libarchive/archive_entry_strmode.c",
+      "sha256": "fc3764b849346f3b91184233608d99bdc9562f008c2673b5103ee5060b0b06b6"
+    },
+    {
+      "path": "libarchive/archive_entry_xattr.c",
+      "sha256": "e4692d8ac2c06f0815510078eaa115da5ca1a116482f3ff96eeaa8b47cd4f2f1"
+    },
+    {
+      "path": "libarchive/archive_hmac.c",
+      "sha256": "9ba2c3f35e6bd9edb4b527eb49cfd7c81528698e1619174bbf679b20e70277ba"
+    },
+    {
+      "path": "libarchive/archive_match.c",
+      "sha256": "6818cabb6f58b6aa3836740eb0bd43cf0939f7b58a4f7770a63cacd7a3c5e2f4"
+    },
+    {
+      "path": "libarchive/archive_options.c",
+      "sha256": "c274a1ed73754464b3cb5de6dfa230c495c157e998f3b1fa445536a2fbfd2d4c"
+    },
+    {
+      "path": "libarchive/archive_pack_dev.c",
+      "sha256": "bd30444ca6a0e88b2e0a8e4d1ca5384ac90a494a5310066a35f8291d97ff616d"
+    },
+    {
+      "path": "libarchive/archive_parse_date.c",
+      "sha256": "e5cb6a5c326cbd55521cd3b14766e90f523274313a9f485b681c8ec8823a9973"
+    },
+    {
+      "path": "libarchive/archive_pathmatch.c",
+      "sha256": "8dda7d08600012df0e0b38723f108c4e75ea8233b0f5ee919d0ecde75bf62979"
+    },
+    {
+      "path": "libarchive/archive_ppmd7.c",
+      "sha256": "a589cb82ead903e58fe67099f37efab5863ea2b3dda3d4d8cfe7af9fe4d2ecfe"
+    },
+    {
+      "path": "libarchive/archive_ppmd8.c",
+      "sha256": "c107959394422fe43149bffff0a9c22e1a4d0f166c36ce398b9d37cd91f6148a"
+    },
+    {
+      "path": "libarchive/archive_random.c",
+      "sha256": "25b343be05706f22a5461d504b01e0c80e64cc011049268ad4cc347921bc52a1"
+    },
+    {
+      "path": "libarchive/archive_rb.c",
+      "sha256": "981e2e6c42bb75e4ef6b9a677d3826a251cae4a2cbd3217397ae3c0dfea9789e"
+    },
+    {
+      "path": "libarchive/archive_read.c",
+      "sha256": "3843e807aa57baca67bb633b11e32a478bea9e7b61b580999d77552573819732"
+    },
+    {
+      "path": "libarchive/archive_read_add_passphrase.c",
+      "sha256": "0f087d8605d00151de2dda70831451013a2ae7b4036869af47c3c024528927f7"
+    },
+    {
+      "path": "libarchive/archive_read_append_filter.c",
+      "sha256": "9c1845b8c82ce2eaec64aad2ef475a30e67923f76893792c0a4267ca84a0ea92"
+    },
+    {
+      "path": "libarchive/archive_read_data_into_fd.c",
+      "sha256": "18e45d8ce02842d4a54fbb871c791e5dbd4ffe2c9123916a5cb0bd629d85684e"
+    },
+    {
+      "path": "libarchive/archive_read_disk_entry_from_file.c",
+      "sha256": "40b7a72120ea28d49e17a8f7afc90196a4da051467f1a12bbdc7e3e81616d29f"
+    },
+    {
+      "path": "libarchive/archive_read_disk_posix.c",
+      "sha256": "2c5bfae2789390a5859af5d004c159dad5f31b2ecc0797c1dab4618b0d11ef5b"
+    },
+    {
+      "path": "libarchive/archive_read_disk_set_standard_lookup.c",
+      "sha256": "69f3e572f34d35a1c7e7d3e3d1dd73b63604b5253b522207a663bb0032af80be"
+    },
+    {
+      "path": "libarchive/archive_read_extract.c",
+      "sha256": "faf2aa768527a4532fe5d3a0e5525fa83d6504a059a8c70c4bc72f27772872b3"
+    },
+    {
+      "path": "libarchive/archive_read_extract2.c",
+      "sha256": "dc9bbe6b16079fbd25da434587e3c4abac043f5a32da5df5ea20726f8c01487c"
+    },
+    {
+      "path": "libarchive/archive_read_open_fd.c",
+      "sha256": "433b256953b27772a0d70f19b771137a2e22b6fd18a04843a67eafd192c42396"
+    },
+    {
+      "path": "libarchive/archive_read_open_file.c",
+      "sha256": "4cd0f75473b959e98dd30762d6cb8a68e6d61243f117845298832518a5e2ea2d"
+    },
+    {
+      "path": "libarchive/archive_read_open_filename.c",
+      "sha256": "e38dd83583afb89ec711bd10014d65836f330cc4357cc907498767d230e02592"
+    },
+    {
+      "path": "libarchive/archive_read_open_memory.c",
+      "sha256": "83c8d3e8d8b3985dfce4f317849c45d44486607216fa0181cb51db174a842d8a"
+    },
+    {
+      "path": "libarchive/archive_read_set_format.c",
+      "sha256": "524ed05c882e559055b50d9b7b1f2b8703cdd71aecf2fda031a3ff78f1dcd986"
+    },
+    {
+      "path": "libarchive/archive_read_set_options.c",
+      "sha256": "5c94ff58e66366c4f08237161f882c70b31b4f883dc1125dc58c5b32d37677ce"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_all.c",
+      "sha256": "ebedac57b0b1d5fa43a68bee809392f432ab7558f6c45897a3e2c9a2bcb4bfcc"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_by_code.c",
+      "sha256": "9d97684cdd4d02abdb9ea3dfafd1f0ea06d351feea08f2c35a6c7d39d5c5278a"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_bzip2.c",
+      "sha256": "8315a70f9ac9fe64c0bb32a7265ec32c85f41c613f8fdc2b7e2ddd9fefb10306"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_compress.c",
+      "sha256": "9cd45ac0ec6f498db1c6d5c9af28ac4788322526c451c33856e8f72e49d4cd9c"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_grzip.c",
+      "sha256": "9b4392532f173cb2b0ce4db65c851d02b8bacab43a52e017086a7ecffd43404d"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_gzip.c",
+      "sha256": "b1774040fa8de3bf359ef64a9a9222ca73346007c37b8d556f7fa9b8604ff644"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lrzip.c",
+      "sha256": "6245951d5fb7149a99dae439049df9f243f25e7f6f154f218bb4ed9f6964447e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lz4.c",
+      "sha256": "b44d56946ac077a4b88085730ff3c02bb9b5b82cd8738e2fbe1c0f34408a805e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lzop.c",
+      "sha256": "bbbecdccdeefb3a3b085b5acbf84b189c336841a6625750e72408c340f2c6728"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_none.c",
+      "sha256": "98f12fce080fdf2dbb62e5aa1527260c6aa03bc013e83ba76bd17ba65f98191e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_program.c",
+      "sha256": "9fbe4b74d6d014363f864217006d6b84bd881818cd230c3610b144d90ee2b332"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_rpm.c",
+      "sha256": "5897789d25eaef3930f149868061b64f20443a6259f6eda84eae7a93f2bdeadb"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_uu.c",
+      "sha256": "7232a662beef6b7c21bb7e3636b0137ca3eb5b197e6528185540dfec51251511"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_xz.c",
+      "sha256": "4fe575a103b8dfaa9286a4ce0350d67932889536d8aeb06d231f5f1e60167a2d"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_zstd.c",
+      "sha256": "317b086ff8f2325d5826fc1654d105122d84f145544ff3d5447b292aeda784ad"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_7zip.c",
+      "sha256": "140450e4ca50e1db98cea1ed1f8cfa57f013f31a74ad9e29c96467eb42eb1d39"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_all.c",
+      "sha256": "d4f9194dbae9e9b6f6a8e1d2417baa44fb05670e85d9c16ecfeb1d8c21991658"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_ar.c",
+      "sha256": "7dd2548ccbf49f2b187b05fb213f8bb285db5d8a77e6aa15d4c4f3241d29ccef"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_by_code.c",
+      "sha256": "6c31918e038465e9874548aedec455a70463436f75e605488b99d46999ab0090"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_cab.c",
+      "sha256": "ed72771830bb8be5b07f10ba336992528cd7eb73cd774fee2f748f5e22f97654"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_cpio.c",
+      "sha256": "1f1232423c419081b699f717511c81b01e1070e53bb98f93607dbcc375da1424"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_empty.c",
+      "sha256": "4c2299e2424ed6f6d510497bee0ef54f6265196be1de38893312ba5180564327"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_iso9660.c",
+      "sha256": "e3d04fec4cf20ad103326c1f5ea4afe6fb989c8c9fe864502715d509b7f247f9"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_lha.c",
+      "sha256": "5b83448c91c685489fb39c5308f5f3490b03260e6a2b293c9bccf0e93daec90a"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_mtree.c",
+      "sha256": "3ab450889848daa4d94c6495bd973a2750ad95bd6e6c0fe06e0d543ae5253b63"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_rar.c",
+      "sha256": "9bab39d97e637d086e19990d23114a6daf95009eba5bc24c211c88ae6afb1661"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_rar5.c",
+      "sha256": "9fbe40c8c67dca96f56573c6b49fc1495de0f877b12627cdb2ebcd4d215b4b07"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_raw.c",
+      "sha256": "27a88b01efaf0cc31c7d74f70314cc95443c300b082148752e1ab5faea2768b2"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_tar.c",
+      "sha256": "df73a234f3e9d0ea844db6e959997040d808e925238c4d95b2d8bcee79daa6fb"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_warc.c",
+      "sha256": "11e3ff8c23029f9935e3fda9044a5ce88243b22a75157de8de1717a056c90e1f"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_xar.c",
+      "sha256": "8136e95de429d21008db55c511a61862cdf862edc5935e59fd2310829ff0eee7"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_zip.c",
+      "sha256": "29f73c0305544d6448dff9e0ce999c8a68502cfb571b721aadd196d18c50b328"
+    },
+    {
+      "path": "libarchive/archive_string.c",
+      "sha256": "b58d8a36ebeaec20a669d45e7d7107cc21ec1c2287edb42d878241d2fa5d83c1"
+    },
+    {
+      "path": "libarchive/archive_string_sprintf.c",
+      "sha256": "16441aa05137ae1567b0fe1d6c22201daf2a31116bd617b8bd24975de645de65"
+    },
+    {
+      "path": "libarchive/archive_time.c",
+      "sha256": "c0085dce78f9d2a3a8fb318a20d0f2d1fa971157c25c380fa9e5cd8fa67b5381"
+    },
+    {
+      "path": "libarchive/archive_util.c",
+      "sha256": "3d864cdf28a54bf63f47b88b9f54c52e8a115df6f122e3c930dd4b64baea1028"
+    },
+    {
+      "path": "libarchive/archive_version_details.c",
+      "sha256": "f4d066ba5451a8e99a6ab69d865df703ced1aee528a1ea877d413ae9dd72548b"
+    },
+    {
+      "path": "libarchive/archive_virtual.c",
+      "sha256": "523728aab6b92713a9eda70fec9486fc16086f55f9d035d70223e128e443bda3"
+    },
+    {
+      "path": "libarchive/archive_write.c",
+      "sha256": "e2e1d992591562bcf8267a97d18e9d3fd9a2cc474882079da2151a57a8a73062"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter.c",
+      "sha256": "1bddb6bb725416d0c056de6eff8c1cc447ecafc3b6715d6dbf51d4198266a49a"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_b64encode.c",
+      "sha256": "8f5dfb300bff83b90d2e8c7d07ed632eea1e3e6470dfcb53e0940924780c45d1"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_by_name.c",
+      "sha256": "e62db376e1a061c3c4c4306a76cbcf167483b040adc8b754d6cf94123c6ceca6"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_bzip2.c",
+      "sha256": "415ba5834a8480b2143997e9078b2ecbd34fbf64f28a51909d6b97a6400b9a81"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_compress.c",
+      "sha256": "f0df99ae10b089dfe052fe40d75937d8ad6c442becb024542cefd55686be5f38"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_grzip.c",
+      "sha256": "3d8b03813d7c8b4b99f365f176db16d2a6319e025a2e224ce4a7b7adaf2817d4"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_gzip.c",
+      "sha256": "fc0369c62c06c8e51a0e38fbc26f429fcae5bcc3b32ae849cfb238927be33673"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lrzip.c",
+      "sha256": "5767a486865a01db9eeeddc2c0d9f150fd87ec91405012432db359b949efbf1b"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lz4.c",
+      "sha256": "dacc01261db09d2475cae90053b3c3a72b8e59fe9f37954c0e4cb7297ef83d51"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lzop.c",
+      "sha256": "9f22994783cdb0efb44fe874052ae5cce67d209bd6a0d3a7335bc65c772f0496"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_none.c",
+      "sha256": "9117f91e2478e55d30cda7443d1fa7f4a44121b4a1a8a48205cb758c6f5c3679"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_program.c",
+      "sha256": "32a579cfba1177920907521a4cacd19a33bc31010a05099d3320a3b76eb31509"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_uuencode.c",
+      "sha256": "5ffe88b1d2db3ce9624e5f85f07c9623a6cbc50b2ce757e6ca064f1ce2ead816"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_xz.c",
+      "sha256": "483c1d88b8b8103eb7a19f1e5a9ef9c0eda664115d8742258d7933840b7fe528"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_zstd.c",
+      "sha256": "2122385defcf6053654a54709b0164edb1bc52d7ad4d08a02a71e130d39abe29"
+    },
+    {
+      "path": "libarchive/archive_write_disk_posix.c",
+      "sha256": "311d361a11280e73fa18636fb04b2ae3b7c69a3c71bbe983bf9f5b1d1782096c"
+    },
+    {
+      "path": "libarchive/archive_write_disk_set_standard_lookup.c",
+      "sha256": "aba812d40d245849185113eb9a40c1f7ccb62d72ff4ac0d046064096ed2c9fe7"
+    },
+    {
+      "path": "libarchive/archive_write_open_fd.c",
+      "sha256": "23df83b2fbfbf6db17b53fa656fb6a4c4ead0f4e82215049f7918effd9dd2936"
+    },
+    {
+      "path": "libarchive/archive_write_open_file.c",
+      "sha256": "d73293d021aa3158d105e9e2eee561cec4ddda6b381de859343486c3aa6d6121"
+    },
+    {
+      "path": "libarchive/archive_write_open_filename.c",
+      "sha256": "aa5e1d84891c1f01ab0be8851c814773a8005e32b8b6cfc2c9c158e75021af13"
+    },
+    {
+      "path": "libarchive/archive_write_open_memory.c",
+      "sha256": "2c3c3abeb1d30fceaa14d5b16d30d4ef2606514ec60d6de1f77110b6f87769fd"
+    },
+    {
+      "path": "libarchive/archive_write_set_format.c",
+      "sha256": "038b05d3bd5bbbcb8f790423e98bb3daafd83516b953b5c65b9b94993f9059f2"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_7zip.c",
+      "sha256": "cf88fd1ec2d7e7ff04aa80dc42745f87573e71abad994fe6ee06f8f301a797b5"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_ar.c",
+      "sha256": "357ca328a4a26fd65593ee56a561ee4416e0185044b639ce86db772e77597b8d"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_by_name.c",
+      "sha256": "734b470b88ffe3c3374732b967c16c57e583fe9220d30a2a1f86c3a9e02e29bb"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio.c",
+      "sha256": "699af823a2ea4d5750a5cb963e2be06c5975a41e25cdafa25da1ad1d901a3d16"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_binary.c",
+      "sha256": "fa97d26e40c2d021cb7255b61299270096eb1d13fcd1bf09aa59a36224331513"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_newc.c",
+      "sha256": "c3ef5dd894e11f8c2ccac80a3895f7b71075dce95a8efbe1829b08a0a8f06931"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_odc.c",
+      "sha256": "f25226c952affc476e838cc941954c5b89729c9ac665974fa453e5c097f29fa8"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_filter_by_ext.c",
+      "sha256": "f150f0a4e6bd40a574aeecf02ec79ae3a3ad3e0179ef93d31d19771a136f1c57"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_gnutar.c",
+      "sha256": "3d219e3c8bca865854aff41c0ca27a9228591a0002ef1f2d760707705ccffd8c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_iso9660.c",
+      "sha256": "55c072a9228a745d2d52c1f49693bc7593d502564b5a472f0e498a9da5a53756"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_mtree.c",
+      "sha256": "b21d7204ad30bf0c8e52e4a240e27d81a919bb36c33fde45087c4127debcce8a"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_pax.c",
+      "sha256": "911d5e18bef712a538e3a066c5ac9ecab47e187a3916d807051aee61639bdb6c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_raw.c",
+      "sha256": "cd0ee0f86af78b03f73cd356c8aa50772711797e4a354d006fd60e2194cd9952"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_shar.c",
+      "sha256": "6bf068528976071030cc276bcb376f6301b39b3180e6f8635264b9fe5eaf41f7"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_ustar.c",
+      "sha256": "c7fce47c5b43e216eb41a69c4e7cfd02636a37f73f396aa97b9e79941b63b85f"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_v7tar.c",
+      "sha256": "b6a395dca3ac6f5e1df48fb3fc6c5e0273750d88a787d00e06c4ab4afa598b7c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_warc.c",
+      "sha256": "02c7aa92a3da65e14959c33d672edfcfc8f5318dc734a95d02667b84d5ad5a39"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_xar.c",
+      "sha256": "2567c9aa4db7a521bef82a4ebc3a18b54d089a4fc85b7094d089cbe7f33a68c0"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_zip.c",
+      "sha256": "61b1c2ae0835c353aff3ad8242b8d76e15da9e33d1ee9252923c62a191b020bb"
+    },
+    {
+      "path": "libarchive/archive_write_set_options.c",
+      "sha256": "8974c8daad5a4858f80b1667f7766760175b40497e3760e103d455662026063c"
+    },
+    {
+      "path": "libarchive/archive_write_set_passphrase.c",
+      "sha256": "99a605b86d90064ee3d891447a0dc1b4fb03cf46e436ef0a456ac2939dc32329"
+    },
+    {
+      "path": "libarchive/filter_fork_posix.c",
+      "sha256": "1a0f0fa5290c5c71c8933e9d9bb2a6df897572d0ecaed6cecd326f34e7354115"
+    },
+    {
+      "path": "libarchive/xxhash.c",
+      "sha256": "1dd2b879b5c87ffd2aace2b25bb8b116d927f75581590a85dc4960fa01e2382b"
+    }
+  ],
+  "mutated_digest": "a574a08ac5d167f76cdca18e9f51ca2ac7403b71ecd2ba135771c8930954b714",
+  "mutated_entries": [
+    {
+      "path": "libarchive/archive_acl.c",
+      "sha256": "9527cf8627062314802129e06c68235b56bf5ba0c1706765c9c025ebaddba5d3"
+    },
+    {
+      "path": "libarchive/archive_blake2s_ref.c",
+      "sha256": "bd4217c21aa970cea07fb0a1209fa5370daa2935927b7273317bfbe715e003ca"
+    },
+    {
+      "path": "libarchive/archive_blake2sp_ref.c",
+      "sha256": "c3891562aa2e1bd043a71a0c7f0cca46378644e384cd65f078efd1d3ea363631"
+    },
+    {
+      "path": "libarchive/archive_check_magic.c",
+      "sha256": "24bf7df9789dfdb3f346d5f851e8bcac72548f8a4bd663c8505e3c5af9a26a55"
+    },
+    {
+      "path": "libarchive/archive_cmdline.c",
+      "sha256": "1c7bc342f5eb98ec35caa84c07207ac45d25fa26e0f2944942f343681f0a1429"
+    },
+    {
+      "path": "libarchive/archive_cryptor.c",
+      "sha256": "afd5bec7461784ce367d88ed8979ab4af00d8e591cb0838eaaf61823c44da3e7"
+    },
+    {
+      "path": "libarchive/archive_digest.c",
+      "sha256": "487e12903ee725eb80da3c20bf2cbf0d96f6a72fb306d5b9065971119ec139a5"
+    },
+    {
+      "path": "libarchive/archive_entry.c",
+      "sha256": "eab5335759db21927c9b2997b96b825d35f9a0962adff7ec709ebf19e932f594"
+    },
+    {
+      "path": "libarchive/archive_entry_copy_stat.c",
+      "sha256": "2766d3fc8fd470d0bf1c9d84a325100d5d886ad054bb46f1c91a7c2404b742f6"
+    },
+    {
+      "path": "libarchive/archive_entry_link_resolver.c",
+      "sha256": "2dacfc484c2bba4e5244ba1b56600e5d109fc7c9ca2c3f730c3dfc05f67495cd"
+    },
+    {
+      "path": "libarchive/archive_entry_sparse.c",
+      "sha256": "82dc763f08cb3cfd2fe7be76b9500e0e96980ffffd63169732cde228bb10d8b1"
+    },
+    {
+      "path": "libarchive/archive_entry_stat.c",
+      "sha256": "7c9d521a1ccf18fea5696cfc249f9c603c3f30aa0c87c3c30d875b37dc6efb2d"
+    },
+    {
+      "path": "libarchive/archive_entry_strmode.c",
+      "sha256": "fc3764b849346f3b91184233608d99bdc9562f008c2673b5103ee5060b0b06b6"
+    },
+    {
+      "path": "libarchive/archive_entry_xattr.c",
+      "sha256": "e4692d8ac2c06f0815510078eaa115da5ca1a116482f3ff96eeaa8b47cd4f2f1"
+    },
+    {
+      "path": "libarchive/archive_hmac.c",
+      "sha256": "9ba2c3f35e6bd9edb4b527eb49cfd7c81528698e1619174bbf679b20e70277ba"
+    },
+    {
+      "path": "libarchive/archive_match.c",
+      "sha256": "6818cabb6f58b6aa3836740eb0bd43cf0939f7b58a4f7770a63cacd7a3c5e2f4"
+    },
+    {
+      "path": "libarchive/archive_options.c",
+      "sha256": "c274a1ed73754464b3cb5de6dfa230c495c157e998f3b1fa445536a2fbfd2d4c"
+    },
+    {
+      "path": "libarchive/archive_pack_dev.c",
+      "sha256": "bd30444ca6a0e88b2e0a8e4d1ca5384ac90a494a5310066a35f8291d97ff616d"
+    },
+    {
+      "path": "libarchive/archive_parse_date.c",
+      "sha256": "e5cb6a5c326cbd55521cd3b14766e90f523274313a9f485b681c8ec8823a9973"
+    },
+    {
+      "path": "libarchive/archive_pathmatch.c",
+      "sha256": "8dda7d08600012df0e0b38723f108c4e75ea8233b0f5ee919d0ecde75bf62979"
+    },
+    {
+      "path": "libarchive/archive_ppmd7.c",
+      "sha256": "a589cb82ead903e58fe67099f37efab5863ea2b3dda3d4d8cfe7af9fe4d2ecfe"
+    },
+    {
+      "path": "libarchive/archive_ppmd8.c",
+      "sha256": "c107959394422fe43149bffff0a9c22e1a4d0f166c36ce398b9d37cd91f6148a"
+    },
+    {
+      "path": "libarchive/archive_random.c",
+      "sha256": "25b343be05706f22a5461d504b01e0c80e64cc011049268ad4cc347921bc52a1"
+    },
+    {
+      "path": "libarchive/archive_rb.c",
+      "sha256": "981e2e6c42bb75e4ef6b9a677d3826a251cae4a2cbd3217397ae3c0dfea9789e"
+    },
+    {
+      "path": "libarchive/archive_read.c",
+      "sha256": "3843e807aa57baca67bb633b11e32a478bea9e7b61b580999d77552573819732"
+    },
+    {
+      "path": "libarchive/archive_read_add_passphrase.c",
+      "sha256": "0f087d8605d00151de2dda70831451013a2ae7b4036869af47c3c024528927f7"
+    },
+    {
+      "path": "libarchive/archive_read_append_filter.c",
+      "sha256": "9c1845b8c82ce2eaec64aad2ef475a30e67923f76893792c0a4267ca84a0ea92"
+    },
+    {
+      "path": "libarchive/archive_read_data_into_fd.c",
+      "sha256": "18e45d8ce02842d4a54fbb871c791e5dbd4ffe2c9123916a5cb0bd629d85684e"
+    },
+    {
+      "path": "libarchive/archive_read_disk_entry_from_file.c",
+      "sha256": "13a9600fd5b7eb591e431e142f8e22dbdedc7fee70f9f3e7ea0eff64aa0c45c8"
+    },
+    {
+      "path": "libarchive/archive_read_disk_posix.c",
+      "sha256": "2c5bfae2789390a5859af5d004c159dad5f31b2ecc0797c1dab4618b0d11ef5b"
+    },
+    {
+      "path": "libarchive/archive_read_disk_set_standard_lookup.c",
+      "sha256": "69f3e572f34d35a1c7e7d3e3d1dd73b63604b5253b522207a663bb0032af80be"
+    },
+    {
+      "path": "libarchive/archive_read_extract.c",
+      "sha256": "faf2aa768527a4532fe5d3a0e5525fa83d6504a059a8c70c4bc72f27772872b3"
+    },
+    {
+      "path": "libarchive/archive_read_extract2.c",
+      "sha256": "dc9bbe6b16079fbd25da434587e3c4abac043f5a32da5df5ea20726f8c01487c"
+    },
+    {
+      "path": "libarchive/archive_read_open_fd.c",
+      "sha256": "433b256953b27772a0d70f19b771137a2e22b6fd18a04843a67eafd192c42396"
+    },
+    {
+      "path": "libarchive/archive_read_open_file.c",
+      "sha256": "4cd0f75473b959e98dd30762d6cb8a68e6d61243f117845298832518a5e2ea2d"
+    },
+    {
+      "path": "libarchive/archive_read_open_filename.c",
+      "sha256": "e38dd83583afb89ec711bd10014d65836f330cc4357cc907498767d230e02592"
+    },
+    {
+      "path": "libarchive/archive_read_open_memory.c",
+      "sha256": "83c8d3e8d8b3985dfce4f317849c45d44486607216fa0181cb51db174a842d8a"
+    },
+    {
+      "path": "libarchive/archive_read_set_format.c",
+      "sha256": "524ed05c882e559055b50d9b7b1f2b8703cdd71aecf2fda031a3ff78f1dcd986"
+    },
+    {
+      "path": "libarchive/archive_read_set_options.c",
+      "sha256": "5c94ff58e66366c4f08237161f882c70b31b4f883dc1125dc58c5b32d37677ce"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_all.c",
+      "sha256": "ebedac57b0b1d5fa43a68bee809392f432ab7558f6c45897a3e2c9a2bcb4bfcc"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_by_code.c",
+      "sha256": "9d97684cdd4d02abdb9ea3dfafd1f0ea06d351feea08f2c35a6c7d39d5c5278a"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_bzip2.c",
+      "sha256": "8315a70f9ac9fe64c0bb32a7265ec32c85f41c613f8fdc2b7e2ddd9fefb10306"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_compress.c",
+      "sha256": "9cd45ac0ec6f498db1c6d5c9af28ac4788322526c451c33856e8f72e49d4cd9c"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_grzip.c",
+      "sha256": "9b4392532f173cb2b0ce4db65c851d02b8bacab43a52e017086a7ecffd43404d"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_gzip.c",
+      "sha256": "b1774040fa8de3bf359ef64a9a9222ca73346007c37b8d556f7fa9b8604ff644"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lrzip.c",
+      "sha256": "6245951d5fb7149a99dae439049df9f243f25e7f6f154f218bb4ed9f6964447e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lz4.c",
+      "sha256": "b44d56946ac077a4b88085730ff3c02bb9b5b82cd8738e2fbe1c0f34408a805e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_lzop.c",
+      "sha256": "bbbecdccdeefb3a3b085b5acbf84b189c336841a6625750e72408c340f2c6728"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_none.c",
+      "sha256": "98f12fce080fdf2dbb62e5aa1527260c6aa03bc013e83ba76bd17ba65f98191e"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_program.c",
+      "sha256": "9fbe4b74d6d014363f864217006d6b84bd881818cd230c3610b144d90ee2b332"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_rpm.c",
+      "sha256": "5897789d25eaef3930f149868061b64f20443a6259f6eda84eae7a93f2bdeadb"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_uu.c",
+      "sha256": "7232a662beef6b7c21bb7e3636b0137ca3eb5b197e6528185540dfec51251511"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_xz.c",
+      "sha256": "4fe575a103b8dfaa9286a4ce0350d67932889536d8aeb06d231f5f1e60167a2d"
+    },
+    {
+      "path": "libarchive/archive_read_support_filter_zstd.c",
+      "sha256": "317b086ff8f2325d5826fc1654d105122d84f145544ff3d5447b292aeda784ad"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_7zip.c",
+      "sha256": "140450e4ca50e1db98cea1ed1f8cfa57f013f31a74ad9e29c96467eb42eb1d39"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_all.c",
+      "sha256": "d4f9194dbae9e9b6f6a8e1d2417baa44fb05670e85d9c16ecfeb1d8c21991658"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_ar.c",
+      "sha256": "7dd2548ccbf49f2b187b05fb213f8bb285db5d8a77e6aa15d4c4f3241d29ccef"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_by_code.c",
+      "sha256": "6c31918e038465e9874548aedec455a70463436f75e605488b99d46999ab0090"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_cab.c",
+      "sha256": "ed72771830bb8be5b07f10ba336992528cd7eb73cd774fee2f748f5e22f97654"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_cpio.c",
+      "sha256": "1f1232423c419081b699f717511c81b01e1070e53bb98f93607dbcc375da1424"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_empty.c",
+      "sha256": "4c2299e2424ed6f6d510497bee0ef54f6265196be1de38893312ba5180564327"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_iso9660.c",
+      "sha256": "e3d04fec4cf20ad103326c1f5ea4afe6fb989c8c9fe864502715d509b7f247f9"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_lha.c",
+      "sha256": "5b83448c91c685489fb39c5308f5f3490b03260e6a2b293c9bccf0e93daec90a"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_mtree.c",
+      "sha256": "3ab450889848daa4d94c6495bd973a2750ad95bd6e6c0fe06e0d543ae5253b63"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_rar.c",
+      "sha256": "9bab39d97e637d086e19990d23114a6daf95009eba5bc24c211c88ae6afb1661"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_rar5.c",
+      "sha256": "9fbe40c8c67dca96f56573c6b49fc1495de0f877b12627cdb2ebcd4d215b4b07"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_raw.c",
+      "sha256": "27a88b01efaf0cc31c7d74f70314cc95443c300b082148752e1ab5faea2768b2"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_tar.c",
+      "sha256": "df73a234f3e9d0ea844db6e959997040d808e925238c4d95b2d8bcee79daa6fb"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_warc.c",
+      "sha256": "11e3ff8c23029f9935e3fda9044a5ce88243b22a75157de8de1717a056c90e1f"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_xar.c",
+      "sha256": "8136e95de429d21008db55c511a61862cdf862edc5935e59fd2310829ff0eee7"
+    },
+    {
+      "path": "libarchive/archive_read_support_format_zip.c",
+      "sha256": "29f73c0305544d6448dff9e0ce999c8a68502cfb571b721aadd196d18c50b328"
+    },
+    {
+      "path": "libarchive/archive_string.c",
+      "sha256": "b58d8a36ebeaec20a669d45e7d7107cc21ec1c2287edb42d878241d2fa5d83c1"
+    },
+    {
+      "path": "libarchive/archive_string_sprintf.c",
+      "sha256": "16441aa05137ae1567b0fe1d6c22201daf2a31116bd617b8bd24975de645de65"
+    },
+    {
+      "path": "libarchive/archive_time.c",
+      "sha256": "c0085dce78f9d2a3a8fb318a20d0f2d1fa971157c25c380fa9e5cd8fa67b5381"
+    },
+    {
+      "path": "libarchive/archive_util.c",
+      "sha256": "3d864cdf28a54bf63f47b88b9f54c52e8a115df6f122e3c930dd4b64baea1028"
+    },
+    {
+      "path": "libarchive/archive_version_details.c",
+      "sha256": "f4d066ba5451a8e99a6ab69d865df703ced1aee528a1ea877d413ae9dd72548b"
+    },
+    {
+      "path": "libarchive/archive_virtual.c",
+      "sha256": "523728aab6b92713a9eda70fec9486fc16086f55f9d035d70223e128e443bda3"
+    },
+    {
+      "path": "libarchive/archive_write.c",
+      "sha256": "e2e1d992591562bcf8267a97d18e9d3fd9a2cc474882079da2151a57a8a73062"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter.c",
+      "sha256": "1bddb6bb725416d0c056de6eff8c1cc447ecafc3b6715d6dbf51d4198266a49a"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_b64encode.c",
+      "sha256": "8f5dfb300bff83b90d2e8c7d07ed632eea1e3e6470dfcb53e0940924780c45d1"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_by_name.c",
+      "sha256": "e62db376e1a061c3c4c4306a76cbcf167483b040adc8b754d6cf94123c6ceca6"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_bzip2.c",
+      "sha256": "415ba5834a8480b2143997e9078b2ecbd34fbf64f28a51909d6b97a6400b9a81"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_compress.c",
+      "sha256": "f0df99ae10b089dfe052fe40d75937d8ad6c442becb024542cefd55686be5f38"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_grzip.c",
+      "sha256": "3d8b03813d7c8b4b99f365f176db16d2a6319e025a2e224ce4a7b7adaf2817d4"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_gzip.c",
+      "sha256": "fc0369c62c06c8e51a0e38fbc26f429fcae5bcc3b32ae849cfb238927be33673"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lrzip.c",
+      "sha256": "5767a486865a01db9eeeddc2c0d9f150fd87ec91405012432db359b949efbf1b"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lz4.c",
+      "sha256": "dacc01261db09d2475cae90053b3c3a72b8e59fe9f37954c0e4cb7297ef83d51"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_lzop.c",
+      "sha256": "9f22994783cdb0efb44fe874052ae5cce67d209bd6a0d3a7335bc65c772f0496"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_none.c",
+      "sha256": "9117f91e2478e55d30cda7443d1fa7f4a44121b4a1a8a48205cb758c6f5c3679"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_program.c",
+      "sha256": "32a579cfba1177920907521a4cacd19a33bc31010a05099d3320a3b76eb31509"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_uuencode.c",
+      "sha256": "5ffe88b1d2db3ce9624e5f85f07c9623a6cbc50b2ce757e6ca064f1ce2ead816"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_xz.c",
+      "sha256": "483c1d88b8b8103eb7a19f1e5a9ef9c0eda664115d8742258d7933840b7fe528"
+    },
+    {
+      "path": "libarchive/archive_write_add_filter_zstd.c",
+      "sha256": "2122385defcf6053654a54709b0164edb1bc52d7ad4d08a02a71e130d39abe29"
+    },
+    {
+      "path": "libarchive/archive_write_disk_posix.c",
+      "sha256": "45c87e3794af0c95e9ff9b26af8ee13da4a94380142778e7055627cb3f99b320"
+    },
+    {
+      "path": "libarchive/archive_write_disk_set_standard_lookup.c",
+      "sha256": "aba812d40d245849185113eb9a40c1f7ccb62d72ff4ac0d046064096ed2c9fe7"
+    },
+    {
+      "path": "libarchive/archive_write_open_fd.c",
+      "sha256": "23df83b2fbfbf6db17b53fa656fb6a4c4ead0f4e82215049f7918effd9dd2936"
+    },
+    {
+      "path": "libarchive/archive_write_open_file.c",
+      "sha256": "d73293d021aa3158d105e9e2eee561cec4ddda6b381de859343486c3aa6d6121"
+    },
+    {
+      "path": "libarchive/archive_write_open_filename.c",
+      "sha256": "aa5e1d84891c1f01ab0be8851c814773a8005e32b8b6cfc2c9c158e75021af13"
+    },
+    {
+      "path": "libarchive/archive_write_open_memory.c",
+      "sha256": "2c3c3abeb1d30fceaa14d5b16d30d4ef2606514ec60d6de1f77110b6f87769fd"
+    },
+    {
+      "path": "libarchive/archive_write_set_format.c",
+      "sha256": "038b05d3bd5bbbcb8f790423e98bb3daafd83516b953b5c65b9b94993f9059f2"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_7zip.c",
+      "sha256": "cf88fd1ec2d7e7ff04aa80dc42745f87573e71abad994fe6ee06f8f301a797b5"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_ar.c",
+      "sha256": "357ca328a4a26fd65593ee56a561ee4416e0185044b639ce86db772e77597b8d"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_by_name.c",
+      "sha256": "734b470b88ffe3c3374732b967c16c57e583fe9220d30a2a1f86c3a9e02e29bb"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio.c",
+      "sha256": "699af823a2ea4d5750a5cb963e2be06c5975a41e25cdafa25da1ad1d901a3d16"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_binary.c",
+      "sha256": "fa97d26e40c2d021cb7255b61299270096eb1d13fcd1bf09aa59a36224331513"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_newc.c",
+      "sha256": "c3ef5dd894e11f8c2ccac80a3895f7b71075dce95a8efbe1829b08a0a8f06931"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_cpio_odc.c",
+      "sha256": "f25226c952affc476e838cc941954c5b89729c9ac665974fa453e5c097f29fa8"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_filter_by_ext.c",
+      "sha256": "f150f0a4e6bd40a574aeecf02ec79ae3a3ad3e0179ef93d31d19771a136f1c57"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_gnutar.c",
+      "sha256": "3d219e3c8bca865854aff41c0ca27a9228591a0002ef1f2d760707705ccffd8c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_iso9660.c",
+      "sha256": "55c072a9228a745d2d52c1f49693bc7593d502564b5a472f0e498a9da5a53756"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_mtree.c",
+      "sha256": "b21d7204ad30bf0c8e52e4a240e27d81a919bb36c33fde45087c4127debcce8a"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_pax.c",
+      "sha256": "911d5e18bef712a538e3a066c5ac9ecab47e187a3916d807051aee61639bdb6c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_raw.c",
+      "sha256": "cd0ee0f86af78b03f73cd356c8aa50772711797e4a354d006fd60e2194cd9952"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_shar.c",
+      "sha256": "6bf068528976071030cc276bcb376f6301b39b3180e6f8635264b9fe5eaf41f7"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_ustar.c",
+      "sha256": "c7fce47c5b43e216eb41a69c4e7cfd02636a37f73f396aa97b9e79941b63b85f"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_v7tar.c",
+      "sha256": "b6a395dca3ac6f5e1df48fb3fc6c5e0273750d88a787d00e06c4ab4afa598b7c"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_warc.c",
+      "sha256": "02c7aa92a3da65e14959c33d672edfcfc8f5318dc734a95d02667b84d5ad5a39"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_xar.c",
+      "sha256": "2567c9aa4db7a521bef82a4ebc3a18b54d089a4fc85b7094d089cbe7f33a68c0"
+    },
+    {
+      "path": "libarchive/archive_write_set_format_zip.c",
+      "sha256": "61b1c2ae0835c353aff3ad8242b8d76e15da9e33d1ee9252923c62a191b020bb"
+    },
+    {
+      "path": "libarchive/archive_write_set_options.c",
+      "sha256": "8974c8daad5a4858f80b1667f7766760175b40497e3760e103d455662026063c"
+    },
+    {
+      "path": "libarchive/archive_write_set_passphrase.c",
+      "sha256": "99a605b86d90064ee3d891447a0dc1b4fb03cf46e436ef0a456ac2939dc32329"
+    },
+    {
+      "path": "libarchive/filter_fork_posix.c",
+      "sha256": "1a0f0fa5290c5c71c8933e9d9bb2a6df897572d0ecaed6cecd326f34e7354115"
+    },
+    {
+      "path": "libarchive/xxhash.c",
+      "sha256": "1dd2b879b5c87ffd2aace2b25bb8b116d927f75581590a85dc4960fa01e2382b"
+    }
+  ],
+  "mutation_manifest_sha256": "0f84d2e8f9ea5ad42fdb069e57d78563c43f5f0be2a89bc211274b1cad460351",
+  "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+  "schema": "codeskeptic-quality-floor-resource-input-v1",
+  "translation_units": {
+    "count": 123,
+    "sha256": "1d8306b703571b7c88ed8e3c549950d508e1eb3259f43d7eca34fa7f0a934b10"
+  }
+}

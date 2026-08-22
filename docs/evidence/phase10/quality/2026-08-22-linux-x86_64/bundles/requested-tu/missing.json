@@ -1,0 +1,329 @@
+{
+  "artifacts": [
+    {
+      "path": "raw/build-authority/SHA256SUMS",
+      "sha256": "b168fd096a046121a1a0307351a1b4b3762a53dc2274094ca5d4c8ebed10eca9",
+      "size": 400
+    },
+    {
+      "path": "raw/build-authority/build.log",
+      "sha256": "342ef8ba54be87bbf66b93a9ebf0715064016ec4516560d2f4c9019ae2a1dc29",
+      "size": 5437
+    },
+    {
+      "path": "raw/build-authority/configure.log",
+      "sha256": "40b79165ecfe378a99c08563755b072f243a5276c72997ce5d89e56655508f50",
+      "size": 1399
+    },
+    {
+      "path": "raw/build-authority/operator.log",
+      "sha256": "e31f91bbd840b18fac4985bf6553a1efd41c0e43e407c886b670a4269cdfbada",
+      "size": 127
+    },
+    {
+      "path": "raw/build-authority/receipt.json",
+      "sha256": "af3a310080f8ed7acf2d90ab4286a76c16cf23a6a559c9c4929d111f2e3f8450",
+      "size": 6360
+    },
+    {
+      "path": "raw/build-authority/receipt.json.sha256",
+      "sha256": "5be20ef2a70b86acc59e322a5d9c0da714bd0053b4b0f7e764586f8b1cc1b130",
+      "size": 79
+    },
+    {
+      "path": "raw/campaign-authority.json",
+      "sha256": "80379d0bc24f7068082071fd884fc47bfa00ecf00a8815e38f05220b329104db",
+      "size": 9539
+    },
+    {
+      "path": "raw/campaign-launch-authority.json",
+      "sha256": "dc6a6e6e3ff53ca5e383b712884534fb51b4aedb84e9d921963f17c65bef92f2",
+      "size": 8705
+    },
+    {
+      "path": "raw/stress/logs/missing-requested-tu-1.log",
+      "sha256": "afc5fd3b66bc31b9c98438d81e891ef7407fae33305332c955d19d9b7275ab9a",
+      "size": 585
+    },
+    {
+      "path": "raw/stress/logs/missing-requested-tu-2.log",
+      "sha256": "b5e3cdcc7a43ce17ff8c804c48e86486c3cbe45e2f543c71ab2ac9af83ebc650",
+      "size": 585
+    },
+    {
+      "path": "raw/stress/operator.json",
+      "sha256": "cd82bb5a38edf03c790168f0a0b0557fa81e4ca73425216ad9bd73d37755e32c",
+      "size": 7972
+    },
+    {
+      "path": "raw/stress/receipt.json",
+      "sha256": "a3319b22dad23cf295f0c568161b6bcd5f45d33e5a471d5533aee0029bcae986",
+      "size": 26088
+    },
+    {
+      "path": "raw/stress/reports/missing-requested-tu-1.json",
+      "sha256": "363e6b083806e7bca134aac55c7dbd70ccbce6ec5b33c2f5be92248c7f8b0160",
+      "size": 1494
+    },
+    {
+      "path": "raw/stress/reports/missing-requested-tu-2.json",
+      "sha256": "ddd67b029adf67813691a1144fd9f2a5660f4fc1c7e3c112d43da9ac3f600fa8",
+      "size": 1494
+    }
+  ],
+  "authority": {
+    "analyzer": {
+      "binary_sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+      "version": "CodeSkeptic 0.4.9-dev"
+    },
+    "analyzer_build_authority": {
+      "analyzer": {
+        "path": "src/codeskeptic",
+        "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+        "version": "CodeSkeptic 0.4.9-dev"
+      },
+      "build_identity_sha256": "6eaeb05f52c4fb17e350fdb388feff61815a38a787bed9774634708c6171af1a",
+      "bundle_sha256": "f27fd38d3742216fea895f56c641e08ddcbdab9964052298c2a9db13e57bf0b5",
+      "file_count": 6,
+      "path": "build-authority",
+      "runtime": {
+        "image": {
+          "digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+          "id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+          "reference": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
+        },
+        "normalized_argv": [
+          "$PODMAN",
+          "--cgroup-manager=cgroupfs",
+          "--conmon=/usr/bin/conmon",
+          "--events-backend=none",
+          "--hooks-dir=/usr/share/empty",
+          "--runtime=/usr/bin/crun",
+          "run",
+          "--rm",
+          "--pull=never",
+          "--network=none",
+          "--http-proxy=false",
+          "--env-host=false",
+          "--image-volume=ignore",
+          "--read-only",
+          "--cap-drop=all",
+          "--security-opt",
+          "label=disable",
+          "--security-opt",
+          "no-new-privileges",
+          "--tmpfs",
+          "/tmp:rw,size=4g,mode=1777",
+          "--workdir",
+          "/source",
+          "-e",
+          "GIT_CONFIG_COUNT=1",
+          "-e",
+          "GIT_CONFIG_KEY_0=safe.directory",
+          "-e",
+          "GIT_CONFIG_VALUE_0=/source",
+          "-e",
+          "GIT_OPTIONAL_LOCKS=0",
+          "-e",
+          "HOME=/tmp/home",
+          "-e",
+          "LANG=C",
+          "-e",
+          "LC_ALL=C",
+          "-e",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "-e",
+          "XDG_CACHE_HOME=/tmp/xdg-cache",
+          "-v",
+          "$SOURCE:/source:ro",
+          "-v",
+          "$BUILD:/build:rw",
+          "-e",
+          "CODESKEPTIC_BUILD_AUTHORITY_LAUNCH_SHA256=$LAUNCH_SHA256",
+          "-v",
+          "$STAGE:/authority-stage:rw",
+          "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+          "/usr/bin/python3",
+          "/source/scripts/analyzer_build_authority.py",
+          "_inner-produce",
+          "--source",
+          "/source",
+          "--revision",
+          "$REVISION",
+          "--build-dir",
+          "/build",
+          "--output",
+          "/authority-stage/inner",
+          "--launch-authority",
+          "/authority-stage/launch-authority.json"
+        ],
+        "normalized_argv_sha256": "b7b64bf35933aa35d9324ba25cf9d97df59b047ca0ddbcbb009727182f5f3d3e",
+        "podman": {
+          "path": "/usr/bin/podman",
+          "sha256": "b1bac06f5e73ca1353738b58a2b1fd6e73d6d4a8eb67ed1dde3edf735a52e0c8",
+          "version": "podman version 5.8.4"
+        },
+        "schema": "codeskeptic-analyzer-build-runtime-v1"
+      },
+      "source": {
+        "file_count": 398,
+        "manifest_sha256": "bbe934c5cd7834b24eb6338bfe9d98cdffef7f8a32b86d0ccf40264f4b478c27",
+        "revision": "f7c9ea3125f1262409edff6e5559d9c4718b45af"
+      }
+    },
+    "execution_authority": {
+      "action": "run",
+      "build_identity_sha256": "6eaeb05f52c4fb17e350fdb388feff61815a38a787bed9774634708c6171af1a",
+      "image": {
+        "digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+        "id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+        "reference": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
+      },
+      "jobs": 4,
+      "launch_sha256": "dc6a6e6e3ff53ca5e383b712884534fb51b4aedb84e9d921963f17c65bef92f2",
+      "normalized_argv": [
+        "$PODMAN",
+        "--cgroup-manager=cgroupfs",
+        "--conmon=/usr/bin/conmon",
+        "--events-backend=none",
+        "--hooks-dir=/usr/share/empty",
+        "--runtime=/usr/bin/crun",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--network=none",
+        "--http-proxy=false",
+        "--env-host=false",
+        "--image-volume=ignore",
+        "--read-only",
+        "--cap-drop=all",
+        "--security-opt",
+        "label=disable",
+        "--security-opt",
+        "no-new-privileges",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev,size=256m,mode=1777",
+        "--workdir",
+        "/source",
+        "-e",
+        "CODESKEPTIC_QUALITY_FLOOR_LAUNCH_SHA256=$LAUNCH_SHA256",
+        "-e",
+        "CODESKEPTIC_QUALITY_FLOOR_ENV_SHA256=$ENV_SHA256",
+        "-e",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "-e",
+        "HOME=/scratch/home",
+        "-e",
+        "LANG=C",
+        "-e",
+        "LC_ALL=C",
+        "-e",
+        "TZ=UTC",
+        "-e",
+        "TMPDIR=/scratch",
+        "-e",
+        "XDG_CACHE_HOME=/scratch/xdg-cache",
+        "-e",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "-e",
+        "GIT_OPTIONAL_LOCKS=0",
+        "-e",
+        "GIT_CONFIG_GLOBAL=/dev/null",
+        "-e",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "-e",
+        "GIT_NO_REPLACE_OBJECTS=1",
+        "-e",
+        "GIT_CONFIG_COUNT=5",
+        "-e",
+        "GIT_CONFIG_KEY_0=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_0=/source",
+        "-e",
+        "GIT_CONFIG_KEY_1=safe.directory",
+        "-e",
+        "GIT_CONFIG_VALUE_1=/libarchive",
+        "-e",
+        "GIT_CONFIG_KEY_2=core.hooksPath",
+        "-e",
+        "GIT_CONFIG_VALUE_2=/dev/null",
+        "-e",
+        "GIT_CONFIG_KEY_3=core.fsmonitor",
+        "-e",
+        "GIT_CONFIG_VALUE_3=false",
+        "-e",
+        "GIT_CONFIG_KEY_4=core.commitGraph",
+        "-e",
+        "GIT_CONFIG_VALUE_4=false",
+        "-v",
+        "$SOURCE:/source:ro",
+        "-v",
+        "$BUILD:/build:ro",
+        "-v",
+        "$BUILD_AUTHORITY:/build-authority:ro",
+        "-v",
+        "$JULIET:/juliet:ro",
+        "-v",
+        "$JULIET_ARCHIVE:/juliet.zip:ro",
+        "-v",
+        "$LIBARCHIVE:/libarchive:ro",
+        "-v",
+        "$STAGE:/stage:rw",
+        "-v",
+        "$SCRATCH:/scratch:rw",
+        "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+        "/usr/bin/python3",
+        "/source/scripts/run_quality_floor_campaign.py",
+        "_inner-run",
+        "--source",
+        "/source",
+        "--build-authority",
+        "/build-authority",
+        "--build-dir",
+        "/build",
+        "--juliet-dir",
+        "/juliet",
+        "--juliet-archive",
+        "/juliet.zip",
+        "--libarchive-checkout",
+        "/libarchive",
+        "--output",
+        "/stage/package",
+        "--launch-authority",
+        "/stage/campaign-launch-authority.json",
+        "--jobs",
+        "4"
+      ],
+      "normalized_argv_sha256": "ff75effe82a65505e8d0cedeb55981bd26bbabac2d84696637c59b6a182744ca",
+      "podman": {
+        "path": "/usr/bin/podman",
+        "sha256": "b1bac06f5e73ca1353738b58a2b1fd6e73d6d4a8eb67ed1dde3edf735a52e0c8",
+        "version": "podman version 5.8.4"
+      },
+      "schema": "codeskeptic-quality-floor-execution-authority-v1"
+    },
+    "run_id": "b3cd5a4d-1e2d-4c4a-a2c5-c849542bd14f",
+    "schema": "codeskeptic-quality-floor-raw-authority-v1",
+    "source": {
+      "manifest_sha256": "bbe934c5cd7834b24eb6338bfe9d98cdffef7f8a32b86d0ccf40264f4b478c27",
+      "revision": "f7c9ea3125f1262409edff6e5559d9c4718b45af"
+    }
+  },
+  "evidence_id": "missing",
+  "evidence_kind": "requested-tu",
+  "observation": {
+    "complete": false,
+    "coverage": {
+      "analyzed_tus": 1,
+      "attempted_tus": 2,
+      "broken_tus": 0,
+      "incomplete_functions": 0
+    },
+    "id": "missing-requested-tu",
+    "kind": "missing",
+    "process_exit": 2,
+    "report_exit": 2,
+    "verdict": null
+  },
+  "schema": "codeskeptic-quality-floor-bundle-evidence-v1"
+}

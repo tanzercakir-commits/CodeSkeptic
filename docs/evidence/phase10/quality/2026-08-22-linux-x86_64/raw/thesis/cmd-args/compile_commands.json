@@ -1,0 +1,12 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang-20",
+      "-std=gnu11",
+      "-fsyntax-only",
+      "/stage/package/raw/thesis/cmd-args/source.c"
+    ],
+    "directory": "/stage/package/raw/thesis/cmd-args",
+    "file": "/stage/package/raw/thesis/cmd-args/source.c"
+  }
+]

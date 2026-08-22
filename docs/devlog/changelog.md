@@ -27,8 +27,21 @@
   both admitted compile commands in both whole-program phases instead of
   collapsing them to a unique path set. A failed container surfaces only its
   bounded, escaped final diagnostic while the private workspace is still
-  removed. The exact-head authoritative campaign and retained evidence are
-  still pending; this checkpoint does not close `CS-P10-08` and does not change
+  removed.
+- The exact-head authoritative campaign at source checkpoint
+  `f7c9ea3125f1262409edff6e5559d9c4718b45af` and build-authority seal
+  `6eaeb05f52c4fb17e350fdb388feff61815a38a787bed9774634708c6171af1a`
+  passed both producer and independent verifier paths. Micro precision is
+  `643/657`, addressable recall is `638/898`, every rule exceeds its precision
+  floor, all `9/9` clean cases have zero findings, and both requested-TU
+  unavailable negatives passed.
+- Retained the exact 167-file package under
+  `docs/evidence/phase10/quality/2026-08-22-linux-x86_64`. Its accepted receipt
+  SHA-256 is
+  `eab1be1bf4c08989c4491715f1be72300a76ba08c9627f8f16860af3c12bb923`;
+  the sibling external manifest SHA-256 is
+  `b6b75047799348e945c0d735f738abd90b0749d0e61e75de668264473c80c400`.
+  This evidence checkpoint does not close `CS-P10-08` and does not change
   protected-main status.
 
 ## 2026-08-22 — Phase 10.7 accepted confirmation (branch checkpoint)

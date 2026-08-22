@@ -1,0 +1,17 @@
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+[CodeSkeptic] Analysis starting... (1 files, 12 rules)
+/scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp:1:32: error: expected ')'
+    1 | int malformed_source(int value {
+      |                                ^
+/scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp:1:21: note: to match this '('
+    1 | int malformed_source(int value {
+      |                     ^
+/scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp:3:2: error: expected function body after function declarator
+    3 | }
+      |  ^
+2 errors generated.
+Error while processing /scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp.
+[CodeSkeptic] 1 translation unit(s) failed to COMPILE. Findings from an error-recovery AST are non-verdict evidence. Fix the include paths/flags; --analyze-broken-tus may inspect the recovered AST but the verdict remains unavailable:
+  - /scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp
+[CodeSkeptic] translation unit broken: /scratch/codeskeptic-stress-otbbp_4z/malformed-source/repeat-1/malformed_source.cpp (command_sha256=5aaa70a663526b7b07a96f5e9777c73025104b632aa1f08875261dc1c32c7eeb, ordinal=0, phase=analysis)
+[CodeSkeptic] VERDICT UNAVAILABLE: requested analysis evidence was incomplete or an artifact could not be written (exit 2).

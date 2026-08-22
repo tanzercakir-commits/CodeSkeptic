@@ -1,0 +1,190 @@
+{
+  "analyzer": {
+    "path": "src/codeskeptic",
+    "sha256": "2fdca181e7c881de7a20472c78cf807e0b1f1b984747e9d860eb2119af049562",
+    "version": "CodeSkeptic 0.4.9-dev"
+  },
+  "build_identity_sha256": "6eaeb05f52c4fb17e350fdb388feff61815a38a787bed9774634708c6171af1a",
+  "configuration": {
+    "cmake_cache_canonical_sha256": "d804ad527472fd829aa6192915761b7ffe7d1f946bf70aa615e8ad6336874efe",
+    "cmake_cache_schema": "codeskeptic-cmake-cache-v2",
+    "cmake_cache_sha256": "c7e2570154937658f52695c5e2638d6876698810c34f1fafacc42030453127de",
+    "cmake_cache_size": 22770,
+    "compile_commands_sha256": "1adc91d3e182f3ddc6e8da114f90f74ac8be4cb1c929960785b1a4ab093a9a68",
+    "compile_commands_size": 30386,
+    "identity_sha256": "3feceb31712b095e5addaa81bd6cc166c2f9d8498b6fe8ef5dfa5514abaf15ad",
+    "schema": "codeskeptic-analyzer-build-configuration-v1"
+  },
+  "image": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+  "logs": {
+    "build.log": {
+      "path": "build.log",
+      "sha256": "342ef8ba54be87bbf66b93a9ebf0715064016ec4516560d2f4c9019ae2a1dc29",
+      "size": 5437
+    },
+    "configure.log": {
+      "path": "configure.log",
+      "sha256": "40b79165ecfe378a99c08563755b072f243a5276c72997ce5d89e56655508f50",
+      "size": 1399
+    },
+    "operator.log": {
+      "path": "operator.log",
+      "sha256": "e31f91bbd840b18fac4985bf6553a1efd41c0e43e407c886b670a4269cdfbada",
+      "size": 127
+    }
+  },
+  "recipe": {
+    "build": [
+      "$CMAKE",
+      "--build",
+      "$BUILD",
+      "--target",
+      "codeskeptic",
+      "--parallel",
+      "2"
+    ],
+    "configure": [
+      "$CMAKE",
+      "-S",
+      "$SOURCE",
+      "-B",
+      "$BUILD",
+      "-G",
+      "Ninja",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_PREFIX_PATH=$LLVM20_PREFIX",
+      "-DCMAKE_MAKE_PROGRAM=$NINJA",
+      "-DCMAKE_C_COMPILER=$CLANG20",
+      "-DCMAKE_CXX_COMPILER=$CLANGXX20",
+      "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+      "-DCODESKEPTIC_BUILD_TESTS=OFF",
+      "-DCODESKEPTIC_BUILD_FUZZERS=OFF",
+      "-DCODESKEPTIC_SANITIZER=none"
+    ],
+    "environment": {
+      "CC": "$CLANG20",
+      "CODESKEPTIC_VERSION_OVERRIDE": "0.4.9-dev",
+      "CXX": "$CLANGXX20",
+      "GIT_CONFIG_GLOBAL": "/dev/null",
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "HOME": "$BUILD/.home",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "$LLVM20_PREFIX/bin:/usr/bin:/bin",
+      "TZ": "UTC",
+      "XDG_CACHE_HOME": "$BUILD/.xdg-cache"
+    }
+  },
+  "runtime": {
+    "image": {
+      "digest": "sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+      "id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
+      "reference": "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
+    },
+    "normalized_argv": [
+      "$PODMAN",
+      "--cgroup-manager=cgroupfs",
+      "--conmon=/usr/bin/conmon",
+      "--events-backend=none",
+      "--hooks-dir=/usr/share/empty",
+      "--runtime=/usr/bin/crun",
+      "run",
+      "--rm",
+      "--pull=never",
+      "--network=none",
+      "--http-proxy=false",
+      "--env-host=false",
+      "--image-volume=ignore",
+      "--read-only",
+      "--cap-drop=all",
+      "--security-opt",
+      "label=disable",
+      "--security-opt",
+      "no-new-privileges",
+      "--tmpfs",
+      "/tmp:rw,size=4g,mode=1777",
+      "--workdir",
+      "/source",
+      "-e",
+      "GIT_CONFIG_COUNT=1",
+      "-e",
+      "GIT_CONFIG_KEY_0=safe.directory",
+      "-e",
+      "GIT_CONFIG_VALUE_0=/source",
+      "-e",
+      "GIT_OPTIONAL_LOCKS=0",
+      "-e",
+      "HOME=/tmp/home",
+      "-e",
+      "LANG=C",
+      "-e",
+      "LC_ALL=C",
+      "-e",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "-e",
+      "XDG_CACHE_HOME=/tmp/xdg-cache",
+      "-v",
+      "$SOURCE:/source:ro",
+      "-v",
+      "$BUILD:/build:rw",
+      "-e",
+      "CODESKEPTIC_BUILD_AUTHORITY_LAUNCH_SHA256=$LAUNCH_SHA256",
+      "-v",
+      "$STAGE:/authority-stage:rw",
+      "localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca",
+      "/usr/bin/python3",
+      "/source/scripts/analyzer_build_authority.py",
+      "_inner-produce",
+      "--source",
+      "/source",
+      "--revision",
+      "$REVISION",
+      "--build-dir",
+      "/build",
+      "--output",
+      "/authority-stage/inner",
+      "--launch-authority",
+      "/authority-stage/launch-authority.json"
+    ],
+    "normalized_argv_sha256": "b7b64bf35933aa35d9324ba25cf9d97df59b047ca0ddbcbb009727182f5f3d3e",
+    "podman": {
+      "path": "/usr/bin/podman",
+      "sha256": "b1bac06f5e73ca1353738b58a2b1fd6e73d6d4a8eb67ed1dde3edf735a52e0c8",
+      "version": "podman version 5.8.4"
+    },
+    "schema": "codeskeptic-analyzer-build-runtime-v1"
+  },
+  "schema": "codeskeptic-analyzer-build-authority-v1",
+  "source": {
+    "file_count": 398,
+    "manifest_sha256": "bbe934c5cd7834b24eb6338bfe9d98cdffef7f8a32b86d0ccf40264f4b478c27",
+    "revision": "f7c9ea3125f1262409edff6e5559d9c4718b45af"
+  },
+  "status": "accepted",
+  "toolchain": {
+    "identity_sha256": "f8d6173048b9a65179e376b4c310025a1631c71110b21e347b55f98b56652169",
+    "schema": "codeskeptic-analyzer-build-toolchain-v1",
+    "tools": {
+      "c_compiler": {
+        "path": "/usr/bin/clang-20",
+        "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+        "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+      },
+      "cmake": {
+        "path": "/usr/bin/cmake",
+        "sha256": "1c5227af4edd22d8d689def545e18ee458260c0fd579eba2187967f38817e638",
+        "version": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+      },
+      "cxx_compiler": {
+        "path": "/usr/bin/clang++-20",
+        "sha256": "b15e7640bf3082f36ef14321711706b265df3058721e3c2caef3a4b83895d07d",
+        "version": "Ubuntu clang version 20.1.2 (0ubuntu1~24.04.3)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-20/bin"
+      },
+      "ninja": {
+        "path": "/usr/bin/ninja",
+        "sha256": "5965527e09fe2b3787772aa4f711d6a36b393e7f2fcaa744a7a96c5a4ddf59cb",
+        "version": "1.11.1"
+      }
+    }
+  }
+}

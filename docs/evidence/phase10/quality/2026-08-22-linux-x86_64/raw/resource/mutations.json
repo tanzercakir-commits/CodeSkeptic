@@ -1,0 +1,60 @@
+{
+  "schema": "codeskeptic-quality-floor-resource-mutations-v1",
+  "project": {
+    "id": "libarchive",
+    "revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+    "translation_units": 123,
+    "translation_unit_sha256": "1d8306b703571b7c88ed8e3c549950d508e1eb3259f43d7eca34fa7f0a934b10",
+    "source_files": {
+      "libarchive/archive_read_disk_entry_from_file.c": {
+        "clean_sha256": "40b7a72120ea28d49e17a8f7afc90196a4da051467f1a12bbdc7e3e81616d29f",
+        "mutated_sha256": "13a9600fd5b7eb591e431e142f8e22dbdedc7fee70f9f3e7ea0eff64aa0c45c8"
+      },
+      "libarchive/archive_write_disk_posix.c": {
+        "clean_sha256": "311d361a11280e73fa18636fb04b2ae3b7c69a3c71bbe983bf9f5b1d1782096c",
+        "mutated_sha256": "45c87e3794af0c95e9ff9b26af8ee13da4a94380142778e7055627cb3f99b320"
+      }
+    }
+  },
+  "mutations": [
+    {
+      "id": "read-disk-replacement-close",
+      "path": "libarchive/archive_read_disk_entry_from_file.c",
+      "function": "archive_read_disk_entry_from_file",
+      "source_revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+      "clean_file_sha256": "40b7a72120ea28d49e17a8f7afc90196a4da051467f1a12bbdc7e3e81616d29f",
+      "before": "\t/* If we opened the file earlier in this function, close it. */\n\tif (initial_fd != fd)\n\t\tclose(fd);\n\treturn (r);\n",
+      "before_sha256": "3b1e2be6d903246ca3023af1ff215f10bb01293a037423a6da89ea6a2c540e46",
+      "replacement": "\t/* If we opened the file earlier in this function, close it. */\n\treturn (r);\n",
+      "replacement_sha256": "aef86886c0d2099483d81dd9bd50bea07bcb52ff644788c1f551870a7561cb21",
+      "expected_matches": 1,
+      "expected_mutated_file_sha256": "13a9600fd5b7eb591e431e142f8e22dbdedc7fee70f9f3e7ea0eff64aa0c45c8"
+    },
+    {
+      "id": "write-disk-fixup-loop-close",
+      "path": "libarchive/archive_write_disk_posix.c",
+      "function": "_archive_write_disk_close",
+      "source_revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+      "clean_file_sha256": "311d361a11280e73fa18636fb04b2ae3b7c69a3c71bbe983bf9f5b1d1782096c",
+      "before": "skip_fixup_entry:\n\t\tnext = p->next;\n\t\tarchive_acl_clear(&p->acl);\n\t\tfree(p->mac_metadata);\n\t\tfree(p->name);\n\t\tif (fd >= 0)\n\t\t\tclose(fd);\n\t\tfree(p);\n",
+      "before_sha256": "86bea9ba904f3668571754f00a1bae688bf8e154afe4c5d2df85cfebb8d3ba83",
+      "replacement": "skip_fixup_entry:\n\t\tnext = p->next;\n\t\tarchive_acl_clear(&p->acl);\n\t\tfree(p->mac_metadata);\n\t\tfree(p->name);\n\t\tfree(p);\n",
+      "replacement_sha256": "3f6796094769c187a403d0165eb7f52589df0378897377e4a4139f06590cdd76",
+      "expected_matches": 1,
+      "expected_mutated_file_sha256": "45c87e3794af0c95e9ff9b26af8ee13da4a94380142778e7055627cb3f99b320"
+    },
+    {
+      "id": "linux-set-fflags-internal-close",
+      "path": "libarchive/archive_write_disk_posix.c",
+      "function": "set_fflags_platform",
+      "source_revision": "27cbc7827172698143e440801fc0ba39ccb4f1f5",
+      "clean_file_sha256": "311d361a11280e73fa18636fb04b2ae3b7c69a3c71bbe983bf9f5b1d1782096c",
+      "before": "fail:\n\tarchive_set_error(&a->archive, errno,\n\t    \"Failed to set file flags\");\n\tret = ARCHIVE_WARN;\ncleanup:\n\tif (fd < 0)\n\t\tclose(myfd);\n\treturn (ret);\n",
+      "before_sha256": "34821e8482d43b87a3f5ae4822015c65029c6f9bb61ed259ffbc18d8a7d4830c",
+      "replacement": "fail:\n\tarchive_set_error(&a->archive, errno,\n\t    \"Failed to set file flags\");\n\tret = ARCHIVE_WARN;\ncleanup:\n\treturn (ret);\n",
+      "replacement_sha256": "4062e1c7835ad094bd26fd6403e186985b263c07126cedf54b30d27d76ca5658",
+      "expected_matches": 1,
+      "expected_mutated_file_sha256": "45c87e3794af0c95e9ff9b26af8ee13da4a94380142778e7055627cb3f99b320"
+    }
+  ]
+}

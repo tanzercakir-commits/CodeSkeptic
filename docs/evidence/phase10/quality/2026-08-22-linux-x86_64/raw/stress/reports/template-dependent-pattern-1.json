@@ -1,0 +1,15 @@
+{
+  "tool": "CodeSkeptic",
+  "status": "clean",
+  "complete": true,
+  "exit_code": 0,
+  "coverage": { "attempted_tus": 1, "analyzed_tus": 1, "broken_tus": 0, "incomplete_functions": 0 },
+  "evidence": { "no_inputs": false, "no_rules": false, "compile_database_failed": false, "tool_failed": false, "summary_load_failed": false, "summary_stale": false, "summary_save_failed": false, "baseline_load_failed": false, "baseline_write_failed": false, "baseline_recorded": false, "report_write_failed": false },
+  "finding_counts": { "total": 0, "blocking": 0, "report_only": 0 },
+  "translation_units": [
+    { "path": "/scratch/codeskeptic-stress-otbbp_4z/template-dependent-pattern/repeat-1/template_dependent.cpp", "compile_command_sha256": "1fd7b58e81b4070ef741a42176ee0197072dff75a70b4a7d350ec0fbfb0deffe", "command_ordinal": 0, "phase": "analysis", "status": "completed", "duration_ms": 21, "peak_memory_kib": 81536, "timeout_seconds": 300, "memory_mib": 4096, "origin": "executed", "checkpoint_key_sha256": "", "payload_sha256": "" }
+  ],
+  "total": 0,
+  "diagnostics": [
+  ]
+}
