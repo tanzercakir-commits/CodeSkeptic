@@ -24,6 +24,11 @@
   verifier retains only the narrow legacy rejection shape caused by a nonzero,
   in-tolerance memory delta; a fresh accepted confirmation is still required
   to close `CS-P10-07`.
+- Refreshed the retained frontend/CFG stress receipt against feature commit
+  `8290e814205e586620c0c456e3331838ec02e709` and the current analyzer after
+  the older receipt's source inventory had fallen behind this phase branch.
+  All nine cases passed twice with stable semantic projections; the refreshed
+  37-file bundle and its external checksum manifest verify independently.
 
 ## 2026-08-19 — Phase 10.7 kernel-bound determinism authority (in progress)
 
