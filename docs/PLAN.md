@@ -1,9 +1,11 @@
-# CodeSkeptic — PLAN (sabit referans, tüm plan)
+# CodeSkeptic — PLAN (sürüm kontrollü referans, tüm plan)
 
-> Bu belge **sabit kalır**: projenin hedef mimarisi, CWE kapsamı, yol
-> haritası ve çalışma protokolü tek yerde. Aktif işler `TODO.md`'de,
-> ne yapıldığı `devlog/changelog.md`'de. Ölçüm makbuzları (dated
-> `scan-*.md`, `*-campaign.md`) yaz-bir-kez kanıt dosyalarıdır; yeni
+> Bu belge **keyfî olarak değişmez**: projenin hedef mimarisi, CWE kapsamı,
+> yol haritası ve çalışma protokolü tek yerde. Politika revizyonları yalnız
+> açık kullanıcı onayı, sabitlenmiş önceki/yeni katalog özetleri, regresyon
+> testleri, changelog gerekçesi ve bağımsız denetimle yapılır. Aktif işler
+> `TODO.md`'de, ne yapıldığı `devlog/changelog.md`'de. Ölçüm makbuzları
+> (dated `scan-*.md`, `*-campaign.md`) yaz-bir-kez kanıt dosyalarıdır; yeni
 > ölçümler changelog'a yazılır, yeni PLAN-*.md AÇILMAZ.
 
 ---
@@ -136,7 +138,8 @@ untrusted → sessiz · LVGL loca_count replikası → RAPOR.
 4. phase-* dala push → CI 6 hat (build-and-test·juliet·docker·windows·docs×2)
 5. Zorunlu kapılar yeşil → exact head/tree doğrula → ara merge'i sürekli yetkiyle tamamla → temizle
    (ürün programının son `main` merge'inde kullanıcı onayını bekle)
-6. Her adımı changelog'a yaz; TODO/PROGRESS'i jeneratörle doğrula; PLAN sabit kalır
+6. Her adımı changelog'a yaz; TODO/PROGRESS'i jeneratörle doğrula; PLAN yalnız
+   yukarıdaki özet-bağlı politika revizyonu protokolüyle değişebilir
 ```
 
 **CI çıktı-okuma tuzağı:** bulgular STDERR'de; `CodeSkeptic: N finding(s)`
@@ -188,11 +191,11 @@ dışarı gönderilmez.
 
 Aktif iş → **TODO.md** (aşağıdaki sabit katalogdan otomatik üretilir).
 
-## 8. Sabit v1.0 görev kataloğu
+## 8. Sürüm kontrollü v1.0 görev kataloğu
 
 Bu katalog, protected `main` üzerinde henüz kapanmamış Phase 8.3/8.4/9
 göç işleri ile Phase 10–12 ürün programının tek görev kaynağıdır. Kimlikler,
-sıra, bağımlılıklar, sınırlar ve kabul kapıları sabittir. `TODO.md`, bu
+sıra, bağımlılıklar, sınırlar ve kabul kapıları özet-bağlıdır. `TODO.md`, bu
 katalogdan protected-main üzerinde henüz kapanmamış görevleri üretir;
 `PROGRESS.md` ise legacy prefix sonrasında yalnız protected-main commit
 mesajının gerçek final trailer bloğundaki tam biçimli
@@ -204,10 +207,20 @@ trailer içermeyen son bir `phase-*` reconciliation dalı TODO'yu boş ve ledger
 güncel üretir. V2 ledger sıradan reconciliation commit'lerini kaydetmediği için
 bu protokol sonludur.
 
+V1.0 saha doğrulaması takvim süresine göre değil, üç bağımsız dış projede
+önceden dondurulmuş senaryo ve kapsam matrisiyle ölçülür. Her kampanya
+tekrarlanabilir ve checksummed makbuzlar üretir; 72 saatlik kesintisiz
+stabilite, determinism, kalite, sanitizer, platform, paketleme, SBOM, imza ve
+offline kapıları ayrıca zorunlu kalır. Üç adet 30 günlük report-only pilot ise
+v1.0'ı bloke etmez: v1.0 sonrasında paralel yürütülebilen saha gözlemidir ve
+yalnız daha sonraki `field-proven` / `enterprise-readiness` iddialarına kanıt
+olabilir. Bu ayrım resmî bir sertifikasyon standardı iddiası değildir; süre
+yerine ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
+
 <!-- cs:work-items-begin -->
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "program": "CodeSkeptic measurable v1.0 completion",
   "items": [
     {
@@ -429,72 +442,72 @@ bu protokol sonludur.
     {
       "id": "CS-P12-01",
       "phase": 12,
-      "title": "Report-only pilot protocol",
-      "boundary": "Freeze a privacy-conscious, reproducible 30-day report-only protocol for three independent external projects before any pilot begins.",
+      "title": "External qualification protocol",
+      "boundary": "Freeze a privacy-conscious, coverage-based, reproducible qualification protocol for three independent external projects before any campaign begins.",
       "gates": [
-        "Project selection, immutable inputs, cadence, requested-TU coverage, triage, suppression, incident, and withdrawal procedures are fixed.",
-        "Blocking is technically disabled throughout the initial report-only period.",
-        "Pilot receipts contain only approved product measurements and no external write or maintainer contact occurs without owner authorization."
+        "Project selection, immutable inputs, scenario matrix, requested-TU coverage, triage, suppression, incident, and withdrawal procedures are fixed before measurement.",
+        "Each project exercises full scan, deterministic repeat, cache/resume, bounded resource-failure, JSON/SARIF, baseline, and supported-package parity paths under one checksummed protocol.",
+        "Campaign receipts contain only approved product measurements; no external write or maintainer contact occurs without target-specific owner authorization."
       ],
       "depends_on": ["CS-P11-06"]
     },
     {
       "id": "CS-P12-02",
       "phase": 12,
-      "title": "First thirty-day pilot",
-      "boundary": "Operate the first independent project for 30 consecutive days under the frozen report-only protocol.",
+      "title": "First external project qualification",
+      "boundary": "Complete the frozen qualification matrix on the first independent external project without using elapsed time as a substitute for coverage.",
       "gates": [
-        "Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.",
-        "Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.",
-        "The project-level pilot report is complete and independently auditable."
+        "Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.",
+        "Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.",
+        "The project-level qualification report is repeatable from immutable inputs and independently auditable."
       ],
       "depends_on": ["CS-P12-01"]
     },
     {
       "id": "CS-P12-03",
       "phase": 12,
-      "title": "Second thirty-day pilot",
-      "boundary": "Operate a second independent project for 30 consecutive days under the same report-only protocol.",
+      "title": "Second external project qualification",
+      "boundary": "Complete the same frozen qualification matrix on a second independent external project without using elapsed time as a substitute for coverage.",
       "gates": [
-        "Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.",
-        "Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.",
-        "The project-level pilot report is complete and independently auditable."
+        "Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.",
+        "Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.",
+        "The project-level qualification report is repeatable from immutable inputs and independently auditable."
       ],
       "depends_on": ["CS-P12-01"]
     },
     {
       "id": "CS-P12-04",
       "phase": 12,
-      "title": "Third thirty-day pilot",
-      "boundary": "Operate a third independent project for 30 consecutive days under the same report-only protocol.",
+      "title": "Third external project qualification",
+      "boundary": "Complete the same frozen qualification matrix on a third independent external project without using elapsed time as a substitute for coverage.",
       "gates": [
-        "Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.",
-        "Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.",
-        "The project-level pilot report is complete and independently auditable."
+        "Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.",
+        "Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.",
+        "The project-level qualification report is repeatable from immutable inputs and independently auditable."
       ],
       "depends_on": ["CS-P12-01"]
     },
     {
       "id": "CS-P12-05",
       "phase": 12,
-      "title": "Pilot triage and suppression audit",
-      "boundary": "Aggregate all three pilots without hiding rejected findings, unavailable runs, suppression costs, or project-specific limitations.",
+      "title": "Qualification triage and suppression audit",
+      "boundary": "Aggregate all three qualification campaigns without hiding rejected findings, unavailable scenarios, suppression costs, or project-specific limitations.",
       "gates": [
         "At least 200 findings are human-triaged with reproducible classification and suppression outcomes.",
-        "Precision, recall proxies, time-to-triage, suppression expiry, unavailable-run, and performance measures are reported per project and in aggregate.",
-        "All three pilots satisfy the 30-day report-only requirement and retain a complete audit trail."
+        "Precision, recall proxies, time-to-triage, suppression expiry, unavailable-scenario, and performance measures are reported per project and in aggregate.",
+        "All three campaigns satisfy the frozen coverage matrix and retain a complete checksummed audit trail."
       ],
       "depends_on": ["CS-P12-02", "CS-P12-03", "CS-P12-04"]
     },
     {
       "id": "CS-P12-06",
       "phase": 12,
-      "title": "Optional blocking after a clean week",
-      "boundary": "Permit opt-in blocking for a pilot only after seven consecutive clean, fully available report-only days under frozen rules.",
+      "title": "Evidence-gated optional blocking",
+      "boundary": "Permit project-scoped opt-in blocking only for supported default rules whose three-project qualification evidence satisfies every frozen quality and reliability gate.",
       "gates": [
-        "The clean-week counter resets on blocking false positive, unavailable run, semantic drift, crash, hang, or unexplained budget regression.",
+        "Blocking eligibility is revoked on a blocking false positive, unavailable scenario, semantic drift, crash, hang, or unexplained budget regression.",
         "Blocking remains opt-in, project-scoped, reversible, and defaults to report-only.",
-        "Positive and reset paths are end-to-end tested before any pilot enables blocking."
+        "Positive, revocation, and rollback paths are end-to-end tested before any project enables blocking."
       ],
       "depends_on": ["CS-P12-05"]
     },
@@ -514,10 +527,10 @@ bu protokol sonludur.
       "id": "CS-P12-08",
       "phase": 12,
       "title": "v1.0 checklist support policy and final audit",
-      "boundary": "Close v1.0 only after a requirement-by-requirement audit proves every cumulative product, quality, distribution, pilot, governance, and support gate.",
+      "boundary": "Close v1.0 only after a requirement-by-requirement audit proves every cumulative product, quality, distribution, qualification, governance, and support gate.",
       "gates": [
         "The v1 checklist maps every Phase 10–12 item to authoritative commands, artifacts, measurements, and independent review evidence.",
-        "Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three 30-day pilots.",
+        "Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three independent external qualification campaigns.",
         "Support versions, platforms, response windows, deprecation policy, known limitations, rollback, and release procedure are published with no blocking audit finding."
       ],
       "depends_on": ["CS-P09-01", "CS-P12-07"]

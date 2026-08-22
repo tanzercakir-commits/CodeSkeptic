@@ -56,6 +56,33 @@
   protected-main status automation remains unchanged until an authorized
   integration occurs.
 
+## 2026-08-20 — Phase 12 coverage-based v1 qualification policy (in progress)
+
+- Replaced the proposed three consecutive 30-day pre-v1 pilots with three
+  independent, coverage-based external-project qualification campaigns. Each
+  campaign must execute the same predeclared scenario matrix from immutable
+  inputs and retain checksummed coverage, semantic-fingerprint, crash/hang,
+  performance, triage, suppression, baseline, JSON/SARIF, cache/resume,
+  resource-failure, and distribution-parity evidence. Elapsed time cannot
+  substitute for a missing scenario or rejected receipt.
+- Kept the measurable product gates intact: deterministic 10-of-10 results,
+  precision/recall floors, zero clean-corpus false positives, 200 human-triaged
+  findings, the upstream project/fix ledger, 72-hour stability, sanitizer and
+  platform coverage, distribution parity, packaging, SBOM/provenance,
+  signatures, and offline operation remain v1.0 requirements.
+- Moved three 30-day report-only pilots to a post-v1 field-observation program.
+  They may run in parallel, do not block v1.0, and cannot rewrite its evidence;
+  successful completion may support a later `field-proven` or
+  `enterprise-readiness` claim. No external write or maintainer contact is
+  authorized by this policy revision.
+- Versioned the work catalog as schema 2. The status guard admits this policy
+  change only as the exact successor of authority commit
+  `338be9c4db73f55b08b57b6b482d7d1045b55137`, with pinned full-PLAN and catalog
+  SHA-256 values, the complete unchanged task-ID set, regression coverage, and
+  an independently audited change. Arbitrary PLAN edits still fail closed.
+  `CS-P12-01` through `CS-P12-08` remain open; this policy checkpoint closes no
+  task and does not change protected `main`.
+
 ## 2026-08-19 — Phase 10.7 kernel-bound determinism authority (in progress)
 
 - Advanced the determinism authority to coordinated V7 schemas that bind the

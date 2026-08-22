@@ -9,7 +9,7 @@
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-cache-checkpoint-correctness phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-kernel-bound-authority phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-upstream-validation
+in_flight     = phase-cache-checkpoint-correctness phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-upstream-validation phase-v1-field-validation-policy
 verified_main = 7dfd375
 progress      = sha256:1b6edc7f100977936a6d77b2c3f357f67e42e975dcb1ba8d0faa0b40571cabdb
 ```
@@ -215,71 +215,71 @@ Acceptance gates:
 - Version, rule registry, JSON/SARIF schema, Baseline v2, exit code, and requested-TU behavior are identical.
 - Parity is reproduced from clean environments with checksummed artifacts and no undeclared network dependency.
 
-### CS-P12-01 — Phase 12: Report-only pilot protocol
+### CS-P12-01 — Phase 12: External qualification protocol
 
-Boundary: Freeze a privacy-conscious, reproducible 30-day report-only protocol for three independent external projects before any pilot begins.
+Boundary: Freeze a privacy-conscious, coverage-based, reproducible qualification protocol for three independent external projects before any campaign begins.
 
 Dependencies: `CS-P11-06`.
 
 Acceptance gates:
-- Project selection, immutable inputs, cadence, requested-TU coverage, triage, suppression, incident, and withdrawal procedures are fixed.
-- Blocking is technically disabled throughout the initial report-only period.
-- Pilot receipts contain only approved product measurements and no external write or maintainer contact occurs without owner authorization.
+- Project selection, immutable inputs, scenario matrix, requested-TU coverage, triage, suppression, incident, and withdrawal procedures are fixed before measurement.
+- Each project exercises full scan, deterministic repeat, cache/resume, bounded resource-failure, JSON/SARIF, baseline, and supported-package parity paths under one checksummed protocol.
+- Campaign receipts contain only approved product measurements; no external write or maintainer contact occurs without target-specific owner authorization.
 
-### CS-P12-02 — Phase 12: First thirty-day pilot
+### CS-P12-02 — Phase 12: First external project qualification
 
-Boundary: Operate the first independent project for 30 consecutive days under the frozen report-only protocol.
-
-Dependencies: `CS-P12-01`.
-
-Acceptance gates:
-- Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.
-- Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.
-- The project-level pilot report is complete and independently auditable.
-
-### CS-P12-03 — Phase 12: Second thirty-day pilot
-
-Boundary: Operate a second independent project for 30 consecutive days under the same report-only protocol.
+Boundary: Complete the frozen qualification matrix on the first independent external project without using elapsed time as a substitute for coverage.
 
 Dependencies: `CS-P12-01`.
 
 Acceptance gates:
-- Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.
-- Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.
-- The project-level pilot report is complete and independently auditable.
+- Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.
+- Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.
+- The project-level qualification report is repeatable from immutable inputs and independently auditable.
 
-### CS-P12-04 — Phase 12: Third thirty-day pilot
+### CS-P12-03 — Phase 12: Second external project qualification
 
-Boundary: Operate a third independent project for 30 consecutive days under the same report-only protocol.
+Boundary: Complete the same frozen qualification matrix on a second independent external project without using elapsed time as a substitute for coverage.
 
 Dependencies: `CS-P12-01`.
 
 Acceptance gates:
-- Thirty daily windows have valid coverage, fingerprint, crash/hang, performance, triage, and suppression receipts.
-- Unavailable or missed windows are reported and replayed under the protocol rather than silently counted green.
-- The project-level pilot report is complete and independently auditable.
+- Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.
+- Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.
+- The project-level qualification report is repeatable from immutable inputs and independently auditable.
 
-### CS-P12-05 — Phase 12: Pilot triage and suppression audit
+### CS-P12-04 — Phase 12: Third external project qualification
 
-Boundary: Aggregate all three pilots without hiding rejected findings, unavailable runs, suppression costs, or project-specific limitations.
+Boundary: Complete the same frozen qualification matrix on a third independent external project without using elapsed time as a substitute for coverage.
+
+Dependencies: `CS-P12-01`.
+
+Acceptance gates:
+- Every predeclared scenario has valid coverage, semantic fingerprint, crash/hang, performance, triage, suppression, and distribution-parity receipts.
+- Unavailable, interrupted, or rejected scenarios are retained and rerun under the frozen protocol rather than silently counted green.
+- The project-level qualification report is repeatable from immutable inputs and independently auditable.
+
+### CS-P12-05 — Phase 12: Qualification triage and suppression audit
+
+Boundary: Aggregate all three qualification campaigns without hiding rejected findings, unavailable scenarios, suppression costs, or project-specific limitations.
 
 Dependencies: `CS-P12-02`, `CS-P12-03`, `CS-P12-04`.
 
 Acceptance gates:
 - At least 200 findings are human-triaged with reproducible classification and suppression outcomes.
-- Precision, recall proxies, time-to-triage, suppression expiry, unavailable-run, and performance measures are reported per project and in aggregate.
-- All three pilots satisfy the 30-day report-only requirement and retain a complete audit trail.
+- Precision, recall proxies, time-to-triage, suppression expiry, unavailable-scenario, and performance measures are reported per project and in aggregate.
+- All three campaigns satisfy the frozen coverage matrix and retain a complete checksummed audit trail.
 
-### CS-P12-06 — Phase 12: Optional blocking after a clean week
+### CS-P12-06 — Phase 12: Evidence-gated optional blocking
 
-Boundary: Permit opt-in blocking for a pilot only after seven consecutive clean, fully available report-only days under frozen rules.
+Boundary: Permit project-scoped opt-in blocking only for supported default rules whose three-project qualification evidence satisfies every frozen quality and reliability gate.
 
 Dependencies: `CS-P12-05`.
 
 Acceptance gates:
-- The clean-week counter resets on blocking false positive, unavailable run, semantic drift, crash, hang, or unexplained budget regression.
+- Blocking eligibility is revoked on a blocking false positive, unavailable scenario, semantic drift, crash, hang, or unexplained budget regression.
 - Blocking remains opt-in, project-scoped, reversible, and defaults to report-only.
-- Positive and reset paths are end-to-end tested before any pilot enables blocking.
+- Positive, revocation, and rollback paths are end-to-end tested before any project enables blocking.
 
 ### CS-P12-07 — Phase 12: CLI and schema freeze
 
@@ -294,11 +294,11 @@ Acceptance gates:
 
 ### CS-P12-08 — Phase 12: v1.0 checklist support policy and final audit
 
-Boundary: Close v1.0 only after a requirement-by-requirement audit proves every cumulative product, quality, distribution, pilot, governance, and support gate.
+Boundary: Close v1.0 only after a requirement-by-requirement audit proves every cumulative product, quality, distribution, qualification, governance, and support gate.
 
 Dependencies: `CS-P09-01`, `CS-P12-07`.
 
 Acceptance gates:
 - The v1 checklist maps every Phase 10–12 item to authoritative commands, artifacts, measurements, and independent review evidence.
-- Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three 30-day pilots.
+- Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three independent external qualification campaigns.
 - Support versions, platforms, response windows, deprecation policy, known limitations, rollback, and release procedure are published with no blocking audit finding.
