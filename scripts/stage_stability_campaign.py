@@ -450,7 +450,11 @@ def _bounded_command(
     def terminate_group() -> None:
         if process is None:
             return
-        kill_deadline = min(deadline, time.monotonic() + 5)
+        # Cleanup begins after the command deadline on the timeout path, so it
+        # needs its own grace period.  Reusing the already-expired execution
+        # deadline can observe a just-signalled task for one scheduler tick and
+        # falsely report that SIGKILL failed before the kernel can reap it.
+        kill_deadline = time.monotonic() + 5
         while True:
             members = _owned_process_group_members(
                 process.pid, process.pid

@@ -35,6 +35,10 @@
   quiescence-before-release emergency reserves, and identity-bound rollback.
   The portable statvfs guard is explicitly recovery-oriented detection, not a
   hard aggregate filesystem quota.
+- Gave staging-command cleanup its own bounded grace period after an execution
+  deadline. A timed-out process is still rejected immediately, but SIGKILL
+  cleanup can now observe kernel quiescence instead of falsely reporting a
+  surviving process on the first scheduler tick after the deadline.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 
