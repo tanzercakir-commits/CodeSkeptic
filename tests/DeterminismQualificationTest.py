@@ -583,6 +583,23 @@ def process_is_running(pid: int) -> bool:
     return " Z " not in f" {state} " and "(zombie)" not in state
 
 
+def write_llama_release_links(source: Path, build: Path) -> None:
+    source.mkdir(parents=True, exist_ok=True)
+    (build / "bin").mkdir(parents=True, exist_ok=True)
+    for terminal in (
+        "libggml-base.so.0.19.0",
+        "libggml-cpu.so.0.19.0",
+        "libggml.so.0.19.0",
+        "libllama.so.0.0.1",
+    ):
+        (build / "bin" / terminal).write_bytes(b"library\n")
+    for qualified, target in qualification.LLAMA_STAGING_BUILD_SYMLINKS.items():
+        prefix, relative = qualified.split("/", 1)
+        if prefix != "build":
+            raise AssertionError("fixture symlink contract is malformed")
+        (build / relative).symlink_to(target)
+
+
 def baseline(
     manifest_sha: str,
     value: int = 100,
@@ -3686,6 +3703,618 @@ class DeterminismQualificationTest(unittest.TestCase):
                     Path("/usr/bin/cmake"), Path("/usr/bin/ninja"),
                     Path("/usr/bin/clang-20"), Path("/usr/bin/clang++-20"),
                 )
+
+    def test_release_preparation_accepts_only_an_exact_empty_target_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "release" / "source"
+            build = root / "release" / "build"
+            source.mkdir(parents=True)
+            build.mkdir()
+            self.assertEqual(
+                qualification._release_candidate_paths(
+                    None, "llama-cpp",
+                    release_source=source,
+                    release_build=build,
+                ),
+                (source.resolve(), build.resolve()),
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "both"
+            ):
+                qualification._release_candidate_paths(
+                    None, "llama-cpp", release_source=source
+                )
+            (build / "stale").write_text("collision\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "empty"
+            ):
+                qualification._release_candidate_paths(
+                    None, "llama-cpp",
+                    release_source=source,
+                    release_build=build,
+                )
+
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "mutually exclusive"
+            ):
+                qualification._release_candidate_paths(
+                    root / "workspace", "llama-cpp",
+                    release_source=source,
+                    release_build=build,
+                )
+
+            nested = source / "nested-build"
+            nested.mkdir()
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "overlap"
+            ):
+                qualification._release_candidate_paths(
+                    None, "llama-cpp",
+                    release_source=source,
+                    release_build=nested,
+                )
+
+            alias = root / "source-alias"
+            alias.symlink_to(source, target_is_directory=True)
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "not a real directory"
+            ):
+                qualification._release_candidate_paths(
+                    None, "llama-cpp",
+                    release_source=alias,
+                    release_build=build,
+                )
+
+            parent_alias = root / "release-alias"
+            parent_alias.symlink_to(source.parent, target_is_directory=True)
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "not a real directory"
+            ):
+                qualification._release_candidate_paths(
+                    None, "llama-cpp",
+                    release_source=parent_alias / "source",
+                    release_build=build,
+                )
+
+    def test_release_checkout_ignores_ambient_templates_and_hooks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            upstream = root / "upstream"
+            upstream.mkdir()
+            subprocess.run(
+                ["git", "init", "--quiet", "-b", "main"],
+                cwd=upstream, check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Fixture"],
+                cwd=upstream, check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "fixture@example.invalid"],
+                cwd=upstream, check=True,
+            )
+            (upstream / "sample.txt").write_text(
+                "pinned bytes\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "add", "."], cwd=upstream, check=True)
+            subprocess.run(
+                ["git", "commit", "--quiet", "-m", "fixture"],
+                cwd=upstream, check=True,
+            )
+            revision = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=upstream, text=True,
+            ).strip()
+
+            marker = root / "post-checkout-ran"
+            template = root / "malicious-template"
+            template_hook = template / "hooks" / "post-checkout"
+            template_hook.parent.mkdir(parents=True)
+            template_hook.write_text(
+                "#!/bin/sh\n" f"touch '{marker}'\n", encoding="utf-8"
+            )
+            template_hook.chmod(0o755)
+            global_hooks = root / "global-hooks"
+            global_hooks.mkdir()
+            global_hook = global_hooks / "post-checkout"
+            global_hook.write_text(
+                "#!/bin/sh\n" f"touch '{marker}'\n", encoding="utf-8"
+            )
+            global_hook.chmod(0o755)
+            home = root / "home"
+            home.mkdir()
+            global_config = home / ".gitconfig"
+            global_config.write_text(
+                "[init]\n"
+                f"\ttemplateDir = {template}\n"
+                "[core]\n"
+                f"\thooksPath = {global_hooks}\n",
+                encoding="utf-8",
+            )
+            source = root / "release-source"
+            source.mkdir()
+            injected = {
+                "GIT_CONFIG_GLOBAL": os.fspath(global_config),
+                "GIT_CONFIG_PARAMETERS": (
+                    f"'core.hooksPath'='{global_hooks}'"
+                ),
+                "GIT_DIR": os.fspath(upstream / ".git"),
+                "GIT_TEMPLATE_DIR": os.fspath(template),
+                "HOME": os.fspath(home),
+                "PATH": "/usr/bin:/bin",
+            }
+            with mock.patch.dict(os.environ, injected, clear=True):
+                closed = qualification._release_git_environment(
+                    source, upstream.as_uri()
+                )
+                qualification._prepare_release_checkout(
+                    source, upstream.as_uri(), revision
+                )
+
+            self.assertFalse(marker.exists())
+            self.assertFalse((source / ".git" / "hooks" / "post-checkout").exists())
+            self.assertEqual(
+                (source / "sample.txt").read_text(encoding="utf-8"),
+                "pinned bytes\n",
+            )
+            self.assertNotIn("GIT_CONFIG_PARAMETERS", closed)
+            self.assertNotIn("GIT_DIR", closed)
+            self.assertNotIn("GIT_TEMPLATE_DIR", closed)
+            self.assertEqual(closed["GIT_CONFIG_GLOBAL"], os.devnull)
+            self.assertEqual(closed["GIT_CONFIG_SYSTEM"], os.devnull)
+            self.assertEqual(closed["GIT_NO_REPLACE_OBJECTS"], "1")
+            self.assertEqual(closed["GIT_PROTOCOL_FROM_USER"], "0")
+            self.assertEqual(closed["GIT_ALLOW_PROTOCOL"], "file")
+
+            completed = subprocess.CompletedProcess([], 0, b"")
+            mocked_source = root / "mocked-release-source"
+            with mock.patch.object(
+                qualification.subprocess, "run", return_value=completed
+            ) as invoked:
+                qualification._prepare_release_checkout(
+                    mocked_source, upstream.as_uri(), revision
+                )
+            expected_environment = qualification._release_git_environment(
+                mocked_source, upstream.as_uri()
+            )
+            self.assertEqual(len(invoked.call_args_list), 4)
+            for invocation in invoked.call_args_list:
+                self.assertEqual(invocation.kwargs["env"], expected_environment)
+                self.assertIs(invocation.kwargs["stdin"], subprocess.DEVNULL)
+            commands = [call.args[0] for call in invoked.call_args_list]
+            self.assertIn("--template=", commands[0])
+            self.assertIn("remote", commands[1])
+            self.assertIn("fetch", commands[2])
+            self.assertIn("checkout", commands[3])
+
+    def test_explicit_target_pin_detects_target_and_parent_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release = root / "release"
+            source = release / "source"
+            build = release / "build"
+            source.mkdir(parents=True)
+            build.mkdir()
+            with qualification._PinnedReleaseTargets(
+                source, build, require_empty=True
+            ) as target_pin:
+                original = release / "original-build"
+                build.rename(original)
+                build.symlink_to(original.name, target_is_directory=True)
+                with self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "build identity drift",
+                ):
+                    target_pin.verify("before mutation")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release = root / "release"
+            source = release / "source"
+            build = release / "build"
+            source.mkdir(parents=True)
+            build.mkdir()
+            with qualification._PinnedReleaseTargets(
+                source, build, require_empty=True
+            ) as target_pin:
+                original = root / "original-release"
+                release.rename(original)
+                source.mkdir(parents=True)
+                build.mkdir()
+                with self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "parent identity drift",
+                ):
+                    target_pin.verify("before mutation")
+
+    def test_explicit_release_projection_removes_only_exact_llama_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            build = root / "build"
+            write_llama_release_links(source, build)
+
+            qualification._project_explicit_release_candidate(
+                "llama-cpp", source, build
+            )
+
+            for qualified in qualification.LLAMA_STAGING_BUILD_SYMLINKS:
+                _, relative = qualified.split("/", 1)
+                self.assertFalse((build / relative).exists())
+                self.assertFalse((build / relative).is_symlink())
+            for terminal in (
+                "libggml-base.so.0.19.0",
+                "libggml-cpu.so.0.19.0",
+                "libggml.so.0.19.0",
+                "libllama.so.0.0.1",
+            ):
+                self.assertTrue((build / "bin" / terminal).is_file())
+
+            unexpected = source / "unexpected"
+            unexpected.symlink_to("missing")
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "symlink inventory drift",
+            ):
+                qualification._project_explicit_release_candidate(
+                    "llama-cpp", source, build
+                )
+
+    def test_explicit_release_projection_rolls_back_or_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            build = root / "build"
+            write_llama_release_links(source, build)
+            real_unlink = os.unlink
+            calls = 0
+
+            def fail_second_unlink(
+                path: str, *, dir_fd: int | None = None,
+            ) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("injected unlink failure")
+                real_unlink(path, dir_fd=dir_fd)
+
+            with mock.patch.object(
+                qualification.os, "unlink", side_effect=fail_second_unlink
+            ), self.assertRaisesRegex(
+                qualification.QualificationError,
+                "cannot project explicit release candidate",
+            ):
+                qualification._project_explicit_release_candidate(
+                    "llama-cpp", source, build
+                )
+            for qualified, target in (
+                qualification.LLAMA_STAGING_BUILD_SYMLINKS.items()
+            ):
+                _, relative = qualified.split("/", 1)
+                self.assertTrue((build / relative).is_symlink())
+                self.assertEqual(os.readlink(build / relative), target)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            build = root / "build"
+            write_llama_release_links(source, build)
+            real_unlink = os.unlink
+            calls = 0
+
+            def fail_second_unlink_again(
+                path: str, *, dir_fd: int | None = None,
+            ) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("injected unlink failure")
+                real_unlink(path, dir_fd=dir_fd)
+
+            with (
+                mock.patch.object(
+                    qualification.os, "unlink",
+                    side_effect=fail_second_unlink_again,
+                ),
+                mock.patch.object(
+                    qualification.os, "symlink",
+                    side_effect=OSError("injected rollback failure"),
+                ),
+                self.assertRaisesRegex(
+                    qualification.QualificationError, "rollback failed"
+                ),
+            ):
+                qualification._project_explicit_release_candidate(
+                    "llama-cpp", source, build
+                )
+
+    def test_explicit_release_projection_detects_build_subdirectory_race(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            build = root / "build"
+            write_llama_release_links(source, build)
+            real_unlink = os.unlink
+            raced = False
+
+            def replace_bin_after_first_unlink(
+                path: str, *, dir_fd: int | None = None,
+            ) -> None:
+                nonlocal raced
+                real_unlink(path, dir_fd=dir_fd)
+                if not raced:
+                    raced = True
+                    (build / "bin").rename(build / "original-bin")
+                    (build / "bin").mkdir()
+
+            with (
+                mock.patch.object(
+                    qualification.os, "unlink",
+                    side_effect=replace_bin_after_first_unlink,
+                ),
+                self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "build/bin identity drift",
+                ),
+            ):
+                qualification._project_explicit_release_candidate(
+                    "llama-cpp", source, build
+                )
+            for qualified, target in (
+                qualification.LLAMA_STAGING_BUILD_SYMLINKS.items()
+            ):
+                _, relative = qualified.split("/", 1)
+                name = Path(relative).name
+                self.assertTrue((build / "original-bin" / name).is_symlink())
+                self.assertEqual(
+                    os.readlink(build / "original-bin" / name), target
+                )
+
+    def test_prepare_projects_explicit_targets_but_not_legacy_workspace(self) -> None:
+        release_workload = manifest()["workloads"][2]
+
+        def exercise(
+            root: Path, *, explicit: bool,
+        ) -> tuple[Path, Path, mock.Mock]:
+            if explicit:
+                source = root / "release" / "source"
+                build = root / "release" / "build"
+                source.mkdir(parents=True)
+                build.mkdir()
+                workspace = None
+                explicit_arguments = {
+                    "release_source": source,
+                    "release_build": build,
+                }
+            else:
+                workspace = root / "workspace"
+                workspace.mkdir()
+                source = workspace / "llama-cpp"
+                build = workspace / "llama-cpp-build"
+                explicit_arguments = {}
+
+            def fake_checkout(
+                checkout_source: Path,
+                unused_repository: str,
+                unused_revision: str,
+                unused_pin: object = None,
+            ) -> None:
+                checkout_source.mkdir(parents=True, exist_ok=True)
+
+            prepared = False
+
+            def fake_build(
+                command: list[str], **unused: object,
+            ) -> subprocess.CompletedProcess[bytes]:
+                nonlocal prepared
+                if not prepared:
+                    write_llama_release_links(source, build)
+                    (build / "compile_commands.json").write_text(
+                        "[]\n", encoding="utf-8"
+                    )
+                    prepared = True
+                return subprocess.CompletedProcess(command, 0, b"ok\n")
+
+            with (
+                mock.patch.object(
+                    qualification, "_prepare_release_checkout",
+                    side_effect=fake_checkout,
+                ),
+                mock.patch.object(
+                    qualification.subprocess, "run", side_effect=fake_build,
+                ),
+                mock.patch.object(
+                    qualification, "_build_toolchain_identity", return_value={},
+                ),
+                mock.patch.object(
+                    qualification, "_git_output", return_value="",
+                ),
+                mock.patch.object(
+                    qualification, "_project_explicit_release_candidate",
+                    wraps=qualification._project_explicit_release_candidate,
+                ) as projected,
+            ):
+                observed_source, observed_build, _ = (
+                    qualification.prepare_release_candidate(
+                        ROOT, release_workload, workspace, 1,
+                        Path("/usr/bin/cmake"), Path("/usr/bin/ninja"),
+                        Path("/usr/bin/clang-20"),
+                        Path("/usr/bin/clang++-20"),
+                        **explicit_arguments,
+                    )
+                )
+            self.assertEqual(observed_source, source)
+            self.assertEqual(observed_build, build)
+            return source, build, projected
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, build, projected = exercise(
+                Path(directory), explicit=True
+            )
+            projected.assert_called_once()
+            for qualified in qualification.LLAMA_STAGING_BUILD_SYMLINKS:
+                _, relative = qualified.split("/", 1)
+                self.assertFalse((build / relative).is_symlink())
+            self.assertTrue(source.is_dir())
+
+        with tempfile.TemporaryDirectory() as directory:
+            source, build, projected = exercise(
+                Path(directory), explicit=False
+            )
+            projected.assert_not_called()
+            for qualified in qualification.LLAMA_STAGING_BUILD_SYMLINKS:
+                _, relative = qualified.split("/", 1)
+                self.assertTrue((build / relative).is_symlink())
+            self.assertTrue(source.is_dir())
+
+    def test_prepare_rejects_explicit_target_replacement_before_projection(self) -> None:
+        release_workload = manifest()["workloads"][2]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "release" / "source"
+            build = root / "release" / "build"
+            source.mkdir(parents=True)
+            build.mkdir()
+
+            def fake_checkout(
+                unused_source: Path,
+                unused_repository: str,
+                unused_revision: str,
+                unused_pin: object = None,
+            ) -> None:
+                return None
+
+            prepared = False
+
+            def fake_build(
+                command: list[str], **unused: object,
+            ) -> subprocess.CompletedProcess[bytes]:
+                nonlocal prepared
+                if not prepared:
+                    write_llama_release_links(source, build)
+                    (build / "compile_commands.json").write_text(
+                        "[]\n", encoding="utf-8"
+                    )
+                    prepared = True
+                return subprocess.CompletedProcess(command, 0, b"ok\n")
+
+            def replace_build(*unused: object) -> dict:
+                build.rename(root / "original-build")
+                build.mkdir()
+                return {}
+
+            with (
+                mock.patch.object(
+                    qualification, "_prepare_release_checkout",
+                    side_effect=fake_checkout,
+                ),
+                mock.patch.object(
+                    qualification.subprocess, "run", side_effect=fake_build,
+                ),
+                mock.patch.object(
+                    qualification, "_build_toolchain_identity",
+                    side_effect=replace_build,
+                ),
+                mock.patch.object(
+                    qualification, "_git_output", return_value="",
+                ),
+                mock.patch.object(
+                    qualification, "_project_explicit_release_candidate",
+                ) as projected,
+                self.assertRaisesRegex(
+                    qualification.QualificationError, "build identity drift"
+                ),
+            ):
+                qualification.prepare_release_candidate(
+                    ROOT, release_workload, None, 1,
+                    Path("/usr/bin/cmake"), Path("/usr/bin/ninja"),
+                    Path("/usr/bin/clang-20"), Path("/usr/bin/clang++-20"),
+                    release_source=source, release_build=build,
+                )
+            projected.assert_not_called()
+
+    def test_run_forwards_explicit_release_preparation_targets(self) -> None:
+        raw_manifest = manifest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            build = root / "build"
+            source = root / "release" / "source"
+            release_build = root / "release" / "build"
+            for path in (repo, build, source, release_build):
+                path.mkdir(parents=True, exist_ok=True)
+            binaries: dict[str, Path] = {}
+            for name in (
+                "codeskeptic", "clang", "time", "cmake", "ninja",
+                "cc", "cxx",
+            ):
+                binaries[name] = root / name
+                binaries[name].write_bytes(b"fixture\n")
+            args = mock.Mock(
+                repo_root=repo,
+                build_path=build,
+                binary=binaries["codeskeptic"],
+                clang=binaries["clang"],
+                time_binary=binaries["time"],
+                cmake=binaries["cmake"],
+                ninja=binaries["ninja"],
+                c_compiler=binaries["cc"],
+                cxx_compiler=binaries["cxx"],
+                output=root / "evidence",
+                manifest=root / "manifest.json",
+                baseline=root / "baseline.json",
+                repetitions=10,
+                revision="head-revision",
+                measurement_cgroup=None,
+                hardware_class="test-linux-x86_64",
+                performance_policy="required",
+                prepare_release_candidate=True,
+                release_workspace=None,
+                release_source=source,
+                release_build=release_build,
+                jobs=2,
+                establish_baseline=False,
+                candidate_baseline_output=None,
+                baseline_authority_root=repo,
+            )
+            prepared = mock.Mock(
+                side_effect=qualification.QualificationError(
+                    "explicit preparation reached"
+                )
+            )
+            with (
+                mock.patch.object(
+                    qualification, "load_manifest", return_value=raw_manifest,
+                ),
+                mock.patch.object(
+                    qualification, "source_manifest", return_value={
+                        "revision": "head-revision",
+                        "manifest_sha256": "1" * 64,
+                        "file_count": 1,
+                    },
+                ),
+                mock.patch.object(qualification, "_git_output", return_value=""),
+                mock.patch.object(qualification, "host_identity", return_value={}),
+                mock.patch.object(
+                    qualification, "toolchain_identity", return_value={},
+                ),
+                mock.patch.object(
+                    qualification, "_preflight_qualification_baseline",
+                ),
+                mock.patch.object(
+                    qualification, "prepare_release_candidate", prepared,
+                ),
+                mock.patch.object(qualification, "_persist_rejection"),
+                self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "explicit preparation reached",
+                ),
+            ):
+                qualification.run_qualification(args)
+            self.assertEqual(prepared.call_args.kwargs, {
+                "release_source": source,
+                "release_build": release_build,
+            })
 
     def test_pinned_baseline_is_bound_to_raw_calibration_and_promotion(self) -> None:
         raw_manifest = manifest()

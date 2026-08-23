@@ -110,6 +110,35 @@ add_test(NAME StatusAutomationContract
 add_test(NAME RealworldCampaignContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/RealworldCampaignTest.py)
+add_test(NAME StabilityFaultInjectionContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/StabilityFaultInjectionTest.py)
+add_test(NAME HostedStatusWorkflowContract
+         COMMAND ${Python3_EXECUTABLE}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/HostedStatusWorkflowTest.py)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME StabilityHostContaminationContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityHostContaminationTest.py)
+    add_test(NAME StabilityCampaignContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityCampaignTest.py)
+    add_test(NAME StabilityWorkflowContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityWorkflowTest.py)
+    add_test(NAME StabilityStagingProducerContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityStagingProducerTest.py)
+    add_test(NAME HostedExactHeadReceiptContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/HostedExactHeadReceiptTest.py)
+    add_test(NAME HostedCaptureContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/HostedCaptureTest.py)
+    add_test(NAME RealworldMirrorAuthorityProducerContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/RealworldMirrorAuthorityProducerTest.py)
+endif()
 add_test(NAME Phase83QualificationContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/Phase83QualificationTest.py)

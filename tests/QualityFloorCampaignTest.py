@@ -171,7 +171,10 @@ def _seal_fake_authority(
 ) -> dict:
     retained = package / "raw" / campaign.BUILD_AUTHORITY_RAW_DIR
     build_record = campaign._build_authority_record(retained, build_receipt)
-    normalized = campaign._normalized_campaign_argv("run", 1)
+    container_layout = campaign._campaign_container_layout(build_record)
+    normalized = campaign._normalized_campaign_argv(
+        "run", 1, container_layout=container_layout
+    )
     runtime = {
         "schema": campaign.CAMPAIGN_RUNTIME_SCHEMA,
         "image": copy.deepcopy(build_receipt["runtime"]["image"]),
@@ -187,7 +190,9 @@ def _seal_fake_authority(
         {
             "source": copy.deepcopy(build_record["source"]),
             "build_authority": copy.deepcopy(build_record),
-            "mounts": campaign._campaign_mounts("run"),
+            "mounts": campaign._campaign_mounts(
+                "run", container_layout=container_layout
+            ),
             "juliet": {"file_count": 1, "manifest_sha256": "6" * 64},
             "juliet_archive": campaign._official_corpus_identity(),
             "libarchive": {
@@ -212,7 +217,10 @@ def _seal_fake_authority(
 
 
 def _fake_build_receipt(
-    source: dict[str, str], analyzer: dict[str, str]
+    source: dict[str, str],
+    analyzer: dict[str, str],
+    *,
+    container_layout: str = "legacy",
 ) -> dict:
     build = campaign.build_authority
     configuration_material = {
@@ -241,7 +249,9 @@ def _fake_build_receipt(
         "tools": tool_records,
         "identity_sha256": build.digest_json(tool_records),
     }
-    normalized_argv = build._normalized_container_argv("produce")
+    normalized_argv = build._normalized_container_argv(
+        "produce", container_layout
+    )
     runtime = {
         "schema": build.RUNTIME_SCHEMA,
         "image": {
@@ -328,8 +338,12 @@ def _write_structural_build_authority(
         }
         for name, raw in artifacts.items()
     }
+    container_layout = campaign.build_authority._container_layout_from_runtime(
+        retained["runtime"]
+    )
     operator = campaign.build_authority._expected_operator_log(
-        campaign.build_authority._inner_build_identity_from_final(retained)
+        campaign.build_authority._inner_build_identity_from_final(retained),
+        container_layout,
     )
     artifacts["operator.log"] = operator
     retained["logs"]["operator.log"] = {
@@ -365,8 +379,12 @@ def _fake_launch_authority(
     require_accepted: bool = True,
 ) -> tuple[Path, dict, dict]:
     build_record = campaign._build_authority_record(authority_dir, receipt)
+    container_layout = campaign._campaign_container_layout(build_record)
     normalized = campaign._normalized_campaign_argv(
-        action, jobs, require_accepted=require_accepted
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
     )
     runtime = {
         "schema": campaign.CAMPAIGN_RUNTIME_SCHEMA,
@@ -378,7 +396,9 @@ def _fake_launch_authority(
     inputs = {
         "source": copy.deepcopy(build_record["source"]),
         "build_authority": copy.deepcopy(build_record),
-        "mounts": campaign._campaign_mounts(action),
+        "mounts": campaign._campaign_mounts(
+            action, container_layout=container_layout
+        ),
     }
     if action == "run":
         inputs.update(
@@ -660,6 +680,27 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 campaign.CampaignError, "build authority rejected"
             ):
                 campaign.verify_retained_package(package)
+
+    def test_p10_09_retained_build_authority_static_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _binary, _build_dir, analyzer = _fake_build(root)
+            source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
+            receipt = _fake_build_receipt(
+                source, analyzer, container_layout="p10-09"
+            )
+            retained = _write_structural_build_authority(
+                root / "build-authority", receipt
+            )
+            record, verified = (
+                campaign._verify_retained_build_authority_static(
+                    root / "build-authority"
+                )
+            )
+            self.assertEqual(verified, retained)
+            self.assertEqual(
+                campaign._campaign_container_layout(record), "p10-09"
+            )
 
     def test_offline_verifier_rejects_favorable_resigned_raw_semantic_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1953,6 +1994,346 @@ class QualityFloorCampaignTest(unittest.TestCase):
         self.assertIn(f"{root / 'juliet-archive.zip'}:/juliet.zip:ro", command)
         self.assertFalse(any("$" in token for token in command))
 
+    def test_p10_09_container_layout_is_inferred_from_build_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _binary, _build_dir, analyzer = _fake_build(root)
+            source_identity = {
+                "revision": "a" * 40,
+                "manifest_sha256": "b" * 64,
+            }
+            authority_dir = _write_fake_build_authority(root)
+            receipt = _fake_build_receipt(
+                source_identity, analyzer, container_layout="p10-09"
+            )
+            build_record = campaign._build_authority_record(
+                authority_dir, receipt
+            )
+            self.assertEqual(
+                campaign._campaign_container_layout(build_record), "p10-09"
+            )
+
+            with mock.patch.object(
+                campaign.build_authority,
+                "_runtime_authority",
+                return_value=copy.deepcopy(receipt["runtime"]),
+            ) as runtime_authority:
+                runtime = campaign._campaign_runtime("verify", None, build_record)
+            runtime_authority.assert_called_once_with(
+                container_layout="p10-09"
+            )
+            normalized = runtime["normalized_argv"]
+            self.assertEqual(
+                normalized,
+                campaign._normalized_campaign_argv(
+                    "verify", None, container_layout="p10-09"
+                ),
+            )
+            self.assertEqual(
+                normalized[normalized.index("--workdir") + 1],
+                "/authority/source",
+            )
+            self.assertIn(
+                "GIT_CONFIG_VALUE_0=/authority/source", normalized
+            )
+            self.assertIn(
+                "$SOURCE:/authority/source:ro", normalized
+            )
+            self.assertIn("$BUILD:/authority/build:ro", normalized)
+            self.assertIn(
+                "$BUILD_AUTHORITY:/authority/build-authority:ro", normalized
+            )
+            self.assertIn(
+                "/authority/source/scripts/run_quality_floor_campaign.py",
+                normalized,
+            )
+            for action, jobs in (
+                ("run", 2),
+                ("assemble", None),
+                ("verify", None),
+            ):
+                with self.subTest(action=action):
+                    template = campaign._normalized_campaign_argv(
+                        action, jobs, container_layout="p10-09"
+                    )
+                    self.assertEqual(
+                        template[template.index("--workdir") + 1],
+                        "/authority/source",
+                    )
+                    self.assertIn(
+                        "$SOURCE:/authority/source:ro", template
+                    )
+                    self.assertIn("$BUILD:/authority/build:ro", template)
+                    self.assertIn(
+                        "$BUILD_AUTHORITY:/authority/build-authority:ro",
+                        template,
+                    )
+                    mounts = campaign._campaign_mounts(
+                        action, container_layout="p10-09"
+                    )
+                    self.assertEqual(mounts["source"], "/authority/source")
+                    self.assertEqual(mounts["build"], "/authority/build")
+                    self.assertEqual(
+                        mounts["build_authority"],
+                        "/authority/build-authority",
+                    )
+
+            source_dir = root / "source"
+            source_dir.mkdir()
+            package = root / "package"
+            package.mkdir()
+            (package / "evidence").write_text("sealed\n", encoding="utf-8")
+            with mock.patch.object(
+                campaign, "_source_identity", return_value=source_identity
+            ):
+                inputs = campaign._campaign_input_identity(
+                    "verify",
+                    source=source_dir,
+                    build_record=build_record,
+                    package=package,
+                )
+            self.assertEqual(
+                inputs["mounts"]["source"], "/authority/source"
+            )
+            self.assertEqual(inputs["mounts"]["build"], "/authority/build")
+            self.assertEqual(
+                inputs["mounts"]["build_authority"],
+                "/authority/build-authority",
+            )
+
+            command = campaign._campaign_container_command(
+                "verify",
+                None,
+                "0" * 64,
+                source=root / "source",
+                build_dir=root / "build",
+                build_authority_dir=root / "build-authority",
+                scratch=root / "scratch",
+                package=root / "package",
+                launch_dir=root / "launch",
+                build_record=build_record,
+            )
+            self.assertIn(
+                f"{root / 'source'}:/authority/source:ro", command
+            )
+            self.assertIn(f"{root / 'build'}:/authority/build:ro", command)
+            self.assertIn(
+                f"{root / 'build-authority'}:/authority/build-authority:ro",
+                command,
+            )
+            self.assertIn(
+                "GIT_CONFIG_VALUE_0=/authority/source", command
+            )
+
+        environment = {
+            **campaign._inner_environment("p10-09"),
+            campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV: campaign.compact_json_digest(
+                campaign._inner_environment("p10-09")
+            ),
+            campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
+            "HOSTNAME": "0123456789ab",
+            "container": "podman",
+        }
+        with mock.patch.object(
+            campaign, "ROOT", Path("/authority/source")
+        ), mock.patch.object(
+            campaign,
+            "__file__",
+            "/authority/source/scripts/run_quality_floor_campaign.py",
+        ), mock.patch.dict(campaign.os.environ, environment, clear=True):
+            self.assertEqual(
+                campaign._validate_inner_paths(
+                    "run",
+                    source=Path("/authority/source"),
+                    build_dir=Path("/authority/build"),
+                    build_authority_dir=Path("/authority/build-authority"),
+                    package=Path("/stage/package"),
+                    launch_authority=Path(
+                        f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+                    ),
+                    juliet_dir=Path("/juliet"),
+                    juliet_archive=Path("/juliet.zip"),
+                    libarchive_checkout=Path("/libarchive"),
+                ),
+                "p10-09",
+            )
+
+    def test_p10_09_outer_recheck_preserves_inferred_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _binary, _build_dir, analyzer = _fake_build(root)
+            source_identity = {
+                "revision": "a" * 40,
+                "manifest_sha256": "b" * 64,
+            }
+            authority_dir = _write_fake_build_authority(root)
+            receipt = _fake_build_receipt(
+                source_identity, analyzer, container_layout="p10-09"
+            )
+            build_record = campaign._build_authority_record(
+                authority_dir, receipt
+            )
+            with mock.patch.object(
+                campaign.build_authority,
+                "_runtime_authority",
+                return_value=copy.deepcopy(receipt["runtime"]),
+            ):
+                runtime = campaign._campaign_runtime(
+                    "verify", None, build_record
+                )
+            inputs = {"exact": "p10-09"}
+            snapshot = {
+                "scripts": {"script": "identity"},
+                "build_record": build_record,
+                "container_layout": "p10-09",
+                "source": root,
+                "runtime": runtime,
+                "inputs": inputs,
+                "launch": {"jobs": None},
+            }
+            with mock.patch.object(
+                campaign,
+                "_verify_outer_script_authority",
+                return_value=snapshot["scripts"],
+            ), mock.patch.object(
+                campaign.build_authority,
+                "_runtime_authority",
+                return_value=copy.deepcopy(receipt["runtime"]),
+            ) as runtime_authority, mock.patch.object(
+                campaign,
+                "_campaign_input_identity",
+                return_value=inputs,
+            ):
+                campaign._lightweight_outer_recheck(
+                    snapshot,
+                    action="verify",
+                    require_accepted=True,
+                    package=root,
+                )
+            runtime_authority.assert_called_once_with(
+                container_layout="p10-09"
+            )
+
+            changed = copy.deepcopy(snapshot)
+            changed["container_layout"] = "legacy"
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "layout changed"
+            ):
+                campaign._lightweight_outer_recheck(
+                    changed,
+                    action="verify",
+                    require_accepted=True,
+                    package=root,
+                )
+
+    def test_container_layout_hybrids_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _binary, _build_dir, analyzer = _fake_build(root)
+            source_identity = {
+                "revision": "a" * 40,
+                "manifest_sha256": "b" * 64,
+            }
+            authority_dir = _write_fake_build_authority(root)
+            receipt = _fake_build_receipt(
+                source_identity, analyzer, container_layout="p10-09"
+            )
+            build_record = campaign._build_authority_record(
+                authority_dir, receipt
+            )
+
+            hybrid_build = copy.deepcopy(build_record)
+            hybrid_argv = hybrid_build["runtime"]["normalized_argv"]
+            hybrid_argv[hybrid_argv.index("/authority/source")] = "/source"
+            with self.assertRaisesRegex(campaign.CampaignError, "layout"):
+                campaign._campaign_container_layout(hybrid_build)
+
+            hybrid_receipt = copy.deepcopy(receipt)
+            hybrid_receipt["runtime"]["normalized_argv"] = hybrid_argv
+            with self.assertRaisesRegex(campaign.CampaignError, "layout"):
+                campaign._build_authority_record(
+                    authority_dir, hybrid_receipt
+                )
+
+            normalized = campaign._normalized_campaign_argv(
+                "verify", None, container_layout="p10-09"
+            )
+            hybrid_runtime = {
+                "schema": campaign.CAMPAIGN_RUNTIME_SCHEMA,
+                "image": copy.deepcopy(receipt["runtime"]["image"]),
+                "podman": copy.deepcopy(receipt["runtime"]["podman"]),
+                "normalized_argv": normalized,
+                "normalized_argv_sha256": campaign.compact_json_digest(
+                    normalized
+                ),
+            }
+            hybrid_runtime["normalized_argv"][
+                hybrid_runtime["normalized_argv"].index(
+                    "$BUILD:/authority/build:ro"
+                )
+            ] = "$BUILD:/build:ro"
+            hybrid_runtime["normalized_argv_sha256"] = (
+                campaign.compact_json_digest(
+                    hybrid_runtime["normalized_argv"]
+                )
+            )
+            with self.assertRaisesRegex(campaign.CampaignError, "argv drift"):
+                campaign._validate_campaign_runtime(
+                    hybrid_runtime,
+                    "verify",
+                    None,
+                    require_accepted=True,
+                    build_record=build_record,
+                )
+
+            mounts = campaign._campaign_mounts(
+                "verify", container_layout="p10-09"
+            )
+            mounts["build"] = "/build"
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "mount authority drift"
+            ):
+                campaign._validate_campaign_mounts(
+                    mounts, "verify", container_layout="p10-09"
+                )
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "unsupported"
+            ):
+                campaign._normalized_campaign_argv(
+                    "verify", None, container_layout="hybrid"
+                )
+
+        environment = {
+            **campaign._inner_environment("p10-09"),
+            campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV: campaign.compact_json_digest(
+                campaign._inner_environment("p10-09")
+            ),
+            campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
+            "HOSTNAME": "0123456789ab",
+            "container": "podman",
+        }
+        with mock.patch.object(
+            campaign, "ROOT", Path("/authority/source")
+        ), mock.patch.object(
+            campaign,
+            "__file__",
+            "/authority/source/scripts/run_quality_floor_campaign.py",
+        ), mock.patch.dict(campaign.os.environ, environment, clear=True), \
+                self.assertRaisesRegex(campaign.CampaignError, "layout"):
+            campaign._validate_inner_paths(
+                "run",
+                source=Path("/authority/source"),
+                build_dir=Path("/build"),
+                build_authority_dir=Path("/authority/build-authority"),
+                package=Path("/stage/package"),
+                launch_authority=Path(
+                    f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+                ),
+                juliet_dir=Path("/juliet"),
+                juliet_archive=Path("/juliet.zip"),
+                libarchive_checkout=Path("/libarchive"),
+            )
+
     def test_inner_environment_requires_digest_and_rejects_git_injection(self) -> None:
         expected = campaign._inner_environment()
         environment = {
@@ -2266,10 +2647,20 @@ class QualityFloorCampaignTest(unittest.TestCase):
             archive = root / "juliet.zip"
             archive.write_bytes(b"archive")
             output = root / "campaign"
+            build_record = {
+                "runtime": {
+                    "normalized_argv": (
+                        campaign.build_authority._normalized_container_argv(
+                            "produce"
+                        )
+                    )
+                }
+            }
             snapshot = {
                 "source": source,
                 "build_dir": build_dir,
                 "build_authority_dir": authority,
+                "build_record": build_record,
                 "launch": {"schema": "test-launch"},
             }
             execute = mock.Mock(
@@ -2318,10 +2709,20 @@ class QualityFloorCampaignTest(unittest.TestCase):
             archive = root / "juliet.zip"
             archive.write_bytes(b"archive")
             output = root / "campaign"
+            build_record = {
+                "runtime": {
+                    "normalized_argv": (
+                        campaign.build_authority._normalized_container_argv(
+                            "produce"
+                        )
+                    )
+                }
+            }
             snapshot = {
                 "source": source,
                 "build_dir": build_dir,
                 "build_authority_dir": authority,
+                "build_record": build_record,
                 "launch": {"schema": "test-launch"},
             }
             receipt = {"status": "accepted"}

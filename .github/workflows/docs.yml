@@ -51,7 +51,7 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/docs-structure/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/docs-structure/${{ job.status }}"
 
   quickstart:
     runs-on: ubuntu-24.04
@@ -109,4 +109,4 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/docs-quickstart/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/docs-quickstart/${{ job.status }}"

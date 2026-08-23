@@ -111,6 +111,36 @@ class SanitizerContractTest(unittest.TestCase):
         self.assertEqual(runner.FUZZ_MODE, "smoke")
         self.assertEqual(runner.BUILD_JOBS, 2)
 
+    def test_sanitizer_build_cache_is_bound_to_exact_source_and_build(self) -> None:
+        runner = load_runner()
+        compiler = cmake_compiler(
+            "CXX", ("clang++-20", "clang++", "c++")
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            build = Path(temporary) / "address-tests"
+            build.mkdir()
+            cache = build / "CMakeCache.txt"
+
+            def write(source: Path, recorded_build: Path) -> None:
+                cache.write_text(
+                    "CODESKEPTIC_SANITIZER:STRING=address\n"
+                    "CODESKEPTIC_BUILD_TESTS:BOOL=ON\n"
+                    "CODESKEPTIC_BUILD_FUZZERS:BOOL=OFF\n"
+                    f"CMAKE_CXX_COMPILER:FILEPATH={compiler}\n"
+                    f"CMAKE_HOME_DIRECTORY:INTERNAL={source}\n"
+                    f"CMAKE_CACHEFILE_DIR:INTERNAL={recorded_build}\n",
+                    encoding="utf-8",
+                )
+
+            write(ROOT, build)
+            runner._validate_build(build, "address", fuzz=False)
+            write(ROOT.parent, build)
+            with self.assertRaisesRegex(runner.MatrixError, "source root"):
+                runner._validate_build(build, "address", fuzz=False)
+            write(ROOT, build.parent)
+            with self.assertRaisesRegex(runner.MatrixError, "build root"):
+                runner._validate_build(build, "address", fuzz=False)
+
     def test_source_manifest_binds_all_complete_suite_inputs(self) -> None:
         runner = load_runner()
         files = {

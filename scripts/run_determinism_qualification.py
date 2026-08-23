@@ -22,6 +22,7 @@ import time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 try:
     import resource
@@ -112,6 +113,16 @@ EVIDENCE_FIELDS = {
     "summary_load_failed", "summary_stale", "summary_save_failed",
     "baseline_load_failed", "baseline_write_failed", "baseline_recorded",
     "report_write_failed",
+}
+LLAMA_STAGING_BUILD_SYMLINKS = {
+    "build/bin/libggml-base.so": "libggml-base.so.0",
+    "build/bin/libggml-base.so.0": "libggml-base.so.0.19.0",
+    "build/bin/libggml-cpu.so": "libggml-cpu.so.0",
+    "build/bin/libggml-cpu.so.0": "libggml-cpu.so.0.19.0",
+    "build/bin/libggml.so": "libggml.so.0",
+    "build/bin/libggml.so.0": "libggml.so.0.19.0",
+    "build/bin/libllama.so": "libllama.so.0",
+    "build/bin/libllama.so.0": "libllama.so.0.0.1",
 }
 
 
@@ -4526,25 +4537,494 @@ def _release_environment(project: dict[str, Any]) -> dict[str, str]:
     return environment
 
 
-def prepare_release_candidate(
-    repo: Path,
-    workload: dict[str, Any],
-    workspace: Path,
-    jobs: int,
-    cmake: Path,
-    ninja: Path,
-    c_compiler: Path,
-    cxx_compiler: Path,
-) -> tuple[Path, Path, dict[str, Any]]:
-    sys.path.insert(0, str(repo / "scripts"))
+def _release_git_environment(source: Path, repository: str) -> dict[str, str]:
+    """Return the closed environment used for the pinned release checkout."""
+
+    protocol = urlsplit(repository).scheme.lower()
+    if protocol not in {"file", "https"}:
+        raise QualificationError(
+            "release-candidate repository protocol is not allowed"
+        )
+    mappings = (
+        ("safe.directory", os.fspath(source)),
+        ("core.hooksPath", os.devnull),
+        ("core.fsmonitor", "false"),
+        ("core.commitGraph", "false"),
+        ("core.attributesFile", os.devnull),
+        ("core.excludesFile", os.devnull),
+        ("credential.helper", ""),
+    )
+    environment = {
+        "GIT_ALLOW_PROTOCOL": protocol,
+        "GIT_ASKPASS": "/bin/false",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_EDITOR": "/bin/false",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_PAGER": "cat",
+        "GIT_PROTOCOL_FROM_USER": "0",
+        "GIT_SEQUENCE_EDITOR": "/bin/false",
+        "GIT_TERMINAL_PROMPT": "0",
+        "HOME": os.devnull,
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+        "SSH_ASKPASS": "/bin/false",
+        "TZ": "UTC",
+        "XDG_CONFIG_HOME": os.devnull,
+        "GIT_CONFIG_COUNT": str(len(mappings)),
+    }
+    for index, (key, value) in enumerate(mappings):
+        environment[f"GIT_CONFIG_KEY_{index}"] = key
+        environment[f"GIT_CONFIG_VALUE_{index}"] = value
+    return environment
+
+
+def _prepare_release_checkout(
+    source: Path,
+    repository: str,
+    revision: str,
+    target_pin: "_PinnedReleaseTargets | None" = None,
+) -> None:
+    commands = (
+        ["/usr/bin/git", "init", "--quiet", "--template=", os.fspath(source)],
+        ["/usr/bin/git", "-C", os.fspath(source), "remote", "add",
+         "origin", repository],
+        ["/usr/bin/git", "-C", os.fspath(source), "fetch", "--quiet",
+         "--depth", "1", "origin", revision],
+        ["/usr/bin/git", "-C", os.fspath(source), "checkout", "--quiet",
+         "--detach", "FETCH_HEAD"],
+    )
+    environment = _release_git_environment(source, repository)
+    for command in commands:
+        if target_pin is not None:
+            target_pin.verify("before release-candidate checkout command")
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=environment,
+            )
+        except OSError as error:
+            raise QualificationError(
+                "cannot execute release-candidate checkout"
+            ) from error
+        if target_pin is not None:
+            target_pin.verify("after release-candidate checkout command")
+        if completed.returncode != 0:
+            raise QualificationError(
+                f"release-candidate checkout failed: {completed.stdout[-2000:]!r}"
+            )
+
+
+def _directory_identity(path: Path, label: str) -> tuple[int, int, int]:
     try:
-        import run_realworld_campaign as campaign
-    except ImportError as error:
-        raise QualificationError("cannot import real-world campaign authority") from error
-    manifest_path = _inside(repo, workload["input"]["realworld_manifest"],
-                            "real-world manifest")
-    manifest = campaign.load_manifest(manifest_path)
-    project = campaign.project_by_id(manifest, workload["input"]["project"])
+        metadata = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise QualificationError(f"cannot inspect {label}") from error
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise QualificationError(f"{label} is not a real directory")
+    return metadata.st_dev, metadata.st_ino, stat.S_IFMT(metadata.st_mode)
+
+
+class _PinnedReleaseTargets:
+    """Hold and revalidate explicit release target and parent identities."""
+
+    def __init__(
+        self, source: Path, build: Path, *, require_empty: bool,
+    ) -> None:
+        self.source = source
+        self.build = build
+        self._records: list[
+            tuple[str, Path, int, tuple[int, int, int]]
+        ] = []
+        flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            flags |= os.O_DIRECTORY
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            for label, path in (("source", source), ("build", build)):
+                parent = path.parent
+                parent_descriptor = os.open(parent, flags)
+                self._records.append((
+                    f"{label} parent", parent, parent_descriptor,
+                    _directory_identity(parent, f"explicit release {label} parent"),
+                ))
+                descriptor = os.open(path.name, flags, dir_fd=parent_descriptor)
+                self._records.append((
+                    label, path, descriptor,
+                    _directory_identity(path, f"explicit release {label}"),
+                ))
+            self.verify("while pinning explicit release targets")
+            source_identity = self._record("source")[3]
+            build_identity = self._record("build")[3]
+            source_parent_identity = self._record("source parent")[3]
+            build_parent_identity = self._record("build parent")[3]
+            if (
+                source_identity[:2] == build_identity[:2]
+                or source_identity[:2] == build_parent_identity[:2]
+                or build_identity[:2] == source_parent_identity[:2]
+            ):
+                raise QualificationError("explicit release targets overlap by identity")
+            if require_empty:
+                for label in ("source", "build"):
+                    descriptor = self._record(label)[2]
+                    try:
+                        entries = os.listdir(descriptor)
+                    except OSError as error:
+                        raise QualificationError(
+                            f"cannot inspect explicit release {label}"
+                        ) from error
+                    if entries:
+                        raise QualificationError(
+                            f"explicit release {label} must be empty"
+                        )
+        except BaseException:
+            self.close()
+            raise
+
+    def _record(
+        self, label: str,
+    ) -> tuple[str, Path, int, tuple[int, int, int]]:
+        return next(record for record in self._records if record[0] == label)
+
+    def descriptor(self, label: str) -> int:
+        return self._record(label)[2]
+
+    def verify(self, stage: str) -> None:
+        for label, path, descriptor, expected in self._records:
+            try:
+                opened = os.fstat(descriptor)
+                current = path.stat(follow_symlinks=False)
+            except OSError as error:
+                raise QualificationError(
+                    f"explicit release {label} identity drift {stage}"
+                ) from error
+            opened_identity = (
+                opened.st_dev, opened.st_ino, stat.S_IFMT(opened.st_mode)
+            )
+            current_identity = (
+                current.st_dev, current.st_ino, stat.S_IFMT(current.st_mode)
+            )
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or not stat.S_ISDIR(current.st_mode)
+                or opened_identity != expected
+                or current_identity != expected
+            ):
+                raise QualificationError(
+                    f"explicit release {label} identity drift {stage}"
+                )
+
+    def close(self) -> None:
+        while self._records:
+            _, _, descriptor, _ = self._records.pop()
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+    def __enter__(self) -> "_PinnedReleaseTargets":
+        return self
+
+    def __exit__(self, *unused: object) -> None:
+        self.close()
+
+
+def _release_symlink_inventory(
+    source: Path, build: Path,
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for prefix, root in (("source", source), ("build", build)):
+        stack = [root]
+        while stack:
+            directory = stack.pop()
+            try:
+                children = sorted(
+                    os.scandir(directory), key=lambda item: item.name
+                )
+            except OSError as error:
+                raise QualificationError(
+                    "cannot inspect explicit release symlink inventory"
+                ) from error
+            directories: list[Path] = []
+            for child in children:
+                path = Path(child.path)
+                try:
+                    metadata = path.lstat()
+                except OSError as error:
+                    raise QualificationError(
+                        "cannot inspect explicit release symlink inventory"
+                    ) from error
+                if stat.S_ISLNK(metadata.st_mode):
+                    try:
+                        target = os.readlink(path)
+                    except OSError as error:
+                        raise QualificationError(
+                            "cannot read explicit release symlink"
+                        ) from error
+                    relative = path.relative_to(root).as_posix()
+                    result[f"{prefix}/{relative}"] = target
+                elif stat.S_ISDIR(metadata.st_mode):
+                    directories.append(path)
+            stack.extend(reversed(directories))
+    return result
+
+
+def _project_explicit_release_candidate(
+    project_id: str,
+    source: Path,
+    build: Path,
+    target_pin: _PinnedReleaseTargets | None = None,
+) -> None:
+    """Remove one pinned build's exact symlink aliases before immutable sealing."""
+
+    owns_pin = target_pin is None
+    if target_pin is None:
+        target_pin = _PinnedReleaseTargets(source, build, require_empty=False)
+    expected = (
+        LLAMA_STAGING_BUILD_SYMLINKS if project_id == "llama-cpp" else {}
+    )
+    bin_descriptor: int | None = None
+    removed: list[tuple[str, str]] = []
+    failure: BaseException | None = None
+    try:
+        target_pin.verify("before explicit release projection")
+        actual = _release_symlink_inventory(source, build)
+        target_pin.verify("after explicit release inventory")
+        if actual != expected:
+            raise QualificationError(
+                "explicit release symlink inventory drift"
+            )
+        if not expected:
+            return
+        flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            flags |= os.O_DIRECTORY
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            bin_descriptor = os.open(
+                "bin", flags, dir_fd=target_pin.descriptor("build")
+            )
+        except OSError as error:
+            raise QualificationError(
+                "explicit release build/bin is not a pinned directory"
+            ) from error
+        try:
+            bin_metadata = os.fstat(bin_descriptor)
+            bin_path_metadata = (build / "bin").stat(follow_symlinks=False)
+        except OSError as error:
+            raise QualificationError(
+                "explicit release build/bin identity drift"
+            ) from error
+        bin_identity = (bin_metadata.st_dev, bin_metadata.st_ino)
+        if (
+            not stat.S_ISDIR(bin_metadata.st_mode)
+            or not stat.S_ISDIR(bin_path_metadata.st_mode)
+            or bin_identity != (bin_path_metadata.st_dev, bin_path_metadata.st_ino)
+        ):
+            raise QualificationError("explicit release build/bin identity drift")
+
+        def verify_bin_identity(stage: str) -> None:
+            target_pin.verify(stage)
+            try:
+                opened = os.fstat(bin_descriptor)
+                current = (build / "bin").stat(follow_symlinks=False)
+            except OSError as error:
+                raise QualificationError(
+                    f"explicit release build/bin identity drift {stage}"
+                ) from error
+            if (
+                not stat.S_ISDIR(opened.st_mode)
+                or not stat.S_ISDIR(current.st_mode)
+                or (opened.st_dev, opened.st_ino) != bin_identity
+                or (current.st_dev, current.st_ino) != bin_identity
+            ):
+                raise QualificationError(
+                    f"explicit release build/bin identity drift {stage}"
+                )
+
+        links: list[tuple[str, str]] = []
+        for qualified, target in sorted(expected.items()):
+            prefix, relative = qualified.split("/", 1)
+            relative_path = PurePosixPath(relative)
+            if (
+                prefix != "build"
+                or len(relative_path.parts) != 2
+                or relative_path.parts[0] != "bin"
+            ):
+                raise QualificationError(
+                    "explicit release symlink authority is malformed"
+                )
+            name = relative_path.name
+            try:
+                metadata = os.stat(
+                    name, dir_fd=bin_descriptor, follow_symlinks=False
+                )
+                observed_target = os.readlink(name, dir_fd=bin_descriptor)
+            except OSError as error:
+                raise QualificationError(
+                    "explicit release symlink changed before projection"
+                ) from error
+            if not stat.S_ISLNK(metadata.st_mode) or observed_target != target:
+                raise QualificationError(
+                    "explicit release symlink changed before projection"
+                )
+            links.append((name, target))
+        for terminal_name in sorted({
+            "libggml-base.so.0.19.0",
+            "libggml-cpu.so.0.19.0",
+            "libggml.so.0.19.0",
+            "libllama.so.0.0.1",
+        }):
+            terminal_descriptor: int | None = None
+            terminal_flags = os.O_RDONLY
+            if hasattr(os, "O_CLOEXEC"):
+                terminal_flags |= os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                terminal_flags |= os.O_NOFOLLOW
+            try:
+                terminal_descriptor = os.open(
+                    terminal_name, terminal_flags, dir_fd=bin_descriptor
+                )
+                terminal_metadata = os.fstat(terminal_descriptor)
+            except OSError as error:
+                raise QualificationError(
+                    "explicit release symlink target escapes or is missing"
+                ) from error
+            finally:
+                if terminal_descriptor is not None:
+                    os.close(terminal_descriptor)
+            if not stat.S_ISREG(terminal_metadata.st_mode):
+                raise QualificationError(
+                    "explicit release symlink target is not a regular file"
+                )
+        for name, target in links:
+            verify_bin_identity("before explicit release symlink mutation")
+            try:
+                current = os.stat(
+                    name, dir_fd=bin_descriptor, follow_symlinks=False
+                )
+                current_target = os.readlink(name, dir_fd=bin_descriptor)
+                if not stat.S_ISLNK(current.st_mode) or current_target != target:
+                    raise QualificationError(
+                        "explicit release symlink changed before projection"
+                    )
+                os.unlink(name, dir_fd=bin_descriptor)
+            except OSError as error:
+                raise QualificationError(
+                    "cannot project explicit release candidate"
+                ) from error
+            removed.append((name, target))
+        verify_bin_identity("after explicit release symlink mutation")
+        if _release_symlink_inventory(source, build):
+            raise QualificationError(
+                "explicit release projection retained a symlink"
+            )
+        target_pin.verify("after explicit release projection")
+    except BaseException as error:
+        failure = error
+    finally:
+        if failure is not None and removed and bin_descriptor is not None:
+            rollback_errors: list[str] = []
+            for name, target in reversed(removed):
+                try:
+                    os.symlink(target, name, dir_fd=bin_descriptor)
+                except OSError as error:
+                    rollback_errors.append(f"{name}: {error}")
+            for name, target in removed:
+                try:
+                    metadata = os.stat(
+                        name, dir_fd=bin_descriptor, follow_symlinks=False
+                    )
+                    observed = os.readlink(name, dir_fd=bin_descriptor)
+                except OSError as error:
+                    rollback_errors.append(f"{name}: {error}")
+                    continue
+                if not stat.S_ISLNK(metadata.st_mode) or observed != target:
+                    rollback_errors.append(f"{name}: identity drift")
+            if rollback_errors:
+                failure = QualificationError(
+                    "explicit release projection rollback failed: "
+                    + "; ".join(rollback_errors)
+                )
+        if bin_descriptor is not None:
+            try:
+                os.close(bin_descriptor)
+            except OSError as error:
+                if failure is None:
+                    failure = QualificationError(
+                        f"cannot close explicit release projection: {error}"
+                    )
+        if owns_pin:
+            target_pin.close()
+    if failure is not None:
+        if isinstance(failure, QualificationError):
+            raise failure
+        if isinstance(failure, (KeyboardInterrupt, SystemExit)):
+            raise failure
+        raise QualificationError(
+            "cannot project explicit release candidate"
+        ) from failure
+
+
+def _release_candidate_paths(
+    workspace: Path | None,
+    project_id: str,
+    *,
+    release_source: Path | None = None,
+    release_build: Path | None = None,
+) -> tuple[Path, Path]:
+    explicit = release_source is not None or release_build is not None
+    if explicit:
+        if release_source is None or release_build is None:
+            raise QualificationError(
+                "explicit release preparation requires both source and build"
+            )
+        if workspace is not None:
+            raise QualificationError(
+                "release workspace and explicit targets are mutually exclusive"
+            )
+        source = release_source.absolute()
+        build = release_build.absolute()
+        for path, label in ((source, "source"), (build, "build")):
+            if _regular_kind(path) != "directory" or path.resolve() != path:
+                raise QualificationError(
+                    f"explicit release {label} is not a real directory"
+                )
+        if (
+            source == build
+            or source in build.parents
+            or build in source.parents
+        ):
+            raise QualificationError("explicit release targets overlap")
+        for path, label in ((source, "source"), (build, "build")):
+            try:
+                if next(path.iterdir(), None) is not None:
+                    raise QualificationError(
+                        f"explicit release {label} must be empty"
+                    )
+            except OSError as error:
+                raise QualificationError(
+                    f"cannot inspect explicit release {label}"
+                ) from error
+        return source, build
+
+    if workspace is None:
+        raise QualificationError("release preparation requires --release-workspace")
     workspace = workspace.absolute()
     if _regular_kind(workspace) == "missing":
         workspace.mkdir(parents=True)
@@ -4556,70 +5036,128 @@ def prepare_release_candidate(
             raise QualificationError("release workspace must be empty")
     except OSError as error:
         raise QualificationError("cannot inspect release workspace") from error
-    source = workspace / project["id"]
-    build = workspace / f"{project['id']}-build"
-    commands = (
-        ["git", "init", "--quiet", str(source)],
-        ["git", "-C", str(source), "remote", "add", "origin", project["repository"]],
-        ["git", "-C", str(source), "fetch", "--quiet", "--depth", "1", "origin", project["revision"]],
-        ["git", "-C", str(source), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
+    return workspace / project_id, workspace / f"{project_id}-build"
+
+
+def prepare_release_candidate(
+    repo: Path,
+    workload: dict[str, Any],
+    workspace: Path | None,
+    jobs: int,
+    cmake: Path,
+    ninja: Path,
+    c_compiler: Path,
+    cxx_compiler: Path,
+    *,
+    release_source: Path | None = None,
+    release_build: Path | None = None,
+) -> tuple[Path, Path, dict[str, Any]]:
+    explicit_targets = release_source is not None or release_build is not None
+    sys.path.insert(0, str(repo / "scripts"))
+    try:
+        import run_realworld_campaign as campaign
+    except ImportError as error:
+        raise QualificationError("cannot import real-world campaign authority") from error
+    manifest_path = _inside(repo, workload["input"]["realworld_manifest"],
+                            "real-world manifest")
+    manifest = campaign.load_manifest(manifest_path)
+    project = campaign.project_by_id(manifest, workload["input"]["project"])
+    source, build = _release_candidate_paths(
+        workspace,
+        project["id"],
+        release_source=release_source,
+        release_build=release_build,
     )
-    for command in commands:
-        completed = subprocess.run(command, check=False, stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT)
-        if completed.returncode != 0:
-            raise QualificationError(
-                f"release-candidate checkout failed: {completed.stdout[-2000:]!r}"
-            )
-    for operation in project["copies"]:
-        source_file = _inside(repo, operation["from"], "release copy source")
-        destination = _inside(source, operation["to"], "release copy destination")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source_file, destination)
-    if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
-        raise QualificationError(
-            "release-candidate source is dirty before configuration"
+    target_pin = (
+        _PinnedReleaseTargets(source, build, require_empty=True)
+        if explicit_targets else None
+    )
+    try:
+        _prepare_release_checkout(
+            source, project["repository"], project["revision"], target_pin
         )
-    values = {"source": str(source), "build": str(build), "jobs": str(jobs)}
-    deadline = time.monotonic() + project["timeout_minutes"] * 60
-    for group in ("configure", "build"):
-        for raw_command in project["commands"][group]:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise QualificationError("release-candidate preparation timed out")
-            command = _pin_release_command(
-                campaign._expand(raw_command, values),
-                cmake, ninja, c_compiler, cxx_compiler,
+        for operation in project["copies"]:
+            if target_pin is not None:
+                target_pin.verify("before release-candidate source copy")
+            source_file = _inside(repo, operation["from"], "release copy source")
+            destination = _inside(source, operation["to"], "release copy destination")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_file, destination)
+            if target_pin is not None:
+                target_pin.verify("after release-candidate source copy")
+        if target_pin is not None:
+            target_pin.verify("before release-candidate source status")
+        if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
+            raise QualificationError(
+                "release-candidate source is dirty before configuration"
             )
-            environment = _release_environment(project)
-            try:
-                completed = subprocess.run(
-                    command, cwd=source, env=environment, check=False,
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    timeout=remaining,
+        if target_pin is not None:
+            target_pin.verify("after release-candidate source status")
+        values = {"source": str(source), "build": str(build), "jobs": str(jobs)}
+        deadline = time.monotonic() + project["timeout_minutes"] * 60
+        for group in ("configure", "build"):
+            for raw_command in project["commands"][group]:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise QualificationError("release-candidate preparation timed out")
+                command = _pin_release_command(
+                    campaign._expand(raw_command, values),
+                    cmake, ninja, c_compiler, cxx_compiler,
                 )
-            except subprocess.TimeoutExpired as error:
-                raise QualificationError("release-candidate preparation timed out") from error
-            if completed.returncode != 0:
-                raise QualificationError(
-                    f"release-candidate {group} failed: {completed.stdout[-4000:]!r}"
-                )
-    compile_database = Path(project["compile_database"].format(**values)).resolve()
-    if _regular_kind(compile_database) != "regular":
-        raise QualificationError("release-candidate compile database is missing")
-    _build_toolchain_identity(
-        build, source, cmake, ninja, c_compiler, cxx_compiler
-    )
-    if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
-        raise QualificationError("release-candidate checkout became dirty during preparation")
-    identity = {
-        "project": project["id"],
-        "repository": project["repository"],
-        "revision": project["revision"],
-        "manifest_sha256": digest_json(manifest),
-        "recipe_sha256": digest_json(campaign.project_recipe(project)),
-    }
-    return source, build, identity
+                environment = _release_environment(project)
+                if target_pin is not None:
+                    target_pin.verify(f"before release-candidate {group}")
+                try:
+                    completed = subprocess.run(
+                        command, cwd=source, env=environment, check=False,
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        timeout=remaining,
+                    )
+                except subprocess.TimeoutExpired as error:
+                    raise QualificationError(
+                        "release-candidate preparation timed out"
+                    ) from error
+                if target_pin is not None:
+                    target_pin.verify(f"after release-candidate {group}")
+                if completed.returncode != 0:
+                    raise QualificationError(
+                        f"release-candidate {group} failed: "
+                        f"{completed.stdout[-4000:]!r}"
+                    )
+        if target_pin is not None:
+            target_pin.verify("before release-candidate identity verification")
+        compile_database = Path(
+            project["compile_database"].format(**values)
+        ).resolve()
+        if _regular_kind(compile_database) != "regular":
+            raise QualificationError("release-candidate compile database is missing")
+        _build_toolchain_identity(
+            build, source, cmake, ninja, c_compiler, cxx_compiler
+        )
+        if target_pin is not None:
+            target_pin.verify("before explicit release projection")
+            _project_explicit_release_candidate(
+                project["id"], source, build, target_pin
+            )
+        if target_pin is not None:
+            target_pin.verify("before final release-candidate source status")
+        if project["copies"] == [] and _git_output(source, ["status", "--porcelain"]):
+            raise QualificationError(
+                "release-candidate checkout became dirty during preparation"
+            )
+        if target_pin is not None:
+            target_pin.verify("after release-candidate preparation")
+        identity = {
+            "project": project["id"],
+            "repository": project["repository"],
+            "revision": project["revision"],
+            "manifest_sha256": digest_json(manifest),
+            "recipe_sha256": digest_json(campaign.project_recipe(project)),
+        }
+        return source, build, identity
+    finally:
+        if target_pin is not None:
+            target_pin.close()
 
 
 def _release_manifest_identity(
@@ -6018,13 +6556,19 @@ def run_qualification(args: argparse.Namespace) -> dict[str, Any]:
             if item["kind"] == "release-candidate"
         )
         if args.prepare_release_candidate:
-            if args.release_workspace is None:
+            explicit_release = (
+                args.release_source is not None
+                or args.release_build is not None
+            )
+            if args.release_workspace is None and not explicit_release:
                 raise QualificationError(
-                    "release preparation requires --release-workspace"
+                    "release preparation requires a workspace or explicit targets"
                 )
             release_source, release_build, _ = prepare_release_candidate(
                 repo, release_workload, args.release_workspace, args.jobs,
                 cmake, ninja, c_compiler, cxx_compiler,
+                release_source=args.release_source,
+                release_build=args.release_build,
             )
         else:
             if args.release_source is None or args.release_build is None:

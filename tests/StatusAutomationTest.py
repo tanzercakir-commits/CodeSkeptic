@@ -754,7 +754,7 @@ class ProgressStatusTest(unittest.TestCase):
             [
                 "git",
                 "show",
-                f"{progress_status.POLICY_PLAN_AUTHORITY_OID}:docs/PLAN.md",
+                f"{progress_status.PREVIOUS_POLICY_PLAN_AUTHORITY_OID}^:docs/PLAN.md",
             ],
             cwd=ROOT,
             capture_output=True,
@@ -788,7 +788,7 @@ class ProgressStatusTest(unittest.TestCase):
             [
                 "git",
                 "show",
-                f"{progress_status.POLICY_PLAN_AUTHORITY_OID}:docs/PLAN.md",
+                f"{progress_status.PREVIOUS_POLICY_PLAN_AUTHORITY_OID}^:docs/PLAN.md",
             ],
             cwd=ROOT,
             capture_output=True,
@@ -833,6 +833,44 @@ class ProgressStatusTest(unittest.TestCase):
             ):
                 with self.assertRaises(progress_status.ProgressStatusError):
                     progress_status._enforce_fixed_plan(root, "origin/main")
+
+    def test_scope_policy_pins_and_accepts_exact_schema_two_predecessor(self) -> None:
+        previous = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{progress_status.PREVIOUS_POLICY_PLAN_AUTHORITY_OID}:docs/PLAN.md",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        ).stdout
+        previous_text = previous.decode("utf-8")
+        self.assertEqual(
+            progress_status.sha256(previous).hexdigest(),
+            progress_status.PREVIOUS_POLICY_PLAN_SHA256,
+        )
+        self.assertEqual(
+            progress_status.sha256(
+                progress_status._catalog_payload(previous_text).encode("utf-8")
+            ).hexdigest(),
+            progress_status.PREVIOUS_POLICY_CATALOG_SHA256,
+        )
+        protected = subprocess.CompletedProcess(
+            args=["git", "show"], returncode=0, stdout=previous, stderr=b""
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "docs").mkdir()
+            (root / "docs" / "PLAN.md").write_bytes(
+                (ROOT / "docs" / "PLAN.md").read_bytes()
+            )
+            with mock.patch.object(
+                progress_status.subprocess, "run", return_value=protected
+            ), mock.patch.object(
+                progress_status, "_is_ancestor", return_value=True
+            ):
+                progress_status._enforce_fixed_plan(root, "origin/main")
 
     def test_first_catalog_migration_is_pinned_byte_for_byte(self) -> None:
         missing_plan = subprocess.CompletedProcess(

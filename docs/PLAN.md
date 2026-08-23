@@ -209,18 +209,22 @@ bu protokol sonludur.
 
 V1.0 saha doğrulaması takvim süresine göre değil, üç bağımsız dış projede
 önceden dondurulmuş senaryo ve kapsam matrisiyle ölçülür. Her kampanya
-tekrarlanabilir ve checksummed makbuzlar üretir; 72 saatlik kesintisiz
-stabilite, determinism, kalite, sanitizer, platform, paketleme, SBOM, imza ve
-offline kapıları ayrıca zorunlu kalır. Üç adet 30 günlük report-only pilot ise
-v1.0'ı bloke etmez: v1.0 sonrasında paralel yürütülebilen saha gözlemidir ve
-yalnız daha sonraki `field-proven` / `enterprise-readiness` iddialarına kanıt
-olabilir. Bu ayrım resmî bir sertifikasyon standardı iddiası değildir; süre
-yerine ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
+tekrarlanabilir ve checksummed makbuzlar üretir. P10-09 stabilite otoritesi,
+üç projenin üçer tekrarını önce cold sonra warm çalıştıran iki tam turda
+toplam 18 gerçek-dünya analizi; pre/post 10-of-10 determinism; sanitizer,
+RSS/FD/süre bütçesi, sıfır yetim süreç, checkpoint/restart ve hata enjeksiyonu
+kanıtıdır. Sabit bir asgari duvar süresi kabul kapısı değildir. Determinism,
+kalite, platform, paketleme, SBOM, imza ve offline kapıları ayrıca zorunlu
+kalır. Üç adet 30 günlük pilot ile daha uzun soak koşuları v1.0'ı bloke etmez:
+v1.0 sonrasında paralel yürütülebilen report-only saha gözlemidir ve yalnız
+daha sonraki `field-proven` / `enterprise-readiness` iddialarına kanıt olabilir.
+Bu ayrım resmî bir sertifikasyon standardı iddiası değildir; süre yerine
+ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
 
 <!-- cs:work-items-begin -->
 ```json
 {
-  "schema": 2,
+  "schema": 3,
   "program": "CodeSkeptic measurable v1.0 completion",
   "items": [
     {
@@ -347,7 +351,7 @@ yerine ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
       "id": "CS-P10-08",
       "phase": 10,
       "title": "Cumulative quality-floor audit",
-      "boundary": "Re-prove v1 default-rule quality and requested-TU truthfulness before the long stability campaign.",
+      "boundary": "Re-prove v1 default-rule quality and requested-TU truthfulness before the scope-bound stability campaign.",
       "gates": [
         "Every analyzable requested translation unit is processed; otherwise the run returns exit 2 and no project verdict.",
         "No default rule precision is below 0.85, total default precision is at least 0.90, and lower-precision rules remain experimental.",
@@ -358,12 +362,12 @@ yerine ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
     {
       "id": "CS-P10-09",
       "phase": 10,
-      "title": "Seventy-two-hour stability gate",
-      "boundary": "Run the qualified release-candidate matrix continuously for 72 hours using resource budgets, checkpoints, deterministic fingerprints, and sanitizer-supported diagnostics.",
+      "title": "Scope-bound endurance and restart gate",
+      "boundary": "Run exactly one cold and one warm qualified release-candidate round, each containing three repetitions of all three pinned projects, with resource budgets, checkpoints, deterministic fingerprints, and sanitizer-supported diagnostics.",
       "gates": [
-        "The full 72-hour window completes without analyzer crash or hang.",
-        "No unexplained performance regression above 10 percent or semantic fingerprint drift occurs.",
-        "All requested-unit coverage, restart, resource, and checksummed campaign receipts validate."
+        "Exactly 18 real-world analyses complete across the cold and warm rounds without analyzer crash, hang, or surviving process-group descendant; elapsed time is recorded but is not a completion substitute.",
+        "Pre/post 10-of-10 determinism remains identical, no unexplained performance regression exceeds 10 percent, and no semantic fingerprint or requested-unit plan drift occurs.",
+        "All requested-unit coverage, sanitizer, RSS/FD/time budget, checkpoint/restart, fault-injection, and checksummed campaign receipts validate."
       ],
       "depends_on": ["CS-P10-08"]
     },
@@ -530,7 +534,7 @@ yerine ölçülebilir teknik kapsamı v1.0 otoritesi yapar.
       "boundary": "Close v1.0 only after a requirement-by-requirement audit proves every cumulative product, quality, distribution, qualification, governance, and support gate.",
       "gates": [
         "The v1 checklist maps every Phase 10–12 item to authoritative commands, artifacts, measurements, and independent review evidence.",
-        "Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three independent external qualification campaigns.",
+        "Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, the exact 18-analysis cold/warm endurance and restart matrix, distribution parity, and three independent external qualification campaigns.",
         "Support versions, platforms, response windows, deprecation policy, known limitations, rollback, and release procedure are published with no blocking audit finding."
       ],
       "depends_on": ["CS-P09-01", "CS-P12-07"]

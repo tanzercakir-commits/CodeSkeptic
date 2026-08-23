@@ -79,4 +79,4 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/action-selftest/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/action-selftest/${{ job.status }}"

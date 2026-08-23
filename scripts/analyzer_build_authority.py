@@ -103,6 +103,25 @@ PINNED_PODMAN_PATH = "/usr/bin/podman"
 PODMAN_CONFIG_ROOT = ROOT / "scripts" / "podman-config"
 PODMAN_MOUNTS_CONFIG = b"# Intentionally empty.\n"
 PODMAN_HOST_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+CONTAINER_LAYOUTS = ("legacy", "p10-09")
+
+
+def _container_paths(container_layout: str) -> dict[str, str]:
+    if container_layout == "legacy":
+        return {
+            "source": "/source",
+            "build": "/build",
+            "authority": "/authority",
+            "stage": "/authority-stage",
+        }
+    if container_layout == "p10-09":
+        return {
+            "source": "/authority/source",
+            "build": "/authority/build",
+            "authority": "/authority/build-authority",
+            "stage": "/authority/build-authority",
+        }
+    raise BuildAuthorityError("container layout is unsupported")
 
 
 def canonical_json(value: Any) -> bytes:
@@ -606,9 +625,12 @@ def _toolchain_identity(tools: _ToolPaths) -> dict[str, Any]:
     }
 
 
-def _normalized_container_argv(mode: str) -> list[str]:
+def _normalized_container_argv(
+    mode: str, container_layout: str = "legacy",
+) -> list[str]:
     if mode not in {"produce", "verify"}:
         raise BuildAuthorityError("container launch mode is unsupported")
+    paths = _container_paths(container_layout)
     common = [
         "$PODMAN",
         "--cgroup-manager=cgroupfs",
@@ -632,13 +654,13 @@ def _normalized_container_argv(mode: str) -> list[str]:
         "--tmpfs",
         "/tmp:rw,size=4g,mode=1777",
         "--workdir",
-        "/source",
+        paths["source"],
         "-e",
         "GIT_CONFIG_COUNT=1",
         "-e",
         "GIT_CONFIG_KEY_0=safe.directory",
         "-e",
-        "GIT_CONFIG_VALUE_0=/source",
+        f"GIT_CONFIG_VALUE_0={paths['source']}",
         "-e",
         "GIT_OPTIONAL_LOCKS=0",
         "-e",
@@ -652,40 +674,59 @@ def _normalized_container_argv(mode: str) -> list[str]:
         "-e",
         "XDG_CACHE_HOME=/tmp/xdg-cache",
         "-v",
-        "$SOURCE:/source:ro",
+        f"$SOURCE:{paths['source']}:ro",
         "-v",
-        f"$BUILD:/build:{'rw' if mode == 'produce' else 'ro'}",
+        f"$BUILD:{paths['build']}:{'rw' if mode == 'produce' else 'ro'}",
     ]
     if mode == "produce":
         common.extend([
             "-e",
             f"{INNER_TOKEN_ENV}=$LAUNCH_SHA256",
             "-v",
-            "$STAGE:/authority-stage:rw",
+            f"$STAGE:{paths['stage']}:rw",
         ])
         inner_arguments = [
             "_inner-produce",
-            "--source", "/source",
+            "--source", paths["source"],
             "--revision", "$REVISION",
-            "--build-dir", "/build",
-            "--output", "/authority-stage/inner",
-            "--launch-authority", "/authority-stage/launch-authority.json",
+            "--build-dir", paths["build"],
+            "--output", f"{paths['stage']}/inner",
+            "--launch-authority", f"{paths['stage']}/launch-authority.json",
         ]
     else:
-        common.extend(["-v", "$AUTHORITY:/authority:ro"])
+        common.extend(["-v", f"$AUTHORITY:{paths['authority']}:ro"])
         inner_arguments = [
             "_inner-verify",
-            "--source", "/source",
-            "--build-dir", "/build",
-            "--authority", "/authority",
+            "--source", paths["source"],
+            "--build-dir", paths["build"],
+            "--authority", paths["authority"],
         ]
     return [
         *common,
         PINNED_IMAGE,
         "/usr/bin/python3",
-        "/source/scripts/analyzer_build_authority.py",
+        f"{paths['source']}/scripts/analyzer_build_authority.py",
         *inner_arguments,
     ]
+
+
+def _container_layout_from_normalized_argv(value: Any) -> str:
+    matches = [
+        container_layout
+        for container_layout in CONTAINER_LAYOUTS
+        if value == _normalized_container_argv("produce", container_layout)
+    ]
+    if len(matches) != 1:
+        raise BuildAuthorityError(
+            "runtime normalized Podman argv does not match one exact container layout"
+        )
+    return matches[0]
+
+
+def _container_layout_from_runtime(value: Any) -> str:
+    if not isinstance(value, dict) or "normalized_argv" not in value:
+        raise BuildAuthorityError("runtime container layout evidence is missing")
+    return _container_layout_from_normalized_argv(value["normalized_argv"])
 
 
 def _expand_argv(tokens: list[str], bindings: dict[str, str]) -> list[str]:
@@ -744,7 +785,12 @@ def _podman_environment() -> dict[str, str]:
     }
 
 
-def _runtime_authority(podman: Path = DEFAULT_PODMAN) -> dict[str, Any]:
+def _runtime_authority(
+    podman: Path = DEFAULT_PODMAN,
+    *,
+    container_layout: str = "legacy",
+) -> dict[str, Any]:
+    _container_paths(container_layout)
     environment = _podman_environment()
     podman_record = _tool_record(podman, "Podman", environment=environment)
     command = [
@@ -784,7 +830,7 @@ def _runtime_authority(podman: Path = DEFAULT_PODMAN) -> dict[str, Any]:
         or PINNED_IMAGE not in repo_digests
     ):
         raise BuildAuthorityError("pinned image digest or image ID drift")
-    normalized = _normalized_container_argv("produce")
+    normalized = _normalized_container_argv("produce", container_layout)
     runtime = {
         "schema": RUNTIME_SCHEMA,
         "image": {
@@ -843,8 +889,7 @@ def _validate_runtime(value: Any, podman: Path = DEFAULT_PODMAN) -> dict[str, An
     ):
         raise BuildAuthorityError("runtime Podman version is malformed")
     normalized = payload["normalized_argv"]
-    if normalized != _normalized_container_argv("produce"):
-        raise BuildAuthorityError("runtime normalized Podman argv drift")
+    _container_layout_from_normalized_argv(normalized)
     if (
         _hash(payload["normalized_argv_sha256"], "runtime argv identity")
         != digest_json(normalized)
@@ -1085,11 +1130,14 @@ def _inner_build_identity_from_final(receipt: dict[str, Any]) -> str:
     return digest_json(material)
 
 
-def _expected_operator_log(inner_build_identity: str) -> bytes:
+def _expected_operator_log(
+    inner_build_identity: str, container_layout: str = "legacy",
+) -> bytes:
     _hash(inner_build_identity, "inner build identity")
+    inner_output = f"{_container_paths(container_layout)['stage']}/inner"
     return (
         "CODESKEPTIC_BUILD_OBSERVATION_COMPLETE "
-        f"/authority-stage/inner {inner_build_identity}\n"
+        f"{inner_output} {inner_build_identity}\n"
     ).encode("utf-8")
 
 
@@ -1448,8 +1496,9 @@ def _verify_with_tools(
         authority, tools, final=final, podman=podman
     )
     if final:
+        container_layout = _container_layout_from_runtime(payload["runtime"])
         expected_operator = _expected_operator_log(
-            _inner_build_identity_from_final(payload)
+            _inner_build_identity_from_final(payload), container_layout
         )
         if _read_regular(
             authority / "operator.log", MAX_LOG_BYTES
@@ -1594,6 +1643,7 @@ def _container_command(
     revision: str | None = None,
     launch_sha256: str | None = None,
     runtime: dict[str, Any] | None = None,
+    container_layout: str | None = None,
 ) -> list[str]:
     if mode == "produce":
         if revision is None or REVISION.fullmatch(revision) is None:
@@ -1602,7 +1652,13 @@ def _container_command(
             raise BuildAuthorityError("container launch identity is malformed")
         if runtime is None:
             raise BuildAuthorityError("container producer runtime is missing")
-        normalized = _validate_runtime(runtime, podman)["normalized_argv"]
+        validated_runtime = _validate_runtime(runtime, podman)
+        retained_layout = _container_layout_from_runtime(validated_runtime)
+        if container_layout is not None and container_layout != retained_layout:
+            raise BuildAuthorityError(
+                "container producer layout differs from runtime authority"
+            )
+        normalized = validated_runtime["normalized_argv"]
         bindings = {
             "$PODMAN": str(podman),
             "$SOURCE": _mount_path(source, "source"),
@@ -1612,7 +1668,8 @@ def _container_command(
             "$LAUNCH_SHA256": launch_sha256,
         }
     elif mode == "verify":
-        normalized = _normalized_container_argv("verify")
+        selected_layout = "legacy" if container_layout is None else container_layout
+        normalized = _normalized_container_argv("verify", selected_layout)
         bindings = {
             "$PODMAN": str(podman),
             "$SOURCE": _mount_path(source, "source"),
@@ -1653,8 +1710,9 @@ def _finalize_outer_bundle(
 ) -> dict[str, Any]:
     observation = _verify_bundle_structure(inner, None, final=False)
     operator_raw = _read_regular(operator_log, MAX_LOG_BYTES)
+    container_layout = _container_layout_from_runtime(runtime)
     if operator_raw != _expected_operator_log(
-        observation["build_identity_sha256"]
+        observation["build_identity_sha256"], container_layout
     ):
         raise BuildAuthorityError(
             "container operator log differs from the inner completion record"
@@ -1703,11 +1761,13 @@ def produce_authority(
     authority: Path,
     *,
     podman: Path | None = None,
+    container_layout: str = "legacy",
 ) -> dict[str, Any]:
     """Launch the exact image, build once, verify there, then publish."""
     if os.name != "posix":
         raise BuildAuthorityError("production build authority requires POSIX")
     podman = DEFAULT_PODMAN if podman is None else podman
+    _container_paths(container_layout)
     source = source.resolve()
     build = build.absolute()
     authority = authority.absolute()
@@ -1715,7 +1775,7 @@ def produce_authority(
     source_before = _outer_source_identity(source, revision, producer=True)
     _require_empty_directory(build, "dedicated build")
     _require_empty_directory(authority, "authority output")
-    runtime = _runtime_authority(podman)
+    runtime = _runtime_authority(podman, container_layout=container_layout)
     staging = Path(tempfile.mkdtemp(
         prefix=f".{authority.name}.producer-", dir=authority.parent
     ))
@@ -1734,9 +1794,12 @@ def produce_authority(
             revision=revision,
             launch_sha256=sha256_bytes(launch_raw),
             runtime=runtime,
+            container_layout=container_layout,
         )
         _execute_container(produce_command, produce_log)
-        if _runtime_authority(podman) != runtime:
+        if _runtime_authority(
+            podman, container_layout=container_layout
+        ) != runtime:
             raise BuildAuthorityError("container runtime changed during the build")
         if _outer_source_identity(source, revision, producer=True) != source_before:
             raise BuildAuthorityError("source identity changed during container build")
@@ -1747,10 +1810,17 @@ def produce_authority(
         )
         verify_log = staging / "podman-verify.log"
         verify_command = _container_command(
-            "verify", podman, source, build, final
+            "verify",
+            podman,
+            source,
+            build,
+            final,
+            container_layout=container_layout,
         )
         _execute_container(verify_command, verify_log)
-        if _runtime_authority(podman) != runtime:
+        if _runtime_authority(
+            podman, container_layout=container_layout
+        ) != runtime:
             raise BuildAuthorityError("container runtime changed during verification")
         if _outer_source_identity(source, revision, producer=True) != source_before:
             raise BuildAuthorityError("source identity changed during container verification")
@@ -1786,21 +1856,31 @@ def verify_authority(
     payload = _verify_bundle_structure(
         authority, None, final=True, podman=podman
     )
+    container_layout = _container_layout_from_runtime(payload["runtime"])
     source_before = _outer_source_identity(
         source, payload["source"]["revision"], producer=False
     )
     if source_before != payload["source"]:
         raise BuildAuthorityError("outer source differs from build authority")
-    runtime_now = _runtime_authority(podman)
+    runtime_now = _runtime_authority(
+        podman, container_layout=container_layout
+    )
     if runtime_now != payload["runtime"]:
         raise BuildAuthorityError("container runtime differs from build authority")
     with tempfile.TemporaryDirectory(prefix="codeskeptic-authority-verify-") as directory:
         log = Path(directory) / "podman-verify.log"
         command = _container_command(
-            "verify", podman, source, build, authority
+            "verify",
+            podman,
+            source,
+            build,
+            authority,
+            container_layout=container_layout,
         )
         _execute_container(command, log)
-    if _runtime_authority(podman) != runtime_now:
+    if _runtime_authority(
+        podman, container_layout=container_layout
+    ) != runtime_now:
         raise BuildAuthorityError("container runtime changed during verification")
     if _outer_source_identity(
         source, payload["source"]["revision"], producer=False
@@ -1817,6 +1897,12 @@ def _parser() -> argparse.ArgumentParser:
     produce.add_argument("--revision", required=True)
     produce.add_argument("--build-dir", type=Path, required=True)
     produce.add_argument("--output", type=Path, required=True)
+    produce.add_argument(
+        "--container-layout",
+        choices=CONTAINER_LAYOUTS,
+        default="legacy",
+        help="exact in-container source/build/authority path layout",
+    )
     verify = subparsers.add_parser("verify", help="re-derive sealed authority")
     verify.add_argument("--source", type=Path, required=True)
     verify.add_argument("--build-dir", type=Path, required=True)
@@ -1847,6 +1933,7 @@ def main(argv: list[str] | None = None) -> int:
                 arguments.revision,
                 arguments.build_dir,
                 arguments.output,
+                container_layout=arguments.container_layout,
             )
             path = arguments.output
             marker = "CODESKEPTIC_BUILD_AUTHORITY_ACCEPTED"

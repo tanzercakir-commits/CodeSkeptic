@@ -83,4 +83,4 @@ jobs:
         shell: bash
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/wsl-smoke/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/wsl-smoke/${{ job.status }}"

@@ -9,7 +9,7 @@
 <!-- cs:state-begin -->
 ```
 base          = 7dfd375
-in_flight     = phase-cache-checkpoint-correctness phase-cumulative-quality-floor-audit phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-upstream-validation
+in_flight     = phase-cache-checkpoint-correctness phase-determinism-exclusive-cgroup-authority phase-determinism-exclusive-cgroup-authority-v2 phase-determinism-performance-qualification phase-frontend-cfg-stress phase-per-tu-resource-budgets phase-realworld-release-candidate-factory phase-robustness-input-validation phase-seventy-two-hour-stability-gate phase-upstream-validation
 verified_main = 7dfd375
 progress      = sha256:1b6edc7f100977936a6d77b2c3f357f67e42e975dcb1ba8d0faa0b40571cabdb
 ```
@@ -129,7 +129,7 @@ Acceptance gates:
 
 ### CS-P10-08 — Phase 10: Cumulative quality-floor audit
 
-Boundary: Re-prove v1 default-rule quality and requested-TU truthfulness before the long stability campaign.
+Boundary: Re-prove v1 default-rule quality and requested-TU truthfulness before the scope-bound stability campaign.
 
 Dependencies: `CS-P10-07`.
 
@@ -138,16 +138,16 @@ Acceptance gates:
 - No default rule precision is below 0.85, total default precision is at least 0.90, and lower-precision rules remain experimental.
 - Addressable default recall is at least 0.70 and the clean corpus has zero false positives.
 
-### CS-P10-09 — Phase 10: Seventy-two-hour stability gate
+### CS-P10-09 — Phase 10: Scope-bound endurance and restart gate
 
-Boundary: Run the qualified release-candidate matrix continuously for 72 hours using resource budgets, checkpoints, deterministic fingerprints, and sanitizer-supported diagnostics.
+Boundary: Run exactly one cold and one warm qualified release-candidate round, each containing three repetitions of all three pinned projects, with resource budgets, checkpoints, deterministic fingerprints, and sanitizer-supported diagnostics.
 
 Dependencies: `CS-P10-08`.
 
 Acceptance gates:
-- The full 72-hour window completes without analyzer crash or hang.
-- No unexplained performance regression above 10 percent or semantic fingerprint drift occurs.
-- All requested-unit coverage, restart, resource, and checksummed campaign receipts validate.
+- Exactly 18 real-world analyses complete across the cold and warm rounds without analyzer crash, hang, or surviving process-group descendant; elapsed time is recorded but is not a completion substitute.
+- Pre/post 10-of-10 determinism remains identical, no unexplained performance regression exceeds 10 percent, and no semantic fingerprint or requested-unit plan drift occurs.
+- All requested-unit coverage, sanitizer, RSS/FD/time budget, checkpoint/restart, fault-injection, and checksummed campaign receipts validate.
 
 ### CS-P11-01 — Phase 11: Stable JSON and SARIF contracts
 
@@ -300,5 +300,5 @@ Dependencies: `CS-P09-01`, `CS-P12-07`.
 
 Acceptance gates:
 - The v1 checklist maps every Phase 10–12 item to authoritative commands, artifacts, measurements, and independent review evidence.
-- Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, 72-hour stability, distribution parity, and three independent external qualification campaigns.
+- Cumulative gates prove deterministic 10-of-10 fingerprints, quality floors, zero clean-corpus false positives, 200 triaged findings, five projects and ten accepted fixes, the exact 18-analysis cold/warm endurance and restart matrix, distribution parity, and three independent external qualification campaigns.
 - Support versions, platforms, response windows, deprecation policy, known limitations, rollback, and release procedure are published with no blocking audit finding.

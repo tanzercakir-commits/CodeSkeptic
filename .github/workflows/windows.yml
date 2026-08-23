@@ -229,4 +229,4 @@ jobs:
         shell: bash
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/windows-native/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/windows-native/${{ job.status }}"

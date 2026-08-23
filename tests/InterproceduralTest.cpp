@@ -7,6 +7,7 @@
 //  - Recursion produces no strong claims (soundness).
 
 #include "TestHelper.h"
+#include "core/Messages.h"
 #include "engine/FunctionSummary.h"
 #include "rules/AllocSizeOverflowRule.h"
 #include "rules/DivByZeroRule.h"
@@ -2248,7 +2249,7 @@ TEST(OwnershipSummaryTest, CrossTUDiscardedOwnedResultIsLeak) {
     )");
     ASSERT_EQ(results.size(), 1u);
     EXPECT_EQ(results[0].rule_id, "memory-leak");
-    EXPECT_NE(results[0].message.find("discarded"), std::string::npos);
+    EXPECT_EQ(results[0].message, msg(MsgId::OwnedResultDiscarded));
 }
 
 TEST(OwnershipSummaryTest, CrossTUDiscardedBorrowedResultIsClean) {

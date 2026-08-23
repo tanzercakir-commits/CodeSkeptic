@@ -288,6 +288,21 @@ class AnalyzerBuildAuthorityPortableTest(unittest.TestCase):
             ]).command,
             "verify",
         )
+        self.assertEqual(
+            authority._parser().parse_args([
+                "produce", "--source", "source", "--revision", "a" * 40,
+                "--build-dir", "build", "--output", "authority",
+            ]).container_layout,
+            "legacy",
+        )
+        self.assertEqual(
+            authority._parser().parse_args([
+                "produce", "--source", "source", "--revision", "a" * 40,
+                "--build-dir", "build", "--output", "authority",
+                "--container-layout", "p10-09",
+            ]).container_layout,
+            "p10-09",
+        )
 
     def test_production_explicitly_rejects_non_posix(self) -> None:
         with mock.patch.object(authority.os, "name", "nt"):
@@ -440,6 +455,141 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
             drifted = _initialize_podman(fixture.root / "podman-drift", drift=True)
             with self.assertRaisesRegex(authority.BuildAuthorityError, "digest|ID"):
                 authority._runtime_authority(drifted)
+
+    def test_p10_09_layout_is_exact_and_hybrids_fail_closed(self) -> None:
+        with Fixture() as fixture:
+            runtime = authority._runtime_authority(
+                fixture.podman, container_layout="p10-09"
+            )
+            normalized = runtime["normalized_argv"]
+            self.assertEqual(
+                normalized,
+                authority._normalized_container_argv("produce", "p10-09"),
+            )
+            self.assertIn("$SOURCE:/authority/source:ro", normalized)
+            self.assertIn("$BUILD:/authority/build:rw", normalized)
+            self.assertIn(
+                "$STAGE:/authority/build-authority:rw", normalized
+            )
+            self.assertNotIn("$SOURCE:/source:ro", normalized)
+            self.assertEqual(
+                authority._container_layout_from_runtime(runtime), "p10-09"
+            )
+
+            hybrid = copy.deepcopy(runtime)
+            index = hybrid["normalized_argv"].index(
+                "$BUILD:/authority/build:rw"
+            )
+            hybrid["normalized_argv"][index] = "$BUILD:/build:rw"
+            hybrid["normalized_argv_sha256"] = authority.digest_json(
+                hybrid["normalized_argv"]
+            )
+            with self.assertRaisesRegex(
+                authority.BuildAuthorityError, "layout|normalized Podman argv"
+            ):
+                authority._validate_runtime(hybrid, fixture.podman)
+
+            verify_command = authority._container_command(
+                "verify",
+                fixture.podman,
+                fixture.source,
+                fixture.build,
+                fixture.output,
+                container_layout="p10-09",
+            )
+            self.assertIn(
+                f"{fixture.source}:/authority/source:ro", verify_command
+            )
+            self.assertIn(
+                f"{fixture.build}:/authority/build:ro", verify_command
+            )
+            self.assertIn(
+                f"{fixture.output}:/authority/build-authority:ro",
+                verify_command,
+            )
+            self.assertIn("--source", verify_command)
+            self.assertIn("/authority/source", verify_command)
+            self.assertIn("--build-dir", verify_command)
+            self.assertIn("/authority/build", verify_command)
+            self.assertIn("--authority", verify_command)
+            self.assertIn("/authority/build-authority", verify_command)
+
+    def test_public_p10_09_verifier_infers_layout_from_receipt(self) -> None:
+        with Fixture() as fixture:
+            commands: list[list[str]] = []
+
+            def mounted(command: list[str], suffix: str) -> Path:
+                for index, item in enumerate(command[:-1]):
+                    if item == "-v" and command[index + 1].endswith(suffix):
+                        return Path(command[index + 1].split(":", 1)[0])
+                raise AssertionError(f"missing mount {suffix}")
+
+            def execute(command: list[str], log: Path) -> None:
+                commands.append(list(command))
+                if "_inner-produce" in command:
+                    stage = mounted(
+                        command, ":/authority/build-authority:rw"
+                    )
+                    observation = authority._produce_with_tools(
+                        fixture.source,
+                        fixture.revision,
+                        fixture.build,
+                        stage / "inner",
+                        fixture.tools,
+                    )
+                    log.write_bytes(authority._expected_operator_log(
+                        observation["build_identity_sha256"], "p10-09"
+                    ))
+                elif "_inner-verify" in command:
+                    retained = mounted(
+                        command, ":/authority/build-authority:ro"
+                    )
+                    authority.verify_authority_with_tools(
+                        retained,
+                        fixture.source,
+                        fixture.build,
+                        fixture.tools,
+                        podman=fixture.podman,
+                    )
+                    log.write_text(
+                        "simulated inner verification\n", encoding="utf-8"
+                    )
+                else:
+                    raise AssertionError("unexpected container command")
+
+            with mock.patch.object(
+                authority, "_execute_container", side_effect=execute
+            ):
+                receipt = authority.produce_authority(
+                    fixture.source,
+                    fixture.revision,
+                    fixture.build,
+                    fixture.output,
+                    podman=fixture.podman,
+                    container_layout="p10-09",
+                )
+            self.assertEqual(
+                authority._container_layout_from_runtime(receipt["runtime"]),
+                "p10-09",
+            )
+            self.assertEqual(len(commands), 2)
+
+            commands.clear()
+            with mock.patch.object(
+                authority, "_execute_container", side_effect=execute
+            ):
+                verified = authority.verify_authority(
+                    fixture.output,
+                    fixture.source,
+                    fixture.build,
+                    podman=fixture.podman,
+                )
+            self.assertEqual(verified, receipt)
+            self.assertEqual(len(commands), 1)
+            self.assertIn(
+                f"{fixture.output}:/authority/build-authority:ro",
+                commands[0],
+            )
 
     def test_launch_token_and_actual_podman_argv_are_exact_expansions(self) -> None:
         with Fixture() as fixture:
@@ -1208,7 +1358,7 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
         marker_receipt = {"build_identity_sha256": "a" * 64}
         with mock.patch.object(
             authority, "produce_authority", return_value=marker_receipt
-        ), mock.patch.object(
+        ) as producer, mock.patch.object(
             authority, "verify_authority", return_value=marker_receipt
         ):
             output = io.StringIO()
@@ -1219,9 +1369,17 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
                     "--revision", "a" * 40,
                     "--build-dir", "build",
                     "--output", "authority",
+                    "--container-layout", "p10-09",
                 ])
             self.assertEqual(result, 0)
             self.assertIn("CODESKEPTIC_BUILD_AUTHORITY_ACCEPTED", output.getvalue())
+            producer.assert_called_once_with(
+                Path("source"),
+                "a" * 40,
+                Path("build"),
+                Path("authority"),
+                container_layout="p10-09",
+            )
             output = io.StringIO()
             with redirect_stdout(output):
                 result = authority.main([

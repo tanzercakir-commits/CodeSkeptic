@@ -149,6 +149,7 @@ AUTHORITY_INPUT_PATHS = (
     "tests/thesis_corpus/thesis_expected.txt",
 )
 BUILD_AUTHORITY_RAW_DIR = "build-authority"
+CAMPAIGN_CONTAINER_LAYOUTS = ("legacy", "p10-09")
 
 
 class CampaignError(RuntimeError):
@@ -501,7 +502,7 @@ def _build_authority_record(
         raise CampaignError("analyzer build authority runtime is malformed")
     if not isinstance(build_identity, str) or SHA256.fullmatch(build_identity) is None:
         raise CampaignError("analyzer build authority identity is malformed")
-    return {
+    record = {
         "path": BUILD_AUTHORITY_RAW_DIR,
         "file_count": len(entries),
         "bundle_sha256": compact_json_digest(entries),
@@ -510,6 +511,8 @@ def _build_authority_record(
         "source": copy_json(source),
         "analyzer": copy_json(analyzer),
     }
+    _campaign_container_layout(record)
+    return record
 
 
 def _verify_build_authority(
@@ -560,8 +563,11 @@ def _verify_retained_build_authority_static(
             final=True,
             podman=build_authority.DEFAULT_PODMAN,
         )
+        record = _build_authority_record(authority_dir, receipt)
+        container_layout = _campaign_container_layout(record)
         expected_operator = build_authority._expected_operator_log(
-            build_authority._inner_build_identity_from_final(receipt)
+            build_authority._inner_build_identity_from_final(receipt),
+            container_layout,
         )
         if (authority_dir / "operator.log").read_bytes() != expected_operator:
             raise build_authority.BuildAuthorityError(
@@ -571,7 +577,7 @@ def _verify_retained_build_authority_static(
         raise CampaignError(
             f"retained analyzer build authority rejected: {error}"
         ) from error
-    return _build_authority_record(authority_dir, receipt), receipt
+    return record, receipt
 
 
 def _verify_retained_source_authority(
@@ -3136,13 +3142,48 @@ def _campaign_jobs(action: str, jobs: Any) -> int | None:
     return None
 
 
+def _campaign_container_paths(container_layout: str) -> dict[str, str]:
+    if container_layout == "legacy":
+        return {
+            "source": "/source",
+            "build": "/build",
+            "build_authority": "/build-authority",
+        }
+    if container_layout == "p10-09":
+        return {
+            "source": "/authority/source",
+            "build": "/authority/build",
+            "build_authority": "/authority/build-authority",
+        }
+    raise CampaignError("campaign container layout is unsupported")
+
+
+def _campaign_container_layout(build_record: Any) -> str:
+    if not isinstance(build_record, dict):
+        raise CampaignError("analyzer build container layout evidence is malformed")
+    try:
+        container_layout = build_authority._container_layout_from_runtime(
+            build_record.get("runtime")
+        )
+    except (build_authority.BuildAuthorityError, KeyError, TypeError) as error:
+        raise CampaignError(
+            f"analyzer build container layout is not exact: {error}"
+        ) from error
+    if container_layout not in CAMPAIGN_CONTAINER_LAYOUTS:
+        raise CampaignError("analyzer build container layout is unsupported")
+    _campaign_container_paths(container_layout)
+    return container_layout
+
+
 def _normalized_campaign_argv(
     action: str,
     jobs: int | None,
     *,
     require_accepted: bool = True,
+    container_layout: str = "legacy",
 ) -> list[str]:
     jobs = _campaign_jobs(action, jobs)
+    paths = _campaign_container_paths(container_layout)
     common = [
         "$PODMAN",
         "--cgroup-manager=cgroupfs",
@@ -3166,7 +3207,7 @@ def _normalized_campaign_argv(
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,size=256m,mode=1777",
         "--workdir",
-        "/source",
+        paths["source"],
         "-e",
         f"{CAMPAIGN_INNER_TOKEN_ENV}=$LAUNCH_SHA256",
         "-e",
@@ -3200,7 +3241,7 @@ def _normalized_campaign_argv(
         "-e",
         "GIT_CONFIG_KEY_0=safe.directory",
         "-e",
-        "GIT_CONFIG_VALUE_0=/source",
+        f"GIT_CONFIG_VALUE_0={paths['source']}",
         "-e",
         "GIT_CONFIG_KEY_1=safe.directory",
         "-e",
@@ -3218,11 +3259,11 @@ def _normalized_campaign_argv(
         "-e",
         "GIT_CONFIG_VALUE_4=false",
         "-v",
-        "$SOURCE:/source:ro",
+        f"$SOURCE:{paths['source']}:ro",
         "-v",
-        "$BUILD:/build:ro",
+        f"$BUILD:{paths['build']}:ro",
         "-v",
-        "$BUILD_AUTHORITY:/build-authority:ro",
+        f"$BUILD_AUTHORITY:{paths['build_authority']}:ro",
     ]
     if action == "run":
         common.extend(
@@ -3241,9 +3282,9 @@ def _normalized_campaign_argv(
         )
         inner = [
             "_inner-run",
-            "--source", "/source",
-            "--build-authority", "/build-authority",
-            "--build-dir", "/build",
+            "--source", paths["source"],
+            "--build-authority", paths["build_authority"],
+            "--build-dir", paths["build"],
             "--juliet-dir", "/juliet",
             "--juliet-archive", "/juliet.zip",
             "--libarchive-checkout", "/libarchive",
@@ -3260,9 +3301,9 @@ def _normalized_campaign_argv(
         )
         inner = [
             "_inner-assemble",
-            "--source", "/source",
-            "--build-authority", "/build-authority",
-            "--build-dir", "/build",
+            "--source", paths["source"],
+            "--build-authority", paths["build_authority"],
+            "--build-dir", paths["build"],
             "--package", "/stage/package",
             "--launch-authority", f"/stage/{CAMPAIGN_LAUNCH_NAME}",
         ]
@@ -3276,9 +3317,9 @@ def _normalized_campaign_argv(
         )
         inner = [
             "_inner-verify",
-            "--source", "/source",
-            "--build-authority", "/build-authority",
-            "--build-dir", "/build",
+            "--source", paths["source"],
+            "--build-authority", paths["build_authority"],
+            "--build-dir", paths["build"],
             "--package", "/package",
             "--launch-authority", f"/launch/{CAMPAIGN_LAUNCH_NAME}",
         ]
@@ -3288,7 +3329,7 @@ def _normalized_campaign_argv(
         *common,
         build_authority.PINNED_IMAGE,
         "/usr/bin/python3",
-        "/source/scripts/run_quality_floor_campaign.py",
+        f"{paths['source']}/scripts/run_quality_floor_campaign.py",
         *inner,
     ]
 
@@ -3300,15 +3341,21 @@ def _campaign_runtime(
     *,
     require_accepted: bool = True,
 ) -> dict[str, Any]:
+    container_layout = _campaign_container_layout(build_record)
     try:
-        host_runtime = build_authority._runtime_authority()
+        host_runtime = build_authority._runtime_authority(
+            container_layout=container_layout
+        )
     except (build_authority.BuildAuthorityError, OSError) as error:
         raise CampaignError(f"cannot establish campaign runtime: {error}") from error
     retained_runtime = build_record.get("runtime")
     if host_runtime != retained_runtime:
         raise CampaignError("campaign runtime differs from build authority runtime")
     normalized = _normalized_campaign_argv(
-        action, jobs, require_accepted=require_accepted
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
     )
     return {
         "schema": CAMPAIGN_RUNTIME_SCHEMA,
@@ -3342,8 +3389,12 @@ def _validate_campaign_runtime(
         or runtime["podman"] != retained.get("podman")
     ):
         raise CampaignError("campaign runtime is not build-runtime bound")
+    container_layout = _campaign_container_layout(build_record)
     normalized = _normalized_campaign_argv(
-        action, jobs, require_accepted=require_accepted
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
     )
     if (
         runtime["normalized_argv"] != normalized
@@ -3353,11 +3404,14 @@ def _validate_campaign_runtime(
     return runtime
 
 
-def _campaign_mounts(action: str) -> dict[str, str]:
+def _campaign_mounts(
+    action: str, *, container_layout: str = "legacy"
+) -> dict[str, str]:
+    paths = _campaign_container_paths(container_layout)
     common = {
-        "source": "/source",
-        "build": "/build",
-        "build_authority": "/build-authority",
+        "source": paths["source"],
+        "build": paths["build"],
+        "build_authority": paths["build_authority"],
         "scratch": "/scratch",
     }
     if action == "run":
@@ -3384,8 +3438,10 @@ def _campaign_mounts(action: str) -> dict[str, str]:
     raise CampaignError("campaign action is unsupported")
 
 
-def _validate_campaign_mounts(value: Any, action: str) -> dict[str, str]:
-    expected = _campaign_mounts(action)
+def _validate_campaign_mounts(
+    value: Any, action: str, *, container_layout: str = "legacy"
+) -> dict[str, str]:
+    expected = _campaign_mounts(action, container_layout=container_layout)
     if value != expected:
         raise CampaignError("campaign launch mount authority drift")
     for name, path in value.items():
@@ -3403,6 +3459,7 @@ def _campaign_input_identity(
     libarchive_checkout: Path | None = None,
     package: Path | None = None,
 ) -> dict[str, Any]:
+    container_layout = _campaign_container_layout(build_record)
     source_projection = {
         "revision": build_record["source"]["revision"],
         "manifest_sha256": build_record["source"]["manifest_sha256"],
@@ -3412,7 +3469,9 @@ def _campaign_input_identity(
     result: dict[str, Any] = {
         "source": copy_json(build_record["source"]),
         "build_authority": copy_json(build_record),
-        "mounts": _campaign_mounts(action),
+        "mounts": _campaign_mounts(
+            action, container_layout=container_layout
+        ),
     }
     if action == "run":
         if juliet_dir is None or juliet_archive is None or libarchive_checkout is None:
@@ -3531,7 +3590,11 @@ def _validate_campaign_input_authority(
         or value["build_authority"] != build_record
     ):
         raise CampaignError("campaign launch source or build authority drift")
-    _validate_campaign_mounts(value["mounts"], action)
+    _validate_campaign_mounts(
+        value["mounts"],
+        action,
+        container_layout=_campaign_container_layout(build_record),
+    )
     if action == "run":
         _validate_tree_identity_record(value["juliet"], "Juliet input")
         if value["juliet_archive"] != _official_corpus_identity():
@@ -3694,11 +3757,20 @@ def _campaign_container_command(
     juliet_archive: Path | None = None,
     libarchive_checkout: Path | None = None,
     require_accepted: bool = True,
+    build_record: dict[str, Any] | None = None,
 ) -> list[str]:
     if SHA256.fullmatch(launch_sha256) is None:
         raise CampaignError("campaign launch SHA-256 is malformed")
+    container_layout = (
+        "legacy"
+        if build_record is None
+        else _campaign_container_layout(build_record)
+    )
     normalized = _normalized_campaign_argv(
-        action, jobs, require_accepted=require_accepted
+        action,
+        jobs,
+        require_accepted=require_accepted,
+        container_layout=container_layout,
     )
     bindings = {
         "$PODMAN": str(build_authority.DEFAULT_PODMAN),
@@ -3709,7 +3781,9 @@ def _campaign_container_command(
             build_authority_dir, "build authority"
         ),
         "$SCRATCH": _mount_path(scratch, "scratch"),
-        "$ENV_SHA256": compact_json_digest(_inner_environment()),
+        "$ENV_SHA256": compact_json_digest(
+            _inner_environment(container_layout)
+        ),
     }
     if action in {"run", "assemble"}:
         if stage is None:
@@ -3967,7 +4041,10 @@ def _cleanup_workspace(workspace: Path) -> None:
             pass
 
 
-def _inner_environment() -> dict[str, str]:
+def _inner_environment(
+    container_layout: str = "legacy",
+) -> dict[str, str]:
+    paths = _campaign_container_paths(container_layout)
     return {
         "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/scratch/home",
@@ -3983,7 +4060,7 @@ def _inner_environment() -> dict[str, str]:
         "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_CONFIG_COUNT": "5",
         "GIT_CONFIG_KEY_0": "safe.directory",
-        "GIT_CONFIG_VALUE_0": "/source",
+        "GIT_CONFIG_VALUE_0": paths["source"],
         "GIT_CONFIG_KEY_1": "safe.directory",
         "GIT_CONFIG_VALUE_1": "/libarchive",
         "GIT_CONFIG_KEY_2": "core.hooksPath",
@@ -3995,8 +4072,8 @@ def _inner_environment() -> dict[str, str]:
     }
 
 
-def _validate_inner_environment() -> None:
-    expected_environment = _inner_environment()
+def _validate_inner_environment(container_layout: str = "legacy") -> None:
+    expected_environment = _inner_environment(container_layout)
     if os.environ.get(CAMPAIGN_INNER_ENV_TOKEN_ENV) != compact_json_digest(
         expected_environment
     ):
@@ -4038,8 +4115,7 @@ def _validate_inner_paths(
     juliet_dir: Path | None = None,
     juliet_archive: Path | None = None,
     libarchive_checkout: Path | None = None,
-) -> None:
-    expected = _campaign_mounts(action)
+) -> str:
     actual = {
         "source": str(source),
         "build": str(build_dir),
@@ -4056,14 +4132,49 @@ def _validate_inner_paths(
                 "libarchive": str(libarchive_checkout),
             }
         )
-    for key, value in actual.items():
-        if expected.get(key) != value:
-            raise CampaignError(f"campaign inner mount path drift: {key}")
-    if str(ROOT) != "/source" or str(Path(__file__).resolve()) != (
-        "/source/scripts/run_quality_floor_campaign.py"
-    ):
-        raise CampaignError("campaign inner script is not executing from /source")
-    _validate_inner_environment()
+    script = str(Path(__file__).resolve())
+    matches: list[str] = []
+    for container_layout in CAMPAIGN_CONTAINER_LAYOUTS:
+        paths = _campaign_container_paths(container_layout)
+        expected = _campaign_mounts(
+            action, container_layout=container_layout
+        )
+        if (
+            all(expected.get(key) == value for key, value in actual.items())
+            and str(ROOT) == paths["source"]
+            and script
+            == f"{paths['source']}/scripts/run_quality_floor_campaign.py"
+        ):
+            matches.append(container_layout)
+    if len(matches) != 1:
+        mismatch_sets = [
+            (
+                container_layout,
+                [
+                    key
+                    for key, value in actual.items()
+                    if _campaign_mounts(
+                        action, container_layout=container_layout
+                    ).get(key)
+                    != value
+                ],
+            )
+            for container_layout in CAMPAIGN_CONTAINER_LAYOUTS
+        ]
+        minimum = min(len(items) for _layout, items in mismatch_sets)
+        nearest = [
+            items for _layout, items in mismatch_sets if len(items) == minimum
+        ]
+        if len(nearest) == 1 and nearest[0]:
+            raise CampaignError(
+                "campaign inner container layout mount path drift: "
+                f"{nearest[0][0]}"
+            )
+        raise CampaignError(
+            "campaign inner container layout or mount path drift"
+        )
+    _validate_inner_environment(matches[0])
+    return matches[0]
 
 
 def _run_campaign_core(
@@ -4171,6 +4282,7 @@ def _outer_snapshot(
     build_record, source, build_dir, binary = _verify_external_build_authority(
         build_authority_dir, source, build_dir
     )
+    container_layout = _campaign_container_layout(build_record)
     runtime = _campaign_runtime(
         action,
         jobs,
@@ -4197,6 +4309,7 @@ def _outer_snapshot(
     return {
         "scripts": scripts,
         "build_record": build_record,
+        "container_layout": container_layout,
         "source": source,
         "build_dir": build_dir,
         "binary": binary,
@@ -4219,10 +4332,17 @@ def _lightweight_outer_recheck(
     libarchive_checkout: Path | None = None,
     package: Path | None = None,
 ) -> None:
+    container_layout = _campaign_container_layout(snapshot["build_record"])
+    if container_layout != snapshot.get("container_layout"):
+        raise CampaignError(
+            "campaign container layout changed during container execution"
+        )
     if _verify_outer_script_authority(snapshot["source"]) != snapshot["scripts"]:
         raise CampaignError("campaign scripts changed during container execution")
     try:
-        host_runtime = build_authority._runtime_authority()
+        host_runtime = build_authority._runtime_authority(
+            container_layout=container_layout
+        )
     except (build_authority.BuildAuthorityError, OSError) as error:
         raise CampaignError(f"cannot recheck campaign runtime: {error}") from error
     if (
@@ -4273,7 +4393,14 @@ def _final_outer_recheck(
         libarchive_checkout=libarchive_checkout,
         package=package,
     )
-    for field in ("scripts", "build_record", "runtime", "inputs", "launch"):
+    for field in (
+        "scripts",
+        "build_record",
+        "container_layout",
+        "runtime",
+        "inputs",
+        "launch",
+    ):
         if final[field] != initial[field]:
             raise CampaignError(f"campaign outer authority changed: {field}")
 
@@ -4355,7 +4482,7 @@ def _inner_run(
     launch_authority: Path,
     jobs: int,
 ) -> dict[str, Any]:
-    _validate_inner_paths(
+    container_layout = _validate_inner_paths(
         "run",
         source=source,
         build_dir=build_dir,
@@ -4369,6 +4496,10 @@ def _inner_run(
     payload, execution, build_record, _binary = _inner_launch_context(
         "run", launch_authority, source, build_authority_dir, build_dir
     )
+    if _campaign_container_layout(build_record) != container_layout:
+        raise CampaignError(
+            "inner run container layout differs from analyzer build authority"
+        )
     before = _campaign_input_identity(
         "run",
         source=source,
@@ -4412,7 +4543,7 @@ def _inner_assemble(
     package: Path,
     launch_authority: Path,
 ) -> dict[str, Any]:
-    _validate_inner_paths(
+    container_layout = _validate_inner_paths(
         "assemble",
         source=source,
         build_dir=build_dir,
@@ -4423,6 +4554,10 @@ def _inner_assemble(
     payload, _execution, build_record, _binary = _inner_launch_context(
         "assemble", launch_authority, source, build_authority_dir, build_dir
     )
+    if _campaign_container_layout(build_record) != container_layout:
+        raise CampaignError(
+            "inner assemble container layout differs from analyzer build authority"
+        )
     before = _campaign_input_identity(
         "assemble",
         source=source,
@@ -4454,7 +4589,7 @@ def _inner_verify(
     *,
     require_accepted: bool,
 ) -> dict[str, Any]:
-    _validate_inner_paths(
+    container_layout = _validate_inner_paths(
         "verify",
         source=source,
         build_dir=build_dir,
@@ -4465,6 +4600,10 @@ def _inner_verify(
     payload, _execution, build_record, _binary = _inner_launch_context(
         "verify", launch_authority, source, build_authority_dir, build_dir
     )
+    if _campaign_container_layout(build_record) != container_layout:
+        raise CampaignError(
+            "inner verify container layout differs from analyzer build authority"
+        )
     if payload["require_accepted"] != require_accepted:
         raise CampaignError("inner verify acceptance mode differs from launch")
     before = _campaign_input_identity(
@@ -4535,6 +4674,7 @@ def _launch_independent_verify(
         package=package,
         launch_dir=launch_dir,
         require_accepted=require_accepted,
+        build_record=snapshot["build_record"],
     )
     marker = _execute_campaign_container(
         command, workspace / "verify-container.log", "verify"
@@ -4612,6 +4752,7 @@ def run_campaign(
             juliet_dir=juliet_dir,
             juliet_archive=juliet_archive,
             libarchive_checkout=libarchive_checkout,
+            build_record=snapshot["build_record"],
         )
         marker = _execute_campaign_container(
             command, staging / "run-container.log", "run"
@@ -4698,6 +4839,7 @@ def assemble_campaign(
             build_authority_dir=snapshot["build_authority_dir"],
             scratch=scratch,
             stage=stage,
+            build_record=snapshot["build_record"],
         )
         marker = _execute_campaign_container(
             command, staging / "assemble-container.log", "assemble"

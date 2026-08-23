@@ -50,13 +50,21 @@ MIGRATION_PLAN_SHA256 = (
 MIGRATION_CATALOG_SHA256 = (
     "e99426c1790aee68ec838c851f8bc49219114f1f9e4c6abd36daa599b2357f8c"
 )
-POLICY_PLAN_SCHEMA = 2
-POLICY_PLAN_AUTHORITY_OID = "338be9c4db73f55b08b57b6b482d7d1045b55137"
-POLICY_PLAN_SHA256 = (
+PREVIOUS_POLICY_PLAN_SCHEMA = 2
+PREVIOUS_POLICY_PLAN_AUTHORITY_OID = "0fbe212971abb6599e372b715a4cb662344c2eb0"
+PREVIOUS_POLICY_PLAN_SHA256 = (
     "8f9ae5587063e86862f49dd68497c4c69a2cd244d28128ffb12876199883d6ef"
 )
-POLICY_CATALOG_SHA256 = (
+PREVIOUS_POLICY_CATALOG_SHA256 = (
     "1eb6055330dd0f0b3f7ef0eaf80c074870587278ea05b624fb4840ae3ba44d11"
+)
+POLICY_PLAN_SCHEMA = 3
+POLICY_PLAN_PREDECESSOR_OID = PREVIOUS_POLICY_PLAN_AUTHORITY_OID
+POLICY_PLAN_SHA256 = (
+    "990a23767127679b21e57742b2252055016d3373d32943b3de6ccce30099f369"
+)
+POLICY_CATALOG_SHA256 = (
+    "09fa55fceeae80aec56d261f143b9ff7fc85d82c37cd3f9efc668eeceb737a7b"
 )
 MIGRATION_TASK_IDS = (
     "CS-P08-03",
@@ -260,7 +268,13 @@ def _parse_catalog(content: bytes, label: str) -> WorkCatalog:
     if not isinstance(raw, dict) or set(raw) != {"schema", "program", "items"}:
         raise ProgressStatusError("PLAN work-item catalog has unexpected fields")
     schema = raw["schema"]
-    if not isinstance(schema, int) or isinstance(schema, bool) or schema not in {1, 2}:
+    if (
+        not isinstance(schema, int)
+        or isinstance(schema, bool)
+        or schema not in {
+            1, PREVIOUS_POLICY_PLAN_SCHEMA, POLICY_PLAN_SCHEMA,
+        }
+    ):
         raise ProgressStatusError("unsupported PLAN work-item schema")
     program = _nonempty_string(raw["program"], "program")
     raw_items = raw["items"]
@@ -365,11 +379,19 @@ def _enforce_fixed_plan(root: Path, base_ref: str) -> None:
             and task_ids == MIGRATION_TASK_IDS
         )
 
+    def current_is_previous_policy_revision() -> bool:
+        return (
+            catalog.schema == PREVIOUS_POLICY_PLAN_SCHEMA
+            and plan_digest == PREVIOUS_POLICY_PLAN_SHA256
+            and digest == PREVIOUS_POLICY_CATALOG_SHA256
+            and task_ids == MIGRATION_TASK_IDS
+        )
+
     def require_policy_authority() -> None:
-        if not _is_ancestor(root, POLICY_PLAN_AUTHORITY_OID, "HEAD"):
+        if not _is_ancestor(root, POLICY_PLAN_PREDECESSOR_OID, "HEAD"):
             raise ProgressStatusError(
                 "approved PLAN policy revision is allowed only on descendants "
-                f"of authority commit {POLICY_PLAN_AUTHORITY_OID}"
+                f"of predecessor commit {POLICY_PLAN_PREDECESSOR_OID}"
             )
 
     if completed.returncode != 0 or not protected_has_catalog:
@@ -383,6 +405,9 @@ def _enforce_fixed_plan(root: Path, base_ref: str) -> None:
                 f"commit {MIGRATION_MAIN_OID}"
             )
         if current_is_legacy():
+            return
+        if current_is_previous_policy_revision():
+            require_policy_authority()
             return
         if current_is_policy_revision():
             require_policy_authority()
@@ -408,7 +433,20 @@ def _enforce_fixed_plan(root: Path, base_ref: str) -> None:
         and tuple(item.id for item in protected_catalog.items)
         == MIGRATION_TASK_IDS
     )
-    if protected_is_legacy and current_is_policy_revision():
+    protected_is_previous_policy = (
+        protected_catalog.schema == PREVIOUS_POLICY_PLAN_SCHEMA
+        and sha256(completed.stdout).hexdigest() == PREVIOUS_POLICY_PLAN_SHA256
+        and sha256(protected_payload.encode("utf-8")).hexdigest()
+        == PREVIOUS_POLICY_CATALOG_SHA256
+        and tuple(item.id for item in protected_catalog.items)
+        == MIGRATION_TASK_IDS
+    )
+    if protected_is_legacy and (
+        current_is_previous_policy_revision() or current_is_policy_revision()
+    ):
+        require_policy_authority()
+        return
+    if protected_is_previous_policy and current_is_policy_revision():
         require_policy_authority()
         return
     raise ProgressStatusError(

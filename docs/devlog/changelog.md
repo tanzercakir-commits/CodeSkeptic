@@ -1,5 +1,41 @@
 # CodeSkeptic — Changelog
 
+## 2026-08-23 — Phase 10.9 scope-bound endurance policy (in progress)
+
+- With explicit owner approval, replaced the arbitrary 72-hour v1.0 blocker
+  with an exact risk-based endurance contract: one cold and one warm round,
+  each running three repetitions of llama.cpp, TensorFlow Lite, and shadPS4,
+  for 18 retained real-world analyses in total. Elapsed time remains recorded
+  evidence but cannot replace or extend the fixed scenario inventory.
+- Kept every substantive gate: pre/post 10-of-10 determinism, the 10 percent
+  performance ceiling, semantic and requested-unit-plan stability, complete
+  requested-TU coverage, sanitizer authority, RSS/FD/time budgets, zero live
+  process-group descendants, checkpoint/restart behavior, fault injection,
+  immutable offline inputs, and checksummed receipts. Longer soak runs remain
+  available as non-blocking post-v1 field observation.
+- Versioned the complete work catalog to schema 3 without adding, removing,
+  reordering, closing, or weakening any task dependency. The status guard pins
+  previous full PLAN/catalog SHA-256 values
+  `8f9ae5587063e86862f49dd68497c4c69a2cd244d28128ffb12876199883d6ef` /
+  `1eb6055330dd0f0b3f7ef0eaf80c074870587278ea05b624fb4840ae3ba44d11`
+  and new values
+  `990a23767127679b21e57742b2252055016d3373d32943b3de6ccce30099f369` /
+  `09fa55fceeae80aec56d261f143b9ff7fc85d82c37cd3f9efc668eeceb737a7b`.
+  It accepts the revision only on descendants of policy checkpoint
+  `0fbe212971abb6599e372b715a4cb662344c2eb0`; arbitrary PLAN edits and
+  phase-branch completion claims remain rejected.
+- Hardened every campaign command boundary around exact PID/start-time and
+  all-thread ownership, Linux subreaper `ECHILD` convergence, bounded live
+  stdout/stderr, and setup-failure cleanup. Real-kernel fixtures cover a main
+  thread exiting while a worker remains live; unrelated host processes are
+  never inferred from a global PID delta.
+- Added bounded local-Git exact-head reads and offline mirror production:
+  workflow blobs are type/size checked before capture and remain live-capped,
+  while mirror/shard writers use per-file limits, observed aggregate budgets,
+  quiescence-before-release emergency reserves, and identity-bound rollback.
+  The portable statvfs guard is explicitly recovery-oriented detection, not a
+  hard aggregate filesystem quota.
+
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 
 - Added a fail-closed cumulative receipt for the exact seven supported default

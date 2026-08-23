@@ -43,7 +43,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
-            clang-20 ninja-build
+            clang-20 ninja-build python3-yaml
 
       - name: Configure
         id: configure
@@ -144,7 +144,7 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/build-and-test/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/build-and-test/${{ job.status }}"
 
   resource-budget-macos:
     runs-on: macos-14
@@ -193,7 +193,7 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/resource-budget-macos/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/resource-budget-macos/${{ job.status }}"
 
   fuzz-smoke:
     runs-on: ubuntu-24.04
@@ -248,7 +248,7 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/fuzz-smoke/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/fuzz-smoke/${{ job.status }}"
 
   sanitizer-runtime:
     runs-on: ubuntu-24.04
@@ -269,7 +269,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             llvm-20-dev libclang-20-dev libzstd-dev zlib1g-dev \
-            clang-20 ninja-build
+            clang-20 ninja-build python3-yaml
 
       - name: Configure sanitizer test build
         run: >
@@ -316,4 +316,4 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/sanitizer-${{ matrix.sanitizer }}/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/sanitizer-${{ matrix.sanitizer }}/${{ job.status }}"

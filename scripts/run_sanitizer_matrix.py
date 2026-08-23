@@ -207,6 +207,20 @@ def _read_cache(build: Path) -> dict[str, str]:
 
 def _validate_build(build: Path, profile: str, *, fuzz: bool) -> dict[str, str]:
     values = _read_cache(build)
+    source_value = values.get("CMAKE_HOME_DIRECTORY", "")
+    build_value = values.get("CMAKE_CACHEFILE_DIR", "")
+    if (
+        not source_value
+        or not Path(source_value).is_absolute()
+        or Path(source_value).resolve() != ROOT.resolve()
+    ):
+        raise MatrixError(f"configured source root identity drift in {build.name}")
+    if (
+        not build_value
+        or not Path(build_value).is_absolute()
+        or Path(build_value).resolve() != build.resolve()
+    ):
+        raise MatrixError(f"configured build root identity drift in {build.name}")
     if values.get("CODESKEPTIC_SANITIZER") != profile:
         raise MatrixError(f"sanitizer profile mismatch in {build.name}")
     expected_tests = "OFF" if fuzz else "ON"

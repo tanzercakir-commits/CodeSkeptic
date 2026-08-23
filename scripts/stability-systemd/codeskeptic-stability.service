@@ -1,0 +1,52 @@
+[Unit]
+Description=CodeSkeptic P10-09 scope-bound stability campaign control plane
+Documentation=file:/opt/codeskeptic-p10-09/operator/README.md
+After=local-fs.target
+Conflicts=graphical.target sleep.target suspend.target hibernate.target hybrid-sleep.target
+ConditionKernelCommandLine=systemd.unit=multi-user.target
+
+[Service]
+# Transport only: the runner receipt and verifier, not this unit, decide acceptance.
+Type=exec
+User=root
+Group=root
+UMask=0077
+Environment=CODESKEPTIC_TERMINAL_NOTIFY=0
+ExecStart=/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh
+Restart=no
+OOMPolicy=stop
+KillMode=control-group
+Delegate=yes
+DelegateSubgroup=controller
+AllowedCPUs=0-11
+CPUAffinity=4-11
+LimitNOFILE=4096
+SendSIGKILL=yes
+TimeoutStopSec=2min
+RuntimeMaxSec=7d
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+
+StateDirectory=codeskeptic-p10-09
+StateDirectoryMode=0700
+RuntimeDirectory=codeskeptic-p10-09
+RuntimeDirectoryMode=0700
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=no
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=no
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+ReadOnlyPaths=/opt/codeskeptic-p10-09 /etc/codeskeptic-p10-09/runtime.json /etc/codeskeptic-p10-09/runtime.json.sha256
+ReadWritePaths=/var/lib/codeskeptic-p10-09 /run/codeskeptic-p10-09 /sys/fs/cgroup

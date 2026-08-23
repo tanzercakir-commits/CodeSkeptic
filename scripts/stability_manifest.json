@@ -1,0 +1,58 @@
+{
+  "schema": "codeskeptic-stability-campaign-v2",
+  "completion": {
+    "basis": "exact-cold-warm-matrix",
+    "required_cold_rounds": 1,
+    "required_complete_rounds": 2,
+    "required_realworld_shards": 18,
+    "required_warm_rounds": 1
+  },
+  "continuity": {
+    "boot_change": "reject",
+    "controller_restart": "reject",
+    "suspend": "reject"
+  },
+  "heartbeat": {
+    "interval_seconds": 30,
+    "maximum_action_transition_seconds": 60,
+    "maximum_gap_seconds": 90,
+    "maximum_suspend_delta_seconds": 2
+  },
+  "matrix": {
+    "manifest": "scripts/realworld_manifest.json",
+    "minimum_complete_rounds": 2,
+    "tier": "release-candidate"
+  },
+  "resources": {
+    "maximum_open_fds": 4096,
+    "rss_budget": "per-translation-unit-required",
+    "time_budget": "per-translation-unit-required",
+    "tu_memory_mib": 4096,
+    "tu_timeout_seconds": 300
+  },
+  "qualification": {
+    "baseline": "scripts/determinism_baseline.json",
+    "manifest": "scripts/determinism_workloads.json",
+    "outer_timeout_seconds": 21600,
+    "performance_policy": "required"
+  },
+  "fault_injection": {
+    "mode": "cold-only",
+    "required_test_count": 6,
+    "required_tests": [
+      "BudgetedAnalysisTest.ExpectedCheckpointCorruptionIsWorkerFailure",
+      "BudgetedAnalysisTest.MemoryCeilingFailsExactTranslationUnitClosed",
+      "BudgetedAnalysisTest.TimeoutPreservesCompletedReceiptsAndContinues",
+      "ResourceSupervisorTest.MemoryCeilingIsIndependentlyTriggerable",
+      "ResourceSupervisorTest.TimeoutKillsChildWithinBound",
+      "UnitEvidenceStoreTest.ExpectedEntryCorruptionFailsClosed"
+    ],
+    "timeout_seconds": 900
+  },
+  "diagnostics": {
+    "required_sanitizer_profiles": [
+      "address",
+      "undefined"
+    ]
+  }
+}

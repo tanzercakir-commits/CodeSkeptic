@@ -123,4 +123,4 @@ jobs:
         if: always()
         run: |
           git push --force origin \
-            "HEAD:refs/status/${{ github.sha }}/docker/${{ job.status }}"
+            "${{ github.sha }}:refs/status/${{ github.sha }}/docker/${{ job.status }}"

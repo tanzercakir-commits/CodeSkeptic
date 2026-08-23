@@ -6,8 +6,12 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
+import signal
 import subprocess
+import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -22,6 +26,11 @@ if spec is None or spec.loader is None:
     raise RuntimeError(f"cannot load campaign runner: {RUNNER}")
 campaign = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(campaign)
+LINUX_SUBREAPER_AVAILABLE = (
+    sys.platform.startswith("linux")
+    and Path("/proc").is_dir()
+    and campaign._enable_subreaper()
+)
 
 
 def fixture_manifest() -> dict:
@@ -137,7 +146,7 @@ def translation_unit_receipts(count: int) -> list[dict]:
             "status": "completed",
             "duration_ms": 10,
             "peak_memory_kib": 1024,
-            "timeout_seconds": 30,
+            "timeout_seconds": campaign.DEFAULT_TU_TIMEOUT_SECONDS,
             "memory_mib": 4096,
             "origin": "executed",
             "checkpoint_key_sha256": "",
@@ -145,6 +154,75 @@ def translation_unit_receipts(count: int) -> list[dict]:
         }
         for index in range(count)
     ]
+
+
+def mirror_authority(
+    manifest: dict,
+    *,
+    tree: str = "2" * 40,
+    submodules: list[dict] | None = None,
+) -> dict:
+    project = manifest["projects"][0]
+    return {
+        "schema": "codeskeptic-realworld-mirror-authority-v1",
+        "manifest_sha256": campaign.digest_json(manifest),
+        "projects": [
+            {
+                "id": project["id"],
+                "repository": project["repository"],
+                "revision": project["revision"],
+                "tree": tree,
+                "bundle": "bundles/alpha.bundle",
+                "bundle_sha256": "0" * 64,
+                "submodules": submodules or [],
+            }
+        ],
+    }
+
+
+def seal_mirror(root: Path, authority: dict, bundles: dict[str, bytes]) -> Path:
+    bundle_root = root / "bundles"
+    bundle_root.mkdir(parents=True, exist_ok=True)
+    for relative, payload in bundles.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+        os.chmod(path, 0o444)
+    for project in authority["projects"]:
+        records = [project, *project["submodules"]]
+        for record in records:
+            if record["bundle"] in bundles:
+                record["bundle_sha256"] = campaign.digest_bytes(
+                    bundles[record["bundle"]]
+                )
+    authority_path = root / "authority.json"
+    encoded = campaign.canonical_bytes(authority) + b"\n"
+    authority_path.write_bytes(encoded)
+    authority_path.with_suffix(".json.sha256").write_text(
+        f"{campaign.digest_bytes(encoded)}  authority.json\n",
+        encoding="ascii",
+    )
+    for directory in sorted(
+        (path for path in root.rglob("*") if path.is_dir()),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    ):
+        os.chmod(directory, 0o555)
+    os.chmod(authority_path, 0o444)
+    os.chmod(authority_path.with_suffix(".json.sha256"), 0o444)
+    os.chmod(root, 0o555)
+    return authority_path
+
+
+def unseal_mirror(root: Path) -> None:
+    if not root.exists():
+        return
+    os.chmod(root, 0o755)
+    for path in root.rglob("*"):
+        if path.is_dir():
+            os.chmod(path, 0o755)
+        elif not path.is_symlink():
+            os.chmod(path, 0o644)
 
 
 class ManifestContractTest(unittest.TestCase):
@@ -580,6 +658,1072 @@ class ManifestContractTest(unittest.TestCase):
                 campaign.validate_manifest(changed)
 
 
+@unittest.skipUnless(os.name == "posix", "sealed offline mirror requires POSIX")
+class MirrorAuthorityContractTest(unittest.TestCase):
+    def test_release_candidate_authority_scope_is_exact_and_all_bundles_are_checked(self) -> None:
+        raw = fixture_manifest()
+        beta = copy.deepcopy(raw["projects"][0])
+        beta["id"] = "beta"
+        beta["repository"] = "https://github.com/example/beta.git"
+        beta["revision"] = "9" * 40
+        gamma = copy.deepcopy(beta)
+        gamma["id"] = "gamma"
+        gamma["repository"] = "https://github.com/example/gamma.git"
+        gamma["revision"] = "8" * 40
+        raw["projects"].extend([beta, gamma])
+        raw["campaigns"]["nightly"]["projects"].append("gamma")
+        raw["campaigns"]["release-candidate"] = {
+            "window_minutes": 4320,
+            "repetitions": 3,
+            "projects": ["alpha", "beta"],
+        }
+        manifest = campaign.validate_manifest(raw)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "sealed-mirror"
+            authority = mirror_authority(manifest)
+            beta_record = copy.deepcopy(authority["projects"][0])
+            beta_record.update({
+                "id": "beta",
+                "repository": beta["repository"],
+                "revision": beta["revision"],
+                "bundle": "bundles/beta.bundle",
+            })
+            authority["projects"].append(beta_record)
+            authority_path = seal_mirror(
+                root,
+                authority,
+                {
+                    "bundles/alpha.bundle": b"alpha bundle\n",
+                    "bundles/beta.bundle": b"beta bundle\n",
+                },
+            )
+            try:
+                beta_bundle = root / "bundles" / "beta.bundle"
+                os.chmod(root / "bundles", 0o755)
+                beta_bundle.unlink()
+                os.chmod(root / "bundles", 0o555)
+                with self.assertRaisesRegex(campaign.EvidenceError, "unavailable"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "alpha"
+                    )
+            finally:
+                unseal_mirror(root)
+
+        extra = copy.deepcopy(authority)
+        gamma_record = copy.deepcopy(extra["projects"][0])
+        gamma_record.update({
+            "id": "gamma",
+            "repository": gamma["repository"],
+            "revision": gamma["revision"],
+            "bundle": "bundles/gamma.bundle",
+        })
+        extra["projects"].append(gamma_record)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "extra"
+            authority_path = seal_mirror(
+                root,
+                extra,
+                {
+                    "bundles/alpha.bundle": b"alpha bundle\n",
+                    "bundles/beta.bundle": b"beta bundle\n",
+                    "bundles/gamma.bundle": b"gamma bundle\n",
+                },
+            )
+            try:
+                with self.assertRaisesRegex(campaign.EvidenceError, "project set"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "alpha"
+                    )
+            finally:
+                unseal_mirror(root)
+
+        missing = copy.deepcopy(authority)
+        missing["projects"] = missing["projects"][:1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "missing"
+            authority_path = seal_mirror(
+                root, missing, {"bundles/alpha.bundle": b"alpha bundle\n"}
+            )
+            try:
+                with self.assertRaisesRegex(campaign.EvidenceError, "project set"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "alpha"
+                    )
+            finally:
+                unseal_mirror(root)
+
+    def test_hardlinked_mirror_file_is_rejected(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "sealed-mirror"
+            authority_path = seal_mirror(
+                root,
+                mirror_authority(manifest),
+                {"bundles/alpha.bundle": b"fixture bundle\n"},
+            )
+            try:
+                os.chmod(root, 0o755)
+                os.chmod(root / "bundles", 0o755)
+                os.link(root / "bundles" / "alpha.bundle", root / "bundle-alias")
+                os.chmod(root / "bundles", 0o555)
+                os.chmod(root, 0o555)
+                with self.assertRaisesRegex(campaign.EvidenceError, "hard link"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "alpha"
+                    )
+            finally:
+                unseal_mirror(root)
+
+    def test_selected_offline_mirror_is_canonical_immutable_and_checksummed(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "sealed-mirror"
+            authority = mirror_authority(manifest)
+            authority_path = seal_mirror(
+                root, authority, {"bundles/alpha.bundle": b"fixture bundle\n"}
+            )
+            try:
+                selected, selected_root = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                self.assertEqual(selected_root, root)
+                self.assertEqual(selected["revision"], "1" * 40)
+                self.assertEqual(selected["tree"], "2" * 40)
+                self.assertEqual(selected["submodules"], [])
+                identity = campaign.receipt_identity(
+                    manifest,
+                    manifest["projects"][0],
+                    1,
+                    "b" * 64,
+                    manifest["projects"][0]["expected"][
+                        "translation_unit_sha256"
+                    ],
+                )
+                self.assertNotIn("mirror", identity)
+                self.assertNotIn("transport", identity)
+            finally:
+                unseal_mirror(root)
+
+    def test_authority_may_seal_a_canonical_manifest_subset_only(self) -> None:
+        raw = fixture_manifest()
+        beta = copy.deepcopy(raw["projects"][0])
+        beta["id"] = "beta"
+        beta["repository"] = "https://github.com/example/beta.git"
+        beta["revision"] = "9" * 40
+        raw["projects"].append(beta)
+        raw["campaigns"]["nightly"]["projects"].append("beta")
+        manifest = campaign.validate_manifest(raw)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "sealed-mirror"
+            authority_path = seal_mirror(
+                root,
+                mirror_authority(manifest),
+                {"bundles/alpha.bundle": b"fixture bundle\n"},
+            )
+            try:
+                selected, _ = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                self.assertEqual(selected["id"], "alpha")
+                with self.assertRaisesRegex(campaign.EvidenceError, "no project beta"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "beta"
+                    )
+            finally:
+                unseal_mirror(root)
+
+    def test_offline_mirror_rejects_missing_mismatch_mutability_and_unsafe_paths(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        cases = (
+            ("missing", None, "unavailable"),
+            ("checksum", b"different bundle\n", "checksum"),
+            ("mutable", b"fixture bundle\n", "immutable"),
+            ("absolute", b"fixture bundle\n", "inside"),
+            ("traversal", b"fixture bundle\n", "inside"),
+            ("revision", b"fixture bundle\n", "revision"),
+        )
+        for name, replacement, expected in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "sealed-mirror"
+                authority = mirror_authority(manifest)
+                authority_path = seal_mirror(
+                    root,
+                    authority,
+                    {"bundles/alpha.bundle": b"fixture bundle\n"},
+                )
+                try:
+                    bundle = root / "bundles" / "alpha.bundle"
+                    if name == "missing":
+                        os.chmod(bundle.parent, 0o755)
+                        bundle.unlink()
+                        os.chmod(bundle.parent, 0o555)
+                    elif name == "checksum":
+                        os.chmod(bundle.parent, 0o755)
+                        os.chmod(bundle, 0o644)
+                        bundle.write_bytes(replacement or b"")
+                        os.chmod(bundle, 0o444)
+                        os.chmod(bundle.parent, 0o555)
+                    elif name == "mutable":
+                        os.chmod(bundle, 0o644)
+                    else:
+                        unseal_mirror(root)
+                        if name == "absolute":
+                            authority["projects"][0]["bundle"] = str(bundle)
+                        elif name == "traversal":
+                            authority["projects"][0]["bundle"] = "../alpha.bundle"
+                        else:
+                            authority["projects"][0]["revision"] = "3" * 40
+                        authority_path = seal_mirror(
+                            root,
+                            authority,
+                            {"bundles/alpha.bundle": b"fixture bundle\n"},
+                        )
+                    with self.assertRaisesRegex(campaign.EvidenceError, expected):
+                        campaign.load_mirror_authority(
+                            authority_path, manifest, "alpha"
+                        )
+                finally:
+                    unseal_mirror(root)
+
+    def test_offline_mirror_rejects_symlinked_authority_and_bundle(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        for target in ("authority", "bundle"):
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
+                parent = Path(directory)
+                root = parent / "sealed-mirror"
+                authority = mirror_authority(manifest)
+                authority_path = seal_mirror(
+                    root,
+                    authority,
+                    {"bundles/alpha.bundle": b"fixture bundle\n"},
+                )
+                try:
+                    if target == "authority":
+                        real = parent / "real-authority.json"
+                        real.write_bytes(authority_path.read_bytes())
+                        os.chmod(root, 0o755)
+                        os.chmod(authority_path, 0o644)
+                        authority_path.unlink()
+                        authority_path.symlink_to(real)
+                        os.chmod(root, 0o555)
+                    else:
+                        bundle = root / "bundles" / "alpha.bundle"
+                        real = parent / "real-alpha.bundle"
+                        real.write_bytes(bundle.read_bytes())
+                        os.chmod(bundle.parent, 0o755)
+                        os.chmod(bundle, 0o644)
+                        bundle.unlink()
+                        bundle.symlink_to(real)
+                        os.chmod(bundle.parent, 0o555)
+                    with self.assertRaisesRegex(campaign.EvidenceError, "symlink|regular"):
+                        campaign.load_mirror_authority(
+                            authority_path, manifest, "alpha"
+                        )
+                finally:
+                    unseal_mirror(root)
+
+    def test_offline_authority_itself_must_be_canonical_checksummed_and_read_only(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        for mutation, expected in (
+            ("checksum", "checksum"),
+            ("noncanonical", "canonical"),
+            ("mutable", "immutable"),
+        ):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "sealed-mirror"
+                authority = mirror_authority(manifest)
+                authority_path = seal_mirror(
+                    root,
+                    authority,
+                    {"bundles/alpha.bundle": b"fixture bundle\n"},
+                )
+                try:
+                    os.chmod(root, 0o755)
+                    if mutation == "checksum":
+                        os.chmod(authority_path, 0o644)
+                        authority_path.write_bytes(authority_path.read_bytes() + b" ")
+                        os.chmod(authority_path, 0o444)
+                    elif mutation == "noncanonical":
+                        os.chmod(authority_path, 0o644)
+                        encoded = (
+                            json.dumps(authority, indent=2, sort_keys=True) + "\n"
+                        ).encode("utf-8")
+                        authority_path.write_bytes(encoded)
+                        sidecar = authority_path.with_suffix(".json.sha256")
+                        os.chmod(sidecar, 0o644)
+                        sidecar.write_text(
+                            f"{campaign.digest_bytes(encoded)}  authority.json\n",
+                            encoding="ascii",
+                        )
+                        os.chmod(authority_path, 0o444)
+                        os.chmod(sidecar, 0o444)
+                    else:
+                        os.chmod(authority_path, 0o644)
+                    os.chmod(root, 0o555)
+                    with self.assertRaisesRegex(campaign.EvidenceError, expected):
+                        campaign.load_mirror_authority(
+                            authority_path, manifest, "alpha"
+                        )
+                finally:
+                    unseal_mirror(root)
+
+    def test_recursive_offline_mapping_is_exact_and_network_is_disabled(self) -> None:
+        raw = fixture_manifest()
+        entries = [{"path": "deps/example", "revision": "4" * 40}]
+        raw["projects"][0]["checkout"] = {
+            "submodules": "recursive",
+            "expected_count": 1,
+            "expected_sha256": campaign.digest_json(entries),
+        }
+        manifest = campaign.validate_manifest(raw)
+        submodule = {
+            "path": "deps/example",
+            "repository": "https://android.googlesource.com/platform/external/aac",
+            "revision": "4" * 40,
+            "tree": "5" * 40,
+            "bundle": "bundles/dependency.bundle",
+            "bundle_sha256": "0" * 64,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "sealed-mirror"
+            authority = mirror_authority(manifest, submodules=[submodule])
+            authority_path = seal_mirror(
+                root,
+                authority,
+                {
+                    "bundles/alpha.bundle": b"root bundle\n",
+                    "bundles/dependency.bundle": b"dependency bundle\n",
+                },
+            )
+            try:
+                selected, selected_root = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                repositories = {
+                    selected["repository"]: root / "transport-alpha.git",
+                    submodule["repository"]: root / "transport-dependency.git",
+                }
+                with mock.patch.dict(
+                    os.environ,
+                    {"GIT_DIR": "/tmp/forged", "GIT_CONFIG_COUNT": "99"},
+                    clear=False,
+                ):
+                    environment = campaign.offline_git_environment(
+                        selected, repositories
+                    )
+                self.assertEqual(environment["GIT_ALLOW_PROTOCOL"], "file")
+                self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
+                self.assertNotIn("GIT_DIR", environment)
+                values = {
+                    environment[f"GIT_CONFIG_VALUE_{index}"]
+                    for index in range(int(environment["GIT_CONFIG_COUNT"]))
+                }
+                self.assertIn(manifest["projects"][0]["repository"], values)
+                self.assertIn(submodule["repository"], values)
+
+                forged = copy.deepcopy(authority)
+                forged["projects"][0]["submodules"][0]["revision"] = "6" * 40
+                unseal_mirror(root)
+                authority_path = seal_mirror(
+                    root,
+                    forged,
+                    {
+                        "bundles/alpha.bundle": b"root bundle\n",
+                        "bundles/dependency.bundle": b"dependency bundle\n",
+                    },
+                )
+                with self.assertRaisesRegex(campaign.EvidenceError, "submodule identity"):
+                    campaign.load_mirror_authority(
+                        authority_path, manifest, "alpha"
+                    )
+            finally:
+                unseal_mirror(root)
+
+    def test_offline_checkout_never_fetches_an_upstream_url(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        project = manifest["projects"][0]
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            root = temporary / "sealed-mirror"
+            authority = mirror_authority(manifest)
+            authority_path = seal_mirror(
+                root, authority, {"bundles/alpha.bundle": b"fixture bundle\n"}
+            )
+            try:
+                selected, selected_root = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                commands: list[tuple[list[str], dict[str, str] | None]] = []
+
+                def fake_run(command, cwd, deadline, memory_mb, log_path, env=None):
+                    del cwd, deadline, memory_mb, log_path
+                    commands.append((command, env))
+                    return subprocess.CompletedProcess(command, 0)
+
+                with (
+                    mock.patch.object(campaign, "_run_command", side_effect=fake_run),
+                    mock.patch.object(
+                        campaign,
+                        "_materialize_offline_repositories",
+                        return_value={
+                            project["repository"]: temporary / "transport-alpha.git"
+                        },
+                    ),
+                    mock.patch.object(
+                        campaign,
+                        "_capture_git",
+                        side_effect=[project["revision"] + "\n", selected["tree"] + "\n"],
+                    ),
+                    mock.patch.object(
+                        campaign,
+                        "_submodule_identity",
+                        return_value=campaign._expected_submodules(project),
+                    ),
+                ):
+                    actual = campaign._checkout_project(
+                        project,
+                        temporary / "work" / "alpha",
+                        10_000.0,
+                        temporary / "commands.log",
+                        selected,
+                        selected_root,
+                    )
+                self.assertEqual(actual, campaign._expected_submodules(project))
+                fetches = [command for command, _ in commands if "fetch" in command]
+                self.assertEqual(len(fetches), 1)
+                self.assertNotIn(project["repository"], fetches[0])
+                self.assertIn(str(temporary / "transport-alpha.git"), fetches[0])
+                for command, environment in commands:
+                    if command[0] == "git":
+                        self.assertIsNotNone(environment)
+                        self.assertEqual(environment["GIT_ALLOW_PROTOCOL"], "file")
+            finally:
+                unseal_mirror(root)
+
+    def test_offline_transport_staging_symlink_is_rejected_without_deletion(self) -> None:
+        manifest = campaign.validate_manifest(fixture_manifest())
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            root = temporary / "sealed-mirror"
+            authority = mirror_authority(manifest)
+            authority_path = seal_mirror(
+                root, authority, {"bundles/alpha.bundle": b"fixture bundle\n"}
+            )
+            try:
+                selected, selected_root = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                workspace = temporary / "work"
+                workspace.mkdir()
+                sentinel = temporary / "sentinel"
+                sentinel.mkdir()
+                (sentinel / "keep.txt").write_text("keep\n", encoding="utf-8")
+                (workspace / ".alpha-mirror-transport").symlink_to(
+                    sentinel, target_is_directory=True
+                )
+                with self.assertRaisesRegex(campaign.EvidenceError, "staging path"):
+                    campaign._checkout_project(
+                        manifest["projects"][0],
+                        workspace / "alpha",
+                        campaign.time.monotonic() + 30.0,
+                        workspace / "commands.log",
+                        selected,
+                        selected_root,
+                    )
+                self.assertEqual(
+                    (sentinel / "keep.txt").read_text(encoding="utf-8"),
+                    "keep\n",
+                )
+            finally:
+                unseal_mirror(root)
+
+    @unittest.skipUnless(
+        LINUX_SUBREAPER_AVAILABLE,
+        "offline execution requires Linux /proc subreaper containment",
+    )
+    def test_offline_bundle_checkout_resolves_recursive_submodule_without_network(self) -> None:
+        def git(repository: Path, *arguments: str) -> str:
+            environment = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("GIT_")
+            }
+            environment.update(
+                {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+            )
+            return subprocess.run(
+                ["git", *arguments],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            ).stdout.strip()
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            dependency = temporary / "dependency-source"
+            dependency.mkdir()
+            git(dependency, "init", "--quiet")
+            git(dependency, "config", "user.name", "Fixture")
+            git(dependency, "config", "user.email", "fixture@example.invalid")
+            (dependency / "dependency.txt").write_text("dependency\n", encoding="utf-8")
+            git(dependency, "add", "dependency.txt")
+            git(dependency, "commit", "--quiet", "-m", "dependency")
+            dependency_revision = git(dependency, "rev-parse", "HEAD")
+            dependency_tree = git(dependency, "rev-parse", "HEAD^{tree}")
+
+            source = temporary / "alpha-source"
+            source.mkdir()
+            git(source, "init", "--quiet")
+            git(source, "config", "user.name", "Fixture")
+            git(source, "config", "user.email", "fixture@example.invalid")
+            (source / "alpha.txt").write_text("alpha\n", encoding="utf-8")
+            git(source, "add", "alpha.txt")
+            git(source, "commit", "--quiet", "-m", "alpha")
+            git(
+                source,
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "--quiet",
+                str(dependency),
+                "deps/example",
+            )
+            git(
+                source,
+                "config",
+                "--file",
+                ".gitmodules",
+                "submodule.deps/example.url",
+                "../dependency.git",
+            )
+            git(source, "add", ".gitmodules", "deps/example")
+            git(source, "commit", "--quiet", "-m", "submodule")
+            source_revision = git(source, "rev-parse", "HEAD")
+            source_tree = git(source, "rev-parse", "HEAD^{tree}")
+
+            raw = fixture_manifest()
+            raw["projects"][0]["revision"] = source_revision
+            submodule_identity = [
+                {"path": "deps/example", "revision": dependency_revision}
+            ]
+            raw["projects"][0]["checkout"] = {
+                "submodules": "recursive",
+                "expected_count": 1,
+                "expected_sha256": campaign.digest_json(submodule_identity),
+            }
+            manifest = campaign.validate_manifest(raw)
+
+            source_bundle = temporary / "alpha.bundle"
+            dependency_bundle = temporary / "dependency.bundle"
+            git(source, "bundle", "create", str(source_bundle), "--all")
+            git(dependency, "bundle", "create", str(dependency_bundle), "--all")
+            submodule = {
+                "path": "deps/example",
+                "repository": "https://github.com/example/dependency.git",
+                "revision": dependency_revision,
+                "tree": dependency_tree,
+                "bundle": "bundles/dependency.bundle",
+                "bundle_sha256": "0" * 64,
+            }
+            root = temporary / "sealed-mirror"
+            authority = mirror_authority(
+                manifest, tree=source_tree, submodules=[submodule]
+            )
+            authority_path = seal_mirror(
+                root,
+                authority,
+                {
+                    "bundles/alpha.bundle": source_bundle.read_bytes(),
+                    "bundles/dependency.bundle": dependency_bundle.read_bytes(),
+                },
+            )
+            try:
+                selected, selected_root = campaign.load_mirror_authority(
+                    authority_path, manifest, "alpha"
+                )
+                workspace = temporary / "offline-work" / "alpha"
+                workspace.parent.mkdir()
+                try:
+                    actual = campaign._checkout_project(
+                        manifest["projects"][0],
+                        workspace,
+                        campaign.time.monotonic() + 30.0,
+                        temporary / "offline-work" / "commands.log",
+                        selected,
+                        selected_root,
+                    )
+                except campaign.EvidenceError as error:
+                    self.fail(
+                        f"{error}\n"
+                        + (temporary / "offline-work" / "commands.log").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                self.assertEqual(
+                    actual,
+                    {
+                        "mode": "recursive",
+                        "count": 1,
+                        "sha256": campaign.digest_json(submodule_identity),
+                    },
+                )
+                self.assertEqual(
+                    (workspace / "deps/example/dependency.txt").read_text(
+                        encoding="utf-8"
+                    ),
+                    "dependency\n",
+                )
+                self.assertFalse(
+                    (workspace.parent / ".alpha-mirror-transport").exists()
+                )
+                log = (temporary / "offline-work" / "commands.log").read_text(
+                    encoding="utf-8"
+                )
+                self.assertNotIn("fetch\", \"https://", log)
+            finally:
+                unseal_mirror(root)
+
+    def test_online_run_cli_remains_the_default_and_offline_is_explicit(self) -> None:
+        parser = campaign.build_parser()
+        required = [
+            "run",
+            "--project",
+            "alpha",
+            "--repetition",
+            "1",
+            "--analyzer",
+            "analyzer",
+            "--workspace",
+            "work",
+            "--output",
+            "receipt.json",
+        ]
+        online = parser.parse_args(required)
+        self.assertIsNone(online.mirror_authority)
+        offline = parser.parse_args(
+            [*required, "--mirror-authority", "sealed/authority.json"]
+        )
+        self.assertEqual(
+            offline.mirror_authority, Path("sealed/authority.json")
+        )
+
+
+@unittest.skipUnless(
+    LINUX_SUBREAPER_AVAILABLE,
+    "process supervision requires Linux /proc subreaper containment",
+)
+class CommandSupervisorTest(unittest.TestCase):
+    def _detached_script(
+        self, root: Path, *, inherit_pipe: bool, leader_delay: float = 0.1
+    ) -> tuple[Path, Path]:
+        pid_path = root / "child.pid"
+        script = root / "launcher.py"
+        redirection = "" if inherit_pipe else "os.close(1); os.close(2);"
+        script.write_text(
+            "#!/usr/bin/python3\nimport os,time\n"
+            "pid=os.fork()\n"
+            "if pid == 0:\n"
+            " os.setsid(); " + redirection + f" open('{pid_path}','w').write(str(os.getpid())); time.sleep(30)\n"
+            f"time.sleep({leader_delay!r})\n",
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        return script, pid_path
+
+    def _assert_pid_gone(self, pid_path: Path) -> None:
+        pid = int(pid_path.read_text(encoding="ascii"))
+        for _ in range(100):
+            if not Path(f"/proc/{pid}").exists():
+                break
+            campaign.time.sleep(0.01)
+        self.assertFalse(Path(f"/proc/{pid}").exists())
+
+    def test_closed_pipe_detached_descendant_is_killed_after_leader_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script, pid_path = self._detached_script(root, inherit_pipe=False)
+            with self.assertRaisesRegex(campaign.EvidenceError, "orphan"):
+                campaign._run_command(
+                    [str(script)], root, campaign.time.monotonic() + 2,
+                    512, root / "commands.log",
+                )
+            self._assert_pid_gone(pid_path)
+
+    def test_inherited_pipe_detached_descendant_is_killed_at_deadline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script, pid_path = self._detached_script(root, inherit_pipe=True)
+            with self.assertRaisesRegex(campaign.EvidenceError, "timed out"):
+                campaign._capture_git(
+                    [str(script)], root, campaign.time.monotonic() + 0.25,
+                    512, root / "commands.log", os.environ.copy(),
+                )
+            self._assert_pid_gone(pid_path)
+
+    def test_immediate_exit_closed_pipe_escape_is_rejected_repeatedly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for attempt in range(10):
+                attempt_root = root / str(attempt)
+                attempt_root.mkdir()
+                script, pid_path = self._detached_script(
+                    attempt_root, inherit_pipe=False, leader_delay=0
+                )
+                with self.assertRaisesRegex(campaign.EvidenceError, "orphan"):
+                    campaign._run_command(
+                        [str(script)], attempt_root,
+                        campaign.time.monotonic() + 2, 512,
+                        attempt_root / "commands.log",
+                    )
+                self._assert_pid_gone(pid_path)
+                self.assertTrue(campaign._child_table_empty())
+
+    def test_preexisting_direct_child_rejects_execution_without_killing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            unrelated = subprocess.Popen(["/usr/bin/sleep", "30"])
+            try:
+                with self.assertRaisesRegex(campaign.EvidenceError, "pre-existing child"):
+                    campaign._run_command(
+                        ["/usr/bin/true"], root,
+                        campaign.time.monotonic() + 2, 512,
+                        root / "commands.log",
+                    )
+                self.assertIsNone(unrelated.poll())
+            finally:
+                unrelated.terminate()
+                unrelated.wait(timeout=2)
+
+    def test_second_controller_thread_rejects_execution_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stop = threading.Event()
+            other = threading.Thread(target=stop.wait)
+            other.start()
+            try:
+                with self.assertRaisesRegex(campaign.EvidenceError, "single-threaded"):
+                    campaign._run_command(
+                        ["/usr/bin/true"], root,
+                        campaign.time.monotonic() + 2, 512,
+                        root / "commands.log",
+                    )
+            finally:
+                stop.set()
+                other.join(timeout=2)
+
+    def test_child_table_treats_echild_as_the_only_empty_postcondition(self) -> None:
+        with mock.patch.object(
+            campaign.os, "waitpid", side_effect=ChildProcessError()
+        ):
+            self.assertTrue(campaign._child_table_empty())
+        with mock.patch.object(campaign.os, "waitpid", return_value=(0, 0)):
+            self.assertFalse(campaign._child_table_empty())
+
+    @unittest.skipUnless(
+        hasattr(os, "fork") and Path("/proc").is_dir(),
+        "Linux fork/subreaper semantics unavailable",
+    )
+    def test_subreaper_cache_is_revalidated_after_fork(self) -> None:
+        self.assertTrue(campaign._enable_subreaper())
+        read_fd, write_fd = os.pipe()
+        child = os.fork()
+        if child == 0:  # pragma: no cover - assertion is returned to the parent.
+            os.close(read_fd)
+            result = b"0"
+            try:
+                enabled = campaign._enable_subreaper()
+                state = campaign.ctypes.c_int(0)
+                library = campaign.ctypes.CDLL(None, use_errno=True)
+                if (
+                    enabled
+                    and library.prctl(
+                        37, campaign.ctypes.byref(state), 0, 0, 0
+                    ) == 0
+                ):
+                    result = b"1" if state.value == 1 else b"0"
+            finally:
+                os.write(write_fd, result)
+                os.close(write_fd)
+                os._exit(0)
+        os.close(write_fd)
+        try:
+            observed = os.read(read_fd, 1)
+        finally:
+            os.close(read_fd)
+        waited, status = os.waitpid(child, 0)
+        self.assertEqual(waited, child)
+        self.assertTrue(os.WIFEXITED(status))
+        self.assertEqual(os.WEXITSTATUS(status), 0)
+        self.assertEqual(observed, b"1")
+
+    def test_selector_registration_failure_closes_and_reaps(self) -> None:
+        class BrokenSelector:
+            closed = False
+
+            def register(self, *_arguments) -> None:
+                raise RuntimeError("selector registration failed")
+
+            def close(self) -> None:
+                self.closed = True
+                raise OSError("selector close failed")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selector = BrokenSelector()
+            captured: list[subprocess.Popen] = []
+            real_popen = campaign.subprocess.Popen
+
+            def recording_popen(*arguments, **keywords):
+                process = real_popen(*arguments, **keywords)
+                captured.append(process)
+                return process
+
+            with (
+                mock.patch.object(
+                    campaign.subprocess, "Popen", side_effect=recording_popen
+                ),
+                mock.patch.object(
+                    campaign.selectors, "DefaultSelector", return_value=selector
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    campaign.EvidenceError,
+                    "registration failed; selector cleanup failed",
+                ):
+                    campaign._run_command(
+                        ["/usr/bin/sleep", "30"],
+                        root,
+                        campaign.time.monotonic() + 2,
+                        512,
+                        root / "commands.log",
+                    )
+            self.assertTrue(selector.closed)
+            self.assertEqual(len(captured), 1)
+            self.assertIsNotNone(captured[0].poll())
+            self.assertTrue(campaign._child_table_empty())
+
+    def test_shard_reserve_release_retries_delayed_accounting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recovered = mock.Mock(f_bavail=1 << 20, f_frsize=1)
+            below_floor = mock.Mock(f_bavail=0, f_frsize=1)
+            delayed = root / "delayed"
+            delayed.mkdir()
+            with (
+                mock.patch.object(
+                    campaign, "MIN_SHARD_FILESYSTEM_FREE_BYTES", 1 << 20
+                ),
+                mock.patch.object(
+                    campaign, "SHARD_EMERGENCY_RESERVE_BYTES", 1 << 20
+                ),
+                campaign._bounded_shard_workspace(delayed),
+                mock.patch.object(
+                    campaign.os,
+                    "fstatvfs",
+                    side_effect=[below_floor, recovered],
+                ) as probe,
+                mock.patch.object(campaign.time, "sleep") as pause,
+            ):
+                campaign._release_shard_emergency_reserve()
+                self.assertEqual(probe.call_count, 2)
+                pause.assert_called_once()
+
+            never = root / "never"
+            never.mkdir()
+            with (
+                mock.patch.object(
+                    campaign, "MIN_SHARD_FILESYSTEM_FREE_BYTES", 1 << 20
+                ),
+                mock.patch.object(
+                    campaign, "SHARD_EMERGENCY_RESERVE_BYTES", 1 << 20
+                ),
+                mock.patch.object(
+                    campaign, "SHARD_RESERVE_RECOVERY_TIMEOUT_SECONDS", 0
+                ),
+                campaign._bounded_shard_workspace(never),
+                mock.patch.object(
+                    campaign.os, "fstatvfs", return_value=below_floor
+                ),
+            ):
+                with self.assertRaisesRegex(campaign.EvidenceError, "recover"):
+                    campaign._release_shard_emergency_reserve()
+
+    def test_live_log_and_capture_floods_are_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flood = ["/usr/bin/python3", "-c", "import sys;sys.stdout.write('x'*100000)"]
+            with mock.patch.object(campaign, "MAX_COMMAND_LOG_BYTES", 1024):
+                with self.assertRaisesRegex(campaign.EvidenceError, "commands log"):
+                    campaign._run_command(
+                        flood, root, campaign.time.monotonic() + 2,
+                        512, root / "commands.log",
+                    )
+            self.assertLessEqual((root / "commands.log").stat().st_size, 1024)
+            (root / "commands.log").unlink()
+            with mock.patch.object(campaign, "MAX_COMMAND_CAPTURE_BYTES", 128):
+                with self.assertRaisesRegex(campaign.EvidenceError, "capture"):
+                    campaign._capture_git(
+                        flood, root, campaign.time.monotonic() + 2,
+                        512, root / "commands.log", os.environ.copy(),
+                    )
+
+    def test_child_written_report_growth_is_stopped_live(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.json"
+            writer = [
+                "/usr/bin/python3", "-c",
+                "import pathlib,time; p=pathlib.Path(r'%s'); f=p.open('wb'); "
+                "[(f.write(b'x'*128),f.flush(),time.sleep(.01)) for _ in range(100)]"
+                % report,
+            ]
+            with self.assertRaisesRegex(campaign.EvidenceError, "bounded output"):
+                campaign._run_command(
+                    writer, root, campaign.time.monotonic() + 2,
+                    512, root / "commands.log",
+                    watched_files={report: 512},
+                )
+            self.assertLess(report.stat().st_size, 4096)
+
+    def test_closed_output_child_cannot_flood_watched_report_while_waiting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.json"
+            writer = [
+                "/usr/bin/python3", "-c",
+                "import os,pathlib,time; os.close(1); os.close(2); "
+                "f=pathlib.Path(r'%s').open('wb'); "
+                "[(f.write(b'x'*128),f.flush(),time.sleep(.01)) for _ in range(100)]"
+                % report,
+            ]
+            with self.assertRaisesRegex(campaign.EvidenceError, "bounded output"):
+                campaign._run_command(
+                    writer, root, campaign.time.monotonic() + 2,
+                    512, root / "commands.log",
+                    watched_files={report: 512},
+                )
+            self.assertLess(report.stat().st_size, 4096)
+
+    def test_exiting_closed_pipe_descendant_cannot_escape_final_file_check(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = root / "report.json"
+            launcher = root / "late-writer.py"
+            launcher.write_text(
+                "#!/usr/bin/python3\nimport os,time\n"
+                "pid=os.fork()\n"
+                "if pid == 0:\n"
+                " os.setsid(); os.close(1); os.close(2); time.sleep(.03); "
+                f"open('{report}','wb').write(b'x'*4096); os._exit(0)\n"
+                "os._exit(0)\n",
+                encoding="utf-8",
+            )
+            launcher.chmod(0o755)
+            with self.assertRaisesRegex(campaign.EvidenceError, "bounded output"):
+                campaign._run_command(
+                    [str(launcher)], root, campaign.time.monotonic() + 2,
+                    512, root / "commands.log",
+                    watched_files={report: 128},
+                )
+            self.assertGreater(report.stat().st_size, 128)
+            self.assertTrue(campaign._child_table_empty())
+
+    def test_shard_workspace_multi_file_growth_and_tmp_are_bounded_live(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "shard"
+            workspace.mkdir()
+            payloads = workspace / "payloads"
+            pid_path = workspace / "writer.pid"
+            tmp_record = workspace / "tmp.txt"
+            writer = root / "workspace-writer.py"
+            writer.write_text(
+                "#!/usr/bin/python3\nimport os,pathlib,time\n"
+                f"root=pathlib.Path('{payloads}'); root.mkdir(); "
+                f"pathlib.Path('{pid_path}').write_text(str(os.getpid())); "
+                f"pathlib.Path('{tmp_record}').write_text(os.environ['TMPDIR']); "
+                "os.close(1); os.close(2)\n"
+                "for index in range(10000):\n"
+                " fd=os.open(root / str(index),os.O_RDWR|os.O_CREAT|os.O_EXCL,0o600); "
+                "os.posix_fallocate(fd,0,4096); os.close(fd); time.sleep(.002)\n",
+                encoding="utf-8",
+            )
+            writer.chmod(0o755)
+            before = campaign._shard_workspace_allocated_bytes(workspace)
+            with (
+                mock.patch.object(
+                    campaign, "MAX_SHARD_WORKSPACE_ALLOCATED_BYTES", 128 << 10
+                ),
+                mock.patch.object(
+                    campaign, "MIN_SHARD_FILESYSTEM_FREE_BYTES", 1 << 20
+                ),
+                mock.patch.object(campaign, "SHARD_EMERGENCY_RESERVE_BYTES", 1 << 20),
+                campaign._bounded_shard_workspace(workspace),
+            ):
+                with self.assertRaisesRegex(campaign.EvidenceError, "workspace allocation"):
+                    campaign._run_command(
+                        [str(writer)], workspace,
+                        campaign.time.monotonic() + 3, 512,
+                        root / "commands.log",
+                        file_size_limit_bytes=1 << 20,
+                    )
+                reserve = campaign._COMMAND_WORKSPACE_STATE.get()
+                self.assertIsNotNone(reserve)
+                pid = int(pid_path.read_text(encoding="ascii"))
+                self.assertFalse(Path(f"/proc/{pid}").exists())
+                self.assertIsNone(reserve[5]["reserve"])
+                capacity = os.fstatvfs(reserve[5]["probe"])
+                self.assertGreaterEqual(
+                    capacity.f_bavail * capacity.f_frsize,
+                    campaign.MIN_SHARD_FILESYSTEM_FREE_BYTES,
+                )
+                stable_allocation = campaign._shard_workspace_allocated_bytes(workspace)
+                campaign.time.sleep(0.05)
+                self.assertEqual(
+                    campaign._shard_workspace_allocated_bytes(workspace),
+                    stable_allocation,
+                )
+            pid = int(pid_path.read_text(encoding="ascii"))
+            self.assertFalse(Path(f"/proc/{pid}").exists())
+            self.assertEqual(tmp_record.read_text(encoding="utf-8"), str(workspace / ".codeskeptic-tmp"))
+            growth = campaign._shard_workspace_allocated_bytes(workspace) - before
+            self.assertLess(growth, 4 << 20)
+
+    def test_default_single_file_rlimit_is_hard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "payload.bin"
+            writer = [
+                "/usr/bin/python3", "-c",
+                f"open(r'{payload}','wb').write(b'x'*4096)",
+            ]
+            with mock.patch.object(campaign, "MAX_PROCESS_FILE_BYTES", 512):
+                result = campaign._run_command(
+                    writer, root, campaign.time.monotonic() + 2,
+                    512, root / "commands.log",
+                )
+            self.assertIn(result.returncode, (0, -signal.SIGXFSZ, 1))
+            self.assertLessEqual(payload.stat().st_size, 512)
+
+    def test_compile_database_and_report_reads_reject_oversize_and_hardlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "compile_commands.json"
+            database.write_text("[]" + " " * 100, encoding="utf-8")
+            project = campaign.validate_manifest(fixture_manifest())["projects"][0]
+            with mock.patch.object(campaign, "MAX_COMPILE_DATABASE_BYTES", 8):
+                with self.assertRaisesRegex(campaign.EvidenceError, "size limit"):
+                    campaign._derive_translation_units(project, root, root, database)
+            report = root / "report.json"
+            report.write_text("{}", encoding="utf-8")
+            os.link(report, root / "report-alias.json")
+            with self.assertRaisesRegex(campaign.EvidenceError, "regular file"):
+                campaign._read_regular_bytes(report, campaign.MAX_ANALYZER_REPORT_BYTES)
+
+
 class EvidenceContractTest(unittest.TestCase):
     def test_multi_command_coverage_pins_extra_analysis_executions(self) -> None:
         manifest = fixture_manifest()
@@ -651,6 +1795,48 @@ class EvidenceContractTest(unittest.TestCase):
                 2,
                 [Path("/tmp/unit-0.c"), Path("/tmp/unit-1.c")],
             )
+
+    def test_plan_enforces_and_projects_exact_tu_resource_budgets(self) -> None:
+        report = {"translation_units": translation_unit_receipts(2)}
+        plan = campaign.translation_unit_plan(report, 2, 2)
+        resources = campaign.translation_unit_resource_summary(
+            report,
+            expected_timeout_seconds=300,
+            expected_memory_mib=4096,
+        )
+        self.assertEqual(resources["translation_units"], plan["count"])
+        self.assertEqual(resources["maximum_duration_ms"], 10)
+        self.assertEqual(resources["maximum_peak_memory_kib"], 1024)
+        self.assertEqual(resources["timeout_seconds"], 300)
+        self.assertEqual(resources["memory_mib"], 4096)
+        self.assertEqual(resources["duration_budget_violations"], 0)
+        self.assertEqual(resources["memory_budget_violations"], 0)
+
+        inflated = copy.deepcopy(report)
+        for receipt in inflated["translation_units"]:
+            receipt["timeout_seconds"] = 86_400
+            receipt["memory_mib"] = 131_072
+        with self.assertRaisesRegex(campaign.EvidenceError, "timeout budget"):
+            campaign.translation_unit_resource_summary(
+                inflated,
+                expected_timeout_seconds=300,
+                expected_memory_mib=4096,
+            )
+
+        mixed = copy.deepcopy(report)
+        mixed["translation_units"][1]["memory_mib"] = 8192
+        with self.assertRaisesRegex(campaign.EvidenceError, "not uniform"):
+            campaign.translation_unit_resource_summary(mixed)
+
+        duration = copy.deepcopy(report)
+        duration["translation_units"][0]["duration_ms"] = 300_001
+        with self.assertRaisesRegex(campaign.EvidenceError, "duration budget"):
+            campaign.translation_unit_plan(duration, 2, 2)
+
+        memory = copy.deepcopy(report)
+        memory["translation_units"][0]["peak_memory_kib"] = 4_194_305
+        with self.assertRaisesRegex(campaign.EvidenceError, "memory budget"):
+            campaign.translation_unit_plan(memory, 2, 2)
 
     def test_report_requires_complete_exact_coverage_and_verdict(self) -> None:
         project = fixture_manifest()["projects"][0]
@@ -808,6 +1994,10 @@ class EvidenceContractTest(unittest.TestCase):
         )
         self.assertEqual(campaign.analyzer_checkpoint_arguments(None), [])
 
+    @unittest.skipUnless(
+        LINUX_SUBREAPER_AVAILABLE,
+        "real shard execution requires Linux /proc subreaper containment",
+    )
     def test_accepted_shard_receipt_revalidates_current_execution_plan(self) -> None:
         raw_manifest = fixture_manifest()
         relative_files = ["src/a.c", "src/b.c"]
@@ -830,8 +2020,10 @@ class EvidenceContractTest(unittest.TestCase):
             files = [root / "work" / "alpha" / path for path in relative_files]
             analyzer_invocations: list[list[str]] = []
 
-            def fake_command(command, cwd, deadline, memory_mb, log_path, env=None):
-                del cwd, deadline, memory_mb, log_path, env
+            def fake_command(
+                command, cwd, deadline, memory_mb, log_path, env=None, **keywords
+            ):
+                del cwd, deadline, memory_mb, log_path, env, keywords
                 if command and command[0] == str(analyzer):
                     analyzer_invocations.append(command)
                     report = {
@@ -859,13 +2051,10 @@ class EvidenceContractTest(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 1)
                 return subprocess.CompletedProcess(command, 0)
 
-            revision_result = subprocess.CompletedProcess(
-                ["git", "rev-parse", "HEAD"], 0, stdout=project["revision"] + "\n"
-            )
             with (
                 mock.patch.object(campaign, "_run_command", side_effect=fake_command),
                 mock.patch.object(
-                    campaign.subprocess, "run", return_value=revision_result
+                    campaign, "_capture_git", return_value=project["revision"] + "\n"
                 ),
                 mock.patch.object(
                     campaign,
@@ -876,6 +2065,12 @@ class EvidenceContractTest(unittest.TestCase):
                     campaign,
                     "_submodule_identity",
                     return_value=campaign._expected_submodules(project),
+                ),
+                mock.patch.object(
+                    campaign, "SHARD_EMERGENCY_RESERVE_BYTES", 1 << 20
+                ),
+                mock.patch.object(
+                    campaign, "MIN_SHARD_FILESYSTEM_FREE_BYTES", 1 << 20
                 ),
             ):
                 code = campaign.run_shard(
@@ -891,6 +2086,15 @@ class EvidenceContractTest(unittest.TestCase):
 
             self.assertEqual(code, 0)
             self.assertEqual(len(analyzer_invocations), 1)
+            analyzer_argv = analyzer_invocations[0]
+            self.assertEqual(
+                analyzer_argv[analyzer_argv.index("--tu-timeout-seconds") + 1],
+                "300",
+            )
+            self.assertEqual(
+                analyzer_argv[analyzer_argv.index("--tu-memory-mib") + 1],
+                "4096",
+            )
             receipt = campaign.load_verified_receipt(output)
             self.assertNotEqual(
                 receipt["execution"]["translation_unit_plan"]["sha256"],
@@ -900,6 +2104,7 @@ class EvidenceContractTest(unittest.TestCase):
                 receipt["execution"]["translation_unit_plan"]["checkpoint"], 1
             )
             self.assertTrue(receipt["execution"]["resumed"])
+            self.assertFalse((root / "work").exists())
 
     def test_legacy_execution_plan_exception_is_explicit_and_uniform(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
