@@ -623,8 +623,8 @@ class QualityFloorReceiptTest(unittest.TestCase):
             tampered["metrics"]["micro_precision"]["numerator"] += 1
             receipt_path.write_bytes(quality.canonical_json(tampered))
             digest = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
-            quality.receipt_checksum_path(receipt_path).write_text(
-                f"{digest}  {receipt_path.name}\n", encoding="utf-8"
+            quality.receipt_checksum_path(receipt_path).write_bytes(
+                f"{digest}  {receipt_path.name}\n".encode("utf-8")
             )
             with self.assertRaisesRegex(quality.QualityFloorError, "differs"):
                 quality.verify_receipt(receipt_path, input_path)

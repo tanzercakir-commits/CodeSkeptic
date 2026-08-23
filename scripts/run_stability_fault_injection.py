@@ -937,7 +937,8 @@ def run_gate(
             f"fault-injection command failed: {error}"
         ) from error
     if return_code != 0:
-        if return_code == 128 + signal.SIGXFSZ:
+        sigxfsz = getattr(signal, "SIGXFSZ", None)
+        if sigxfsz is not None and return_code == 128 + int(sigxfsz):
             raise FaultInjectionError(
                 "fault-injection artifact exceeds its size limit"
             )

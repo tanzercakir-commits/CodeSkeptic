@@ -499,6 +499,9 @@ os._exit(0)
             mock.patch.object(
                 fault, "_run_bounded_gtest", side_effect=failed_run
             ),
+            mock.patch.object(
+                fault.signal, "SIGXFSZ", None, create=True
+            ),
             self.assertRaisesRegex(fault.FaultInjectionError, "returned 1"),
         ):
             fault.run_gate(
@@ -532,6 +535,7 @@ os._exit(0)
     def test_low_level_regular_io_requests_binary_descriptors(self) -> None:
         sentinel = 1 << 29
         actual_open = os.open
+        native_binary = getattr(os, "O_BINARY", 0)
         observed_flags: list[int] = []
 
         def open_without_sentinel(path, flags, mode=0o777):
@@ -540,7 +544,7 @@ os._exit(0)
 
         target = self.root / "binary-io.txt"
         with mock.patch.object(
-            fault.os, "O_BINARY", sentinel, create=True
+            fault.os, "O_BINARY", native_binary | sentinel, create=True
         ), mock.patch.object(
             fault.os, "open", side_effect=open_without_sentinel
         ):
