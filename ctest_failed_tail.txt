@@ -1,0 +1,526 @@
+      gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_public_preflight_does_not_execute_host_analyzer (__main__.QualityFloorCampaignTest.test_public_preflight_does_not_execute_host_analyzer)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2641, in test_public_preflight_does_not_execute_host_analyzer
+    _binary, build_dir, analyzer = _fake_build(root)
+                                   ~~~~~~~~~~~^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_public_run_verifies_in_separate_phase_before_promotion (__main__.QualityFloorCampaignTest.test_public_run_verifies_in_separate_phase_before_promotion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2915, in test_public_run_verifies_in_separate_phase_before_promotion
+    retained = campaign.run_campaign(
+        source,
+    ...<6 lines>...
+        jobs=1,
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 4844, in run_campaign
+    command = _campaign_container_command(
+        "run",
+    ...<10 lines>...
+        build_record=snapshot["build_record"],
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3879, in _campaign_container_command
+    "$SOURCE": _mount_path(source, "source"),
+               ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3824, in _mount_path
+    raise CampaignError(f"{label} path is unsafe for a Podman bind mount")
+run_quality_floor_campaign.CampaignError: source path is unsafe for a Podman bind mount
+
+======================================================================
+ERROR: test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time (__main__.QualityFloorCampaignTest.test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 969, in test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time
+    binary, build_dir, analyzer = _fake_build(Path(directory))
+                                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_retained_build_authority_is_publicly_reverified_and_bound (__main__.QualityFloorCampaignTest.test_retained_build_authority_is_publicly_reverified_and_bound)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 1030, in test_retained_build_authority_is_publicly_reverified_and_bound
+    binary, build_dir, analyzer = _fake_build(root)
+                                  ~~~~~~~~~~~^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_retained_execution_authority_tampering_is_rejected (__main__.QualityFloorCampaignTest.test_retained_execution_authority_tampering_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2938, in test_retained_execution_authority_tampering_is_rejected
+    _binary, build_dir, analyzer = _fake_build(root)
+                                   ~~~~~~~~~~~^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_run_verifies_external_build_authority_before_creating_output (__main__.QualityFloorCampaignTest.test_run_verifies_external_build_authority_before_creating_output)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 1201, in test_run_verifies_external_build_authority_before_creating_output
+    binary, build_dir, _analyzer = _fake_build(root)
+                                   ~~~~~~~~~~~^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+ERROR: test_stress_receipt_uses_authority_identity_and_source_revision (__main__.QualityFloorCampaignTest.test_stress_receipt_uses_authority_identity_and_source_revision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 1838, in test_stress_receipt_uses_authority_identity_and_source_revision
+    rows, used = campaign.collect_requested_tu_negatives(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        raw, None, authority
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 2485, in collect_requested_tu_negatives
+    path.relative_to(raw_root).as_posix()
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\pathlib\__init__.py", line 490, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tmpt6_fkprg\\stress\\operator.json' is not in the subpath of 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\tmpt6_fkprg'
+
+======================================================================
+ERROR: test_verify_rederives_bundle_and_rejects_raw_tampering (__main__.QualityFloorCampaignTest.test_verify_rederives_bundle_and_rejects_raw_tampering)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 916, in test_verify_rederives_bundle_and_rejects_raw_tampering
+    binary, build_dir, analyzer = _fake_build(Path(directory))
+                                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 309, in _fake_build
+    return binary, build_dir, campaign._binary_identity(binary)
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 418, in _binary_identity
+    completed = subprocess.run(
+        [str(binary), "--version"],
+    ...<3 lines>...
+        check=False,
+    )
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 555, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\hostedtoolcache\windows\Python\3.14.7\x64\Lib\subprocess.py", line 1553, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+                             # no special security
+                             ^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+                             cwd,
+                             ^^^^
+                             startupinfo)
+                             ^^^^^^^^^^^^
+OSError: [WinError 193] %1 is not a valid Win32 application
+
+======================================================================
+FAIL: test_campaign_git_commands_use_closed_authority_environment (__main__.QualityFloorCampaignTest.test_campaign_git_commands_use_closed_authority_environment)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2509, in test_campaign_git_commands_use_closed_authority_environment
+    self.assertEqual(environment["GIT_CONFIG_VALUE_1"], "/dev/null")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'nul' != '/dev/null'
+- nul
++ /dev/null
+
+
+======================================================================
+FAIL: test_container_failure_or_partial_marker_never_counts_as_success (__main__.QualityFloorCampaignTest.test_container_failure_or_partial_marker_never_counts_as_success) (label='nonzero')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3921, in _execute_campaign_container
+    environment = build_authority._podman_environment()
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\analyzer_build_authority.py", line 747, in _podman_environment
+    raise BuildAuthorityError("Podman authority requires a POSIX host")
+analyzer_build_authority.BuildAuthorityError: Podman authority requires a POSIX host
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot establish closed Podman environment: Podman authority requires a POSIX host
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2703, in test_container_failure_or_partial_marker_never_counts_as_success
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "exit 2.*partial" does not match "cannot establish closed Podman environment: Podman authority requires a POSIX host"
+
+======================================================================
+FAIL: test_container_failure_or_partial_marker_never_counts_as_success (__main__.QualityFloorCampaignTest.test_container_failure_or_partial_marker_never_counts_as_success) (label='bad marker')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3921, in _execute_campaign_container
+    environment = build_authority._podman_environment()
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\analyzer_build_authority.py", line 747, in _podman_environment
+    raise BuildAuthorityError("Podman authority requires a POSIX host")
+analyzer_build_authority.BuildAuthorityError: Podman authority requires a POSIX host
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot establish closed Podman environment: Podman authority requires a POSIX host
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2703, in test_container_failure_or_partial_marker_never_counts_as_success
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "marker" does not match "cannot establish closed Podman environment: Podman authority requires a POSIX host"
+
+======================================================================
+FAIL: test_container_failure_or_partial_marker_never_counts_as_success (__main__.QualityFloorCampaignTest.test_container_failure_or_partial_marker_never_counts_as_success) (label='non-UTF-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3921, in _execute_campaign_container
+    environment = build_authority._podman_environment()
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\analyzer_build_authority.py", line 747, in _podman_environment
+    raise BuildAuthorityError("Podman authority requires a POSIX host")
+analyzer_build_authority.BuildAuthorityError: Podman authority requires a POSIX host
+
+The above exception was the direct cause of the following exception:
+
+run_quality_floor_campaign.CampaignError: cannot establish closed Podman environment: Podman authority requires a POSIX host
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2703, in test_container_failure_or_partial_marker_never_counts_as_success
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "unreadable" does not match "cannot establish closed Podman environment: Podman authority requires a POSIX host"
+
+======================================================================
+FAIL: test_failed_public_run_leaves_no_output_or_workspace (__main__.QualityFloorCampaignTest.test_failed_public_run_leaves_no_output_or_workspace)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: source path is unsafe for a Podman bind mount
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 2801, in test_failed_public_run_leaves_no_output_or_workspace
+    ), self.assertRaisesRegex(campaign.CampaignError, "container failed"):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "container failed" does not match "source path is unsafe for a Podman bind mount"
+
+======================================================================
+FAIL: test_package_overlap_protection_covers_build_and_authority (__main__.QualityFloorCampaignTest.test_package_overlap_protection_covers_build_and_authority) (label='analyzer build')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3000, in test_package_overlap_protection_covers_build_and_authority
+    with self.subTest(label=label), self.assertRaisesRegex(
+                                    ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "overlaps"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: CampaignError not raised
+
+======================================================================
+FAIL: test_package_overlap_protection_covers_build_and_authority (__main__.QualityFloorCampaignTest.test_package_overlap_protection_covers_build_and_authority) (label='build authority')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorCampaignTest.py", line 3000, in test_package_overlap_protection_covers_build_and_authority
+    with self.subTest(label=label), self.assertRaisesRegex(
+                                    ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "overlaps"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: CampaignError not raised
+
+----------------------------------------------------------------------
+Ran 58 tests in 1.637s
+
+FAILED (failures=7, errors=26)
+
+    Start 1291: QualityFloorEvidenceContract
+7/7 Test #1291: QualityFloorEvidenceContract ......***Failed   43.24 sec
+.....F.E.
+======================================================================
+ERROR: test_package_shape_manifests_bundles_and_receipt_are_exact (__main__.QualityFloorEvidenceTest.test_package_shape_manifests_bundles_and_receipt_are_exact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 2959, in _verify_retained_semantic_chain
+    return quality.verify_receipt(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        package / "receipt.json",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+        ),
+        ^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\quality_floor_receipt.py", line 1182, in verify_receipt
+    checksum_raw = _read_public_regular(
+        receipt_checksum_path(receipt_path),
+        "quality-floor receipt checksum",
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\quality_floor_receipt.py", line 969, in _read_public_regular
+    _digest, raw = _inspect_regular_file(path, label, collect=True)
+                   ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\quality_floor_receipt.py", line 660, in _inspect_regular_file
+    raise ManifestUnavailable(f"{label} changed while being read")
+quality_floor_receipt.ManifestUnavailable: quality-floor receipt checksum changed while being read
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorEvidenceTest.py", line 340, in test_package_shape_manifests_bundles_and_receipt_are_exact
+    receipt = campaign.verify_retained_package(
+        PACKAGE,
+    ...<2 lines>...
+        require_current_source=False,
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 3054, in verify_retained_package
+    return _verify_retained_semantic_chain(
+        package,
+    ...<4 lines>...
+        source_material=source_material,
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_quality_floor_campaign.py", line 2970, in _verify_retained_semantic_chain
+    raise CampaignError(f"quality-floor receipt rejected: {error}") from error
+run_quality_floor_campaign.CampaignError: quality-floor receipt rejected: quality-floor receipt checksum changed while being read
+
+======================================================================
+FAIL: test_external_manifest_binds_exact_regular_evidence_tree (__main__.QualityFloorEvidenceTest.test_external_manifest_binds_exact_regular_evidence_tree)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorEvidenceTest.py", line 130, in _manifest_entries
+    observed, _unused = quality._inspect_regular_file(
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        candidate,
+        ^^^^^^^^^^
+        f"external quality evidence file {name}",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        collect=False,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\quality_floor_receipt.py", line 660, in _inspect_regular_file
+    raise ManifestUnavailable(f"{label} changed while being read")
+quality_floor_receipt.ManifestUnavailable: external quality evidence file 2026-08-22-linux-x86_64/bundles/clean/running-product.json changed while being read
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorEvidenceTest.py", line 311, in test_external_manifest_binds_exact_regular_evidence_tree
+    entries = _verify_external_manifest_tree(
+        EVIDENCE_ROOT,
+        PACKAGE_NAME,
+        expected_file_count=167,
+    )
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorEvidenceTest.py", line 169, in _verify_external_manifest_tree
+    entries = _manifest_entries(evidence_root, manifest)
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorEvidenceTest.py", line 136, in _manifest_entries
+    raise AssertionError(str(error)) from error
+AssertionError: external quality evidence file 2026-08-22-linux-x86_64/bundles/clean/running-product.json changed while being read
+
+----------------------------------------------------------------------
+Ran 9 tests in 43.080s
+
+FAILED (failures=1, errors=1)
+
+
+0% tests passed, 7 tests failed out of 7
+
+Total Test time (real) =  85.92 sec
+
+The following tests FAILED:
+	1277 - StatusAutomationContract (Failed)
+	1278 - RealworldCampaignContract (Failed)
+	1279 - StabilityFaultInjectionContract (Failed)
+	1281 - Phase83QualificationContract (Failed)
+	1289 - QualityFloorReceiptContract (Failed)
+	1290 - QualityFloorCampaignContract (Failed)
+	1291 - QualityFloorEvidenceContract (Failed)
+Errors while running CTest
