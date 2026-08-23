@@ -1,0 +1,494 @@
+/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 195, in test_accepts_exact_seven_rule_floor_and_uses_integer_fractions
+    self.assertEqual(receipt["status"], "accepted")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'rejected' != 'accepted'
+- rejected
++ accepted
+
+
+======================================================================
+FAIL: test_exact_70_percent_case_level_recall_is_accepted (__main__.QualityFloorReceiptTest.test_exact_70_percent_case_level_recall_is_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 262, in test_exact_70_percent_case_level_recall_is_accepted
+    self.assertEqual(receipt["status"], "accepted")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'rejected' != 'accepted'
+- rejected
++ accepted
+
+
+======================================================================
+FAIL: test_generate_refuses_checksum_alias_and_sidecar_symlink (__main__.QualityFloorReceiptTest.test_generate_refuses_checksum_alias_and_sidecar_symlink)
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor input traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 740, in test_generate_refuses_checksum_alias_and_sidecar_symlink
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "aliases protected"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "aliases protected" does not match "quality-floor input traverses a symbolic link"
+
+======================================================================
+FAIL: test_generate_refuses_output_aliases_before_clobbering_evidence (__main__.QualityFloorReceiptTest.test_generate_refuses_output_aliases_before_clobbering_evidence) (label='input')
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor input traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 717, in test_generate_refuses_output_aliases_before_clobbering_evidence
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "aliases protected"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "aliases protected" does not match "quality-floor input traverses a symbolic link"
+
+======================================================================
+FAIL: test_generate_refuses_output_aliases_before_clobbering_evidence (__main__.QualityFloorReceiptTest.test_generate_refuses_output_aliases_before_clobbering_evidence) (label='raw-manifest')
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor input traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 717, in test_generate_refuses_output_aliases_before_clobbering_evidence
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "aliases protected"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "aliases protected" does not match "quality-floor input traverses a symbolic link"
+
+======================================================================
+FAIL: test_generate_refuses_output_aliases_before_clobbering_evidence (__main__.QualityFloorReceiptTest.test_generate_refuses_output_aliases_before_clobbering_evidence) (label='retained-artifact')
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor input traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 717, in test_generate_refuses_output_aliases_before_clobbering_evidence
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "aliases protected"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "aliases protected" does not match "quality-floor input traverses a symbolic link"
+
+======================================================================
+FAIL: test_public_api_rejects_external_hardlink_aliases (__main__.QualityFloorReceiptTest.test_public_api_rejects_external_hardlink_aliases)
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor input traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 676, in test_public_api_rejects_external_hardlink_aliases
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "external hard links"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "external hard links" does not match "quality-floor input traverses a symbolic link"
+
+======================================================================
+FAIL: test_rejects_per_rule_and_micro_precision_below_their_floors (__main__.QualityFloorReceiptTest.test_rejects_per_rule_and_micro_precision_below_their_floors)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 278, in test_rejects_per_rule_and_micro_precision_below_their_floors
+    self.assertTrue(
+    ~~~~~~~~~~~~~~~^
+        any("per-rule precision" in failure for failure in receipt["failures"])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_verify_canonical_non_object_receipt_raises_contract_error (__main__.QualityFloorReceiptTest.test_verify_canonical_non_object_receipt_raises_contract_error)
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor receipt traverses a symbolic link
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorReceiptTest.py", line 780, in test_verify_canonical_non_object_receipt_raises_contract_error
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        quality.QualityFloorError, "JSON object"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "JSON object" does not match "quality-floor receipt traverses a symbolic link"
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.125s
+
+FAILED (failures=9, errors=11)
+
+    Start 1294: QualityFloorCampaignContract
+4/5 Test #1294: QualityFloorCampaignContract .......***Failed    1.29 sec
+.....FFFF..........EF.....FE...F.........FF....F...E.F...E..E.
+======================================================================
+ERROR: test_existing_package_replacement_uses_atomic_exchange (__main__.QualityFloorCampaignTest.test_existing_package_replacement_uses_atomic_exchange)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1319, in test_existing_package_replacement_uses_atomic_exchange
+    campaign._replace_package(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        staged, package, expected, expected_staged
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 4119, in _replace_package
+    _rename_exchange(staged, package)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 4054, in _rename_exchange
+    raise CampaignError("atomic campaign replacement requires renameat2")
+run_quality_floor_campaign.CampaignError: atomic campaign replacement requires renameat2
+
+======================================================================
+ERROR: test_juliet_metrics_are_recomputed_from_raw_findings_and_case_list (__main__.QualityFloorCampaignTest.test_juliet_metrics_are_recomputed_from_raw_findings_and_case_list)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1520, in test_juliet_metrics_are_recomputed_from_raw_findings_and_case_list
+    row, _bundle, _requested = campaign._juliet_rule_row(
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        raw, cwe, "memory-leak"
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 1446, in _juliet_rule_row
+    filelist.relative_to(raw_root).as_posix(),
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 490, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: '/private/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmp7ggtblaa/juliet/files_CWE401_Memory_Leak.txt' is not in the subpath of '/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmp7ggtblaa'
+
+======================================================================
+ERROR: test_retained_build_authority_is_publicly_reverified_and_bound (__main__.QualityFloorCampaignTest.test_retained_build_authority_is_publicly_reverified_and_bound)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1039, in test_retained_build_authority_is_publicly_reverified_and_bound
+    verified = campaign._validate_raw_authority(
+        package,
+    ...<3 lines>...
+        exact_source_revision=True,
+    )
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 938, in _validate_raw_authority
+    binary, build_dir = _require_build_binary(
+                        ~~~~~~~~~~~~~~~~~~~~~^
+        Path(build_dir) / build_authority.ANALYZER_RELATIVE, build_dir
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 441, in _require_build_binary
+    raise CampaignError(
+    ...<2 lines>...
+    )
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+======================================================================
+ERROR: test_stress_receipt_uses_authority_identity_and_source_revision (__main__.QualityFloorCampaignTest.test_stress_receipt_uses_authority_identity_and_source_revision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1838, in test_stress_receipt_uses_authority_identity_and_source_revision
+    rows, used = campaign.collect_requested_tu_negatives(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        raw, None, authority
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 2485, in collect_requested_tu_negatives
+    path.relative_to(raw_root).as_posix()
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 490, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: '/private/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmp21ir9701/stress/operator.json' is not in the subpath of '/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmp21ir9701'
+
+======================================================================
+ERROR: test_verify_rederives_bundle_and_rejects_raw_tampering (__main__.QualityFloorCampaignTest.test_verify_rederives_bundle_and_rejects_raw_tampering)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 935, in test_verify_rederives_bundle_and_rejects_raw_tampering
+    campaign._raw_manifest_bytes(package)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 2758, in _raw_manifest_bytes
+    for path in _manifest_files(package)
+                ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 2752, in _manifest_files
+    return sorted(files, key=lambda path: path.relative_to(package).as_posix())
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_quality_floor_campaign.py", line 2752, in <lambda>
+    return sorted(files, key=lambda path: path.relative_to(package).as_posix())
+                                          ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py", line 490, in relative_to
+    raise ValueError(f"{str(self)!r} is not in the subpath of {str(other)!r}")
+ValueError: '/private/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmpj3bn0h6n/package/raw/campaign-launch-authority.json' is not in the subpath of '/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmpj3bn0h6n/package'
+
+======================================================================
+FAIL: test_build_authority_rejects_wrong_source_analyzer_and_stale_identity (__main__.QualityFloorCampaignTest.test_build_authority_rejects_wrong_source_analyzer_and_stale_identity) (label='wrong source')
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1099, in test_build_authority_rejects_wrong_source_analyzer_and_stale_identity
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "source differs" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_build_authority_rejects_wrong_source_analyzer_and_stale_identity (__main__.QualityFloorCampaignTest.test_build_authority_rejects_wrong_source_analyzer_and_stale_identity) (label='wrong analyzer')
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1099, in test_build_authority_rejects_wrong_source_analyzer_and_stale_identity
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "analyzer differs" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_build_authority_rejects_wrong_source_analyzer_and_stale_identity (__main__.QualityFloorCampaignTest.test_build_authority_rejects_wrong_source_analyzer_and_stale_identity) (label='wrong analyzer version')
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1099, in test_build_authority_rejects_wrong_source_analyzer_and_stale_identity
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "analyzer differs" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_build_authority_rejects_wrong_source_analyzer_and_stale_identity (__main__.QualityFloorCampaignTest.test_build_authority_rejects_wrong_source_analyzer_and_stale_identity) (label='stale identity')
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1099, in test_build_authority_rejects_wrong_source_analyzer_and_stale_identity
+    ), self.assertRaisesRegex(campaign.CampaignError, error):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "identity mismatch" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_failed_public_run_leaves_no_output_or_workspace (__main__.QualityFloorCampaignTest.test_failed_public_run_leaves_no_output_or_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 2823, in test_failed_public_run_leaves_no_output_or_workspace
+    self.assertIn(root, host.parents)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: PosixPath('/var/folders/g3/pffjr_y96bq06blnkf72x_hw0000gn/T/tmpyovbowi9') not found in <PosixPath.parents>
+
+======================================================================
+FAIL: test_inner_launch_uses_only_in_runtime_build_verifier (__main__.QualityFloorCampaignTest.test_inner_launch_uses_only_in_runtime_build_verifier)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 2547, in test_inner_launch_uses_only_in_runtime_build_verifier
+    self.assertEqual(derived_binary, binary)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: PosixPath('/private/var/folders/g3/pffjr_y96bq06blnkf[45 chars]tic') != PosixPath('/var/folders/g3/pffjr_y96bq06blnkf72x_hw00[37 chars]tic')
+
+======================================================================
+FAIL: test_missing_or_tampered_retained_build_authority_is_rejected (__main__.QualityFloorCampaignTest.test_missing_or_tampered_retained_build_authority_is_rejected)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 1124, in test_missing_or_tampered_retained_build_authority_is_rejected
+    ), self.assertRaisesRegex(campaign.CampaignError, "file set"):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "file set" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_package_overlap_protection_covers_build_and_authority (__main__.QualityFloorCampaignTest.test_package_overlap_protection_covers_build_and_authority) (label='analyzer build')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3000, in test_package_overlap_protection_covers_build_and_authority
+    with self.subTest(label=label), self.assertRaisesRegex(
+                                    ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "overlaps"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: CampaignError not raised
+
+======================================================================
+FAIL: test_package_overlap_protection_covers_build_and_authority (__main__.QualityFloorCampaignTest.test_package_overlap_protection_covers_build_and_authority) (label='build authority')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 3000, in test_package_overlap_protection_covers_build_and_authority
+    with self.subTest(label=label), self.assertRaisesRegex(
+                                    ~~~~~~~~~~~~~~~~~~~~~~^
+        campaign.CampaignError, "overlaps"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: CampaignError not raised
+
+======================================================================
+FAIL: test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time (__main__.QualityFloorCampaignTest.test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 981, in test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time
+    ), self.assertRaisesRegex(campaign.CampaignError, "binary mismatch"):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "binary mismatch" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+======================================================================
+FAIL: test_retained_execution_authority_tampering_is_rejected (__main__.QualityFloorCampaignTest.test_retained_execution_authority_tampering_is_rejected)
+----------------------------------------------------------------------
+run_quality_floor_campaign.CampaignError: analyzer binary must be exactly build-dir/src/codeskeptic
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/QualityFloorCampaignTest.py", line 2948, in test_retained_execution_authority_tampering_is_rejected
+    ), self.assertRaisesRegex(campaign.CampaignError, "execution authority"):
+       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "execution authority" does not match "analyzer binary must be exactly build-dir/src/codeskeptic"
+
+----------------------------------------------------------------------
+Ran 58 tests in 1.196s
+
+FAILED (failures=11, errors=5)
+
+    Start 1306: DeterminismQualificationContract
+5/5 Test #1306: DeterminismQualificationContract ...***Failed   12.72 sec
+.....................................EF.........E..F.............
+======================================================================
+ERROR: test_prepare_projects_explicit_targets_but_not_legacy_workspace (__main__.DeterminismQualificationTest.test_prepare_projects_explicit_targets_but_not_legacy_workspace)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 4151, in test_prepare_projects_explicit_targets_but_not_legacy_workspace
+    source, build, projected = exercise(
+                               ~~~~~~~~^
+        Path(directory), explicit=True
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 4138, in exercise
+    qualification.prepare_release_candidate(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        ROOT, release_workload, workspace, 1,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **explicit_arguments,
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_determinism_qualification.py", line 5069, in prepare_release_candidate
+    source, build = _release_candidate_paths(
+                    ~~~~~~~~~~~~~~~~~~~~~~~~^
+        workspace,
+        ^^^^^^^^^^
+    ...<2 lines>...
+        release_build=release_build,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_determinism_qualification.py", line 5009, in _release_candidate_paths
+    raise QualificationError(
+        f"explicit release {label} is not a real directory"
+    )
+run_determinism_qualification.QualificationError: explicit release source is not a real directory
+
+======================================================================
+ERROR: test_release_preparation_accepts_only_an_exact_empty_target_pair (__main__.DeterminismQualificationTest.test_release_preparation_accepts_only_an_exact_empty_target_pair)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 3715, in test_release_preparation_accepts_only_an_exact_empty_target_pair
+    qualification._release_candidate_paths(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        None, "llama-cpp",
+        ^^^^^^^^^^^^^^^^^^
+        release_source=source,
+        ^^^^^^^^^^^^^^^^^^^^^^
+        release_build=build,
+        ^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/scripts/run_determinism_qualification.py", line 5009, in _release_candidate_paths
+    raise QualificationError(
+        f"explicit release {label} is not a real directory"
+    )
+run_determinism_qualification.QualificationError: explicit release source is not a real directory
+
+======================================================================
+FAIL: test_prepare_rejects_explicit_target_replacement_before_projection (__main__.DeterminismQualificationTest.test_prepare_rejects_explicit_target_replacement_before_projection)
+----------------------------------------------------------------------
+run_determinism_qualification.QualificationError: explicit release source is not a real directory
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 4224, in test_prepare_rejects_explicit_target_replacement_before_projection
+    self.assertRaisesRegex(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        qualification.QualificationError, "build identity drift"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+AssertionError: "build identity drift" does not match "explicit release source is not a real directory"
+
+======================================================================
+FAIL: test_required_baseline_preflight_precedes_release_preparation (__main__.DeterminismQualificationTest.test_required_baseline_preflight_precedes_release_preparation)
+----------------------------------------------------------------------
+run_determinism_qualification.QualificationError: repository or build directory is missing
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/runner/work/CodeSkeptic/CodeSkeptic/tests/DeterminismQualificationTest.py", line 1221, in test_required_baseline_preflight_precedes_release_preparation
+    with self.assertRaisesRegex(
+         ~~~~~~~~~~~~~~~~~~~~~~^
+        qualification.QualificationError,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "baseline OS, hardware, or toolchain inventory drift",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: "baseline OS, hardware, or toolchain inventory drift" does not match "repository or build directory is missing"
+
+----------------------------------------------------------------------
+Ran 65 tests in 12.622s
+
+FAILED (failures=2, errors=2)
+DETERMINISM_REJECTED_EVIDENCE_OK mode=verify
+
+
+0% tests passed, 5 tests failed out of 5
+
+Total Test time (real) =  14.60 sec
+
+The following tests FAILED:
+	1282 - RealworldCampaignContract (Failed)
+	1283 - StabilityFaultInjectionContract (Failed)
+	1293 - QualityFloorReceiptContract (Failed)
+	1294 - QualityFloorCampaignContract (Failed)
+	1306 - DeterminismQualificationContract (Failed)
+Errors while running CTest
