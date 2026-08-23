@@ -148,6 +148,7 @@ AUTHORITY_INPUT_PATHS = (
     "scripts/realworld_manifest.json",
     "tests/thesis_corpus/thesis_expected.txt",
 )
+CAPABILITY_REGISTRY_RELATIVE = "src/core/RuleCapabilities.def"
 BUILD_AUTHORITY_RAW_DIR = "build-authority"
 CAMPAIGN_CONTAINER_LAYOUTS = ("legacy", "p10-09")
 
@@ -581,14 +582,20 @@ def _verify_retained_build_authority_static(
 
 
 def _verify_retained_source_authority(
-    source_root: Path, build_receipt: dict[str, Any]
+    source_root: Path,
+    build_receipt: dict[str, Any],
+    *,
+    require_current_source: bool = True,
 ) -> dict[str, str]:
     """Re-derive the retained build source at its committed revision."""
     source_root = _directory(source_root, "campaign source root")
     recorded = build_receipt["source"]
     try:
         build_authority.determinism._verify_source_authority(
-            recorded, source_root, "retained quality-floor package"
+            recorded,
+            source_root,
+            "retained quality-floor package",
+            require_current_source=require_current_source,
         )
     except (build_authority.determinism.QualificationError, OSError) as error:
         raise CampaignError(
@@ -629,6 +636,43 @@ def _script_identities(root: Path = ROOT) -> dict[str, str]:
     return {
         relative: sha256_file(_regular(root / relative, f"authority input {relative}"))
         for relative in AUTHORITY_INPUT_PATHS
+    }
+
+
+def _source_authority_material(
+    root: Path, *, revision: str | None = None
+) -> dict[str, Any]:
+    """Return executable quality inputs from current or recorded source bytes."""
+    root = _directory(root, "campaign source authority root")
+    relatives = (*AUTHORITY_INPUT_PATHS, CAPABILITY_REGISTRY_RELATIVE)
+    try:
+        if revision is None:
+            blobs = {
+                relative: _regular(
+                    root / relative, f"source authority input {relative}"
+                ).read_bytes()
+                for relative in relatives
+            }
+        else:
+            blobs = {
+                relative: build_authority.determinism._git_blob(
+                    root, revision, relative
+                )
+                for relative in relatives
+            }
+    except (build_authority.determinism.QualificationError, OSError) as error:
+        raise CampaignError(
+            f"cannot re-derive quality source authority material: {error}"
+        ) from error
+    return {
+        "scripts": {
+            relative: sha256_bytes(blobs[relative])
+            for relative in AUTHORITY_INPUT_PATHS
+        },
+        "mutation_manifest": blobs[
+            "scripts/quality_floor_resource_mutations.json"
+        ],
+        "capability_registry": blobs[CAPABILITY_REGISTRY_RELATIVE],
     }
 
 
@@ -822,6 +866,7 @@ def _validate_raw_authority_envelope(
     verified_source: dict[str, str],
     verified_analyzer: dict[str, str],
     verified_build: dict[str, Any],
+    expected_scripts: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     source_root = _directory(source_root, "campaign source root")
     raw_root, path, authority = _raw_authority_payload(package)
@@ -852,7 +897,12 @@ def _validate_raw_authority_envelope(
         raise CampaignError("raw campaign completion precedes its start")
     if authority["official_corpus"] != _official_corpus_identity():
         raise CampaignError("raw campaign official corpus identity drift")
-    if authority["scripts"] != _script_identities(source_root):
+    scripts = (
+        _script_identities(source_root)
+        if expected_scripts is None
+        else expected_scripts
+    )
+    if authority["scripts"] != scripts:
         raise CampaignError("raw campaign script identity drift")
     if authority["source"] != verified_source:
         raise CampaignError("raw campaign source is stale or mixed")
@@ -2005,13 +2055,22 @@ def run_resource_campaign(
         write_json(resource_raw / "operator.json", observations)
 
 
-def _resource_input(raw_root: Path) -> tuple[dict[str, Any], list[str]]:
+def _resource_input(
+    raw_root: Path, *, mutation_manifest: bytes | None = None
+) -> tuple[dict[str, Any], list[str]]:
     resource_root = _directory(raw_root / "resource", "resource raw evidence")
     retained_config = _regular(
         resource_root / "mutations.json", "retained resource mutation manifest"
     )
-    if retained_config.read_bytes() != MUTATION_PATH.read_bytes():
-        raise CampaignError("retained resource mutations differ from current source")
+    expected_mutations = (
+        MUTATION_PATH.read_bytes()
+        if mutation_manifest is None
+        else mutation_manifest
+    )
+    if retained_config.read_bytes() != expected_mutations:
+        raise CampaignError(
+            "retained resource mutations differ from verified source authority"
+        )
     config = _load_mutations(retained_config)
     payload = strict_json(resource_root / "input-manifest.json")
     required = {
@@ -2143,9 +2202,14 @@ def _diagnostic_projection(diagnostic: Any) -> tuple[Any, ...]:
 
 
 def collect_resource(
-    raw_root: Path, authority: dict[str, Any]
+    raw_root: Path,
+    authority: dict[str, Any],
+    *,
+    mutation_manifest: bytes | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
-    payload, used = _resource_input(raw_root)
+    payload, used = _resource_input(
+        raw_root, mutation_manifest=mutation_manifest
+    )
     resource_root = raw_root / "resource"
     operator_path = _regular(resource_root / "operator.json", "resource operator")
     operator = strict_json(operator_path)
@@ -2465,7 +2529,11 @@ def _raw_files(raw_root: Path) -> list[Path]:
 
 
 def _collect_observations(
-    package: Path, binary: Path | None, authority: dict[str, Any]
+    package: Path,
+    binary: Path | None,
+    authority: dict[str, Any],
+    *,
+    source_material: dict[str, Any] | None = None,
 ) -> tuple[
     list[dict[str, Any]],
     list[dict[str, Any]],
@@ -2474,7 +2542,15 @@ def _collect_observations(
 ]:
     raw_root = _directory(package / "raw", "raw campaign directory")
     juliet_rows, juliet_used = collect_juliet(raw_root, authority)
-    resource_row, resource_used = collect_resource(raw_root, authority)
+    resource_row, resource_used = collect_resource(
+        raw_root,
+        authority,
+        mutation_manifest=(
+            source_material["mutation_manifest"]
+            if source_material is not None
+            else None
+        ),
+    )
     clean_cases, clean_used = collect_clean_corpus(raw_root, authority)
     negatives, stress_used = collect_requested_tu_negatives(
         raw_root, binary, authority
@@ -2709,17 +2785,22 @@ def derive_quality_input(
     require_clean_source: bool,
     authority: dict[str, Any],
     source_identity: dict[str, str] | None = None,
+    source_material: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, list[str]]]:
     if source_identity is not None and source_identity != authority["source"]:
         raise CampaignError("quality input source differs from raw campaign authority")
     rules, clean_cases, negatives, used = _collect_observations(
-        package, binary, authority
+        package, binary, authority, source_material=source_material
     )
     materialize_bundles(
         package, rules, clean_cases, negatives, used, write=False
     )
     raw_manifest, file_count = verify_raw_manifest(package)
-    capabilities = quality.capability_registry_identity()
+    capabilities = quality.capability_registry_identity(
+        source_material["capability_registry"]
+        if source_material is not None
+        else None
+    )
     manifest = {
         "schema": quality.INPUT_SCHEMA,
         "identity": {
@@ -2850,6 +2931,7 @@ def _verify_retained_semantic_chain(
     source_identity: dict[str, str],
     *,
     require_accepted: bool,
+    source_material: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     verify_raw_manifest(package)
     input_path = _regular(package / "quality-floor-input.json", "quality-floor input")
@@ -2867,6 +2949,7 @@ def _verify_retained_semantic_chain(
         require_clean_source=False,
         authority=authority,
         source_identity=source_identity,
+        source_material=source_material,
     )
     if retained_input != expected_input or input_path.read_bytes() != canonical_json(
         retained_input
@@ -2877,6 +2960,11 @@ def _verify_retained_semantic_chain(
             package / "receipt.json",
             input_path,
             require_accepted=require_accepted,
+            capability_registry=(
+                source_material["capability_registry"]
+                if source_material is not None
+                else None
+            ),
         )
     except quality.QualityFloorError as error:
         raise CampaignError(f"quality-floor receipt rejected: {error}") from error
@@ -2928,6 +3016,7 @@ def verify_retained_package(
     *,
     require_accepted: bool = True,
     source_root: Path = ROOT,
+    require_current_source: bool = True,
 ) -> dict[str, Any]:
     """Offline semantic verification using only committed retained evidence."""
     package = _directory(package, "campaign package")
@@ -2942,7 +3031,17 @@ def verify_retained_package(
         raw_root / BUILD_AUTHORITY_RAW_DIR
     )
     verified_source = _verify_retained_source_authority(
-        source_root, build_receipt
+        source_root,
+        build_receipt,
+        require_current_source=require_current_source,
+    )
+    source_material = _source_authority_material(
+        source_root,
+        revision=(
+            None
+            if require_current_source
+            else build_receipt["source"]["revision"]
+        ),
     )
     authority = _validate_raw_authority_envelope(
         package,
@@ -2950,6 +3049,7 @@ def verify_retained_package(
         verified_source=verified_source,
         verified_analyzer=_campaign_analyzer_from_build(build_record),
         verified_build=build_record,
+        expected_scripts=source_material["scripts"],
     )
     return _verify_retained_semantic_chain(
         package,
@@ -2957,6 +3057,7 @@ def verify_retained_package(
         authority,
         verified_source,
         require_accepted=require_accepted,
+        source_material=source_material,
     )
 
 

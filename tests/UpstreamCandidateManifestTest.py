@@ -193,18 +193,22 @@ class DefaultRecipeSnapshotGuardTest(unittest.TestCase):
                 for item in ast.walk(node.test)
                 if isinstance(item, ast.Attribute)
             )
+            string_literals = {
+                item.value
+                for item in ast.walk(node.test)
+                if isinstance(item, ast.Constant)
+                and isinstance(item.value, str)
+            }
             if (
-                any("observed" in name or "actual" in name for name in names)
-                and any("count" in name or "len" in name for name in names)
-                and any(
-                    marker in name
-                    for name in names
-                    for marker in ("sha", "checksum", "digest")
-                )
+                {"actual_tu_sha", "files", "len"} <= names
+                and {
+                    "translation_units",
+                    "translation_unit_sha256",
+                } <= string_literals
             ):
                 checks.append(node)
 
-        self.assertTrue(checks)
+        self.assertEqual(len(checks), 1)
         for check in checks:
             current = parents.get(check)
             guarded = False

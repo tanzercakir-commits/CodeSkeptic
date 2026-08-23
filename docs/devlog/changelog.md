@@ -39,6 +39,20 @@
   deadline. A timed-out process is still rejected immediately, but SIGKILL
   cleanup can now observe kernel quiescence instead of falsely reporting a
   surviving process on the first scheduler tick after the deadline.
+- Closed every offline real-world shard subprocess over a fixed executable
+  path and authority-declared compiler pair, disabled ambient compiler caches,
+  and placed HOME, TMP, and XDG state inside the identity-bound shard budget.
+  Checkout, configure, build, target-closure discovery, and analyzer execution
+  now share that environment; hostile host compiler, launcher, proxy, and
+  cache variables are covered by both unit and real adapter regressions.
+- Separated historical P10-08 quality evidence from the fresh P10-09 source
+  gate. Historical verification may skip only equality with the descendant
+  worktree: ancestry, the recorded revision manifest, authority scripts,
+  mutation manifest, capability registry, raw evidence, bundles, and receipt
+  are still re-derived. Fresh verification remains exact-current by default.
+- Narrowed the upstream-manifest AST contract to the single translation-unit
+  count/hash guard it is intended to protect, so unrelated mirror-submodule
+  digest checks cannot satisfy or multiply that assertion.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

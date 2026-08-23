@@ -76,6 +76,9 @@ SHARD_RESERVE_RECOVERY_POLL_SECONDS = 0.05
 MAX_MIRROR_AUTHORITY_BYTES = 4 << 20
 MAX_MIRROR_BUNDLE_BYTES = 32 << 30
 MIRROR_AUTHORITY_SCHEMA = "codeskeptic-realworld-mirror-authority-v1"
+OFFLINE_COMMAND_PATH = (
+    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+)
 DEFAULT_TU_TIMEOUT_SECONDS = 300
 DEFAULT_TU_MEMORY_MIB = 4096
 PR_SET_CHILD_SUBREAPER = 36
@@ -955,23 +958,54 @@ def load_mirror_authority(
 
 
 def _offline_base_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    for key in list(environment):
-        if key.startswith("GIT_"):
-            environment.pop(key)
-    environment.update(
-        {
-            "GIT_ALLOW_PROTOCOL": "file",
-            "GIT_PROTOCOL_FROM_USER": "0",
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_ASKPASS": "/bin/false",
-            "SSH_ASKPASS": "/bin/false",
-            "GIT_CONFIG_COUNT": "0",
-        }
-    )
-    return environment
+    # Offline authority must not inherit compiler launchers, cache settings,
+    # proxy variables, CMake knobs, or arbitrary executables from the host.
+    # When a shard is live, every writable environment root is the fresh,
+    # budgeted temporary directory inside that shard.  The fallback keeps
+    # private pure-environment helpers closed without pretending that a command
+    # may run outside the bounded shard context.
+    workspace_state = _COMMAND_WORKSPACE_STATE.get()
+    if workspace_state is None:
+        home = "/nonexistent"
+        temporary = "/tmp"
+        xdg_root = "/nonexistent"
+    else:
+        root, identity, _allocated, _free, temporary_path, _reserve = (
+            workspace_state
+        )
+        if (
+            _workspace_directory_identity(root) != identity
+            or _path_kind(temporary_path) != "directory"
+            or temporary_path.parent != root
+            or temporary_path.name != ".codeskeptic-tmp"
+        ):
+            raise EvidenceError(
+                "offline command environment escaped the bounded shard workspace"
+            )
+        home = os.fspath(temporary_path)
+        temporary = os.fspath(temporary_path)
+        xdg_root = os.fspath(temporary_path)
+    return {
+        "PATH": OFFLINE_COMMAND_PATH,
+        "HOME": home,
+        "TMPDIR": temporary,
+        "XDG_CACHE_HOME": xdg_root,
+        "XDG_CONFIG_HOME": xdg_root,
+        "XDG_DATA_HOME": xdg_root,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "CCACHE_DISABLE": "1",
+        "GIT_ALLOW_PROTOCOL": "file",
+        "GIT_PROTOCOL_FROM_USER": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_ASKPASS": "/bin/false",
+        "SSH_ASKPASS": "/bin/false",
+        "GIT_CONFIG_COUNT": "0",
+    }
 
 
 def offline_git_environment(
@@ -2416,7 +2450,7 @@ def _capture_git(
     deadline: float,
     memory_mb: int,
     log_path: Path,
-    env: dict[str, str],
+    env: dict[str, str] | None,
 ) -> str:
     result = _supervise_command(
         command, cwd, deadline, memory_mb, log_path, env, capture=True
@@ -3100,6 +3134,10 @@ def run_shard(
         build = _inside(project_root, project_root / "build-codeskeptic", "project build")
         values = {"source": str(project_root), "build": str(build), "jobs": "2"}
         compile_database = Path(project["compile_database"].format(**values))
+        offline_execution_environment: dict[str, str] | None = None
+        if mirror_project is not None:
+            offline_execution_environment = _offline_base_environment()
+            offline_execution_environment.update(project.get("environment", {}))
 
         for operation in project["copies"]:
             source_file = _inside(repository_root, repository_root / operation["from"], "copy source")
@@ -3111,7 +3149,7 @@ def run_shard(
         for group in ("configure", "build"):
             for command in project["commands"][group]:
                 command_environment = (
-                    _offline_base_environment()
+                    dict(offline_execution_environment)
                     if mirror_project is not None
                     else os.environ.copy()
                 )
@@ -3150,7 +3188,7 @@ def run_shard(
                 deadline,
                 project["memory_mb"],
                 log_path,
-                None,
+                offline_execution_environment,
             )
         if target_commands:
             files, relative_files = filter_target_translation_units(
@@ -3195,6 +3233,7 @@ def run_shard(
             deadline,
             project["memory_mb"],
             log_path,
+            env=offline_execution_environment,
             watched_files={report_path: MAX_ANALYZER_REPORT_BYTES},
             file_size_limit_bytes=MAX_ANALYZER_REPORT_BYTES,
         )

@@ -105,12 +105,29 @@ def receipt_checksum_path(receipt_path: Path) -> Path:
     return receipt_path.with_name(receipt_path.name + ".sha256")
 
 
-def capability_registry_identity() -> dict[str, Any]:
-    """Return the exact current quality-gated default set and registry hash."""
+def capability_registry_identity(
+    registry: bytes | None = None,
+) -> dict[str, Any]:
+    """Return the exact quality-gated default set and registry hash.
+
+    By default the executing source registry is authoritative.  Historical
+    evidence verifiers may instead supply bytes that they independently
+    re-derived from the evidence's recorded Git revision.
+    """
+    if registry is None:
+        try:
+            raw = CAPABILITY_REGISTRY.read_bytes()
+        except OSError as error:
+            raise ManifestUnavailable(
+                f"cannot read capability registry: {error}"
+            ) from error
+    else:
+        if not isinstance(registry, bytes):
+            raise ManifestUnavailable("capability registry bytes are malformed")
+        raw = registry
     try:
-        raw = CAPABILITY_REGISTRY.read_bytes()
         lines = raw.decode("utf-8").splitlines()
-    except (OSError, UnicodeDecodeError) as error:
+    except UnicodeDecodeError as error:
         raise ManifestUnavailable(
             f"cannot read capability registry: {error}"
         ) from error
@@ -201,7 +218,9 @@ def _coverage(value: Any, label: str) -> dict[str, int]:
     }
 
 
-def _identity(value: Any) -> dict[str, Any]:
+def _identity(
+    value: Any, *, capability_registry: bytes | None = None
+) -> dict[str, Any]:
     payload = _object(
         value,
         {"source", "analyzer", "capabilities", "retained_artifacts"},
@@ -244,13 +263,15 @@ def _identity(value: Any) -> dict[str, Any]:
             "capability rule set is not the exact seven supported "
             "quality-gated defaults"
         )
-    current_capabilities = capability_registry_identity()
+    expected_capabilities = capability_registry_identity(capability_registry)
     registry_sha256 = _hash(
         capabilities["registry_sha256"],
         "identity.capabilities.registry_sha256",
     )
-    if registry_sha256 != current_capabilities["sha256"]:
-        raise ManifestUnavailable("capability registry hash differs from this source")
+    if registry_sha256 != expected_capabilities["sha256"]:
+        raise ManifestUnavailable(
+            "capability registry hash differs from verified source authority"
+        )
 
     artifacts = _object(
         payload["retained_artifacts"],
@@ -279,7 +300,7 @@ def _identity(value: Any) -> dict[str, Any]:
         },
         "capabilities": {
             "registry_sha256": registry_sha256,
-            "supported_quality_gated_default_rules": current_capabilities["rules"],
+            "supported_quality_gated_default_rules": expected_capabilities["rules"],
         },
         "retained_artifacts": {
             "manifest_path": RAW_MANIFEST_NAME,
@@ -874,6 +895,7 @@ def build_receipt(
     input_bytes: int,
     parse_error: str | None = None,
     artifacts_root: Path | None = None,
+    capability_registry: bytes | None = None,
 ) -> dict[str, Any]:
     """Build a receipt; acceptance requires externally checked artifacts_root."""
     if SHA256.fullmatch(input_sha256) is None:
@@ -913,7 +935,9 @@ def build_receipt(
         )
         if payload["schema"] != INPUT_SCHEMA:
             raise ManifestUnavailable("unsupported quality-floor input schema")
-        normalized_identity = _identity(payload["identity"])
+        normalized_identity = _identity(
+            payload["identity"], capability_registry=capability_registry
+        )
         receipt["identity"] = normalized_identity
         rules = _rules(payload["rules"])
         clean_cases = _clean_corpus(payload["clean_corpus"])
@@ -956,7 +980,9 @@ def _read_input(input_path: Path) -> tuple[bytes, Any, str | None]:
     return raw, payload, None
 
 
-def _receipt_from_input(input_path: Path) -> dict[str, Any]:
+def _receipt_from_input(
+    input_path: Path, *, capability_registry: bytes | None = None
+) -> dict[str, Any]:
     raw, payload, parse_error = _read_input(input_path)
     return build_receipt(
         payload,
@@ -964,6 +990,7 @@ def _receipt_from_input(input_path: Path) -> dict[str, Any]:
         input_bytes=len(raw),
         parse_error=parse_error,
         artifacts_root=input_path.resolve().parent,
+        capability_registry=capability_registry,
     )
 
 
@@ -1148,6 +1175,7 @@ def verify_receipt(
     input_path: Path,
     *,
     require_accepted: bool = True,
+    capability_registry: bytes | None = None,
 ) -> dict[str, Any]:
     try:
         data = _read_public_regular(receipt_path, "quality-floor receipt")
@@ -1171,7 +1199,9 @@ def verify_receipt(
         raise QualityFloorError("quality-floor receipt is not a JSON object")
     if data != canonical_json(receipt):
         raise QualityFloorError("quality-floor receipt is not canonical JSON")
-    expected = _receipt_from_input(input_path)
+    expected = _receipt_from_input(
+        input_path, capability_registry=capability_registry
+    )
     if receipt.get("status") == "accepted" and expected["status"] == "rejected":
         raise QualityFloorError(expected["failures"][0])
     if receipt != expected:

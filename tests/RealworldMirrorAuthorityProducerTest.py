@@ -703,18 +703,47 @@ class MirrorAuthorityProducerTest(unittest.TestCase):
             analyzer.chmod(0o755)
             normalized = campaign.validate_manifest(manifest)
             receipt = workspace / "run" / "receipt.json"
-            status = campaign.run_shard(
-                normalized,
-                "adapter",
-                1,
-                analyzer,
-                workspace / "shard-work",
-                receipt,
-                None,
-                ROOT,
-                authority_path,
+            hostile_bin = workspace / "hostile-bin"
+            hostile_bin.mkdir()
+            marker = workspace / "ambient-compiler-ran"
+            hostile_compiler = hostile_bin / "cc"
+            hostile_compiler.write_text(
+                "#!/bin/sh\n"
+                f"printf invoked > '{marker}'\n"
+                "exec /usr/bin/cc \"$@\"\n",
+                encoding="utf-8",
             )
-            self.assertEqual(status, 0, receipt.read_text(encoding="utf-8"))
+            hostile_compiler.chmod(0o755)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "PATH": f"{hostile_bin}:{os.environ.get('PATH', '')}",
+                    "CC": os.fspath(hostile_compiler),
+                    "CMAKE_C_COMPILER_LAUNCHER": os.fspath(hostile_compiler),
+                    "CCACHE_DIR": os.fspath(workspace / "ambient-cache"),
+                    "HTTP_PROXY": "http://hostile.invalid",
+                },
+                clear=False,
+            ):
+                status = campaign.run_shard(
+                    normalized,
+                    "adapter",
+                    1,
+                    analyzer,
+                    workspace / "shard-work",
+                    receipt,
+                    None,
+                    ROOT,
+                    authority_path,
+                )
+            failure_detail = receipt.read_text(encoding="utf-8")
+            command_log = receipt.parent / "commands.log"
+            if status != 0 and command_log.is_file():
+                failure_detail += "\ncommand log tail:\n" + command_log.read_bytes()[
+                    -4000:
+                ].decode("utf-8", errors="replace")
+            self.assertEqual(status, 0, failure_detail)
+            self.assertFalse(marker.exists())
             self.assertEqual(json.loads(receipt.read_text())["status"], "accepted")
 
     @unittest.skipUnless(

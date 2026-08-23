@@ -967,6 +967,65 @@ class MirrorAuthorityContractTest(unittest.TestCase):
                 finally:
                     unseal_mirror(root)
 
+    def test_offline_environment_closes_host_compiler_cache_and_build_injection(self) -> None:
+        hostile = {
+            "PATH": "/hostile/bin:/usr/lib64/ccache:/usr/bin",
+            "HOME": "/runtime/home",
+            "TMPDIR": "/runtime/tmp",
+            "CC": "/hostile/cc",
+            "CXX": "/hostile/cxx",
+            "CFLAGS": "-include /hostile/header.h",
+            "CMAKE_GENERATOR": "Hostile",
+            "CCACHE_DIR": "/hostile/cache",
+            "CCACHE_PREFIX": "/hostile/prefix",
+            "HTTP_PROXY": "http://hostile.invalid",
+            "LD_PRELOAD": "/hostile/preload.so",
+            "BASH_ENV": "/hostile/bash-env",
+            "XDG_CACHE_HOME": "/hostile/xdg-cache",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            temporary = workspace / ".codeskeptic-tmp"
+            temporary.mkdir()
+            identity = campaign._workspace_directory_identity(workspace)
+            token = campaign._COMMAND_WORKSPACE_STATE.set(
+                (
+                    workspace,
+                    identity,
+                    0,
+                    0,
+                    temporary,
+                    {"reserve": None, "probe": None},
+                )
+            )
+            try:
+                with mock.patch.dict(os.environ, hostile, clear=True):
+                    environment = campaign._offline_base_environment()
+            finally:
+                campaign._COMMAND_WORKSPACE_STATE.reset(token)
+        self.assertEqual(
+            environment["PATH"],
+            "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        )
+        self.assertEqual(environment["HOME"], os.fspath(temporary))
+        self.assertEqual(environment["TMPDIR"], os.fspath(temporary))
+        self.assertEqual(environment["XDG_CACHE_HOME"], os.fspath(temporary))
+        self.assertEqual(environment["XDG_CONFIG_HOME"], os.fspath(temporary))
+        self.assertEqual(environment["XDG_DATA_HOME"], os.fspath(temporary))
+        self.assertEqual(environment["CCACHE_DISABLE"], "1")
+        for rejected in (
+            "CC",
+            "CXX",
+            "CFLAGS",
+            "CMAKE_GENERATOR",
+            "CCACHE_DIR",
+            "CCACHE_PREFIX",
+            "HTTP_PROXY",
+            "LD_PRELOAD",
+            "BASH_ENV",
+        ):
+            self.assertNotIn(rejected, environment)
+
     def test_recursive_offline_mapping_is_exact_and_network_is_disabled(self) -> None:
         raw = fixture_manifest()
         entries = [{"path": "deps/example", "revision": "4" * 40}]

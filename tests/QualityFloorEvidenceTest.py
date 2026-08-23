@@ -341,6 +341,7 @@ class QualityFloorEvidenceTest(unittest.TestCase):
             PACKAGE,
             require_accepted=True,
             source_root=ROOT,
+            require_current_source=False,
         )
         self.assertEqual(receipt["status"], "accepted")
         self.assertEqual(receipt["availability"], "available")
@@ -368,6 +369,50 @@ class QualityFloorEvidenceTest(unittest.TestCase):
             },
         )
 
+    def test_historical_capability_blob_tampering_is_rejected(self) -> None:
+        raw_root = PACKAGE / "raw"
+        build_record, build_receipt = (
+            campaign._verify_retained_build_authority_static(
+                raw_root / campaign.BUILD_AUTHORITY_RAW_DIR
+            )
+        )
+        source = campaign._verify_retained_source_authority(
+            ROOT,
+            build_receipt,
+            require_current_source=False,
+        )
+        material = campaign._source_authority_material(
+            ROOT, revision=build_receipt["source"]["revision"]
+        )
+        authority = campaign._validate_raw_authority_envelope(
+            PACKAGE,
+            source_root=ROOT,
+            verified_source=source,
+            verified_analyzer=campaign._campaign_analyzer_from_build(
+                build_record
+            ),
+            verified_build=build_record,
+            expected_scripts=material["scripts"],
+        )
+        tampered = {
+            **material,
+            "capability_registry": (
+                material["capability_registry"]
+                + b"// forged historical registry bytes\n"
+            ),
+        }
+        with self.assertRaisesRegex(
+            campaign.CampaignError, "input differs from raw-derived metrics"
+        ):
+            campaign._verify_retained_semantic_chain(
+                PACKAGE,
+                None,
+                authority,
+                source,
+                require_accepted=True,
+                source_material=tampered,
+            )
+
     def test_build_source_and_execution_authorities_rederive(self) -> None:
         retained = PACKAGE / "raw" / campaign.BUILD_AUTHORITY_RAW_DIR
         payload = build_authority._verify_bundle_structure(
@@ -389,7 +434,10 @@ class QualityFloorEvidenceTest(unittest.TestCase):
             source,
         )
         determinism._verify_source_authority(
-            source, ROOT, "retained P10-08 evidence"
+            source,
+            ROOT,
+            "retained P10-08 evidence",
+            require_current_source=False,
         )
 
         launch_path = PACKAGE / "raw" / campaign.CAMPAIGN_LAUNCH_NAME

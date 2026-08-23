@@ -471,6 +471,43 @@ class QualityFloorReceiptTest(unittest.TestCase):
                 ):
                     quality.capability_registry_identity()
 
+    def test_recorded_registry_bytes_rederive_historical_receipt(self) -> None:
+        recorded_registry = quality.CAPABILITY_REGISTRY.read_bytes()
+        manifest = accepted_manifest()
+        raw = quality.canonical_json(manifest)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            materialize_artifacts(root)
+            input_path = root / "quality-floor-input.json"
+            receipt_path = root / "receipt.json"
+            input_path.write_bytes(raw)
+            quality.generate_receipt(input_path, receipt_path)
+            drifted_registry = root / "RuleCapabilities.def"
+            drifted_registry.write_bytes(
+                recorded_registry + b"// later source-only comment\n"
+            )
+            with mock.patch.object(
+                quality, "CAPABILITY_REGISTRY", drifted_registry
+            ):
+                with self.assertRaisesRegex(
+                    quality.QualityFloorError, "registry hash"
+                ):
+                    quality.verify_receipt(receipt_path, input_path)
+                historical = quality.verify_receipt(
+                    receipt_path,
+                    input_path,
+                    capability_registry=recorded_registry,
+                )
+        self.assertEqual(historical["status"], "accepted")
+        with self.assertRaisesRegex(
+            quality.ManifestUnavailable, "cannot read capability registry"
+        ):
+            quality.capability_registry_identity(b"\xff")
+        with self.assertRaisesRegex(
+            quality.ManifestUnavailable, "bytes are malformed"
+        ):
+            quality.capability_registry_identity("not bytes")  # type: ignore[arg-type]
+
     def test_inner_validation_cannot_accept_unverified_artifact_declarations(self) -> None:
         manifest = accepted_manifest()
         raw = quality.canonical_json(manifest)

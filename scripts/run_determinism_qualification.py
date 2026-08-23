@@ -3569,7 +3569,8 @@ def _git_authority_environment(repo: Path) -> dict[str, str]:
 
 
 def _verify_source_authority(
-    recorded: dict[str, Any], repo: Path, label: str,
+    recorded: dict[str, Any], repo: Path, label: str, *,
+    require_current_source: bool = True,
 ) -> None:
     revision = recorded["revision"]
     ancestry = subprocess.run(
@@ -3581,12 +3582,15 @@ def _verify_source_authority(
         raise QualificationError(f"{label} source revision is not an ancestor")
     if source_manifest_at_revision(repo, revision) != recorded:
         raise QualificationError(f"{label} source bytes differ from recorded revision")
-    current = source_manifest(repo)
-    if (
-        current["manifest_sha256"] != recorded["manifest_sha256"] or
-        current["file_count"] != recorded["file_count"]
-    ):
-        raise QualificationError(f"{label} source bytes differ from current repository")
+    if require_current_source:
+        current = source_manifest(repo)
+        if (
+            current["manifest_sha256"] != recorded["manifest_sha256"] or
+            current["file_count"] != recorded["file_count"]
+        ):
+            raise QualificationError(
+                f"{label} source bytes differ from current repository"
+            )
 
 
 def _git_output(repo: Path, arguments: list[str]) -> str:

@@ -441,7 +441,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
         juliet_rows = [row for row in rules if row["id"] != "resource-leak"]
         resource_row = next(row for row in rules if row["id"] == "resource-leak")
 
-        def collect_resource(raw_root, _authority):
+        def collect_resource(raw_root, _authority, **_kwargs):
             row = copy.deepcopy(resource_row)
             if resource_from_raw and (
                 raw_root / "resource" / "raw.json"
@@ -471,6 +471,132 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     copy.deepcopy(used["requested_tu_negatives"]),
                 ),
             ),
+        )
+
+    def test_historical_source_authority_skips_only_current_tree_equality(self) -> None:
+        determinism = campaign.build_authority.determinism
+        recorded = {
+            "revision": "a" * 40,
+            "manifest_sha256": "b" * 64,
+            "file_count": 7,
+        }
+        with mock.patch.object(
+            determinism.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=0),
+        ), mock.patch.object(
+            determinism,
+            "source_manifest_at_revision",
+            return_value=recorded,
+        ), mock.patch.object(
+            determinism,
+            "source_manifest",
+            side_effect=AssertionError("historical mode read current source"),
+        ) as current:
+            determinism._verify_source_authority(
+                recorded,
+                ROOT,
+                "historical fixture",
+                require_current_source=False,
+            )
+        current.assert_not_called()
+
+    def test_current_source_authority_still_rejects_descendant_drift(self) -> None:
+        determinism = campaign.build_authority.determinism
+        recorded = {
+            "revision": "a" * 40,
+            "manifest_sha256": "b" * 64,
+            "file_count": 7,
+        }
+        current = {**recorded, "manifest_sha256": "c" * 64}
+        with mock.patch.object(
+            determinism.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=0),
+        ), mock.patch.object(
+            determinism,
+            "source_manifest_at_revision",
+            return_value=recorded,
+        ), mock.patch.object(
+            determinism, "source_manifest", return_value=current
+        ), self.assertRaisesRegex(
+            determinism.QualificationError, "current repository"
+        ):
+            determinism._verify_source_authority(
+                recorded, ROOT, "current fixture"
+            )
+
+    def test_historical_source_authority_rejects_nonancestor_and_revision_drift(self) -> None:
+        determinism = campaign.build_authority.determinism
+        recorded = {
+            "revision": "a" * 40,
+            "manifest_sha256": "b" * 64,
+            "file_count": 7,
+        }
+        with mock.patch.object(
+            determinism.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=1),
+        ), self.assertRaisesRegex(
+            determinism.QualificationError, "not an ancestor"
+        ):
+            determinism._verify_source_authority(
+                recorded,
+                ROOT,
+                "historical fixture",
+                require_current_source=False,
+            )
+        with mock.patch.object(
+            determinism.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=0),
+        ), mock.patch.object(
+            determinism,
+            "source_manifest_at_revision",
+            return_value={**recorded, "manifest_sha256": "d" * 64},
+        ), self.assertRaisesRegex(
+            determinism.QualificationError, "recorded revision"
+        ):
+            determinism._verify_source_authority(
+                recorded,
+                ROOT,
+                "historical fixture",
+                require_current_source=False,
+            )
+
+    def test_historical_source_material_comes_from_recorded_git_blobs(self) -> None:
+        blobs = {
+            relative: f"recorded {relative}\n".encode("utf-8")
+            for relative in (
+                *campaign.AUTHORITY_INPUT_PATHS,
+                campaign.CAPABILITY_REGISTRY_RELATIVE,
+            )
+        }
+        with mock.patch.object(
+            campaign.build_authority.determinism,
+            "_git_blob",
+            side_effect=lambda _root, _revision, relative: blobs[relative],
+        ) as git_blob:
+            material = campaign._source_authority_material(
+                ROOT, revision="a" * 40
+            )
+        self.assertEqual(
+            material["scripts"],
+            {
+                relative: hashlib.sha256(blobs[relative]).hexdigest()
+                for relative in campaign.AUTHORITY_INPUT_PATHS
+            },
+        )
+        self.assertEqual(
+            material["mutation_manifest"],
+            blobs["scripts/quality_floor_resource_mutations.json"],
+        )
+        self.assertEqual(
+            material["capability_registry"],
+            blobs[campaign.CAPABILITY_REGISTRY_RELATIVE],
+        )
+        self.assertEqual(
+            git_blob.call_count, len(campaign.AUTHORITY_INPUT_PATHS) + 1
         )
 
     def test_campaign_source_projection_matches_build_authority_manifest(self) -> None:
