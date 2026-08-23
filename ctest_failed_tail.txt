@@ -1,0 +1,69 @@
+Test project D:/a/CodeSkeptic/CodeSkeptic/build
+    Start 1279: StabilityFaultInjectionContract
+1/2 Test #1279: StabilityFaultInjectionContract ...***Failed    4.03 sec
+ss...ssEsssssE.
+======================================================================
+ERROR: test_low_level_regular_io_requests_binary_descriptors (__main__.StabilityFaultInjectionContractTest.test_low_level_regular_io_requests_binary_descriptors)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StabilityFaultInjectionTest.py", line 549, in test_low_level_regular_io_requests_binary_descriptors
+    fault._read_regular(target), b"line one\nline two\n"
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_stability_fault_injection.py", line 135, in _read_regular
+    raise FaultInjectionError(f"regular file changed while reading: {path}")
+stability_fault.FaultInjectionError: regular file changed while reading: C:\Users\runneradmin\AppData\Local\Temp\tmpoyefu2ws\binary-io.txt
+
+======================================================================
+ERROR: test_xml_binary_and_nonzero_fail_closed (__main__.StabilityFaultInjectionContractTest.test_xml_binary_and_nonzero_fail_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\StabilityFaultInjectionTest.py", line 504, in test_xml_binary_and_nonzero_fail_closed
+    fault.run_gate(
+    ~~~~~~~~~~~~~~^
+        failed_output,
+        ^^^^^^^^^^^^^^
+    ...<2 lines>...
+        binary_sha256=fault.sha256_binary(failed_binary),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\a\CodeSkeptic\CodeSkeptic\scripts\run_stability_fault_injection.py", line 940, in run_gate
+    if return_code == 128 + signal.SIGXFSZ:
+                            ^^^^^^^^^^^^^^
+AttributeError: module 'signal' has no attribute 'SIGXFSZ'
+
+----------------------------------------------------------------------
+Ran 15 tests in 3.863s
+
+FAILED (errors=2, skipped=9)
+
+    Start 1289: QualityFloorReceiptContract
+2/2 Test #1289: QualityFloorReceiptContract .......***Failed    1.89 sec
+.....F...................
+======================================================================
+FAIL: test_generate_and_verify_bind_raw_input_sidecar_and_canonical_bytes (__main__.QualityFloorReceiptTest.test_generate_and_verify_bind_raw_input_sidecar_and_canonical_bytes)
+----------------------------------------------------------------------
+quality_floor_receipt.QualityFloorError: quality-floor receipt checksum mismatch
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\a\CodeSkeptic\CodeSkeptic\tests\QualityFloorReceiptTest.py", line 629, in test_generate_and_verify_bind_raw_input_sidecar_and_canonical_bytes
+    with self.assertRaisesRegex(quality.QualityFloorError, "differs"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "differs" does not match "quality-floor receipt checksum mismatch"
+
+----------------------------------------------------------------------
+Ran 25 tests in 1.731s
+
+FAILED (failures=1)
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =   5.97 sec
+
+The following tests FAILED:
+	1279 - StabilityFaultInjectionContract (Failed)
+	1289 - QualityFloorReceiptContract (Failed)
+Errors while running CTest
