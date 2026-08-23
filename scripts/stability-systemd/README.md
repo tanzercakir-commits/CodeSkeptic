@@ -101,16 +101,19 @@ digest and image ID before any installation path is changed.
 
 ## Staging lifecycle
 
-`scripts/stage_stability_campaign.py` exposes exactly `prepare`, `seal`,
-`verify`, `install`, and `verify-install`. `prepare` clones a clean, detached,
-standalone exact-head source and creates only the fixed authority layout. It
+`scripts/stage_stability_campaign.py` exposes exactly `prepare`, `configure`,
+`seal`, `verify`, `install`, and `verify-install`. `prepare` clones a clean,
+detached, standalone exact-head source and creates only the fixed authority
+layout; the `config` root remains absent until publication. It
 deliberately leaves `authority/mirrors` absent so the real-world mirror sealer
 can publish that authority create-new rather than reuse a producer placeholder.
-Prerequisite producers populate that mutable layout and write the canonical
-runtime config. `seal` binds every root-executed operator byte to its exact-head
-source counterpart, validates the data-only config schema without importing
-staged Python on the host, normalizes modes, and publishes a checksummed bundle
-with an atomic no-replace rename. `verify` rederives the complete inventory and
+After all prerequisite producers populate the mutable layout, `configure`
+derives every source, receipt, analyzer, mirror, policy, and fault-binary hash
+from the fixed authority paths and atomically publishes the canonical config
+pair. `seal` binds every root-executed operator byte to its exact-head source
+counterpart, validates the data-only config schema without importing staged
+Python on the host, normalizes modes, and publishes a checksummed bundle with
+an atomic no-replace rename. `verify` rederives the complete inventory and
 executes the retained image and static-authority checks in bounded, networkless
 containers.
 
@@ -129,17 +132,36 @@ and verify-install create, use, and remove the exact service pathname
 cold boot reopens the persistent dedicated store without changing Podman's
 storage identity.
 
+The `seal`, `verify`, and `install` command-line actions require an explicit
+large temporary root rather than trusting ambient `TMPDIR`, which `sudo`
+commonly discards. The absolute root must already be empty, mode `0700`, owned
+by the invoking uid/gid, outside the staged or sealed input, and large enough
+for the bundle snapshot, expanded VFS image store, four-GiB cleanup reserve,
+and snapshot inode reserve. The producer creates one random, identity-bound
+child and removes it on both success and failure; the selected root is empty
+again after a successful cleanup. A root-owned operation must use a separately
+root-owned temporary root. Direct Python callers may omit the override, in
+which case the bundle/output parent is the fixed fallback; ambient `TMPDIR` is
+never consulted.
+
 For example, after obtaining both values through the separately retained
 exact-head authority record, the public lifecycle is invoked as follows (the
 values shown are placeholders, not bundle-derived defaults):
 
 ```text
+python3 scripts/stage_stability_campaign.py configure --staging STAGING \
+  --revision EXPECTED_40_HEX --repository OWNER/REPOSITORY
+python3 scripts/stage_stability_campaign.py seal --staging STAGING \
+  --revision EXPECTED_40_HEX --output SEALED \
+  --temporary-root /absolute/empty/user-owned-disk-root
 python3 scripts/stage_stability_campaign.py verify --bundle SEALED \
   --expected-revision EXPECTED_40_HEX \
-  --expected-bundle-receipt-sha256 EXPECTED_64_HEX
+  --expected-bundle-receipt-sha256 EXPECTED_64_HEX \
+  --temporary-root /absolute/empty/user-owned-disk-root
 sudo python3 scripts/stage_stability_campaign.py install --bundle SEALED \
   --expected-revision EXPECTED_40_HEX \
-  --expected-bundle-receipt-sha256 EXPECTED_64_HEX
+  --expected-bundle-receipt-sha256 EXPECTED_64_HEX \
+  --temporary-root /absolute/empty/root-owned-disk-root
 ```
 
 ## One-command guided start

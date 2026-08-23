@@ -16,13 +16,13 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import selectors
 import shutil
 import signal
 import stat
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import zipfile
@@ -62,6 +62,7 @@ MAX_ARCHIVE_TOTAL_BYTES = 16 * 1024 * 1024 * 1024
 MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 64 * 1024 * 1024 * 1024
 MAX_INVENTORY_ENTRIES = 4096
 MAX_EVIDENCE_TOTAL_BYTES = MAX_ARCHIVE_TOTAL_BYTES + 512 * 1024 * 1024
+PROVIDER_FILTERED_RESULT_CAP = 1000
 MAX_ZIP_ENTRIES = 1_000_000
 MAX_ZIP_UNCOMPRESSED_BYTES = 64 * 1024 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
@@ -122,6 +123,7 @@ CHECK_NAMES = {
 
 BASE_API_FILES = (
     "api/workflow-runs.json",
+    "api/check-suites.json",
     "api/check-runs.json",
     "api/status-refs.json",
 )
@@ -136,6 +138,10 @@ if list(GATE_JOB_KEYS) != stability.REQUIRED_HOSTED_GATES:
 
 class HostedEvidenceError(RuntimeError):
     """The hosted evidence is missing, mutable, or violates fixed policy."""
+
+
+class _HostedPublicationCollision(HostedEvidenceError):
+    """Atomic no-replace publication observed a foreign destination."""
 
 
 if yaml is not None:
@@ -689,8 +695,11 @@ def _nonnegative_integer(value: Any, label: str) -> int:
 def _repository(value: Any) -> str:
     if not isinstance(value, str) or REPOSITORY.fullmatch(value) is None:
         raise HostedEvidenceError("repository identity is malformed")
+    components = value.split("/", 1)
     if value.endswith(".git"):
         raise HostedEvidenceError("repository identity must not contain .git")
+    if any(component in {".", ".."} for component in components):
+        raise HostedEvidenceError("repository identity has inadmissible components")
     return value
 
 
@@ -1508,6 +1517,9 @@ def _stage_offline_inputs(
         "api/workflow-runs.json": (
             "raw/api/workflow-runs.json", MAX_JSON_BYTES, "workflow-run API input"
         ),
+        "api/check-suites.json": (
+            "raw/api/check-suites.json", MAX_JSON_BYTES, "check-suite API input"
+        ),
         "api/check-runs.json": (
             "raw/api/check-runs.json", MAX_JSON_BYTES, "check-run API input"
         ),
@@ -1564,6 +1576,261 @@ def _find_by_id(records: list[Any], label: str) -> dict[int, dict[str, Any]]:
     return indexed
 
 
+def derive_canonical_selection(
+    runs_value: Any,
+    suites_value: Any,
+    checks_value: Any,
+    refs_value: Any,
+    repository: str,
+    revision: str,
+) -> dict[str, Any]:
+    """Derive the sole deterministic gate selection from provider base APIs."""
+
+    repository = _repository(repository)
+    revision = _git_sha(revision, "selection revision")
+    run_list = _complete_collection(
+        runs_value, "total_count", "workflow_runs", "workflow-run"
+    )
+    if runs_value["total_count"] >= PROVIDER_FILTERED_RESULT_CAP:
+        raise HostedEvidenceError(
+            "workflow-run authority is ambiguous at the provider result cap"
+        )
+    run_records = _find_by_id(run_list, "workflow run")
+    suite_list = _complete_collection(
+        suites_value, "total_count", "check_suites", "check-suite"
+    )
+    if suites_value["total_count"] >= PROVIDER_FILTERED_RESULT_CAP:
+        raise HostedEvidenceError(
+            "check-suite authority is ambiguous at the check-run provider cap"
+        )
+    suite_records = _find_by_id(suite_list, "check suite")
+    check_records = _find_by_id(
+        _complete_collection(
+            checks_value, "total_count", "check_runs", "check-run"
+        ),
+        "check run",
+    )
+    for suite_id, suite in suite_records.items():
+        if suite.get("head_sha") != revision:
+            raise HostedEvidenceError("check-suite head revision drift")
+        _exact_provider_url(
+            suite.get("url"),
+            f"https://api.github.com/repos/{repository}/check-suites/{suite_id}",
+            "check-suite API",
+        )
+        _exact_provider_url(
+            suite.get("check_runs_url"),
+            (
+                f"https://api.github.com/repos/{repository}/check-suites/"
+                f"{suite_id}/check-runs"
+            ),
+            "check-suite runs",
+        )
+    for run in run_records.values():
+        if run.get("head_sha") != revision or run.get("status") != "completed":
+            raise HostedEvidenceError("filtered workflow-run authority drift")
+        suite_id = _positive_integer(
+            run.get("check_suite_id"), "workflow check-suite ID"
+        )
+        if suite_id not in suite_records:
+            raise HostedEvidenceError(
+                "workflow run check suite is absent from complete suite authority"
+            )
+    for check in check_records.values():
+        check_suite = check.get("check_suite")
+        if not isinstance(check_suite, dict):
+            raise HostedEvidenceError("check-run suite authority is malformed")
+        suite_id = _positive_integer(
+            check_suite.get("id"), "check-run suite ID"
+        )
+        if suite_id not in suite_records or check.get("head_sha") != revision:
+            raise HostedEvidenceError("check-run suite or revision authority drift")
+    if not isinstance(refs_value, list):
+        raise HostedEvidenceError("status-ref API snapshot is malformed")
+    refs: dict[str, dict[str, Any]] = {}
+    for raw in refs_value:
+        if not isinstance(raw, dict) or not isinstance(raw.get("ref"), str):
+            raise HostedEvidenceError("status-ref API record is malformed")
+        ref_name = raw["ref"]
+        if ref_name in refs:
+            raise HostedEvidenceError("status refs are duplicated")
+        refs[ref_name] = raw
+    for gate_id in stability.REQUIRED_HOSTED_GATES:
+        ref_name = f"refs/status/{revision}/{gate_id}/success"
+        ref = refs.get(ref_name)
+        if ref is None:
+            raise HostedEvidenceError(
+                f"required success status ref is missing: {gate_id}"
+            )
+        target = ref.get("object")
+        if (
+            not isinstance(target, dict)
+            or target.get("type") != "commit"
+            or target.get("sha") != revision
+        ):
+            raise HostedEvidenceError(f"status ref target drift: {gate_id}")
+        _exact_provider_url(
+            target.get("url"),
+            f"https://api.github.com/repos/{repository}/git/commits/{revision}",
+            "status-ref target",
+        )
+
+    gates_by_path: dict[str, list[str]] = {}
+    for gate_id in stability.REQUIRED_HOSTED_GATES:
+        gates_by_path.setdefault(GATE_WORKFLOWS[gate_id], []).append(gate_id)
+    chosen_by_gate: dict[str, tuple[int, int]] = {}
+    chosen_check_ids: set[int] = set()
+    for workflow_path, gate_ids in gates_by_path.items():
+        candidates: list[
+            tuple[int, int, dict[str, int]]
+        ] = []
+        for run_id, run in run_records.items():
+            raw_path = run.get("path")
+            if not isinstance(raw_path, str):
+                continue
+            path_without_ref = raw_path.rsplit("@", 1)[0]
+            if path_without_ref != workflow_path:
+                continue
+            try:
+                attempt = _positive_integer(
+                    run.get("run_attempt"), "workflow run attempt"
+                )
+                if attempt != 1:
+                    continue
+                event = run.get("event")
+                if (
+                    not isinstance(event, str)
+                    or event not in {"push", "workflow_dispatch"}
+                ):
+                    continue
+                if (
+                    run.get("head_sha") != revision
+                    or run.get("status") != "completed"
+                    or run.get("conclusion") != "success"
+                ):
+                    continue
+                _workflow_path(
+                    raw_path, workflow_path, run.get("head_branch")
+                )
+                run_repository = run.get("repository")
+                if (
+                    not isinstance(run_repository, dict)
+                    or run_repository.get("full_name") != repository
+                ):
+                    continue
+                _exact_provider_url(
+                    run.get("url"),
+                    f"https://api.github.com/repos/{repository}/actions/runs/{run_id}",
+                    "workflow run API",
+                )
+                _exact_provider_url(
+                    run.get("html_url"),
+                    f"https://github.com/{repository}/actions/runs/{run_id}",
+                    "workflow run",
+                )
+                _exact_provider_url(
+                    run.get("jobs_url"),
+                    f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/jobs",
+                    "workflow jobs",
+                )
+                _exact_provider_url(
+                    run.get("logs_url"),
+                    f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/logs",
+                    "workflow logs",
+                )
+                suite_id = _positive_integer(
+                    run.get("check_suite_id"), "workflow check-suite ID"
+                )
+                suite = suite_records[suite_id]
+                suite_app = suite.get("app")
+                suite_repository = suite.get("repository")
+                if (
+                    suite.get("status") != "completed"
+                    or suite.get("conclusion") != "success"
+                    or not isinstance(suite_app, dict)
+                    or suite_app.get("slug") != "github-actions"
+                    or not isinstance(suite_repository, dict)
+                    or suite_repository.get("full_name") != repository
+                ):
+                    continue
+                _exact_provider_url(
+                    run.get("check_suite_url"),
+                    f"https://api.github.com/repos/{repository}/check-suites/{suite_id}",
+                    "workflow check-suite",
+                )
+            except HostedEvidenceError:
+                continue
+
+            selected_checks: dict[str, int] = {}
+            admissible = True
+            for gate_id in gate_ids:
+                matches: list[tuple[int, dict[str, Any]]] = []
+                for check_id, check in check_records.items():
+                    check_suite = check.get("check_suite")
+                    if (
+                        check.get("name") != CHECK_NAMES[gate_id]
+                        or not isinstance(check_suite, dict)
+                    ):
+                        continue
+                    try:
+                        check_suite_id = _positive_integer(
+                            check_suite.get("id"), "check-suite ID"
+                        )
+                    except HostedEvidenceError:
+                        continue
+                    if check_suite_id == suite_id:
+                        matches.append((check_id, check))
+                if len(matches) != 1:
+                    admissible = False
+                    break
+                check_id, check = matches[0]
+                app = check.get("app")
+                if (
+                    check.get("head_sha") != revision
+                    or check.get("status") != "completed"
+                    or check.get("conclusion") != "success"
+                    or not isinstance(app, dict)
+                    or app.get("slug") != "github-actions"
+                ):
+                    admissible = False
+                    break
+                selected_checks[gate_id] = check_id
+            if admissible:
+                event_priority = 0 if event == "push" else 1
+                candidates.append((event_priority, run_id, selected_checks))
+        if not candidates:
+            raise HostedEvidenceError(
+                f"no admissible attempt-one workflow run for {workflow_path}"
+            )
+        _priority, chosen_run_id, selected_checks = min(
+            candidates, key=lambda candidate: (candidate[0], candidate[1])
+        )
+        for gate_id in gate_ids:
+            check_id = selected_checks[gate_id]
+            if check_id in chosen_check_ids:
+                raise HostedEvidenceError(
+                    "derived selection check-run IDs are duplicated"
+                )
+            chosen_check_ids.add(check_id)
+            chosen_by_gate[gate_id] = (chosen_run_id, check_id)
+
+    selection = {
+        "schema": SELECTION_SCHEMA,
+        "repository": repository,
+        "revision": revision,
+        "gates": [
+            {
+                "gate_id": gate_id,
+                "workflow_run_id": chosen_by_gate[gate_id][0],
+                "check_run_id": chosen_by_gate[gate_id][1],
+            }
+            for gate_id in stability.REQUIRED_HOSTED_GATES
+        ],
+    }
+    _validate_selection(selection, repository, revision)
+    return selection
+
+
 def _snapshot_record(root: Path, relative: str, label: str) -> dict[str, Any]:
     digest, size = _hash_regular(root / relative, MAX_JSON_BYTES if relative.endswith(".json") else MAX_WORKFLOW_BYTES, label)
     return {"path": relative, "sha256": digest, "size": size}
@@ -1592,6 +1859,10 @@ def _derive_receipt(
         ),
         "workflow run",
     )
+    suites_value, _ = _read_json(
+        root / "raw" / "api" / "check-suites.json",
+        "check-suite API snapshot",
+    )
     checks_value, _ = _read_json(
         root / "raw" / "api" / "check-runs.json", "check-run API snapshot"
     )
@@ -1617,6 +1888,7 @@ def _derive_receipt(
     snapshot_paths = {
         "raw/selection.json",
         "raw/api/workflow-runs.json",
+        "raw/api/check-suites.json",
         "raw/api/check-runs.json",
         "raw/api/status-refs.json",
     }
@@ -1831,6 +2103,19 @@ def _derive_receipt(
             "status_ref": ref_name,
             "status_ref_target": revision,
         })
+
+    derived_selection = derive_canonical_selection(
+        runs_value,
+        suites_value,
+        checks_value,
+        refs_value,
+        repository,
+        revision,
+    )
+    if selection != derived_selection:
+        raise HostedEvidenceError(
+            "retained selection differs from deterministic provider selection"
+        )
 
     normalized_logs: list[dict[str, Any]] = []
     normalized_artifacts: list[dict[str, Any]] = []
@@ -2170,9 +2455,307 @@ def _fsync_directories(root: Path) -> None:
             os.close(descriptor)
 
 
-def _rename_noreplace(source: Path, target: Path) -> None:
-    """Atomically publish a directory without replacing any existing target."""
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(
+        path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    )
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
+
+def _make_tree_removable_at(parent_descriptor: int, name: str) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    try:
+        metadata = os.fstat(descriptor)
+        os.fchmod(descriptor, stat.S_IMODE(metadata.st_mode) | 0o700)
+        for child in os.listdir(descriptor):
+            child_metadata = os.stat(
+                child, dir_fd=descriptor, follow_symlinks=False
+            )
+            if stat.S_ISDIR(child_metadata.st_mode):
+                _make_tree_removable_at(descriptor, child)
+    finally:
+        os.close(descriptor)
+
+
+def _remove_tree_identity(path: Path, device: int, inode: int) -> None:
+    """Atomically quarantine and remove only the exact published tree."""
+
+    parent_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    parent_flags |= getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    parent_descriptor: int | None = None
+    owned_descriptor: int | None = None
+    quarantine_name: str | None = None
+    rename_completed = False
+    deletion_started = False
+    try:
+        parent_descriptor = os.open(path.parent, parent_flags)
+        owned_flags = getattr(os, "O_PATH", os.O_RDONLY)
+        owned_flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        owned_descriptor = os.open(
+            path.name, owned_flags, dir_fd=parent_descriptor
+        )
+        pinned = os.fstat(owned_descriptor)
+        if (
+            not stat.S_ISDIR(pinned.st_mode)
+            or pinned.st_dev != device
+            or pinned.st_ino != inode
+        ):
+            raise HostedEvidenceError(
+                f"published tree identity changed: {path}"
+            )
+
+        for _attempt in range(128):
+            candidate = (
+                f".codeskeptic-hosted-cleanup-{secrets.token_hex(16)}"
+            )
+            quarantine_name = candidate
+            try:
+                _rename_noreplace_at(
+                    parent_descriptor,
+                    path.name,
+                    parent_descriptor,
+                    candidate,
+                )
+            except _HostedPublicationCollision:
+                quarantine_name = None
+                continue
+            rename_completed = True
+            break
+        if quarantine_name is None:
+            raise HostedEvidenceError(
+                "hosted cleanup quarantine name budget exhausted"
+            )
+        os.fsync(parent_descriptor)
+
+        metadata = os.stat(
+            quarantine_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        pinned = os.fstat(owned_descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_dev != device
+            or metadata.st_ino != inode
+            or metadata.st_dev != pinned.st_dev
+            or metadata.st_ino != pinned.st_ino
+        ):
+            _rename_noreplace_at(
+                parent_descriptor,
+                quarantine_name,
+                parent_descriptor,
+                path.name,
+            )
+            quarantine_name = None
+            rename_completed = False
+            os.fsync(parent_descriptor)
+            raise HostedEvidenceError(
+                f"published tree identity changed: {path}"
+            )
+
+        deletion_started = True
+        _make_tree_removable_at(parent_descriptor, quarantine_name)
+        shutil.rmtree(quarantine_name, dir_fd=parent_descriptor)
+        quarantine_name = None
+        rename_completed = False
+        os.fsync(parent_descriptor)
+    except BaseException as error:
+        cleanup_errors: list[BaseException] = []
+        if (
+            not deletion_started
+            and parent_descriptor is not None
+            and quarantine_name is not None
+        ):
+            try:
+                quarantined = os.stat(
+                    quarantine_name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                quarantined = None
+            except BaseException as restore_error:
+                cleanup_errors.append(restore_error)
+                quarantined = None
+            if quarantined is not None:
+                quarantine_is_owned = (
+                    quarantined.st_dev == device
+                    and quarantined.st_ino == inode
+                )
+                try:
+                    os.stat(
+                        path.name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                    original_missing = False
+                except FileNotFoundError:
+                    original_missing = True
+                except BaseException as restore_error:
+                    original_missing = False
+                    cleanup_errors.append(restore_error)
+                if quarantine_is_owned or original_missing:
+                    try:
+                        _rename_noreplace_at(
+                            parent_descriptor,
+                            quarantine_name,
+                            parent_descriptor,
+                            path.name,
+                        )
+                        os.fsync(parent_descriptor)
+                        quarantine_name = None
+                        rename_completed = False
+                    except BaseException as restore_error:
+                        cleanup_errors.append(restore_error)
+                elif rename_completed:
+                    cleanup_errors.append(HostedEvidenceError(
+                        "quarantined replacement could not be restored without "
+                        f"overwriting {path}"
+                    ))
+        elif deletion_started and parent_descriptor is not None:
+            quarantined = None
+            if quarantine_name is not None:
+                try:
+                    quarantined = os.stat(
+                        quarantine_name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    quarantine_name = None
+                except BaseException as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if quarantined is not None:
+                exact_quarantine = (
+                    stat.S_ISDIR(quarantined.st_mode)
+                    and quarantined.st_dev == device
+                    and quarantined.st_ino == inode
+                )
+                if not exact_quarantine:
+                    cleanup_errors.append(HostedEvidenceError(
+                        "quarantined hosted tree identity changed"
+                    ))
+                else:
+                    try:
+                        _make_tree_removable_at(
+                            parent_descriptor, quarantine_name
+                        )
+                        shutil.rmtree(
+                            quarantine_name,
+                            dir_fd=parent_descriptor,
+                        )
+                        quarantine_name = None
+                        rename_completed = False
+                    except BaseException as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+            try:
+                os.fsync(parent_descriptor)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+        if cleanup_errors:
+            retained = (
+                os.fspath(path.parent / quarantine_name)
+                if quarantine_name is not None
+                else "none; parent durability sync failed"
+            )
+            raise HostedEvidenceError(
+                "hosted tree cleanup failed; retained quarantine: "
+                f"{retained}; primary failure: {error}; "
+                f"cleanup failure: {cleanup_errors[0]}"
+            ) from error
+        if isinstance(error, HostedEvidenceError):
+            raise
+        if isinstance(error, OSError):
+            suffix = (
+                f"; partial tree retained at {path.parent / quarantine_name}"
+                if deletion_started and quarantine_name is not None
+                else ""
+            )
+            raise HostedEvidenceError(
+                f"cannot remove published tree {path}: {error}{suffix}"
+            ) from error
+        raise
+    finally:
+        if owned_descriptor is not None:
+            os.close(owned_descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def _create_private_staging_directory(
+    parent: Path, prefix: str, label: str,
+) -> tuple[Path, os.stat_result]:
+    """Create and identity-pin a private random staging directory."""
+
+    for _attempt in range(128):
+        candidate = parent / f"{prefix}{secrets.token_hex(16)}"
+        mkdir_returned = False
+        try:
+            os.mkdir(candidate, 0o700)
+            mkdir_returned = True
+            metadata = candidate.lstat()
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or metadata.st_uid != os.geteuid()
+                or metadata.st_gid != os.getegid()
+                or stat.S_IMODE(metadata.st_mode) != 0o700
+            ):
+                raise HostedEvidenceError(f"{label} authority drift")
+            _fsync_directory(parent)
+            return candidate, metadata
+        except FileExistsError:
+            continue
+        except BaseException as error:
+            cleanup_errors: list[Exception] = []
+            if mkdir_returned or not isinstance(error, Exception):
+                try:
+                    created = candidate.lstat()
+                except FileNotFoundError:
+                    created = None
+                except Exception as cleanup_error:
+                    created = None
+                    cleanup_errors.append(cleanup_error)
+                if created is not None:
+                    try:
+                        if (
+                            not stat.S_ISDIR(created.st_mode)
+                            or created.st_uid != os.geteuid()
+                            or created.st_gid != os.getegid()
+                            or stat.S_IMODE(created.st_mode) != 0o700
+                        ):
+                            raise HostedEvidenceError(
+                                f"interrupted {label} authority drift"
+                            )
+                        _remove_tree_identity(
+                            candidate, created.st_dev, created.st_ino
+                        )
+                    except Exception as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+            if cleanup_errors:
+                detail = "; ".join(str(item) for item in cleanup_errors)
+                raise HostedEvidenceError(
+                    f"{label}: primary failure: {error}; "
+                    f"cleanup failure: {detail}"
+                ) from error
+            if isinstance(error, HostedEvidenceError):
+                raise
+            if isinstance(error, OSError):
+                raise HostedEvidenceError(f"{label}: {error}") from error
+            raise
+    raise HostedEvidenceError(f"{label}: random name budget exhausted")
+
+
+def _rename_noreplace_at(
+    source_directory: int,
+    source: str,
+    target_directory: int,
+    target: str,
+) -> None:
     if not sys.platform.startswith("linux"):
         raise HostedEvidenceError(
             "atomic no-replace evidence publication requires Linux renameat2"
@@ -2191,13 +2774,29 @@ def _rename_noreplace(source: Path, target: Path) -> None:
     renameat2.restype = ctypes.c_int
     source_bytes = os.fsencode(source)
     target_bytes = os.fsencode(target)
-    if renameat2(-100, source_bytes, -100, target_bytes, 1) != 0:
+    if renameat2(
+        source_directory,
+        source_bytes,
+        target_directory,
+        target_bytes,
+        1,
+    ) != 0:
         code = ctypes.get_errno()
         if code == errno.EEXIST:
-            raise HostedEvidenceError(f"output already exists: {target}")
+            raise _HostedPublicationCollision(
+                f"output already exists: {target}"
+            )
         raise HostedEvidenceError(
             f"atomic no-replace evidence publication failed: {os.strerror(code)}"
         )
+
+
+def _rename_noreplace(source: Path, target: Path) -> None:
+    """Atomically publish a directory without replacing any existing target."""
+
+    _rename_noreplace_at(
+        -100, os.fspath(source), -100, os.fspath(target)
+    )
 
 
 def seal_evidence(
@@ -2216,9 +2815,15 @@ def seal_evidence(
         raise HostedEvidenceError(f"output already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     tree, workflows = _source_identity(source, repository, revision)
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{output.name}.tmp-", dir=output.parent)
+    staging, staging_metadata = _create_private_staging_directory(
+        output.parent,
+        f".{output.name}.tmp-",
+        "hosted evidence staging creation failed",
     )
+    publication_identity: tuple[int, int] | None = None
+    publication_collision = False
+    verified: dict[str, Any] | None = None
+    primary: BaseException | None = None
     try:
         _stage_offline_inputs(
             staging, inputs, repository, revision, workflows
@@ -2242,19 +2847,90 @@ def seal_evidence(
             source=source,
         )
         _fsync_directories(staging)
-        _rename_noreplace(staging, output)
-        parent_descriptor = os.open(
-            output.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        publication_metadata = staging.lstat()
+        if (
+            publication_metadata.st_dev != staging_metadata.st_dev
+            or publication_metadata.st_ino != staging_metadata.st_ino
+        ):
+            raise HostedEvidenceError(
+                "hosted evidence staging identity changed"
+            )
+        publication_identity = (
+            publication_metadata.st_dev,
+            publication_metadata.st_ino,
         )
+        _rename_noreplace(staging, output)
+        _fsync_directory(output.parent)
+        published_metadata = output.lstat()
+        if (
+            not stat.S_ISDIR(published_metadata.st_mode)
+            or (published_metadata.st_dev, published_metadata.st_ino)
+            != publication_identity
+        ):
+            raise HostedEvidenceError(
+                "published hosted evidence identity changed"
+            )
+    except _HostedPublicationCollision as error:
+        publication_collision = True
+        primary = error
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    try:
         try:
-            os.fsync(parent_descriptor)
-        finally:
-            os.close(parent_descriptor)
-        return verified
-    except BaseException:
-        if staging.exists():
-            shutil.rmtree(staging)
-        raise
+            remaining_staging = staging.lstat()
+        except FileNotFoundError:
+            remaining_staging = None
+        if remaining_staging is not None:
+            _remove_tree_identity(
+                staging, staging_metadata.st_dev, staging_metadata.st_ino
+            )
+    except Exception as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if (
+        (primary is not None or cleanup_errors)
+        and publication_identity is not None
+        and not publication_collision
+    ):
+        try:
+            try:
+                published_metadata = output.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == publication_identity:
+                _remove_tree_identity(
+                    output, publication_identity[0], publication_identity[1]
+                )
+            elif published_metadata is not None:
+                raise HostedEvidenceError(
+                    "published hosted evidence identity changed"
+                )
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if primary is not None and cleanup_errors:
+        detail = "; ".join(str(item) for item in cleanup_errors)
+        raise HostedEvidenceError(
+            "hosted evidence publication failed: "
+            f"primary failure: {primary}; cleanup failure: {detail}"
+        ) from primary
+    if primary is not None:
+        if isinstance(primary, HostedEvidenceError):
+            raise primary
+        if not isinstance(primary, Exception):
+            raise primary
+        raise HostedEvidenceError(
+            f"hosted evidence publication failed: {primary}"
+        ) from primary
+    if cleanup_errors:
+        detail = "; ".join(str(item) for item in cleanup_errors)
+        raise HostedEvidenceError(
+            f"hosted evidence publication cleanup failed: {detail}"
+        ) from cleanup_errors[0]
+    assert verified is not None
+    return verified
 
 
 def _build_parser() -> argparse.ArgumentParser:

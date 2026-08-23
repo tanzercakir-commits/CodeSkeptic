@@ -53,6 +53,38 @@
 - Narrowed the upstream-manifest AST contract to the single translation-unit
   count/hash guard it is intended to protect, so unrelated mirror-submodule
   digest checks cannot satisfy or multiply that assertion.
+- Versioned the staging lifecycle to v2 and removed its last hand-authored
+  runtime input. `configure` now derives every fixed-path authority hash from
+  exact staged bytes and atomically publishes the canonical config pair; a
+  partial write, collision, stale receipt, malformed repository identity, or
+  post-publication drift removes only the producer-owned inode and fails closed.
+- Removed large sealed-bundle and private VFS work from ambient `TMPDIR`.
+  The command-line seal, verify, and install actions now require an explicit
+  empty, mode-0700, caller-owned disk root, enforce a size-derived free-space
+  budget plus cleanup reserve, and identity-bind both publication and removal.
+  This prevents the pinned multi-gigabyte archive from exhausting the host's
+  tmpfs and remains reliable across `sudo` environment filtering.
+- Removed the hand-authored hosted gate selection from the authority path. The
+  capture now deterministically selects attempt-one successful runs and their
+  exact check suites from complete provider API snapshots, prefers `push` over
+  `workflow_dispatch` and then the lowest run ID, and re-derives the same
+  selection offline. The capture retains the complete check-suite inventory
+  and rejects the boundary where GitHub's filtered workflow-run or commit
+  check-run APIs become ambiguous at 1,000 results. A legacy `--selection` is
+  accepted only when its canonical bytes exactly match that provider-derived
+  result.
+- Made hosted capture and sealing publication interruption-safe. Random private
+  staging directories and published outputs are inode-bound; a signal, parent
+  fsync failure, or post-publication verification error removes only the exact
+  producer-owned tree, while a concurrent or substituted foreign output is
+  preserved and reported.
+- Closed the remaining cleanup and success-return races with descriptor-relative
+  atomic quarantine. Cleanup pins the original inode, moves it to a random
+  sibling before deletion, restores any mismatched node without replacement,
+  preserves restore collisions, and refuses multiply-linked regular files.
+  Staging, hosted capture, and hosted sealing also recheck the published inode
+  after the durable parent sync instead of reporting success over a concurrent
+  replacement.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

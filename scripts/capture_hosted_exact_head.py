@@ -14,9 +14,8 @@ import hashlib
 import json
 import os
 import re
-import shutil
+import stat
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -41,6 +40,7 @@ MAX_COLLECTION_RESPONSE_BYTES = hosted.MAX_JSON_BYTES
 MAX_CAPTURE_ARCHIVE_FILES = hosted.MAX_ARCHIVE_FILES
 MAX_CAPTURE_ARCHIVE_BYTES = hosted.MAX_ARCHIVE_TOTAL_BYTES
 MAX_CAPTURE_SECONDS = 6 * 60 * 60
+PROVIDER_FILTERED_RESULT_CAP = 1000
 LINK_PART = re.compile(r'^<([^<>]+)>\s*;\s*rel="([a-z ]+)"(?:\s*;.*)?$')
 
 
@@ -401,6 +401,7 @@ def _fetch_collection(
     label: str,
     items_key: str | None,
     deadline: float | None = None,
+    provider_result_cap: int | None = None,
 ) -> Any:
     current: str | None = first_url
     visited: set[str] = set()
@@ -441,6 +442,14 @@ def _fetch_collection(
             ):
                 raise HostedCaptureError(f"{label} API page has an invalid collection shape")
             page_total = value["total_count"]
+            if (
+                provider_result_cap is not None
+                and page_total >= provider_result_cap
+            ):
+                raise HostedCaptureError(
+                    f"{label} is ambiguous at the provider "
+                    f"{provider_result_cap}-result cap"
+                )
             if page_total > MAX_COLLECTION_ITEMS:
                 raise HostedCaptureError(
                     f"{label} collection item budget exceeded"
@@ -499,11 +508,15 @@ def _snapshot_api(
     *,
     repository: str,
     revision: str,
-    selected: list[dict[str, int | str]],
     token: str,
     transport: HttpTransport,
+    expected_selection_raw: bytes | None = None,
     deadline: float | None = None,
-) -> dict[str, bytes]:
+) -> tuple[
+    dict[str, bytes],
+    bytes,
+    list[dict[str, int | str]],
+]:
     base = f"https://api.github.com/repos/{repository}"
     runs = _fetch_collection(
         transport,
@@ -513,6 +526,16 @@ def _snapshot_api(
         label="workflow runs",
         items_key="workflow_runs",
         deadline=deadline,
+        provider_result_cap=PROVIDER_FILTERED_RESULT_CAP,
+    )
+    suites = _fetch_collection(
+        transport,
+        f"{base}/commits/{revision}/check-suites?per_page=100&page=1",
+        token=token,
+        label="check suites",
+        items_key="check_suites",
+        deadline=deadline,
+        provider_result_cap=PROVIDER_FILTERED_RESULT_CAP,
     )
     checks = _fetch_collection(
         transport,
@@ -530,12 +553,35 @@ def _snapshot_api(
         items_key=None,
         deadline=deadline,
     )
+    try:
+        selection_value = hosted.derive_canonical_selection(
+            runs,
+            suites,
+            checks,
+            refs,
+            repository,
+            revision,
+        )
+        selection_raw = _canonical_bytes(selection_value)
+        selected = hosted._validate_selection(
+            selection_value, repository, revision
+        )
+    except hosted.HostedEvidenceError as error:
+        raise HostedCaptureError(str(error)) from error
+    if (
+        expected_selection_raw is not None
+        and selection_raw != expected_selection_raw
+    ):
+        raise HostedCaptureError(
+            "capture selection differs from deterministic provider selection"
+        )
     run_records = _indexed(runs["workflow_runs"], label="workflow runs")
     selected_run_ids = list(
         dict.fromkeys(int(record["workflow_run_id"]) for record in selected)
     )
     snapshot = {
         "api/workflow-runs.json": _canonical_bytes(runs),
+        "api/check-suites.json": _canonical_bytes(suites),
         "api/check-runs.json": _canonical_bytes(checks),
         "api/status-refs.json": _canonical_bytes(refs),
     }
@@ -568,7 +614,7 @@ def _snapshot_api(
         )
         snapshot[f"api/jobs/{run_id}-attempt-{attempt}.json"] = _canonical_bytes(jobs)
         snapshot[f"api/artifacts/{run_id}.json"] = _canonical_bytes(artifacts)
-    return snapshot
+    return snapshot, selection_raw, selected
 
 
 def _redirect_origin(url: str, *, label: str) -> str:
@@ -789,7 +835,7 @@ def capture_snapshot(
     *,
     repository: str,
     revision: str,
-    selection: Path,
+    selection: Path | None = None,
     token: str,
     transport: HttpTransport | None = None,
 ) -> None:
@@ -803,23 +849,34 @@ def capture_snapshot(
     _api_headers(token)
     if output.exists() or output.is_symlink():
         raise HostedCaptureError(f"output already exists: {output}")
-    selection_raw, selected = _read_selection(selection, repository, revision)
+    legacy_selection_raw: bytes | None = None
+    if selection is not None:
+        legacy_selection_raw, _legacy_selected = _read_selection(
+            selection, repository, revision
+        )
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
-        staging = Path(
-            tempfile.mkdtemp(prefix=f".{output.name}.tmp-", dir=output.parent)
+        staging, staging_metadata = hosted._create_private_staging_directory(
+            output.parent,
+            f".{output.name}.tmp-",
+            "hosted capture staging creation failed",
         )
+    except hosted.HostedEvidenceError as error:
+        raise HostedCaptureError(str(error)) from error
     except OSError as error:
         raise HostedCaptureError(f"cannot create capture staging directory: {error}") from error
     client = transport or UrllibTransport()
     deadline = time.monotonic() + MAX_CAPTURE_SECONDS
+    publication_identity: tuple[int, int] | None = None
+    publication_collision = False
+    primary: BaseException | None = None
     try:
-        before = _snapshot_api(
+        before, selection_raw, selected = _snapshot_api(
             repository=repository,
             revision=revision,
-            selected=selected,
             token=token,
             transport=client,
+            expected_selection_raw=legacy_selection_raw,
             deadline=deadline,
         )
         runs_value = _snapshot_value(before, "api/workflow-runs.json")
@@ -931,49 +988,120 @@ def capture_snapshot(
                     _canonical_bytes(artifact_authority),
                 )
 
-        after = _snapshot_api(
+        after, selection_after, selected_after = _snapshot_api(
             repository=repository,
             revision=revision,
-            selected=selected,
             token=token,
             transport=client,
+            expected_selection_raw=selection_raw,
             deadline=deadline,
         )
         if before != after:
             raise HostedCaptureError("GitHub API authority changed during capture")
-        selection_after, _ = _read_selection(selection, repository, revision)
-        if selection_after != selection_raw:
-            raise HostedCaptureError("capture selection changed during capture")
+        if selection_after != selection_raw or selected_after != selected:
+            raise HostedCaptureError(
+                "deterministic provider selection changed during capture"
+            )
+        if selection is not None:
+            legacy_after, _ = _read_selection(
+                selection, repository, revision
+            )
+            if legacy_after != legacy_selection_raw:
+                raise HostedCaptureError("capture selection changed during capture")
         _write_new(staging / "selection.json", selection_raw)
         for relative, raw in sorted(before.items()):
             _write_new(staging / relative, raw)
-        try:
-            hosted._fsync_directories(staging)
-            hosted._rename_noreplace(staging, output)
-        except (hosted.HostedEvidenceError, OSError) as error:
-            raise HostedCaptureError(str(error)) from error
-        parent_descriptor = os.open(
-            output.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        hosted._fsync_directories(staging)
+        publication_metadata = staging.lstat()
+        if (
+            publication_metadata.st_dev != staging_metadata.st_dev
+            or publication_metadata.st_ino != staging_metadata.st_ino
+        ):
+            raise HostedCaptureError("capture staging identity changed")
+        publication_identity = (
+            publication_metadata.st_dev,
+            publication_metadata.st_ino,
         )
         try:
-            os.fsync(parent_descriptor)
-        finally:
-            os.close(parent_descriptor)
+            hosted._rename_noreplace(staging, output)
+        except hosted._HostedPublicationCollision as error:
+            publication_collision = True
+            raise HostedCaptureError(str(error)) from error
+        hosted._fsync_directory(output.parent)
+        published_metadata = output.lstat()
+        if (
+            not stat.S_ISDIR(published_metadata.st_mode)
+            or (published_metadata.st_dev, published_metadata.st_ino)
+            != publication_identity
+        ):
+            raise HostedCaptureError("published capture identity changed")
+    except hosted.HostedEvidenceError as error:
+        primary = HostedCaptureError(str(error))
     except OSError as error:
-        if staging.exists():
-            shutil.rmtree(staging)
-        raise HostedCaptureError(f"capture filesystem operation failed: {error}") from error
-    except BaseException:
-        if staging.exists():
-            shutil.rmtree(staging)
-        raise
+        primary = HostedCaptureError(
+            f"capture filesystem operation failed: {error}"
+        )
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    try:
+        try:
+            remaining_staging = staging.lstat()
+        except FileNotFoundError:
+            remaining_staging = None
+        if remaining_staging is not None:
+            hosted._remove_tree_identity(
+                staging, staging_metadata.st_dev, staging_metadata.st_ino
+            )
+    except Exception as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if (
+        (primary is not None or cleanup_errors)
+        and publication_identity is not None
+        and not publication_collision
+    ):
+        try:
+            try:
+                published_metadata = output.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == publication_identity:
+                hosted._remove_tree_identity(
+                    output, publication_identity[0], publication_identity[1]
+                )
+            elif published_metadata is not None:
+                raise HostedCaptureError(
+                    "published capture identity changed"
+                )
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if primary is not None and cleanup_errors:
+        detail = "; ".join(str(item) for item in cleanup_errors)
+        raise HostedCaptureError(
+            "capture publication failed: "
+            f"primary failure: {primary}; cleanup failure: {detail}"
+        ) from primary
+    if primary is not None:
+        if isinstance(primary, HostedCaptureError):
+            raise primary
+        if not isinstance(primary, Exception):
+            raise primary
+        raise HostedCaptureError(f"capture failed: {primary}") from primary
+    if cleanup_errors:
+        detail = "; ".join(str(item) for item in cleanup_errors)
+        raise HostedCaptureError(
+            f"capture publication cleanup failed: {detail}"
+        ) from cleanup_errors[0]
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--revision", required=True)
-    parser.add_argument("--selection", type=Path, required=True)
+    parser.add_argument("--selection", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--token-env", default="GITHUB_TOKEN")
     return parser

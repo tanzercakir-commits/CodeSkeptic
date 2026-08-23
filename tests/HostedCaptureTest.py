@@ -111,9 +111,12 @@ class CaptureFixture:
         paginate_checks: bool = False,
         streaming: bool = False,
         mixed_authoritative_events: bool = False,
+        run_attempt: int = 1,
     ) -> None:
         self.root = root
-        self.exact = fixture_module.Fixture(root / "exact")
+        self.exact = fixture_module.Fixture(
+            root / "exact", run_attempt=run_attempt
+        )
         self.output = root / "capture"
         self.transport = FakeStreamingTransport() if streaming else FakeTransport()
         self.paginate_checks = paginate_checks
@@ -145,6 +148,18 @@ class CaptureFixture:
         self._twice(
             runs_url,
             {"total_count": len(self.exact.runs), "workflow_runs": self.exact.runs},
+        )
+
+        suites_url = (
+            f"{self.api}/commits/{REVISION}/check-suites"
+            "?per_page=100&page=1"
+        )
+        self._twice(
+            suites_url,
+            {
+                "total_count": len(self.exact.check_suites),
+                "check_suites": self.exact.check_suites,
+            },
         )
 
         checks_url = (
@@ -267,12 +282,12 @@ class CaptureFixture:
                     ),
                 )
 
-    def capture(self) -> None:
+    def capture(self, selection: Path | None = None) -> None:
         capture.capture_snapshot(
             self.output,
             repository=REPOSITORY,
             revision=REVISION,
-            selection=self.exact.input / "selection.json",
+            selection=selection,
             token="top-secret-token",
             transport=self.transport,
         )
@@ -289,6 +304,10 @@ class HostedCaptureTest(unittest.TestCase):
     def test_capture_round_trip_and_redirect_requests_never_leak_authorization(self) -> None:
         fixture = CaptureFixture(self.root)
         fixture.capture()
+        self.assertEqual(
+            (fixture.output / "selection.json").read_bytes(),
+            (fixture.exact.input / "selection.json").read_bytes(),
+        )
         evidence = self.root / "sealed"
         receipt = hosted.seal_evidence(
             evidence,
@@ -320,6 +339,216 @@ class HostedCaptureTest(unittest.TestCase):
         for headers in api_calls:
             self.assertEqual(headers["X-GitHub-Api-Version"], capture.API_VERSION)
             self.assertEqual(headers["Authorization"], "Bearer top-secret-token")
+
+    def test_automatic_selection_is_order_independent_and_legacy_input_must_match(self) -> None:
+        fixture = CaptureFixture(self.root / "shuffled")
+        runs_url = (
+            f"{fixture.api}/actions/runs?head_sha={REVISION}&status=completed"
+            "&per_page=100&page=1"
+        )
+        checks_url = (
+            f"{fixture.api}/commits/{REVISION}/check-runs?filter=all"
+            "&per_page=100&page=1"
+        )
+        fixture.transport.routes[runs_url].clear()
+        fixture._twice(runs_url, {
+            "total_count": len(fixture.exact.runs),
+            "workflow_runs": list(reversed(fixture.exact.runs)),
+        })
+        fixture.transport.routes[checks_url].clear()
+        fixture._twice(checks_url, {
+            "total_count": len(fixture.exact.checks),
+            "check_runs": list(reversed(fixture.exact.checks)),
+        })
+        fixture.capture()
+        self.assertEqual(
+            (fixture.output / "selection.json").read_bytes(),
+            (fixture.exact.input / "selection.json").read_bytes(),
+        )
+
+        fixture = CaptureFixture(self.root / "legacy-match")
+        fixture.capture(selection=fixture.exact.input / "selection.json")
+        self.assertEqual(
+            (fixture.output / "selection.json").read_bytes(),
+            (fixture.exact.input / "selection.json").read_bytes(),
+        )
+
+        fixture = CaptureFixture(self.root / "legacy-conflict")
+        conflicting = json.loads(
+            (fixture.exact.input / "selection.json").read_text(encoding="ascii")
+        )
+        conflicting["gates"][0]["check_run_id"] += 100_000
+        conflict_path = fixture.root / "conflicting-selection.json"
+        conflict_path.write_bytes(fixture_module.canonical_bytes(conflicting))
+        with self.assertRaisesRegex(
+            capture.HostedCaptureError, "selection.*provider"
+        ):
+            fixture.capture(selection=conflict_path)
+        self.assertFalse(fixture.output.exists())
+        self.assertFalse(any(
+            "/logs" in url or "/actions/artifacts/" in url
+            for url, _headers, _maximum in fixture.transport.calls
+        ))
+
+    def test_automatic_selection_rejects_reruns_and_duplicate_gate_checks(self) -> None:
+        fixture = CaptureFixture(self.root / "rerun", run_attempt=2)
+        with self.assertRaisesRegex(
+            capture.HostedCaptureError, "attempt|admissible"
+        ):
+            fixture.capture()
+        self.assertFalse(fixture.output.exists())
+
+        fixture = CaptureFixture(self.root / "duplicate-check")
+        duplicate = dict(fixture.exact.checks[0])
+        duplicate["id"] = 999_999
+        checks = [*fixture.exact.checks, duplicate]
+        checks_url = (
+            f"{fixture.api}/commits/{REVISION}/check-runs?filter=all"
+            "&per_page=100&page=1"
+        )
+        fixture.transport.routes[checks_url].clear()
+        fixture._twice(checks_url, {
+            "total_count": len(checks),
+            "check_runs": checks,
+        })
+        with self.assertRaisesRegex(
+            capture.HostedCaptureError, "check|admissible"
+        ):
+            fixture.capture()
+        self.assertFalse(fixture.output.exists())
+
+        fixture = CaptureFixture(self.root / "noninteger-check-suite")
+        checks = json.loads(json.dumps(fixture.exact.checks))
+        checks[0]["check_suite"]["id"] = float(
+            checks[0]["check_suite"]["id"]
+        )
+        checks_url = (
+            f"{fixture.api}/commits/{REVISION}/check-runs?filter=all"
+            "&per_page=100&page=1"
+        )
+        fixture.transport.routes[checks_url].clear()
+        fixture._twice(checks_url, {
+            "total_count": len(checks),
+            "check_runs": checks,
+        })
+        with self.assertRaisesRegex(
+            capture.HostedCaptureError, "check|admissible"
+        ):
+            fixture.capture()
+        self.assertFalse(fixture.output.exists())
+
+    def test_automatic_selection_prefers_push_then_lowest_run_id(self) -> None:
+        fixture = CaptureFixture(self.root / "selection-priority")
+        gate_id = "juliet"
+        original_run_id = fixture.exact.run_for_path[
+            hosted.GATE_WORKFLOWS[gate_id]
+        ]
+        original_run = next(
+            run for run in fixture.exact.runs
+            if int(run["id"]) == original_run_id
+        )
+        dispatch_run = json.loads(json.dumps(original_run))
+        dispatch_run_id = 1
+        dispatch_suite_id = 900_001
+        dispatch_run.update({
+            "id": dispatch_run_id,
+            "event": "workflow_dispatch",
+            "url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{dispatch_run_id}"
+            ),
+            "html_url": (
+                f"https://github.com/{REPOSITORY}/actions/runs/"
+                f"{dispatch_run_id}"
+            ),
+            "jobs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{dispatch_run_id}/jobs"
+            ),
+            "logs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{dispatch_run_id}/logs"
+            ),
+            "check_suite_id": dispatch_suite_id,
+            "check_suite_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-suites/"
+                f"{dispatch_suite_id}"
+            ),
+        })
+        original_check = next(
+            check for check in fixture.exact.checks
+            if check["name"] == hosted.CHECK_NAMES[gate_id]
+        )
+        dispatch_check = json.loads(json.dumps(original_check))
+        dispatch_check.update({
+            "id": 900_002,
+            "check_suite": {"id": dispatch_suite_id},
+        })
+        higher_push = json.loads(json.dumps(dispatch_run))
+        higher_push_id = 900_003
+        higher_push_suite_id = 900_004
+        higher_push.update({
+            "id": higher_push_id,
+            "event": "push",
+            "url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{higher_push_id}"
+            ),
+            "html_url": (
+                f"https://github.com/{REPOSITORY}/actions/runs/"
+                f"{higher_push_id}"
+            ),
+            "jobs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{higher_push_id}/jobs"
+            ),
+            "logs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{higher_push_id}/logs"
+            ),
+            "check_suite_id": higher_push_suite_id,
+            "check_suite_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-suites/"
+                f"{higher_push_suite_id}"
+            ),
+        })
+        higher_push_check = json.loads(json.dumps(original_check))
+        higher_push_check.update({
+            "id": 900_005,
+            "check_suite": {"id": higher_push_suite_id},
+        })
+        runs = [dispatch_run, higher_push, *reversed(fixture.exact.runs)]
+        checks = [
+            dispatch_check,
+            higher_push_check,
+            *reversed(fixture.exact.checks),
+        ]
+        suites = [
+            {
+                "id": int(run["check_suite_id"]),
+                "head_sha": REVISION,
+                "url": run["check_suite_url"],
+                "check_runs_url": f"{run['check_suite_url']}/check-runs",
+                "status": "completed",
+                "conclusion": "success",
+                "app": {"slug": "github-actions"},
+                "repository": {"full_name": REPOSITORY},
+            }
+            for run in runs
+        ]
+        selection = hosted.derive_canonical_selection(
+            {"total_count": len(runs), "workflow_runs": runs},
+            {"total_count": len(suites), "check_suites": suites},
+            {"total_count": len(checks), "check_runs": checks},
+            list(reversed(fixture.exact.refs)),
+            REPOSITORY,
+            REVISION,
+        )
+        juliet = next(
+            gate for gate in selection["gates"]
+            if gate["gate_id"] == gate_id
+        )
+        self.assertEqual(juliet["workflow_run_id"], original_run_id)
 
     def test_archive_bytes_use_the_bounded_streaming_path_when_available(self) -> None:
         fixture = CaptureFixture(self.root / "streamed", streaming=True)
@@ -410,7 +639,8 @@ class HostedCaptureTest(unittest.TestCase):
             }),
         )
         with self.assertRaisesRegex(
-            capture.HostedCaptureError, "collection item budget"
+            capture.HostedCaptureError,
+            "collection item budget|provider 1000-result cap",
         ):
             fixture.capture()
         self.assertFalse(fixture.output.exists())
@@ -514,6 +744,50 @@ class HostedCaptureTest(unittest.TestCase):
             )
         self.assertEqual(len(transport.calls), capture.MAX_API_PAGES)
 
+    def test_provider_filtered_search_caps_fail_closed(self) -> None:
+        cases = (
+            (
+                "workflow-runs",
+                lambda fixture: (
+                    f"{fixture.api}/actions/runs?head_sha={REVISION}"
+                    "&status=completed&per_page=100&page=1"
+                ),
+                lambda fixture: {
+                    "total_count": 1000,
+                    "workflow_runs": fixture.exact.runs,
+                },
+            ),
+            (
+                "check-suites",
+                lambda fixture: (
+                    f"{fixture.api}/commits/{REVISION}/check-suites"
+                    "?per_page=100&page=1"
+                ),
+                lambda fixture: {
+                    "total_count": 1000,
+                    "check_suites": fixture.exact.check_suites,
+                },
+            ),
+        )
+        for name, url_for, value_for in cases:
+            with self.subTest(name=name):
+                fixture = CaptureFixture(self.root / f"cap-{name}")
+                url = url_for(fixture)
+                fixture.transport.routes[url].clear()
+                fixture.transport.add(url, response_json(value_for(fixture)))
+                with self.assertRaisesRegex(
+                    capture.HostedCaptureError,
+                    "ambiguous at the provider 1000-result cap",
+                ):
+                    fixture.capture()
+                self.assertFalse(fixture.output.exists())
+                self.assertEqual(
+                    list(fixture.output.parent.glob(
+                        f".{fixture.output.name}.tmp-*"
+                    )),
+                    [],
+                )
+
     def test_capture_and_streaming_download_have_absolute_wall_deadlines(self) -> None:
         fixture = CaptureFixture(self.root / "capture-deadline")
         with (
@@ -593,6 +867,85 @@ class HostedCaptureTest(unittest.TestCase):
             fixture.capture()
         self.assertEqual(sentinel.read_text(encoding="ascii"), "keep\n")
         self.assertEqual(fixture.transport.calls, [])
+
+    def test_capture_publication_interrupts_are_identity_safe(self) -> None:
+        fixture = CaptureFixture(self.root / "temporary-interrupt")
+        fixture.output.parent.mkdir(parents=True, exist_ok=True)
+        real_mkdir = hosted.os.mkdir
+
+        def mkdir_then_interrupt(path, mode=0o777, *args, **kwargs):
+            result = real_mkdir(path, mode, *args, **kwargs)
+            if Path(path).name.startswith(f".{fixture.output.name}.tmp-"):
+                raise KeyboardInterrupt()
+            return result
+
+        with mock.patch.object(
+            hosted.os, "mkdir", side_effect=mkdir_then_interrupt
+        ), self.assertRaises(KeyboardInterrupt):
+            fixture.capture()
+        self.assertFalse(fixture.output.exists())
+        self.assertEqual(
+            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
+            [],
+        )
+
+        fixture = CaptureFixture(self.root / "publication-interrupt")
+        real_rename = hosted._rename_noreplace
+
+        def rename_then_interrupt(source, destination):
+            real_rename(source, destination)
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            capture.hosted,
+            "_rename_noreplace",
+            side_effect=rename_then_interrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            fixture.capture()
+        self.assertFalse(fixture.output.exists())
+        self.assertEqual(
+            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
+            [],
+        )
+
+        fixture = CaptureFixture(self.root / "publication-replacement")
+        marker = fixture.output / "owner-data"
+
+        def rename_replace_then_interrupt(source, destination):
+            real_rename(source, destination)
+            hosted.shutil.rmtree(destination)
+            Path(destination).mkdir()
+            marker.write_text("preserve\n", encoding="utf-8")
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            capture.hosted,
+            "_rename_noreplace",
+            side_effect=rename_replace_then_interrupt,
+        ), self.assertRaisesRegex(
+            capture.HostedCaptureError, "identity changed"
+        ):
+            fixture.capture()
+        self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+
+        fixture = CaptureFixture(self.root / "publication-replacement-return")
+        marker = fixture.output / "owner-data"
+
+        def rename_replace_then_return(source, destination):
+            real_rename(source, destination)
+            hosted.shutil.rmtree(destination)
+            Path(destination).mkdir()
+            marker.write_text("preserve\n", encoding="utf-8")
+
+        with mock.patch.object(
+            capture.hosted,
+            "_rename_noreplace",
+            side_effect=rename_replace_then_return,
+        ), self.assertRaisesRegex(
+            capture.HostedCaptureError, "identity changed"
+        ):
+            fixture.capture()
+        self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
 
     def test_redirect_requires_two_hops_and_an_https_non_api_target(self) -> None:
         fixture = CaptureFixture(self.root / "redirect")

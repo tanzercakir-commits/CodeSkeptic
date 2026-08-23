@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import selectors
 import shutil
 import signal
@@ -24,7 +25,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-TOOL_VERSION = "1"
+TOOL_VERSION = "2"
 BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 INVENTORY_SCHEMA = "codeskeptic-stability-staging-inventory-v1"
 INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
@@ -114,11 +115,14 @@ print("CODESKEPTIC_STAGING_STATIC_AUTHORITIES_OK")
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
 GIT_SHA1 = re.compile(r"[0-9a-f]{40}")
+HOSTED_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 MAX_FILE_BYTES = 8 * 1024 * 1024 * 1024
 MAX_INVENTORY_ENTRIES = 1_000_000
 MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
 EXTERNAL_COMMAND_TIMEOUT_SECONDS = 900
 IMAGE_LOAD_TIMEOUT_SECONDS = 1800
+LARGE_TEMPORARY_RESERVE_BYTES = 4 * 1024 * 1024 * 1024
+VFS_ARCHIVE_EXPANSION_FACTOR = 10
 
 
 class StagingError(RuntimeError):
@@ -817,7 +821,12 @@ def reject_dropin_authority(unit_root: Path, unit_name: str) -> None:
     raise StagingError("service drop-in authority is forbidden")
 
 
-def _rename_noreplace(source: Path, destination: Path) -> None:
+def _rename_noreplace_at(
+    source_directory: int,
+    source: str,
+    destination_directory: int,
+    destination: str,
+) -> None:
     libc = ctypes.CDLL(None, use_errno=True)
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is not None:
@@ -827,7 +836,11 @@ def _rename_noreplace(source: Path, destination: Path) -> None:
         ]
         renameat2.restype = ctypes.c_int
         result = renameat2(
-            -100, os.fsencode(source), -100, os.fsencode(destination), 1
+            source_directory,
+            os.fsencode(source),
+            destination_directory,
+            os.fsencode(destination),
+            1,
         )
         if result == 0:
             return
@@ -841,19 +854,265 @@ def _rename_noreplace(source: Path, destination: Path) -> None:
     )
 
 
+def _rename_noreplace(source: Path, destination: Path) -> None:
+    _rename_noreplace_at(
+        -100, os.fspath(source), -100, os.fspath(destination)
+    )
+
+
+def _make_tree_removable_at(parent_descriptor: int, name: str) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    try:
+        metadata = os.fstat(descriptor)
+        os.fchmod(descriptor, stat.S_IMODE(metadata.st_mode) | 0o700)
+        for child in os.listdir(descriptor):
+            child_metadata = os.stat(
+                child, dir_fd=descriptor, follow_symlinks=False
+            )
+            if stat.S_ISDIR(child_metadata.st_mode):
+                _make_tree_removable_at(descriptor, child)
+    finally:
+        os.close(descriptor)
+
+
+def _require_published_identity(
+    path: Path,
+    device: int,
+    inode: int,
+    is_directory: bool,
+    label: str,
+) -> None:
+    metadata = path.lstat()
+    expected_type = (
+        stat.S_ISDIR(metadata.st_mode)
+        if is_directory
+        else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+    )
+    if (
+        not expected_type
+        or metadata.st_dev != device
+        or metadata.st_ino != inode
+    ):
+        raise StagingError(f"{label} identity changed")
+
+
 def _remove_created_identity(
     path: Path, device: int, inode: int, is_directory: bool,
 ) -> None:
-    """Remove only the exact node created by this invocation, durably."""
+    """Atomically quarantine and remove only this invocation's exact node."""
 
-    metadata = path.lstat()
-    if metadata.st_dev != device or metadata.st_ino != inode:
-        raise StagingError(f"created path identity changed: {path}")
-    if is_directory:
-        _remove_private_tree(path)
-    else:
-        path.unlink()
-    _fsync_directory(path.parent)
+    parent_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    parent_flags |= getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    parent_descriptor: int | None = None
+    owned_descriptor: int | None = None
+    quarantine_name: str | None = None
+    rename_completed = False
+    deletion_started = False
+    try:
+        parent_descriptor = os.open(path.parent, parent_flags)
+        owned_flags = getattr(os, "O_PATH", os.O_RDONLY)
+        owned_flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        owned_descriptor = os.open(
+            path.name, owned_flags, dir_fd=parent_descriptor
+        )
+        pinned = os.fstat(owned_descriptor)
+        expected_type = (
+            stat.S_ISDIR(pinned.st_mode)
+            if is_directory
+            else stat.S_ISREG(pinned.st_mode) and pinned.st_nlink == 1
+        )
+        if (
+            not expected_type
+            or pinned.st_dev != device
+            or pinned.st_ino != inode
+        ):
+            raise StagingError(f"created path identity changed: {path}")
+
+        for _attempt in range(128):
+            candidate = f".codeskeptic-cleanup-{secrets.token_hex(16)}"
+            quarantine_name = candidate
+            try:
+                _rename_noreplace_at(
+                    parent_descriptor,
+                    path.name,
+                    parent_descriptor,
+                    candidate,
+                )
+            except FileExistsError:
+                quarantine_name = None
+                continue
+            rename_completed = True
+            break
+        if quarantine_name is None:
+            raise StagingError("cleanup quarantine name budget exhausted")
+        os.fsync(parent_descriptor)
+
+        metadata = os.stat(
+            quarantine_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        pinned = os.fstat(owned_descriptor)
+        expected_type = (
+            stat.S_ISDIR(metadata.st_mode)
+            if is_directory
+            else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+        )
+        if (
+            not expected_type
+            or metadata.st_dev != device
+            or metadata.st_ino != inode
+            or metadata.st_dev != pinned.st_dev
+            or metadata.st_ino != pinned.st_ino
+        ):
+            _rename_noreplace_at(
+                parent_descriptor,
+                quarantine_name,
+                parent_descriptor,
+                path.name,
+            )
+            quarantine_name = None
+            rename_completed = False
+            os.fsync(parent_descriptor)
+            raise StagingError(f"created path identity changed: {path}")
+
+        if is_directory:
+            deletion_started = True
+            _make_tree_removable_at(parent_descriptor, quarantine_name)
+            shutil.rmtree(quarantine_name, dir_fd=parent_descriptor)
+        else:
+            deletion_started = True
+            os.unlink(quarantine_name, dir_fd=parent_descriptor)
+        quarantine_name = None
+        rename_completed = False
+        os.fsync(parent_descriptor)
+    except BaseException as error:
+        cleanup_errors: list[BaseException] = []
+        if (
+            not deletion_started
+            and parent_descriptor is not None
+            and quarantine_name is not None
+        ):
+            try:
+                quarantined = os.stat(
+                    quarantine_name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                quarantined = None
+            except BaseException as restore_error:
+                cleanup_errors.append(restore_error)
+                quarantined = None
+            if quarantined is not None:
+                quarantine_is_owned = (
+                    quarantined.st_dev == device
+                    and quarantined.st_ino == inode
+                )
+                try:
+                    os.stat(
+                        path.name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                    original_missing = False
+                except FileNotFoundError:
+                    original_missing = True
+                except BaseException as restore_error:
+                    original_missing = False
+                    cleanup_errors.append(restore_error)
+                if quarantine_is_owned or original_missing:
+                    try:
+                        _rename_noreplace_at(
+                            parent_descriptor,
+                            quarantine_name,
+                            parent_descriptor,
+                            path.name,
+                        )
+                        os.fsync(parent_descriptor)
+                        quarantine_name = None
+                        rename_completed = False
+                    except BaseException as restore_error:
+                        cleanup_errors.append(restore_error)
+                elif rename_completed:
+                    cleanup_errors.append(StagingError(
+                        "quarantined replacement could not be restored without "
+                        f"overwriting {path}"
+                    ))
+        elif deletion_started and parent_descriptor is not None:
+            quarantined = None
+            if quarantine_name is not None:
+                try:
+                    quarantined = os.stat(
+                        quarantine_name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                except FileNotFoundError:
+                    quarantine_name = None
+                except BaseException as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if quarantined is not None:
+                exact_quarantine = (
+                    quarantined.st_dev == device
+                    and quarantined.st_ino == inode
+                    and (
+                        stat.S_ISDIR(quarantined.st_mode)
+                        if is_directory
+                        else stat.S_ISREG(quarantined.st_mode)
+                        and quarantined.st_nlink == 1
+                    )
+                )
+                if not exact_quarantine:
+                    cleanup_errors.append(StagingError(
+                        "quarantined created path identity changed"
+                    ))
+                else:
+                    try:
+                        if is_directory:
+                            _make_tree_removable_at(
+                                parent_descriptor, quarantine_name
+                            )
+                            shutil.rmtree(
+                                quarantine_name,
+                                dir_fd=parent_descriptor,
+                            )
+                        else:
+                            os.unlink(
+                                quarantine_name,
+                                dir_fd=parent_descriptor,
+                            )
+                        quarantine_name = None
+                        rename_completed = False
+                    except BaseException as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+            try:
+                os.fsync(parent_descriptor)
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+        if cleanup_errors:
+            retained = (
+                os.fspath(path.parent / quarantine_name)
+                if quarantine_name is not None
+                else "none; parent durability sync failed"
+            )
+            raise StagingError(
+                "created path cleanup failed; retained quarantine: "
+                f"{retained}; primary failure: {error}; "
+                f"cleanup failure: {cleanup_errors[0]}"
+            ) from error
+        if isinstance(error, OSError):
+            raise StagingError(
+                f"cannot remove created path {path}: {error}"
+            ) from error
+        raise
+    finally:
+        if owned_descriptor is not None:
+            os.close(owned_descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
 def _publish_tree_noreplace(source: Path, destination: Path) -> None:
@@ -863,6 +1122,13 @@ def _publish_tree_noreplace(source: Path, destination: Path) -> None:
     _rename_noreplace(source, destination)
     try:
         _fsync_directory(destination.parent)
+        _require_published_identity(
+            destination,
+            metadata.st_dev,
+            metadata.st_ino,
+            True,
+            "published tree",
+        )
     except Exception as error:
         try:
             _remove_created_identity(
@@ -886,52 +1152,247 @@ def _create_directory_create_new(
 ) -> None:
     """Prepare ownership off-path, then publish and immediately register."""
 
-    temporary = Path(tempfile.mkdtemp(
-        prefix=f".{path.name}.directory-", dir=path.parent
-    ))
+    temporary, temporary_metadata = _create_private_temporary_directory(
+        path.parent,
+        f".{path.name}.directory-",
+        "private directory staging tree creation failed",
+    )
     published_identity: tuple[int, int] | None = None
-    publication_registered = False
+    record: tuple[Path, int, int, bool] | None = None
+    primary: BaseException | None = None
+    collision = False
     try:
         os.chmod(temporary, mode)
         os.chown(temporary, owner_uid, owner_gid)
         _fsync_directory(temporary)
         metadata = temporary.lstat()
-        _rename_noreplace(temporary, path)
-        published_identity = (metadata.st_dev, metadata.st_ino)
-        if created_nodes is not None:
-            created_nodes.append((
-                path, metadata.st_dev, metadata.st_ino, True
-            ))
-            publication_registered = True
-        _fsync_directory(path.parent)
-    except Exception as error:
-        if published_identity is not None and (
-            created_nodes is None or not publication_registered
+        if (
+            metadata.st_dev != temporary_metadata.st_dev
+            or metadata.st_ino != temporary_metadata.st_ino
         ):
+            raise StagingError("private directory staging identity changed")
+        published_identity = (metadata.st_dev, metadata.st_ino)
+        record = (path, metadata.st_dev, metadata.st_ino, True)
+        _rename_noreplace(temporary, path)
+        if created_nodes is not None:
+            created_nodes.append(record)
+        _fsync_directory(path.parent)
+        _require_published_identity(
+            path,
+            published_identity[0],
+            published_identity[1],
+            True,
+            "published private directory",
+        )
+    except BaseException as error:
+        if isinstance(error, FileExistsError):
+            primary = StagingError(f"directory appeared concurrently: {path}")
+            collision = True
+        elif isinstance(error, OSError):
+            primary = StagingError(
+                f"cannot create private directory {path}: {error}"
+            )
+        else:
+            primary = error
+    if primary is None:
+        return
+    cleanup_errors: list[Exception] = []
+    registered = (
+        record is not None
+        and created_nodes is not None
+        and record in created_nodes
+    )
+    if published_identity is not None and not registered:
+        try:
             try:
+                published_metadata = path.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if not collision and published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == published_identity:
                 _remove_created_identity(
                     path,
                     published_identity[0],
                     published_identity[1],
                     True,
                 )
-            except Exception as cleanup_error:
-                raise StagingError(
-                    "directory publication failed and cleanup failed: "
-                    f"{error}; {cleanup_error}"
-                ) from error
+            elif published_metadata is not None and not collision:
+                raise StagingError("published private directory identity changed")
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    try:
+        try:
+            remaining_temporary = temporary.lstat()
+        except FileNotFoundError:
+            remaining_temporary = None
+        if remaining_temporary is not None:
+            _remove_created_identity(
+                temporary,
+                temporary_metadata.st_dev,
+                temporary_metadata.st_ino,
+                True,
+            )
+    except Exception as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if cleanup_errors:
+        _raise_primary_and_cleanup(
+            primary, cleanup_errors, "directory publication failed"
+        )
+    raise primary
+
+
+def _regular_file_create_new(
+    destination: Path,
+    mode: int,
+    owner_uid: int | None,
+    owner_gid: int | None,
+    write_payload: Any,
+    *,
+    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    label: str,
+) -> None:
+    """Build a regular file privately, then publish and register its inode."""
+
+    if (owner_uid is None) != (owner_gid is None):
+        raise StagingError("staging file ownership is incomplete")
+    temporary, temporary_metadata = _create_private_temporary_directory(
+        destination.parent,
+        ".codeskeptic-file-",
+        f"{label} private file staging creation failed",
+    )
+    staged = temporary / "payload"
+    staged_identity: tuple[int, int] | None = None
+    published_identity: tuple[int, int] | None = None
+    record: tuple[Path, int, int, bool] | None = None
+    descriptor: int | None = None
+    primary: BaseException | None = None
+    cleanup_errors: list[Exception] = []
+    collision = False
+    try:
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor = os.open(staged, flags, 0o600)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+            raise StagingError(f"{label} private file authority drift")
+        staged_identity = (opened.st_dev, opened.st_ino)
+        write_payload(descriptor)
+        os.fchmod(descriptor, mode)
+        if owner_uid is not None and owner_gid is not None:
+            os.fchown(descriptor, owner_uid, owner_gid)
+        os.fsync(descriptor)
+        os.close(descriptor)
+        descriptor = None
+        staged_metadata = staged.lstat()
+        if (
+            not stat.S_ISREG(staged_metadata.st_mode)
+            or staged_metadata.st_nlink != 1
+            or (staged_metadata.st_dev, staged_metadata.st_ino)
+            != staged_identity
+        ):
+            raise StagingError(f"{label} private file identity changed")
+        published_identity = staged_identity
+        record = (
+            destination,
+            published_identity[0],
+            published_identity[1],
+            False,
+        )
+        _rename_noreplace(staged, destination)
+        if created_nodes is not None:
+            created_nodes.append(record)
+        _fsync_directory(destination.parent)
+        _require_published_identity(
+            destination,
+            published_identity[0],
+            published_identity[1],
+            False,
+            "published file",
+        )
+    except BaseException as error:
         if isinstance(error, FileExistsError):
-            raise StagingError(
-                f"directory appeared concurrently: {path}"
-            ) from error
-        if isinstance(error, OSError):
-            raise StagingError(
-                f"cannot create private directory {path}: {error}"
-            ) from error
-        raise
-    finally:
-        if temporary.exists() and temporary != path:
-            _remove_private_tree(temporary)
+            primary = StagingError(f"file appeared concurrently: {destination}")
+            collision = True
+        elif isinstance(error, OSError):
+            primary = StagingError(f"{label}: {error}")
+        else:
+            primary = error
+    if descriptor is not None:
+        try:
+            os.close(descriptor)
+        except BaseException as close_error:
+            if primary is None:
+                primary = close_error
+            else:
+                cleanup_errors.append(
+                    StagingError(f"private file descriptor cleanup failed: {close_error}")
+                )
+    registered = (
+        record is not None
+        and created_nodes is not None
+        and record in created_nodes
+    )
+    if staged_identity is not None:
+        try:
+            try:
+                remaining_staged = staged.lstat()
+            except FileNotFoundError:
+                remaining_staged = None
+            if remaining_staged is not None:
+                _remove_created_identity(
+                    staged,
+                    staged_identity[0],
+                    staged_identity[1],
+                    False,
+                )
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    try:
+        try:
+            remaining_temporary = temporary.lstat()
+        except FileNotFoundError:
+            remaining_temporary = None
+        if remaining_temporary is not None:
+            _remove_created_identity(
+                temporary,
+                temporary_metadata.st_dev,
+                temporary_metadata.st_ino,
+                True,
+            )
+    except Exception as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if (
+        (primary is not None or cleanup_errors)
+        and published_identity is not None
+        and not registered
+    ):
+        try:
+            try:
+                published_metadata = destination.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if not collision and published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == published_identity:
+                _remove_created_identity(
+                    destination,
+                    published_identity[0],
+                    published_identity[1],
+                    False,
+                )
+            elif published_metadata is not None and not collision:
+                raise StagingError("published file identity changed")
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    _raise_primary_and_cleanup(primary, cleanup_errors, label)
 
 
 def _copy_regular_create_new(
@@ -949,29 +1410,20 @@ def _copy_regular_create_new(
         or source_metadata.st_size > MAX_FILE_BYTES
     ):
         raise StagingError("installation source is not an admissible regular file")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
     source_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
     source_flags |= getattr(os, "O_NOFOLLOW", 0)
-    source_descriptor = os.open(source, source_flags)
-    destination_identity: tuple[int, int] | None = None
-    try:
-        opened_source = os.fstat(source_descriptor)
-        if (
-            not stat.S_ISREG(opened_source.st_mode)
-            or opened_source.st_dev != source_metadata.st_dev
-            or opened_source.st_ino != source_metadata.st_ino
-            or opened_source.st_size != source_metadata.st_size
-        ):
-            raise StagingError("installation source changed while opening")
-        destination_descriptor = os.open(destination, flags, 0o600)
+
+    def copy_payload(destination_descriptor: int) -> None:
+        source_descriptor = os.open(source, source_flags)
         try:
-            created = os.fstat(destination_descriptor)
-            destination_identity = (created.st_dev, created.st_ino)
-            if created_nodes is not None:
-                created_nodes.append((
-                    destination, created.st_dev, created.st_ino, False
-                ))
+            opened_source = os.fstat(source_descriptor)
+            if (
+                not stat.S_ISREG(opened_source.st_mode)
+                or opened_source.st_dev != source_metadata.st_dev
+                or opened_source.st_ino != source_metadata.st_ino
+                or opened_source.st_size != source_metadata.st_size
+            ):
+                raise StagingError("installation source changed while opening")
             while True:
                 block = os.read(source_descriptor, 1024 * 1024)
                 if not block:
@@ -982,35 +1434,25 @@ def _copy_regular_create_new(
                     if written <= 0:
                         raise OSError("short installation write")
                     offset += written
-            os.fchmod(destination_descriptor, mode)
-            os.fchown(destination_descriptor, owner_uid, owner_gid)
-            os.fsync(destination_descriptor)
+            after_source = os.fstat(source_descriptor)
+            if (
+                after_source.st_dev != source_metadata.st_dev
+                or after_source.st_ino != source_metadata.st_ino
+                or after_source.st_size != source_metadata.st_size
+            ):
+                raise StagingError("installation source changed while copying")
         finally:
-            os.close(destination_descriptor)
-        after_source = os.fstat(source_descriptor)
-        if (
-            after_source.st_dev != source_metadata.st_dev
-            or after_source.st_ino != source_metadata.st_ino
-            or after_source.st_size != source_metadata.st_size
-        ):
-            raise StagingError("installation source changed while copying")
-    except Exception as error:
-        if destination_identity is not None:
-            try:
-                _remove_created_identity(
-                    destination,
-                    destination_identity[0],
-                    destination_identity[1],
-                    False,
-                )
-            except Exception as cleanup_error:
-                raise StagingError(
-                    "installation copy failed and cleanup failed: "
-                    f"{error}; {cleanup_error}"
-                ) from error
-        raise
-    finally:
-        os.close(source_descriptor)
+            os.close(source_descriptor)
+
+    _regular_file_create_new(
+        destination,
+        mode,
+        owner_uid,
+        owner_gid,
+        copy_payload,
+        created_nodes=created_nodes,
+        label="installation copy failed",
+    )
 
 
 def _verify_installed_ownership(
@@ -1060,11 +1502,15 @@ def install_tree_create_new(
         ) from error
     if not stat.S_ISDIR(parent_metadata.st_mode):
         raise StagingError("installation destination parent is not a directory")
-    temporary = Path(tempfile.mkdtemp(
-        prefix=f".{destination.name}.install-", dir=destination.parent
-    ))
+    temporary, staging_metadata = _create_private_temporary_directory(
+        destination.parent,
+        f".{destination.name}.install-",
+        "installation tree staging creation failed",
+    )
     published_identity: tuple[int, int] | None = None
-    publication_registered = False
+    record: tuple[Path, int, int, bool] | None = None
+    primary: BaseException | None = None
+    collision = False
     try:
         os.chown(temporary, owner_uid, owner_gid)
         directories = [item for item in expected if item["type"] == "directory"]
@@ -1085,48 +1531,88 @@ def install_tree_create_new(
         _verify_installed_ownership(temporary, expected, owner_uid, owner_gid)
         _fsync_tree(temporary)
         temporary_metadata = temporary.lstat()
-        _rename_noreplace(temporary, destination)
+        if (
+            temporary_metadata.st_dev != staging_metadata.st_dev
+            or temporary_metadata.st_ino != staging_metadata.st_ino
+        ):
+            raise StagingError("installation staging tree identity changed")
         published_identity = (
             temporary_metadata.st_dev, temporary_metadata.st_ino
         )
+        record = (
+            destination,
+            temporary_metadata.st_dev,
+            temporary_metadata.st_ino,
+            True,
+        )
+        _rename_noreplace(temporary, destination)
         if created_nodes is not None:
-            created_nodes.append((
-                destination,
-                temporary_metadata.st_dev,
-                temporary_metadata.st_ino,
-                True,
-            ))
-            publication_registered = True
+            created_nodes.append(record)
         _fsync_directory(destination.parent)
+        _require_published_identity(
+            destination,
+            published_identity[0],
+            published_identity[1],
+            True,
+            "published installation tree",
+        )
+    except BaseException as error:
+        if isinstance(error, FileExistsError):
+            primary = StagingError(
+                "installation destination appeared concurrently"
+            )
+            collision = True
+        elif isinstance(error, OSError):
+            primary = StagingError(f"cannot create installation tree: {error}")
+        else:
+            primary = error
+    if primary is None:
         return "created"
-    except Exception as error:
-        if published_identity is not None and (
-            created_nodes is None or not publication_registered
-        ):
+    cleanup_errors: list[Exception] = []
+    registered = (
+        record is not None
+        and created_nodes is not None
+        and record in created_nodes
+    )
+    if published_identity is not None and not registered:
+        try:
             try:
+                published_metadata = destination.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if not collision and published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == published_identity:
                 _remove_created_identity(
                     destination,
                     published_identity[0],
                     published_identity[1],
                     True,
                 )
-            except Exception as cleanup_error:
-                raise StagingError(
-                    "installation tree publication failed and cleanup failed: "
-                    f"{error}; {cleanup_error}"
-                ) from error
-        if isinstance(error, FileExistsError):
-            raise StagingError(
-                "installation destination appeared concurrently"
-            ) from error
-        if isinstance(error, OSError):
-            raise StagingError(
-                f"cannot create installation tree: {error}"
-            ) from error
-        raise
-    finally:
-        if temporary.exists() and temporary != destination:
-            _remove_private_tree(temporary)
+            elif published_metadata is not None and not collision:
+                raise StagingError("published installation tree identity changed")
+        except Exception as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    try:
+        try:
+            remaining_temporary = temporary.lstat()
+        except FileNotFoundError:
+            remaining_temporary = None
+        if remaining_temporary is not None:
+            _remove_created_identity(
+                temporary,
+                staging_metadata.st_dev,
+                staging_metadata.st_ino,
+                True,
+            )
+    except Exception as cleanup_error:
+        cleanup_errors.append(cleanup_error)
+    if cleanup_errors:
+        _raise_primary_and_cleanup(
+            primary, cleanup_errors, "installation tree publication failed"
+        )
+    raise primary
 
 
 def _require_root() -> None:
@@ -1224,6 +1710,309 @@ def _remove_private_tree(path: Path) -> None:
     shutil.rmtree(path)
 
 
+def _regular_tree_size(root: Path) -> int:
+    """Bound the bytes copied into one private bundle snapshot."""
+
+    try:
+        root_metadata = root.lstat()
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect temporary-space input tree: {error}"
+        ) from error
+    if not stat.S_ISDIR(root_metadata.st_mode):
+        raise StagingError("temporary-space input tree is not a real directory")
+    total = 0
+    seen = 0
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            children = sorted(
+                os.scandir(directory), key=lambda item: item.name
+            )
+        except OSError as error:
+            raise StagingError(
+                f"cannot enumerate temporary-space input tree: {error}"
+            ) from error
+        descendants: list[Path] = []
+        for child in children:
+            seen += 1
+            if seen > MAX_INVENTORY_ENTRIES:
+                raise StagingError(
+                    "temporary-space input tree exceeds its entry limit"
+                )
+            path = Path(child.path)
+            try:
+                metadata = child.stat(follow_symlinks=False)
+            except OSError as error:
+                raise StagingError(
+                    f"cannot inspect temporary-space input: {error}"
+                ) from error
+            if stat.S_ISDIR(metadata.st_mode):
+                descendants.append(path)
+            elif stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1:
+                total += metadata.st_size
+            else:
+                raise StagingError(
+                    "temporary-space input contains a linked or special node"
+                )
+        stack.extend(reversed(descendants))
+    return total
+
+
+def _temporary_available_bytes(path: Path) -> int:
+    try:
+        filesystem = os.statvfs(path)
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect temporary root capacity: {error}"
+        ) from error
+    return filesystem.f_bavail * filesystem.f_frsize
+
+
+def _temporary_capacity(path: Path, required_bytes: int) -> None:
+    available = _temporary_available_bytes(path)
+    if available < required_bytes:
+        raise StagingError(
+            "temporary root has insufficient free space: "
+            f"requires {required_bytes} bytes, found {available}"
+        )
+
+
+def _temporary_inventory_capacity(
+    path: Path,
+    required_bytes: int,
+    required_inodes: int,
+) -> None:
+    """Keep cleanup space and inode capacity ahead of untrusted creates."""
+
+    try:
+        filesystem = os.statvfs(path)
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect temporary root inventory capacity: {error}"
+        ) from error
+    available_bytes = filesystem.f_bavail * filesystem.f_frsize
+    available_inodes = filesystem.f_favail
+    if (
+        available_bytes < required_bytes
+        or available_inodes < required_inodes
+    ):
+        raise StagingError(
+            "temporary root has insufficient free space or inodes for "
+            "the bundle snapshot reserve"
+        )
+
+
+def _create_private_temporary_directory(
+    parent: Path,
+    prefix: str,
+    label: str,
+) -> tuple[Path, os.stat_result]:
+    """Create and identity-pin a preselected private directory safely."""
+
+    for _attempt in range(128):
+        candidate = parent / f"{prefix}{secrets.token_hex(16)}"
+        mkdir_returned = False
+        try:
+            os.mkdir(candidate, 0o700)
+            mkdir_returned = True
+            metadata = candidate.lstat()
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or metadata.st_uid != os.geteuid()
+                or metadata.st_gid != os.getegid()
+                or stat.S_IMODE(metadata.st_mode) != 0o700
+            ):
+                raise StagingError(f"{label} authority drift")
+            _fsync_directory(parent)
+            return candidate, metadata
+        except FileExistsError:
+            continue
+        except BaseException as error:
+            cleanup_errors: list[Exception] = []
+            # KeyboardInterrupt/SystemExit can arrive after mkdir succeeds but
+            # before Python records its return. The unpredictable name and
+            # private parent make an admissible candidate invocation-owned.
+            if mkdir_returned or not isinstance(error, Exception):
+                try:
+                    created = candidate.lstat()
+                except FileNotFoundError:
+                    created = None
+                except Exception as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+                    created = None
+                if created is not None:
+                    try:
+                        if (
+                            not stat.S_ISDIR(created.st_mode)
+                            or created.st_uid != os.geteuid()
+                            or created.st_gid != os.getegid()
+                            or stat.S_IMODE(created.st_mode) != 0o700
+                        ):
+                            raise StagingError(
+                                f"interrupted {label} authority drift"
+                            )
+                        _remove_created_identity(
+                            candidate,
+                            created.st_dev,
+                            created.st_ino,
+                            True,
+                        )
+                    except Exception as cleanup_error:
+                        cleanup_errors.append(cleanup_error)
+            _raise_primary_and_cleanup(error, cleanup_errors, label)
+    raise StagingError(f"cannot allocate a unique {label}")
+
+
+def _bundle_temporary_requirement(
+    bundle: Path, *, include_snapshot: bool,
+) -> int:
+    archive = bundle / "image" / PINNED_ARCHIVE_NAME
+    try:
+        metadata = archive.lstat()
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect pinned image archive size: {error}"
+        ) from error
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+        raise StagingError("pinned image archive is inadmissible")
+    snapshot_bytes = _regular_tree_size(bundle) if include_snapshot else 0
+    return (
+        snapshot_bytes
+        + metadata.st_size * VFS_ARCHIVE_EXPANSION_FACTOR
+        + LARGE_TEMPORARY_RESERVE_BYTES
+    )
+
+
+@contextlib.contextmanager
+def _large_temporary_workspace(
+    temporary_root: Path | None,
+    fallback_root: Path,
+    *,
+    required_bytes: int,
+    forbidden_tree: Path,
+):
+    """Create one identity-bound large workspace outside ambient TMPDIR."""
+
+    explicit = temporary_root is not None
+    selected = temporary_root if explicit else fallback_root.absolute()
+    assert selected is not None
+    if explicit and not selected.is_absolute():
+        raise StagingError("temporary root must be an absolute path")
+    root = selected.absolute()
+    try:
+        metadata = root.lstat()
+        resolved = root.resolve(strict=True)
+        forbidden = forbidden_tree.resolve(strict=True)
+    except OSError as error:
+        raise StagingError(f"cannot inspect temporary root: {error}") from error
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or resolved != root
+        or root == forbidden
+        or forbidden in root.parents
+    ):
+        raise StagingError(
+            "temporary root must be a real directory outside the input tree"
+        )
+    if explicit:
+        try:
+            names = list(root.iterdir())
+        except OSError as error:
+            raise StagingError(
+                f"cannot enumerate temporary root: {error}"
+            ) from error
+        if (
+            metadata.st_uid != os.geteuid()
+            or metadata.st_gid != os.getegid()
+            or stat.S_IMODE(metadata.st_mode) != 0o700
+            or names
+        ):
+            raise StagingError(
+                "explicit temporary root must be empty, mode 0700, and owned "
+                "by the invoking user"
+            )
+    _temporary_capacity(root, required_bytes)
+    root_identity = (metadata.st_dev, metadata.st_ino)
+    workspace: Path | None = None
+    workspace_metadata: os.stat_result | None = None
+    cleanup_root_identity = root_identity
+    primary: BaseException | None = None
+    try:
+        workspace, workspace_metadata = _create_private_temporary_directory(
+            root,
+            "codeskeptic-stability-work-",
+            "private temporary workspace creation failed",
+        )
+        workspace_parent = root.lstat()
+        workspace_parent_identity = (
+            workspace_parent.st_dev, workspace_parent.st_ino
+        )
+        cleanup_root_identity = workspace_parent_identity
+        if workspace_parent_identity != root_identity:
+            raise StagingError(
+                "temporary root identity changed during workspace creation"
+            )
+        if explicit:
+            names = sorted(path.name for path in root.iterdir())
+            if (
+                workspace_parent.st_uid != os.geteuid()
+                or workspace_parent.st_gid != os.getegid()
+                or stat.S_IMODE(workspace_parent.st_mode) != 0o700
+                or names != [workspace.name]
+            ):
+                raise StagingError(
+                    "explicit temporary root authority changed during "
+                    "workspace creation"
+                )
+        _temporary_capacity(root, required_bytes)
+        if (
+            not stat.S_ISDIR(workspace_metadata.st_mode)
+            or workspace_metadata.st_uid != os.geteuid()
+            or workspace_metadata.st_gid != os.getegid()
+            or stat.S_IMODE(workspace_metadata.st_mode) != 0o700
+        ):
+            raise StagingError("private temporary workspace authority drift")
+        _fsync_directory(root)
+        yield workspace
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    root_matches = False
+    if workspace is not None and workspace_metadata is not None:
+        try:
+            after = root.lstat()
+            root_matches = (
+                after.st_dev, after.st_ino
+            ) == cleanup_root_identity
+            if not root_matches:
+                raise StagingError("temporary root identity changed")
+        except Exception as error:
+            cleanup_errors.append(error)
+        if root_matches:
+            try:
+                _remove_created_identity(
+                    workspace,
+                    workspace_metadata.st_dev,
+                    workspace_metadata.st_ino,
+                    True,
+                )
+            except Exception as error:
+                cleanup_errors.append(error)
+            if explicit:
+                try:
+                    if any(root.iterdir()):
+                        raise StagingError(
+                            "explicit temporary root retained unexpected entries"
+                        )
+                except Exception as error:
+                    cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary, cleanup_errors, "large temporary workspace lifecycle failed"
+    )
+
+
 def _fsync_directory(path: Path) -> None:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
     flags |= getattr(os, "O_DIRECTORY", 0)
@@ -1267,12 +2056,81 @@ def _fsync_tree(root: Path) -> None:
     _fsync_directory(root)
 
 
-def _copy_snapshot_directory(source_fd: int, destination: Path) -> None:
+def _pinned_bundle_archive_size(source_fd: int) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags = flags | getattr(os, "O_DIRECTORY", 0)
+    nofollow_flags = flags | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        image_before = os.stat(
+            "image", dir_fd=source_fd, follow_symlinks=False
+        )
+        image_fd = os.open(
+            "image",
+            directory_flags | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=source_fd,
+        )
+        try:
+            image_opened = os.fstat(image_fd)
+            if (
+                not stat.S_ISDIR(image_before.st_mode)
+                or image_opened.st_dev != image_before.st_dev
+                or image_opened.st_ino != image_before.st_ino
+            ):
+                raise StagingError(
+                    "bundle image directory changed while opening"
+                )
+            archive_before = os.stat(
+                PINNED_ARCHIVE_NAME,
+                dir_fd=image_fd,
+                follow_symlinks=False,
+            )
+            archive_fd = os.open(
+                PINNED_ARCHIVE_NAME, nofollow_flags, dir_fd=image_fd
+            )
+            try:
+                archive_opened = os.fstat(archive_fd)
+                if (
+                    not stat.S_ISREG(archive_opened.st_mode)
+                    or archive_opened.st_dev != archive_before.st_dev
+                    or archive_opened.st_ino != archive_before.st_ino
+                    or archive_opened.st_size != archive_before.st_size
+                    or archive_opened.st_nlink != 1
+                    or archive_opened.st_size > MAX_FILE_BYTES
+                ):
+                    raise StagingError(
+                        "pinned image archive changed while opening"
+                    )
+                return archive_opened.st_size
+            finally:
+                os.close(archive_fd)
+        finally:
+            os.close(image_fd)
+    except StagingError:
+        raise
+    except OSError as error:
+        raise StagingError(
+            f"cannot pin bundle image archive size: {error}"
+        ) from error
+
+
+def _copy_snapshot_directory(
+    source_fd: int,
+    destination: Path,
+    budget: dict[str, Any],
+) -> None:
     try:
         names = sorted(os.listdir(source_fd))
     except OSError as error:
         raise StagingError(f"cannot enumerate bundle snapshot input: {error}") from error
     for name in names:
+        budget["entries"] += 1
+        if budget["entries"] > MAX_INVENTORY_ENTRIES:
+            raise StagingError("bundle snapshot exceeds its entry budget")
+        _temporary_inventory_capacity(
+            budget["temporary_workspace"],
+            budget["reserve_bytes"],
+            2,
+        )
         if (
             not isinstance(name, str)
             or not name
@@ -1307,7 +2165,12 @@ def _copy_snapshot_directory(source_fd: int, destination: Path) -> None:
                         "bundle snapshot directory changed while opening"
                     )
                 target.mkdir(mode=0o700)
-                _copy_snapshot_directory(child_fd, target)
+                _temporary_inventory_capacity(
+                    budget["temporary_workspace"],
+                    budget["reserve_bytes"],
+                    1,
+                )
+                _copy_snapshot_directory(child_fd, target, budget)
                 after = os.fstat(child_fd)
                 if (
                     after.st_dev != before.st_dev
@@ -1338,6 +2201,15 @@ def _copy_snapshot_directory(source_fd: int, destination: Path) -> None:
                     raise StagingError(
                         "bundle snapshot file changed while opening"
                     )
+                if opened.st_size > budget["remaining_bytes"]:
+                    raise StagingError(
+                        "bundle snapshot exceeds its pinned byte budget"
+                    )
+                _temporary_capacity(
+                    budget["temporary_workspace"],
+                    opened.st_size + budget["reserve_bytes"],
+                )
+                budget["remaining_bytes"] -= opened.st_size
                 destination_flags = (
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL
                     | getattr(os, "O_CLOEXEC", 0)
@@ -1389,7 +2261,7 @@ def _copy_snapshot_directory(source_fd: int, destination: Path) -> None:
 
 
 @contextlib.contextmanager
-def _trusted_bundle_snapshot(bundle: Path):
+def _trusted_bundle_snapshot(bundle: Path, temporary_workspace: Path):
     """Pin an untrusted pathname into a private tree before parsing/execution."""
 
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
@@ -1399,15 +2271,36 @@ def _trusted_bundle_snapshot(bundle: Path):
         source_fd = os.open(bundle, flags)
     except OSError as error:
         raise StagingError(f"cannot open sealed bundle root: {error}") from error
-    temporary = Path(tempfile.mkdtemp(prefix="codeskeptic-install-snapshot-"))
-    snapshot = temporary / "bundle"
-    primary: Exception | None = None
+    snapshot = temporary_workspace / "bundle-snapshot"
+    snapshot_identity: tuple[int, int] | None = None
+    primary: BaseException | None = None
     try:
         before = os.fstat(source_fd)
         if not stat.S_ISDIR(before.st_mode):
             raise StagingError("sealed bundle root is not a directory")
+        archive_size = _pinned_bundle_archive_size(source_fd)
+        reserve_bytes = (
+            archive_size * VFS_ARCHIVE_EXPANSION_FACTOR
+            + LARGE_TEMPORARY_RESERVE_BYTES
+        )
+        available_bytes = _temporary_available_bytes(temporary_workspace)
+        if available_bytes < reserve_bytes:
+            raise StagingError(
+                "temporary root has insufficient free space for the pinned "
+                "image store reserve"
+            )
+        budget = {
+            "entries": 0,
+            "remaining_bytes": available_bytes - reserve_bytes,
+            "reserve_bytes": reserve_bytes,
+            "temporary_workspace": temporary_workspace,
+        }
         snapshot.mkdir(mode=0o700)
-        _copy_snapshot_directory(source_fd, snapshot)
+        snapshot_metadata = snapshot.lstat()
+        snapshot_identity = (
+            snapshot_metadata.st_dev, snapshot_metadata.st_ino
+        )
+        _copy_snapshot_directory(source_fd, snapshot, budget)
         after = os.fstat(source_fd)
         if (
             after.st_dev != before.st_dev
@@ -1417,22 +2310,28 @@ def _trusted_bundle_snapshot(bundle: Path):
         ):
             raise StagingError("sealed bundle root changed while snapshotting")
         os.chmod(snapshot, stat.S_IMODE(before.st_mode))
-        _fsync_directory(temporary)
+        _fsync_directory(temporary_workspace)
         try:
             yield snapshot
-        except Exception as error:
+        except BaseException as error:
             primary = error
-    except Exception as error:
+    except BaseException as error:
         primary = error
     cleanup_errors: list[Exception] = []
     try:
         os.close(source_fd)
     except Exception as error:
         cleanup_errors.append(error)
-    try:
-        _remove_private_tree(temporary)
-    except Exception as error:
-        cleanup_errors.append(error)
+    if snapshot_identity is not None:
+        try:
+            _remove_created_identity(
+                snapshot,
+                snapshot_identity[0],
+                snapshot_identity[1],
+                True,
+            )
+        except Exception as error:
+            cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "trusted bundle snapshot lifecycle failed"
     )
@@ -1547,7 +2446,7 @@ def _fixed_podman_runroot(owner_uid: int, owner_gid: int):
     """Create-new the one runroot pathname shared by install and service."""
 
     created_parent: list[tuple[Path, int, int, bool]] = []
-    primary: Exception | None = None
+    primary: BaseException | None = None
     try:
         parent = PODMAN_RUNROOT.parent
         if not parent.exists() and not parent.is_symlink():
@@ -1564,7 +2463,7 @@ def _fixed_podman_runroot(owner_uid: int, owner_gid: int):
         ):
             raise StagingError("fixed Podman runroot appeared concurrently")
         yield PODMAN_RUNROOT
-    except Exception as error:
+    except BaseException as error:
         primary = error
     cleanup_errors: list[Exception] = []
     try:
@@ -1828,46 +2727,23 @@ def _write_new(
     owner_gid: int | None = None,
     created_nodes: list[tuple[Path, int, int, bool]] | None = None,
 ) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    if (owner_uid is None) != (owner_gid is None):
-        raise StagingError("staging file ownership is incomplete")
-    identity: tuple[int, int] | None = None
-    try:
-        descriptor = os.open(path, flags, mode)
-        try:
-            metadata = os.fstat(descriptor)
-            identity = (metadata.st_dev, metadata.st_ino)
-            if created_nodes is not None:
-                created_nodes.append((
-                    path, metadata.st_dev, metadata.st_ino, False
-                ))
-            offset = 0
-            while offset < len(data):
-                written = os.write(descriptor, data[offset:])
-                if written <= 0:
-                    raise OSError("short staging write")
-                offset += written
-            os.fchmod(descriptor, mode)
-            if owner_uid is not None and owner_gid is not None:
-                os.fchown(descriptor, owner_uid, owner_gid)
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    except Exception as error:
-        if identity is not None:
-            try:
-                _remove_created_identity(
-                    path, identity[0], identity[1], False
-                )
-            except Exception as cleanup_error:
-                raise StagingError(
-                    f"cannot create staging file {path}: {error}; "
-                    f"cleanup failed: {cleanup_error}"
-                ) from error
-        if isinstance(error, StagingError):
-            raise
-        raise StagingError(f"cannot create staging file {path}: {error}") from error
+    def write_payload(descriptor: int) -> None:
+        offset = 0
+        while offset < len(data):
+            written = os.write(descriptor, data[offset:])
+            if written <= 0:
+                raise OSError("short staging write")
+            offset += written
+
+    _regular_file_create_new(
+        path,
+        mode,
+        owner_uid,
+        owner_gid,
+        write_payload,
+        created_nodes=created_nodes,
+        label=f"cannot create staging file {path}",
+    )
 
 
 def _load_canonical_document(path: Path, label: str) -> dict[str, Any]:
@@ -2015,11 +2891,17 @@ def prepare_staging(
     archive_sha256 = _sha256_regular(image_archive)
     _require_absent(output, "prepare output")
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(
-        prefix=f".{output.name}.prepare-", dir=output.parent
-    ))
+    temporary, temporary_metadata = _create_private_temporary_directory(
+        output.parent,
+        f".{output.name}.prepare-",
+        "prepare staging tree creation failed",
+    )
+    publication_identity: tuple[int, int] | None = None
+    staged_identity: dict[str, str] | None = None
+    primary: BaseException | None = None
+    collision = False
     try:
-        for name in ("authority", "config", "image", "unit"):
+        for name in ("authority", "image", "unit"):
             (temporary / name).mkdir(mode=0o700)
         authority = temporary / "authority"
         staged_source = authority / "source"
@@ -2055,16 +2937,68 @@ def prepare_staging(
             image_archive, temporary / "image" / PINNED_ARCHIVE_NAME, 0o400
         )
         _fsync_tree(temporary)
+        publication_metadata = temporary.lstat()
+        if (
+            publication_metadata.st_dev != temporary_metadata.st_dev
+            or publication_metadata.st_ino != temporary_metadata.st_ino
+        ):
+            raise StagingError("prepare staging tree identity changed")
+        publication_identity = (
+            publication_metadata.st_dev,
+            publication_metadata.st_ino,
+        )
         _publish_tree_noreplace(temporary, output)
-        return {
-            **staged_identity,
-            "image_archive_sha256": archive_sha256,
-        }
     except FileExistsError as error:
-        raise StagingError("prepare output appeared concurrently") from error
-    finally:
-        if temporary.exists() and temporary != output:
-            _remove_private_tree(temporary)
+        primary = StagingError("prepare output appeared concurrently")
+        collision = True
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    try:
+        try:
+            remaining_temporary = temporary.lstat()
+        except FileNotFoundError:
+            remaining_temporary = None
+        if remaining_temporary is not None:
+            _remove_created_identity(
+                temporary,
+                temporary_metadata.st_dev,
+                temporary_metadata.st_ino,
+                True,
+            )
+    except Exception as error:
+        cleanup_errors.append(error)
+    if (
+        (primary is not None or cleanup_errors)
+        and publication_identity is not None
+    ):
+        try:
+            try:
+                published_metadata = output.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if not collision and published_metadata is not None and (
+                published_metadata.st_dev,
+                published_metadata.st_ino,
+            ) == publication_identity:
+                _remove_created_identity(
+                    output,
+                    publication_identity[0],
+                    publication_identity[1],
+                    True,
+                )
+            elif published_metadata is not None and not collision:
+                raise StagingError("published prepare output identity changed")
+        except Exception as error:
+            cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary, cleanup_errors, "prepare publication failed"
+    )
+    assert staged_identity is not None
+    return {
+        **staged_identity,
+        "image_archive_sha256": archive_sha256,
+    }
 
 
 def _payload_roots(root: Path) -> list[Path]:
@@ -2317,11 +3251,14 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
     )
     _valid_sha256(hosted["receipt_sha256"], "runtime hosted receipt")
     repository = hosted["repository"]
+    repository_components = (
+        repository.split("/", 1) if isinstance(repository, str) else []
+    )
     if (
         not isinstance(repository, str)
-        or "\x00" in repository
-        or repository.count("/") != 1
-        or any(not part for part in repository.split("/"))
+        or HOSTED_REPOSITORY.fullmatch(repository) is None
+        or repository.endswith(".git")
+        or any(component in {".", ".."} for component in repository_components)
     ):
         raise StagingError("runtime hosted repository identity is malformed")
 
@@ -2459,6 +3396,254 @@ def _verify_runtime_static_files(root: Path, config: dict[str, Any]) -> None:
     _verify_runtime_static_files_at(root / "authority", config)
 
 
+def _require_real_directory(path: Path, label: str) -> None:
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise StagingError(f"cannot inspect {label}: {error}") from error
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise StagingError(f"{label} is not a real directory")
+
+
+def configure_staging(
+    staging: Path,
+    revision: str,
+    *,
+    repository: str,
+) -> dict[str, Any]:
+    """Publish the canonical runtime config from fixed authority bytes."""
+
+    revision = _valid_git_sha1(revision, "configure revision")
+    config_root = staging / "config"
+    _require_absent(config_root, "runtime config output")
+    try:
+        staging_metadata = staging.lstat()
+        names = sorted(path.name for path in staging.iterdir())
+    except OSError as error:
+        raise StagingError(f"cannot inspect configure staging: {error}") from error
+    if (
+        not stat.S_ISDIR(staging_metadata.st_mode)
+        or names != ["authority", "image", "operator", "unit"]
+    ):
+        raise StagingError("configure staging layout is not exact")
+    for name in names:
+        _require_real_directory(staging / name, f"staging {name} root")
+
+    authority = staging / "authority"
+    source = authority / "source"
+    source_identity = validate_staged_source(source, revision)
+    _verify_operator_exact_head(
+        authority,
+        staging / "operator",
+        staging / "unit" / UNIT_NAME,
+        immutable=False,
+    )
+    verify_static_unit(staging / "unit" / UNIT_NAME)
+    if _read_regular(staging / "unit" / UNIT_NAME) != _read_regular(
+        staging / "operator" / UNIT_NAME
+    ):
+        raise StagingError("operator and staged service units differ")
+
+    required_directories = (
+        authority / "build",
+        authority / "build-authority",
+        authority / "mirrors",
+        authority / "release/source",
+        authority / "release/build",
+        authority / "prerequisites/determinism",
+        authority / "prerequisites/hosted",
+        authority / "prerequisites/quality",
+        authority / "sanitizers/address",
+        authority / "sanitizers/undefined",
+        source / SANITIZER_WORK_ROOT / "address-tests",
+        source / SANITIZER_WORK_ROOT / "address-fuzz",
+        source / SANITIZER_WORK_ROOT / "undefined-tests",
+        source / SANITIZER_WORK_ROOT / "undefined-fuzz",
+    )
+    for path in required_directories:
+        _require_real_directory(path, "runtime authority directory")
+
+    def digest(relative: str) -> str:
+        return _sha256_regular(authority / relative)
+
+    undefined_test_binary = (
+        source / SANITIZER_WORK_ROOT / "undefined-tests"
+        / "tests/codeskeptic_tests"
+    )
+    config = _validate_runtime_config_contract({
+        "schema": RUNTIME_CONFIG_SCHEMA,
+        "policy": {
+            "path": "/authority/source/scripts/stability_manifest.json",
+            "sha256": digest("source/scripts/stability_manifest.json"),
+        },
+        "source": {
+            "root": "/authority/source",
+            "revision": revision,
+            "tree_sha1": source_identity["tree_sha1"],
+            "manifest_sha256": source_identity["manifest_sha256"],
+        },
+        "runtime": {
+            "image_reference": PINNED_EVIDENCE_IMAGE,
+            "image_digest": PINNED_EVIDENCE_IMAGE_DIGEST,
+            "image_id": PINNED_EVIDENCE_IMAGE_ID,
+            "launch_receipt": "/launch/receipt.json",
+        },
+        "analyzer": {
+            "path": "/authority/build/src/codeskeptic",
+            "sha256": digest("build/src/codeskeptic"),
+        },
+        "build_authority": {
+            "root": "/authority/build-authority",
+            "receipt_sha256": digest("build-authority/receipt.json"),
+            "build_path": "/authority/build",
+        },
+        "realworld": {
+            "mirror_authority": "/authority/mirrors/authority.json",
+            "mirror_authority_sha256": digest("mirrors/authority.json"),
+        },
+        "fault_injection": {
+            "test_binary": (
+                "/authority/source/build/p10-09-sanitizers/"
+                "undefined-tests/tests/codeskeptic_tests"
+            ),
+            "test_binary_sha256": _sha256_regular(undefined_test_binary),
+        },
+        "qualification": {
+            "hardware_class": "fedora44-i5-1235u-exclusive-pcores-0-3",
+            "measurement_cgroup": RUNTIME_MEASUREMENT_CGROUP,
+            "baseline_authority_root": "/authority/source",
+            "release_source": "/authority/release/source",
+            "release_build": "/authority/release/build",
+            "jobs": 2,
+            "tools": {
+                "clang": "/usr/bin/clang-20",
+                "time": "/usr/bin/time",
+                "cmake": "/usr/bin/cmake",
+                "ninja": "/usr/bin/ninja",
+                "c_compiler": "/usr/bin/clang-20",
+                "cxx_compiler": "/usr/bin/clang++-20",
+            },
+        },
+        "prerequisites": {
+            "determinism": {
+                "root": "/authority/prerequisites/determinism",
+                "receipt_sha256": digest(
+                    "prerequisites/determinism/receipt.json"
+                ),
+            },
+            "hosted_exact_head": {
+                "root": "/authority/prerequisites/hosted",
+                "receipt_sha256": digest(
+                    "prerequisites/hosted/receipt.json"
+                ),
+                "repository": repository,
+            },
+            "quality_floor": {
+                "root": "/authority/prerequisites/quality",
+                "receipt_sha256": digest(
+                    "prerequisites/quality/receipt.json"
+                ),
+            },
+        },
+        "sanitizers": {
+            profile: {
+                "root": f"/authority/sanitizers/{profile}",
+                "receipt_sha256": digest(
+                    f"sanitizers/{profile}/receipt.json"
+                ),
+                "test_build": (
+                    "/authority/source/build/p10-09-sanitizers/"
+                    f"{profile}-tests"
+                ),
+                "fuzz_build": (
+                    "/authority/source/build/p10-09-sanitizers/"
+                    f"{profile}-fuzz"
+                ),
+            }
+            for profile in SANITIZER_PROFILES
+        },
+    })
+    _verify_runtime_static_files_at(authority, config)
+    data = canonical_document(config)
+    sidecar = (
+        f"{hashlib.sha256(data).hexdigest()}  runtime.json\n"
+    ).encode("ascii")
+
+    temporary, temporary_metadata = _create_private_temporary_directory(
+        staging,
+        ".config.runtime-",
+        "runtime config staging tree creation failed",
+    )
+    publication_identity: tuple[int, int] | None = None
+    primary: BaseException | None = None
+    publication_collision = False
+    try:
+        _write_new(temporary / "runtime.json", data, 0o600)
+        _write_new(temporary / "runtime.json.sha256", sidecar, 0o600)
+        _fsync_tree(temporary)
+        metadata = temporary.lstat()
+        publication_identity = (metadata.st_dev, metadata.st_ino)
+        _publish_tree_noreplace(temporary, config_root)
+        reloaded, reloaded_data = _runtime_config(staging)
+        if reloaded != config or reloaded_data != data:
+            raise StagingError("published runtime config identity drift")
+        _verify_runtime_static_files(staging, reloaded)
+    except FileExistsError as error:
+        primary = StagingError("runtime config output appeared concurrently")
+        publication_collision = True
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    if temporary != config_root:
+        try:
+            try:
+                remaining_temporary = temporary.lstat()
+            except FileNotFoundError:
+                remaining_temporary = None
+            if remaining_temporary is not None:
+                _remove_created_identity(
+                    temporary,
+                    temporary_metadata.st_dev,
+                    temporary_metadata.st_ino,
+                    True,
+                )
+        except Exception as error:
+            cleanup_errors.append(error)
+    if (
+        (primary is not None or cleanup_errors)
+        and publication_identity is not None
+    ):
+        try:
+            try:
+                published_metadata = config_root.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if (
+                not publication_collision
+                and published_metadata is not None
+                and (
+                    published_metadata.st_dev,
+                    published_metadata.st_ino,
+                ) == publication_identity
+            ):
+                _remove_created_identity(
+                    config_root,
+                    publication_identity[0],
+                    publication_identity[1],
+                    True,
+                )
+            elif published_metadata is not None and not publication_collision:
+                raise StagingError(
+                    "published runtime config identity changed"
+                )
+        except Exception as error:
+            cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary, cleanup_errors, "runtime config publication failed"
+    )
+    return config
+
+
 def _normalize_payload_modes(root: Path) -> None:
     for payload_root in _payload_roots(root):
         paths = [payload_root, *sorted(payload_root.rglob("*"), reverse=True)]
@@ -2483,6 +3668,7 @@ def seal_staging(
     output: Path,
     *,
     command_runner: Any | None = None,
+    temporary_root: Path | None = None,
 ) -> dict[str, Any]:
     """Seal a fully populated authority-layout workspace without replacing."""
 
@@ -2515,9 +3701,15 @@ def seal_staging(
     # opportunity to follow or normalize it.
     _collect_payload_inventory(staging)
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(
-        prefix=f".{output.name}.seal-", dir=output.parent
-    ))
+    temporary, temporary_metadata = _create_private_temporary_directory(
+        output.parent,
+        f".{output.name}.seal-",
+        "sealed bundle staging tree creation failed",
+    )
+    publication_identity: tuple[int, int] | None = None
+    receipt: dict[str, Any] | None = None
+    primary: BaseException | None = None
+    publication_collision = False
     try:
         for payload_root in _payload_roots(staging):
             shutil.copytree(
@@ -2569,20 +3761,88 @@ def seal_staging(
         )
         _write_new(metadata / "SHA256SUMS", sums, 0o400)
         os.chmod(metadata, 0o500)
-        _verify_trusted_bundle(
-            temporary,
-            expected_revision=revision,
-            expected_bundle_receipt_sha256=receipt_sha,
-            command_runner=command_runner,
-        )
+        with _large_temporary_workspace(
+            temporary_root,
+            output.parent,
+            required_bytes=_bundle_temporary_requirement(
+                temporary, include_snapshot=False
+            ),
+            forbidden_tree=staging,
+        ) as temporary_workspace:
+            _verify_trusted_bundle(
+                temporary,
+                expected_revision=revision,
+                expected_bundle_receipt_sha256=receipt_sha,
+                command_runner=command_runner,
+                temporary_workspace=temporary_workspace,
+            )
         _fsync_tree(temporary)
+        publication_metadata = temporary.lstat()
+        if (
+            publication_metadata.st_dev != temporary_metadata.st_dev
+            or publication_metadata.st_ino != temporary_metadata.st_ino
+        ):
+            raise StagingError("sealed bundle staging tree identity changed")
+        publication_identity = (
+            publication_metadata.st_dev,
+            publication_metadata.st_ino,
+        )
         _publish_tree_noreplace(temporary, output)
-        return receipt
     except FileExistsError as error:
-        raise StagingError("sealed bundle output appeared concurrently") from error
-    finally:
-        if temporary.exists() and temporary != output:
-            _remove_private_tree(temporary)
+        primary = StagingError("sealed bundle output appeared concurrently")
+        publication_collision = True
+    except BaseException as error:
+        primary = error
+    cleanup_errors: list[Exception] = []
+    try:
+        try:
+            remaining_temporary = temporary.lstat()
+        except FileNotFoundError:
+            remaining_temporary = None
+        if remaining_temporary is not None:
+            _remove_created_identity(
+                temporary,
+                temporary_metadata.st_dev,
+                temporary_metadata.st_ino,
+                True,
+            )
+    except Exception as error:
+        cleanup_errors.append(error)
+    if (
+        (primary is not None or cleanup_errors)
+        and publication_identity is not None
+    ):
+        try:
+            try:
+                published_metadata = output.lstat()
+            except FileNotFoundError:
+                published_metadata = None
+            if (
+                not publication_collision
+                and published_metadata is not None
+                and (
+                    published_metadata.st_dev,
+                    published_metadata.st_ino,
+                ) == publication_identity
+            ):
+                _remove_created_identity(
+                    output,
+                    publication_identity[0],
+                    publication_identity[1],
+                    True,
+                )
+            elif (
+                published_metadata is not None
+                and not publication_collision
+            ):
+                raise StagingError("published sealed bundle identity changed")
+        except Exception as error:
+            cleanup_errors.append(error)
+    _raise_primary_and_cleanup(
+        primary, cleanup_errors, "sealed bundle publication failed"
+    )
+    assert receipt is not None
+    return receipt
 
 
 def _verify_bundle_metadata(
@@ -2715,7 +3975,7 @@ def _assert_expected_bundle_identity(
 
 
 def _raise_primary_and_cleanup(
-    primary: Exception | None,
+    primary: BaseException | None,
     cleanup_errors: list[Exception],
     label: str,
 ) -> None:
@@ -2726,6 +3986,8 @@ def _raise_primary_and_cleanup(
         ) from primary
     if primary is not None:
         if isinstance(primary, StagingError):
+            raise primary
+        if not isinstance(primary, Exception):
             raise primary
         raise StagingError(f"{label}: {primary}") from primary
     if cleanup_errors:
@@ -2739,6 +4001,7 @@ def _verify_trusted_bundle(
     expected_revision: str,
     expected_bundle_receipt_sha256: str,
     command_runner: Any | None,
+    temporary_workspace: Path,
 ) -> dict[str, Any]:
     """Verify one caller-pinned private bundle snapshot."""
 
@@ -2748,19 +4011,37 @@ def _verify_trusted_bundle(
     receipt = _verify_bundle_structure(bundle)
     if receipt != trusted_receipt:
         raise StagingError("bundle receipt changed after authority binding")
-    image_runtime = Path(tempfile.mkdtemp(
-        prefix="codeskeptic-staging-image-"
-    ))
+    archive = bundle / "image" / PINNED_ARCHIVE_NAME
+    try:
+        archive_size = archive.lstat().st_size
+    except OSError as error:
+        raise StagingError(
+            f"cannot inspect pinned image archive size: {error}"
+        ) from error
+    _temporary_capacity(
+        temporary_workspace,
+        archive_size * VFS_ARCHIVE_EXPANSION_FACTOR
+        + LARGE_TEMPORARY_RESERVE_BYTES,
+    )
+    image_runtime = temporary_workspace / "image-runtime"
+    try:
+        image_runtime.mkdir(mode=0o700)
+    except OSError as error:
+        raise StagingError(
+            f"cannot create private staging image store: {error}"
+        ) from error
+    image_runtime_metadata = image_runtime.lstat()
+    _fsync_directory(temporary_workspace)
     options = _podman_global_options(
         image_runtime / "root",
         image_runtime / "runroot",
         bundle / "operator",
         storage_driver="vfs",
     )
-    primary: Exception | None = None
+    primary: BaseException | None = None
     try:
         options = _load_and_verify_image_archive(
-            bundle / "image" / PINNED_ARCHIVE_NAME,
+            archive,
             podman_root=image_runtime / "root",
             podman_runroot=image_runtime / "runroot",
             hooks=bundle / "operator",
@@ -2775,7 +4056,7 @@ def _verify_trusted_bundle(
             bundle / "config" / "runtime.json",
             command_runner,
         )
-    except Exception as error:
+    except BaseException as error:
         primary = error
     cleanup_errors: list[Exception] = []
     try:
@@ -2788,7 +4069,12 @@ def _verify_trusted_bundle(
     except Exception as error:
         cleanup_errors.append(error)
     try:
-        _remove_private_tree(image_runtime)
+        _remove_created_identity(
+            image_runtime,
+            image_runtime_metadata.st_dev,
+            image_runtime_metadata.st_ino,
+            True,
+        )
     except Exception as error:
         cleanup_errors.append(error)
     _raise_primary_and_cleanup(
@@ -2803,16 +4089,31 @@ def verify_bundle(
     expected_revision: str,
     expected_bundle_receipt_sha256: str,
     command_runner: Any | None = None,
+    temporary_root: Path | None = None,
 ) -> dict[str, Any]:
     """Snapshot and verify a bundle against out-of-band authority."""
 
-    with _trusted_bundle_snapshot(bundle) as trusted_bundle:
-        return _verify_trusted_bundle(
-            trusted_bundle,
-            expected_revision=expected_revision,
-            expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
-            command_runner=command_runner,
-        )
+    requirement = _bundle_temporary_requirement(
+        bundle, include_snapshot=True
+    )
+    with _large_temporary_workspace(
+        temporary_root,
+        bundle.parent,
+        required_bytes=requirement,
+        forbidden_tree=bundle,
+    ) as temporary_workspace:
+        with _trusted_bundle_snapshot(
+            bundle, temporary_workspace
+        ) as trusted_bundle:
+            return _verify_trusted_bundle(
+                trusted_bundle,
+                expected_revision=expected_revision,
+                expected_bundle_receipt_sha256=(
+                    expected_bundle_receipt_sha256
+                ),
+                command_runner=command_runner,
+                temporary_workspace=temporary_workspace,
+            )
 
 
 def _payload_inventory_parts(
@@ -3023,22 +4324,14 @@ def _rollback_created(
     failures: list[str] = []
     for path, device, inode, is_directory in reversed(created):
         try:
-            metadata = path.lstat()
-        except FileNotFoundError:
-            continue
-        except OSError as error:
+            _remove_created_identity(
+                path, device, inode, is_directory
+            )
+        except StagingError as error:
+            if isinstance(error.__cause__, FileNotFoundError):
+                continue
             failures.append(f"{path}: {error}")
-            continue
-        if metadata.st_dev != device or metadata.st_ino != inode:
-            failures.append(f"{path}: identity changed")
-            continue
-        try:
-            if is_directory:
-                _remove_private_tree(path)
-            else:
-                path.unlink()
-            _fsync_directory(path.parent)
-        except (OSError, StagingError) as error:
+        except OSError as error:
             failures.append(f"{path}: {error}")
     if failures:
         raise StagingError(
@@ -3169,6 +4462,7 @@ def install_bundle(
     require_root: bool = True,
     owner_uid: int = 0,
     owner_gid: int = 0,
+    temporary_root: Path | None = None,
 ) -> dict[str, Any]:
     """Install a sealed bundle create-new, or verify an exact prior install."""
 
@@ -3181,7 +4475,17 @@ def install_bundle(
         expected_bundle_receipt_sha256,
         "expected bundle receipt checksum",
     )
-    with _trusted_bundle_snapshot(bundle) as trusted_bundle:
+    requirement = _bundle_temporary_requirement(
+        bundle, include_snapshot=True
+    )
+    with _large_temporary_workspace(
+        temporary_root,
+        bundle.parent,
+        required_bytes=requirement,
+        forbidden_tree=bundle,
+    ) as temporary_workspace, _trusted_bundle_snapshot(
+        bundle, temporary_workspace
+    ) as trusted_bundle:
         trusted_receipt = _assert_expected_bundle_identity(
             trusted_bundle,
             expected_revision,
@@ -3221,6 +4525,7 @@ def install_bundle(
             expected_revision=expected_revision,
             expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
             command_runner=command_runner,
+            temporary_workspace=temporary_workspace,
         )
 
         created: list[tuple[Path, int, int, bool]] = []
@@ -3389,7 +4694,7 @@ def install_bundle(
             )
             created.clear()
             return result
-        except Exception as error:
+        except BaseException as error:
             base = AUTHORITY_ROOT.parent
             live_unit_was_created = any(
                 path == UNIT_PATH for path, _device, _inode, _directory in created
@@ -3602,10 +4907,18 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--image-archive", type=Path, required=True)
     prepare.add_argument("--output", type=Path, required=True)
 
+    configure = commands.add_parser(
+        "configure", help="materialize the canonical runtime config"
+    )
+    configure.add_argument("--staging", type=Path, required=True)
+    configure.add_argument("--revision", required=True)
+    configure.add_argument("--repository", required=True)
+
     seal = commands.add_parser("seal", help="seal a populated staging tree")
     seal.add_argument("--staging", type=Path, required=True)
     seal.add_argument("--revision", required=True)
     seal.add_argument("--output", type=Path, required=True)
+    seal.add_argument("--temporary-root", type=Path, required=True)
 
     verify = commands.add_parser("verify", help="verify a sealed staging bundle")
     verify.add_argument("--bundle", type=Path, required=True)
@@ -3613,6 +4926,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument(
         "--expected-bundle-receipt-sha256", required=True
     )
+    verify.add_argument("--temporary-root", type=Path, required=True)
 
     install = commands.add_parser("install", help="install a verified bundle")
     install.add_argument("--bundle", type=Path, required=True)
@@ -3620,6 +4934,7 @@ def build_parser() -> argparse.ArgumentParser:
     install.add_argument(
         "--expected-bundle-receipt-sha256", required=True
     )
+    install.add_argument("--temporary-root", type=Path, required=True)
 
     verify_install = commands.add_parser(
         "verify-install", help="verify the fixed installed receipt"
@@ -3642,9 +4957,23 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"CODESKEPTIC_STAGING_PREPARED {arguments.output}")
             return 0
+        if arguments.command == "configure":
+            configure_staging(
+                arguments.staging,
+                arguments.revision,
+                repository=arguments.repository,
+            )
+            print(
+                "CODESKEPTIC_STAGING_CONFIGURED "
+                f"{arguments.staging / 'config' / 'runtime.json'}"
+            )
+            return 0
         if arguments.command == "seal":
             seal_staging(
-                arguments.staging, arguments.revision, arguments.output
+                arguments.staging,
+                arguments.revision,
+                arguments.output,
+                temporary_root=arguments.temporary_root,
             )
             print(f"CODESKEPTIC_STAGING_SEALED {arguments.output}")
             return 0
@@ -3655,6 +4984,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_bundle_receipt_sha256=(
                     arguments.expected_bundle_receipt_sha256
                 ),
+                temporary_root=arguments.temporary_root,
             )
             print(f"CODESKEPTIC_STAGING_VERIFIED {arguments.bundle}")
             return 0
@@ -3665,6 +4995,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_bundle_receipt_sha256=(
                     arguments.expected_bundle_receipt_sha256
                 ),
+                temporary_root=arguments.temporary_root,
             )
             print(f"CODESKEPTIC_STAGING_INSTALLED {INSTALLATION_RECEIPT_PATH}")
             return 0

@@ -212,6 +212,21 @@ class Fixture:
                 "check_suite_url": f"https://api.github.com/repos/{REPOSITORY}/check-suites/{suite_id}",
                 "repository": {"full_name": REPOSITORY},
             })
+        self.check_suites = [
+            {
+                "id": int(run["check_suite_id"]),
+                "head_sha": REVISION,
+                "status": "completed",
+                "conclusion": "success",
+                "url": run["check_suite_url"],
+                "check_runs_url": (
+                    f"{run['check_suite_url']}/check-runs"
+                ),
+                "app": {"slug": "github-actions"},
+                "repository": {"full_name": REPOSITORY},
+            }
+            for run in self.runs
+        ]
         self.checks = []
         self.jobs_by_run: dict[int, list[dict[str, object]]] = {
             run_id: [] for run_id in self.run_for_path.values()
@@ -289,6 +304,13 @@ class Fixture:
         write_json(
             self.input / "api" / "workflow-runs.json",
             {"total_count": len(self.runs), "workflow_runs": self.runs},
+        )
+        write_json(
+            self.input / "api" / "check-suites.json",
+            {
+                "total_count": len(self.check_suites),
+                "check_suites": self.check_suites,
+            },
         )
         write_json(
             self.input / "api" / "check-runs.json",
@@ -878,6 +900,77 @@ jobs:
         with self.assertRaisesRegex(hosted.HostedEvidenceError, "incomplete"):
             self.fixture.seal()
 
+    def test_complete_suite_authority_and_provider_caps_are_required(self) -> None:
+        fixture = Fixture(Path(self.temporary.name) / "missing-suite")
+        fixture.check_suites.pop()
+        fixture.write()
+        with self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "absent from complete suite authority"
+        ):
+            fixture.seal()
+
+        fixture = Fixture(Path(self.temporary.name) / "workflow-cap")
+        with mock.patch.object(
+            hosted,
+            "PROVIDER_FILTERED_RESULT_CAP",
+            len(fixture.runs),
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "workflow-run authority is ambiguous"
+        ):
+            fixture.seal()
+
+        fixture = Fixture(Path(self.temporary.name) / "suite-cap")
+        extra_suite_id = 999_999
+        fixture.check_suites.append({
+            "id": extra_suite_id,
+            "head_sha": REVISION,
+            "status": "completed",
+            "conclusion": "success",
+            "url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-suites/"
+                f"{extra_suite_id}"
+            ),
+            "check_runs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-suites/"
+                f"{extra_suite_id}/check-runs"
+            ),
+            "app": {"slug": "github-actions"},
+            "repository": {"full_name": REPOSITORY},
+        })
+        fixture.write()
+        with mock.patch.object(
+            hosted,
+            "PROVIDER_FILTERED_RESULT_CAP",
+            len(fixture.check_suites),
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "check-suite authority is ambiguous"
+        ):
+            fixture.seal()
+
+    def test_selected_suite_lifecycle_app_and_repository_are_bound(self) -> None:
+        cases = (
+            ("status", "status", "in_progress"),
+            ("conclusion", "conclusion", "failure"),
+            ("app", "app", {"slug": "foreign-app"}),
+            (
+                "repository",
+                "repository",
+                {"full_name": "foreign/repository"},
+            ),
+        )
+        for case, field, value in cases:
+            with self.subTest(case=case):
+                fixture = Fixture(
+                    Path(self.temporary.name) / f"suite-binding-{case}"
+                )
+                fixture.check_suites[0][field] = value
+                fixture.write()
+                with self.assertRaisesRegex(
+                    hosted.HostedEvidenceError,
+                    "no admissible attempt-one workflow run",
+                ):
+                    fixture.seal()
+
     def test_selection_must_be_exact_ordered_and_coherent_by_workflow(self) -> None:
         self.fixture.selection["gates"].reverse()
         self.fixture.write()
@@ -890,6 +983,132 @@ jobs:
         ]
         fixture.write()
         with self.assertRaisesRegex(hosted.HostedEvidenceError, "workflow run binding"):
+            fixture.seal()
+
+    def test_valid_manual_alternative_is_rejected_by_offline_rederivation(self) -> None:
+        fixture = Fixture(Path(self.temporary.name) / "manual-alternative")
+        gate_id = "juliet"
+        original_run_id = fixture.run_for_path[GATE_WORKFLOWS[gate_id]]
+        original_run = next(
+            run for run in fixture.runs if run["id"] == original_run_id
+        )
+        original_check = next(
+            check for check in fixture.checks
+            if check["name"] == CHECK_NAMES[gate_id]
+        )
+        original_job = fixture.jobs_by_run[original_run_id][0]
+        original_artifact_ids = [
+            int(artifact["id"])
+            for artifact in fixture.artifacts_by_run[original_run_id]
+        ]
+        alternative_run_id = 90_001
+        alternative_suite_id = 90_002
+        alternative_check_id = 90_003
+        alternative_job_id = 90_004
+        job_html = (
+            f"https://github.com/{REPOSITORY}/actions/runs/"
+            f"{alternative_run_id}/job/{alternative_job_id}"
+        )
+        alternative_run = json.loads(json.dumps(original_run))
+        alternative_run.update({
+            "id": alternative_run_id,
+            "url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{alternative_run_id}"
+            ),
+            "html_url": (
+                f"https://github.com/{REPOSITORY}/actions/runs/"
+                f"{alternative_run_id}"
+            ),
+            "jobs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{alternative_run_id}/jobs"
+            ),
+            "logs_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{alternative_run_id}/logs"
+            ),
+            "check_suite_id": alternative_suite_id,
+            "check_suite_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-suites/"
+                f"{alternative_suite_id}"
+            ),
+        })
+        alternative_check = json.loads(json.dumps(original_check))
+        alternative_check.update({
+            "id": alternative_check_id,
+            "html_url": job_html,
+            "details_url": job_html,
+            "check_suite": {"id": alternative_suite_id},
+        })
+        alternative_job = json.loads(json.dumps(original_job))
+        alternative_job.update({
+            "id": alternative_job_id,
+            "run_id": alternative_run_id,
+            "run_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/runs/"
+                f"{alternative_run_id}"
+            ),
+            "url": (
+                f"https://api.github.com/repos/{REPOSITORY}/actions/jobs/"
+                f"{alternative_job_id}"
+            ),
+            "html_url": job_html,
+            "check_run_url": (
+                f"https://api.github.com/repos/{REPOSITORY}/check-runs/"
+                f"{alternative_check_id}"
+            ),
+        })
+        fixture.runs.append(alternative_run)
+        fixture.check_suites.append({
+            "id": alternative_suite_id,
+            "head_sha": REVISION,
+            "status": "completed",
+            "conclusion": "success",
+            "url": alternative_run["check_suite_url"],
+            "check_runs_url": (
+                f"{alternative_run['check_suite_url']}/check-runs"
+            ),
+            "app": {"slug": "github-actions"},
+            "repository": {"full_name": REPOSITORY},
+        })
+        fixture.checks.append(alternative_check)
+        fixture.jobs_by_run[alternative_run_id] = [alternative_job]
+        fixture.artifacts_by_run[alternative_run_id] = []
+        fixture.artifacts_by_run[original_run_id] = []
+        next(
+            gate for gate in fixture.selection["gates"]
+            if gate["gate_id"] == gate_id
+        ).update({
+            "workflow_run_id": alternative_run_id,
+            "check_run_id": alternative_check_id,
+        })
+        fixture.write()
+
+        attempt = int(original_run["run_attempt"])
+        for path in (
+            fixture.input / "api/artifacts" / f"{original_run_id}.json",
+            fixture.input / "api/jobs"
+            / f"{original_run_id}-attempt-{attempt}.json",
+            fixture.input / "api/log-downloads"
+            / f"{original_run_id}-attempt-{attempt}.json",
+            fixture.input / "downloads/logs"
+            / f"{original_run_id}-attempt-{attempt}.zip",
+        ):
+            path.unlink()
+        for artifact_id in original_artifact_ids:
+            (
+                fixture.input / "api/artifact-downloads"
+                / f"{artifact_id}.json"
+            ).unlink()
+            (
+                fixture.input / "downloads/artifacts" / f"{artifact_id}.zip"
+            ).unlink()
+
+        with self.assertRaisesRegex(
+            hosted.HostedEvidenceError,
+            "differs from deterministic provider selection",
+        ):
             fixture.seal()
 
     def test_workflow_path_ref_shape_is_normalized_but_must_match_head(self) -> None:
@@ -1104,6 +1323,307 @@ jobs:
         with self.assertRaises(hosted.HostedEvidenceError):
             fixture.seal()
         self.assertFalse(fixture.output.exists())
+
+    def test_seal_publication_interrupts_are_identity_safe(self) -> None:
+        root = Path(self.temporary.name)
+        fixture = Fixture(root / "temporary-interrupt")
+        fixture.output.parent.mkdir(parents=True, exist_ok=True)
+        real_mkdir = hosted.os.mkdir
+
+        def mkdir_then_interrupt(path, mode=0o777, *args, **kwargs):
+            result = real_mkdir(path, mode, *args, **kwargs)
+            if Path(path).name.startswith(f".{fixture.output.name}.tmp-"):
+                raise KeyboardInterrupt()
+            return result
+
+        with mock.patch.object(
+            hosted.os, "mkdir", side_effect=mkdir_then_interrupt
+        ), self.assertRaises(KeyboardInterrupt):
+            fixture.seal()
+        self.assertFalse(fixture.output.exists())
+        self.assertEqual(
+            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
+            [],
+        )
+
+        fixture = Fixture(root / "publication-interrupt")
+        real_rename = hosted._rename_noreplace
+
+        def rename_then_interrupt(source, destination):
+            real_rename(source, destination)
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            hosted, "_rename_noreplace", side_effect=rename_then_interrupt
+        ), self.assertRaises(KeyboardInterrupt):
+            fixture.seal()
+        self.assertFalse(fixture.output.exists())
+        self.assertEqual(
+            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
+            [],
+        )
+
+        fixture = Fixture(root / "publication-replacement")
+        marker = fixture.output / "owner-data"
+
+        def rename_replace_then_interrupt(source, destination):
+            real_rename(source, destination)
+            shutil.rmtree(destination)
+            Path(destination).mkdir()
+            marker.write_text("preserve\n", encoding="utf-8")
+            raise KeyboardInterrupt()
+
+        with mock.patch.object(
+            hosted,
+            "_rename_noreplace",
+            side_effect=rename_replace_then_interrupt,
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "identity changed"
+        ):
+            fixture.seal()
+        self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+
+        fixture = Fixture(root / "publication-replacement-return")
+        marker = fixture.output / "owner-data"
+
+        def rename_replace_then_return(source, destination):
+            real_rename(source, destination)
+            shutil.rmtree(destination)
+            Path(destination).mkdir()
+            marker.write_text("preserve\n", encoding="utf-8")
+
+        with mock.patch.object(
+            hosted,
+            "_rename_noreplace",
+            side_effect=rename_replace_then_return,
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "identity changed"
+        ):
+            fixture.seal()
+        self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+
+    def test_hosted_cleanup_quarantine_preserves_concurrent_foreign_tree(
+        self,
+    ) -> None:
+        root = Path(self.temporary.name) / "cleanup-quarantine"
+        root.mkdir()
+        owned = root / "published"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        metadata = owned.lstat()
+        marker = owned / "foreign-data"
+        real_rename_at = hosted._rename_noreplace_at
+        injected = False
+
+        def quarantine_then_replace(
+            source_directory, source, target_directory, target,
+        ):
+            nonlocal injected
+            result = real_rename_at(
+                source_directory,
+                source,
+                target_directory,
+                target,
+            )
+            if not injected and target.startswith(
+                ".codeskeptic-hosted-cleanup-"
+            ):
+                injected = True
+                owned.mkdir()
+                marker.write_text("preserve\n", encoding="utf-8")
+            return result
+
+        with mock.patch.object(
+            hosted,
+            "_rename_noreplace_at",
+            side_effect=quarantine_then_replace,
+        ):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+        self.assertEqual(
+            list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+        owned = root / "predelete-interrupted"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        metadata = owned.lstat()
+        real_make_removable = hosted._make_tree_removable_at
+        interrupted = False
+
+        def make_removable_then_interrupt(parent_descriptor, name):
+            nonlocal interrupted
+            if not interrupted:
+                interrupted = True
+                raise KeyboardInterrupt()
+            return real_make_removable(parent_descriptor, name)
+
+        with mock.patch.object(
+            hosted,
+            "_make_tree_removable_at",
+            side_effect=make_removable_then_interrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertFalse(owned.exists())
+        self.assertEqual(
+            list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+        owned = root / "chmod-interrupted"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        owned.chmod(0o500)
+        metadata = owned.lstat()
+        real_fchmod = hosted.os.fchmod
+        interrupted = False
+
+        def fchmod_then_interrupt(descriptor, mode):
+            nonlocal interrupted
+            result = real_fchmod(descriptor, mode)
+            if not interrupted:
+                interrupted = True
+                raise KeyboardInterrupt()
+            return result
+
+        with mock.patch.object(
+            hosted.os,
+            "fchmod",
+            side_effect=fchmod_then_interrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertFalse(owned.exists())
+        self.assertEqual(
+            list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+        owned = root / "delete-interrupted"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        metadata = owned.lstat()
+        real_rmtree = hosted.shutil.rmtree
+        interrupted = False
+
+        def rmtree_then_interrupt(path, *args, **kwargs):
+            nonlocal interrupted
+            if not interrupted and str(path).startswith(
+                ".codeskeptic-hosted-cleanup-"
+            ):
+                interrupted = True
+                raise KeyboardInterrupt()
+            return real_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(
+            hosted.shutil,
+            "rmtree",
+            side_effect=rmtree_then_interrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertFalse(owned.exists())
+        self.assertEqual(
+            list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+        owned = root / "interrupted"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        metadata = owned.lstat()
+        real_rename_at = hosted._rename_noreplace_at
+        interrupted = False
+
+        def quarantine_then_interrupt(
+            source_directory, source, target_directory, target,
+        ):
+            nonlocal interrupted
+            result = real_rename_at(
+                source_directory,
+                source,
+                target_directory,
+                target,
+            )
+            if not interrupted and target.startswith(
+                ".codeskeptic-hosted-cleanup-"
+            ):
+                interrupted = True
+                raise KeyboardInterrupt()
+            return result
+
+        with mock.patch.object(
+            hosted,
+            "_rename_noreplace_at",
+            side_effect=quarantine_then_interrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertTrue((owned / "owned-data").is_file())
+        self.assertEqual(
+            list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+    def test_hosted_cleanup_restore_collision_preserves_every_tree(self) -> None:
+        root = Path(self.temporary.name) / "cleanup-restore-collision"
+        root.mkdir()
+        owned = root / "published"
+        owned.mkdir()
+        (owned / "owned-data").write_text("owned\n", encoding="utf-8")
+        metadata = owned.lstat()
+        moved_owned = root / "moved-owned"
+        real_rename_at = hosted._rename_noreplace_at
+        injected = False
+
+        def quarantine_then_conflict(
+            source_directory, source, target_directory, target,
+        ):
+            nonlocal injected
+            result = real_rename_at(
+                source_directory,
+                source,
+                target_directory,
+                target,
+            )
+            if not injected and target.startswith(
+                ".codeskeptic-hosted-cleanup-"
+            ):
+                injected = True
+                os.rename(
+                    target,
+                    moved_owned.name,
+                    src_dir_fd=target_directory,
+                    dst_dir_fd=target_directory,
+                )
+                os.mkdir(target, dir_fd=target_directory)
+                Path(root / target / "quarantined-foreign").write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+                owned.mkdir()
+                (owned / "path-foreign").write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+            return result
+
+        with mock.patch.object(
+            hosted,
+            "_rename_noreplace_at",
+            side_effect=quarantine_then_conflict,
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "retained quarantine"
+        ):
+            hosted._remove_tree_identity(
+                owned, metadata.st_dev, metadata.st_ino
+            )
+        self.assertTrue((moved_owned / "owned-data").is_file())
+        self.assertTrue((owned / "path-foreign").is_file())
+        quarantines = list(root.glob(".codeskeptic-hosted-cleanup-*"))
+        self.assertEqual(len(quarantines), 1)
+        self.assertTrue((quarantines[0] / "quarantined-foreign").is_file())
 
     def test_raw_api_mutation_is_rejected_even_when_json_stays_valid(self) -> None:
         self.fixture.seal()

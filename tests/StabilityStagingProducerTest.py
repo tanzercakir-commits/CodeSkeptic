@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -224,7 +225,6 @@ def initialize_lifecycle_source(
 def populate_prepared_authorities(
     prepared: Path,
     revision: str,
-    source_identity: dict[str, str],
     *,
     mirror_authority_sealer=None,
 ) -> None:
@@ -242,10 +242,8 @@ def populate_prepared_authorities(
             "tests/codeskeptic_tests"
         ): b"fixture tests\n",
     }
-    digests = {
-        relative: write_payload(authority / relative, payload)
-        for relative, payload in blobs.items()
-    }
+    for relative, payload in blobs.items():
+        write_payload(authority / relative, payload)
     mirror_root = authority / "mirrors"
     if mirror_root.exists() or mirror_root.is_symlink():
         raise AssertionError("mirror sealer target must be create-new")
@@ -259,7 +257,6 @@ def populate_prepared_authorities(
     mirror_authority = mirror_root / "authority.json"
     if not mirror_authority.is_file() or mirror_authority.is_symlink():
         raise AssertionError("mirror sealer did not publish authority.json")
-    digests["mirrors/authority.json"] = sha256_file(mirror_authority)
     for relative in (
         "release/source",
         "release/build",
@@ -269,124 +266,11 @@ def populate_prepared_authorities(
     ):
         (authority / relative).mkdir(parents=True, exist_ok=True)
 
-    policy = authority / "source" / "scripts" / "stability_manifest.json"
-    config = {
-        "schema": "codeskeptic-stability-runtime-v1",
-        "policy": {
-            "path": "/authority/source/scripts/stability_manifest.json",
-            "sha256": sha256_file(policy),
-        },
-        "source": {
-            "root": "/authority/source",
-            "revision": revision,
-            "tree_sha1": source_identity["tree_sha1"],
-            "manifest_sha256": source_identity["manifest_sha256"],
-        },
-        "runtime": {
-            "image_reference": PINNED_IMAGE_REFERENCE,
-            "image_digest": PINNED_IMAGE_DIGEST,
-            "image_id": PINNED_IMAGE_ID,
-            "launch_receipt": "/launch/receipt.json",
-        },
-        "analyzer": {
-            "path": "/authority/build/src/codeskeptic",
-            "sha256": digests["build/src/codeskeptic"],
-        },
-        "build_authority": {
-            "root": "/authority/build-authority",
-            "receipt_sha256": digests["build-authority/receipt.json"],
-            "build_path": "/authority/build",
-        },
-        "realworld": {
-            "mirror_authority": "/authority/mirrors/authority.json",
-            "mirror_authority_sha256": digests["mirrors/authority.json"],
-        },
-        "fault_injection": {
-            "test_binary": (
-                "/authority/source/build/p10-09-sanitizers/undefined-tests/"
-                "tests/codeskeptic_tests"
-            ),
-            "test_binary_sha256": digests[
-                "source/build/p10-09-sanitizers/undefined-tests/"
-                "tests/codeskeptic_tests"
-            ],
-        },
-        "qualification": {
-            "hardware_class": "fedora44-i5-1235u-exclusive-pcores-0-3",
-            "measurement_cgroup": (
-                "/sys/fs/cgroup/system.slice/codeskeptic-stability.service/"
-                "codeskeptic-p10-09/measurement"
-            ),
-            "baseline_authority_root": "/authority/source",
-            "release_source": "/authority/release/source",
-            "release_build": "/authority/release/build",
-            "jobs": 2,
-            "tools": {
-                "clang": "/usr/bin/clang-20",
-                "time": "/usr/bin/time",
-                "cmake": "/usr/bin/cmake",
-                "ninja": "/usr/bin/ninja",
-                "c_compiler": "/usr/bin/clang-20",
-                "cxx_compiler": "/usr/bin/clang++-20",
-            },
-        },
-        "prerequisites": {
-            "determinism": {
-                "root": "/authority/prerequisites/determinism",
-                "receipt_sha256": digests[
-                    "prerequisites/determinism/receipt.json"
-                ],
-            },
-            "hosted_exact_head": {
-                "root": "/authority/prerequisites/hosted",
-                "receipt_sha256": digests[
-                    "prerequisites/hosted/receipt.json"
-                ],
-                "repository": "codeskeptic/staging-fixture",
-            },
-            "quality_floor": {
-                "root": "/authority/prerequisites/quality",
-                "receipt_sha256": digests[
-                    "prerequisites/quality/receipt.json"
-                ],
-            },
-        },
-        "sanitizers": {
-            "address": {
-                "root": "/authority/sanitizers/address",
-                "receipt_sha256": digests[
-                    "sanitizers/address/receipt.json"
-                ],
-                "test_build": (
-                    "/authority/source/build/p10-09-sanitizers/address-tests"
-                ),
-                "fuzz_build": (
-                    "/authority/source/build/p10-09-sanitizers/address-fuzz"
-                ),
-            },
-            "undefined": {
-                "root": "/authority/sanitizers/undefined",
-                "receipt_sha256": digests[
-                    "sanitizers/undefined/receipt.json"
-                ],
-                "test_build": (
-                    "/authority/source/build/p10-09-sanitizers/undefined-tests"
-                ),
-                "fuzz_build": (
-                    "/authority/source/build/p10-09-sanitizers/undefined-fuzz"
-                ),
-            },
-        },
-    }
     assert stage is not None
-    config_data = stage.canonical_document(config)
-    config_path = prepared / "config" / "runtime.json"
-    write_payload(config_path, config_data)
-    write_payload(
-        Path(f"{config_path}.sha256"),
-        f"{hashlib.sha256(config_data).hexdigest()}  runtime.json\n".encode(
-            "ascii"
-        ),
+    stage.configure_staging(
+        prepared,
+        revision,
+        repository="codeskeptic/staging-fixture",
     )
 
 
@@ -401,9 +285,9 @@ def make_manual_prepared_tree(
     revision = initialize_lifecycle_source(
         source, execution_marker=execution_marker
     )
-    source_identity = stage.validate_staged_source(source, revision)
+    stage.validate_staged_source(source, revision)
     prepared = workspace / "prepared"
-    for relative in ("authority", "config", "image", "operator", "unit"):
+    for relative in ("authority", "image", "operator", "unit"):
         (prepared / relative).mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, prepared / "authority" / "source")
     for relative in (
@@ -451,7 +335,6 @@ def make_manual_prepared_tree(
     populate_prepared_authorities(
         prepared,
         revision,
-        source_identity,
         mirror_authority_sealer=mirror_authority_sealer,
     )
     return prepared, revision
@@ -628,7 +511,7 @@ class StabilityStagingProducerPresenceTest(unittest.TestCase):
 class StabilityStagingProducerTest(unittest.TestCase):
     def test_cli_is_versioned_and_exposes_the_complete_lifecycle(self) -> None:
         assert stage is not None
-        self.assertEqual(stage.TOOL_VERSION, "1")
+        self.assertEqual(stage.TOOL_VERSION, "2")
         parser = stage.build_parser()
         subparser_actions = [
             action
@@ -638,8 +521,20 @@ class StabilityStagingProducerTest(unittest.TestCase):
         self.assertEqual(len(subparser_actions), 1)
         self.assertEqual(
             set(subparser_actions[0].choices),
-            {"prepare", "seal", "verify", "install", "verify-install"},
+            {
+                "prepare", "configure", "seal", "verify", "install",
+                "verify-install",
+            },
         )
+        for command in ("seal", "verify", "install"):
+            command_parser = subparser_actions[0].choices[command]
+            temporary_actions = [
+                action
+                for action in command_parser._actions
+                if "--temporary-root" in action.option_strings
+            ]
+            self.assertEqual(len(temporary_actions), 1)
+            self.assertTrue(temporary_actions[0].required)
 
         version = subprocess.run(
             [sys.executable, str(PRODUCER), "--version"],
@@ -650,7 +545,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
         )
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertEqual(version.stderr, "")
-        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 1\n")
+        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 2\n")
 
     def test_cli_dispatches_every_lifecycle_command(self) -> None:
         assert stage is not None
@@ -667,10 +562,20 @@ class StabilityStagingProducerTest(unittest.TestCase):
             ),
             (
                 [
+                    "configure",
+                    "--staging", "/fixture/prepared",
+                    "--revision", "1" * 40,
+                    "--repository", "codeskeptic/staging-fixture",
+                ],
+                "configure_staging",
+            ),
+            (
+                [
                     "seal",
                     "--staging", "/fixture/prepared",
                     "--revision", "1" * 40,
                     "--output", "/fixture/sealed",
+                    "--temporary-root", "/fixture/disk-temporary",
                 ],
                 "seal_staging",
             ),
@@ -679,6 +584,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     "verify", "--bundle", "/fixture/sealed",
                     "--expected-revision", "1" * 40,
                     "--expected-bundle-receipt-sha256", "2" * 64,
+                    "--temporary-root", "/fixture/disk-temporary",
                 ],
                 "verify_bundle",
             ),
@@ -687,6 +593,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     "install", "--bundle", "/fixture/sealed",
                     "--expected-revision", "1" * 40,
                     "--expected-bundle-receipt-sha256", "2" * 64,
+                    "--temporary-root", "/fixture/disk-temporary",
                 ],
                 "install_bundle",
             ),
@@ -701,7 +608,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             ),
         )
         lifecycle = (
-            "prepare_staging",
+            "prepare_staging", "configure_staging",
             "seal_staging",
             "verify_bundle",
             "install_bundle",
@@ -737,7 +644,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             self.assertEqual(identity["revision"], revision)
             self.assertEqual(
                 sorted(path.name for path in prepared.iterdir()),
-                ["authority", "config", "image", "operator", "unit"],
+                ["authority", "image", "operator", "unit"],
             )
             self.assertFalse(
                 (prepared / "authority" / "mirrors").exists(),
@@ -770,6 +677,382 @@ class StabilityStagingProducerTest(unittest.TestCase):
         finally:
             make_writable(workspace)
             temporary.cleanup()
+
+    def test_prepare_publication_interrupt_removes_published_output(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            revision = initialize_lifecycle_source(source)
+            archive = workspace / "fixture.oci.tar"
+            archive.write_bytes(b"fixture OCI archive\n")
+            prepared = workspace / "prepared"
+            real_publish = stage._publish_tree_noreplace
+
+            def publish_then_interrupt(source_path, destination):
+                real_publish(source_path, destination)
+                raise KeyboardInterrupt()
+
+            with mock.patch.object(
+                stage,
+                "_publish_tree_noreplace",
+                side_effect=publish_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.prepare_staging(source, revision, archive, prepared)
+            self.assertFalse(prepared.exists())
+            self.assertEqual(
+                list(workspace.glob(".prepared.prepare-*")),
+                [],
+            )
+
+    def test_tree_publications_roll_back_on_temporary_cleanup_failure(self) -> None:
+        assert stage is not None
+
+        def cleanup_failure_context(prefix: str):
+            published = False
+            real_publish = stage._publish_tree_noreplace
+            real_lstat = Path.lstat
+
+            def publish(source, destination):
+                nonlocal published
+                result = real_publish(source, destination)
+                published = True
+                return result
+
+            def fail_old_temporary_lstat(path):
+                if published and path.name.startswith(prefix):
+                    raise PermissionError("fixture temporary cleanup failure")
+                return real_lstat(path)
+
+            return (
+                mock.patch.object(
+                    stage, "_publish_tree_noreplace", side_effect=publish
+                ),
+                mock.patch.object(Path, "lstat", new=fail_old_temporary_lstat),
+            )
+
+        with self.subTest(lifecycle="prepare"), tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            revision = initialize_lifecycle_source(source)
+            archive = workspace / "fixture.oci.tar"
+            archive.write_bytes(b"fixture OCI archive\n")
+            prepared = workspace / "prepared"
+            publish_patch, lstat_patch = cleanup_failure_context(
+                ".prepared.prepare-"
+            )
+            with publish_patch, lstat_patch, self.assertRaisesRegex(
+                stage.StagingError, "temporary cleanup failure"
+            ):
+                stage.prepare_staging(source, revision, archive, prepared)
+            self.assertFalse(prepared.exists())
+
+        with self.subTest(lifecycle="configure"), tempfile.TemporaryDirectory() as temporary:
+            prepared, revision = make_manual_prepared_tree(Path(temporary))
+            config_root = prepared / "config"
+            shutil.rmtree(config_root)
+            publish_patch, lstat_patch = cleanup_failure_context(
+                ".config.runtime-"
+            )
+            with publish_patch, lstat_patch, self.assertRaisesRegex(
+                stage.StagingError, "temporary cleanup failure"
+            ):
+                stage.configure_staging(
+                    prepared,
+                    revision,
+                    repository="codeskeptic/staging-fixture",
+                )
+            self.assertFalse(config_root.exists())
+
+        with self.subTest(lifecycle="seal"), tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            prepared, revision = make_manual_prepared_tree(workspace)
+            sealed = workspace / "sealed"
+            publish_patch, lstat_patch = cleanup_failure_context(
+                ".sealed.seal-"
+            )
+            with publish_patch, lstat_patch, self.assertRaisesRegex(
+                stage.StagingError, "temporary cleanup failure"
+            ):
+                stage.seal_staging(
+                    prepared,
+                    revision,
+                    sealed,
+                    command_runner=FakeCommandRunner(),
+                )
+            self.assertFalse(sealed.exists())
+
+    def test_configure_materializes_canonical_receipt_bound_runtime_config(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prepared, revision = make_manual_prepared_tree(Path(temporary))
+            config_path = prepared / "config" / "runtime.json"
+            sidecar_path = Path(f"{config_path}.sha256")
+            data = config_path.read_bytes()
+            config = json.loads(data.decode("utf-8"))
+
+            self.assertEqual(data, stage.canonical_document(config))
+            self.assertEqual(config["source"]["revision"], revision)
+            self.assertEqual(
+                config["prerequisites"]["hosted_exact_head"]["repository"],
+                "codeskeptic/staging-fixture",
+            )
+            self.assertEqual(
+                config["build_authority"]["receipt_sha256"],
+                sha256_file(
+                    prepared / "authority/build-authority/receipt.json"
+                ),
+            )
+            self.assertEqual(
+                sidecar_path.read_bytes(),
+                f"{hashlib.sha256(data).hexdigest()}  runtime.json\n".encode(
+                    "ascii"
+                ),
+            )
+
+            before = (data, sidecar_path.read_bytes())
+            with self.assertRaisesRegex(stage.StagingError, "previously absent"):
+                stage.configure_staging(
+                    prepared,
+                    revision,
+                    repository="codeskeptic/staging-fixture",
+                )
+            self.assertEqual(
+                (config_path.read_bytes(), sidecar_path.read_bytes()), before
+            )
+
+    def test_configure_is_atomic_and_rejects_missing_authority_inputs(self) -> None:
+        assert stage is not None
+        for case in (
+            "missing-receipt",
+            "malformed-repository-suffix",
+            "malformed-repository-component",
+            "sidecar-write",
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                prepared, revision = make_manual_prepared_tree(Path(temporary))
+                config_path = prepared / "config" / "runtime.json"
+                sidecar_path = Path(f"{config_path}.sha256")
+                shutil.rmtree(config_path.parent)
+
+                if case == "missing-receipt":
+                    (
+                        prepared
+                        / "authority/prerequisites/hosted/receipt.json"
+                    ).unlink()
+                    context = contextlib.nullcontext()
+                    repository = "codeskeptic/staging-fixture"
+                elif case == "malformed-repository-suffix":
+                    context = contextlib.nullcontext()
+                    repository = "codeskeptic/invalid.git"
+                elif case == "malformed-repository-component":
+                    context = contextlib.nullcontext()
+                    repository = "../staging-fixture"
+                else:
+                    original_write = stage._write_new
+
+                    def fail_sidecar(path, data, *args, **kwargs):
+                        if Path(path).name == "runtime.json.sha256":
+                            raise stage.StagingError("fixture sidecar failure")
+                        return original_write(path, data, *args, **kwargs)
+
+                    context = mock.patch.object(
+                        stage, "_write_new", side_effect=fail_sidecar
+                    )
+                    repository = "codeskeptic/staging-fixture"
+
+                with context, self.assertRaises(stage.StagingError):
+                    stage.configure_staging(
+                        prepared,
+                        revision,
+                        repository=repository,
+                    )
+                self.assertFalse(config_path.parent.exists())
+
+    def test_configure_interrupt_during_temporary_creation_removes_child(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prepared, revision = make_manual_prepared_tree(Path(temporary))
+            config_root = prepared / "config"
+            shutil.rmtree(config_root)
+            original_mkdir = os.mkdir
+
+            def interrupt_after_create(path, mode=0o777, *args, **kwargs):
+                result = original_mkdir(path, mode, *args, **kwargs)
+                if Path(path).name.startswith(".config.runtime-"):
+                    raise KeyboardInterrupt()
+                return result
+
+            with mock.patch.object(
+                stage.os, "mkdir", side_effect=interrupt_after_create
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.configure_staging(
+                    prepared,
+                    revision,
+                    repository="codeskeptic/staging-fixture",
+                )
+            self.assertFalse(config_root.exists())
+            self.assertEqual(
+                [
+                    path.name
+                    for path in prepared.iterdir()
+                    if path.name.startswith(".config.runtime-")
+                ],
+                [],
+            )
+
+    def test_configure_preserves_replacement_when_temporary_identity_drifts(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prepared, revision = make_manual_prepared_tree(Path(temporary))
+            config_root = prepared / "config"
+            shutil.rmtree(config_root)
+            moved = prepared / "producer-temporary-moved"
+            marker: Path | None = None
+            original_write = stage._write_new
+
+            def swap_before_sidecar(path, data, *args, **kwargs):
+                nonlocal marker
+                target = Path(path)
+                if target.name == "runtime.json.sha256":
+                    producer_root = target.parent
+                    producer_root.rename(moved)
+                    producer_root.mkdir(mode=0o700)
+                    marker = producer_root / "owner-data"
+                    marker.write_text("preserve\n", encoding="utf-8")
+                    raise stage.StagingError("fixture sidecar failure")
+                return original_write(path, data, *args, **kwargs)
+
+            with mock.patch.object(
+                stage, "_write_new", side_effect=swap_before_sidecar
+            ), self.assertRaisesRegex(
+                stage.StagingError, "cleanup failure|identity changed"
+            ):
+                stage.configure_staging(
+                    prepared,
+                    revision,
+                    repository="codeskeptic/staging-fixture",
+                )
+            assert marker is not None
+            self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+            self.assertTrue(moved.is_dir())
+            self.assertTrue((moved / "runtime.json").is_file())
+            self.assertFalse(config_root.exists())
+
+    def test_configure_rolls_back_after_publication_and_preserves_collision(self) -> None:
+        assert stage is not None
+        for case in (
+            "post-publication", "publish-interrupt", "concurrent-collision",
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                prepared, revision = make_manual_prepared_tree(Path(temporary))
+                config_root = prepared / "config"
+                shutil.rmtree(config_root)
+                if case == "post-publication":
+                    context = mock.patch.object(
+                        stage,
+                        "_runtime_config",
+                        side_effect=stage.StagingError(
+                            "fixture post-publication failure"
+                        ),
+                    )
+                    marker = None
+                    expected_exception = stage.StagingError
+                elif case == "publish-interrupt":
+                    real_publish = stage._publish_tree_noreplace
+
+                    def publish_then_interrupt(source, destination):
+                        real_publish(source, destination)
+                        raise KeyboardInterrupt()
+
+                    context = mock.patch.object(
+                        stage,
+                        "_publish_tree_noreplace",
+                        side_effect=publish_then_interrupt,
+                    )
+                    marker = None
+                    expected_exception = KeyboardInterrupt
+                else:
+                    def collide(source, destination):
+                        destination.mkdir()
+                        collision_marker = destination / "owner-data"
+                        collision_marker.write_text(
+                            "preserve\n", encoding="utf-8"
+                        )
+                        raise FileExistsError(destination)
+
+                    context = mock.patch.object(
+                        stage, "_publish_tree_noreplace", side_effect=collide
+                    )
+                    marker = config_root / "owner-data"
+                    expected_exception = stage.StagingError
+
+                with context, self.assertRaises(expected_exception):
+                    stage.configure_staging(
+                        prepared,
+                        revision,
+                        repository="codeskeptic/staging-fixture",
+                    )
+                if marker is None:
+                    self.assertFalse(config_root.exists())
+                else:
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8"), "preserve\n"
+                    )
+                self.assertEqual(
+                    [
+                        path.name
+                        for path in prepared.iterdir()
+                        if path.name.startswith(".config.runtime-")
+                    ],
+                    [],
+                )
+
+    def test_seal_rejects_authority_changed_after_configuration(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            prepared, revision = make_manual_prepared_tree(workspace)
+            receipt = prepared / "authority/build-authority/receipt.json"
+            receipt.write_bytes(b'{"accepted":false}\n')
+            runner = FakeCommandRunner()
+            with self.assertRaisesRegex(stage.StagingError, "checksum drift"):
+                stage.seal_staging(
+                    prepared,
+                    revision,
+                    workspace / "sealed",
+                    command_runner=runner,
+                )
+            self.assertEqual(runner.commands, [])
+
+    def test_seal_publication_interrupt_removes_published_output(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            prepared, revision = make_manual_prepared_tree(workspace)
+            sealed = workspace / "sealed"
+            real_publish = stage._publish_tree_noreplace
+
+            def publish_then_interrupt(source, destination):
+                real_publish(source, destination)
+                raise KeyboardInterrupt()
+
+            with mock.patch.object(
+                stage,
+                "_publish_tree_noreplace",
+                side_effect=publish_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.seal_staging(
+                    prepared,
+                    revision,
+                    sealed,
+                    command_runner=FakeCommandRunner(),
+                )
+            self.assertFalse(sealed.exists())
+            self.assertEqual(
+                list(workspace.glob(".sealed.seal-*")),
+                [],
+            )
 
     def test_fixture_allows_a_create_new_realworld_mirror_sealer(self) -> None:
         assert stage is not None
@@ -872,6 +1155,314 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     metadata_mode_tampered,
                     **bundle_authority(sealed),
                 )
+
+    def test_large_private_trees_use_the_selected_disk_backed_root(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, prepared, revision, sealed, _receipt = fixture
+            temporary_root = workspace / "disk-backed-temporary"
+            temporary_root.mkdir(mode=0o700)
+            observed: list[Path] = []
+            original_mkdir = os.mkdir
+
+            def observe_mkdir(path, mode=0o777, *args, **kwargs):
+                candidate = Path(path)
+                if candidate.name.startswith("codeskeptic-stability-work-"):
+                    observed.append(candidate.parent)
+                return original_mkdir(path, mode, *args, **kwargs)
+
+            with mock.patch.object(
+                stage.os, "mkdir", side_effect=observe_mkdir
+            ):
+                second_sealed = workspace / "second-sealed"
+                stage.seal_staging(
+                    prepared,
+                    revision,
+                    second_sealed,
+                    command_runner=FakeCommandRunner(),
+                    temporary_root=temporary_root,
+                )
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=FakeCommandRunner(),
+                    temporary_root=temporary_root,
+                )
+                install_workspace = workspace / "temporary-root-install"
+                install_workspace.mkdir()
+                with patched_install_layout(install_workspace):
+                    stage.install_bundle(
+                        sealed,
+                        **bundle_authority(sealed),
+                        command_runner=FakeCommandRunner(),
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        temporary_root=temporary_root,
+                    )
+
+            self.assertEqual(len(observed), 3)
+            self.assertTrue(all(path == temporary_root for path in observed))
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_disk_backed_temporary_root_rejects_symlink_before_execution(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            target = workspace / "real-temporary-root"
+            target.mkdir()
+            linked = workspace / "linked-temporary-root"
+            linked.symlink_to(target, target_is_directory=True)
+            runner = FakeCommandRunner()
+            with self.assertRaisesRegex(stage.StagingError, "temporary root"):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=linked,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(target.iterdir()), [])
+
+    def test_disk_backed_temporary_root_rejects_low_capacity_before_copy(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "small-temporary-root"
+            temporary_root.mkdir(mode=0o700)
+            runner = FakeCommandRunner()
+            filesystem = mock.Mock(f_bavail=1, f_frsize=1)
+            with mock.patch.object(
+                stage.os, "statvfs", return_value=filesystem
+            ), self.assertRaisesRegex(stage.StagingError, "insufficient"):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_disk_backed_root_swap_is_rejected_and_cleaned_before_execution(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "swapped-temporary-root"
+            temporary_root.mkdir(mode=0o700)
+            original_root = workspace / "original-temporary-root"
+            original_mkdir = os.mkdir
+
+            def swap_root(path, mode=0o777, *args, **kwargs):
+                candidate = Path(path)
+                if candidate.name.startswith("codeskeptic-stability-work-"):
+                    temporary_root.rename(original_root)
+                    original_mkdir(temporary_root, 0o700)
+                return original_mkdir(path, mode, *args, **kwargs)
+
+            runner = FakeCommandRunner()
+            with mock.patch.object(
+                stage.os, "mkdir", side_effect=swap_root
+            ), self.assertRaisesRegex(stage.StagingError, "identity changed"):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+            self.assertEqual(list(original_root.iterdir()), [])
+
+    def test_interrupt_during_workspace_creation_removes_created_child(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "creation-interrupt-root"
+            temporary_root.mkdir(mode=0o700)
+            original_mkdir = os.mkdir
+
+            def interrupt_after_create(path, mode=0o777, *args, **kwargs):
+                result = original_mkdir(path, mode, *args, **kwargs)
+                if Path(path).name.startswith(
+                    "codeskeptic-stability-work-"
+                ):
+                    raise KeyboardInterrupt()
+                return result
+
+            runner = FakeCommandRunner()
+            with mock.patch.object(
+                stage.os, "mkdir", side_effect=interrupt_after_create
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_interrupt_during_workspace_identity_capture_removes_child(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "identity-interrupt-root"
+            temporary_root.mkdir(mode=0o700)
+            original_lstat = Path.lstat
+            interrupted = False
+
+            def interrupt_identity(path, *args, **kwargs):
+                nonlocal interrupted
+                if (
+                    not interrupted
+                    and path.name.startswith("codeskeptic-stability-work-")
+                ):
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return original_lstat(path, *args, **kwargs)
+
+            runner = FakeCommandRunner()
+            with mock.patch.object(
+                stage.Path, "lstat", autospec=True, side_effect=interrupt_identity
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_interrupt_during_workspace_parent_revalidation_removes_child(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "parent-interrupt-root"
+            temporary_root.mkdir(mode=0o700)
+            original_lstat = Path.lstat
+            root_lstats = 0
+
+            def interrupt_second_root_lstat(path, *args, **kwargs):
+                nonlocal root_lstats
+                if path == temporary_root:
+                    root_lstats += 1
+                    if root_lstats == 2:
+                        raise KeyboardInterrupt()
+                return original_lstat(path, *args, **kwargs)
+
+            runner = FakeCommandRunner()
+            with mock.patch.object(
+                stage.Path,
+                "lstat",
+                autospec=True,
+                side_effect=interrupt_second_root_lstat,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertGreaterEqual(root_lstats, 2)
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_snapshot_directory_creation_preserves_space_and_inode_reserve(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            destination = workspace / "destination"
+            source.mkdir()
+            (source / "empty").mkdir()
+            destination.mkdir()
+            source_fd = os.open(
+                source,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            reserve = 4096
+            budget = {
+                "entries": 0,
+                "remaining_bytes": 4096,
+                "reserve_bytes": reserve,
+                "temporary_workspace": workspace,
+            }
+            roomy = mock.Mock(
+                f_bavail=2,
+                f_frsize=4096,
+                f_favail=2,
+            )
+            exhausted = mock.Mock(
+                f_bavail=0,
+                f_frsize=4096,
+                f_favail=0,
+            )
+            try:
+                with mock.patch.object(
+                    stage.os,
+                    "statvfs",
+                    side_effect=[roomy, exhausted],
+                ), self.assertRaisesRegex(
+                    stage.StagingError, "temporary root.*(space|inode)"
+                ):
+                    stage._copy_snapshot_directory(
+                        source_fd, destination, budget
+                    )
+            finally:
+                os.close(source_fd)
+
+    def test_pinned_snapshot_byte_budget_fails_before_disk_exhaustion(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "budgeted-temporary-root"
+            temporary_root.mkdir(mode=0o700)
+            archive_size = (
+                sealed / "image" / stage.PINNED_ARCHIVE_NAME
+            ).stat().st_size
+            reserve = (
+                archive_size * stage.VFS_ARCHIVE_EXPANSION_FACTOR
+                + stage.LARGE_TEMPORARY_RESERVE_BYTES
+            )
+            runner = FakeCommandRunner()
+            with mock.patch.object(
+                stage,
+                "_temporary_available_bytes",
+                side_effect=[10**12, 10**12, reserve + 1],
+            ), self.assertRaisesRegex(stage.StagingError, "pinned byte budget"):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(runner.commands, [])
+            self.assertEqual(list(temporary_root.iterdir()), [])
+
+    def test_interrupt_cleans_snapshot_and_private_image_store(self) -> None:
+        assert stage is not None
+
+        class InterruptingRunner(FakeCommandRunner):
+            def __call__(self, argv: list[str], **kwargs) -> bytes:
+                command = [os.fspath(item) for item in argv]
+                if "load" in command:
+                    raise KeyboardInterrupt()
+                return super().__call__(argv, **kwargs)
+
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            temporary_root = workspace / "interrupted-temporary-root"
+            temporary_root.mkdir(mode=0o700)
+            with self.assertRaises(KeyboardInterrupt):
+                stage.verify_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=InterruptingRunner(),
+                    temporary_root=temporary_root,
+                )
+            self.assertEqual(list(temporary_root.iterdir()), [])
 
     def test_host_never_executes_staged_python_while_sealing(self) -> None:
         assert stage is not None
@@ -1307,6 +1898,651 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 "a private fixed directory must self-clean if registration fails",
             )
 
+    def test_tree_and_file_publication_interrupts_self_clean(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            destination = workspace / "published"
+            make_inventory_tree(source)
+            inventory = stage.collect_inventory(source)
+            real_rename = stage._rename_noreplace
+
+            def rename_then_interrupt(source_path, destination_path):
+                real_rename(source_path, destination_path)
+                raise KeyboardInterrupt()
+
+            created: list[tuple[Path, int, int, bool]] = []
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=rename_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage.install_tree_create_new(
+                    source,
+                    destination,
+                    inventory,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                    created_nodes=created,
+                )
+            self.assertFalse(destination.exists())
+            self.assertEqual(created, [])
+
+            foreign_destination = workspace / "foreign-published"
+            foreign_marker = foreign_destination / "owner-data"
+            staged_metadata = None
+            real_lstat = Path.lstat
+            real_remove = stage._remove_created_identity
+            removed_paths: list[Path] = []
+
+            def same_identity_collision(source_path, destination_path):
+                nonlocal staged_metadata
+                if Path(destination_path) != foreign_destination:
+                    return real_rename(source_path, destination_path)
+                staged_metadata = real_lstat(Path(source_path))
+                Path(destination_path).mkdir()
+                foreign_marker.write_text("preserve\n", encoding="utf-8")
+                raise FileExistsError(destination_path)
+
+            def report_same_identity(path):
+                if Path(path) == foreign_destination and staged_metadata is not None:
+                    return staged_metadata
+                return real_lstat(path)
+
+            def record_remove(path, device, inode, is_directory):
+                removed_paths.append(Path(path))
+                return real_remove(path, device, inode, is_directory)
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=same_identity_collision,
+            ), mock.patch.object(
+                Path, "lstat", new=report_same_identity
+            ), mock.patch.object(
+                stage,
+                "_remove_created_identity",
+                side_effect=record_remove,
+            ), self.assertRaises(stage.StagingError):
+                stage.install_tree_create_new(
+                    source,
+                    foreign_destination,
+                    inventory,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            self.assertNotIn(foreign_destination, removed_paths)
+            self.assertTrue(
+                foreign_marker.exists(),
+                f"removed={removed_paths!r}; workspace={list(workspace.iterdir())!r}",
+            )
+            self.assertEqual(
+                foreign_marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+
+            target = workspace / "created-file"
+            real_write = stage.os.write
+            interrupted = False
+
+            def write_then_interrupt(descriptor, data):
+                nonlocal interrupted
+                written = real_write(descriptor, data)
+                if not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return written
+
+            with mock.patch.object(
+                stage.os, "write", side_effect=write_then_interrupt
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._write_new(target, b"fixture\n")
+            self.assertFalse(target.exists())
+
+    def test_identity_cleanup_quarantines_before_removing_exact_nodes(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            for is_directory in (True, False):
+                with self.subTest(is_directory=is_directory):
+                    target = workspace / (
+                        "owned-tree" if is_directory else "owned-file"
+                    )
+                    if is_directory:
+                        target.mkdir()
+                        (target / "owned-data").write_text(
+                            "owned\n", encoding="utf-8"
+                        )
+                    else:
+                        target.write_text("owned\n", encoding="utf-8")
+                    metadata = target.lstat()
+                    real_rename_at = stage._rename_noreplace_at
+                    injected = False
+
+                    def quarantine_then_replace(
+                        source_directory,
+                        source,
+                        destination_directory,
+                        destination,
+                    ):
+                        nonlocal injected
+                        result = real_rename_at(
+                            source_directory,
+                            source,
+                            destination_directory,
+                            destination,
+                        )
+                        if not injected and destination.startswith(
+                            ".codeskeptic-cleanup-"
+                        ):
+                            injected = True
+                            if is_directory:
+                                target.mkdir()
+                                (target / "foreign-data").write_text(
+                                    "preserve\n", encoding="utf-8"
+                                )
+                            else:
+                                target.write_text(
+                                    "preserve\n", encoding="utf-8"
+                                )
+                        return result
+
+                    with mock.patch.object(
+                        stage,
+                        "_rename_noreplace_at",
+                        side_effect=quarantine_then_replace,
+                    ):
+                        stage._remove_created_identity(
+                            target,
+                            metadata.st_dev,
+                            metadata.st_ino,
+                            is_directory,
+                        )
+                    marker = (
+                        target / "foreign-data"
+                        if is_directory
+                        else target
+                    )
+                    self.assertEqual(
+                        marker.read_text(encoding="utf-8"), "preserve\n"
+                    )
+                    self.assertEqual(
+                        list(workspace.glob(".codeskeptic-cleanup-*")), []
+                    )
+
+            linked = workspace / "linked-file"
+            linked.write_text("owned\n", encoding="utf-8")
+            peer = workspace / "linked-peer"
+            os.link(linked, peer)
+            metadata = linked.lstat()
+            with self.assertRaisesRegex(
+                stage.StagingError, "identity changed"
+            ):
+                stage._remove_created_identity(
+                    linked, metadata.st_dev, metadata.st_ino, False
+                )
+            self.assertEqual(linked.read_text(encoding="utf-8"), "owned\n")
+            self.assertEqual(peer.read_text(encoding="utf-8"), "owned\n")
+
+            interrupted_target = workspace / "interrupt-owned"
+            interrupted_target.mkdir()
+            (interrupted_target / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            metadata = interrupted_target.lstat()
+            real_rename_at = stage._rename_noreplace_at
+            interrupted = False
+
+            def quarantine_then_interrupt(
+                source_directory,
+                source,
+                destination_directory,
+                destination,
+            ):
+                nonlocal interrupted
+                result = real_rename_at(
+                    source_directory,
+                    source,
+                    destination_directory,
+                    destination,
+                )
+                if not interrupted and destination.startswith(
+                    ".codeskeptic-cleanup-"
+                ):
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return result
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace_at",
+                side_effect=quarantine_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._remove_created_identity(
+                    interrupted_target,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    True,
+                )
+            self.assertTrue(
+                (interrupted_target / "owned-data").is_file()
+            )
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+            predelete_target = workspace / "predelete-owned"
+            predelete_target.mkdir()
+            (predelete_target / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            metadata = predelete_target.lstat()
+            real_make_removable = stage._make_tree_removable_at
+            interrupted = False
+
+            def make_removable_then_interrupt(parent_descriptor, name):
+                nonlocal interrupted
+                if not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return real_make_removable(parent_descriptor, name)
+
+            with mock.patch.object(
+                stage,
+                "_make_tree_removable_at",
+                side_effect=make_removable_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._remove_created_identity(
+                    predelete_target,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    True,
+                )
+            self.assertFalse(predelete_target.exists())
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+            chmod_target = workspace / "chmod-owned"
+            chmod_target.mkdir()
+            (chmod_target / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            chmod_target.chmod(0o500)
+            metadata = chmod_target.lstat()
+            real_fchmod = stage.os.fchmod
+            interrupted = False
+
+            def fchmod_then_interrupt(descriptor, mode):
+                nonlocal interrupted
+                result = real_fchmod(descriptor, mode)
+                if not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return result
+
+            with mock.patch.object(
+                stage.os,
+                "fchmod",
+                side_effect=fchmod_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._remove_created_identity(
+                    chmod_target,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    True,
+                )
+            self.assertFalse(chmod_target.exists())
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+            delete_target = workspace / "delete-owned"
+            delete_target.mkdir()
+            (delete_target / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            metadata = delete_target.lstat()
+            real_rmtree = stage.shutil.rmtree
+            interrupted = False
+
+            def rmtree_then_interrupt(path, *args, **kwargs):
+                nonlocal interrupted
+                if not interrupted and str(path).startswith(
+                    ".codeskeptic-cleanup-"
+                ):
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return real_rmtree(path, *args, **kwargs)
+
+            with mock.patch.object(
+                stage.shutil,
+                "rmtree",
+                side_effect=rmtree_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._remove_created_identity(
+                    delete_target,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    True,
+                )
+            self.assertFalse(delete_target.exists())
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+            delete_file = workspace / "delete-file"
+            delete_file.write_text("owned\n", encoding="utf-8")
+            metadata = delete_file.lstat()
+            real_unlink = stage.os.unlink
+            interrupted = False
+
+            def unlink_then_interrupt(path, *args, **kwargs):
+                nonlocal interrupted
+                if not interrupted and str(path).startswith(
+                    ".codeskeptic-cleanup-"
+                ):
+                    interrupted = True
+                    raise KeyboardInterrupt()
+                return real_unlink(path, *args, **kwargs)
+
+            with mock.patch.object(
+                stage.os,
+                "unlink",
+                side_effect=unlink_then_interrupt,
+            ), self.assertRaises(KeyboardInterrupt):
+                stage._remove_created_identity(
+                    delete_file,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    False,
+                )
+            self.assertFalse(delete_file.exists())
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+    def test_publication_success_path_rechecks_and_preserves_replacements(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            real_rename = stage._rename_noreplace
+
+            directory = workspace / "published-directory"
+            directory_marker = directory / "foreign-data"
+
+            def replace_directory_then_return(source, destination):
+                real_rename(source, destination)
+                shutil.rmtree(destination)
+                Path(destination).mkdir()
+                directory_marker.write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=replace_directory_then_return,
+            ), self.assertRaisesRegex(stage.StagingError, "identity changed"):
+                stage._ensure_private_directory(
+                    directory, os.getuid(), os.getgid()
+                )
+            self.assertEqual(
+                directory_marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+
+            file_path = workspace / "published-file"
+
+            def replace_file_then_return(source, destination):
+                real_rename(source, destination)
+                Path(destination).unlink()
+                Path(destination).write_bytes(b"FOREIGN\n")
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=replace_file_then_return,
+            ), self.assertRaisesRegex(stage.StagingError, "identity changed"):
+                stage._write_new(file_path, b"owned\n")
+            self.assertEqual(file_path.read_bytes(), b"FOREIGN\n")
+
+            source = workspace / "source-tree"
+            make_inventory_tree(source)
+            inventory = stage.collect_inventory(source)
+            installed = workspace / "published-installation"
+            installation_marker = installed / "foreign-data"
+
+            def replace_installation_then_return(source_path, destination):
+                if Path(destination) != installed:
+                    return real_rename(source_path, destination)
+                real_rename(source_path, destination)
+                shutil.rmtree(destination)
+                Path(destination).mkdir()
+                installation_marker.write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=replace_installation_then_return,
+            ), self.assertRaisesRegex(stage.StagingError, "identity changed"):
+                stage.install_tree_create_new(
+                    source,
+                    installed,
+                    inventory,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            self.assertEqual(
+                installation_marker.read_text(encoding="utf-8"),
+                "preserve\n",
+            )
+
+            published_tree_source = workspace / "generic-source"
+            published_tree_source.mkdir()
+            (published_tree_source / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            published_tree = workspace / "generic-published"
+            published_tree_marker = published_tree / "foreign-data"
+
+            def replace_generic_tree_then_return(source_path, destination):
+                real_rename(source_path, destination)
+                shutil.rmtree(destination)
+                Path(destination).mkdir()
+                published_tree_marker.write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=replace_generic_tree_then_return,
+            ), self.assertRaisesRegex(stage.StagingError, "identity changed"):
+                stage._publish_tree_noreplace(
+                    published_tree_source, published_tree
+                )
+            self.assertEqual(
+                published_tree_marker.read_text(encoding="utf-8"),
+                "preserve\n",
+            )
+
+    def test_install_rollback_uses_anchored_identity_cleanup(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            target = workspace / "rollback-owned"
+            target.mkdir()
+            (target / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            metadata = target.lstat()
+            marker = target / "foreign-data"
+            real_rename_at = stage._rename_noreplace_at
+            injected = False
+
+            def quarantine_then_replace(
+                source_directory,
+                source,
+                destination_directory,
+                destination,
+            ):
+                nonlocal injected
+                result = real_rename_at(
+                    source_directory,
+                    source,
+                    destination_directory,
+                    destination,
+                )
+                if not injected and destination.startswith(
+                    ".codeskeptic-cleanup-"
+                ):
+                    injected = True
+                    target.mkdir()
+                    marker.write_text("preserve\n", encoding="utf-8")
+                return result
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace_at",
+                side_effect=quarantine_then_replace,
+            ):
+                stage._rollback_created([
+                    (target, metadata.st_dev, metadata.st_ino, True)
+                ])
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+            self.assertEqual(
+                list(workspace.glob(".codeskeptic-cleanup-*")), []
+            )
+
+            absent = workspace / "already-absent"
+            stage._rollback_created([
+                (absent, metadata.st_dev, metadata.st_ino, True)
+            ])
+
+    def test_file_publication_interrupt_preserves_foreign_collision(self) -> None:
+        assert stage is not None
+        marker = b"FOREIGN\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            source.write_bytes(b"source\n")
+
+            def foreign_then_interrupt(_source_path, destination_path):
+                Path(destination_path).write_bytes(marker)
+                raise KeyboardInterrupt()
+
+            cases = (
+                (
+                    "write",
+                    lambda target: stage._write_new(target, b"fixture\n"),
+                ),
+                (
+                    "copy",
+                    lambda target: stage._copy_regular_create_new(
+                        source,
+                        target,
+                        0o600,
+                        os.getuid(),
+                        os.getgid(),
+                    ),
+                ),
+            )
+            for name, producer in cases:
+                with self.subTest(name=name):
+                    target = workspace / f"{name}-target"
+                    with mock.patch.object(
+                        stage,
+                        "_rename_noreplace",
+                        side_effect=foreign_then_interrupt,
+                    ), self.assertRaisesRegex(
+                        stage.StagingError, "published file identity changed"
+                    ):
+                        producer(target)
+                    self.assertEqual(target.read_bytes(), marker)
+                    self.assertFalse(any(
+                        child.name.startswith(".codeskeptic-file-")
+                        for child in workspace.iterdir()
+                    ))
+
+            def hardlink_then_collision(source_path, destination_path):
+                os.link(source_path, destination_path)
+                raise FileExistsError(destination_path)
+
+            hardlink_cases = (
+                (
+                    "write-hardlink",
+                    b"fixture\n",
+                    0o400,
+                    lambda target: stage._write_new(
+                        target, b"fixture\n", mode=0o400
+                    ),
+                ),
+                (
+                    "copy-hardlink",
+                    b"source\n",
+                    0o440,
+                    lambda target: stage._copy_regular_create_new(
+                        source,
+                        target,
+                        0o440,
+                        os.getuid(),
+                        os.getgid(),
+                    ),
+                ),
+            )
+            for name, expected, expected_mode, producer in hardlink_cases:
+                with self.subTest(name=name):
+                    target = workspace / f"{name}-target"
+                    with mock.patch.object(
+                        stage,
+                        "_rename_noreplace",
+                        side_effect=hardlink_then_collision,
+                    ), self.assertRaises(stage.StagingError):
+                        producer(target)
+                    self.assertEqual(target.read_bytes(), expected)
+                    self.assertEqual(
+                        stat.S_IMODE(target.stat().st_mode), expected_mode
+                    )
+                    self.assertFalse(any(
+                        child.name.startswith(".codeskeptic-file-")
+                        for child in workspace.iterdir()
+                    ))
+
+            target = workspace / "cleanup-failure-target"
+            real_remove = stage._remove_created_identity
+
+            def fail_private_directory_cleanup(
+                path, device, inode, is_directory
+            ):
+                if (
+                    is_directory
+                    and Path(path).name.startswith(".codeskeptic-file-")
+                ):
+                    raise OSError("private file directory cleanup failure")
+                return real_remove(path, device, inode, is_directory)
+
+            with mock.patch.object(
+                stage,
+                "_remove_created_identity",
+                side_effect=fail_private_directory_cleanup,
+            ), self.assertRaisesRegex(
+                stage.StagingError, "private file directory cleanup failure"
+            ):
+                stage._write_new(target, b"fixture\n")
+            self.assertFalse(
+                target.exists(),
+                "a reported helper failure must not leave a fixed output",
+            )
+
+    def test_install_publication_boundaries_roll_back_fixed_targets(self) -> None:
+        assert stage is not None
+
         def assert_fixed_targets_absent(layout: dict[str, Path]) -> None:
             for name in (
                 "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
@@ -1591,6 +2827,44 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     stage.StagingError, "late persistent load failure"
                 ):
+                    stage.install_bundle(
+                        sealed,
+                        **bundle_authority(sealed),
+                        command_runner=runner,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                    )
+                for name in (
+                    "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
+                    "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                    "PODMAN_ROOT", "PODMAN_RUNROOT",
+                ):
+                    self.assertFalse(layout[name].exists(), name)
+
+    def test_install_rolls_back_after_persistent_load_interrupt(self) -> None:
+        assert stage is not None
+
+        class InterruptPersistentLoad(FakeCommandRunner):
+            def __init__(self) -> None:
+                super().__init__()
+                self.load_count = 0
+
+            def __call__(self, argv: list[str], **kwargs) -> bytes:
+                command = [os.fspath(item) for item in argv]
+                if "load" in command:
+                    self.load_count += 1
+                    if self.load_count == 2:
+                        raise KeyboardInterrupt()
+                return super().__call__(argv, **kwargs)
+
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            install_workspace = workspace / "interrupt-rollback-root"
+            install_workspace.mkdir()
+            runner = InterruptPersistentLoad()
+            with patched_install_layout(install_workspace) as layout:
+                with self.assertRaises(KeyboardInterrupt):
                     stage.install_bundle(
                         sealed,
                         **bundle_authority(sealed),
