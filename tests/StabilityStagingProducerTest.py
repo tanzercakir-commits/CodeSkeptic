@@ -869,7 +869,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     )
                 self.assertFalse(config_path.parent.exists())
 
-    def test_configure_interrupt_during_temporary_creation_removes_child(self) -> None:
+    def test_configure_interrupt_before_identity_pin_retains_child(self) -> None:
         assert stage is not None
         with tempfile.TemporaryDirectory() as temporary:
             prepared, revision = make_manual_prepared_tree(Path(temporary))
@@ -885,21 +885,22 @@ class StabilityStagingProducerTest(unittest.TestCase):
 
             with mock.patch.object(
                 stage.os, "mkdir", side_effect=interrupt_after_create
-            ), self.assertRaises(KeyboardInterrupt):
+            ), self.assertRaisesRegex(
+                stage.StagingError, "cleanup withheld"
+            ):
                 stage.configure_staging(
                     prepared,
                     revision,
                     repository="codeskeptic/staging-fixture",
                 )
             self.assertFalse(config_root.exists())
-            self.assertEqual(
-                [
-                    path.name
-                    for path in prepared.iterdir()
-                    if path.name.startswith(".config.runtime-")
-                ],
-                [],
-            )
+            retained = [
+                path
+                for path in prepared.iterdir()
+                if path.name.startswith(".config.runtime-")
+            ]
+            self.assertEqual(len(retained), 1)
+            retained[0].rmdir()
 
     def test_configure_preserves_replacement_when_temporary_identity_drifts(self) -> None:
         assert stage is not None
@@ -1274,7 +1275,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             self.assertEqual(list(temporary_root.iterdir()), [])
             self.assertEqual(list(original_root.iterdir()), [])
 
-    def test_interrupt_during_workspace_creation_removes_created_child(self) -> None:
+    def test_interrupt_before_workspace_pin_retains_created_child(self) -> None:
         assert stage is not None
         with sealed_bundle_fixture() as fixture:
             workspace, _prepared, _revision, sealed, _receipt = fixture
@@ -1293,7 +1294,9 @@ class StabilityStagingProducerTest(unittest.TestCase):
             runner = FakeCommandRunner()
             with mock.patch.object(
                 stage.os, "mkdir", side_effect=interrupt_after_create
-            ), self.assertRaises(KeyboardInterrupt):
+            ), self.assertRaisesRegex(
+                stage.StagingError, "cleanup withheld"
+            ):
                 stage.verify_bundle(
                     sealed,
                     **bundle_authority(sealed),
@@ -1301,9 +1304,11 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     temporary_root=temporary_root,
                 )
             self.assertEqual(runner.commands, [])
-            self.assertEqual(list(temporary_root.iterdir()), [])
+            retained = list(temporary_root.iterdir())
+            self.assertEqual(len(retained), 1)
+            retained[0].rmdir()
 
-    def test_interrupt_during_workspace_identity_capture_removes_child(self) -> None:
+    def test_interrupt_during_workspace_identity_capture_retains_child(self) -> None:
         assert stage is not None
         with sealed_bundle_fixture() as fixture:
             workspace, _prepared, _revision, sealed, _receipt = fixture
@@ -1325,7 +1330,9 @@ class StabilityStagingProducerTest(unittest.TestCase):
             runner = FakeCommandRunner()
             with mock.patch.object(
                 stage.Path, "lstat", autospec=True, side_effect=interrupt_identity
-            ), self.assertRaises(KeyboardInterrupt):
+            ), self.assertRaisesRegex(
+                stage.StagingError, "cleanup withheld"
+            ):
                 stage.verify_bundle(
                     sealed,
                     **bundle_authority(sealed),
@@ -1333,7 +1340,9 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     temporary_root=temporary_root,
                 )
             self.assertEqual(runner.commands, [])
-            self.assertEqual(list(temporary_root.iterdir()), [])
+            retained = list(temporary_root.iterdir())
+            self.assertEqual(len(retained), 1)
+            retained[0].rmdir()
 
     def test_interrupt_during_workspace_parent_revalidation_removes_child(self) -> None:
         assert stage is not None
@@ -1912,7 +1921,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 real_rename(source_path, destination_path)
                 raise KeyboardInterrupt()
 
-            created: list[tuple[Path, int, int, bool]] = []
+            created = []
             with mock.patch.object(
                 stage,
                 "_rename_noreplace",
@@ -2370,6 +2379,35 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 "preserve\n",
             )
 
+            moved_source = workspace / "moved-source"
+            moved_source.mkdir()
+            (moved_source / "owned-data").write_text(
+                "owned\n", encoding="utf-8"
+            )
+            moved_destination = workspace / "moved-destination"
+            source_marker = moved_source / "foreign-data"
+
+            def replace_source_after_publish(source_path, destination):
+                real_rename(source_path, destination)
+                Path(source_path).mkdir()
+                source_marker.write_text("preserve\n", encoding="utf-8")
+                raise KeyboardInterrupt()
+
+            with mock.patch.object(
+                stage,
+                "_rename_noreplace",
+                side_effect=replace_source_after_publish,
+            ), self.assertRaisesRegex(
+                stage.StagingError, "source identity changed"
+            ):
+                stage._publish_tree_noreplace(
+                    moved_source, moved_destination
+                )
+            self.assertEqual(
+                source_marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+            self.assertFalse(moved_destination.exists())
+
     def test_install_rollback_uses_anchored_identity_cleanup(self) -> None:
         assert stage is not None
         with tempfile.TemporaryDirectory() as temporary:
@@ -2405,14 +2443,25 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     marker.write_text("preserve\n", encoding="utf-8")
                 return result
 
+            record = stage._CreatedNode(
+                target,
+                metadata.st_dev,
+                metadata.st_ino,
+                True,
+                stage._open_identity_pin(
+                    target,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                    True,
+                    "rollback fixture",
+                ),
+            )
             with mock.patch.object(
                 stage,
                 "_rename_noreplace_at",
                 side_effect=quarantine_then_replace,
             ):
-                stage._rollback_created([
-                    (target, metadata.st_dev, metadata.st_ino, True)
-                ])
+                stage._rollback_created([record])
             self.assertEqual(
                 marker.read_text(encoding="utf-8"), "preserve\n"
             )
@@ -2421,9 +2470,200 @@ class StabilityStagingProducerTest(unittest.TestCase):
             )
 
             absent = workspace / "already-absent"
-            stage._rollback_created([
-                (absent, metadata.st_dev, metadata.st_ino, True)
-            ])
+            absent.mkdir()
+            absent_metadata = absent.lstat()
+            absent_record = stage._CreatedNode(
+                absent,
+                absent_metadata.st_dev,
+                absent_metadata.st_ino,
+                True,
+                stage._open_identity_pin(
+                    absent,
+                    absent_metadata.st_dev,
+                    absent_metadata.st_ino,
+                    True,
+                    "absent rollback fixture",
+                ),
+            )
+            absent.rmdir()
+            stage._rollback_created([absent_record])
+
+    def test_private_directory_pin_failure_preserves_replacement(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            replacement: Path | None = None
+
+            def replace_then_fail(path, *_arguments, **_keywords):
+                nonlocal replacement
+                replacement = Path(path)
+                replacement.rmdir()
+                replacement.mkdir(mode=0o700)
+                (replacement / "foreign-data").write_text(
+                    "preserve\n", encoding="utf-8"
+                )
+                raise stage.StagingError("identity changed while pinning")
+
+            with mock.patch.object(
+                stage,
+                "_open_identity_pin",
+                side_effect=replace_then_fail,
+            ), self.assertRaisesRegex(
+                stage.StagingError, "cleanup withheld"
+            ):
+                stage._create_private_temporary_directory(
+                    workspace, ".creator-race-", "creator fixture"
+                )
+            assert replacement is not None
+            self.assertEqual(
+                (replacement / "foreign-data").read_text(encoding="utf-8"),
+                "preserve\n",
+            )
+
+    def test_private_file_descriptor_remains_pinned_through_cleanup(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            captured_descriptor: int | None = None
+            real_remove = stage._remove_created_identity
+
+            def fail_payload(descriptor: int) -> None:
+                nonlocal captured_descriptor
+                captured_descriptor = descriptor
+                os.write(descriptor, b"partial\n")
+                raise RuntimeError("payload failure")
+
+            def assert_pinned_then_remove(
+                path: Path, device: int, inode: int, is_directory: bool,
+            ) -> None:
+                if Path(path).name == "payload":
+                    assert captured_descriptor is not None
+                    opened = os.fstat(captured_descriptor)
+                    self.assertEqual((opened.st_dev, opened.st_ino), (device, inode))
+                real_remove(path, device, inode, is_directory)
+
+            target = workspace / "target"
+            with mock.patch.object(
+                stage,
+                "_remove_created_identity",
+                side_effect=assert_pinned_then_remove,
+            ), self.assertRaisesRegex(RuntimeError, "payload failure"):
+                stage._regular_file_create_new(
+                    target,
+                    0o600,
+                    None,
+                    None,
+                    fail_payload,
+                    label="payload fixture",
+                )
+            assert captured_descriptor is not None
+            with self.assertRaises(OSError):
+                os.fstat(captured_descriptor)
+            self.assertFalse(target.exists())
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "transaction identity pins require Linux renameat2",
+    )
+    def test_transaction_identity_pin_survives_until_release_or_rollback(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            committed = workspace / "committed"
+            committed_records = []
+            stage._create_directory_create_new(
+                committed,
+                0o700,
+                os.getuid(),
+                os.getgid(),
+                created_nodes=committed_records,
+            )
+            committed_descriptor = committed_records[0].descriptor
+            self.assertTrue(stat.S_ISDIR(os.fstat(committed_descriptor).st_mode))
+            stage._release_created(committed_records)
+            self.assertEqual(committed_records, [])
+            with self.assertRaises(OSError):
+                os.fstat(committed_descriptor)
+
+            rolled_back = workspace / "rolled-back"
+            rollback_records = []
+            stage._create_directory_create_new(
+                rolled_back,
+                0o700,
+                os.getuid(),
+                os.getgid(),
+                created_nodes=rollback_records,
+            )
+            rollback_descriptor = rollback_records[0].descriptor
+            rolled_back.rmdir()
+            rolled_back.mkdir(mode=0o700)
+            marker = rolled_back / "foreign-data"
+            marker.write_text("preserve\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                stage.StagingError, "rollback was incomplete"
+            ):
+                stage._rollback_created(rollback_records)
+            self.assertEqual(marker.read_text(encoding="utf-8"), "preserve\n")
+            self.assertEqual(rollback_records, [])
+            with self.assertRaises(OSError):
+                os.fstat(rollback_descriptor)
+
+            parent = workspace / "nested-parent"
+            nested_records = []
+            stage._create_directory_create_new(
+                parent,
+                0o700,
+                os.getuid(),
+                os.getgid(),
+                created_nodes=nested_records,
+            )
+            child = parent / "nested-child"
+            stage._create_directory_create_new(
+                child,
+                0o700,
+                os.getuid(),
+                os.getgid(),
+                created_nodes=nested_records,
+            )
+            child.rmdir()
+            child.mkdir(mode=0o700)
+            nested_marker = child / "foreign-data"
+            nested_marker.write_text("preserve\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                stage.StagingError, "descendant cleanup failed"
+            ):
+                stage._rollback_created(nested_records)
+            self.assertEqual(
+                nested_marker.read_text(encoding="utf-8"), "preserve\n"
+            )
+
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "fixed runroot transaction requires Linux renameat2",
+    )
+    def test_fixed_runroot_rollback_preserves_replacement(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary) / "runtime"
+            parent.mkdir(mode=0o700)
+            runroot = parent / "podman-runroot"
+            marker = runroot / "foreign-data"
+            with mock.patch.object(
+                stage, "PODMAN_RUNROOT", runroot
+            ), self.assertRaisesRegex(
+                stage.StagingError, "rollback was incomplete"
+            ):
+                with stage._fixed_podman_runroot(
+                    os.getuid(), os.getgid()
+                ):
+                    runroot.rmdir()
+                    runroot.mkdir(mode=0o700)
+                    marker.write_text("preserve\n", encoding="utf-8")
+            self.assertEqual(
+                marker.read_text(encoding="utf-8"), "preserve\n"
+            )
 
     def test_file_publication_interrupt_preserves_foreign_collision(self) -> None:
         assert stage is not None
@@ -2744,6 +2984,44 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     installed_operator.read_text(encoding="utf-8"),
                     "tampered\n",
                 )
+
+    def test_post_commit_pin_release_failure_never_enters_rollback(self) -> None:
+        assert stage is not None
+        with sealed_bundle_fixture() as fixture:
+            workspace, _prepared, _revision, sealed, _receipt = fixture
+            install_workspace = workspace / "post-commit-release-root"
+            install_workspace.mkdir()
+            runner = FakeCommandRunner()
+            real_release = stage._release_created
+
+            def release_then_fail(records) -> None:
+                real_release(records)
+                raise stage.StagingError("post-commit pin release failed")
+
+            with (
+                patched_install_layout(install_workspace) as layout,
+                mock.patch.object(
+                    stage,
+                    "_release_created",
+                    side_effect=release_then_fail,
+                ),
+                mock.patch.object(
+                    stage, "_reset_persistent_podman_store"
+                ) as reset_store,
+                self.assertRaisesRegex(
+                    stage.StagingError, "post-commit pin release failed"
+                ),
+            ):
+                stage.install_bundle(
+                    sealed,
+                    **bundle_authority(sealed),
+                    command_runner=runner,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                )
+            reset_store.assert_not_called()
+            self.assertTrue(layout["INSTALLATION_RECEIPT_PATH"].is_file())
 
     def test_verify_install_survives_cold_boot_without_persistent_runroot(self) -> None:
         assert stage is not None
@@ -3236,13 +3514,6 @@ class StabilityStagingProducerTest(unittest.TestCase):
         podman_runroot = workspace / "runtime" / "podman-runroot"
         ambient_cwd = workspace / "ambient-cwd"
         ambient_cwd.mkdir()
-        runroot_cleanup_states: list[bool] = []
-        real_remove_private_tree = stage._remove_private_tree
-
-        def track_runroot_cleanup(path: Path) -> None:
-            real_remove_private_tree(path)
-            if Path(path) == podman_runroot:
-                runroot_cleanup_states.append(podman_runroot.exists())
 
         try:
             with contextlib.ExitStack() as stack:
@@ -3252,11 +3523,6 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 stack.enter_context(
                     mock.patch.object(stage, "PODMAN_ROOT", podman_root)
                 )
-                stack.enter_context(mock.patch.object(
-                    stage,
-                    "_remove_private_tree",
-                    side_effect=track_runroot_cleanup,
-                ))
                 stack.enter_context(
                     mock.patch.object(stage, "PODMAN_RUNROOT", podman_runroot)
                 )
@@ -3280,9 +3546,8 @@ class StabilityStagingProducerTest(unittest.TestCase):
                         command_runner=None,
                         owner_uid=os.getuid(),
                         owner_gid=os.getgid(),
-                    )
+                )
                 self.assertFalse(podman_runroot.exists())
-                self.assertEqual(runroot_cleanup_states, [False])
                 self.assertFalse(
                     (ambient_cwd / ".local").exists(),
                     "Podman must not write an ambient cwd HOME cache",

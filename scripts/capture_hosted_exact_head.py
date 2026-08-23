@@ -856,10 +856,12 @@ def capture_snapshot(
         )
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
-        staging, staging_metadata = hosted._create_private_staging_directory(
-            output.parent,
-            f".{output.name}.tmp-",
-            "hosted capture staging creation failed",
+        staging, staging_metadata, staging_descriptor = (
+            hosted._create_private_staging_directory(
+                output.parent,
+                f".{output.name}.tmp-",
+                "hosted capture staging creation failed",
+            )
         )
     except hosted.HostedEvidenceError as error:
         raise HostedCaptureError(str(error)) from error
@@ -1078,6 +1080,10 @@ def capture_snapshot(
                 )
         except Exception as cleanup_error:
             cleanup_errors.append(cleanup_error)
+    try:
+        os.close(staging_descriptor)
+    except OSError as cleanup_error:
+        cleanup_errors.append(cleanup_error)
     if primary is not None and cleanup_errors:
         detail = "; ".join(str(item) for item in cleanup_errors)
         raise HostedCaptureError(

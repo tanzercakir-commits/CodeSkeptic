@@ -1338,13 +1338,16 @@ jobs:
 
         with mock.patch.object(
             hosted.os, "mkdir", side_effect=mkdir_then_interrupt
-        ), self.assertRaises(KeyboardInterrupt):
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "cleanup withheld"
+        ):
             fixture.seal()
         self.assertFalse(fixture.output.exists())
-        self.assertEqual(
-            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
-            [],
+        retained = list(
+            fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")
         )
+        self.assertEqual(len(retained), 1)
+        retained[0].rmdir()
 
         fixture = Fixture(root / "publication-interrupt")
         real_rename = hosted._rename_noreplace
@@ -1566,6 +1569,39 @@ jobs:
         self.assertTrue((owned / "owned-data").is_file())
         self.assertEqual(
             list(root.glob(".codeskeptic-hosted-cleanup-*")), []
+        )
+
+    def test_private_staging_pin_failure_preserves_replacement(self) -> None:
+        root = Path(self.temporary.name) / "private-creator-race"
+        root.mkdir()
+        replacement: Path | None = None
+
+        def replace_then_fail(path, *_arguments, **_keywords):
+            nonlocal replacement
+            replacement = Path(path)
+            replacement.rmdir()
+            replacement.mkdir(mode=0o700)
+            (replacement / "foreign-data").write_text(
+                "preserve\n", encoding="utf-8"
+            )
+            raise hosted.HostedEvidenceError(
+                "identity changed while pinning"
+            )
+
+        with mock.patch.object(
+            hosted,
+            "_open_tree_identity_pin",
+            side_effect=replace_then_fail,
+        ), self.assertRaisesRegex(
+            hosted.HostedEvidenceError, "cleanup withheld"
+        ):
+            hosted._create_private_staging_directory(
+                root, ".creator-race-", "creator fixture"
+            )
+        assert replacement is not None
+        self.assertEqual(
+            (replacement / "foreign-data").read_text(encoding="utf-8"),
+            "preserve\n",
         )
 
     def test_hosted_cleanup_restore_collision_preserves_every_tree(self) -> None:

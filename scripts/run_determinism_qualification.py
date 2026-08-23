@@ -4378,13 +4378,16 @@ def _compile_identity(
 
 
 def _path_manifest(paths: Iterable[Path], root: Path) -> list[dict[str, str]]:
-    result = []
-    for path in sorted(set(item.resolve() for item in paths),
-                       key=lambda item: item.relative_to(root).as_posix()):
+    root = root.resolve()
+    selected: list[tuple[str, Path]] = []
+    for path in set(item.resolve() for item in paths):
         try:
             relative = path.relative_to(root).as_posix()
         except ValueError as error:
             raise QualificationError("input path escapes its source root") from error
+        selected.append((relative, path))
+    result = []
+    for relative, path in sorted(selected):
         if _regular_kind(path) != "regular":
             raise QualificationError(f"input is not a regular file: {relative}")
         result.append({"path": relative, "sha256": sha256_file(path)})

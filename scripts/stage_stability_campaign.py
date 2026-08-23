@@ -898,6 +898,74 @@ def _require_published_identity(
         raise StagingError(f"{label} identity changed")
 
 
+def _open_identity_pin(
+    path: Path,
+    device: int,
+    inode: int,
+    is_directory: bool,
+    label: str,
+) -> int:
+    """Pin one inode so unlink/recreate cannot reuse its identity mid-commit."""
+
+    flags = getattr(os, "O_PATH", os.O_RDONLY)
+    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if is_directory:
+        flags |= getattr(os, "O_DIRECTORY", 0)
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, flags)
+        metadata = os.fstat(descriptor)
+    except OSError as error:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise StagingError(f"cannot pin {label}: {error}") from error
+    expected_type = (
+        stat.S_ISDIR(metadata.st_mode)
+        if is_directory
+        else stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1
+    )
+    if (
+        not expected_type
+        or metadata.st_dev != device
+        or metadata.st_ino != inode
+    ):
+        os.close(descriptor)
+        raise StagingError(f"{label} identity changed while pinning")
+    return descriptor
+
+
+class _CreatedNode:
+    """A rollback record that keeps its original filesystem object pinned."""
+
+    __slots__ = ("path", "device", "inode", "is_directory", "descriptor")
+
+    def __init__(
+        self,
+        path: Path,
+        device: int,
+        inode: int,
+        is_directory: bool,
+        descriptor: int,
+    ) -> None:
+        self.path = path
+        self.device = device
+        self.inode = inode
+        self.is_directory = is_directory
+        self.descriptor = descriptor
+
+    def __iter__(self):
+        yield self.path
+        yield self.device
+        yield self.inode
+        yield self.is_directory
+
+    def close(self) -> None:
+        if self.descriptor >= 0:
+            descriptor = self.descriptor
+            self.descriptor = -1
+            os.close(descriptor)
+
+
 def _remove_created_identity(
     path: Path, device: int, inode: int, is_directory: bool,
 ) -> None:
@@ -1119,27 +1187,62 @@ def _publish_tree_noreplace(source: Path, destination: Path) -> None:
     """Publish and parent-fsync one tree, self-cleaning any partial commit."""
 
     metadata = source.lstat()
-    _rename_noreplace(source, destination)
+    descriptor = _open_identity_pin(
+        source,
+        metadata.st_dev,
+        metadata.st_ino,
+        True,
+        "tree publication source",
+    )
     try:
-        _fsync_directory(destination.parent)
-        _require_published_identity(
-            destination,
-            metadata.st_dev,
-            metadata.st_ino,
-            True,
-            "published tree",
-        )
-    except Exception as error:
         try:
-            _remove_created_identity(
-                destination, metadata.st_dev, metadata.st_ino, True
+            _rename_noreplace(source, destination)
+            _fsync_directory(destination.parent)
+            _require_published_identity(
+                destination,
+                metadata.st_dev,
+                metadata.st_ino,
+                True,
+                "published tree",
             )
-        except Exception as cleanup_error:
-            raise StagingError(
-                "tree publication failed and cleanup failed: "
-                f"{error}; {cleanup_error}"
-            ) from error
-        raise
+        except BaseException as error:
+            try:
+                remaining_source = source.lstat()
+            except FileNotFoundError:
+                remaining_source = None
+            if remaining_source is not None:
+                if (
+                    remaining_source.st_dev == metadata.st_dev
+                    and remaining_source.st_ino == metadata.st_ino
+                ):
+                    raise
+                try:
+                    _remove_created_identity(
+                        destination,
+                        metadata.st_dev,
+                        metadata.st_ino,
+                        True,
+                    )
+                except Exception as cleanup_error:
+                    raise StagingError(
+                        "tree publication source identity changed and "
+                        f"published-tree cleanup failed: {cleanup_error}"
+                    ) from error
+                raise StagingError(
+                    "tree publication source identity changed"
+                ) from error
+            try:
+                _remove_created_identity(
+                    destination, metadata.st_dev, metadata.st_ino, True
+                )
+            except Exception as cleanup_error:
+                raise StagingError(
+                    "tree publication failed and cleanup failed: "
+                    f"{error}; {cleanup_error}"
+                ) from error
+            raise
+    finally:
+        os.close(descriptor)
 
 
 def _create_directory_create_new(
@@ -1148,17 +1251,19 @@ def _create_directory_create_new(
     owner_uid: int,
     owner_gid: int,
     *,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> None:
     """Prepare ownership off-path, then publish and immediately register."""
 
-    temporary, temporary_metadata = _create_private_temporary_directory(
-        path.parent,
-        f".{path.name}.directory-",
-        "private directory staging tree creation failed",
+    temporary, temporary_metadata, temporary_descriptor = (
+        _create_private_temporary_directory(
+            path.parent,
+            f".{path.name}.directory-",
+            "private directory staging tree creation failed",
+        )
     )
     published_identity: tuple[int, int] | None = None
-    record: tuple[Path, int, int, bool] | None = None
+    record: _CreatedNode | None = None
     primary: BaseException | None = None
     collision = False
     try:
@@ -1172,7 +1277,14 @@ def _create_directory_create_new(
         ):
             raise StagingError("private directory staging identity changed")
         published_identity = (metadata.st_dev, metadata.st_ino)
-        record = (path, metadata.st_dev, metadata.st_ino, True)
+        record = _CreatedNode(
+            path,
+            metadata.st_dev,
+            metadata.st_ino,
+            True,
+            temporary_descriptor,
+        )
+        temporary_descriptor = None
         _rename_noreplace(temporary, path)
         if created_nodes is not None:
             created_nodes.append(record)
@@ -1194,14 +1306,16 @@ def _create_directory_create_new(
             )
         else:
             primary = error
-    if primary is None:
-        return
-    cleanup_errors: list[Exception] = []
     registered = (
         record is not None
         and created_nodes is not None
         and record in created_nodes
     )
+    if primary is None:
+        if record is not None and not registered:
+            record.close()
+        return
+    cleanup_errors: list[Exception] = []
     if published_identity is not None and not registered:
         try:
             try:
@@ -1236,6 +1350,16 @@ def _create_directory_create_new(
             )
     except Exception as cleanup_error:
         cleanup_errors.append(cleanup_error)
+    if record is not None and not registered:
+        try:
+            record.close()
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if temporary_descriptor is not None:
+        try:
+            os.close(temporary_descriptor)
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
     if cleanup_errors:
         _raise_primary_and_cleanup(
             primary, cleanup_errors, "directory publication failed"
@@ -1250,22 +1374,24 @@ def _regular_file_create_new(
     owner_gid: int | None,
     write_payload: Any,
     *,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
     label: str,
 ) -> None:
     """Build a regular file privately, then publish and register its inode."""
 
     if (owner_uid is None) != (owner_gid is None):
         raise StagingError("staging file ownership is incomplete")
-    temporary, temporary_metadata = _create_private_temporary_directory(
-        destination.parent,
-        ".codeskeptic-file-",
-        f"{label} private file staging creation failed",
+    temporary, temporary_metadata, temporary_descriptor = (
+        _create_private_temporary_directory(
+            destination.parent,
+            ".codeskeptic-file-",
+            f"{label} private file staging creation failed",
+        )
     )
     staged = temporary / "payload"
     staged_identity: tuple[int, int] | None = None
     published_identity: tuple[int, int] | None = None
-    record: tuple[Path, int, int, bool] | None = None
+    record: _CreatedNode | None = None
     descriptor: int | None = None
     primary: BaseException | None = None
     cleanup_errors: list[Exception] = []
@@ -1288,8 +1414,6 @@ def _regular_file_create_new(
         if owner_uid is not None and owner_gid is not None:
             os.fchown(descriptor, owner_uid, owner_gid)
         os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = None
         staged_metadata = staged.lstat()
         if (
             not stat.S_ISREG(staged_metadata.st_mode)
@@ -1299,12 +1423,14 @@ def _regular_file_create_new(
         ):
             raise StagingError(f"{label} private file identity changed")
         published_identity = staged_identity
-        record = (
+        record = _CreatedNode(
             destination,
             published_identity[0],
             published_identity[1],
             False,
+            descriptor,
         )
+        descriptor = None
         _rename_noreplace(staged, destination)
         if created_nodes is not None:
             created_nodes.append(record)
@@ -1324,16 +1450,6 @@ def _regular_file_create_new(
             primary = StagingError(f"{label}: {error}")
         else:
             primary = error
-    if descriptor is not None:
-        try:
-            os.close(descriptor)
-        except BaseException as close_error:
-            if primary is None:
-                primary = close_error
-            else:
-                cleanup_errors.append(
-                    StagingError(f"private file descriptor cleanup failed: {close_error}")
-                )
     registered = (
         record is not None
         and created_nodes is not None
@@ -1368,6 +1484,10 @@ def _regular_file_create_new(
             )
     except Exception as cleanup_error:
         cleanup_errors.append(cleanup_error)
+    try:
+        os.close(temporary_descriptor)
+    except OSError as cleanup_error:
+        cleanup_errors.append(cleanup_error)
     if (
         (primary is not None or cleanup_errors)
         and published_identity is not None
@@ -1392,13 +1512,26 @@ def _regular_file_create_new(
                 raise StagingError("published file identity changed")
         except Exception as cleanup_error:
             cleanup_errors.append(cleanup_error)
+    if record is not None and not registered:
+        try:
+            record.close()
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if descriptor is not None:
+        try:
+            os.close(descriptor)
+        except BaseException as cleanup_error:
+            cleanup_errors.append(StagingError(
+                "private file descriptor cleanup failed: "
+                f"{cleanup_error}"
+            ))
     _raise_primary_and_cleanup(primary, cleanup_errors, label)
 
 
 def _copy_regular_create_new(
     source: Path, destination: Path, mode: int, owner_uid: int, owner_gid: int,
     *,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> None:
     try:
         source_metadata = source.lstat()
@@ -1475,7 +1608,7 @@ def install_tree_create_new(
     *,
     owner_uid: int = 0,
     owner_gid: int = 0,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> str:
     expected = _validate_inventory_document(inventory)
     verify_inventory(source, expected)
@@ -1502,13 +1635,15 @@ def install_tree_create_new(
         ) from error
     if not stat.S_ISDIR(parent_metadata.st_mode):
         raise StagingError("installation destination parent is not a directory")
-    temporary, staging_metadata = _create_private_temporary_directory(
-        destination.parent,
-        f".{destination.name}.install-",
-        "installation tree staging creation failed",
+    temporary, staging_metadata, staging_descriptor = (
+        _create_private_temporary_directory(
+            destination.parent,
+            f".{destination.name}.install-",
+            "installation tree staging creation failed",
+        )
     )
     published_identity: tuple[int, int] | None = None
-    record: tuple[Path, int, int, bool] | None = None
+    record: _CreatedNode | None = None
     primary: BaseException | None = None
     collision = False
     try:
@@ -1539,12 +1674,14 @@ def install_tree_create_new(
         published_identity = (
             temporary_metadata.st_dev, temporary_metadata.st_ino
         )
-        record = (
+        record = _CreatedNode(
             destination,
             temporary_metadata.st_dev,
             temporary_metadata.st_ino,
             True,
+            staging_descriptor,
         )
+        staging_descriptor = None
         _rename_noreplace(temporary, destination)
         if created_nodes is not None:
             created_nodes.append(record)
@@ -1566,14 +1703,16 @@ def install_tree_create_new(
             primary = StagingError(f"cannot create installation tree: {error}")
         else:
             primary = error
-    if primary is None:
-        return "created"
-    cleanup_errors: list[Exception] = []
     registered = (
         record is not None
         and created_nodes is not None
         and record in created_nodes
     )
+    if primary is None:
+        if record is not None and not registered:
+            record.close()
+        return "created"
+    cleanup_errors: list[Exception] = []
     if published_identity is not None and not registered:
         try:
             try:
@@ -1608,6 +1747,16 @@ def install_tree_create_new(
             )
     except Exception as cleanup_error:
         cleanup_errors.append(cleanup_error)
+    if record is not None and not registered:
+        try:
+            record.close()
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
+    if staging_descriptor is not None:
+        try:
+            os.close(staging_descriptor)
+        except OSError as cleanup_error:
+            cleanup_errors.append(cleanup_error)
     if cleanup_errors:
         _raise_primary_and_cleanup(
             primary, cleanup_errors, "installation tree publication failed"
@@ -1808,12 +1957,14 @@ def _create_private_temporary_directory(
     parent: Path,
     prefix: str,
     label: str,
-) -> tuple[Path, os.stat_result]:
+) -> tuple[Path, os.stat_result, int]:
     """Create and identity-pin a preselected private directory safely."""
 
     for _attempt in range(128):
         candidate = parent / f"{prefix}{secrets.token_hex(16)}"
         mkdir_returned = False
+        created_metadata: os.stat_result | None = None
+        descriptor: int | None = None
         try:
             os.mkdir(candidate, 0o700)
             mkdir_returned = True
@@ -1825,42 +1976,44 @@ def _create_private_temporary_directory(
                 or stat.S_IMODE(metadata.st_mode) != 0o700
             ):
                 raise StagingError(f"{label} authority drift")
+            created_metadata = metadata
+            descriptor = _open_identity_pin(
+                candidate,
+                metadata.st_dev,
+                metadata.st_ino,
+                True,
+                label,
+            )
             _fsync_directory(parent)
-            return candidate, metadata
+            return candidate, metadata, descriptor
         except FileExistsError:
             continue
         except BaseException as error:
             cleanup_errors: list[Exception] = []
-            # KeyboardInterrupt/SystemExit can arrive after mkdir succeeds but
-            # before Python records its return. The unpredictable name and
-            # private parent make an admissible candidate invocation-owned.
-            if mkdir_returned or not isinstance(error, Exception):
+            # A pathname cannot safely identify the mkdir result until its
+            # inode is pinned. If pinning failed, an unlink/recreate attacker
+            # may have installed a foreign object with even the same recycled
+            # inode number. Preserve that path instead of guessing ownership.
+            if descriptor is not None and created_metadata is not None:
                 try:
-                    created = candidate.lstat()
-                except FileNotFoundError:
-                    created = None
+                    _remove_created_identity(
+                        candidate,
+                        created_metadata.st_dev,
+                        created_metadata.st_ino,
+                        True,
+                    )
                 except Exception as cleanup_error:
                     cleanup_errors.append(cleanup_error)
-                    created = None
-                if created is not None:
-                    try:
-                        if (
-                            not stat.S_ISDIR(created.st_mode)
-                            or created.st_uid != os.geteuid()
-                            or created.st_gid != os.getegid()
-                            or stat.S_IMODE(created.st_mode) != 0o700
-                        ):
-                            raise StagingError(
-                                f"interrupted {label} authority drift"
-                            )
-                        _remove_created_identity(
-                            candidate,
-                            created.st_dev,
-                            created.st_ino,
-                            True,
-                        )
-                    except Exception as cleanup_error:
-                        cleanup_errors.append(cleanup_error)
+            elif mkdir_returned or not isinstance(error, Exception):
+                cleanup_errors.append(StagingError(
+                    "private directory cleanup withheld because its original "
+                    f"identity was not pinned; retained path may be {candidate}"
+                ))
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
             _raise_primary_and_cleanup(error, cleanup_errors, label)
     raise StagingError(f"cannot allocate a unique {label}")
 
@@ -1935,15 +2088,25 @@ def _large_temporary_workspace(
             )
     _temporary_capacity(root, required_bytes)
     root_identity = (metadata.st_dev, metadata.st_ino)
+    root_descriptor = _open_identity_pin(
+        root,
+        metadata.st_dev,
+        metadata.st_ino,
+        True,
+        "temporary root",
+    )
     workspace: Path | None = None
     workspace_metadata: os.stat_result | None = None
+    workspace_descriptor: int | None = None
     cleanup_root_identity = root_identity
     primary: BaseException | None = None
     try:
-        workspace, workspace_metadata = _create_private_temporary_directory(
-            root,
-            "codeskeptic-stability-work-",
-            "private temporary workspace creation failed",
+        workspace, workspace_metadata, workspace_descriptor = (
+            _create_private_temporary_directory(
+                root,
+                "codeskeptic-stability-work-",
+                "private temporary workspace creation failed",
+            )
         )
         workspace_parent = root.lstat()
         workspace_parent_identity = (
@@ -2008,6 +2171,17 @@ def _large_temporary_workspace(
                         )
                 except Exception as error:
                     cleanup_errors.append(error)
+    for descriptor, label in (
+        (workspace_descriptor, "temporary workspace"),
+        (root_descriptor, "temporary root"),
+    ):
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError as error:
+                cleanup_errors.append(
+                    StagingError(f"cannot close {label} identity pin: {error}")
+                )
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "large temporary workspace lifecycle failed"
     )
@@ -2271,8 +2445,9 @@ def _trusted_bundle_snapshot(bundle: Path, temporary_workspace: Path):
         source_fd = os.open(bundle, flags)
     except OSError as error:
         raise StagingError(f"cannot open sealed bundle root: {error}") from error
-    snapshot = temporary_workspace / "bundle-snapshot"
-    snapshot_identity: tuple[int, int] | None = None
+    snapshot: Path | None = None
+    snapshot_metadata: os.stat_result | None = None
+    snapshot_descriptor: int | None = None
     primary: BaseException | None = None
     try:
         before = os.fstat(source_fd)
@@ -2295,10 +2470,12 @@ def _trusted_bundle_snapshot(bundle: Path, temporary_workspace: Path):
             "reserve_bytes": reserve_bytes,
             "temporary_workspace": temporary_workspace,
         }
-        snapshot.mkdir(mode=0o700)
-        snapshot_metadata = snapshot.lstat()
-        snapshot_identity = (
-            snapshot_metadata.st_dev, snapshot_metadata.st_ino
+        snapshot, snapshot_metadata, snapshot_descriptor = (
+            _create_private_temporary_directory(
+                temporary_workspace,
+                "bundle-snapshot-",
+                "trusted bundle snapshot creation failed",
+            )
         )
         _copy_snapshot_directory(source_fd, snapshot, budget)
         after = os.fstat(source_fd)
@@ -2322,15 +2499,20 @@ def _trusted_bundle_snapshot(bundle: Path, temporary_workspace: Path):
         os.close(source_fd)
     except Exception as error:
         cleanup_errors.append(error)
-    if snapshot_identity is not None:
+    if snapshot is not None and snapshot_metadata is not None:
         try:
             _remove_created_identity(
                 snapshot,
-                snapshot_identity[0],
-                snapshot_identity[1],
+                snapshot_metadata.st_dev,
+                snapshot_metadata.st_ino,
                 True,
             )
         except Exception as error:
+            cleanup_errors.append(error)
+    if snapshot_descriptor is not None:
+        try:
+            os.close(snapshot_descriptor)
+        except OSError as error:
             cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "trusted bundle snapshot lifecycle failed"
@@ -2365,7 +2547,7 @@ def _podman_global_options(
 def _ensure_private_directory(
     path: Path, owner_uid: int, owner_gid: int,
     *,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> bool:
     existed = path.exists() or path.is_symlink()
     if not existed:
@@ -2445,13 +2627,13 @@ def _verify_podman_environment(
 def _fixed_podman_runroot(owner_uid: int, owner_gid: int):
     """Create-new the one runroot pathname shared by install and service."""
 
-    created_parent: list[tuple[Path, int, int, bool]] = []
+    created: list[_CreatedNode] = []
     primary: BaseException | None = None
     try:
         parent = PODMAN_RUNROOT.parent
         if not parent.exists() and not parent.is_symlink():
             if not _ensure_private_directory(
-                parent, owner_uid, owner_gid, created_nodes=created_parent
+                parent, owner_uid, owner_gid, created_nodes=created
             ):
                 raise StagingError("fixed Podman runtime root appeared concurrently")
         else:
@@ -2459,7 +2641,10 @@ def _fixed_podman_runroot(owner_uid: int, owner_gid: int):
         if PODMAN_RUNROOT.exists() or PODMAN_RUNROOT.is_symlink():
             raise StagingError("fixed Podman runroot must be previously absent")
         if not _ensure_private_directory(
-            PODMAN_RUNROOT, owner_uid, owner_gid
+            PODMAN_RUNROOT,
+            owner_uid,
+            owner_gid,
+            created_nodes=created,
         ):
             raise StagingError("fixed Podman runroot appeared concurrently")
         yield PODMAN_RUNROOT
@@ -2467,16 +2652,7 @@ def _fixed_podman_runroot(owner_uid: int, owner_gid: int):
         primary = error
     cleanup_errors: list[Exception] = []
     try:
-        if PODMAN_RUNROOT.exists() or PODMAN_RUNROOT.is_symlink():
-            _verify_private_directory(
-                PODMAN_RUNROOT, owner_uid, owner_gid
-            )
-            _remove_private_tree(PODMAN_RUNROOT)
-            _fsync_directory(PODMAN_RUNROOT.parent)
-    except Exception as error:
-        cleanup_errors.append(error)
-    try:
-        _rollback_created(created_parent)
+        _rollback_created(created)
     except Exception as error:
         cleanup_errors.append(error)
     _raise_primary_and_cleanup(
@@ -2725,7 +2901,7 @@ def _write_new(
     *,
     owner_uid: int | None = None,
     owner_gid: int | None = None,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> None:
     def write_payload(descriptor: int) -> None:
         offset = 0
@@ -2891,10 +3067,12 @@ def prepare_staging(
     archive_sha256 = _sha256_regular(image_archive)
     _require_absent(output, "prepare output")
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary, temporary_metadata = _create_private_temporary_directory(
-        output.parent,
-        f".{output.name}.prepare-",
-        "prepare staging tree creation failed",
+    temporary, temporary_metadata, temporary_descriptor = (
+        _create_private_temporary_directory(
+            output.parent,
+            f".{output.name}.prepare-",
+            "prepare staging tree creation failed",
+        )
     )
     publication_identity: tuple[int, int] | None = None
     staged_identity: dict[str, str] | None = None
@@ -2991,6 +3169,10 @@ def prepare_staging(
                 raise StagingError("published prepare output identity changed")
         except Exception as error:
             cleanup_errors.append(error)
+    try:
+        os.close(temporary_descriptor)
+    except OSError as error:
+        cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "prepare publication failed"
     )
@@ -3569,10 +3751,12 @@ def configure_staging(
         f"{hashlib.sha256(data).hexdigest()}  runtime.json\n"
     ).encode("ascii")
 
-    temporary, temporary_metadata = _create_private_temporary_directory(
-        staging,
-        ".config.runtime-",
-        "runtime config staging tree creation failed",
+    temporary, temporary_metadata, temporary_descriptor = (
+        _create_private_temporary_directory(
+            staging,
+            ".config.runtime-",
+            "runtime config staging tree creation failed",
+        )
     )
     publication_identity: tuple[int, int] | None = None
     primary: BaseException | None = None
@@ -3638,6 +3822,10 @@ def configure_staging(
                 )
         except Exception as error:
             cleanup_errors.append(error)
+    try:
+        os.close(temporary_descriptor)
+    except OSError as error:
+        cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "runtime config publication failed"
     )
@@ -3701,10 +3889,12 @@ def seal_staging(
     # opportunity to follow or normalize it.
     _collect_payload_inventory(staging)
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary, temporary_metadata = _create_private_temporary_directory(
-        output.parent,
-        f".{output.name}.seal-",
-        "sealed bundle staging tree creation failed",
+    temporary, temporary_metadata, temporary_descriptor = (
+        _create_private_temporary_directory(
+            output.parent,
+            f".{output.name}.seal-",
+            "sealed bundle staging tree creation failed",
+        )
     )
     publication_identity: tuple[int, int] | None = None
     receipt: dict[str, Any] | None = None
@@ -3838,6 +4028,10 @@ def seal_staging(
                 raise StagingError("published sealed bundle identity changed")
         except Exception as error:
             cleanup_errors.append(error)
+    try:
+        os.close(temporary_descriptor)
+    except OSError as error:
+        cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "sealed bundle publication failed"
     )
@@ -4023,23 +4217,22 @@ def _verify_trusted_bundle(
         archive_size * VFS_ARCHIVE_EXPANSION_FACTOR
         + LARGE_TEMPORARY_RESERVE_BYTES,
     )
-    image_runtime = temporary_workspace / "image-runtime"
-    try:
-        image_runtime.mkdir(mode=0o700)
-    except OSError as error:
-        raise StagingError(
-            f"cannot create private staging image store: {error}"
-        ) from error
-    image_runtime_metadata = image_runtime.lstat()
-    _fsync_directory(temporary_workspace)
-    options = _podman_global_options(
-        image_runtime / "root",
-        image_runtime / "runroot",
-        bundle / "operator",
-        storage_driver="vfs",
+    image_runtime, image_runtime_metadata, image_runtime_descriptor = (
+        _create_private_temporary_directory(
+            temporary_workspace,
+            "image-runtime-",
+            "cannot create private staging image store",
+        )
     )
+    options: list[str] | None = None
     primary: BaseException | None = None
     try:
+        options = _podman_global_options(
+            image_runtime / "root",
+            image_runtime / "runroot",
+            bundle / "operator",
+            storage_driver="vfs",
+        )
         options = _load_and_verify_image_archive(
             archive,
             podman_root=image_runtime / "root",
@@ -4059,15 +4252,16 @@ def _verify_trusted_bundle(
     except BaseException as error:
         primary = error
     cleanup_errors: list[Exception] = []
-    try:
-        _external_output(
-            [*options, "system", "reset", "--force"],
-            64 * 1024,
-            command_runner,
-            timeout_seconds=300,
-        )
-    except Exception as error:
-        cleanup_errors.append(error)
+    if options is not None:
+        try:
+            _external_output(
+                [*options, "system", "reset", "--force"],
+                64 * 1024,
+                command_runner,
+                timeout_seconds=300,
+            )
+        except Exception as error:
+            cleanup_errors.append(error)
     try:
         _remove_created_identity(
             image_runtime,
@@ -4076,6 +4270,10 @@ def _verify_trusted_bundle(
             True,
         )
     except Exception as error:
+        cleanup_errors.append(error)
+    try:
+        os.close(image_runtime_descriptor)
+    except OSError as error:
         cleanup_errors.append(error)
     _raise_primary_and_cleanup(
         primary, cleanup_errors, "cannot clean private staging image store"
@@ -4218,7 +4416,7 @@ def _install_regular_create_new_or_reuse(
     owner_uid: int,
     owner_gid: int,
     *,
-    created_nodes: list[tuple[Path, int, int, bool]] | None = None,
+    created_nodes: list[_CreatedNode] | None = None,
 ) -> str:
     source_metadata = source.lstat()
     mode = stat.S_IMODE(source_metadata.st_mode)
@@ -4319,23 +4517,57 @@ def _preflight_fresh_installation() -> None:
 
 
 def _rollback_created(
-    created: list[tuple[Path, int, int, bool]],
+    created: list[_CreatedNode],
 ) -> None:
     failures: list[str] = []
-    for path, device, inode, is_directory in reversed(created):
+    retained_descendants: list[Path] = []
+    for record in reversed(created):
+        path, device, inode, is_directory = record
         try:
+            if any(
+                retained != path and path in retained.parents
+                for retained in retained_descendants
+            ):
+                retained_descendants.append(path)
+                failures.append(
+                    f"{path}: retained because descendant cleanup failed"
+                )
+                continue
             _remove_created_identity(
                 path, device, inode, is_directory
             )
         except StagingError as error:
             if isinstance(error.__cause__, FileNotFoundError):
                 continue
+            retained_descendants.append(path)
             failures.append(f"{path}: {error}")
         except OSError as error:
+            retained_descendants.append(path)
             failures.append(f"{path}: {error}")
+        finally:
+            try:
+                record.close()
+            except OSError as error:
+                failures.append(f"{path}: cannot close identity pin: {error}")
+    created.clear()
     if failures:
         raise StagingError(
             "installation rollback was incomplete: " + "; ".join(failures)
+        )
+
+
+def _release_created(created: list[_CreatedNode]) -> None:
+    failures: list[str] = []
+    for record in created:
+        try:
+            record.close()
+        except OSError as error:
+            failures.append(f"{record.path}: {error}")
+    created.clear()
+    if failures:
+        raise StagingError(
+            "installed identity-pin release was incomplete: "
+            + "; ".join(failures)
         )
 
 
@@ -4408,7 +4640,7 @@ def _preflight_install_base(owner_uid: int, owner_gid: int) -> None:
 def _ensure_install_base(
     owner_uid: int,
     owner_gid: int,
-    created_nodes: list[tuple[Path, int, int, bool]],
+    created_nodes: list[_CreatedNode],
 ) -> bool:
     _preflight_install_base(owner_uid, owner_gid)
     base = AUTHORITY_ROOT.parent
@@ -4528,9 +4760,10 @@ def install_bundle(
             temporary_workspace=temporary_workspace,
         )
 
-        created: list[tuple[Path, int, int, bool]] = []
+        created: list[_CreatedNode] = []
         base_created = False
         persistent_store_touched = False
+        verified_installation: dict[str, Any] | None = None
         try:
             base_created = _ensure_install_base(
                 owner_uid, owner_gid, created
@@ -4681,7 +4914,7 @@ def install_bundle(
             os.chmod(INSTALLATION_ROOT, 0o500)
             os.chmod(AUTHORITY_ROOT.parent, 0o555)
             _fsync_directory(AUTHORITY_ROOT.parent)
-            result = verify_installation(
+            verified_installation = verify_installation(
                 INSTALLATION_RECEIPT_PATH,
                 expected_revision=expected_revision,
                 expected_bundle_receipt_sha256=(
@@ -4692,8 +4925,6 @@ def install_bundle(
                 owner_uid=owner_uid,
                 owner_gid=owner_gid,
             )
-            created.clear()
-            return result
         except BaseException as error:
             base = AUTHORITY_ROOT.parent
             live_unit_was_created = any(
@@ -4735,6 +4966,12 @@ def install_bundle(
             _raise_primary_and_cleanup(
                 error, cleanup_errors, "installation failed"
             )
+        # Verification above is the commit boundary. Releasing identity pins
+        # can report a descriptor-close failure, but must never re-enter the
+        # destructive rollback path after the committed receipt was accepted.
+        _release_created(created)
+        assert verified_installation is not None
+        return verified_installation
 
 
 def verify_installation(

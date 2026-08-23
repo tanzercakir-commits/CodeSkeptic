@@ -21,6 +21,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import quality_floor_receipt as quality  # noqa: E402
 
 
+def temporary_root(value: str) -> Path:
+    """Return the real directory behind a platform temporary-path alias."""
+
+    return Path(value).resolve(strict=True)
+
+
 def sha(character: str) -> str:
     return character * 64
 
@@ -181,7 +187,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
     def build(self, manifest: dict) -> dict:
         raw = quality.canonical_json(manifest)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             return quality.build_receipt(
                 manifest,
@@ -443,7 +449,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
         for replacement in mutations:
             with self.subTest(replacement=replacement):
                 with tempfile.TemporaryDirectory() as directory:
-                    registry = Path(directory) / "RuleCapabilities.def"
+                    registry = temporary_root(directory) / "RuleCapabilities.def"
                     registry.write_text(
                         original.replace(experimental, replacement),
                         encoding="utf-8",
@@ -463,7 +469,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
             'Supported, true, true, true, "must not be ignored")\n'
         )
         with tempfile.TemporaryDirectory() as directory:
-            registry = Path(directory) / "RuleCapabilities.def"
+            registry = temporary_root(directory) / "RuleCapabilities.def"
             registry.write_text(original + extra, encoding="utf-8")
             with mock.patch.object(quality, "CAPABILITY_REGISTRY", registry):
                 with self.assertRaisesRegex(
@@ -476,7 +482,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
         manifest = accepted_manifest()
         raw = quality.canonical_json(manifest)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             input_path = root / "quality-floor-input.json"
             receipt_path = root / "receipt.json"
@@ -528,7 +534,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
         for mutation in mutations:
             with self.subTest(mutation=mutation):
                 with tempfile.TemporaryDirectory() as directory:
-                    root = Path(directory)
+                    root = temporary_root(directory)
                     manifest = accepted_manifest()
                     if mutation == "missing-evidence":
                         retained = artifact_payloads()
@@ -569,7 +575,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
         manifest = accepted_manifest()
         raw = quality.canonical_json(manifest)
         with tempfile.TemporaryDirectory() as directory:
-            parent = Path(directory)
+            parent = temporary_root(directory)
             target = parent / "artifact-target"
             target.mkdir()
             materialize_artifacts(target)
@@ -588,7 +594,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
     def test_generate_and_verify_bind_raw_input_sidecar_and_canonical_bytes(self) -> None:
         manifest = accepted_manifest()
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             input_path = root / "input.json"
             receipt_path = root / "receipt.json"
             materialize_artifacts(root)
@@ -625,7 +631,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_public_api_rejects_symlinked_input_receipt_and_checksum(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             input_path = root / "input.json"
             input_target = root / "outside-input.json"
@@ -663,7 +669,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_public_api_rejects_external_hardlink_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             input_path = root / "input.json"
             input_path.write_bytes(quality.canonical_json(accepted_manifest()))
@@ -698,7 +704,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_generate_refuses_output_aliases_before_clobbering_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             input_path = root / "input.json"
             input_raw = quality.canonical_json(accepted_manifest())
@@ -722,7 +728,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_generate_refuses_checksum_alias_and_sidecar_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             retained = artifact_payloads()
             retained["receipt.json.sha256"] = b"retained sidecar name\n"
             materialize_artifacts(root, retained)
@@ -766,7 +772,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_verify_canonical_non_object_receipt_raises_contract_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             materialize_artifacts(root)
             input_path = root / "input.json"
             input_path.write_bytes(quality.canonical_json(accepted_manifest()))
@@ -784,7 +790,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_regular_file_reader_rejects_mid_read_metadata_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "artifact.json"
+            path = temporary_root(directory) / "artifact.json"
             path.write_bytes(b"stable\n")
             observed = os.stat(path)
             before = mock.Mock(
@@ -810,7 +816,7 @@ class QualityFloorReceiptTest(unittest.TestCase):
 
     def test_malformed_json_still_produces_a_verifiable_rejected_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             input_path = root / "input.json"
             receipt_path = root / "receipt.json"
             malformed_inputs = (

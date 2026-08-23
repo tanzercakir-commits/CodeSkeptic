@@ -24,6 +24,12 @@ import quality_floor_receipt as quality  # noqa: E402
 import run_quality_floor_campaign as campaign  # noqa: E402
 
 
+def temporary_root(value: str) -> Path:
+    """Return the real directory behind a platform temporary-path alias."""
+
+    return Path(value).resolve(strict=True)
+
+
 def _coverage(attempted: int = 1, analyzed: int = 1,
               broken: int = 0) -> dict[str, int]:
     return {
@@ -632,10 +638,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_accepted_assemble_and_verify_use_real_bundle_file_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            package = Path(directory) / "package"
+            package = temporary_root(directory) / "package"
             package.mkdir()
             _write_fake_raw(package)
-            binary, build_dir, analyzer = _fake_build(Path(directory))
+            binary, build_dir, analyzer = _fake_build(temporary_root(directory))
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             build_receipt = _fake_build_receipt(source, analyzer)
             _seal_fake_authority(package, source, analyzer, build_receipt)
@@ -706,7 +712,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_offline_retained_verifier_passes_without_build_or_analyzer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -809,7 +815,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_p10_09_retained_build_authority_static_verification(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, _build_dir, analyzer = _fake_build(root)
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             receipt = _fake_build_receipt(
@@ -830,7 +836,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_offline_verifier_rejects_favorable_resigned_raw_semantic_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -910,10 +916,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_verify_rederives_bundle_and_rejects_raw_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            package = Path(directory) / "package"
+            package = temporary_root(directory) / "package"
             package.mkdir()
             _write_fake_raw(package)
-            binary, build_dir, analyzer = _fake_build(Path(directory))
+            binary, build_dir, analyzer = _fake_build(temporary_root(directory))
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             build_receipt = _fake_build_receipt(source, analyzer)
             _seal_fake_authority(package, source, analyzer, build_receipt)
@@ -946,10 +952,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_assemble_requires_completed_preexisting_raw_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            package = Path(directory) / "package"
+            package = temporary_root(directory) / "package"
             package.mkdir()
             _write_fake_raw(package)
-            binary, build_dir, _analyzer = _fake_build(Path(directory))
+            binary, build_dir, _analyzer = _fake_build(temporary_root(directory))
             verifier = mock.Mock(side_effect=AssertionError("must not verify"))
             with self.assertRaisesRegex(campaign.CampaignError, "authority"):
                 campaign.assemble_package(
@@ -963,10 +969,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_raw_authority_rejects_binary_mix_stale_bytes_and_bad_time(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            package = Path(directory) / "package"
+            package = temporary_root(directory) / "package"
             package.mkdir()
             _write_fake_raw(package)
-            binary, build_dir, analyzer = _fake_build(Path(directory))
+            binary, build_dir, analyzer = _fake_build(temporary_root(directory))
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             build_receipt = _fake_build_receipt(source, analyzer)
             authority = _seal_fake_authority(
@@ -1023,7 +1029,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_retained_build_authority_is_publicly_reverified_and_bound(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -1051,7 +1057,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_build_authority_rejects_wrong_source_analyzer_and_stale_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -1107,7 +1113,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_missing_or_tampered_retained_build_authority_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -1144,7 +1150,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_alternate_or_symlinked_binary_is_not_the_authoritative_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             binary, build_dir, analyzer = _fake_build(root)
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             receipt = _fake_build_receipt(source, analyzer)
@@ -1197,7 +1203,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_run_verifies_external_build_authority_before_creating_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             binary, build_dir, _analyzer = _fake_build(root)
             source_dir = root / "source"
             source_dir.mkdir()
@@ -1227,7 +1233,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_build_authority_copy_is_exact_and_rejects_extra_input(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             published = root / "published"
             published.mkdir()
             for name in campaign.build_authority.AUTHORITY_FILES:
@@ -1265,7 +1271,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_output_overlap_and_symlink_are_rejected_before_creation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             protected = root / "input"
             protected.mkdir()
             descendant = protected / "output"
@@ -1288,9 +1294,13 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 campaign._validate_output_target(public_empty, ())
             self.assertTrue(public_empty.is_dir())
 
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "atomic package exchange requires Linux renameat2",
+    )
     def test_existing_package_replacement_uses_atomic_exchange(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             staged = root / "staged"
             (package / "raw").mkdir(parents=True)
@@ -1329,7 +1339,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_verified_tree_rejects_hardlink_injection_at_promotion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             staged = root / "staged"
             (staged / "raw").mkdir(parents=True)
             (staged / "bundles").mkdir()
@@ -1373,7 +1383,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_atomic_replacement_rejects_post_verify_content_change(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             staged = root / "staged"
             (package / "raw").mkdir(parents=True)
@@ -1408,7 +1418,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_mini_juliet_manifest_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            raw = Path(directory)
+            raw = temporary_root(directory)
             juliet = raw / "juliet"
             juliet.mkdir()
             relative = "C/testcases/CWE401_Memory_Leak/example.c"
@@ -1462,7 +1472,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_juliet_metrics_are_recomputed_from_raw_findings_and_case_list(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            raw = Path(directory)
+            raw = temporary_root(directory)
             juliet = raw / "juliet"
             juliet.mkdir()
             cwe = "CWE401_Memory_Leak"
@@ -1569,7 +1579,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_unsafe_symlink_is_rejected_before_resolution(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             target = root / "target"
             target.write_text("target\n", encoding="utf-8")
             link = root / "link"
@@ -1586,7 +1596,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_credited_juliet_diagnostic_must_be_supported_and_blocking(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            raw = Path(directory)
+            raw = temporary_root(directory)
             juliet = raw / "juliet"
             juliet.mkdir()
             cwe = "CWE401_Memory_Leak"
@@ -1618,7 +1628,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
     def test_resource_compile_database_requires_exact_clang_surface(self) -> None:
         relatives = ["libarchive/a.c", "libarchive/b.c"]
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "compile_commands.json"
+            path = temporary_root(directory) / "compile_commands.json"
             valid = []
             for relative in relatives:
                 for suffix in ("one", "two"):
@@ -1755,7 +1765,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             for source in requested
         ]
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "compile_commands.json"
+            path = temporary_root(directory) / "compile_commands.json"
             path.write_bytes(campaign.canonical_json(database))
             campaign._validate_juliet_compile_db(path, requested, relatives)
 
@@ -1768,7 +1778,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_stress_receipt_uses_authority_identity_and_source_revision(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            raw = Path(directory)
+            raw = temporary_root(directory)
             stress_root = raw / "stress"
             (stress_root / "logs").mkdir(parents=True)
             (stress_root / "reports").mkdir()
@@ -1891,7 +1901,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_resource_input_rejects_non_target_hash_and_rebased_digest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            raw = Path(directory)
+            raw = temporary_root(directory)
             resource = raw / "resource"
             resource.mkdir()
             shutil.copyfile(campaign.MUTATION_PATH, resource / "mutations.json")
@@ -1974,7 +1984,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_wrong_juliet_archive_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "juliet.zip"
+            archive = temporary_root(directory) / "juliet.zip"
             archive.write_bytes(b"not the official archive")
             with self.assertRaisesRegex(campaign.CampaignError, "official pinned"):
                 campaign._validate_juliet_archive(archive)
@@ -2098,7 +2108,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
         self.assertIn("$LAUNCH_DIR:/launch:ro", verify)
         self.assertNotIn("$STAGE:/stage:rw", verify)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             command = campaign._campaign_container_command(
                 "run",
                 4,
@@ -2122,7 +2132,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_p10_09_container_layout_is_inferred_from_build_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, _build_dir, analyzer = _fake_build(root)
             source_identity = {
                 "revision": "a" * 40,
@@ -2286,7 +2296,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_p10_09_outer_recheck_preserves_inferred_layout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, _build_dir, analyzer = _fake_build(root)
             source_identity = {
                 "revision": "a" * 40,
@@ -2354,7 +2364,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_container_layout_hybrids_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, _build_dir, analyzer = _fake_build(root)
             source_identity = {
                 "revision": "a" * 40,
@@ -2512,7 +2522,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_inner_launch_uses_only_in_runtime_build_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             binary, build_dir, analyzer = _fake_build(root)
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             authority_dir = _write_fake_build_authority(root)
@@ -2550,7 +2560,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_inner_launch_rejects_stale_token_before_any_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, build_dir, analyzer = _fake_build(root)
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             authority_dir = _write_fake_build_authority(root)
@@ -2575,7 +2585,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_launch_rejects_runtime_argv_and_mount_path_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, _build_dir, analyzer = _fake_build(root)
             source = {"revision": "a" * 40, "manifest_sha256": "b" * 64}
             authority_dir = _write_fake_build_authority(root)
@@ -2637,7 +2647,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_public_preflight_does_not_execute_host_analyzer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             _binary, build_dir, analyzer = _fake_build(root)
             source_identity = {
                 "revision": "a" * 40,
@@ -2686,7 +2696,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_container_failure_or_partial_marker_never_counts_as_success(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for label, returncode, output, error in (
                 ("nonzero", 2, b"partial\n", "exit 2.*partial"),
                 ("bad marker", 0, b"partial\n", "marker"),
@@ -2707,7 +2717,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_container_failure_detail_is_bounded_escaped_and_last_line_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "container.log"
+            log = temporary_root(directory) / "container.log"
             log.write_text("earlier detail\nlast \x1b[31m detail\n", encoding="utf-8")
             detail = campaign._campaign_failure_detail(log)
             self.assertNotIn("earlier detail", detail)
@@ -2727,7 +2737,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_campaign_podman_process_uses_only_shared_closed_environment(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "container.log"
+            log = temporary_root(directory) / "container.log"
             digest = "1" * 64
             environment = {"CLOSED_PODMAN_ENV": "1"}
 
@@ -2762,7 +2772,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_failed_public_run_leaves_no_output_or_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build_dir = root / "build"
             authority = root / "authority"
@@ -2824,7 +2834,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_public_run_verifies_in_separate_phase_before_promotion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build_dir = root / "build"
             authority = root / "authority"
@@ -2931,7 +2941,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_retained_execution_authority_tampering_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             package = root / "package"
             package.mkdir()
             _write_fake_raw(package)
@@ -2982,7 +2992,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
 
     def test_package_overlap_protection_covers_build_and_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build_dir = root / "build"
             authority = root / "authority"

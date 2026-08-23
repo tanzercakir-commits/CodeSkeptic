@@ -33,6 +33,12 @@ LINUX_SUBREAPER_AVAILABLE = (
 )
 
 
+def temporary_root(value: str) -> Path:
+    """Return the real directory behind a platform temporary-path alias."""
+
+    return Path(value).resolve(strict=True)
+
+
 def fixture_manifest() -> dict:
     fingerprints = ["csf1-0000000000000001"]
     return {
@@ -679,7 +685,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         }
         manifest = campaign.validate_manifest(raw)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "sealed-mirror"
+            root = temporary_root(directory) / "sealed-mirror"
             authority = mirror_authority(manifest)
             beta_record = copy.deepcopy(authority["projects"][0])
             beta_record.update({
@@ -719,7 +725,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         })
         extra["projects"].append(gamma_record)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "extra"
+            root = temporary_root(directory) / "extra"
             authority_path = seal_mirror(
                 root,
                 extra,
@@ -740,7 +746,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         missing = copy.deepcopy(authority)
         missing["projects"] = missing["projects"][:1]
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "missing"
+            root = temporary_root(directory) / "missing"
             authority_path = seal_mirror(
                 root, missing, {"bundles/alpha.bundle": b"alpha bundle\n"}
             )
@@ -755,7 +761,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
     def test_hardlinked_mirror_file_is_rejected(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "sealed-mirror"
+            root = temporary_root(directory) / "sealed-mirror"
             authority_path = seal_mirror(
                 root,
                 mirror_authority(manifest),
@@ -777,7 +783,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
     def test_selected_offline_mirror_is_canonical_immutable_and_checksummed(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "sealed-mirror"
+            root = temporary_root(directory) / "sealed-mirror"
             authority = mirror_authority(manifest)
             authority_path = seal_mirror(
                 root, authority, {"bundles/alpha.bundle": b"fixture bundle\n"}
@@ -814,7 +820,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         raw["campaigns"]["nightly"]["projects"].append("beta")
         manifest = campaign.validate_manifest(raw)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "sealed-mirror"
+            root = temporary_root(directory) / "sealed-mirror"
             authority_path = seal_mirror(
                 root,
                 mirror_authority(manifest),
@@ -844,7 +850,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         )
         for name, replacement, expected in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory) / "sealed-mirror"
+                root = temporary_root(directory) / "sealed-mirror"
                 authority = mirror_authority(manifest)
                 authority_path = seal_mirror(
                     root,
@@ -889,7 +895,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(fixture_manifest())
         for target in ("authority", "bundle"):
             with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
-                parent = Path(directory)
+                parent = temporary_root(directory)
                 root = parent / "sealed-mirror"
                 authority = mirror_authority(manifest)
                 authority_path = seal_mirror(
@@ -906,6 +912,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
                         authority_path.unlink()
                         authority_path.symlink_to(real)
                         os.chmod(root, 0o555)
+                        rejected_path = authority_path
                     else:
                         bundle = root / "bundles" / "alpha.bundle"
                         real = parent / "real-alpha.bundle"
@@ -915,10 +922,14 @@ class MirrorAuthorityContractTest(unittest.TestCase):
                         bundle.unlink()
                         bundle.symlink_to(real)
                         os.chmod(bundle.parent, 0o555)
-                    with self.assertRaisesRegex(campaign.EvidenceError, "symlink|regular"):
+                        rejected_path = bundle
+                    with self.assertRaisesRegex(
+                        campaign.EvidenceError, "symlink|regular"
+                    ) as raised:
                         campaign.load_mirror_authority(
                             authority_path, manifest, "alpha"
                         )
+                    self.assertIn(str(rejected_path), str(raised.exception))
                 finally:
                     unseal_mirror(root)
 
@@ -930,7 +941,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
             ("mutable", "immutable"),
         ):
             with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory) / "sealed-mirror"
+                root = temporary_root(directory) / "sealed-mirror"
                 authority = mirror_authority(manifest)
                 authority_path = seal_mirror(
                     root,
@@ -984,7 +995,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
             "XDG_CACHE_HOME": "/hostile/xdg-cache",
         }
         with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory)
+            workspace = temporary_root(directory)
             temporary = workspace / ".codeskeptic-tmp"
             temporary.mkdir()
             identity = campaign._workspace_directory_identity(workspace)
@@ -1044,7 +1055,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
             "bundle_sha256": "0" * 64,
         }
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "sealed-mirror"
+            root = temporary_root(directory) / "sealed-mirror"
             authority = mirror_authority(manifest, submodules=[submodule])
             authority_path = seal_mirror(
                 root,
@@ -1102,7 +1113,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(fixture_manifest())
         project = manifest["projects"][0]
         with tempfile.TemporaryDirectory() as directory:
-            temporary = Path(directory)
+            temporary = temporary_root(directory)
             root = temporary / "sealed-mirror"
             authority = mirror_authority(manifest)
             authority_path = seal_mirror(
@@ -1162,7 +1173,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
     def test_offline_transport_staging_symlink_is_rejected_without_deletion(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
-            temporary = Path(directory)
+            temporary = temporary_root(directory)
             root = temporary / "sealed-mirror"
             authority = mirror_authority(manifest)
             authority_path = seal_mirror(
@@ -1220,7 +1231,7 @@ class MirrorAuthorityContractTest(unittest.TestCase):
             ).stdout.strip()
 
         with tempfile.TemporaryDirectory() as directory:
-            temporary = Path(directory)
+            temporary = temporary_root(directory)
             dependency = temporary / "dependency-source"
             dependency.mkdir()
             git(dependency, "init", "--quiet")
@@ -1402,7 +1413,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_closed_pipe_detached_descendant_is_killed_after_leader_exit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             script, pid_path = self._detached_script(root, inherit_pipe=False)
             with self.assertRaisesRegex(campaign.EvidenceError, "orphan"):
                 campaign._run_command(
@@ -1413,7 +1424,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_inherited_pipe_detached_descendant_is_killed_at_deadline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             script, pid_path = self._detached_script(root, inherit_pipe=True)
             with self.assertRaisesRegex(campaign.EvidenceError, "timed out"):
                 campaign._capture_git(
@@ -1424,7 +1435,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_immediate_exit_closed_pipe_escape_is_rejected_repeatedly(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for attempt in range(10):
                 attempt_root = root / str(attempt)
                 attempt_root.mkdir()
@@ -1442,7 +1453,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_preexisting_direct_child_rejects_execution_without_killing_it(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             unrelated = subprocess.Popen(["/usr/bin/sleep", "30"])
             try:
                 with self.assertRaisesRegex(campaign.EvidenceError, "pre-existing child"):
@@ -1458,7 +1469,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_second_controller_thread_rejects_execution_before_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             stop = threading.Event()
             other = threading.Thread(target=stop.wait)
             other.start()
@@ -1530,7 +1541,7 @@ class CommandSupervisorTest(unittest.TestCase):
                 raise OSError("selector close failed")
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             selector = BrokenSelector()
             captured: list[subprocess.Popen] = []
             real_popen = campaign.subprocess.Popen
@@ -1566,7 +1577,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_shard_reserve_release_retries_delayed_accounting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             recovered = mock.Mock(f_bavail=1 << 20, f_frsize=1)
             below_floor = mock.Mock(f_bavail=0, f_frsize=1)
             delayed = root / "delayed"
@@ -1612,7 +1623,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_live_log_and_capture_floods_are_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             flood = ["/usr/bin/python3", "-c", "import sys;sys.stdout.write('x'*100000)"]
             with mock.patch.object(campaign, "MAX_COMMAND_LOG_BYTES", 1024):
                 with self.assertRaisesRegex(campaign.EvidenceError, "commands log"):
@@ -1631,7 +1642,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_child_written_report_growth_is_stopped_live(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             report = root / "report.json"
             writer = [
                 "/usr/bin/python3", "-c",
@@ -1649,7 +1660,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_closed_output_child_cannot_flood_watched_report_while_waiting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             report = root / "report.json"
             writer = [
                 "/usr/bin/python3", "-c",
@@ -1668,7 +1679,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_exiting_closed_pipe_descendant_cannot_escape_final_file_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             report = root / "report.json"
             launcher = root / "late-writer.py"
             launcher.write_text(
@@ -1692,7 +1703,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_shard_workspace_multi_file_growth_and_tmp_are_bounded_live(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             workspace = root / "shard"
             workspace.mkdir()
             payloads = workspace / "payloads"
@@ -1753,7 +1764,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_default_single_file_rlimit_is_hard(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             payload = root / "payload.bin"
             writer = [
                 "/usr/bin/python3", "-c",
@@ -1769,7 +1780,7 @@ class CommandSupervisorTest(unittest.TestCase):
 
     def test_compile_database_and_report_reads_reject_oversize_and_hardlinks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             database = root / "compile_commands.json"
             database.write_text("[]" + " " * 100, encoding="utf-8")
             project = campaign.validate_manifest(fixture_manifest())["projects"][0]
@@ -1945,7 +1956,7 @@ class EvidenceContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(fixture_manifest())
         receipt = accepted_receipt(manifest, 1)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "receipt.json"
+            path = temporary_root(directory) / "receipt.json"
             campaign.write_receipt(path, receipt)
             loaded = campaign.load_verified_receipt(path)
             self.assertTrue(campaign.checkpoint_matches(loaded, receipt["identity"]))
@@ -1962,7 +1973,7 @@ class EvidenceContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(fixture_manifest())
         receipt = accepted_receipt(manifest, 1)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             path = root / "receipt.json"
             outside = root / "outside.txt"
             outside.write_text("sentinel\n", encoding="utf-8")
@@ -1984,7 +1995,7 @@ class EvidenceContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(fixture_manifest())
         receipt = accepted_receipt(manifest, 1)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             path = root / "checkpoint" / "receipt.json"
             self.assertIsNone(
                 campaign.load_matching_checkpoint(
@@ -2067,7 +2078,7 @@ class EvidenceContractTest(unittest.TestCase):
         project = manifest["projects"][0]
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             analyzer = root / "codeskeptic"
             analyzer.write_bytes(b"fixture analyzer")
             analyzer = analyzer.resolve()
@@ -2197,7 +2208,7 @@ class EvidenceContractTest(unittest.TestCase):
     def test_aggregate_requires_three_identical_accepted_repetitions(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for repetition in (1, 2, 3):
                 campaign.write_receipt(
                     root / "alpha" / f"repeat-{repetition}" / "receipt.json",
@@ -2255,7 +2266,7 @@ class EvidenceContractTest(unittest.TestCase):
         manifest = campaign.validate_manifest(raw)
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for project_index, project in enumerate(manifest["projects"]):
                 analyzer_sha = ("b" if project_index == 0 else "c") * 64
                 for repetition in (1, 2, 3):
@@ -2278,7 +2289,7 @@ class EvidenceContractTest(unittest.TestCase):
     def test_aggregate_recomputes_semantic_fingerprint_evidence(self) -> None:
         manifest = campaign.validate_manifest(fixture_manifest())
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for repetition in (1, 2, 3):
                 receipt = accepted_receipt(manifest, repetition)
                 receipt["semantic"]["fingerprints"] = ["csf1-0000000000000002"]
@@ -2293,7 +2304,7 @@ class EvidenceContractTest(unittest.TestCase):
     def test_aggregate_cli_writes_unavailable_receipt_on_failure(self) -> None:
         manifest = fixture_manifest()
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             output = root / "aggregate" / "receipt.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -2318,7 +2329,7 @@ class EvidenceContractTest(unittest.TestCase):
     def test_run_cli_writes_unavailable_receipt_before_execution(self) -> None:
         manifest = fixture_manifest()
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             output = root / "alpha" / "repeat-1" / "receipt.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")

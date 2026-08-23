@@ -881,13 +881,16 @@ class HostedCaptureTest(unittest.TestCase):
 
         with mock.patch.object(
             hosted.os, "mkdir", side_effect=mkdir_then_interrupt
-        ), self.assertRaises(KeyboardInterrupt):
+        ), self.assertRaisesRegex(
+            capture.HostedCaptureError, "cleanup withheld"
+        ):
             fixture.capture()
         self.assertFalse(fixture.output.exists())
-        self.assertEqual(
-            list(fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")),
-            [],
+        retained = list(
+            fixture.output.parent.glob(f".{fixture.output.name}.tmp-*")
         )
+        self.assertEqual(len(retained), 1)
+        retained[0].rmdir()
 
         fixture = CaptureFixture(self.root / "publication-interrupt")
         real_rename = hosted._rename_noreplace

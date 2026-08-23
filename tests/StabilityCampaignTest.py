@@ -4811,7 +4811,20 @@ ctypes.CDLL(None).pthread_exit(None)
         ).split(":")
         pid = int(pid_text)
         start_time = int(start_text)
+        # The worker writes its identity immediately before the main pthread
+        # calls pthread_exit.  Under scheduler pressure that leader can still
+        # be briefly runnable here, so wait for the exact same identity to
+        # reach the zombie-leader state the contract is exercising.
+        deadline = time.monotonic() + 2.0
         record = stability._action_process_record(pid)
+        while (
+            record is not None
+            and record[2] == start_time
+            and record[3] != "Z"
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
+            record = stability._action_process_record(pid)
         self.assertIsNotNone(record)
         self.assertEqual(record[2], start_time)
         self.assertEqual(record[3], "Z")

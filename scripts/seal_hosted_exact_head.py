@@ -2689,12 +2689,14 @@ def _remove_tree_identity(path: Path, device: int, inode: int) -> None:
 
 def _create_private_staging_directory(
     parent: Path, prefix: str, label: str,
-) -> tuple[Path, os.stat_result]:
+) -> tuple[Path, os.stat_result, int]:
     """Create and identity-pin a private random staging directory."""
 
     for _attempt in range(128):
         candidate = parent / f"{prefix}{secrets.token_hex(16)}"
         mkdir_returned = False
+        created_metadata: os.stat_result | None = None
+        descriptor: int | None = None
         try:
             os.mkdir(candidate, 0o700)
             mkdir_returned = True
@@ -2706,36 +2708,33 @@ def _create_private_staging_directory(
                 or stat.S_IMODE(metadata.st_mode) != 0o700
             ):
                 raise HostedEvidenceError(f"{label} authority drift")
+            created_metadata = metadata
+            descriptor = _open_tree_identity_pin(candidate, metadata, label)
             _fsync_directory(parent)
-            return candidate, metadata
+            return candidate, metadata, descriptor
         except FileExistsError:
             continue
         except BaseException as error:
             cleanup_errors: list[Exception] = []
-            if mkdir_returned or not isinstance(error, Exception):
+            if descriptor is not None and created_metadata is not None:
                 try:
-                    created = candidate.lstat()
-                except FileNotFoundError:
-                    created = None
+                    _remove_tree_identity(
+                        candidate,
+                        created_metadata.st_dev,
+                        created_metadata.st_ino,
+                    )
                 except Exception as cleanup_error:
-                    created = None
                     cleanup_errors.append(cleanup_error)
-                if created is not None:
-                    try:
-                        if (
-                            not stat.S_ISDIR(created.st_mode)
-                            or created.st_uid != os.geteuid()
-                            or created.st_gid != os.getegid()
-                            or stat.S_IMODE(created.st_mode) != 0o700
-                        ):
-                            raise HostedEvidenceError(
-                                f"interrupted {label} authority drift"
-                            )
-                        _remove_tree_identity(
-                            candidate, created.st_dev, created.st_ino
-                        )
-                    except Exception as cleanup_error:
-                        cleanup_errors.append(cleanup_error)
+            elif mkdir_returned or not isinstance(error, Exception):
+                cleanup_errors.append(HostedEvidenceError(
+                    "private staging cleanup withheld because its original "
+                    f"identity was not pinned; retained path may be {candidate}"
+                ))
+            if descriptor is not None:
+                try:
+                    os.close(descriptor)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
             if cleanup_errors:
                 detail = "; ".join(str(item) for item in cleanup_errors)
                 raise HostedEvidenceError(
@@ -2748,6 +2747,32 @@ def _create_private_staging_directory(
                 raise HostedEvidenceError(f"{label}: {error}") from error
             raise
     raise HostedEvidenceError(f"{label}: random name budget exhausted")
+
+
+def _open_tree_identity_pin(
+    path: Path, metadata: os.stat_result, label: str
+) -> int:
+    """Keep a tree inode allocated across publication and rollback decisions."""
+
+    flags = getattr(os, "O_PATH", os.O_RDONLY)
+    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_DIRECTORY", 0)
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, flags)
+        pinned = os.fstat(descriptor)
+    except OSError as error:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise HostedEvidenceError(f"cannot pin {label}: {error}") from error
+    if (
+        not stat.S_ISDIR(pinned.st_mode)
+        or pinned.st_dev != metadata.st_dev
+        or pinned.st_ino != metadata.st_ino
+    ):
+        os.close(descriptor)
+        raise HostedEvidenceError(f"{label} identity changed while pinning")
+    return descriptor
 
 
 def _rename_noreplace_at(
@@ -2815,7 +2840,7 @@ def seal_evidence(
         raise HostedEvidenceError(f"output already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     tree, workflows = _source_identity(source, repository, revision)
-    staging, staging_metadata = _create_private_staging_directory(
+    staging, staging_metadata, staging_descriptor = _create_private_staging_directory(
         output.parent,
         f".{output.name}.tmp-",
         "hosted evidence staging creation failed",
@@ -2910,6 +2935,10 @@ def seal_evidence(
                 )
         except Exception as cleanup_error:
             cleanup_errors.append(cleanup_error)
+    try:
+        os.close(staging_descriptor)
+    except OSError as cleanup_error:
+        cleanup_errors.append(cleanup_error)
     if primary is not None and cleanup_errors:
         detail = "; ".join(str(item) for item in cleanup_errors)
         raise HostedEvidenceError(

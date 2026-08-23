@@ -24,6 +24,10 @@ SPEC.loader.exec_module(fault)
 
 
 REVISION = "a" * 40
+LINUX_CONTAINMENT_AVAILABLE = (
+    sys.platform.startswith("linux")
+    and Path("/proc/self/stat").is_file()
+)
 
 
 def gtest_xml(*, reverse_suite_order: bool = False) -> str:
@@ -108,7 +112,7 @@ raise SystemExit({exit_code})
 class StabilityFaultInjectionContractTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve(strict=True)
         self.binary = self.root / "codeskeptic_tests"
         self.binary.write_bytes(b"portable native-binary fixture\n")
         self.binary_sha = fault.sha256_binary(self.binary)
@@ -210,6 +214,10 @@ class StabilityFaultInjectionContractTest(unittest.TestCase):
         )
         return [sys.executable, "-c", code, str(identity_path)]
 
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_selector_constructor_failure_reaps_fault_tree(self) -> None:
         identity_path = self.root / "fault-selector-ctor.identity"
         log_path = self.output / "selector-ctor.log"
@@ -257,6 +265,10 @@ class StabilityFaultInjectionContractTest(unittest.TestCase):
                 if process.poll() is None:
                     fault._kill_owned_command(process)
 
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_selector_failure_before_target_spawn_cannot_release_wrapper(
         self,
     ) -> None:
@@ -340,6 +352,10 @@ os._exit(0)
                 if process.poll() is None:
                     fault._kill_owned_command(process)
 
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_selector_register_and_close_failures_compose_after_fault_cleanup(
         self,
     ) -> None:
@@ -526,7 +542,10 @@ os._exit(0)
             receipt["command"]["filter"], ":".join(fault.REQUIRED_TESTS)
         )
 
-    @unittest.skipIf(os.name == "nt", "POSIX direct-exec integration")
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_posix_direct_binary_execution_is_retained(self) -> None:
         binary = self.root / "posix-codeskeptic-tests"
         posix_gtest(binary)
@@ -540,7 +559,10 @@ os._exit(0)
         )
         self.assertEqual(receipt["results"]["test_count"], 6)
 
-    @unittest.skipIf(os.name == "nt", "POSIX process containment")
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_live_log_flood_is_killed_at_the_hard_limit(self) -> None:
         binary = self.root / "flood-tests"
         source = """#!/usr/bin/env python3
@@ -565,7 +587,10 @@ while True:
         self.assertLessEqual((output / "gtest.log").stat().st_size, 4096)
         self.assertFalse((output / "receipt.json").exists())
 
-    @unittest.skipIf(os.name == "nt", "POSIX process containment")
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_live_oversize_xml_is_killed_before_hashing(self) -> None:
         binary = self.root / "oversize-xml-tests"
         source = """#!/usr/bin/env python3
@@ -606,7 +631,7 @@ time.sleep(60)
             fault._inventory(output)
 
     @unittest.skipUnless(
-        os.name == "posix" and Path("/proc/self/stat").is_file(),
+        LINUX_CONTAINMENT_AVAILABLE,
         "Linux process containment unavailable",
     )
     def test_new_session_descendant_is_killed_by_standalone_timeout(self) -> None:
@@ -662,7 +687,7 @@ pathlib.Path(target).write_text({xml!r}, encoding='utf-8')
         self.assertTrue(identity is None or identity[1] != start_time)
 
     @unittest.skipUnless(
-        os.name == "posix" and Path("/proc/self/stat").is_file(),
+        LINUX_CONTAINMENT_AVAILABLE,
         "Linux process containment unavailable",
     )
     def test_cleanup_converges_while_descendant_rapidly_forks_new_sessions(self) -> None:

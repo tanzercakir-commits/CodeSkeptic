@@ -36,6 +36,12 @@ SAMPLE_BYTES = b"int sample;\n"
 THESIS_MANIFEST_BYTES = b"sample.cpp CLEAN 0\n"
 
 
+def temporary_root(value: str) -> Path:
+    """Return the real directory behind a platform temporary-path alias."""
+
+    return Path(value).resolve(strict=True)
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -1122,7 +1128,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         manifest_sha = qualification.digest_json(raw_manifest)
         pinned = baseline(manifest_sha)
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             repo = root / "repo"
             build = root / "build"
             repo.mkdir()
@@ -1351,7 +1357,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_measurement_cgroup_identity_is_exclusive_empty_and_pinned(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             authority = root / "cgroup"
             authority.mkdir()
             group = measurement_cgroup_fixture(authority)
@@ -1440,7 +1446,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.os, "sched_getaffinity", return_value={2, 3},
             create=True,
         ):
-            authority = Path(directory) / "cgroup"
+            authority = temporary_root(directory) / "cgroup"
             authority.mkdir()
             group = measurement_cgroup_fixture(authority)
             before_group = qualification._measurement_cgroup_snapshot(
@@ -1485,7 +1491,7 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_measurement_wrapper_enters_only_the_bounded_cgroup(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
                 contextlib.redirect_stderr(io.StringIO()):
-            root = Path(directory)
+            root = temporary_root(directory)
             authority = root / "cgroup"
             authority.mkdir()
             group = authority / "measurement"
@@ -1567,7 +1573,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             "idle-preflight-rejection",
         )
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             evidence = root / "rejected"
@@ -1853,7 +1859,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         batch_path = qualification._batch_environment_artifact_path("unit", 1)
         original = json.loads(retained[batch_path].decode("utf-8"))
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             for relative, data in retained.items():
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -2092,7 +2098,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_environment_capture_is_exact_and_rejects_authority_escape(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             proc_root = root / "proc"
             cpu_root = root / "cpu"
             (proc_root / "pressure").mkdir(parents=True)
@@ -2256,7 +2262,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         ):
             run, artifacts = qualification.run_once(
                 Path("/fixture/codeskeptic"), Path("/usr/bin/time"),
-                prepared, 1, ROOT, Path(directory), "required",
+                prepared, 1, ROOT, temporary_root(directory), "required",
                 {
                     "cpu_affinity": [0, 1],
                     "logical_cpus": 2,
@@ -2330,7 +2336,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.time, "monotonic_ns",
             side_effect=(0, 5_000_000_000),
         ):
-            scratch = Path(directory)
+            scratch = temporary_root(directory)
             with self.assertRaises(
                 qualification.QualificationBatchEnvironmentError
             ) as raised:
@@ -2393,7 +2399,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             "batch-environment-error",
         )
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             evidence = root / "rejected"
@@ -2509,7 +2515,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             qualification.time, "monotonic_ns",
             side_effect=(0, 65_001_000_000),
         ):
-            scratch = Path(directory)
+            scratch = temporary_root(directory)
             with self.assertRaisesRegex(
                 qualification.QualificationBatchEnvironmentError,
                 "batch wall evidence differs",
@@ -2567,7 +2573,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             time.monotonic_ns(), error, retained, None, None,
         )
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             evidence = root / "wall-rejected"
@@ -2618,7 +2624,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                     dt.datetime.now(dt.timezone.utc), time.monotonic_ns(),
                     error, retained, None, None,
                 )
-                root = Path(directory)
+                root = temporary_root(directory)
                 manifest_path = root / "manifest.json"
                 manifest_path.write_bytes(
                     qualification.canonical_json(raw_manifest)
@@ -2702,7 +2708,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 )
                 descriptor["sha256"] = sha256(artifacts[artifact_path])
                 descriptor["size"] = len(artifacts[artifact_path])
-                root = Path(directory)
+                root = temporary_root(directory)
                 manifest_path = root / "manifest.json"
                 baseline_path = root / "baseline.json"
                 manifest_path.write_bytes(
@@ -3265,7 +3271,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_uclamp_identity_and_required_performance_are_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            sched = Path(directory) / "sched"
+            sched = temporary_root(directory) / "sched"
             sched.write_text(
                 "effective uclamp.min : 1024\n"
                 "effective uclamp.max : 1024\n",
@@ -3276,7 +3282,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 ("proc-self-sched", 1024, 1024),
             )
             self.assertEqual(
-                qualification._cpu_uclamp_identity(Path(directory) / "missing"),
+                qualification._cpu_uclamp_identity(temporary_root(directory) / "missing"),
                 ("unavailable", None, None),
             )
             sched.write_text("effective uclamp.min : 1024\n", encoding="ascii")
@@ -3367,7 +3373,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             tools = root / "tools"
             tools.mkdir()
             cmake = tools / "cmake"
@@ -3686,7 +3692,7 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_release_preparation_rejects_reusable_workspace_state(self) -> None:
         release_workload = manifest()["workloads"][2]
         with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory) / "release"
+            workspace = temporary_root(directory) / "release"
             source = workspace / "llama-cpp"
             build = workspace / "llama-cpp-build"
             source.mkdir(parents=True)
@@ -3706,7 +3712,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_release_preparation_accepts_only_an_exact_empty_target_pair(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "release" / "source"
             build = root / "release" / "build"
             source.mkdir(parents=True)
@@ -3779,7 +3785,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_release_checkout_ignores_ambient_templates_and_hooks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             upstream = root / "upstream"
             upstream.mkdir()
             subprocess.run(
@@ -3889,7 +3895,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_explicit_target_pin_detects_target_and_parent_replacement(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             release = root / "release"
             source = release / "source"
             build = release / "build"
@@ -3908,7 +3914,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                     target_pin.verify("before mutation")
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             release = root / "release"
             source = release / "source"
             build = release / "build"
@@ -3929,7 +3935,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_explicit_release_projection_removes_only_exact_llama_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build = root / "build"
             write_llama_release_links(source, build)
@@ -3962,7 +3968,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_explicit_release_projection_rolls_back_or_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build = root / "build"
             write_llama_release_links(source, build)
@@ -3995,7 +4001,7 @@ class DeterminismQualificationTest(unittest.TestCase):
                 self.assertEqual(os.readlink(build / relative), target)
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build = root / "build"
             write_llama_release_links(source, build)
@@ -4030,7 +4036,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
     def test_explicit_release_projection_detects_build_subdirectory_race(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "source"
             build = root / "build"
             write_llama_release_links(source, build)
@@ -4149,7 +4155,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             source, build, projected = exercise(
-                Path(directory), explicit=True
+                temporary_root(directory), explicit=True
             )
             projected.assert_called_once()
             for qualified in qualification.LLAMA_STAGING_BUILD_SYMLINKS:
@@ -4159,7 +4165,7 @@ class DeterminismQualificationTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             source, build, projected = exercise(
-                Path(directory), explicit=False
+                temporary_root(directory), explicit=False
             )
             projected.assert_not_called()
             for qualified in qualification.LLAMA_STAGING_BUILD_SYMLINKS:
@@ -4170,7 +4176,7 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_prepare_rejects_explicit_target_replacement_before_projection(self) -> None:
         release_workload = manifest()["workloads"][2]
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source = root / "release" / "source"
             build = root / "release" / "build"
             source.mkdir(parents=True)
@@ -4236,7 +4242,7 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_run_forwards_explicit_release_preparation_targets(self) -> None:
         raw_manifest = manifest()
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             repo = root / "repo"
             build = root / "build"
             source = root / "release" / "source"
@@ -4320,7 +4326,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         raw_manifest = manifest()
         manifest_sha = qualification.digest_json(raw_manifest)
         with tempfile.TemporaryDirectory() as directory:
-            authority = Path(directory) / "authority"
+            authority = temporary_root(directory) / "authority"
             initialize_source_repo(authority)
             write_determinism_infrastructure(authority, raw_manifest)
             source_revision = git_commit(authority, "determinism infrastructure")
@@ -4383,10 +4389,31 @@ class DeterminismQualificationTest(unittest.TestCase):
                     base, authority, manifest_path
                 )
 
+    def test_path_manifest_canonicalizes_its_root_and_reports_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = temporary_root(directory)
+            root = temporary / "root"
+            root.mkdir()
+            inside = root / "inside.cpp"
+            inside.write_bytes(SAMPLE_BYTES)
+            alias = temporary / "root-alias"
+            alias.symlink_to(root, target_is_directory=True)
+            outside = temporary / "outside.cpp"
+            outside.write_bytes(SAMPLE_BYTES)
+            self.assertEqual(
+                qualification._path_manifest([inside], alias),
+                [{"path": "inside.cpp", "sha256": sha256(SAMPLE_BYTES)}],
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "input path escapes its source root",
+            ):
+                qualification._path_manifest([outside], root)
+
     def test_manifest_and_git_tree_reject_input_identity_drift(self) -> None:
         raw_manifest = manifest()
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory) / "repo"
+            repo = temporary_root(directory) / "repo"
             initialize_source_repo(repo)
             write_determinism_infrastructure(repo, raw_manifest)
             source_revision = git_commit(repo, "determinism infrastructure")
@@ -4458,7 +4485,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         raw_manifest = manifest()
         manifest_sha = qualification.digest_json(raw_manifest)
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory) / "repo"
+            repo = temporary_root(directory) / "repo"
             initialize_source_repo(repo)
             base_revision = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], cwd=repo, text=True
@@ -4524,18 +4551,18 @@ class DeterminismQualificationTest(unittest.TestCase):
         raw_manifest = manifest()
         manifest_sha = qualification.digest_json(raw_manifest)
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory) / "repo"
+            repo = temporary_root(directory) / "repo"
             source = initialize_source_repo(repo)
             source_revision = source["revision"]
             payload = calibration_receipt(
                 manifest_sha, repo_root=repo,
                 source_revision=source_revision, source=source,
             )
-            evidence = Path(directory) / "calibration"
+            evidence = temporary_root(directory) / "calibration"
             qualification.write_receipt(
                 evidence, payload, artifact_bytes(payload)
             )
-            manifest_path = Path(directory) / "manifest.json"
+            manifest_path = temporary_root(directory) / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
 
             ignored = (
@@ -4547,7 +4574,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             git_commit(repo, "retain ignored authority")
 
             qualification.verify_receipt(
-                evidence, manifest_path, Path(directory) / "unused.json", repo
+                evidence, manifest_path, temporary_root(directory) / "unused.json", repo
             )
 
             (repo / "src" / "sample.cpp").write_text(
@@ -4559,14 +4586,14 @@ class DeterminismQualificationTest(unittest.TestCase):
             ):
                 qualification.verify_receipt(
                     evidence, manifest_path,
-                    Path(directory) / "unused.json", repo,
+                    temporary_root(directory) / "unused.json", repo,
                 )
 
     def test_baseline_update_requires_exact_predecessor_and_authority_only_diff(self) -> None:
         raw_manifest = manifest()
         manifest_sha = qualification.digest_json(raw_manifest)
         with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory) / "repo"
+            repo = temporary_root(directory) / "repo"
             initialize_source_repo(repo)
             write_determinism_infrastructure(repo, raw_manifest)
             source_revision = git_commit(repo, "determinism infrastructure")
@@ -4663,7 +4690,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             manifest_sha, "unit repetition 1 timed out"
         )
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             source_repo = root / "source"
             rejected["source"] = initialize_source_repo(source_repo)
             manifest_path = root / "manifest.json"
@@ -4770,7 +4797,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             baseline_path = root / "baseline.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
@@ -4910,7 +4937,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             rejected_with_baseline, raw_manifest, existing_baseline
         )
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             evidence = root / "rejected"
@@ -4923,7 +4950,7 @@ class DeterminismQualificationTest(unittest.TestCase):
     def test_rejected_evidence_is_persisted_once_and_never_overwritten(self) -> None:
         raw_manifest = manifest()
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             manifest_path = root / "manifest.json"
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             output = root / "rejected"
@@ -4981,7 +5008,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         base = baseline(manifest_sha)
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "evidence"
+            root = temporary_root(directory) / "evidence"
             artifact_bytes = {
                 item["path"]: json.dumps({"forged": True}).encode()
                 for item in payload["artifacts"]
@@ -4990,8 +5017,8 @@ class DeterminismQualificationTest(unittest.TestCase):
                 data = artifact_bytes[item["path"]]
                 item["sha256"] = sha256(data)
                 item["size"] = len(data)
-            baseline_path = Path(directory) / "baseline.json"
-            manifest_path = Path(directory) / "manifest.json"
+            baseline_path = temporary_root(directory) / "baseline.json"
+            manifest_path = temporary_root(directory) / "manifest.json"
             baseline_path.write_bytes(qualification.canonical_json(base))
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             payload["baseline"]["sha256"] = qualification.sha256_file(baseline_path)
@@ -5008,7 +5035,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         if os.name != "posix":
             self.skipTest("POSIX process-group contract")
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = temporary_root(directory)
             stdout = root / "stdout.log"
             stderr = root / "stderr.log"
             heartbeat = root / "heartbeat.log"
@@ -5225,10 +5252,10 @@ class DeterminismQualificationTest(unittest.TestCase):
         base = baseline(manifest_sha)
 
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "evidence"
+            root = temporary_root(directory) / "evidence"
             artifact_data = artifact_bytes(payload)
-            baseline_path = Path(directory) / "baseline.json"
-            manifest_path = Path(directory) / "manifest.json"
+            baseline_path = temporary_root(directory) / "baseline.json"
+            manifest_path = temporary_root(directory) / "manifest.json"
             baseline_path.write_bytes(qualification.canonical_json(base))
             manifest_path.write_bytes(qualification.canonical_json(raw_manifest))
             payload["baseline"]["sha256"] = qualification.sha256_file(baseline_path)
@@ -5242,7 +5269,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             extra.unlink()
 
             report = root / payload["artifacts"][0]["path"]
-            outside = Path(directory) / "outside"
+            outside = temporary_root(directory) / "outside"
             report.unlink()
             try:
                 os.symlink(outside, report)
