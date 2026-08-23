@@ -446,6 +446,23 @@ class HostedExactHeadReceiptTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_path_filtered_gate_workflows_are_exact_head_dispatchable(self) -> None:
+        docs = (ROOT / GATE_WORKFLOWS["docs-structure"]).read_bytes()
+        docker = (ROOT / GATE_WORKFLOWS["docker"]).read_bytes()
+
+        docs_workflow = hosted._parse_workflow(docs)
+        docker_workflow = hosted._parse_workflow(docker)
+        docs_triggers = docs_workflow.get("on", docs_workflow.get(True))
+        docker_triggers = docker_workflow.get("on", docker_workflow.get(True))
+        self.assertIn("workflow_dispatch", docs_triggers)
+        self.assertIn("workflow_dispatch", docker_triggers)
+
+        release_tag = docker_triggers["workflow_dispatch"]["inputs"][
+            "release_tag"
+        ]
+        self.assertIs(release_tag["required"], False)
+        self.assertEqual(release_tag["default"], "")
+
     def test_round_trip_is_canonical_and_matches_stability_projector(self) -> None:
         receipt = self.fixture.seal()
         verified = self.fixture.verify()

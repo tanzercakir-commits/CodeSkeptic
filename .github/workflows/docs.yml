@@ -10,6 +10,10 @@ name: Docs
 #     when the docs themselves change; code breakage of the same
 #     commands is already covered by ci.yml's build+smoke on every PR.)
 on:
+  # Path-filtered pushes keep routine docs cost low. The hosted exact-head
+  # authority can still request both gates for a source revision whose diff
+  # does not touch documentation.
+  workflow_dispatch:
   push:
     branches: [main, "phase*"]
     paths:

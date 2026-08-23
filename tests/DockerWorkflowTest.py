@@ -57,6 +57,28 @@ class DockerWorkflowTest(unittest.TestCase):
             dockerfile,
         )
 
+    def test_tagless_dispatch_is_exact_head_build_and_smoke_only(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("required: false", workflow)
+        self.assertIn('default: ""', workflow)
+        tagged_dispatch = (
+            "github.event_name == 'workflow_dispatch' && "
+            "inputs.release_tag != ''"
+        )
+        self.assertEqual(workflow.count(tagged_dispatch), 2)
+        self.assertIn(
+            "github.event_name == 'workflow_run' && "
+            "github.event.workflow_run.head_sha || inputs.release_tag",
+            workflow,
+        )
+        publish_condition = workflow.split(
+            "- name: Publish exact release identity to ghcr.io", 1
+        )[1].split("env:", 1)[0]
+        self.assertNotIn(
+            "github.event_name == 'workflow_dispatch'\n", publish_condition
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
