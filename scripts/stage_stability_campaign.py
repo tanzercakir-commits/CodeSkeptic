@@ -146,6 +146,31 @@ def canonical_json(value: Any) -> bytes:
     ).encode("ascii")
 
 
+def _stat_time_ns(metadata: os.stat_result, field: str) -> int:
+    nanoseconds = getattr(metadata, field + "_ns", None)
+    if nanoseconds is not None:
+        return int(nanoseconds)
+    return int(float(getattr(metadata, field)) * 1_000_000_000)
+
+
+def _stat_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(metadata.st_mode),
+        int(metadata.st_nlink),
+        int(metadata.st_size),
+        _stat_time_ns(metadata, "st_mtime"),
+        _stat_time_ns(metadata, "st_ctime"),
+    )
+
+
+def _same_file_identity(
+    left: os.stat_result, right: os.stat_result
+) -> bool:
+    return os.path.samestat(left, right)
+
+
 def _valid_sha256(value: Any, label: str) -> str:
     if not isinstance(value, str) or SHA256.fullmatch(value) is None:
         raise StagingError(f"{label} is malformed")
@@ -2332,8 +2357,7 @@ def _copy_snapshot_directory(
                 opened = os.fstat(child_fd)
                 if (
                     not stat.S_ISDIR(opened.st_mode)
-                    or opened.st_dev != before.st_dev
-                    or opened.st_ino != before.st_ino
+                    or not _same_file_identity(before, opened)
                 ):
                     raise StagingError(
                         "bundle snapshot directory changed while opening"
@@ -2346,11 +2370,16 @@ def _copy_snapshot_directory(
                 )
                 _copy_snapshot_directory(child_fd, target, budget)
                 after = os.fstat(child_fd)
+                path_after = os.stat(
+                    name, dir_fd=source_fd, follow_symlinks=False
+                )
                 if (
-                    after.st_dev != before.st_dev
-                    or after.st_ino != before.st_ino
-                    or after.st_mtime_ns != before.st_mtime_ns
-                    or after.st_ctime_ns != before.st_ctime_ns
+                    not stat.S_ISDIR(path_after.st_mode)
+                    or _stat_fingerprint(opened)
+                    != _stat_fingerprint(after)
+                    or _stat_fingerprint(before)
+                    != _stat_fingerprint(path_after)
+                    or not _same_file_identity(after, path_after)
                 ):
                     raise StagingError(
                         "bundle snapshot directory changed while copying"
@@ -2359,16 +2388,18 @@ def _copy_snapshot_directory(
             finally:
                 os.close(child_fd)
         elif stat.S_ISREG(before.st_mode) and before.st_nlink == 1:
-            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_BINARY", 0)
+            )
             flags |= getattr(os, "O_NOFOLLOW", 0)
             try:
                 source_file = os.open(name, flags, dir_fd=source_fd)
                 opened = os.fstat(source_file)
                 if (
                     not stat.S_ISREG(opened.st_mode)
-                    or opened.st_dev != before.st_dev
-                    or opened.st_ino != before.st_ino
-                    or opened.st_size != before.st_size
+                    or not _same_file_identity(before, opened)
                     or opened.st_nlink != 1
                     or opened.st_size > MAX_FILE_BYTES
                 ):
@@ -2388,13 +2419,16 @@ def _copy_snapshot_directory(
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL
                     | getattr(os, "O_CLOEXEC", 0)
                     | getattr(os, "O_NOFOLLOW", 0)
+                    | getattr(os, "O_BINARY", 0)
                 )
                 destination_file = os.open(target, destination_flags, 0o600)
                 try:
+                    total = 0
                     while True:
                         block = os.read(source_file, 1024 * 1024)
                         if not block:
                             break
+                        total += len(block)
                         offset = 0
                         while offset < len(block):
                             written = os.write(destination_file, block[offset:])
@@ -2406,13 +2440,18 @@ def _copy_snapshot_directory(
                 finally:
                     os.close(destination_file)
                 after = os.fstat(source_file)
+                path_after = os.stat(
+                    name, dir_fd=source_fd, follow_symlinks=False
+                )
                 if (
-                    after.st_dev != before.st_dev
-                    or after.st_ino != before.st_ino
-                    or after.st_size != before.st_size
-                    or after.st_mtime_ns != before.st_mtime_ns
-                    or after.st_ctime_ns != before.st_ctime_ns
-                    or after.st_nlink != 1
+                    not stat.S_ISREG(path_after.st_mode)
+                    or path_after.st_nlink != 1
+                    or _stat_fingerprint(opened)
+                    != _stat_fingerprint(after)
+                    or _stat_fingerprint(before)
+                    != _stat_fingerprint(path_after)
+                    or not _same_file_identity(after, path_after)
+                    or total != after.st_size
                 ):
                     raise StagingError(
                         "bundle snapshot file changed while copying"

@@ -588,6 +588,14 @@ def _stat_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _same_file_identity(
+    left: os.stat_result, right: os.stat_result
+) -> bool:
+    """Compare only the portable identity shared by path and handle stats."""
+
+    return os.path.samestat(left, right)
+
+
 def _inspect_regular_file(
     path: Path,
     label: str,
@@ -623,13 +631,7 @@ def _inspect_regular_file(
             raise ManifestUnavailable(f"{label} is not a regular file")
         if opened_before.st_nlink != 1:
             raise ManifestUnavailable(f"{label} has external hard links")
-        if (
-            path_before.st_dev,
-            path_before.st_ino,
-        ) != (
-            opened_before.st_dev,
-            opened_before.st_ino,
-        ):
+        if not _same_file_identity(path_before, opened_before):
             raise ManifestUnavailable(f"{label} changed while being opened")
         if max_bytes is not None and opened_before.st_size > max_bytes:
             raise ManifestUnavailable(f"{label} is too large")
@@ -651,10 +653,17 @@ def _inspect_regular_file(
         opened_after = os.fstat(descriptor)
         path_after = os.lstat(path)
         if (
+            stat.S_ISLNK(path_after.st_mode)
+            or not stat.S_ISREG(path_after.st_mode)
+            or path_after.st_nlink != 1
+        ):
+            raise ManifestUnavailable(f"{label} changed while being read")
+        if (
             _stat_fingerprint(opened_before)
             != _stat_fingerprint(opened_after)
-            or _stat_fingerprint(opened_after)
+            or _stat_fingerprint(path_before)
             != _stat_fingerprint(path_after)
+            or not _same_file_identity(opened_after, path_after)
             or total != opened_after.st_size
         ):
             raise ManifestUnavailable(f"{label} changed while being read")

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -1792,6 +1793,60 @@ class CommandSupervisorTest(unittest.TestCase):
             os.link(report, root / "report-alias.json")
             with self.assertRaisesRegex(campaign.EvidenceError, "regular file"):
                 campaign._read_regular_bytes(report, campaign.MAX_ANALYZER_REPORT_BYTES)
+
+    def test_regular_reader_accepts_cross_api_ctime_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = temporary_root(directory) / "report.json"
+            payload = b"{}\n"
+            report.write_bytes(payload)
+            observed = report.stat()
+            opened = mock.Mock(
+                st_mode=observed.st_mode,
+                st_dev=observed.st_dev,
+                st_ino=observed.st_ino,
+                st_nlink=observed.st_nlink,
+                st_size=observed.st_size,
+                st_mtime_ns=observed.st_mtime_ns,
+                st_ctime_ns=observed.st_ctime_ns + 1,
+            )
+            with mock.patch.object(
+                campaign.os,
+                "fstat",
+                side_effect=(opened, copy.copy(opened)),
+            ):
+                retained = campaign._read_regular_bytes(
+                    report, campaign.MAX_ANALYZER_REPORT_BYTES
+                )
+            self.assertEqual(retained, payload)
+
+    def test_immutable_reader_accepts_cross_api_ctime_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            authority_file = temporary_root(directory) / "mirror.json"
+            payload = b"sealed\n"
+            authority_file.write_bytes(payload)
+            authority_file.chmod(0o400)
+            observed = authority_file.stat()
+            opened = mock.Mock(
+                st_mode=observed.st_mode,
+                st_dev=observed.st_dev,
+                st_ino=observed.st_ino,
+                st_nlink=observed.st_nlink,
+                st_size=observed.st_size,
+                st_mtime_ns=observed.st_mtime_ns,
+                st_ctime_ns=observed.st_ctime_ns + 1,
+            )
+            with mock.patch.object(
+                campaign.os,
+                "fstat",
+                side_effect=(opened, copy.copy(opened)),
+            ):
+                digest, retained = campaign._immutable_file_digest(
+                    authority_file, capture=True
+                )
+            self.assertEqual(
+                digest, hashlib.sha256(payload).hexdigest()
+            )
+            self.assertEqual(retained, payload)
 
 
 class EvidenceContractTest(unittest.TestCase):

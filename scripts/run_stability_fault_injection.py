@@ -61,6 +61,31 @@ def canonical_document(value: Any) -> bytes:
     ).encode("utf-8")
 
 
+def _stat_time_ns(metadata: os.stat_result, field: str) -> int:
+    nanoseconds = getattr(metadata, field + "_ns", None)
+    if nanoseconds is not None:
+        return int(nanoseconds)
+    return int(float(getattr(metadata, field)) * 1_000_000_000)
+
+
+def _stat_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(metadata.st_mode),
+        int(metadata.st_nlink),
+        int(metadata.st_size),
+        _stat_time_ns(metadata, "st_mtime"),
+        _stat_time_ns(metadata, "st_ctime"),
+    )
+
+
+def _same_file_identity(
+    left: os.stat_result, right: os.stat_result
+) -> bool:
+    return os.path.samestat(left, right)
+
+
 def _read_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> bytes:
     try:
         before = path.lstat()
@@ -68,7 +93,7 @@ def _read_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> bytes:
         raise FaultInjectionError(f"cannot inspect regular file {path}: {error}") from error
     if not stat.S_ISREG(before.st_mode) or before.st_size > maximum:
         raise FaultInjectionError(f"inadmissible regular file: {path}")
-    flags = os.O_RDONLY
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -77,8 +102,8 @@ def _read_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> bytes:
             opened = os.fstat(descriptor)
             if (
                 not stat.S_ISREG(opened.st_mode)
-                or (opened.st_dev, opened.st_ino, opened.st_size)
-                != (before.st_dev, before.st_ino, before.st_size)
+                or opened.st_nlink != 1
+                or not _same_file_identity(before, opened)
             ):
                 raise FaultInjectionError(f"regular file changed while opening: {path}")
             blocks: list[bytes] = []
@@ -92,6 +117,7 @@ def _read_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> bytes:
                     raise FaultInjectionError(f"regular file exceeds limit: {path}")
                 blocks.append(block)
             after = os.fstat(descriptor)
+            pathname_after = path.lstat()
         finally:
             os.close(descriptor)
     except FaultInjectionError:
@@ -99,8 +125,12 @@ def _read_regular(path: Path, maximum: int = MAX_FILE_BYTES) -> bytes:
     except OSError as error:
         raise FaultInjectionError(f"cannot read regular file {path}: {error}") from error
     if (
-        (after.st_dev, after.st_ino, after.st_size)
-        != (before.st_dev, before.st_ino, before.st_size)
+        not stat.S_ISREG(pathname_after.st_mode)
+        or pathname_after.st_nlink != 1
+        or _stat_fingerprint(opened) != _stat_fingerprint(after)
+        or _stat_fingerprint(before) != _stat_fingerprint(pathname_after)
+        or not _same_file_identity(after, pathname_after)
+        or total != after.st_size
     ):
         raise FaultInjectionError(f"regular file changed while reading: {path}")
     return b"".join(blocks)
@@ -119,7 +149,7 @@ def _sha256_regular(path: Path, maximum: int) -> str:
         or before.st_size > maximum
     ):
         raise FaultInjectionError(f"regular file exceeds hash limit: {path}")
-    flags = os.O_RDONLY
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     digest = hashlib.sha256()
@@ -129,8 +159,8 @@ def _sha256_regular(path: Path, maximum: int) -> str:
             opened = os.fstat(descriptor)
             if (
                 not stat.S_ISREG(opened.st_mode)
-                or (opened.st_dev, opened.st_ino, opened.st_size)
-                != (before.st_dev, before.st_ino, before.st_size)
+                or opened.st_nlink != 1
+                or not _same_file_identity(before, opened)
             ):
                 raise FaultInjectionError(f"regular file changed while opening: {path}")
             total = 0
@@ -143,6 +173,7 @@ def _sha256_regular(path: Path, maximum: int) -> str:
                     raise FaultInjectionError(f"regular file exceeds hash limit: {path}")
                 digest.update(block)
             after = os.fstat(descriptor)
+            pathname_after = path.lstat()
         finally:
             os.close(descriptor)
     except FaultInjectionError:
@@ -150,9 +181,12 @@ def _sha256_regular(path: Path, maximum: int) -> str:
     except OSError as error:
         raise FaultInjectionError(f"cannot hash regular file {path}: {error}") from error
     if (
-        total != before.st_size
-        or (after.st_dev, after.st_ino, after.st_size)
-        != (before.st_dev, before.st_ino, before.st_size)
+        not stat.S_ISREG(pathname_after.st_mode)
+        or pathname_after.st_nlink != 1
+        or _stat_fingerprint(opened) != _stat_fingerprint(after)
+        or _stat_fingerprint(before) != _stat_fingerprint(pathname_after)
+        or not _same_file_identity(after, pathname_after)
+        or total != after.st_size
     ):
         raise FaultInjectionError(f"regular file changed while hashing: {path}")
     return digest.hexdigest()
@@ -167,7 +201,7 @@ def sha256_binary(path: Path) -> str:
 
 
 def _atomic_create(path: Path, data: bytes) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -714,7 +748,7 @@ def _run_bounded_gtest(
         raise FaultInjectionError(
             "fault-injection descendant containment requires Linux /proc"
         )
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(log_path, flags, 0o600)

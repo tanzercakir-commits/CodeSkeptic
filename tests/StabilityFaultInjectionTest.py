@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -137,6 +138,10 @@ class StabilityFaultInjectionContractTest(unittest.TestCase):
         identity = fault._proc_identity(pid)
         self.assertTrue(identity is None or identity[1] != start_time)
 
+    @unittest.skipUnless(
+        LINUX_CONTAINMENT_AVAILABLE,
+        "Linux process containment unavailable",
+    )
     def test_cleanup_treats_zombie_leader_live_worker_as_owned(
         self,
     ) -> None:
@@ -523,6 +528,32 @@ os._exit(0)
             stream.truncate(fault.MAX_BINARY_BYTES + 1)
         with self.assertRaisesRegex(fault.FaultInjectionError, "limit"):
             fault.sha256_binary(oversized)
+
+    def test_low_level_regular_io_requests_binary_descriptors(self) -> None:
+        sentinel = 1 << 29
+        actual_open = os.open
+        observed_flags: list[int] = []
+
+        def open_without_sentinel(path, flags, mode=0o777):
+            observed_flags.append(flags)
+            return actual_open(path, flags & ~sentinel, mode)
+
+        target = self.root / "binary-io.txt"
+        with mock.patch.object(
+            fault.os, "O_BINARY", sentinel, create=True
+        ), mock.patch.object(
+            fault.os, "open", side_effect=open_without_sentinel
+        ):
+            fault._atomic_create(target, b"line one\nline two\n")
+            self.assertEqual(
+                fault._read_regular(target), b"line one\nline two\n"
+            )
+            self.assertEqual(
+                fault._sha256_regular(target, fault.MAX_FILE_BYTES),
+                hashlib.sha256(b"line one\nline two\n").hexdigest(),
+            )
+        self.assertEqual(len(observed_flags), 3)
+        self.assertTrue(all(flags & sentinel for flags in observed_flags))
 
     def test_xml_execution_order_may_differ_but_inventory_is_exact(self) -> None:
         reordered_binary = self.root / "reordered-codeskeptic-tests"

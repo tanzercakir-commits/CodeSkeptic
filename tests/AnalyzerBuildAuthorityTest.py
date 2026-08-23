@@ -270,6 +270,51 @@ class Fixture:
 
 
 class AnalyzerBuildAuthorityPortableTest(unittest.TestCase):
+    def test_regular_reader_accepts_cross_api_ctime_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "authority.json"
+            payload = b"stable\n"
+            path.write_bytes(payload)
+            observed = path.stat()
+            opened = mock.Mock(
+                st_mode=observed.st_mode,
+                st_dev=observed.st_dev,
+                st_ino=observed.st_ino,
+                st_nlink=observed.st_nlink,
+                st_size=observed.st_size,
+                st_mtime_ns=observed.st_mtime_ns,
+                st_ctime_ns=observed.st_ctime_ns + 1,
+            )
+            with mock.patch.object(
+                authority.os,
+                "fstat",
+                side_effect=(opened, copy.copy(opened)),
+            ):
+                self.assertEqual(
+                    authority._read_regular(path, 1024), payload
+                )
+
+    def test_regular_reader_rejects_final_path_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "authority.json"
+            path.write_bytes(b"stable\n")
+            before = path.lstat()
+            after = mock.Mock(
+                st_mode=before.st_mode,
+                st_dev=before.st_dev,
+                st_ino=before.st_ino + 1,
+                st_nlink=before.st_nlink,
+                st_size=before.st_size,
+                st_mtime_ns=before.st_mtime_ns,
+                st_ctime_ns=before.st_ctime_ns,
+            )
+            with mock.patch.object(
+                authority.os, "lstat", side_effect=(before, after)
+            ), self.assertRaisesRegex(
+                authority.BuildAuthorityError, "changed while reading"
+            ):
+                authority._read_regular(path, 1024)
+
     def test_module_and_recipe_contract_import_on_every_platform(self) -> None:
         self.assertEqual(
             authority.RECEIPT_SCHEMA,

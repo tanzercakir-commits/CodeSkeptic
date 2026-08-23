@@ -181,6 +181,12 @@ def _stat_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _same_file_identity(
+    left: os.stat_result, right: os.stat_result
+) -> bool:
+    return os.path.samestat(left, right)
+
+
 def _inspect_regular(
     path: Path, maximum: int, *, collect: bool
 ) -> tuple[str, bytes | None]:
@@ -202,13 +208,7 @@ def _inspect_regular(
             raise BuildAuthorityError(f"required regular file is missing: {path}")
         if opened_before.st_nlink != 1:
             raise BuildAuthorityError(f"regular file has external hard links: {path}")
-        if (
-            path_before.st_dev,
-            path_before.st_ino,
-        ) != (
-            opened_before.st_dev,
-            opened_before.st_ino,
-        ):
+        if not _same_file_identity(path_before, opened_before):
             raise BuildAuthorityError(f"regular file changed while opening: {path}")
         if opened_before.st_size > maximum:
             raise BuildAuthorityError(f"file exceeds admitted size: {path}")
@@ -228,10 +228,16 @@ def _inspect_regular(
         opened_after = os.fstat(descriptor)
         path_after = os.lstat(path)
         if (
+            not stat.S_ISREG(path_after.st_mode)
+            or path_after.st_nlink != 1
+        ):
+            raise BuildAuthorityError(f"regular file changed while reading: {path}")
+        if (
             _stat_fingerprint(opened_before)
             != _stat_fingerprint(opened_after)
-            or _stat_fingerprint(opened_after)
+            or _stat_fingerprint(path_before)
             != _stat_fingerprint(path_after)
+            or not _same_file_identity(opened_after, path_after)
             or total != opened_after.st_size
         ):
             raise BuildAuthorityError(f"regular file changed while reading: {path}")

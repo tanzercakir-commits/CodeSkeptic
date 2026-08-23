@@ -266,7 +266,7 @@ def _fake_build_receipt(
             "id": build.PINNED_IMAGE_ID,
         },
         "podman": {
-            "path": str(build.DEFAULT_PODMAN.absolute()),
+            "path": build.PINNED_PODMAN_PATH,
             "sha256": "a" * 64,
             "version": "podman version 5.0",
         },
@@ -312,7 +312,30 @@ def _fake_build(root: Path) -> tuple[Path, Path, dict[str, str]]:
         encoding="utf-8",
     )
     binary.chmod(0o755)
-    return binary, build_dir, campaign._binary_identity(binary)
+    return binary, build_dir, {
+        "version": "CodeSkeptic 0.4.9-dev",
+        "binary_sha256": campaign.sha256_file(binary),
+    }
+
+
+def _fake_binary_identity(analyzer: dict[str, str]):
+    return mock.patch.object(
+        campaign, "_binary_identity", return_value=analyzer
+    )
+
+
+def _file_symlinks_available(root: Path) -> bool:
+    target = root / "symlink-capability-target"
+    linked = root / "symlink-capability-link"
+    target.write_bytes(b"probe\n")
+    try:
+        linked.symlink_to(target)
+        return linked.is_symlink()
+    except (NotImplementedError, OSError):
+        return False
+    finally:
+        linked.unlink(missing_ok=True)
+        target.unlink(missing_ok=True)
 
 
 def _write_fake_build_authority(root: Path) -> Path:
@@ -441,6 +464,16 @@ def _fake_launch_authority(
 class QualityFloorCampaignTest(unittest.TestCase):
     def _collector(self, *_args, **_kwargs):
         return copy.deepcopy(_accepted_observations())
+
+    @unittest.skipUnless(
+        os.name == "posix", "shell analyzer fixture requires POSIX"
+    )
+    def test_binary_identity_executes_version_tripwire(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            binary, _build_dir, expected = _fake_build(
+                temporary_root(directory)
+            )
+            self.assertEqual(campaign._binary_identity(binary), expected)
 
     def _raw_parser_patches(self, *, resource_from_raw: bool = False):
         rules, clean, negatives, used = _accepted_observations()
@@ -652,7 +685,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 ),
                 mock.patch.object(campaign, "_source_identity", return_value=source),
             )
-            with patches[0], patches[1]:
+            with patches[0], patches[1], _fake_binary_identity(analyzer):
                 receipt = campaign.assemble_package(
                     package,
                     build_dir,
@@ -728,7 +761,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             with parsers[0], parsers[1], parsers[2], parsers[3], \
                     mock.patch.object(
                         campaign, "_source_identity", return_value=source
-                    ):
+                    ), _fake_binary_identity(analyzer):
                 expected = campaign.assemble_package(
                     package,
                     build_dir,
@@ -767,19 +800,20 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 ).parameters,
             )
 
-            for name in ("receipt.json", "receipt.json.sha256"):
-                with self.subTest(top_level_symlink=name):
-                    retained_bytes = (package / name).read_bytes()
-                    external = root / f"external-{name}"
-                    external.write_bytes(retained_bytes)
-                    (package / name).unlink()
-                    (package / name).symlink_to(external)
-                    with self.assertRaisesRegex(
-                        campaign.CampaignError, "missing or unsafe"
-                    ):
-                        campaign.verify_retained_package(package)
-                    (package / name).unlink()
-                    (package / name).write_bytes(retained_bytes)
+            if _file_symlinks_available(root):
+                for name in ("receipt.json", "receipt.json.sha256"):
+                    with self.subTest(top_level_symlink=name):
+                        retained_bytes = (package / name).read_bytes()
+                        external = root / f"external-{name}"
+                        external.write_bytes(retained_bytes)
+                        (package / name).unlink()
+                        (package / name).symlink_to(external)
+                        with self.assertRaisesRegex(
+                            campaign.CampaignError, "missing or unsafe"
+                        ):
+                            campaign.verify_retained_package(package)
+                        (package / name).unlink()
+                        (package / name).write_bytes(retained_bytes)
 
             for index, relative in enumerate(
                 (
@@ -852,7 +886,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             with parsers[0], parsers[1], parsers[2], parsers[3], \
                     mock.patch.object(
                         campaign, "_source_identity", return_value=source
-                    ):
+                    ), _fake_binary_identity(analyzer):
                 campaign.assemble_package(
                     package,
                     build_dir,
@@ -883,7 +917,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             with parsers[0], parsers[1], parsers[2], parsers[3], \
                     mock.patch.object(
                         campaign, "_source_identity", return_value=source
-                    ):
+                    ), _fake_binary_identity(analyzer):
                 forged = campaign.assemble_package(
                     package,
                     build_dir,
@@ -928,7 +962,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 campaign, "_collect_observations", side_effect=self._collector
             ), mock.patch.object(
                 campaign, "_source_identity", return_value=source
-            ):
+            ), _fake_binary_identity(analyzer):
                 campaign.assemble_package(
                     package,
                     build_dir,
@@ -1041,7 +1075,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             public_verify = mock.Mock(return_value=receipt)
             with mock.patch.object(
                 campaign, "_source_identity", return_value=source
-            ):
+            ), _fake_binary_identity(analyzer):
                 verified = campaign._validate_raw_authority(
                     package,
                     build_dir,
@@ -1102,7 +1136,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
             for label, returned, error in cases:
                 with self.subTest(label=label), mock.patch.object(
                     campaign, "_source_identity", return_value=source
-                ), self.assertRaisesRegex(campaign.CampaignError, error):
+                ), _fake_binary_identity(analyzer), self.assertRaisesRegex(
+                    campaign.CampaignError, error
+                ):
                     campaign._validate_raw_authority(
                         package,
                         build_dir,
@@ -1127,7 +1163,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
             target.unlink()
             with mock.patch.object(
                 campaign, "_source_identity", return_value=source
-            ), self.assertRaisesRegex(campaign.CampaignError, "file set"):
+            ), _fake_binary_identity(analyzer), self.assertRaisesRegex(
+                campaign.CampaignError, "file set"
+            ):
                 campaign._validate_raw_authority(
                     package,
                     build_dir,
@@ -1139,7 +1177,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
             target.write_bytes(original + b"tampered\n")
             with mock.patch.object(
                 campaign, "_source_identity", return_value=source
-            ), self.assertRaisesRegex(campaign.CampaignError, "identity mismatch"):
+            ), _fake_binary_identity(analyzer), self.assertRaisesRegex(
+                campaign.CampaignError, "identity mismatch"
+            ):
                 campaign._validate_raw_authority(
                     package,
                     build_dir,
@@ -1161,13 +1201,17 @@ class QualityFloorCampaignTest(unittest.TestCase):
             alternate = root / "alternate-codeskeptic"
             shutil.copyfile(binary, alternate)
             alternate.chmod(0o755)
-            linked = root / "linked-codeskeptic"
-            linked.symlink_to(binary)
-            for candidate in (alternate, linked):
-                with self.subTest(candidate=candidate.name), self.assertRaisesRegex(
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "exactly build-dir|unsafe"
+            ):
+                campaign._require_build_binary(alternate, build_dir)
+            if _file_symlinks_available(root):
+                linked = root / "linked-codeskeptic"
+                linked.symlink_to(binary)
+                with self.assertRaisesRegex(
                     campaign.CampaignError, "exactly build-dir|unsafe"
                 ):
-                    campaign._require_build_binary(candidate, build_dir)
+                    campaign._require_build_binary(linked, build_dir)
             with self.assertRaisesRegex(campaign.CampaignError, "missing or unsafe"):
                 campaign._require_build_binary(binary, root / "missing-build")
 
@@ -2107,28 +2151,31 @@ class QualityFloorCampaignTest(unittest.TestCase):
         self.assertIn("$PACKAGE:/package:ro", verify)
         self.assertIn("$LAUNCH_DIR:/launch:ro", verify)
         self.assertNotIn("$STAGE:/stage:rw", verify)
-        with tempfile.TemporaryDirectory() as directory:
-            root = temporary_root(directory)
-            command = campaign._campaign_container_command(
-                "run",
-                4,
-                "0" * 64,
-                source=root / "source",
-                build_dir=root / "build",
-                build_authority_dir=root / "build-authority",
-                scratch=root / "scratch",
-                stage=root / "stage",
-                juliet_dir=root / "juliet",
-                juliet_archive=root / "juliet-archive.zip",
-                libarchive_checkout=root / "libarchive",
+        if os.name == "posix":
+            with tempfile.TemporaryDirectory() as directory:
+                root = temporary_root(directory)
+                command = campaign._campaign_container_command(
+                    "run",
+                    4,
+                    "0" * 64,
+                    source=root / "source",
+                    build_dir=root / "build",
+                    build_authority_dir=root / "build-authority",
+                    scratch=root / "scratch",
+                    stage=root / "stage",
+                    juliet_dir=root / "juliet",
+                    juliet_archive=root / "juliet-archive.zip",
+                    libarchive_checkout=root / "libarchive",
+                )
+            self.assertIn(f"{root / 'build'}:/build:ro", command)
+            self.assertIn(
+                f"{root / 'build-authority'}:/build-authority:ro", command
             )
-        self.assertIn(f"{root / 'build'}:/build:ro", command)
-        self.assertIn(
-            f"{root / 'build-authority'}:/build-authority:ro", command
-        )
-        self.assertIn(f"{root / 'juliet'}:/juliet:ro", command)
-        self.assertIn(f"{root / 'juliet-archive.zip'}:/juliet.zip:ro", command)
-        self.assertFalse(any("$" in token for token in command))
+            self.assertIn(f"{root / 'juliet'}:/juliet:ro", command)
+            self.assertIn(
+                f"{root / 'juliet-archive.zip'}:/juliet.zip:ro", command
+            )
+            self.assertFalse(any("$" in token for token in command))
 
     def test_p10_09_container_layout_is_inferred_from_build_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -2237,62 +2284,70 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 "/authority/build-authority",
             )
 
-            command = campaign._campaign_container_command(
-                "verify",
-                None,
-                "0" * 64,
-                source=root / "source",
-                build_dir=root / "build",
-                build_authority_dir=root / "build-authority",
-                scratch=root / "scratch",
-                package=root / "package",
-                launch_dir=root / "launch",
-                build_record=build_record,
-            )
-            self.assertIn(
-                f"{root / 'source'}:/authority/source:ro", command
-            )
-            self.assertIn(f"{root / 'build'}:/authority/build:ro", command)
-            self.assertIn(
-                f"{root / 'build-authority'}:/authority/build-authority:ro",
-                command,
-            )
-            self.assertIn(
-                "GIT_CONFIG_VALUE_0=/authority/source", command
-            )
+            if os.name == "posix":
+                command = campaign._campaign_container_command(
+                    "verify",
+                    None,
+                    "0" * 64,
+                    source=root / "source",
+                    build_dir=root / "build",
+                    build_authority_dir=root / "build-authority",
+                    scratch=root / "scratch",
+                    package=root / "package",
+                    launch_dir=root / "launch",
+                    build_record=build_record,
+                )
+                self.assertIn(
+                    f"{root / 'source'}:/authority/source:ro", command
+                )
+                self.assertIn(
+                    f"{root / 'build'}:/authority/build:ro", command
+                )
+                self.assertIn(
+                    f"{root / 'build-authority'}:"
+                    "/authority/build-authority:ro",
+                    command,
+                )
+                self.assertIn(
+                    "GIT_CONFIG_VALUE_0=/authority/source", command
+                )
 
-        environment = {
-            **campaign._inner_environment("p10-09"),
-            campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV: campaign.compact_json_digest(
-                campaign._inner_environment("p10-09")
-            ),
-            campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
-            "HOSTNAME": "0123456789ab",
-            "container": "podman",
-        }
-        with mock.patch.object(
-            campaign, "ROOT", Path("/authority/source")
-        ), mock.patch.object(
-            campaign,
-            "__file__",
-            "/authority/source/scripts/run_quality_floor_campaign.py",
-        ), mock.patch.dict(campaign.os.environ, environment, clear=True):
-            self.assertEqual(
-                campaign._validate_inner_paths(
-                    "run",
-                    source=Path("/authority/source"),
-                    build_dir=Path("/authority/build"),
-                    build_authority_dir=Path("/authority/build-authority"),
-                    package=Path("/stage/package"),
-                    launch_authority=Path(
-                        f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+        if os.name == "posix":
+            environment = {
+                **campaign._inner_environment("p10-09"),
+                campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV:
+                    campaign.compact_json_digest(
+                        campaign._inner_environment("p10-09")
                     ),
-                    juliet_dir=Path("/juliet"),
-                    juliet_archive=Path("/juliet.zip"),
-                    libarchive_checkout=Path("/libarchive"),
-                ),
-                "p10-09",
-            )
+                campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
+                "HOSTNAME": "0123456789ab",
+                "container": "podman",
+            }
+            with mock.patch.object(
+                campaign, "ROOT", Path("/authority/source")
+            ), mock.patch.object(
+                campaign,
+                "__file__",
+                "/authority/source/scripts/run_quality_floor_campaign.py",
+            ), mock.patch.object(campaign.os, "environ", environment):
+                self.assertEqual(
+                    campaign._validate_inner_paths(
+                        "run",
+                        source=Path("/authority/source"),
+                        build_dir=Path("/authority/build"),
+                        build_authority_dir=Path(
+                            "/authority/build-authority"
+                        ),
+                        package=Path("/stage/package"),
+                        launch_authority=Path(
+                            f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+                        ),
+                        juliet_dir=Path("/juliet"),
+                        juliet_archive=Path("/juliet.zip"),
+                        libarchive_checkout=Path("/libarchive"),
+                    ),
+                    "p10-09",
+                )
 
     def test_p10_09_outer_recheck_preserves_inferred_layout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -2439,36 +2494,41 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     "verify", None, container_layout="hybrid"
                 )
 
-        environment = {
-            **campaign._inner_environment("p10-09"),
-            campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV: campaign.compact_json_digest(
-                campaign._inner_environment("p10-09")
-            ),
-            campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
-            "HOSTNAME": "0123456789ab",
-            "container": "podman",
-        }
-        with mock.patch.object(
-            campaign, "ROOT", Path("/authority/source")
-        ), mock.patch.object(
-            campaign,
-            "__file__",
-            "/authority/source/scripts/run_quality_floor_campaign.py",
-        ), mock.patch.dict(campaign.os.environ, environment, clear=True), \
-                self.assertRaisesRegex(campaign.CampaignError, "layout"):
-            campaign._validate_inner_paths(
-                "run",
-                source=Path("/authority/source"),
-                build_dir=Path("/build"),
-                build_authority_dir=Path("/authority/build-authority"),
-                package=Path("/stage/package"),
-                launch_authority=Path(
-                    f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
-                ),
-                juliet_dir=Path("/juliet"),
-                juliet_archive=Path("/juliet.zip"),
-                libarchive_checkout=Path("/libarchive"),
-            )
+        if os.name == "posix":
+            environment = {
+                **campaign._inner_environment("p10-09"),
+                campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV:
+                    campaign.compact_json_digest(
+                        campaign._inner_environment("p10-09")
+                    ),
+                campaign.CAMPAIGN_INNER_TOKEN_ENV: "1" * 64,
+                "HOSTNAME": "0123456789ab",
+                "container": "podman",
+            }
+            with mock.patch.object(
+                campaign, "ROOT", Path("/authority/source")
+            ), mock.patch.object(
+                campaign,
+                "__file__",
+                "/authority/source/scripts/run_quality_floor_campaign.py",
+            ), mock.patch.object(
+                campaign.os, "environ", environment
+            ), self.assertRaisesRegex(campaign.CampaignError, "layout"):
+                campaign._validate_inner_paths(
+                    "run",
+                    source=Path("/authority/source"),
+                    build_dir=Path("/build"),
+                    build_authority_dir=Path(
+                        "/authority/build-authority"
+                    ),
+                    package=Path("/stage/package"),
+                    launch_authority=Path(
+                        f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+                    ),
+                    juliet_dir=Path("/juliet"),
+                    juliet_archive=Path("/juliet.zip"),
+                    libarchive_checkout=Path("/libarchive"),
+                )
 
     def test_inner_environment_requires_digest_and_rejects_git_injection(self) -> None:
         expected = campaign._inner_environment()
@@ -2480,7 +2540,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
             "HOSTNAME": "0123456789ab",
             "container": "podman",
         }
-        with mock.patch.dict(campaign.os.environ, environment, clear=True):
+        with mock.patch.object(campaign.os, "environ", environment):
             campaign._validate_inner_environment()
         for label, mutation in (
             ("wrong digest", {campaign.CAMPAIGN_INNER_ENV_TOKEN_ENV: "0" * 64}),
@@ -2492,7 +2552,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
         ):
             with self.subTest(label=label):
                 changed = {**environment, **mutation}
-                with mock.patch.dict(campaign.os.environ, changed, clear=True), \
+                with mock.patch.object(campaign.os, "environ", changed), \
                         self.assertRaisesRegex(campaign.CampaignError, "environment"):
                     campaign._validate_inner_environment()
 
@@ -2516,7 +2576,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
         self.assertEqual(environment["GIT_CONFIG_GLOBAL"], campaign.os.devnull)
         self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
         self.assertEqual(environment["GIT_NO_REPLACE_OBJECTS"], "1")
-        self.assertEqual(environment["GIT_CONFIG_VALUE_1"], "/dev/null")
+        self.assertEqual(
+            environment["GIT_CONFIG_VALUE_1"], campaign.os.devnull
+        )
         self.assertEqual(environment["GIT_CONFIG_VALUE_2"], "false")
         self.assertEqual(environment["GIT_CONFIG_VALUE_3"], "false")
 
@@ -2546,7 +2608,7 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 campaign.build_authority,
                 "verify_authority",
                 side_effect=AssertionError("nested Podman verifier invoked"),
-            ):
+            ), _fake_binary_identity(analyzer):
                 payload, execution, retained, derived_binary = (
                     campaign._inner_launch_context(
                         "run", launch_path, root, authority_dir, build_dir
@@ -2630,20 +2692,23 @@ class QualityFloorCampaignTest(unittest.TestCase):
                         build_record=build_record,
                         require_token=False,
                     )
-        with self.assertRaisesRegex(campaign.CampaignError, "mount path drift: build"):
-            campaign._validate_inner_paths(
-                "run",
-                source=Path("/source"),
-                build_dir=Path("/alternate-build"),
-                build_authority_dir=Path("/build-authority"),
-                package=Path("/stage/package"),
-                launch_authority=Path(
-                    f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
-                ),
-                juliet_dir=Path("/juliet"),
-                juliet_archive=Path("/juliet.zip"),
-                libarchive_checkout=Path("/libarchive"),
-            )
+        if os.name == "posix":
+            with self.assertRaisesRegex(
+                campaign.CampaignError, "mount path drift: build"
+            ):
+                campaign._validate_inner_paths(
+                    "run",
+                    source=Path("/source"),
+                    build_dir=Path("/alternate-build"),
+                    build_authority_dir=Path("/build-authority"),
+                    package=Path("/stage/package"),
+                    launch_authority=Path(
+                        f"/stage/{campaign.CAMPAIGN_LAUNCH_NAME}"
+                    ),
+                    juliet_dir=Path("/juliet"),
+                    juliet_archive=Path("/juliet.zip"),
+                    libarchive_checkout=Path("/libarchive"),
+                )
 
     def test_public_preflight_does_not_execute_host_analyzer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -2709,6 +2774,10 @@ class QualityFloorCampaignTest(unittest.TestCase):
                     return mock.Mock(returncode=returncode)
 
                 with self.subTest(label=label), mock.patch.object(
+                    campaign.build_authority,
+                    "_podman_environment",
+                    return_value={},
+                ), mock.patch.object(
                     campaign.subprocess, "run", side_effect=fake_run
                 ), self.assertRaisesRegex(campaign.CampaignError, error):
                     campaign._execute_campaign_container(
@@ -2770,6 +2839,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 )
             self.assertIs(invoked.call_args.kwargs["env"], environment)
 
+    @unittest.skipUnless(
+        os.name == "posix", "Podman bind mounts require POSIX"
+    )
     def test_failed_public_run_leaves_no_output_or_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = temporary_root(directory)
@@ -2832,6 +2904,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
                 host = Path(mount.split(":", 1)[0])
                 self.assertIn(root, host.parents)
 
+    @unittest.skipUnless(
+        os.name == "posix", "Podman bind mounts require POSIX"
+    )
     def test_public_run_verifies_in_separate_phase_before_promotion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = temporary_root(directory)
@@ -2955,7 +3030,9 @@ class QualityFloorCampaignTest(unittest.TestCase):
             )
             with mock.patch.object(
                 campaign, "_source_identity", return_value=source
-            ), self.assertRaisesRegex(campaign.CampaignError, "execution authority"):
+            ), _fake_binary_identity(analyzer), self.assertRaisesRegex(
+                campaign.CampaignError, "execution authority"
+            ):
                 campaign._validate_raw_authority(
                     package,
                     build_dir,

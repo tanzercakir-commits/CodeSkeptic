@@ -1422,6 +1422,112 @@ class StabilityStagingProducerTest(unittest.TestCase):
             finally:
                 os.close(source_fd)
 
+    def test_snapshot_copy_separates_path_and_descriptor_ctime(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            destination = workspace / "destination"
+            source.mkdir()
+            destination.mkdir()
+            payload = b"stable\n"
+            nested = source / "nested"
+            nested.mkdir()
+            (nested / "payload.bin").write_bytes(payload)
+            source_fd = os.open(
+                source,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            actual_stat = os.stat
+
+            def path_stat_with_distinct_ctime(path, *args, **kwargs):
+                observed = actual_stat(path, *args, **kwargs)
+                if kwargs.get("dir_fd") is None:
+                    return observed
+                return mock.Mock(
+                    st_mode=observed.st_mode,
+                    st_dev=observed.st_dev,
+                    st_ino=observed.st_ino,
+                    st_nlink=observed.st_nlink,
+                    st_size=observed.st_size,
+                    st_mtime_ns=observed.st_mtime_ns,
+                    st_ctime_ns=observed.st_ctime_ns + 1,
+                )
+
+            budget = {
+                "entries": 0,
+                "remaining_bytes": 4096,
+                "reserve_bytes": 0,
+                "temporary_workspace": workspace,
+            }
+            try:
+                with mock.patch.object(
+                    stage.os,
+                    "stat",
+                    side_effect=path_stat_with_distinct_ctime,
+                ):
+                    stage._copy_snapshot_directory(
+                        source_fd, destination, budget
+                    )
+            finally:
+                os.close(source_fd)
+            self.assertEqual(
+                (destination / "nested" / "payload.bin").read_bytes(),
+                payload,
+            )
+
+    def test_snapshot_copy_rejects_descriptor_metadata_drift(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            source = workspace / "source"
+            destination = workspace / "destination"
+            source.mkdir()
+            destination.mkdir()
+            (source / "payload.bin").write_bytes(b"stable\n")
+            source_fd = os.open(
+                source,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            actual_fstat = os.fstat
+            calls = 0
+
+            def descriptor_stat_with_final_drift(descriptor):
+                nonlocal calls
+                observed = actual_fstat(descriptor)
+                calls += 1
+                if calls != 2:
+                    return observed
+                return mock.Mock(
+                    st_mode=observed.st_mode,
+                    st_dev=observed.st_dev,
+                    st_ino=observed.st_ino,
+                    st_nlink=observed.st_nlink,
+                    st_size=observed.st_size + 1,
+                    st_mtime_ns=observed.st_mtime_ns,
+                    st_ctime_ns=observed.st_ctime_ns,
+                )
+
+            budget = {
+                "entries": 0,
+                "remaining_bytes": 4096,
+                "reserve_bytes": 0,
+                "temporary_workspace": workspace,
+            }
+            try:
+                with mock.patch.object(
+                    stage.os,
+                    "fstat",
+                    side_effect=descriptor_stat_with_final_drift,
+                ), self.assertRaisesRegex(
+                    stage.StagingError, "changed while copying"
+                ):
+                    stage._copy_snapshot_directory(
+                        source_fd, destination, budget
+                    )
+            finally:
+                os.close(source_fd)
+
     def test_pinned_snapshot_byte_budget_fails_before_disk_exhaustion(self) -> None:
         assert stage is not None
         with sealed_bundle_fixture() as fixture:

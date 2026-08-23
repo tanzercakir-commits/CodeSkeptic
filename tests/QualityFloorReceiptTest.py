@@ -779,9 +779,11 @@ class QualityFloorReceiptTest(unittest.TestCase):
             receipt_path = root / "receipt.json"
             data = quality.canonical_json([])
             receipt_path.write_bytes(data)
-            quality.receipt_checksum_path(receipt_path).write_text(
-                f"{hashlib.sha256(data).hexdigest()}  {receipt_path.name}\n",
-                encoding="utf-8",
+            quality.receipt_checksum_path(receipt_path).write_bytes(
+                (
+                    f"{hashlib.sha256(data).hexdigest()}  "
+                    f"{receipt_path.name}\n"
+                ).encode("utf-8")
             )
             with self.assertRaisesRegex(
                 quality.QualityFloorError, "JSON object"
@@ -813,6 +815,55 @@ class QualityFloorReceiptTest(unittest.TestCase):
                     quality._inspect_regular_file(
                         path, "retained artifact", collect=False
                     )
+
+    def test_regular_file_reader_accepts_cross_api_ctime_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = temporary_root(directory) / "artifact.json"
+            payload = b"stable\n"
+            path.write_bytes(payload)
+            observed = path.stat()
+            opened = mock.Mock(
+                st_mode=observed.st_mode,
+                st_dev=observed.st_dev,
+                st_ino=observed.st_ino,
+                st_nlink=observed.st_nlink,
+                st_size=observed.st_size,
+                st_mtime_ns=observed.st_mtime_ns,
+                st_ctime_ns=observed.st_ctime_ns + 1,
+            )
+            with mock.patch.object(
+                quality.os,
+                "fstat",
+                side_effect=(opened, copy.copy(opened)),
+            ):
+                digest, retained = quality._inspect_regular_file(
+                    path, "retained artifact", collect=True
+                )
+            self.assertEqual(digest, hashlib.sha256(payload).hexdigest())
+            self.assertEqual(retained, payload)
+
+    def test_regular_file_reader_rejects_final_path_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = temporary_root(directory) / "artifact.json"
+            path.write_bytes(b"stable\n")
+            before = path.lstat()
+            after = mock.Mock(
+                st_mode=before.st_mode,
+                st_dev=before.st_dev,
+                st_ino=before.st_ino + 1,
+                st_nlink=before.st_nlink,
+                st_size=before.st_size,
+                st_mtime_ns=before.st_mtime_ns,
+                st_ctime_ns=before.st_ctime_ns,
+            )
+            with mock.patch.object(
+                quality.os, "lstat", side_effect=(before, after)
+            ), self.assertRaisesRegex(
+                quality.ManifestUnavailable, "changed while being read"
+            ):
+                quality._inspect_regular_file(
+                    path, "retained artifact", collect=False
+                )
 
     def test_malformed_json_still_produces_a_verifiable_rejected_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

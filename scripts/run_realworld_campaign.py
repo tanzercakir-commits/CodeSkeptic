@@ -553,8 +553,45 @@ def _path_kind(path: Path) -> str:
     return "non-regular"
 
 
+def _stat_time_ns(metadata: os.stat_result, field: str) -> int:
+    nanoseconds = getattr(metadata, field + "_ns", None)
+    if nanoseconds is not None:
+        return int(nanoseconds)
+    return int(float(getattr(metadata, field)) * 1_000_000_000)
+
+
+def _stat_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(metadata.st_mode),
+        int(metadata.st_nlink),
+        int(metadata.st_size),
+        _stat_time_ns(metadata, "st_mtime"),
+        _stat_time_ns(metadata, "st_ctime"),
+    )
+
+
+def _same_file_identity(
+    left: os.stat_result, right: os.stat_result
+) -> bool:
+    return os.path.samestat(left, right)
+
+
 def _read_regular_bytes(path: Path, maximum: int) -> bytes:
-    flags = os.O_RDONLY
+    try:
+        path_before = path.lstat()
+    except OSError as error:
+        raise EvidenceError(
+            f"evidence path is not a readable regular file: {path}: {error}"
+        ) from error
+    if (
+        stat.S_ISLNK(path_before.st_mode)
+        or not stat.S_ISREG(path_before.st_mode)
+        or path_before.st_nlink != 1
+    ):
+        raise EvidenceError(f"evidence path is not a regular file: {path}")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -565,6 +602,8 @@ def _read_regular_bytes(path: Path, maximum: int) -> bytes:
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
             raise EvidenceError(f"evidence path is not a regular file: {path}")
+        if not _same_file_identity(path_before, metadata):
+            raise EvidenceError(f"evidence file changed while opening: {path}")
         if metadata.st_size > maximum:
             raise EvidenceError(f"evidence file exceeds size limit: {path}")
         chunks: list[bytes] = []
@@ -579,11 +618,15 @@ def _read_regular_bytes(path: Path, maximum: int) -> bytes:
                 raise EvidenceError(f"evidence file exceeds size limit: {path}")
         after = os.fstat(descriptor)
         pathname = path.lstat()
-        identity = lambda value: (
-            value.st_dev, value.st_ino, value.st_mode, value.st_size,
-            value.st_nlink, value.st_mtime_ns, value.st_ctime_ns,
-        )
-        if identity(metadata) != identity(after) or identity(metadata) != identity(pathname):
+        if (
+            stat.S_ISLNK(pathname.st_mode)
+            or not stat.S_ISREG(pathname.st_mode)
+            or pathname.st_nlink != 1
+            or _stat_fingerprint(metadata) != _stat_fingerprint(after)
+            or _stat_fingerprint(path_before) != _stat_fingerprint(pathname)
+            or not _same_file_identity(after, pathname)
+            or total != after.st_size
+        ):
             raise EvidenceError(f"evidence file changed while reading: {path}")
         return b"".join(chunks)
     finally:
@@ -663,7 +706,11 @@ def _open_immutable_file(
             f"immutable mirror file is unavailable: {path}: {error}"
         ) from error
     _validate_immutable_metadata(preliminary, path)
-    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NONBLOCK", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -675,7 +722,7 @@ def _open_immutable_file(
     try:
         before = os.fstat(descriptor)
         _validate_immutable_metadata(before, path)
-        if _immutable_identity(preliminary) != _immutable_identity(before):
+        if not _same_file_identity(preliminary, before):
             raise EvidenceError(f"immutable mirror file changed while opening: {path}")
         if maximum is not None and before.st_size > maximum:
             raise EvidenceError(f"mirror authority file exceeds size limit: {path}")
@@ -704,10 +751,11 @@ def _open_immutable_file(
             raise EvidenceError(
                 f"immutable mirror file changed while in use: {path}: {error}"
             ) from error
-        expected = _immutable_identity(before)
         if (
-            _immutable_identity(after) != expected
-            or _immutable_identity(pathname_after) != expected
+            _immutable_identity(after) != _immutable_identity(before)
+            or _immutable_identity(pathname_after)
+            != _immutable_identity(preliminary)
+            or not _same_file_identity(after, pathname_after)
         ):
             raise EvidenceError(f"immutable mirror file changed while in use: {path}")
         _validate_immutable_metadata(after, path)
@@ -1038,7 +1086,7 @@ def _write_new_regular_staging(path: Path, payload: bytes) -> None:
             path.unlink()
         except OSError as error:
             raise EvidenceError(f"cannot recover evidence staging file {path}: {error}") from error
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
@@ -2185,7 +2233,12 @@ def _terminate_command_tree(
 
 
 def _open_command_log(path: Path) -> int:
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+    flags = (
+        os.O_WRONLY
+        | os.O_APPEND
+        | os.O_CREAT
+        | getattr(os, "O_BINARY", 0)
+    )
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)
