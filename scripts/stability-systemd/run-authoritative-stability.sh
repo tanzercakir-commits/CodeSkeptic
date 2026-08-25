@@ -234,6 +234,7 @@ readonly -a PODMAN_CONTAINER_OPTIONS=(
     --cgroups=no-conmon
     --cgroupns=host
     --cgroup-parent "$PAYLOAD_CGROUP_RELATIVE"
+    --cpuset-cpus="$CONTROLLER_CPUS"
     --ipc=private
     --pid=private
     --uts=private

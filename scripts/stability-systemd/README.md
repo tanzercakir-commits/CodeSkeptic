@@ -311,6 +311,11 @@ silently narrow the operator, probe, controller, or descendant ceiling. The
 `no-conmon` mode avoids an extra conmon cgroup while preserving the delegated
 container cgroup model required for the fixed measurement child; Podman's
 incompatible `cgroups=disabled`/`cgroupns=host` combination is forbidden.
+Every probe, controller, and verifier Podman argv explicitly includes
+`--cpuset-cpus=4-11`; recovery independently requires the same effective
+`HostConfig.CpusetCpus` value. This keeps container control work off the
+isolated 0-3 measurement partition while the child measurement process can
+still move into its sibling cgroup.
 The absolute cgroup parent
 `/system.slice/codeskeptic-stability.service/codeskeptic-p10-09` is created
 below the systemd service cgroup, keeping every payload inside

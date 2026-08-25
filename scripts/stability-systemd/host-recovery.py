@@ -107,6 +107,7 @@ PAYLOAD_CGROUP_RELATIVE = (
 )
 MEASUREMENT_CGROUP = Path(f"/sys/fs/cgroup{PAYLOAD_CGROUP_RELATIVE}/measurement")
 MEASUREMENT_CPU_LIST = "0,1,2,3"
+CONTROLLER_CPUSET = "4-11"
 CONTAINER_WORKDIR = "/authority/source"
 CONTAINER_ENVIRONMENT = {
     "HOME": "/runtime/home",
@@ -1467,6 +1468,7 @@ def _validate_container_execution_contract(
         # container value "default"; the runner argv remains independently
         # pinned by the installed operator inventory.
         "Cgroups": "default",
+        "CpusetCpus": CONTROLLER_CPUSET,
         "ContainerIDFile": os.fspath(expected_container_cidfile(marker, kind)),
         "IpcMode": "private",
         "NetworkMode": "none",

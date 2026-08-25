@@ -369,6 +369,7 @@ class StabilityWorkflowTest(unittest.TestCase):
                 "--cgroupns=host",
                 "--cgroup-parent",
                 "$PAYLOAD_CGROUP_RELATIVE",
+                "--cpuset-cpus=$CONTROLLER_CPUS",
                 "--ipc=private",
                 "--pid=private",
                 "--uts=private",
@@ -408,6 +409,7 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn('"pid_namespace": "private"', controller)
         self.assertIn('"maximum_open_fds": MAXIMUM_OPEN_FDS', controller)
         self.assertNotIn("--cgroups=disabled", self.operator)
+        self.assertIn("--cpuset-cpus=4-11", self.readme)
         self.assertIn('--root "$PODMAN_ROOT"', self.operator)
         self.assertIn('--runroot "$PODMAN_RUNROOT"', self.operator)
         self.assertIn('image inspect \\\n            --format', self.operator)

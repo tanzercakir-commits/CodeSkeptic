@@ -144,6 +144,7 @@ class FakePodman:
                 "CgroupMode": "host",
                 "CgroupParent": host_recovery.PAYLOAD_CGROUP_RELATIVE,
                 "Cgroups": "default",
+                "CpusetCpus": host_recovery.CONTROLLER_CPUSET,
                 "ContainerIDFile": os.fspath(
                     host_recovery.expected_container_cidfile(marker, kind)
                 ),
@@ -645,6 +646,11 @@ class HostRecoveryTest(unittest.TestCase):
             assert isinstance(host, dict)
             host["ContainerIDFile"] = "/run/foreign.cid"
 
+        def cpuset(value: dict[str, object]) -> None:
+            host = value["HostConfig"]
+            assert isinstance(host, dict)
+            host["CpusetCpus"] = "0-11"
+
         def security(value: dict[str, object]) -> None:
             host = value["HostConfig"]
             assert isinstance(host, dict)
@@ -672,6 +678,7 @@ class HostRecoveryTest(unittest.TestCase):
             ("ipc", ipc),
             ("uts", uts),
             ("cidfile", cidfile),
+            ("cpuset", cpuset),
             ("security", security),
             ("privilege", privilege),
         ):
