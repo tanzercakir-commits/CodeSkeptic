@@ -1696,7 +1696,6 @@ run_inner_verifier() {
 write_cleanup_record() {
     local authority_intent_sha
     local host_recovery_intent_sha
-    local podman_version
     local cleanup_path="${host_output}/cleanup.json"
     local expected_runtime="${CONTAINER_RUNTIME_ROOT}/${session_name}"
     local expected_identity_marker="${RUNTIME_IDENTITY_ROOT}/${session_name}.json"
@@ -1762,6 +1761,7 @@ write_cleanup_record() {
     [[ ! -e "$HOST_RECOVERY_MARKER_TEMP" \
         && ! -L "$HOST_RECOVERY_MARKER_TEMP" ]] ||
         fail "host recovery temporary marker survived cleanup"
+    require_empty_private_directory "$PODMAN_RUNROOT"
     "$CGROUP_AUTHORITY" check-clean
     require_absent_or_empty_cgroup "$MEASUREMENT_CGROUP"
     require_absent_or_empty_cgroup "$PAYLOAD_CGROUP"
@@ -1795,17 +1795,6 @@ write_cleanup_record() {
         && -z "$service_exclusive_effective" \
         && "$service_effective" == "$CAMPAIGN_CPUS" ]] ||
         fail "service cgroup authority was not exactly restored"
-    podman_version="$(
-        run_podman version --format '{{.Client.Version}}'
-    )" || {
-        fail "cannot re-inspect the dedicated Podman version after cleanup"
-        return 1
-    }
-    [[ "$podman_version" == "$PINNED_PODMAN_VERSION" ]] || {
-        fail "dedicated Podman version drift after cleanup"
-        return 1
-    }
-    verify_dedicated_container_inventory_empty
     [[ ! -e "$cleanup_path" && ! -L "$cleanup_path" ]] ||
         fail "host cleanup record already exists"
 
@@ -1816,7 +1805,7 @@ write_cleanup_record() {
         "codeskeptic-p10-09-verifier-${session_nonce}" \
         "${RUNTIME_ROOT}/${session_name}.verifier.cid" \
         "$expected_runtime" "$expected_identity_marker" "$OPERATOR_ROOT" \
-        "$podman_version" \
+        "$PINNED_PODMAN_VERSION" \
         "$authority_intent_sha" "$host_recovery_intent_sha" "$root_isolated" \
         "$system_slice_partition" "$system_slice_exclusive" \
         "$system_slice_exclusive_effective" "$system_slice_effective" \

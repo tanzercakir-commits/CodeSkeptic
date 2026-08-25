@@ -388,6 +388,13 @@ cutpoint-aware and idempotent:
 it can complete active, partially restored, or already-clean states, including
 a strict unpublished-marker prefix only when the machine is otherwise proven
 clean.
+The cleanup-v5 record binds the ambient-environment reset, every dedicated
+Podman environment claim, the immutable containers configuration, and the
+pinned client version. After the host-recovery marker is removed, the operator
+never invokes Podman directly. Live seal-time revalidation calls the installed
+host-recovery helper instead; that helper publishes a separate durable Podman
+inspection marker before reading the store, verifies version, image, and empty
+inventory, clears runroot, and removes the inspection marker last.
 
 After the controller exits successfully, the operator starts a second fresh
 container from the same pinned image with the exact `verify` command. The

@@ -123,7 +123,8 @@ def socket_bytes(accepted: int = 0) -> bytes:
 
 class FakeHostRunner:
     def __init__(self, *, coredump: bytes = b"", socket: bytes | None = None,
-                 overrides: dict[str, bytes] | None = None) -> None:
+                 overrides: dict[str, bytes] | None = None,
+                 host_recovery: bytes = b"already-clean\n") -> None:
         self.outputs = {
             "coredumpctl": coredump,
             "system_helpers": b"",
@@ -142,10 +143,13 @@ class FakeHostRunner:
             self.outputs.update(overrides)
         self.phase: str | None = None
         self.calls: list[list[str]] = []
+        self.host_recovery = host_recovery
 
     def __call__(self, argv: list[str], maximum: int) -> bytes:
         del maximum
         self.calls.append(copy.deepcopy(argv))
+        if any(Path(argument).name == "host-recovery.py" for argument in argv):
+            return self.host_recovery
         if argv and argv[0] == "/usr/bin/podman":
             return b""
         if argv and argv[0] == "/usr/bin/coredumpctl":
@@ -1671,6 +1675,84 @@ class StabilityHostContaminationTest(unittest.TestCase):
                         live_cgroup_root=cgroup_root,
                         live_state_root=state_root,
                     )
+
+    def test_live_cleanup_uses_authorized_marker_bounded_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+            (root / "host").mkdir(parents=True)
+            operator = base / "operator" / "run.sh"
+            write_cleanup(root, operator)
+            cgroup_root = base / "cgroup"
+            state_root = base / "state"
+            write_restored_cgroup_tree(cgroup_root)
+            state_root.mkdir()
+            runner = FakeHostRunner()
+
+            stability._validate_cleanup_record(
+                root / "host" / "cleanup.json",
+                session_root=root,
+                boot_id=BOOT_ID,
+                session_nonce=NONCE,
+                target_user=USER,
+                target_uid=UID,
+                operator_path=operator,
+                verify_live=True,
+                **cleanup_validation_authority(),
+                command_runner=runner,
+                live_cgroup_root=cgroup_root,
+                live_state_root=state_root,
+            )
+
+            recovery_calls = [
+                call
+                for call in runner.calls
+                if any(Path(item).name == "host-recovery.py" for item in call)
+            ]
+            self.assertEqual(
+                recovery_calls,
+                [[
+                    "/usr/bin/python3",
+                    "-B",
+                    (operator.parent / "host-recovery.py").as_posix(),
+                    "recover",
+                ]],
+            )
+            self.assertFalse(
+                any("/usr/bin/podman" in call for call in runner.calls)
+            )
+
+    def test_live_cleanup_rejects_incomplete_recovery_attestation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+            (root / "host").mkdir(parents=True)
+            operator = base / "operator" / "run.sh"
+            write_cleanup(root, operator)
+            cgroup_root = base / "cgroup"
+            state_root = base / "state"
+            write_restored_cgroup_tree(cgroup_root)
+            state_root.mkdir()
+
+            with self.assertRaisesRegex(
+                stability.StabilityError, "live host recovery revalidation"
+            ):
+                stability._validate_cleanup_record(
+                    root / "host" / "cleanup.json",
+                    session_root=root,
+                    boot_id=BOOT_ID,
+                    session_nonce=NONCE,
+                    target_user=USER,
+                    target_uid=UID,
+                    operator_path=operator,
+                    verify_live=True,
+                    **cleanup_validation_authority(),
+                    command_runner=FakeHostRunner(
+                        host_recovery=b"recovered\n"
+                    ),
+                    live_cgroup_root=cgroup_root,
+                    live_state_root=state_root,
+                )
 
 
 if __name__ == "__main__":

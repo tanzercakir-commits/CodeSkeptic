@@ -656,6 +656,10 @@ exit 0
                 "verify",
             ],
         )
+        cleanup = shell_function(self.operator, "write_cleanup_record")
+        self.assertNotIn("run_podman", cleanup)
+        self.assertNotIn("verify_dedicated_container_inventory_empty", cleanup)
+        self.assertIn('require_empty_private_directory "$PODMAN_RUNROOT"', cleanup)
         for function in (
             "capture_host_snapshot() {",
             "cleanup_container() {",

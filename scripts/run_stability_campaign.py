@@ -10585,24 +10585,30 @@ def _validate_cleanup_record(
             live_path = _live_cgroup_path(cgroups[name], live_cgroup_root)
             if not _cgroup_absent_or_empty(live_path):
                 raise StabilityError(f"{name} cgroup is not empty after cleanup")
-        inventory_argv = [
-            podman["executable"],
-            "--root", podman["root"],
-            "--runroot", podman["runroot"],
-            f"--storage-driver={podman['storage_driver']}",
-            f"--cgroup-manager={podman['cgroup_manager']}",
-            f"--conmon={podman['conmon']}",
-            f"--events-backend={podman['events_backend']}",
-            f"--hooks-dir={podman['hooks_dir']}",
-            f"--runtime={podman['runtime']}",
-            "container", "list", "--all", "--no-trunc",
-            "--format", "{{.ID}}|{{.Names}}",
+        # Direct post-marker Podman access is forbidden: even a read-only CLI
+        # command may create runroot locks.  The recovery helper publishes its
+        # dedicated inspection marker first, validates the exact clean Podman
+        # environment/version/image/inventory, clears runroot, and removes the
+        # inspection marker last.
+        recovery_argv = [
+            "/usr/bin/python3",
+            "-B",
+            (operator_path.parent / "host-recovery.py").as_posix(),
+            "recover",
         ]
-        inventory = _host_command_bytes(
-            inventory_argv, MAX_HOST_COMMAND_BYTES, command_runner
+        recovery = _host_command_bytes(
+            recovery_argv, 64, command_runner
         )
-        if inventory:
-            raise StabilityError("dedicated Podman container inventory is not empty")
+        if recovery != b"already-clean\n":
+            raise StabilityError("live host recovery revalidation drift")
+        for name in (
+            "podman-inspection-intent.json",
+            ".podman-inspection-intent.tmp",
+        ):
+            if not _path_absent(live_state_root / name):
+                raise StabilityError(
+                    "Podman inspection authority survived live revalidation"
+                )
     intent_record = {
         "path": CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH,
         "sha256": intent_sha256,
