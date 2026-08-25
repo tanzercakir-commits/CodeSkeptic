@@ -1755,10 +1755,11 @@ class RuntimeConfigContractTest(unittest.TestCase):
             )
 
             launch = stability.build_runtime_launch_receipt(config_sha, BOOT_ID)
+            self.assertEqual(launch["container"]["cgroups"], "disabled")
             self.assertEqual(
-                launch["container"]["cgroup_parent"],
-                stability.RUNTIME_CGROUP_PARENT,
+                launch["container"]["cgroup_namespace"], "host"
             )
+            self.assertNotIn("cgroup_parent", launch["container"])
             launch_path = root / "launch" / "receipt.json"
             write_canonical_pair(launch_path, launch)
             self.assertEqual(
@@ -1799,7 +1800,7 @@ class RuntimeConfigContractTest(unittest.TestCase):
                     boot_id=BOOT_ID,
                 )
             launch = stability.build_runtime_launch_receipt(config_sha, BOOT_ID)
-            launch["container"]["cgroup_parent"] = "codeskeptic-p10-09"
+            launch["container"]["cgroups"] = "default"
             with self.assertRaisesRegex(stability.StabilityError, "topology"):
                 stability.validate_runtime_launch_receipt(
                     launch,

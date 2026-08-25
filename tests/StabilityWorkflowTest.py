@@ -23,6 +23,8 @@ OPERATOR = OPERATOR_ROOT / "run-authoritative-stability.sh"
 GUIDED = OPERATOR_ROOT / "guided-stability.sh"
 POST_STOP = OPERATOR_ROOT / "post-stop.sh"
 HOST_RECOVERY = OPERATOR_ROOT / "host-recovery.py"
+CONTAINER_ENTRY = OPERATOR_ROOT / "container-entry.py"
+CONTAINERS_CONF = OPERATOR_ROOT / "containers.conf"
 README = OPERATOR_ROOT / "README.md"
 CONTROLLER = ROOT / "scripts" / "run_stability_campaign.py"
 
@@ -312,14 +314,13 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertEqual(
             command,
             [
+                "/usr/bin/taskset",
+                "--cpu-list",
+                "4-11",
                 "/usr/bin/python3",
                 "-B",
-                "/authority/source/scripts/run_stability_campaign.py",
+                "/operator/container-entry.py",
                 "run",
-                "--config",
-                "/config/runtime.json",
-                "--output",
-                "/evidence",
             ],
         )
         self.assertEqual(
@@ -331,6 +332,7 @@ class StabilityWorkflowTest(unittest.TestCase):
             bind_mounts,
             [
                 "${AUTHORITY_ROOT}:/authority:ro",
+                "${OPERATOR_ROOT}:/operator:ro",
                 "${CONFIG_PATH}:/config/runtime.json:ro",
                 "${CONFIG_SHA_PATH}:/config/runtime.json.sha256:ro",
                 "${launch_root}:/launch:ro",
@@ -368,11 +370,7 @@ class StabilityWorkflowTest(unittest.TestCase):
                 "run",
                 "--pull=never",
                 "--network=none",
-                "--cgroups=no-conmon",
-                "--cgroupns=host",
-                "--cgroup-parent",
-                "$PAYLOAD_CGROUP_RELATIVE",
-                "--cpuset-cpus=$CONTROLLER_CPUS",
+                "--cgroups=disabled",
                 "--ipc=private",
                 "--pid=private",
                 "--uts=private",
@@ -396,7 +394,7 @@ class StabilityWorkflowTest(unittest.TestCase):
             ],
         )
         self.assertIn(
-            '"cgroups": "no-conmon"', CONTROLLER.read_text(encoding="utf-8")
+            '"cgroups": "disabled"', CONTROLLER.read_text(encoding="utf-8")
         )
         controller = CONTROLLER.read_text(encoding="utf-8")
         self.assertEqual(
@@ -408,11 +406,25 @@ class StabilityWorkflowTest(unittest.TestCase):
             "/sys/fs/cgroup/system.slice/codeskeptic-stability.service/"
             "codeskeptic-p10-09/measurement",
         )
-        self.assertIn('"cgroup_parent": RUNTIME_CGROUP_PARENT', controller)
+        self.assertNotIn('"cgroup_parent": RUNTIME_CGROUP_PARENT', controller)
         self.assertIn('"pid_namespace": "private"', controller)
         self.assertIn('"maximum_open_fds": MAXIMUM_OPEN_FDS', controller)
-        self.assertNotIn("--cgroups=disabled", self.operator)
-        self.assertIn("--cpuset-cpus=4-11", self.readme)
+        self.assertIn("--cgroups=disabled", self.operator)
+        self.assertNotIn("--cgroupns", self.operator)
+        self.assertNotIn("--cgroup-parent", self.operator)
+        self.assertNotIn("--cpuset-cpus=", self.operator)
+        self.assertIn("cgroup creation disabled", self.readme)
+        self.assertEqual(
+            CONTAINERS_CONF.read_text(encoding="utf-8"),
+            '[containers]\ncgroupns = "host"\n',
+        )
+        self.assertIn(
+            '"CONTAINERS_CONF=${CONTAINERS_CONF}"', self.operator
+        )
+        self.assertIn('"$ENV" --ignore-environment --', self.operator)
+        self.assertNotIn("CONTAINERS_CONF_OVERRIDE", self.operator)
+        self.assertIn('readonly PINNED_PODMAN_VERSION="5.8.4"', self.operator)
+        self.assertIn("run_podman version --format", self.operator)
         self.assertIn('--root "$PODMAN_ROOT"', self.operator)
         self.assertIn('--runroot "$PODMAN_RUNROOT"', self.operator)
         self.assertIn('image inspect \\\n            --format', self.operator)
@@ -470,6 +482,8 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn('cgroup.procs', self.operator)
         self.assertIn('cgroup.events', self.operator)
         self.assertIn('os.sched_getaffinity(0)', self.operator)
+        self.assertIn('os.sched_setaffinity(0, range(4, 12))', self.operator)
+        self.assertIn('record != f"0::{expected_controller}"', self.operator)
         self.assertIn('resource.getrlimit(resource.RLIMIT_NOFILE)', self.operator)
         self.assertIn('import yaml', self.operator)
         self.assertIn('run_in_measurement_cgroup.py', self.operator)
@@ -499,19 +513,147 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("0-3", self.readme)
         self.assertIn("4-11", self.readme)
 
+    def test_real_container_entry_rechecks_exact_process_contract(self) -> None:
+        entry = CONTAINER_ENTRY.read_text(encoding="utf-8")
+        self.assertIn('EXPECTED_CGROUP = "/system.slice/', entry)
+        self.assertIn('codeskeptic-stability.service/controller"', entry)
+        self.assertIn("os.getpid() != 1", entry)
+        self.assertIn("os.geteuid() != 0", entry)
+        self.assertIn("os.sched_getaffinity(0)", entry)
+        self.assertIn("resource.getrlimit(resource.RLIMIT_NOFILE)", entry)
+        self.assertIn('record != f"0::{EXPECTED_CGROUP}"', entry)
+        self.assertIn('"run": (', entry)
+        self.assertIn('"verify": (', entry)
+        completed = subprocess.run(
+            [sys.executable, "-B", os.fspath(CONTAINER_ENTRY), "run"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn(b"CODESKEPTIC_STABILITY_CONTAINER_ENTRY_FAIL", completed.stderr)
+        self.assertNotIn(b"Traceback", completed.stderr)
+
+    def test_controller_inventory_gate_propagates_each_ancestor_failure(self) -> None:
+        functions = "\n".join(
+            shell_function(self.operator, name)
+            for name in (
+                "require_ancestor_controller_inventory",
+                "require_active_controller_inventory",
+            )
+        )
+        for failure_label in (
+            "root available",
+            "root subtree",
+            "system.slice available",
+            "system.slice subtree",
+            "service available",
+            "service subtree",
+            "payload available",
+            "payload subtree",
+        ):
+            with self.subTest(failure_label=failure_label):
+                harness = f"""#!/usr/bin/env bash
+set -uo pipefail
+CGROUP_ROOT=/root
+SYSTEM_SLICE_CGROUP=/system.slice
+SERVICE_CGROUP=/service
+PAYLOAD_CGROUP=/payload
+ROOT_AVAILABLE_CONTROLLER_INVENTORY=root-available
+HOST_SUBTREE_CONTROLLER_INVENTORY=host-subtree
+DELEGATED_CONTROLLER_INVENTORY=delegated-baseline
+FAILURE_LABEL={shlex.quote(failure_label)}
+require_exact_controller_inventory() {{
+    [[ "$4" != "$FAILURE_LABEL" ]]
+}}
+{functions}
+if require_active_controller_inventory; then
+    exit 9
+fi
+exit 0
+"""
+                completed = subprocess.run(
+                    ["/usr/bin/bash", "-c", harness],
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_empty_cgroup_gate_propagates_pseudofile_read_failures(self) -> None:
+        function = shell_function(self.operator, "require_empty_cgroup")
+        for failed_file in ("cgroup.procs", "cgroup.events"):
+            with self.subTest(failed_file=failed_file):
+                harness = f"""#!/usr/bin/env bash
+set -uo pipefail
+FAILED_FILE={shlex.quote(failed_file)}
+fail() {{ return 1; }}
+cgroup_value() {{
+    if [[ "$1" == */"$FAILED_FILE" ]]; then
+        return 1
+    fi
+    if [[ "$1" == */cgroup.procs ]]; then
+        printf ''
+    else
+        printf 'populated 0\\nfrozen 0'
+    fi
+}}
+{function}
+if require_empty_cgroup /payload; then
+    exit 9
+fi
+exit 0
+"""
+                completed = subprocess.run(
+                    ["/usr/bin/bash", "-c", harness],
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_empty_cgroup_gate_rejects_symlinked_pseudofile(self) -> None:
+        functions = "\n".join(
+            shell_function(self.operator, name)
+            for name in ("cgroup_value", "require_empty_cgroup")
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "target"
+            target.write_text("", encoding="ascii")
+            (root / "cgroup.procs").symlink_to(target)
+            (root / "cgroup.events").write_text(
+                "populated 0\nfrozen 0\n", encoding="ascii"
+            )
+            harness = f"""#!/usr/bin/env bash
+set -uo pipefail
+fail() {{ return 1; }}
+{functions}
+if require_empty_cgroup {shlex.quote(os.fspath(root))}; then
+    exit 9
+fi
+exit 0
+"""
+            completed = subprocess.run(
+                ["/usr/bin/bash", "-c", harness],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+
     def test_operator_seals_host_envelope_after_independent_inner_verification(self) -> None:
         verifier = shell_array(self.operator, "RUNTIME_VERIFIER_COMMAND")
         self.assertEqual(
             verifier,
             [
+                "/usr/bin/taskset",
+                "--cpu-list",
+                "4-11",
                 "/usr/bin/python3",
                 "-B",
-                "/authority/source/scripts/run_stability_campaign.py",
+                "/operator/container-entry.py",
                 "verify",
-                "--config",
-                "/config/runtime.json",
-                "--evidence",
-                "/evidence",
             ],
         )
         for function in (
@@ -642,7 +784,7 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertLess(normal_recovery, graphical_recovery)
 
         cleanup = shell_function(runner, "write_cleanup_record")
-        self.assertIn("codeskeptic-stability-host-cleanup-v4", cleanup)
+        self.assertIn("codeskeptic-stability-host-cleanup-v5", cleanup)
         self.assertIn("host-recovery-intent.json", cleanup)
         self.assertIn("host_recovery_intent_bound", cleanup)
         self.assertIn("host_recovery_marker_absent", cleanup)

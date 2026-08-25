@@ -274,6 +274,12 @@ def initialize_lifecycle_source(
     (systemd / "cgroup-authority.py").write_text(
         "#!/usr/bin/env python3\nraise SystemExit(0)\n", encoding="utf-8"
     )
+    (systemd / "container-entry.py").write_text(
+        "#!/usr/bin/env python3\nraise SystemExit(0)\n", encoding="utf-8"
+    )
+    (systemd / "containers.conf").write_text(
+        '[containers]\ncgroupns = "host"\n', encoding="utf-8"
+    )
     (systemd / "host-recovery.py").write_text(
         "#!/usr/bin/env python3\nraise SystemExit(0)\n", encoding="utf-8"
     )
@@ -307,7 +313,8 @@ def initialize_lifecycle_source(
     )
     for executable in (
         "guided-stability.sh", "run-authoritative-stability.sh",
-        "cgroup-authority.py", "host-recovery.py", "post-stop.sh",
+        "cgroup-authority.py", "container-entry.py", "host-recovery.py",
+        "post-stop.sh",
     ):
         (systemd / executable).chmod(0o755)
     git(repository, "add", ".")
@@ -407,6 +414,8 @@ def make_manual_prepared_tree(
     operator_files = {
         "README.md": systemd / "README.md",
         "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "container-entry.py": systemd / "container-entry.py",
+        "containers.conf": systemd / "containers.conf",
         "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
         "post-stop.sh": systemd / "post-stop.sh",
@@ -1967,6 +1976,8 @@ class StabilityStagingProducerTest(unittest.TestCase):
         mutations = (
             ("README.md", False),
             ("cgroup-authority.py", False),
+            ("container-entry.py", False),
+            ("containers.conf", False),
             ("host-recovery.py", False),
             ("guided-stability.sh", False),
             ("post-stop.sh", False),

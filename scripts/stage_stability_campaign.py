@@ -3082,6 +3082,8 @@ def _prepare_operator(source_root: Path, output: Path) -> None:
     files = {
         "README.md": systemd / "README.md",
         "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "container-entry.py": systemd / "container-entry.py",
+        "containers.conf": systemd / "containers.conf",
         "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
         "post-stop.sh": systemd / "post-stop.sh",
@@ -3115,6 +3117,8 @@ def _verify_operator_exact_head(
     expected = {
         "README.md": systemd / "README.md",
         "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "container-entry.py": systemd / "container-entry.py",
+        "containers.conf": systemd / "containers.conf",
         "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
         "post-stop.sh": systemd / "post-stop.sh",

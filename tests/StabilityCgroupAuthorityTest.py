@@ -61,6 +61,7 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         self.assertIn('write_control(path / "cgroup.kill", "1")', authority)
         self.assertIn("remove_owned_tree(child", authority)
         self.assertIn("refusing to clear foreign", authority)
+        self.assertIn("payload contains an unexpected runtime cgroup", authority)
         self.assertLess(
             authority.index("validate_payload_tree(owned_container_ids)"),
             authority.index('kill_and_wait(PAYLOAD, "payload")'),
@@ -68,6 +69,8 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
 
         self.assertIn('readonly CGROUP_AUTHORITY="${OPERATOR_ROOT}/cgroup-authority.py"', runner)
         self.assertIn('readonly HOST_RECOVERY="${OPERATOR_ROOT}/host-recovery.py"', runner)
+        self.assertIn("require_active_controller_inventory", runner)
+        self.assertIn('"payload subtree"', runner)
         self.assertIn('"$HOST_RECOVERY" recover', runner)
         self.assertIn('"$CGROUP_AUTHORITY" arm --session "$session_name"', runner)
         self.assertIn('"$CGROUP_AUTHORITY" verify-active --session "$session_name"', runner)
@@ -102,10 +105,10 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         self.assertIn("systemctl isolate --no-block multi-user.target", runner)
         self.assertNotIn("/usr/bin/systemd-inhibit", runner)
 
-    def test_cleanup_v4_records_durable_authority_restoration(self) -> None:
+    def test_cleanup_v5_records_durable_authority_restoration(self) -> None:
         runner = RUNNER_PATH.read_text(encoding="utf-8")
         for literal in (
-            '"schema": "codeskeptic-stability-host-cleanup-v4"',
+            '"schema": "codeskeptic-stability-host-cleanup-v5"',
             '"cgroup_authority"',
             '"cgroup_restoration"',
             '"cgroup_authority_intent_bound": "pass"',
@@ -409,13 +412,10 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             authority.check_clean()
         already_clean.assert_called_once_with()
 
-    def test_active_payload_container_cgroups_are_bound_to_exact_ids(self) -> None:
+    def test_active_payload_rejects_runtime_created_container_cgroups(self) -> None:
         authority = load_authority()
         container_id = "a" * 64
-        children = [
-            authority.MEASUREMENT,
-            authority.PAYLOAD / f"libpod-{container_id}.scope",
-        ]
+        children = [authority.MEASUREMENT]
         values = [
             authority.CONTROLLER_CPUS,
             authority.EXCLUSIVE_CPUS,
@@ -440,13 +440,17 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             mock.patch.object(authority, "require_exact_directory"),
             mock.patch.object(authority, "cgroup_value", side_effect=values.copy()),
             mock.patch.object(
-                authority, "validate_payload_tree", return_value=children
+                authority,
+                "validate_payload_tree",
+                side_effect=authority.AuthorityError(
+                    "payload contains an unexpected runtime cgroup"
+                ),
             ),
             self.assertRaisesRegex(
-                authority.AuthorityError, "unbound container cgroup"
+                authority.AuthorityError, "unexpected runtime cgroup"
             ),
         ):
-            authority.verify_active(SESSION)
+            authority.verify_active(SESSION, (container_id,))
 
     def test_recover_discovers_the_durable_session_after_runtime_loss(self) -> None:
         authority = load_authority()

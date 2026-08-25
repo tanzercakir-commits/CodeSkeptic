@@ -80,6 +80,7 @@ class FakePodman:
         self.image_id = host_recovery.PINNED_EVIDENCE_IMAGE_ID
         self.image_digest = host_recovery.PINNED_EVIDENCE_IMAGE_DIGEST
         self.image_inventory = [host_recovery.PINNED_EVIDENCE_IMAGE_ID]
+        self.version = host_recovery.PINNED_PODMAN_VERSION
 
     def add_owned(
         self,
@@ -94,11 +95,14 @@ class FakePodman:
             command = list(host_recovery.RUNTIME_VERIFIER_COMMAND)
         else:
             command = [
+                "/usr/bin/taskset",
+                "--cpu-list",
+                "4-11",
                 "/usr/bin/python3",
                 "-B",
                 "-c",
                 preflight_python(),
-                host_recovery.PAYLOAD_CGROUP_RELATIVE,
+                host_recovery.CONTROLLER_CGROUP_RELATIVE,
                 os.fspath(host_recovery.MEASUREMENT_CGROUP),
                 f"{host_recovery.PAYLOAD_CGROUP_RELATIVE}/measurement",
                 host_recovery.MEASUREMENT_CPU_LIST,
@@ -142,9 +146,9 @@ class FakePodman:
                 "Cgroup": "",
                 "CgroupManager": "cgroupfs",
                 "CgroupMode": "host",
-                "CgroupParent": host_recovery.PAYLOAD_CGROUP_RELATIVE,
-                "Cgroups": "default",
-                "CpusetCpus": host_recovery.CONTROLLER_CPUSET,
+                "CgroupParent": "",
+                "Cgroups": "disabled",
+                "CpusetCpus": "",
                 "ContainerIDFile": os.fspath(
                     host_recovery.expected_container_cidfile(marker, kind)
                 ),
@@ -193,6 +197,13 @@ class FakePodman:
         self.assert_invocation_contract(capture_output, text, check)
         if self.required_marker is not None and not self.required_marker.exists():
             raise AssertionError("Podman was accessed before durable marker publication")
+        if "version" in argv:
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                f"{self.version}\n".encode("ascii"),
+                b"",
+            )
         if "image" in argv and "inspect" in argv:
             output = (
                 f"{self.image_id}|{self.image_digest}\n"
@@ -234,6 +245,27 @@ class FakePodman:
 
 
 class HostRecoveryTest(unittest.TestCase):
+    def test_podman_commands_use_only_the_pinned_host_environment(self) -> None:
+        argv = host_recovery._podman_argv(("version",))
+        self.assertEqual(
+            argv[:3],
+            [os.fspath(host_recovery.ENV), "--ignore-environment", "--"],
+        )
+        podman_index = argv.index(os.fspath(host_recovery.PODMAN))
+        environment = argv[3:podman_index]
+        self.assertIn(
+            f"CONTAINERS_CONF={host_recovery.CONTAINERS_CONF}", environment
+        )
+        self.assertIn("LANG=C", environment)
+        self.assertIn("LC_ALL=C", environment)
+        self.assertIn(
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            environment,
+        )
+        self.assertFalse(
+            any(item.startswith("CONTAINERS_CONF_OVERRIDE=") for item in environment)
+        )
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -887,6 +919,43 @@ class HostRecoveryTest(unittest.TestCase):
         self.assertTrue(cidfile.exists())
         self.assertIn(CONTAINER_ID, self.fake_podman.containers)
         self.assertEqual(self.fake_podman.removed, [])
+
+    def test_podman_version_drift_precedes_central_cleanup_mutation(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        self.fake_podman.add_owned(marker, "campaign")
+        self.arm_cgroup(marker)
+        cidfile = host_recovery.expected_container_cidfile(marker, "campaign")
+        cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        cidfile.chmod(0o400)
+        self.fake_podman.version = "5.8.3"
+
+        with self.assertRaisesRegex(host_recovery.RecoveryError, "version drift"):
+            host_recovery.remove_owned_container(SESSION, "campaign")
+
+        self.assertTrue(cidfile.exists())
+        self.assertIn(CONTAINER_ID, self.fake_podman.containers)
+        self.assertEqual(self.fake_podman.removed, [])
+        self.assertEqual(self.cgroup_calls, [])
+
+    def test_podman_version_drift_precedes_recovery_mutation(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        self.fake_podman.add_owned(marker, "campaign")
+        self.arm_cgroup(marker)
+        cidfile = host_recovery.expected_container_cidfile(marker, "campaign")
+        cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        cidfile.chmod(0o400)
+        self.fake_podman.version = "5.8.3"
+
+        with self.assertRaisesRegex(host_recovery.RecoveryError, "version drift"):
+            host_recovery.recover()
+
+        self.assertTrue(host_recovery.MARKER.exists())
+        self.assertTrue(cidfile.exists())
+        self.assertIn(CONTAINER_ID, self.fake_podman.containers)
+        self.assertEqual(self.fake_podman.removed, [])
+        self.assertEqual(self.cgroup_calls, [])
 
     def test_recovery_unlinks_and_fsyncs_all_cids_before_first_container_rm(
         self,

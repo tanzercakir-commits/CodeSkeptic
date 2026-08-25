@@ -17,7 +17,6 @@ SCHEMA = "codeskeptic-p10-09-cgroup-authority-intent-v1"
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 CAMPAIGN_SESSION = re.compile(rf"[0-9]{{8}}T[0-9]{{6}}Z-{UUID}-{UUID}")
 PROBE_SESSION = re.compile(rf"probe-{UUID}")
-LIBPOD = re.compile(r"libpod-([0-9a-f]{64})(?:[.]scope)?")
 INSTALLATION_RECEIPT = Path(
     "/opt/codeskeptic-p10-09/installation/receipt.json"
 )
@@ -550,7 +549,7 @@ def expected_active_ancestry() -> tuple[tuple[Path, str, str], ...]:
 def verify_active(
     session: str, owned_container_ids: tuple[str, ...] = ()
 ) -> None:
-    expected_container_ids = valid_container_ids(owned_container_ids)
+    valid_container_ids(owned_container_ids)
     read_marker(session)
     for path, partition, effective_cpus in expected_active_ancestry():
         label = path.name
@@ -575,14 +574,7 @@ def verify_active(
     # Ancestry values alone do not establish ownership of every mutable
     # descendant. Container cleanup uses this action as its final
     # pre-mutation gate, so reject any foreign payload child here too.
-    children = validate_payload_tree(owned_container_ids)
-    observed_container_ids = {
-        match.group(1)
-        for child in children
-        if (match := LIBPOD.fullmatch(child.name)) is not None
-    }
-    if not observed_container_ids <= expected_container_ids:
-        raise AuthorityError("payload contains an unbound container cgroup")
+    validate_payload_tree(owned_container_ids)
 
 
 def cgroup_events(path: Path, label: str) -> dict[str, str]:
@@ -649,7 +641,7 @@ def validate_owned_tree(
 def validate_payload_tree(
     owned_container_ids: tuple[str, ...] = (),
 ) -> list[Path]:
-    expected_container_ids = valid_container_ids(owned_container_ids)
+    valid_container_ids(owned_container_ids)
     require_exact_directory(PAYLOAD, "payload")
     if cgroup_value(PAYLOAD / "cpuset.cpus.partition", "payload") != "member":
         raise AuthorityError("payload is not a member cgroup")
@@ -665,17 +657,10 @@ def validate_payload_tree(
     for child in children:
         if child == MEASUREMENT:
             validate_owned_tree(child, "measurement", measurement_root=True)
-        elif LIBPOD.fullmatch(child.name) is not None:
-            validate_owned_tree(child, f"container {child.name}")
         else:
-            raise AuthorityError(f"payload contains a foreign cgroup: {child.name}")
-    observed_container_ids = {
-        match.group(1)
-        for child in children
-        if (match := LIBPOD.fullmatch(child.name)) is not None
-    }
-    if not observed_container_ids <= expected_container_ids:
-        raise AuthorityError("payload contains an unbound container cgroup")
+            raise AuthorityError(
+                f"payload contains an unexpected runtime cgroup: {child.name}"
+            )
     return children
 
 
@@ -712,10 +697,10 @@ def cleanup_payload(owned_container_ids: tuple[str, ...] = ()) -> None:
     for child in child_directories(PAYLOAD):
         if child == MEASUREMENT:
             remove_owned_tree(child, "measurement", measurement_root=True)
-        elif LIBPOD.fullmatch(child.name) is not None:
-            remove_owned_tree(child, f"container {child.name}")
         else:
-            raise AuthorityError(f"payload contains a foreign cgroup: {child.name}")
+            raise AuthorityError(
+                f"payload contains an unexpected runtime cgroup: {child.name}"
+            )
     if child_directories(PAYLOAD):
         raise AuthorityError("payload retained child cgroups")
     subtree = set(

@@ -8,6 +8,8 @@ readonly AUTHORITY_ROOT="/opt/codeskeptic-p10-09/authority"
 readonly OPERATOR_ROOT="/opt/codeskeptic-p10-09/operator"
 readonly RUNNER_PATH="${AUTHORITY_ROOT}/source/scripts/run_stability_campaign.py"
 readonly CGROUP_AUTHORITY="${OPERATOR_ROOT}/cgroup-authority.py"
+readonly CONTAINER_ENTRY="${OPERATOR_ROOT}/container-entry.py"
+readonly CONTAINERS_CONF="${OPERATOR_ROOT}/containers.conf"
 readonly HOST_RECOVERY="${OPERATOR_ROOT}/host-recovery.py"
 readonly CONFIG_PATH="/etc/codeskeptic-p10-09/runtime.json"
 readonly CONFIG_SHA_PATH="${CONFIG_PATH}.sha256"
@@ -53,6 +55,9 @@ readonly CONTROLLER_CPU_LIST="4,5,6,7,8,9,10,11"
 readonly CAMPAIGN_CPUS="0-11"
 readonly MEASUREMENT_CPUS="0-3"
 readonly MEASUREMENT_CPU_LIST="0,1,2,3"
+readonly ROOT_AVAILABLE_CONTROLLER_INVENTORY="cpu cpuset dmem hugetlb io memory misc pids rdma"
+readonly HOST_SUBTREE_CONTROLLER_INVENTORY="cpu cpuset hugetlb io memory misc pids"
+readonly DELEGATED_CONTROLLER_INVENTORY="cpu cpuset memory pids"
 readonly PODMAN="/usr/bin/podman"
 readonly ENV="/usr/bin/env"
 readonly PYTHON="/usr/bin/python3"
@@ -63,11 +68,11 @@ readonly GUIDED_DECISION_WAIT_INTERVAL=0.1
 readonly PINNED_EVIDENCE_IMAGE="localhost/codeskeptic-p10-07-evidence@sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
 readonly PINNED_EVIDENCE_IMAGE_DIGEST="sha256:3408b08a92f59d67f5c46347baca76bdb1aafeca34601fae82d6ebd9d8d837ca"
 readonly PINNED_EVIDENCE_IMAGE_ID="sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5"
+readonly PINNED_PODMAN_VERSION="5.8.4"
 
 readonly PREFLIGHT_PYTHON='
 import os
 import pathlib
-import re
 import resource
 import subprocess
 import sys
@@ -87,7 +92,7 @@ def fail(message):
     print(f"CODESKEPTIC_ROOTFUL_PREFLIGHT_FAIL {message}", file=sys.stderr)
     raise SystemExit(125)
 
-expected_parent = pathlib.PurePosixPath(sys.argv[1])
+expected_controller = sys.argv[1]
 measurement_path = pathlib.Path(sys.argv[2])
 measurement_relative = sys.argv[3]
 measurement_cpu_list = sys.argv[4]
@@ -96,15 +101,12 @@ if os.getpid() != 1:
 record = pathlib.Path("/proc/self/cgroup").read_text(encoding="ascii").strip()
 if not record.startswith("0::"):
     fail("container cgroup record is malformed")
-current = pathlib.PurePosixPath(record[3:])
+if record != f"0::{expected_controller}":
+    fail("container is outside the exact delegated controller cgroup")
 try:
-    suffix = current.relative_to(expected_parent)
-except ValueError:
-    fail("container escaped the delegated service payload subtree")
-if len(suffix.parts) != 1 or re.fullmatch(
-    r"libpod-[0-9a-f]{64}(?:[.]scope)?", suffix.name
-) is None:
-    fail("container cgroup identity is malformed")
+    os.sched_setaffinity(0, range(4, 12))
+except OSError as error:
+    fail(f"controller affinity could not be pinned: {error}")
 if sorted(os.sched_getaffinity(0)) != list(range(4, 12)):
     fail("controller affinity is not exact CPUs 4-11")
 if resource.getrlimit(resource.RLIMIT_NOFILE) != (4096, 4096):
@@ -158,25 +160,23 @@ print(f"CODESKEPTIC_ROOTFUL_PREFLIGHT_OK yaml={yaml.__version__}")
 '
 
 readonly -a RUNTIME_CONTROLLER_COMMAND=(
+    "/usr/bin/taskset"
+    "--cpu-list"
+    "4-11"
     "/usr/bin/python3"
     "-B"
-    "/authority/source/scripts/run_stability_campaign.py"
+    "/operator/container-entry.py"
     "run"
-    "--config"
-    "/config/runtime.json"
-    "--output"
-    "/evidence"
 )
 
 readonly -a RUNTIME_VERIFIER_COMMAND=(
+    "/usr/bin/taskset"
+    "--cpu-list"
+    "4-11"
     "/usr/bin/python3"
     "-B"
-    "/authority/source/scripts/run_stability_campaign.py"
+    "/operator/container-entry.py"
     "verify"
-    "--config"
-    "/config/runtime.json"
-    "--evidence"
-    "/evidence"
 )
 
 # Dedicated root/runroot paths prevent ambient rootful Podman state from
@@ -193,7 +193,12 @@ readonly -a PODMAN_GLOBAL_OPTIONS=(
 )
 
 readonly -a PODMAN_HOST_ENVIRONMENT=(
+    "CONTAINERS_CONF=${CONTAINERS_CONF}"
     "HOME=${PODMAN_ENVIRONMENT_ROOT}/home"
+    "LANG=C"
+    "LC_ALL=C"
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    "TZ=UTC"
     "XDG_DATA_HOME=${PODMAN_ENVIRONMENT_ROOT}/data"
     "XDG_CACHE_HOME=${PODMAN_ENVIRONMENT_ROOT}/cache"
     "XDG_CONFIG_HOME=${PODMAN_ENVIRONMENT_ROOT}/config"
@@ -202,7 +207,7 @@ readonly -a PODMAN_HOST_ENVIRONMENT=(
 )
 
 run_podman() {
-    "$ENV" -- "${PODMAN_HOST_ENVIRONMENT[@]}" \
+    "$ENV" --ignore-environment -- "${PODMAN_HOST_ENVIRONMENT[@]}" \
         "$PODMAN" "${PODMAN_GLOBAL_OPTIONS[@]}" "$@"
 }
 
@@ -231,10 +236,7 @@ readonly -a PODMAN_CONTAINER_OPTIONS=(
     run
     --pull=never
     --network=none
-    --cgroups=no-conmon
-    --cgroupns=host
-    --cgroup-parent "$PAYLOAD_CGROUP_RELATIVE"
-    --cpuset-cpus="$CONTROLLER_CPUS"
+    --cgroups=disabled
     --ipc=private
     --pid=private
     --uts=private
@@ -1188,6 +1190,18 @@ verify_pinned_image_and_empty_container_store() {
     local image_digest
     local image_id
     local image_identity
+    local podman_version
+
+    podman_version="$(
+        run_podman version --format '{{.Client.Version}}'
+    )" || {
+        fail "cannot inspect the dedicated Podman version"
+        return 1
+    }
+    [[ "$podman_version" == "$PINNED_PODMAN_VERSION" ]] || {
+        fail "dedicated Podman version drift"
+        return 1
+    }
     image_identity="$(
         run_podman image inspect \
             --format '{{.Id}}|{{.Digest}}' "$PINNED_EVIDENCE_IMAGE"
@@ -1213,8 +1227,11 @@ verify_pinned_image_and_empty_container_store() {
 
 cgroup_value() {
     local path="$1"
-    [[ ! -L "$path" && -f "$path" ]] || fail "cgroup file is unavailable: ${path}"
-    /usr/bin/tr --delete '\n' <"$path"
+    [[ ! -L "$path" && -f "$path" ]] || {
+        fail "cgroup file is unavailable: ${path}"
+        return 1
+    }
+    /usr/bin/tr --delete '\n' <"$path" || return 1
 }
 
 cgroup_has_word() {
@@ -1232,18 +1249,75 @@ cgroup_word_set() {
     cgroup_value "$path" |
         /usr/bin/tr ' ' '\n' |
         /usr/bin/sed '/^$/d' |
-        /usr/bin/sort --unique |
+        LC_ALL=C /usr/bin/sort --unique |
         /usr/bin/paste --serial --delimiters=' ' -
+}
+
+require_exact_controller_inventory() {
+    local path="$1"
+    local file="$2"
+    local expected="$3"
+    local label="$4"
+    local observed
+
+    observed="$(cgroup_word_set "${path}/${file}")" || return 1
+    [[ "$observed" == "$expected" ]] || {
+        fail "${label} controller inventory drift: expected ${expected}; observed ${observed}"
+        return 1
+    }
+}
+
+require_ancestor_controller_inventory() {
+    require_exact_controller_inventory \
+        "$CGROUP_ROOT" cgroup.controllers \
+        "$ROOT_AVAILABLE_CONTROLLER_INVENTORY" \
+        "root available" || return 1
+    require_exact_controller_inventory \
+        "$CGROUP_ROOT" cgroup.subtree_control \
+        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "root subtree" || return 1
+    require_exact_controller_inventory \
+        "$SYSTEM_SLICE_CGROUP" cgroup.controllers \
+        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "system.slice available" || return 1
+    require_exact_controller_inventory \
+        "$SYSTEM_SLICE_CGROUP" cgroup.subtree_control \
+        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "system.slice subtree" || return 1
+    require_exact_controller_inventory \
+        "$SERVICE_CGROUP" cgroup.controllers \
+        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "service available" || return 1
+    require_exact_controller_inventory \
+        "$SERVICE_CGROUP" cgroup.subtree_control \
+        "$DELEGATED_CONTROLLER_INVENTORY" "service subtree" || return 1
+}
+
+require_active_controller_inventory() {
+    require_ancestor_controller_inventory || return 1
+    require_exact_controller_inventory \
+        "$PAYLOAD_CGROUP" cgroup.controllers \
+        "$DELEGATED_CONTROLLER_INVENTORY" "payload available" || return 1
+    require_exact_controller_inventory \
+        "$PAYLOAD_CGROUP" cgroup.subtree_control \
+        "$DELEGATED_CONTROLLER_INVENTORY" "payload subtree" || return 1
 }
 
 require_empty_cgroup() {
     local path="$1"
     local events
-    [[ -z "$(cgroup_value "${path}/cgroup.procs")" ]] ||
+    local processes
+
+    processes="$(cgroup_value "${path}/cgroup.procs")" || return 1
+    [[ -z "$processes" ]] || {
         fail "cgroup is not empty: ${path}"
-    events="$(cgroup_value "${path}/cgroup.events")"
-    [[ "$events" == *"populated 0"* && "$events" == *"frozen 0"* ]] ||
+        return 1
+    }
+    events="$(cgroup_value "${path}/cgroup.events")" || return 1
+    [[ "$events" == *"populated 0"* && "$events" == *"frozen 0"* ]] || {
         fail "cgroup is populated or frozen: ${path}"
+        return 1
+    }
 }
 
 require_absent_or_empty_cgroup() {
@@ -1303,6 +1377,7 @@ enable_service_controllers() {
     [[ "$(cgroup_word_set "${SERVICE_CGROUP}/cgroup.subtree_control")" \
         == "cpu cpuset memory pids" ]] ||
         fail "service subtree controller activation drift"
+    require_ancestor_controller_inventory
 }
 
 prepare_measurement_cgroup() {
@@ -1351,6 +1426,7 @@ prepare_measurement_cgroup() {
     [[ "$(cgroup_value "${PAYLOAD_CGROUP}/cpuset.cpus.effective")" == "$CONTROLLER_CPUS" ]] ||
         fail "payload controller CPU set drift"
     require_empty_cgroup "$MEASUREMENT_CGROUP"
+    require_active_controller_inventory
     "$CGROUP_AUTHORITY" verify-active --session "$session_name"
 }
 
@@ -1492,17 +1568,21 @@ run_rootful_preflight_probe() {
     done
     probe_args+=(
         "$PINNED_EVIDENCE_IMAGE"
+        "/usr/bin/taskset"
+        "--cpu-list"
+        "$CONTROLLER_CPUS"
         "/usr/bin/python3"
         "-B"
         "-c"
         "$PREFLIGHT_PYTHON"
-        "$PAYLOAD_CGROUP_RELATIVE"
+        "$CONTROLLER_CGROUP_RELATIVE"
         "$MEASUREMENT_CGROUP"
         "${PAYLOAD_CGROUP_RELATIVE}/measurement"
         "$MEASUREMENT_CPU_LIST"
     )
     run_podman "${probe_args[@]}" ||
         probe_exit=$?
+    require_active_controller_inventory || probe_exit=1
     if (( probe_exit == 0 )) && [[ ! -f "$cidfile" || -L "$cidfile" ]]; then
         fail "successful preflight did not retain its cleanup identity"
         probe_exit=1
@@ -1515,6 +1595,7 @@ run_rootful_preflight_probe() {
     container_kind=""
     cidfile=""
     require_empty_cgroup "$MEASUREMENT_CGROUP" || probe_exit=1
+    require_active_controller_inventory || probe_exit=1
     (( probe_exit == 0 )) || fail "rootful Podman preflight probe failed"
 }
 
@@ -1545,6 +1626,7 @@ run_inner_verifier() {
     local -a verifier_args=("${PODMAN_CONTAINER_OPTIONS[@]}")
     local -a verifier_bind_mounts=(
         "${AUTHORITY_ROOT}:/authority:ro"
+        "${OPERATOR_ROOT}:/operator:ro"
         "${CONFIG_PATH}:/config/runtime.json:ro"
         "${CONFIG_SHA_PATH}:/config/runtime.json.sha256:ro"
         "${launch_root}:/launch:ro"
@@ -1573,6 +1655,7 @@ run_inner_verifier() {
 
     run_podman "${verifier_args[@]}" \
         >"$inner_verifier_log" 2>"$stderr_path" || verifier_exit=$?
+    require_active_controller_inventory || verifier_exit=1
     if (( verifier_exit == 0 )) && [[ ! -f "$cidfile" || -L "$cidfile" ]]; then
         fail "successful verifier did not retain its cleanup identity"
         verifier_exit=1
@@ -1600,6 +1683,7 @@ run_inner_verifier() {
         verifier_exit=1
     fi
     require_empty_cgroup "$MEASUREMENT_CGROUP" || verifier_exit=1
+    require_active_controller_inventory || verifier_exit=1
     (( verifier_exit == 0 )) || {
         fail "strict inner verifier container failed"
         return 1
@@ -1612,6 +1696,7 @@ run_inner_verifier() {
 write_cleanup_record() {
     local authority_intent_sha
     local host_recovery_intent_sha
+    local podman_version
     local cleanup_path="${host_output}/cleanup.json"
     local expected_runtime="${CONTAINER_RUNTIME_ROOT}/${session_name}"
     local expected_identity_marker="${RUNTIME_IDENTITY_ROOT}/${session_name}.json"
@@ -1710,6 +1795,16 @@ write_cleanup_record() {
         && -z "$service_exclusive_effective" \
         && "$service_effective" == "$CAMPAIGN_CPUS" ]] ||
         fail "service cgroup authority was not exactly restored"
+    podman_version="$(
+        run_podman version --format '{{.Client.Version}}'
+    )" || {
+        fail "cannot re-inspect the dedicated Podman version after cleanup"
+        return 1
+    }
+    [[ "$podman_version" == "$PINNED_PODMAN_VERSION" ]] || {
+        fail "dedicated Podman version drift after cleanup"
+        return 1
+    }
     verify_dedicated_container_inventory_empty
     [[ ! -e "$cleanup_path" && ! -L "$cleanup_path" ]] ||
         fail "host cleanup record already exists"
@@ -1721,6 +1816,7 @@ write_cleanup_record() {
         "codeskeptic-p10-09-verifier-${session_nonce}" \
         "${RUNTIME_ROOT}/${session_name}.verifier.cid" \
         "$expected_runtime" "$expected_identity_marker" "$OPERATOR_ROOT" \
+        "$podman_version" \
         "$authority_intent_sha" "$host_recovery_intent_sha" "$root_isolated" \
         "$system_slice_partition" "$system_slice_exclusive" \
         "$system_slice_exclusive_effective" "$system_slice_effective" \
@@ -1734,7 +1830,8 @@ import sys
     path, boot_id, session, nonce, target_user, target_uid,
     campaign_id, campaign_name, campaign_cidfile,
     verifier_id, verifier_name, verifier_cidfile,
-    runtime_tree, identity_marker, hooks_dir, authority_intent_sha,
+    runtime_tree, identity_marker, hooks_dir, podman_version,
+    authority_intent_sha,
     host_recovery_intent_sha,
     root_isolated, system_partition, system_exclusive,
     system_exclusive_effective, system_effective,
@@ -1742,7 +1839,7 @@ import sys
     service_exclusive_effective, service_effective,
 ) = sys.argv[1:]
 value = {
-    "schema": "codeskeptic-stability-host-cleanup-v4",
+    "schema": "codeskeptic-stability-host-cleanup-v5",
     "boot_id": boot_id,
     "session": session,
     "session_nonce": nonce,
@@ -1763,6 +1860,23 @@ value = {
         "hooks_dir": hooks_dir,
         "runtime": "/usr/bin/crun",
         "conmon": "/usr/bin/conmon",
+        "containers_conf": f"{hooks_dir}/containers.conf",
+        "environment_launcher": "/usr/bin/env",
+        "environment_reset": "ignore-all-ambient",
+        "environment": {
+            "CONTAINERS_CONF": f"{hooks_dir}/containers.conf",
+            "HOME": "/var/lib/codeskeptic-p10-09/podman-environment/home",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "TZ": "UTC",
+            "XDG_DATA_HOME": "/var/lib/codeskeptic-p10-09/podman-environment/data",
+            "XDG_CACHE_HOME": "/var/lib/codeskeptic-p10-09/podman-environment/cache",
+            "XDG_CONFIG_HOME": "/var/lib/codeskeptic-p10-09/podman-environment/config",
+            "XDG_RUNTIME_DIR": "/var/lib/codeskeptic-p10-09/podman-environment/runtime",
+            "TMPDIR": "/var/lib/codeskeptic-p10-09/podman-environment/tmp",
+        },
+        "version": podman_version,
     },
     "container": {
         "id": campaign_id,
@@ -1770,9 +1884,8 @@ value = {
         "cidfile": campaign_cidfile,
         "image_id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
         "command": [
-            "/usr/bin/python3", "-B",
-            "/authority/source/scripts/run_stability_campaign.py", "run",
-            "--config", "/config/runtime.json", "--output", "/evidence",
+            "/usr/bin/taskset", "--cpu-list", "4-11",
+            "/usr/bin/python3", "-B", "/operator/container-entry.py", "run",
         ],
     },
     "verifier_container": {
@@ -1781,9 +1894,8 @@ value = {
         "cidfile": verifier_cidfile,
         "image_id": "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5",
         "command": [
-            "/usr/bin/python3", "-B",
-            "/authority/source/scripts/run_stability_campaign.py", "verify",
-            "--config", "/config/runtime.json", "--evidence", "/evidence",
+            "/usr/bin/taskset", "--cpu-list", "4-11",
+            "/usr/bin/python3", "-B", "/operator/container-entry.py", "verify",
         ],
     },
     "cgroup_authority": {
@@ -2062,6 +2174,8 @@ require_root_immutable_file "$CONFIG_PATH"
 require_root_immutable_file "$CONFIG_SHA_PATH"
 require_root_immutable_file "$RUNNER_PATH"
 require_root_immutable_file "$CGROUP_AUTHORITY"
+require_root_immutable_file "$CONTAINER_ENTRY"
+require_root_immutable_file "$CONTAINERS_CONF"
 require_root_immutable_file "$HOST_RECOVERY"
 require_root_immutable_file "$PODMAN"
 require_root_immutable_file "$ENV"
@@ -2192,6 +2306,7 @@ fi
 
 readonly -a CONTAINER_BIND_MOUNTS=(
     "${AUTHORITY_ROOT}:/authority:ro"
+    "${OPERATOR_ROOT}:/operator:ro"
     "${CONFIG_PATH}:/config/runtime.json:ro"
     "${CONFIG_SHA_PATH}:/config/runtime.json.sha256:ro"
     "${launch_root}:/launch:ro"
@@ -2235,6 +2350,7 @@ podman_run_args+=("$PINNED_EVIDENCE_IMAGE" "${RUNTIME_CONTROLLER_COMMAND[@]}")
 runner_exit=0
 run_podman "${podman_run_args[@]}" ||
     runner_exit=$?
+require_active_controller_inventory || runner_exit=1
 
 # Without --rm the CID file and stopped container must both remain available
 # for the EXIT trap to remove explicitly. A successful command without a CID
@@ -2251,9 +2367,11 @@ container_name=""
 container_kind=""
 cidfile=""
 require_empty_cgroup "$MEASUREMENT_CGROUP"
+require_active_controller_inventory
 
 run_inner_verifier
 cleanup_cgroup_authority
+require_ancestor_controller_inventory
 cleanup_campaign_runtime
 cleanup_guided_handoff
 cleanup_consumed_campaign_request

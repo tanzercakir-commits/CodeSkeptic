@@ -797,6 +797,35 @@ def write_cleanup(
             "hooks_dir": operator.parent.as_posix(),
             "runtime": "/usr/bin/crun",
             "conmon": "/usr/bin/conmon",
+            "containers_conf": (operator.parent / "containers.conf").as_posix(),
+            "environment_launcher": "/usr/bin/env",
+            "environment_reset": "ignore-all-ambient",
+            "environment": {
+                "CONTAINERS_CONF": (
+                    operator.parent / "containers.conf"
+                ).as_posix(),
+                "HOME": "/var/lib/codeskeptic-p10-09/podman-environment/home",
+                "LANG": "C",
+                "LC_ALL": "C",
+                "PATH": (
+                    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                ),
+                "TZ": "UTC",
+                "XDG_DATA_HOME": (
+                    "/var/lib/codeskeptic-p10-09/podman-environment/data"
+                ),
+                "XDG_CACHE_HOME": (
+                    "/var/lib/codeskeptic-p10-09/podman-environment/cache"
+                ),
+                "XDG_CONFIG_HOME": (
+                    "/var/lib/codeskeptic-p10-09/podman-environment/config"
+                ),
+                "XDG_RUNTIME_DIR": (
+                    "/var/lib/codeskeptic-p10-09/podman-environment/runtime"
+                ),
+                "TMPDIR": "/var/lib/codeskeptic-p10-09/podman-environment/tmp",
+            },
+            "version": stability.PINNED_PODMAN_VERSION,
         },
         "container": {
             "id": container_id,
@@ -1343,6 +1372,22 @@ class StabilityHostContaminationTest(unittest.TestCase):
     def test_cleanup_authority_is_exact_and_resealed_mutations_fail(self) -> None:
         mutations = (
             ("extra cleanup field", lambda cleanup, intent: cleanup.update(extra=True)),
+            (
+                "Podman version drift",
+                lambda cleanup, intent: cleanup["podman"].update(version="5.8.5"),
+            ),
+            (
+                "Podman config drift",
+                lambda cleanup, intent: cleanup["podman"].update(
+                    containers_conf="/tmp/containers.conf"
+                ),
+            ),
+            (
+                "Podman ambient environment enabled",
+                lambda cleanup, intent: cleanup["podman"].update(
+                    environment_reset="inherit-ambient"
+                ),
+            ),
             (
                 "type-confused intent digest",
                 lambda cleanup, intent: cleanup["cgroup_authority"]["intent"].update(

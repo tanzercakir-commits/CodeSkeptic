@@ -291,7 +291,7 @@ only the short rootful launch and cgroup validation:
 This mode creates one root-private, exclusive probe request in `/run`, which
 the operator atomically consumes and binds to both the handoff and terminal
 status as `mode=probe-only`. It uses the same unit, pinned image, Podman options, cgroup
-topology, limits, hooks directory, and seven bind destinations, but substitutes
+topology, limits, hooks directory, and eight bind destinations, but substitutes
 fresh ephemeral `/run` directories for the launch, evidence, and runtime
 mounts. It exits immediately after the probe and full cleanup: it creates no
 campaign evidence, no campaign launch receipt, never starts the campaign
@@ -302,24 +302,37 @@ host launch topology works; it is not campaign acceptance.
 
 ## Container boundary
 
-The rootful container is launched with `network=none`, `cgroups=no-conmon`, the
-host cgroup namespace, private IPC, PID, and UTS namespaces, a read-only root
-filesystem, user `0:0`, and exact soft/hard `nofile` limits of 4096. The unit also fixes
+The rootful container is launched with `network=none`, cgroup creation disabled,
+the host cgroup namespace selected by the immutable `containers.conf`, private
+IPC, PID, and UTS namespaces, a read-only
+root filesystem, user `0:0`, and exact soft/hard `nofile` limits of 4096. The unit also fixes
 `LimitNOFILE=4096`; its inhibited command explicitly enters through
 `prlimit --nofile=4096:4096` as well, so an inhibitor-manager limit cannot
 silently narrow the operator, probe, controller, or descendant ceiling. The
-`no-conmon` mode avoids an extra conmon cgroup while preserving the delegated
-container cgroup model required for the fixed measurement child; Podman's
-incompatible `cgroups=disabled`/`cgroupns=host` combination is forbidden.
-Every probe, controller, and verifier Podman argv explicitly includes
-`--cpuset-cpus=4-11`; recovery independently requires the same effective
-`HostConfig.CpusetCpus` value. This keeps container control work off the
-isolated 0-3 measurement partition while the child measurement process can
-still move into its sibling cgroup.
-The absolute cgroup parent
-`/system.slice/codeskeptic-stability.service/codeskeptic-p10-09` is created
-below the systemd service cgroup, keeping every payload inside
-`KillMode=control-group` coverage.
+`--cgroups=disabled` contract keeps every container process in the caller's
+systemd-managed controller cgroup and prevents crun from propagating controllers
+or creating `libpod-*` descendants. The host namespace is a pinned Podman
+configuration default, not the incompatible `--cgroupns` CLI option; inspection
+must still report `CgroupMode=host`. Every real container entry independently
+requires the exact controller path. All dedicated Podman commands start from an
+empty host environment and receive only the pinned config and runtime variables,
+so an ambient `CONTAINERS_CONF_OVERRIDE` cannot replace this namespace policy.
+The probe pins its own affinity, while the
+controller and verifier enter through `taskset --cpu-list 4-11`. Recovery
+requires empty `HostConfig.CgroupParent` and `HostConfig.CpusetCpus` claims and
+the exact disabled cgroup mode. Before and after every Podman lifecycle edge,
+the operator requires the qualified Fedora host's exact nine-controller root
+availability, exact seven-controller root and `system.slice` delegation, and
+exact four-controller service and payload delegation. A kernel or
+controller-set change therefore requires explicit
+requalification instead of becoming a live baseline. Measurement work alone
+moves into the fixed
+`/system.slice/codeskeptic-stability.service/codeskeptic-p10-09/measurement`
+cgroup and remains constrained to the isolated 0-3 partition.
+The sorted inventories are `cpu cpuset dmem hugetlb io memory misc pids rdma`
+at root availability, `cpu cpuset hugetlb io memory misc pids` at the root and
+`system.slice` delegation boundary, and `cpu cpuset memory pids` below the
+service boundary.
 Pulling, host environment inheritance, proxy inheritance, image
 volumes, writable implicit read-only tmpfs mounts, and ambient OCI hooks are
 disabled. Podman inspection must expose exactly eight environment claims:
@@ -333,6 +346,7 @@ container-kind labels. Any additional or missing environment claim or label is
 foreign state. Its fixed bind topology is:
 
 - `/authority` read-only;
+- `/operator` read-only;
 - `/config/runtime.json` read-only;
 - `/config/runtime.json.sha256` read-only;
 - `/launch` read-only;
@@ -343,12 +357,12 @@ foreign state. Its fixed bind topology is:
 The exact in-container command is:
 
 ```text
-/usr/bin/python3 -B /authority/source/scripts/run_stability_campaign.py run --config /config/runtime.json --output /evidence
+/usr/bin/taskset --cpu-list 4-11 /usr/bin/python3 -B /operator/container-entry.py run
 ```
 
 The container is not auto-removed. Podman must create a fresh CID file; the
 operator binds it to the durable session marker and host recovery rederives the
-effective command, process argv, seven semantic bind mounts, exact environment
+effective command, process argv, eight semantic bind mounts, exact environment
 and labels, image digest/name/ID, CID path, IPC/PID/UTS and
 cgroup/network topology, rootfs mode, security options, user, workdir, runtime,
 and resource limit from Podman inspection. Every Podman removal is centralized
@@ -366,10 +380,11 @@ execution-contract drift leaves the durable marker in place and changes the
 terminal result to failure.
 
 Before cgroup mutation or container removal, recovery supplies the exact live
-Podman IDs to the cgroup authority. The cgroup helper permits only the
-corresponding `libpod-<ID>` descendants, rejects foreign children, kills and
-empties the owned subtree, restores the ancestor CPU partition state, and
-removes its marker last. Its recovery path is cutpoint-aware and idempotent:
+Podman IDs to the cgroup authority. Podman cgroup creation is disabled, so the
+cgroup helper permits only the fixed `measurement` child and rejects every
+unexpected runtime child. It kills and empties the owned subtree, restores the
+ancestor CPU partition state, and removes its marker last. Its recovery path is
+cutpoint-aware and idempotent:
 it can complete active, partially restored, or already-clean states, including
 a strict unpublished-marker prefix only when the machine is otherwise proven
 clean.
@@ -380,6 +395,10 @@ campaign evidence and runtime are read-only in that verifier. Its CID, name,
 image ID, command, exact one-line success log, empty stderr, and removal are
 bound into the outer cleanup and operator receipts. A controller success is
 therefore not allowed to stand in for independent semantic verification.
+Both real roles enter through the immutable `/operator/container-entry.py`.
+That entrypoint independently requires PID 1, root identity, the exact systemd
+controller cgroup, affinity 4-11, and the fixed open-file limit before it execs
+the role-specific campaign command.
 
 Before the controller starts, the operator performs a short rootful probe with
 the exact pinned image, dedicated store, global Podman options, container

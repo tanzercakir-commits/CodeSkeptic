@@ -34,7 +34,7 @@ import run_stability_fault_injection as fault_injection
 
 POLICY_SCHEMA = "codeskeptic-stability-campaign-v2"
 RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v2"
-RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v1"
+RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v2"
 EVENT_SCHEMA = "codeskeptic-stability-event-v1"
 SESSION_SCHEMA = "codeskeptic-stability-session-v2"
 CYCLE_SCHEMA = "codeskeptic-stability-cycle-v1"
@@ -70,7 +70,7 @@ FAULT_INJECTION_PROJECTION_SCHEMA = (
     "codeskeptic-stability-fault-injection-projection-v1"
 )
 HOST_SNAPSHOT_SCHEMA = "codeskeptic-stability-host-snapshot-v2"
-HOST_CLEANUP_SCHEMA = "codeskeptic-stability-host-cleanup-v4"
+HOST_CLEANUP_SCHEMA = "codeskeptic-stability-host-cleanup-v5"
 OPERATOR_RECEIPT_SCHEMA = "codeskeptic-stability-operator-receipt-v3"
 CGROUP_AUTHORITY_INTENT_SCHEMA = "codeskeptic-p10-09-cgroup-authority-intent-v1"
 HOST_RECOVERY_INTENT_SCHEMA = "codeskeptic-p10-09-host-recovery-intent-v1"
@@ -110,6 +110,7 @@ PINNED_EVIDENCE_IMAGE_DIGEST = (
 PINNED_EVIDENCE_IMAGE_ID = (
     "sha256:25640c190484acc04e0dab2c64f8683668ad33930a3670900ff407023efc7fc5"
 )
+PINNED_PODMAN_VERSION = "5.8.4"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 GIT_SHA1 = re.compile(r"[0-9a-f]{40}")
 BOOT_ID = re.compile(
@@ -202,6 +203,7 @@ HOST_RECOVERY_MARKER_TEMP = (
 )
 RUNTIME_LAUNCH_MOUNTS = [
     {"destination": "/authority", "mode": "ro"},
+    {"destination": "/operator", "mode": "ro"},
     {"destination": "/config/runtime.json", "mode": "ro"},
     {"destination": "/config/runtime.json.sha256", "mode": "ro"},
     {"destination": "/launch", "mode": "ro"},
@@ -210,24 +212,22 @@ RUNTIME_LAUNCH_MOUNTS = [
     {"destination": "/sys/fs/cgroup", "mode": "rw"},
 ]
 RUNTIME_CONTROLLER_COMMAND = [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "4-11",
     "/usr/bin/python3",
     "-B",
-    "/authority/source/scripts/run_stability_campaign.py",
+    "/operator/container-entry.py",
     "run",
-    "--config",
-    "/config/runtime.json",
-    "--output",
-    "/evidence",
 ]
 RUNTIME_VERIFIER_COMMAND = [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "4-11",
     "/usr/bin/python3",
     "-B",
-    "/authority/source/scripts/run_stability_campaign.py",
+    "/operator/container-entry.py",
     "verify",
-    "--config",
-    "/config/runtime.json",
-    "--evidence",
-    "/evidence",
 ]
 HOST_SNAPSHOT_COMMON_RAW_FILES = {
     "coredumpctl": "coredumpctl.jsonl",
@@ -2442,9 +2442,8 @@ def build_runtime_launch_receipt(
         },
         "container": {
             "network": "none",
-            "cgroups": "no-conmon",
+            "cgroups": "disabled",
             "cgroup_namespace": "host",
-            "cgroup_parent": RUNTIME_CGROUP_PARENT,
             "pid_namespace": "private",
             "maximum_open_fds": MAXIMUM_OPEN_FDS,
             "read_only": True,
@@ -2479,7 +2478,7 @@ def validate_runtime_launch_receipt(
     _exact_dict(
         value["container"],
         {
-            "network", "cgroups", "cgroup_namespace", "cgroup_parent",
+            "network", "cgroups", "cgroup_namespace",
             "pid_namespace", "maximum_open_fds", "read_only", "user",
         },
         "launch container",
@@ -10373,6 +10372,8 @@ def _validate_cleanup_record(
         {
             "executable", "root", "runroot", "storage_driver",
             "cgroup_manager", "events_backend", "hooks_dir", "runtime", "conmon",
+            "containers_conf", "environment_launcher", "environment_reset",
+            "environment", "version",
         },
         "host cleanup Podman authority",
     )
@@ -10386,6 +10387,35 @@ def _validate_cleanup_record(
         "hooks_dir": operator_path.parent.as_posix(),
         "runtime": "/usr/bin/crun",
         "conmon": "/usr/bin/conmon",
+        "containers_conf": (operator_path.parent / "containers.conf").as_posix(),
+        "environment_launcher": "/usr/bin/env",
+        "environment_reset": "ignore-all-ambient",
+        "environment": {
+            "CONTAINERS_CONF": (
+                operator_path.parent / "containers.conf"
+            ).as_posix(),
+            "HOME": "/var/lib/codeskeptic-p10-09/podman-environment/home",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": (
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ),
+            "TZ": "UTC",
+            "XDG_DATA_HOME": (
+                "/var/lib/codeskeptic-p10-09/podman-environment/data"
+            ),
+            "XDG_CACHE_HOME": (
+                "/var/lib/codeskeptic-p10-09/podman-environment/cache"
+            ),
+            "XDG_CONFIG_HOME": (
+                "/var/lib/codeskeptic-p10-09/podman-environment/config"
+            ),
+            "XDG_RUNTIME_DIR": (
+                "/var/lib/codeskeptic-p10-09/podman-environment/runtime"
+            ),
+            "TMPDIR": "/var/lib/codeskeptic-p10-09/podman-environment/tmp",
+        },
+        "version": PINNED_PODMAN_VERSION,
     }
     if podman != expected_podman:
         raise StabilityError("host cleanup Podman authority drift")

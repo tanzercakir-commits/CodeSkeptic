@@ -55,6 +55,7 @@ BUNDLE_RECEIPT = INSTALLATION_ROOT / "bundle" / "receipt.json"
 BUNDLE_RECEIPT_SHA = BUNDLE_RECEIPT.with_name("receipt.json.sha256")
 AUTHORITY_ROOT = Path("/opt/codeskeptic-p10-09/authority")
 OPERATOR_ROOT = Path("/opt/codeskeptic-p10-09/operator")
+CONTAINERS_CONF = OPERATOR_ROOT / "containers.conf"
 CONFIG_PATH = Path("/etc/codeskeptic-p10-09/runtime.json")
 UNIT_PATH = Path("/etc/systemd/system/codeskeptic-stability.service")
 STATE_ROOT = Path("/var/lib/codeskeptic-p10-09")
@@ -100,14 +101,17 @@ PINNED_EVIDENCE_IMAGE = (
     "localhost/codeskeptic-p10-07-evidence@"
     + PINNED_EVIDENCE_IMAGE_DIGEST
 )
+PINNED_PODMAN_VERSION = "5.8.4"
 
 CONFIG_SHA_PATH = Path(f"{CONFIG_PATH}.sha256")
+CONTROLLER_CGROUP_RELATIVE = (
+    "/system.slice/codeskeptic-stability.service/controller"
+)
 PAYLOAD_CGROUP_RELATIVE = (
     "/system.slice/codeskeptic-stability.service/codeskeptic-p10-09"
 )
 MEASUREMENT_CGROUP = Path(f"/sys/fs/cgroup{PAYLOAD_CGROUP_RELATIVE}/measurement")
 MEASUREMENT_CPU_LIST = "0,1,2,3"
-CONTROLLER_CPUSET = "4-11"
 CONTAINER_WORKDIR = "/authority/source"
 CONTAINER_ENVIRONMENT = {
     "HOME": "/runtime/home",
@@ -124,30 +128,28 @@ IMAGE_CONFIG_LABELS = {
     "org.opencontainers.image.version": "24.04",
 }
 RUNTIME_CONTROLLER_COMMAND = (
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "4-11",
     "/usr/bin/python3",
     "-B",
-    "/authority/source/scripts/run_stability_campaign.py",
+    "/operator/container-entry.py",
     "run",
-    "--config",
-    "/config/runtime.json",
-    "--output",
-    "/evidence",
 )
 RUNTIME_VERIFIER_COMMAND = (
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "4-11",
     "/usr/bin/python3",
     "-B",
-    "/authority/source/scripts/run_stability_campaign.py",
+    "/operator/container-entry.py",
     "verify",
-    "--config",
-    "/config/runtime.json",
-    "--evidence",
-    "/evidence",
 )
 # The preflight source is deliberately not duplicated here.  Its exact bytes
 # are bound by this digest while the remaining argv elements are checked
 # individually below.
 PREFLIGHT_PYTHON_SHA256 = (
-    "1e547106867812e4c22bc129224124495257800f11736fe92dc99cefdaec98ef"
+    "b139a1af1797d51c06955598534bd87ba7e70f86868ce5f07e19cd4baac60426"
 )
 
 OWNER_LABEL = "io.codeskeptic.p10-09.host-recovery"
@@ -1142,7 +1144,12 @@ def _ensure_podman_runroot() -> None:
 
 def _podman_argv(arguments: Sequence[str]) -> list[str]:
     environment = (
+        f"CONTAINERS_CONF={CONTAINERS_CONF}",
         f"HOME={PODMAN_ENVIRONMENT_ROOT}/home",
+        "LANG=C",
+        "LC_ALL=C",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "TZ=UTC",
         f"XDG_DATA_HOME={PODMAN_ENVIRONMENT_ROOT}/data",
         f"XDG_CACHE_HOME={PODMAN_ENVIRONMENT_ROOT}/cache",
         f"XDG_CONFIG_HOME={PODMAN_ENVIRONMENT_ROOT}/config",
@@ -1151,6 +1158,7 @@ def _podman_argv(arguments: Sequence[str]) -> list[str]:
     )
     return [
         os.fspath(ENV),
+        "--ignore-environment",
         "--",
         *environment,
         os.fspath(PODMAN),
@@ -1189,6 +1197,16 @@ def run_podman(arguments: Sequence[str]) -> bytes:
     return stdout
 
 
+def _verify_podman_version() -> None:
+    version = run_podman(("version", "--format", "{{.Client.Version}}"))
+    try:
+        version_text = version.decode("ascii", errors="strict").strip()
+    except UnicodeDecodeError as error:
+        raise RecoveryError("Podman version is malformed") from error
+    if version_text != PINNED_PODMAN_VERSION:
+        raise RecoveryError("Podman version drift")
+
+
 def _podman_ids() -> list[str]:
     if not _is_present(PODMAN_ROOT):
         return []
@@ -1202,6 +1220,10 @@ def _podman_ids() -> list[str]:
             f"Podman environment {name}",
             mode=0o700,
         )
+    # Version drift must be rejected before creating a missing runroot,
+    # inspecting containers, recovering cgroups, unlinking CIDs, or removing
+    # any owned runtime object.
+    _verify_podman_version()
     _ensure_podman_runroot()
     raw = run_podman(
         ("container", "list", "--all", "--no-trunc", "--format", "{{.ID}}")
@@ -1221,6 +1243,7 @@ def _podman_ids() -> list[str]:
 def _verify_pinned_image_store() -> None:
     if not _is_present(PODMAN_ROOT):
         return
+    _verify_podman_version()
     identity = run_podman(
         (
             "image",
@@ -1317,6 +1340,7 @@ def expected_container_mounts(
     mutable = kind != "verifier"
     return {
         "/authority": (os.fspath(AUTHORITY_ROOT), False),
+        "/operator": (os.fspath(OPERATOR_ROOT), False),
         "/config/runtime.json": (os.fspath(CONFIG_PATH), False),
         "/config/runtime.json.sha256": (os.fspath(CONFIG_SHA_PATH), False),
         "/evidence": (os.fspath(evidence), mutable),
@@ -1360,15 +1384,16 @@ def _validate_container_command(
             raise RecoveryError("owned verifier command identity drift")
     elif kind == "preflight":
         if (
-            len(observed) != 8
-            or observed[:3] != ("/usr/bin/python3", "-B", "-c")
-            or hashlib.sha256(observed[3].encode("utf-8")).hexdigest()
+            len(observed) != 11
+            or observed[:3] != ("/usr/bin/taskset", "--cpu-list", "4-11")
+            or observed[3:6] != ("/usr/bin/python3", "-B", "-c")
+            or hashlib.sha256(observed[6].encode("utf-8")).hexdigest()
             != PREFLIGHT_PYTHON_SHA256
-            or observed[4]
-            != PAYLOAD_CGROUP_RELATIVE
-            or observed[5] != os.fspath(MEASUREMENT_CGROUP)
-            or observed[6] != f"{PAYLOAD_CGROUP_RELATIVE}/measurement"
-            or observed[7] != MEASUREMENT_CPU_LIST
+            or observed[7]
+            != CONTROLLER_CGROUP_RELATIVE
+            or observed[8] != os.fspath(MEASUREMENT_CGROUP)
+            or observed[9] != f"{PAYLOAD_CGROUP_RELATIVE}/measurement"
+            or observed[10] != MEASUREMENT_CPU_LIST
         ):
             raise RecoveryError("owned preflight command identity drift")
     else:
@@ -1463,12 +1488,9 @@ def _validate_container_execution_contract(
         "Cgroup": "",
         "CgroupManager": "cgroupfs",
         "CgroupMode": "host",
-        "CgroupParent": PAYLOAD_CGROUP_RELATIVE,
-        # Podman 5.8 serializes --cgroups=no-conmon as the effective
-        # container value "default"; the runner argv remains independently
-        # pinned by the installed operator inventory.
-        "Cgroups": "default",
-        "CpusetCpus": CONTROLLER_CPUSET,
+        "CgroupParent": "",
+        "Cgroups": "disabled",
+        "CpusetCpus": "",
         "ContainerIDFile": os.fspath(expected_container_cidfile(marker, kind)),
         "IpcMode": "private",
         "NetworkMode": "none",
@@ -1829,7 +1851,7 @@ def verify_active_cgroup_authority(
     marker: dict[str, object],
     owned_containers: Sequence[tuple[str, str]],
 ) -> None:
-    """Bind every live libpod cgroup to the exact Podman inventory."""
+    """Reject runtime cgroup creation and bind the exact Podman inventory."""
 
     if not _is_present(CGROUP_MARKER):
         raise RecoveryError("owned container exists without cgroup authority")
@@ -2465,9 +2487,10 @@ def _recover_bound(marker: dict[str, object]) -> str:
     owned_containers = _owned_container_inventory(marker)
     _validate_complete_cid_bindings(marker, owned_containers)
     validate_cgroup_session_binding(marker)
-    # The cgroup authority validates its whole owned subtree before mutation,
-    # binds each live libpod child to this exact Podman inventory, then resumes
-    # active, partially restored, or already-clean cutpoints idempotently.
+    # The cgroup authority rejects runtime-created children before mutation,
+    # while the supplied IDs bind cleanup to this exact Podman inventory. It
+    # then resumes active, partially restored, or already-clean cutpoints
+    # idempotently.
     # Podman metadata removal is safe only after that bounded recovery succeeds.
     recover_cgroup_authority(owned_containers)
     # CID-first makes every interruption unambiguous: a surviving container
