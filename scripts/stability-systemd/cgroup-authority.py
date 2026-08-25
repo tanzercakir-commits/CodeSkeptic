@@ -9,7 +9,6 @@ import os
 import re
 import stat
 import sys
-import time
 from pathlib import Path
 
 
@@ -32,7 +31,21 @@ MEASUREMENT = PAYLOAD / "measurement"
 EXCLUSIVE_CPUS = "0-3"
 CONTROLLER_CPUS = "4-11"
 CAMPAIGN_CPUS = "0-11"
+MEMORY_NODES = "0"
+DEFAULT_UCLAMP_MIN = "0.00"
+DEFAULT_UCLAMP = (DEFAULT_UCLAMP_MIN, "max")
+# This campaign is kernel-bound.  Fedora 44 / Linux 6.19 canonicalizes a
+# full-scale clamp to ``max`` on both interfaces.
+FULL_UCLAMP = ("max", "max")
+FULL_UCLAMP_STATES = frozenset({FULL_UCLAMP})
+MIN_WRITTEN_UCLAMP_STATES = FULL_UCLAMP_STATES
 REQUIRED_CONTROLLERS = frozenset({"cpuset", "cpu", "memory", "pids"})
+ROOT_CONTROLLERS = frozenset(
+    {"cpu", "cpuset", "dmem", "hugetlb", "io", "memory", "misc", "pids", "rdma"}
+)
+HOST_CONTROLLERS = frozenset(
+    {"cpu", "cpuset", "hugetlb", "io", "memory", "misc", "pids"}
+)
 CPU_POSSIBLE = Path("/sys/devices/system/cpu/possible")
 CPU_ONLINE = Path("/sys/devices/system/cpu/online")
 ROOT_UID = 0
@@ -500,22 +513,22 @@ def discard_unpublished_marker(session: str) -> bool:
 
 
 def require_initial_state() -> None:
-    require_exact_directory(CGROUP_ROOT, "cgroup root")
+    require_topology()
     if cgroup_value(CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"):
         raise AuthorityError("root isolated CPUs are not initially empty")
-    if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("possible CPU topology drift")
-    if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("online CPU topology drift")
-    require_member_with_empty_exclusive(SYSTEM_SLICE, "system.slice")
-    require_member_with_empty_exclusive(SERVICE, "service")
-    if cgroup_value(SYSTEM_SLICE / "cpuset.cpus.effective", "system.slice CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("initial system.slice effective CPUs drift")
-    if cgroup_value(SERVICE / "cpuset.cpus.effective", "service CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("initial service effective CPUs drift")
-    require_exact_directory(CONTROLLER, "controller")
-    if cgroup_value(CONTROLLER / "cpuset.cpus.effective", "controller CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("initial controller effective CPUs drift")
+    require_ancestor_state(
+        SYSTEM_SLICE,
+        "system.slice",
+        exclusive="",
+        effective_cpus=CAMPAIGN_CPUS,
+    )
+    require_ancestor_state(
+        SERVICE,
+        "service",
+        exclusive="",
+        effective_cpus=CAMPAIGN_CPUS,
+    )
+    require_controller_state(CAMPAIGN_CPUS, payload_present=False)
     subtree = set(
         cgroup_value(SERVICE / "cgroup.subtree_control", "service controllers").split()
     )
@@ -546,35 +559,88 @@ def expected_active_ancestry() -> tuple[tuple[Path, str, str], ...]:
     )
 
 
+def require_active_payload_state() -> None:
+    require_cgroup_structure(
+        PAYLOAD,
+        "payload",
+        subtree=REQUIRED_CONTROLLERS,
+        children=(MEASUREMENT,),
+    )
+    require_cgroup_structure(
+        MEASUREMENT,
+        "measurement",
+        subtree=frozenset(),
+        children=(),
+    )
+    if cpuset_state(PAYLOAD, "payload") != (
+        CAMPAIGN_CPUS,
+        CONTROLLER_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "member",
+    ):
+        raise AuthorityError("active payload correlated cpuset state drift")
+    if cpuset_state(MEASUREMENT, "measurement") != (
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "isolated",
+    ):
+        raise AuthorityError("active measurement correlated cpuset state drift")
+    memory_nodes = service_memory_nodes()
+    require_memory_state(
+        PAYLOAD,
+        "payload",
+        configured=frozenset({memory_nodes}),
+        effective=memory_nodes,
+    )
+    require_memory_state(
+        MEASUREMENT,
+        "measurement",
+        configured=frozenset({memory_nodes}),
+        effective=memory_nodes,
+    )
+    require_uclamp_state(
+        PAYLOAD, "payload", frozenset({DEFAULT_UCLAMP})
+    )
+    require_uclamp_state(
+        MEASUREMENT,
+        "measurement",
+        FULL_UCLAMP_STATES,
+    )
+
+
 def verify_active(
     session: str, owned_container_ids: tuple[str, ...] = ()
 ) -> None:
     valid_container_ids(owned_container_ids)
     read_marker(session)
-    for path, partition, effective_cpus in expected_active_ancestry():
-        label = path.name
-        require_exact_directory(path, label)
-        if cgroup_value(path / "cpuset.cpus.exclusive", label) != EXCLUSIVE_CPUS:
-            raise AuthorityError(f"configured exclusive CPU ancestry drift: {label}")
-        if cgroup_value(path / "cpuset.cpus.exclusive.effective", label) != EXCLUSIVE_CPUS:
-            raise AuthorityError(f"effective exclusive CPU ancestry drift: {label}")
-        if cgroup_value(path / "cpuset.cpus.partition", label) != partition:
-            raise AuthorityError(f"partition ancestry drift: {label}")
-        if cgroup_value(path / "cpuset.cpus.effective", label) != effective_cpus:
-            raise AuthorityError(f"effective CPU ancestry drift: {label}")
-    require_exact_directory(CONTROLLER, "controller")
-    if cgroup_value(CONTROLLER / "cpuset.cpus.effective", "controller CPUs") != CONTROLLER_CPUS:
-        raise AuthorityError("controller effective CPUs drift")
+    require_topology()
+    require_ancestor_state(
+        SYSTEM_SLICE,
+        "system.slice",
+        exclusive=EXCLUSIVE_CPUS,
+        effective_cpus=CONTROLLER_CPUS,
+    )
+    require_ancestor_state(
+        SERVICE,
+        "service",
+        exclusive=EXCLUSIVE_CPUS,
+        effective_cpus=CONTROLLER_CPUS,
+    )
+    require_controller_state(CONTROLLER_CPUS, payload_present=True)
     if cgroup_value(CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs") != EXCLUSIVE_CPUS:
         raise AuthorityError("root isolated CPU inventory drift")
-    if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("possible CPU topology drift")
-    if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("online CPU topology drift")
-    # Ancestry values alone do not establish ownership of every mutable
-    # descendant. Container cleanup uses this action as its final
-    # pre-mutation gate, so reject any foreign payload child here too.
-    validate_payload_tree(owned_container_ids)
+    require_active_payload_state()
+
+
+def verify_recovery(
+    session: str, owned_container_ids: tuple[str, ...] = ()
+) -> None:
+    valid_container_ids(owned_container_ids)
+    read_marker(session)
+    validate_cleanup_state(owned_container_ids)
 
 
 def cgroup_events(path: Path, label: str) -> dict[str, str]:
@@ -589,17 +655,14 @@ def cgroup_events(path: Path, label: str) -> dict[str, str]:
     return events
 
 
-def kill_and_wait(path: Path, label: str) -> None:
-    if cgroup_events(path, label)["populated"] == "1":
-        write_control(path / "cgroup.kill", "1")
-        for _ in range(500):
-            if cgroup_events(path, label)["populated"] == "0":
-                break
-            time.sleep(0.01)
-        else:
-            raise AuthorityError(f"{label} cgroup did not become recursively empty")
-    if cgroup_events(path, label)["populated"] != "0":
+def require_empty_cgroup(path: Path, label: str) -> None:
+    # Podman owns process termination.  A populated subtree after its exact
+    # container has been removed is an unproven foreign/orphan process set;
+    # never apply cgroup.kill to it under the cgroup topology authority alone.
+    if cgroup_events(path, label) != {"frozen": "0", "populated": "0"}:
         raise AuthorityError(f"{label} cgroup remains populated")
+    if cgroup_value(path / "cgroup.procs", label):
+        raise AuthorityError(f"{label} cgroup membership is not empty")
 
 
 def child_directories(path: Path) -> list[Path]:
@@ -613,87 +676,593 @@ def child_directories(path: Path) -> list[Path]:
     return sorted(children, key=lambda item: item.name)
 
 
-def validate_owned_tree(
-    path: Path, label: str, *, measurement_root: bool = False
+def word_inventory(path: Path, label: str) -> frozenset[str]:
+    return frozenset(cgroup_value(path, label).split())
+
+
+def require_cgroup_structure(
+    path: Path,
+    label: str,
+    *,
+    subtree: frozenset[str],
+    children: tuple[Path, ...],
 ) -> None:
     require_exact_directory(path, label)
-    partition = cgroup_value(path / "cpuset.cpus.partition", label)
-    configured = cgroup_value(path / "cpuset.cpus.exclusive", label)
-    if measurement_root:
-        if partition != "member" and partition != "isolated" and not partition.startswith(
-            "isolated invalid ("
+    if word_inventory(path / "cgroup.controllers", label) != REQUIRED_CONTROLLERS:
+        raise AuthorityError(f"{label} available controller inventory drift")
+    if word_inventory(path / "cgroup.subtree_control", label) != subtree:
+        raise AuthorityError(f"{label} subtree controller inventory drift")
+    if cgroup_value(path / "cgroup.type", label) != "domain":
+        raise AuthorityError(f"{label} cgroup type drift")
+    if tuple(child_directories(path)) != children:
+        raise AuthorityError(f"{label} child cgroup inventory drift")
+
+
+def cpuset_state(path: Path, label: str) -> tuple[str, str, str, str, str]:
+    return (
+        cgroup_value(path / "cpuset.cpus", label),
+        cgroup_value(path / "cpuset.cpus.effective", label),
+        cgroup_value(path / "cpuset.cpus.exclusive", label),
+        cgroup_value(path / "cpuset.cpus.exclusive.effective", label),
+        cgroup_value(path / "cpuset.cpus.partition", label),
+    )
+
+
+def require_topology() -> None:
+    require_exact_directory(CGROUP_ROOT, "cgroup root")
+    if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
+        raise AuthorityError("possible CPU topology drift")
+    if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
+        raise AuthorityError("online CPU topology drift")
+    for path, label, controllers, subtree in (
+        (CGROUP_ROOT, "cgroup root", ROOT_CONTROLLERS, HOST_CONTROLLERS),
+        (SYSTEM_SLICE, "system.slice", HOST_CONTROLLERS, HOST_CONTROLLERS),
+    ):
+        require_exact_directory(path, label)
+        if word_inventory(path / "cgroup.controllers", label) != controllers:
+            raise AuthorityError(f"{label} available controller inventory drift")
+        if word_inventory(path / "cgroup.subtree_control", label) != subtree:
+            raise AuthorityError(f"{label} subtree controller inventory drift")
+        if path != CGROUP_ROOT and cgroup_value(
+            path / "cgroup.type", label
+        ) != "domain":
+            raise AuthorityError(f"{label} cgroup type drift")
+    for name in (
+        "cgroup.type",
+        "cpuset.cpus",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+        "cpu.uclamp.min",
+        "cpu.uclamp.max",
+    ):
+        path = CGROUP_ROOT / name
+        if path.exists() or path.is_symlink():
+            raise AuthorityError(f"cgroup root exposes unexpected {name}")
+    if cgroup_value(
+        CGROUP_ROOT / "cpuset.cpus.effective", "cgroup root"
+    ) != CAMPAIGN_CPUS:
+        raise AuthorityError("cgroup root effective CPU inventory drift")
+    if cgroup_value(
+        CGROUP_ROOT / "cpuset.mems.effective", "cgroup root"
+    ) != MEMORY_NODES:
+        raise AuthorityError("cgroup root effective memory node inventory drift")
+    if cgroup_value(SYSTEM_SLICE / "cpuset.cpus", "system.slice"):
+        raise AuthorityError("system.slice configured CPU inventory drift")
+    require_memory_state(
+        SYSTEM_SLICE,
+        "system.slice",
+        configured=frozenset({""}),
+        effective=MEMORY_NODES,
+    )
+    require_uclamp_state(
+        SYSTEM_SLICE, "system.slice", frozenset({DEFAULT_UCLAMP})
+    )
+
+
+def self_cgroup_path() -> Path:
+    raw = Path("/proc/self/cgroup").read_text(encoding="ascii").strip()
+    if not raw.startswith("0::") or "\n" in raw:
+        raise AuthorityError("cgroup authority process identity is malformed")
+    relative = Path(raw[3:]).relative_to("/")
+    return CGROUP_ROOT / relative
+
+
+def require_service_structure(
+    *,
+    payload_present: bool,
+    effective_cpus: str,
+    controller_required: bool = True,
+    caller_role: str = "controller",
+    service_subtree: frozenset[str] = REQUIRED_CONTROLLERS,
+) -> None:
+    require_exact_directory(SERVICE, "service")
+    if word_inventory(
+        SERVICE / "cgroup.controllers", "service"
+    ) != HOST_CONTROLLERS:
+        raise AuthorityError("service available controller inventory drift")
+    if word_inventory(
+        SERVICE / "cgroup.subtree_control", "service"
+    ) != service_subtree:
+        raise AuthorityError("service subtree controller inventory drift")
+    if cgroup_value(SERVICE / "cgroup.type", "service") != "domain":
+        raise AuthorityError("service cgroup type drift")
+    if cgroup_value(SERVICE / "cpuset.cpus", "service") != CAMPAIGN_CPUS:
+        raise AuthorityError("service configured CPU inventory drift")
+    require_memory_state(
+        SERVICE,
+        "service",
+        configured=frozenset({""}),
+        effective=MEMORY_NODES,
+    )
+    require_uclamp_state(
+        SERVICE, "service", frozenset({DEFAULT_UCLAMP})
+    )
+    expected_children: list[Path] = []
+    if controller_required:
+        expected_children.append(CONTROLLER)
+    if payload_present:
+        expected_children.append(PAYLOAD)
+    control = SERVICE / ".control"
+    control_present = control.exists() or control.is_symlink()
+    if control_present:
+        expected_children.append(control)
+        require_cgroup_structure(
+            control,
+            "service control",
+            subtree=frozenset(),
+            children=(),
+        )
+        if cpuset_state(control, "service control") != (
+            "",
+            effective_cpus,
+            "",
+            "",
+            "member",
         ):
-            raise AuthorityError("measurement partition ownership drift")
-        if configured not in {"", EXCLUSIVE_CPUS}:
-            raise AuthorityError("refusing foreign measurement exclusive CPUs")
+            raise AuthorityError("service control correlated cpuset state drift")
+        require_memory_state(
+            control,
+            "service control",
+            configured=frozenset({""}),
+            effective=MEMORY_NODES,
+        )
+        require_uclamp_state(
+            control, "service control", frozenset({DEFAULT_UCLAMP})
+        )
+    if child_directories(SERVICE) != sorted(
+        expected_children, key=lambda item: item.name
+    ):
+        raise AuthorityError("service child cgroup inventory drift")
+    caller = self_cgroup_path()
+    if caller_role == "controller":
+        if caller != CONTROLLER or control_present:
+            raise AuthorityError("active controller caller identity drift")
+    elif caller_role == "recovery":
+        if control_present:
+            if caller != control:
+                raise AuthorityError("foreign service control subgroup")
+        elif controller_required:
+            if caller != CONTROLLER:
+                raise AuthorityError("recovery controller caller identity drift")
+        elif caller != SERVICE:
+            raise AuthorityError("startup recovery caller identity drift")
     else:
-        if partition != "member":
-            raise AuthorityError(f"{label} is not a member cgroup")
-        if configured:
-            raise AuthorityError(f"refusing foreign {label} exclusive CPUs")
-    children = child_directories(path)
-    if measurement_root and children:
-        raise AuthorityError("measurement cgroup contains foreign descendants")
-    for child in children:
-        validate_owned_tree(child, f"{label}/{child.name}")
+        raise AuthorityError("service caller role is malformed")
+
+
+def service_memory_nodes() -> str:
+    if cgroup_value(
+        SERVICE / "cpuset.mems.effective", "service"
+    ) != MEMORY_NODES:
+        raise AuthorityError("service effective memory node inventory drift")
+    return MEMORY_NODES
+
+
+def require_memory_state(
+    path: Path,
+    label: str,
+    *,
+    configured: frozenset[str],
+    effective: str,
+) -> None:
+    observed_configured = cgroup_value(path / "cpuset.mems", label)
+    observed_effective = cgroup_value(path / "cpuset.mems.effective", label)
+    if observed_configured not in configured:
+        raise AuthorityError(f"{label} configured memory node inventory drift")
+    if observed_effective != effective:
+        raise AuthorityError(f"{label} effective memory node inventory drift")
+
+
+def require_ancestor_state(
+    path: Path,
+    label: str,
+    *,
+    exclusive: str,
+    effective_cpus: str,
+) -> None:
+    require_exact_directory(path, label)
+    cpus, effective, configured, configured_effective, partition = cpuset_state(
+        path, label
+    )
+    allowed_cpus = {""} if path == SYSTEM_SLICE else {CAMPAIGN_CPUS}
+    if (
+        cpus not in allowed_cpus
+        or effective != effective_cpus
+        or configured != exclusive
+        or configured_effective != exclusive
+        or partition != "member"
+    ):
+        raise AuthorityError(f"{label} correlated cpuset state drift")
+    require_uclamp_state(path, label, frozenset({DEFAULT_UCLAMP}))
+
+
+def require_controller_state(
+    effective_cpus: str,
+    *,
+    payload_present: bool,
+    caller_role: str = "controller",
+) -> None:
+    require_service_structure(
+        payload_present=payload_present,
+        effective_cpus=effective_cpus,
+        caller_role=caller_role,
+    )
+    require_cgroup_structure(
+        CONTROLLER,
+        "controller",
+        subtree=frozenset(),
+        children=(),
+    )
+    if cpuset_state(CONTROLLER, "controller") != (
+        "",
+        effective_cpus,
+        "",
+        "",
+        "member",
+    ):
+        raise AuthorityError("controller correlated cpuset state drift")
+    memory_nodes = service_memory_nodes()
+    require_memory_state(
+        CONTROLLER,
+        "controller",
+        configured=frozenset({""}),
+        effective=MEMORY_NODES,
+    )
+    require_uclamp_state(
+        CONTROLLER, "controller", frozenset({DEFAULT_UCLAMP})
+    )
+
+
+def require_clean_start_controller_state(effective_cpus: str) -> None:
+    """Validate systemd's controller subgroup before delegation is enabled."""
+
+    require_service_structure(
+        payload_present=False,
+        effective_cpus=effective_cpus,
+        caller_role="recovery",
+        service_subtree=frozenset(),
+    )
+    require_exact_directory(CONTROLLER, "startup controller")
+    if word_inventory(
+        CONTROLLER / "cgroup.controllers", "startup controller"
+    ):
+        raise AuthorityError(
+            "startup controller available controller inventory drift"
+        )
+    if word_inventory(
+        CONTROLLER / "cgroup.subtree_control", "startup controller"
+    ):
+        raise AuthorityError(
+            "startup controller subtree controller inventory drift"
+        )
+    if cgroup_value(CONTROLLER / "cgroup.type", "startup controller") != "domain":
+        raise AuthorityError("startup controller cgroup type drift")
+    if child_directories(CONTROLLER):
+        raise AuthorityError("startup controller child cgroup inventory drift")
+    for name in (
+        "cpuset.cpus",
+        "cpuset.cpus.effective",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+        "cpuset.mems.effective",
+        "cpu.uclamp.min",
+        "cpu.uclamp.max",
+    ):
+        path = CONTROLLER / name
+        if path.exists() or path.is_symlink():
+            raise AuthorityError(
+                f"startup controller exposes unexpected {name}"
+            )
+
+
+def require_recovery_control_plane(
+    effective_cpus: str,
+    *,
+    payload_present: bool,
+    allow_clean_start: bool = False,
+) -> None:
+    if CONTROLLER.exists() or CONTROLLER.is_symlink():
+        if allow_clean_start and not payload_present and word_inventory(
+            SERVICE / "cgroup.subtree_control", "service"
+        ) == frozenset():
+            require_clean_start_controller_state(effective_cpus)
+            return
+        require_controller_state(
+            effective_cpus,
+            payload_present=payload_present,
+            caller_role="recovery",
+        )
+        return
+    control = SERVICE / ".control"
+    if (
+        allow_clean_start
+        and not payload_present
+        and not (control.exists() or control.is_symlink())
+    ):
+        require_service_structure(
+            payload_present=False,
+            effective_cpus=effective_cpus,
+            controller_required=False,
+            caller_role="recovery",
+            service_subtree=frozenset(),
+        )
+        return
+    require_service_structure(
+        payload_present=payload_present,
+        effective_cpus=effective_cpus,
+        controller_required=False,
+        caller_role="recovery",
+    )
+
+
+def require_uclamp_state(
+    path: Path,
+    label: str,
+    expected: frozenset[tuple[str, str]],
+) -> None:
+    observed = (
+        cgroup_value(path / "cpu.uclamp.min", label),
+        cgroup_value(path / "cpu.uclamp.max", label),
+    )
+    if observed not in expected:
+        raise AuthorityError(f"{label} correlated uclamp state drift")
 
 
 def validate_payload_tree(
     owned_container_ids: tuple[str, ...] = (),
 ) -> list[Path]:
     valid_container_ids(owned_container_ids)
-    require_exact_directory(PAYLOAD, "payload")
-    if cgroup_value(PAYLOAD / "cpuset.cpus.partition", "payload") != "member":
-        raise AuthorityError("payload is not a member cgroup")
-    configured = cgroup_value(PAYLOAD / "cpuset.cpus.exclusive", "payload")
-    if configured not in {"", EXCLUSIVE_CPUS}:
-        raise AuthorityError("refusing foreign payload exclusive CPUs")
-    subtree = set(
-        cgroup_value(PAYLOAD / "cgroup.subtree_control", "payload").split()
-    )
-    if not subtree <= REQUIRED_CONTROLLERS:
-        raise AuthorityError("payload subtree controller inventory drift")
+    require_topology()
     children = child_directories(PAYLOAD)
-    for child in children:
-        if child == MEASUREMENT:
-            validate_owned_tree(child, "measurement", measurement_root=True)
-        else:
-            raise AuthorityError(
-                f"payload contains an unexpected runtime cgroup: {child.name}"
-            )
+    if children not in ([], [MEASUREMENT]):
+        raise AuthorityError("payload child cgroup inventory drift")
+    subtree = word_inventory(PAYLOAD / "cgroup.subtree_control", "payload")
+    if subtree not in (frozenset(), REQUIRED_CONTROLLERS):
+        raise AuthorityError("payload subtree controller inventory drift")
+    require_cgroup_structure(
+        PAYLOAD,
+        "payload",
+        subtree=subtree,
+        children=tuple(children),
+    )
+    memory_nodes = service_memory_nodes()
+    payload_state = cpuset_state(PAYLOAD, "payload")
+    require_uclamp_state(
+        PAYLOAD, "payload", frozenset({DEFAULT_UCLAMP})
+    )
+
+    if not children:
+        if MEASUREMENT.exists() or MEASUREMENT.is_symlink():
+            raise AuthorityError("measurement cgroup identity drift")
+        if cgroup_value(
+            CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"
+        ):
+            raise AuthorityError("payload-only recovery overlaps isolated CPUs")
+        require_ancestor_state(
+            SYSTEM_SLICE,
+            "system.slice",
+            exclusive=EXCLUSIVE_CPUS,
+            effective_cpus=CAMPAIGN_CPUS,
+        )
+        require_ancestor_state(
+            SERVICE,
+            "service",
+            exclusive=EXCLUSIVE_CPUS,
+            effective_cpus=CAMPAIGN_CPUS,
+        )
+        require_recovery_control_plane(
+            CAMPAIGN_CPUS, payload_present=True
+        )
+        allowed_payload_states = {
+            ("", CAMPAIGN_CPUS, "", "", "member", frozenset()),
+            (
+                CAMPAIGN_CPUS,
+                CAMPAIGN_CPUS,
+                "",
+                "",
+                "member",
+                frozenset(),
+            ),
+            (
+                CAMPAIGN_CPUS,
+                CAMPAIGN_CPUS,
+                EXCLUSIVE_CPUS,
+                EXCLUSIVE_CPUS,
+                "member",
+                frozenset(),
+            ),
+            (
+                CAMPAIGN_CPUS,
+                CAMPAIGN_CPUS,
+                EXCLUSIVE_CPUS,
+                EXCLUSIVE_CPUS,
+                "member",
+                REQUIRED_CONTROLLERS,
+            ),
+        }
+        if (*payload_state, subtree) not in allowed_payload_states:
+            raise AuthorityError("payload correlated recovery state drift")
+        configured_mems = frozenset({"", memory_nodes})
+        if payload_state[0]:
+            configured_mems = frozenset({memory_nodes})
+        require_memory_state(
+            PAYLOAD,
+            "payload",
+            configured=configured_mems,
+            effective=memory_nodes,
+        )
+        return children
+
+    if subtree != REQUIRED_CONTROLLERS:
+        raise AuthorityError("measurement exists without exact payload delegation")
+    require_cgroup_structure(
+        MEASUREMENT,
+        "measurement",
+        subtree=frozenset(),
+        children=(),
+    )
+    measurement_state = cpuset_state(MEASUREMENT, "measurement")
+    partition = measurement_state[4]
+    if partition == "isolated":
+        expected_root = EXCLUSIVE_CPUS
+        expected_ancestor_cpus = CONTROLLER_CPUS
+    elif partition == "member":
+        expected_root = ""
+        expected_ancestor_cpus = CAMPAIGN_CPUS
+    else:
+        raise AuthorityError("measurement partition recovery state drift")
+    if cgroup_value(
+        CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"
+    ) != expected_root:
+        raise AuthorityError("measurement/root isolation correlation drift")
+    require_ancestor_state(
+        SYSTEM_SLICE,
+        "system.slice",
+        exclusive=EXCLUSIVE_CPUS,
+        effective_cpus=expected_ancestor_cpus,
+    )
+    require_ancestor_state(
+        SERVICE,
+        "service",
+        exclusive=EXCLUSIVE_CPUS,
+        effective_cpus=expected_ancestor_cpus,
+    )
+    require_recovery_control_plane(
+        expected_ancestor_cpus, payload_present=True
+    )
+    expected_payload_state = (
+        CAMPAIGN_CPUS,
+        expected_ancestor_cpus,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "member",
+    )
+    if payload_state != expected_payload_state:
+        raise AuthorityError("payload/measurement correlated cpuset state drift")
+    require_memory_state(
+        PAYLOAD,
+        "payload",
+        configured=frozenset({memory_nodes}),
+        effective=memory_nodes,
+    )
+
+    empty_measurement = (
+        "",
+        CAMPAIGN_CPUS,
+        "",
+        "",
+        "member",
+    )
+    configured_measurement = (
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "",
+        "",
+        "member",
+    )
+    exclusive_measurement = (
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "member",
+    )
+    active_measurement = (
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        EXCLUSIVE_CPUS,
+        "isolated",
+    )
+    if measurement_state not in {
+        empty_measurement,
+        configured_measurement,
+        exclusive_measurement,
+        active_measurement,
+    }:
+        raise AuthorityError("measurement correlated recovery state drift")
+    configured_mems = frozenset({memory_nodes})
+    if measurement_state == empty_measurement:
+        configured_mems = frozenset({"", memory_nodes})
+    require_memory_state(
+        MEASUREMENT,
+        "measurement",
+        configured=configured_mems,
+        effective=memory_nodes,
+    )
+    if measurement_state in {empty_measurement, configured_measurement}:
+        require_uclamp_state(
+            MEASUREMENT,
+            "measurement",
+            frozenset({DEFAULT_UCLAMP}),
+        )
+    elif measurement_state == exclusive_measurement:
+        require_uclamp_state(
+            MEASUREMENT,
+            "measurement",
+            frozenset({DEFAULT_UCLAMP})
+            | MIN_WRITTEN_UCLAMP_STATES
+            | FULL_UCLAMP_STATES,
+        )
+    else:
+        require_uclamp_state(
+            MEASUREMENT,
+            "measurement",
+            FULL_UCLAMP_STATES,
+        )
     return children
 
 
 def remove_owned_tree(
     path: Path, label: str, *, measurement_root: bool = False
 ) -> None:
-    require_exact_directory(path, label)
-    kill_and_wait(path, label)
-    children = child_directories(path)
-    if measurement_root and children:
-        raise AuthorityError("measurement cgroup contains foreign descendants")
-    for child in children:
-        remove_owned_tree(child, f"{label}/{child.name}")
+    if not measurement_root or path != MEASUREMENT or label != "measurement":
+        raise AuthorityError("refusing non-measurement owned-tree removal")
+    validate_payload_tree()
+    require_empty_cgroup(path, label)
+    validate_payload_tree()
     partition = cgroup_value(path / "cpuset.cpus.partition", label)
-    if measurement_root:
-        if partition == "member":
-            pass
-        elif partition == "isolated" or partition.startswith("isolated invalid ("):
-            write_control(path / "cpuset.cpus.partition", "member")
-        else:
-            raise AuthorityError("measurement partition ownership drift")
+    if partition == "isolated":
+        write_control(path / "cpuset.cpus.partition", "member")
+        validate_payload_tree()
     elif partition != "member":
-        raise AuthorityError(f"{label} is not a member cgroup")
+        raise AuthorityError("measurement partition ownership drift")
     if cgroup_value(path / "cpuset.cpus.partition", label) != "member":
         raise AuthorityError(f"{label} partition did not return to member")
     path.rmdir()
+    validate_payload_tree()
 
 
 def cleanup_payload(owned_container_ids: tuple[str, ...] = ()) -> None:
     if not PAYLOAD.exists() and not PAYLOAD.is_symlink():
         return
     validate_payload_tree(owned_container_ids)
-    kill_and_wait(PAYLOAD, "payload")
+    require_empty_cgroup(PAYLOAD, "payload")
+    validate_payload_tree(owned_container_ids)
     for child in child_directories(PAYLOAD):
         if child == MEASUREMENT:
             remove_owned_tree(child, "measurement", measurement_root=True)
@@ -703,20 +1272,85 @@ def cleanup_payload(owned_container_ids: tuple[str, ...] = ()) -> None:
             )
     if child_directories(PAYLOAD):
         raise AuthorityError("payload retained child cgroups")
-    subtree = set(
-        cgroup_value(PAYLOAD / "cgroup.subtree_control", "payload").split()
+    validate_payload_tree(owned_container_ids)
+    subtree = word_inventory(
+        PAYLOAD / "cgroup.subtree_control", "payload"
     )
-    if not subtree <= REQUIRED_CONTROLLERS:
-        raise AuthorityError("payload subtree controller inventory drift")
     if subtree:
         write_control(
             PAYLOAD / "cgroup.subtree_control",
             " ".join(f"-{controller}" for controller in sorted(subtree)),
         )
-    if cgroup_value(PAYLOAD / "cgroup.subtree_control", "payload"):
+        validate_payload_tree(owned_container_ids)
+    if word_inventory(PAYLOAD / "cgroup.subtree_control", "payload"):
         raise AuthorityError("payload subtree controllers were not disabled")
-    kill_and_wait(PAYLOAD, "payload")
+    require_empty_cgroup(PAYLOAD, "payload")
+    validate_payload_tree(owned_container_ids)
     PAYLOAD.rmdir()
+
+
+def validate_cleanup_state(owned_container_ids: tuple[str, ...] = ()) -> None:
+    """Accept only literal crash cutpoints before any recovery mutation."""
+
+    valid_container_ids(owned_container_ids)
+    require_topology()
+    root_isolated = cgroup_value(
+        CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"
+    )
+    if root_isolated not in {"", EXCLUSIVE_CPUS}:
+        raise AuthorityError("root isolated CPU recovery state drift")
+    payload_present = PAYLOAD.exists() or PAYLOAD.is_symlink()
+    measurement_present = MEASUREMENT.exists() or MEASUREMENT.is_symlink()
+    service_present = SERVICE.exists() or SERVICE.is_symlink()
+
+    if measurement_present and not payload_present:
+        raise AuthorityError("measurement exists without its payload ancestor")
+    if payload_present:
+        if not service_present:
+            raise AuthorityError("payload exists without its service ancestor")
+        validate_payload_tree(owned_container_ids)
+        return
+    if root_isolated:
+        raise AuthorityError("isolated CPUs remain without a payload")
+
+    system_state = cpuset_state(SYSTEM_SLICE, "system.slice")
+    if service_present:
+        service_state = cpuset_state(SERVICE, "service")
+        arm_pairs = {
+            ("", ""),
+            (EXCLUSIVE_CPUS, ""),
+            (EXCLUSIVE_CPUS, EXCLUSIVE_CPUS),
+        }
+        if (system_state[2], service_state[2]) not in arm_pairs:
+            raise AuthorityError("ancestor arm/cleanup ordering drift")
+        for label, state in (
+            ("system.slice", system_state),
+            ("service", service_state),
+        ):
+            if (
+                state[1] != CAMPAIGN_CPUS
+                or state[2] != state[3]
+                or state[4] != "member"
+            ):
+                raise AuthorityError(f"{label} correlated recovery state drift")
+        require_recovery_control_plane(
+            CAMPAIGN_CPUS,
+            payload_present=False,
+            allow_clean_start=(
+                system_state[2] == "" and service_state[2] == ""
+            ),
+        )
+        return
+
+    if CONTROLLER.exists() or CONTROLLER.is_symlink():
+        raise AuthorityError("controller exists without its service ancestor")
+    if (
+        system_state[1] != CAMPAIGN_CPUS
+        or system_state[2] not in {"", EXCLUSIVE_CPUS}
+        or system_state[2] != system_state[3]
+        or system_state[4] != "member"
+    ):
+        raise AuthorityError("service-absent system.slice recovery state drift")
 
 
 def restore_ancestor(path: Path, label: str, *, allow_absent: bool = False) -> bool:
@@ -760,16 +1394,31 @@ def require_restored_ancestor(
 
 
 def already_clean() -> None:
+    require_topology()
     if PAYLOAD.exists() or PAYLOAD.is_symlink() or MEASUREMENT.exists() or MEASUREMENT.is_symlink():
         raise AuthorityError("cgroup authority marker is absent but payload remains")
-    require_restored_ancestor(SERVICE, "service", allow_absent=True)
-    require_restored_ancestor(SYSTEM_SLICE, "system.slice")
+    require_ancestor_state(
+        SYSTEM_SLICE,
+        "system.slice",
+        exclusive="",
+        effective_cpus=CAMPAIGN_CPUS,
+    )
+    if SERVICE.exists() or SERVICE.is_symlink():
+        require_ancestor_state(
+            SERVICE,
+            "service",
+            exclusive="",
+            effective_cpus=CAMPAIGN_CPUS,
+        )
+        require_recovery_control_plane(
+            CAMPAIGN_CPUS,
+            payload_present=False,
+            allow_clean_start=True,
+        )
+    elif CONTROLLER.exists() or CONTROLLER.is_symlink():
+        raise AuthorityError("controller exists without its service ancestor")
     if cgroup_value(CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"):
         raise AuthorityError("cgroup authority marker is absent but isolated CPUs remain")
-    if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("possible CPU topology drift")
-    if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
-        raise AuthorityError("online CPU topology drift")
 
 
 def remove_marker(session: str) -> None:
@@ -788,32 +1437,23 @@ def cleanup(
         if discard_unpublished_marker(session):
             return "discarded-unarmed-intent"
         return "already-clean"
+    read_marker(session)
+    validate_cleanup_state(owned_container_ids)
     read_marker(session, repair_link=True)
-    root_isolated = cgroup_value(
-        CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"
-    )
-    if root_isolated not in {"", EXCLUSIVE_CPUS}:
-        raise AuthorityError("refusing foreign root isolated CPUs")
-    system_configured = cgroup_value(
-        SYSTEM_SLICE / "cpuset.cpus.exclusive", "system.slice"
-    )
-    if system_configured not in {"", EXCLUSIVE_CPUS}:
-        raise AuthorityError("refusing foreign system.slice exclusive CPUs")
-    if SERVICE.exists() and not SERVICE.is_symlink():
-        service_configured = cgroup_value(
-            SERVICE / "cpuset.cpus.exclusive", "service"
-        )
-        if service_configured not in {"", EXCLUSIVE_CPUS}:
-            raise AuthorityError("refusing foreign service exclusive CPUs")
+    validate_cleanup_state(owned_container_ids)
     cleanup_payload(owned_container_ids)
+    validate_cleanup_state(owned_container_ids)
     restore_ancestor(SERVICE, "service", allow_absent=True)
+    validate_cleanup_state(owned_container_ids)
     restore_ancestor(SYSTEM_SLICE, "system.slice")
+    validate_cleanup_state(owned_container_ids)
     if cgroup_value(CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"):
         raise AuthorityError("root isolated CPUs were not restored")
     if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
         raise AuthorityError("possible CPU topology drift")
     if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
         raise AuthorityError("online CPU topology drift")
+    already_clean()
     remove_marker(session)
     return "restored"
 
@@ -850,7 +1490,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "action",
-        choices=("arm", "verify-active", "cleanup", "recover", "check-clean"),
+        choices=(
+            "arm", "verify-active", "verify-recovery", "cleanup",
+            "recover", "check-clean",
+        ),
     )
     parser.add_argument("--session")
     parser.add_argument("--container-id", action="append", default=[])
@@ -878,6 +1521,9 @@ def main() -> int:
         elif args.action == "verify-active":
             verify_active(args.session, tuple(args.container_id))
             result = "active"
+        elif args.action == "verify-recovery":
+            verify_recovery(args.session, tuple(args.container_id))
+            result = "recovery-state"
         else:
             result = cleanup(args.session, tuple(args.container_id))
     print(

@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,148 @@ def canonical(value: object) -> bytes:
     )
 
 
+def write_value(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{value}\n", encoding="ascii")
+
+
+def create_group(
+    path: Path,
+    *,
+    controllers: frozenset[str],
+    subtree: frozenset[str],
+    cpus: str,
+    effective_cpus: str,
+    exclusive: str,
+    exclusive_effective: str,
+    partition: str,
+    mems: str,
+    effective_mems: str = "0",
+    uclamp: tuple[str, str] | None = None,
+) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    values = {
+        "cgroup.controllers": " ".join(sorted(controllers)),
+        "cgroup.subtree_control": " ".join(sorted(subtree)),
+        "cgroup.type": "domain",
+        "cpuset.cpus": cpus,
+        "cpuset.cpus.effective": effective_cpus,
+        "cpuset.cpus.exclusive": exclusive,
+        "cpuset.cpus.exclusive.effective": exclusive_effective,
+        "cpuset.cpus.partition": partition,
+        "cpuset.mems": mems,
+        "cpuset.mems.effective": effective_mems,
+    }
+    if uclamp is not None:
+        values["cpu.uclamp.min"], values["cpu.uclamp.max"] = uclamp
+    for name, value in values.items():
+        write_value(path / name, value)
+
+
+def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
+    root = Path(directory) / "cgroup"
+    system = root / "system.slice"
+    service = system / "codeskeptic-stability.service"
+    controller = service / "controller"
+    payload = service / "codeskeptic-p10-09"
+    measurement = payload / "measurement"
+    possible = Path(directory) / "possible"
+    online = Path(directory) / "online"
+    create_group(
+        root,
+        controllers=authority.ROOT_CONTROLLERS,
+        subtree=authority.HOST_CONTROLLERS,
+        cpus="",
+        effective_cpus=authority.CAMPAIGN_CPUS,
+        exclusive="",
+        exclusive_effective="",
+        partition="member",
+        mems="",
+    )
+    for name in (
+        "cgroup.type",
+        "cpuset.cpus",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+    ):
+        (root / name).unlink()
+    write_value(root / "cpuset.cpus.isolated", authority.EXCLUSIVE_CPUS)
+    create_group(
+        system,
+        controllers=authority.HOST_CONTROLLERS,
+        subtree=authority.HOST_CONTROLLERS,
+        cpus="",
+        effective_cpus=authority.CONTROLLER_CPUS,
+        exclusive=authority.EXCLUSIVE_CPUS,
+        exclusive_effective=authority.EXCLUSIVE_CPUS,
+        partition="member",
+        mems="",
+        uclamp=authority.DEFAULT_UCLAMP,
+    )
+    create_group(
+        service,
+        controllers=authority.HOST_CONTROLLERS,
+        subtree=authority.REQUIRED_CONTROLLERS,
+        cpus=authority.CAMPAIGN_CPUS,
+        effective_cpus=authority.CONTROLLER_CPUS,
+        exclusive=authority.EXCLUSIVE_CPUS,
+        exclusive_effective=authority.EXCLUSIVE_CPUS,
+        partition="member",
+        mems="",
+        uclamp=authority.DEFAULT_UCLAMP,
+    )
+    create_group(
+        controller,
+        controllers=authority.REQUIRED_CONTROLLERS,
+        subtree=frozenset(),
+        cpus="",
+        effective_cpus=authority.CONTROLLER_CPUS,
+        exclusive="",
+        exclusive_effective="",
+        partition="member",
+        mems="",
+        uclamp=authority.DEFAULT_UCLAMP,
+    )
+    create_group(
+        payload,
+        controllers=authority.REQUIRED_CONTROLLERS,
+        subtree=authority.REQUIRED_CONTROLLERS,
+        cpus=authority.CAMPAIGN_CPUS,
+        effective_cpus=authority.CONTROLLER_CPUS,
+        exclusive=authority.EXCLUSIVE_CPUS,
+        exclusive_effective=authority.EXCLUSIVE_CPUS,
+        partition="member",
+        mems=authority.MEMORY_NODES,
+        uclamp=authority.DEFAULT_UCLAMP,
+    )
+    create_group(
+        measurement,
+        controllers=authority.REQUIRED_CONTROLLERS,
+        subtree=frozenset(),
+        cpus=authority.EXCLUSIVE_CPUS,
+        effective_cpus=authority.EXCLUSIVE_CPUS,
+        exclusive=authority.EXCLUSIVE_CPUS,
+        exclusive_effective=authority.EXCLUSIVE_CPUS,
+        partition="isolated",
+        mems=authority.MEMORY_NODES,
+        uclamp=("max", "max"),
+    )
+    write_value(possible, authority.CAMPAIGN_CPUS)
+    write_value(online, authority.CAMPAIGN_CPUS)
+    return {
+        "root": root,
+        "system": system,
+        "service": service,
+        "controller": controller,
+        "payload": payload,
+        "measurement": measurement,
+        "possible": possible,
+        "online": online,
+    }
+
+
 class StabilityCgroupAuthorityTest(unittest.TestCase):
     def test_helper_and_runner_share_the_exact_lifecycle(self) -> None:
         self.assertTrue(AUTHORITY_PATH.is_file())
@@ -51,20 +194,21 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         self.assertIn('PAYLOAD = SERVICE / "codeskeptic-p10-09"', authority)
         self.assertIn('MEASUREMENT = PAYLOAD / "measurement"', authority)
         self.assertIn(
-            'choices=("arm", "verify-active", "cleanup", "recover", "check-clean")',
+            '"arm", "verify-active", "verify-recovery", "cleanup",',
             authority,
         )
         self.assertLess(
             authority.index("publish_marker(session)"),
             authority.index('write_control(SYSTEM_SLICE / "cpuset.cpus.exclusive"'),
         )
-        self.assertIn('write_control(path / "cgroup.kill", "1")', authority)
+        self.assertNotIn('write_control(path / "cgroup.kill", "1")', authority)
+        self.assertIn("require_empty_cgroup(path, label)", authority)
         self.assertIn("remove_owned_tree(child", authority)
         self.assertIn("refusing to clear foreign", authority)
         self.assertIn("payload contains an unexpected runtime cgroup", authority)
         self.assertLess(
             authority.index("validate_payload_tree(owned_container_ids)"),
-            authority.index('kill_and_wait(PAYLOAD, "payload")'),
+            authority.index('require_empty_cgroup(PAYLOAD, "payload")'),
         )
 
         self.assertIn('readonly CGROUP_AUTHORITY="${OPERATOR_ROOT}/cgroup-authority.py"', runner)
@@ -77,6 +221,10 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         self.assertIn('"$CGROUP_AUTHORITY" cleanup --session "$session_name"', runner)
         self.assertNotIn("cleanup_measurement_cgroup()", runner)
         self.assertNotIn("cgroup_prepared=", runner)
+        self.assertLess(
+            runner.index('\n"$HOST_RECOVERY" recover\n'),
+            runner.rindex("\nenable_service_controllers\n"),
+        )
         self.assertLess(
             runner.index("enable_service_controllers"),
             runner.index('"$CGROUP_AUTHORITY" arm --session "$session_name"'),
@@ -361,23 +509,42 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             write_control.assert_not_called()
             self.assertTrue(temporary.exists())
 
-    def test_recursive_kill_and_foreign_ancestor_value_fail_closed(self) -> None:
+    def test_populated_payload_and_foreign_ancestor_value_fail_closed(self) -> None:
         authority = load_authority()
         cgroup = Path("/test/payload")
         with (
             mock.patch.object(
                 authority,
                 "cgroup_events",
-                side_effect=[
-                    {"populated": "1"},
-                    {"populated": "0"},
-                    {"populated": "0"},
-                ],
+                return_value={"frozen": "0", "populated": "1"},
             ),
             mock.patch.object(authority, "write_control") as write,
+            self.assertRaisesRegex(
+                authority.AuthorityError, "remains populated"
+            ),
         ):
-            authority.kill_and_wait(cgroup, "payload")
-            write.assert_called_once_with(cgroup / "cgroup.kill", "1")
+            authority.require_empty_cgroup(cgroup, "payload")
+        write.assert_not_called()
+
+        with mock.patch.object(
+            authority,
+            "cgroup_events",
+            return_value={"frozen": "0", "populated": "0"},
+        ), mock.patch.object(authority, "cgroup_value", return_value=""):
+            authority.require_empty_cgroup(cgroup, "payload")
+
+        with (
+            mock.patch.object(
+                authority,
+                "cgroup_events",
+                return_value={"frozen": "0", "populated": "0"},
+            ),
+            mock.patch.object(authority, "cgroup_value", return_value="123"),
+            self.assertRaisesRegex(
+                authority.AuthorityError, "membership is not empty"
+            ),
+        ):
+            authority.require_empty_cgroup(cgroup, "payload")
 
         with (
             mock.patch.object(Path, "exists", return_value=True),
@@ -400,11 +567,11 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                 "validate_payload_tree",
                 side_effect=authority.AuthorityError("foreign payload"),
             ),
-            mock.patch.object(authority, "kill_and_wait") as kill,
+            mock.patch.object(authority, "require_empty_cgroup") as empty,
         ):
             with self.assertRaises(authority.AuthorityError):
                 authority.cleanup_payload()
-            kill.assert_not_called()
+            empty.assert_not_called()
 
     def test_check_clean_is_an_explicit_fail_closed_action(self) -> None:
         authority = load_authority()
@@ -412,45 +579,485 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             authority.check_clean()
         already_clean.assert_called_once_with()
 
-    def test_active_payload_rejects_runtime_created_container_cgroups(self) -> None:
+    def test_active_gate_invokes_the_complete_correlated_contract(self) -> None:
         authority = load_authority()
         container_id = "a" * 64
-        children = [authority.MEASUREMENT]
-        values = [
-            authority.CONTROLLER_CPUS,
-            authority.EXCLUSIVE_CPUS,
-            authority.CAMPAIGN_CPUS,
-            authority.CAMPAIGN_CPUS,
-        ]
         with (
-            mock.patch.object(authority, "read_marker"),
-            mock.patch.object(authority, "expected_active_ancestry", return_value=()),
-            mock.patch.object(authority, "require_exact_directory"),
-            mock.patch.object(authority, "cgroup_value", side_effect=values),
+            mock.patch.object(authority, "read_marker") as read_marker,
+            mock.patch.object(authority, "require_topology") as topology,
+            mock.patch.object(authority, "require_ancestor_state") as ancestor,
+            mock.patch.object(authority, "require_controller_state") as controller,
             mock.patch.object(
-                authority, "validate_payload_tree", return_value=children
-            ) as validate,
+                authority,
+                "cgroup_value",
+                return_value=authority.EXCLUSIVE_CPUS,
+            ),
+            mock.patch.object(
+                authority, "require_active_payload_state"
+            ) as payload,
         ):
             authority.verify_active(SESSION, (container_id,))
-        validate.assert_called_once_with((container_id,))
+        read_marker.assert_called_once_with(SESSION)
+        topology.assert_called_once_with()
+        self.assertEqual(ancestor.call_count, 2)
+        controller.assert_called_once_with(
+            authority.CONTROLLER_CPUS, payload_present=True
+        )
+        payload.assert_called_once_with()
 
         with (
             mock.patch.object(authority, "read_marker"),
-            mock.patch.object(authority, "expected_active_ancestry", return_value=()),
-            mock.patch.object(authority, "require_exact_directory"),
-            mock.patch.object(authority, "cgroup_value", side_effect=values.copy()),
+            mock.patch.object(authority, "require_topology"),
             mock.patch.object(
                 authority,
-                "validate_payload_tree",
+                "require_ancestor_state",
                 side_effect=authority.AuthorityError(
-                    "payload contains an unexpected runtime cgroup"
+                    "correlated cpuset state drift"
                 ),
             ),
             self.assertRaisesRegex(
-                authority.AuthorityError, "unexpected runtime cgroup"
+                authority.AuthorityError, "correlated cpuset"
             ),
         ):
             authority.verify_active(SESSION, (container_id,))
+
+    def test_exact_active_fixture_and_impossible_states_fail_before_mutation(
+        self,
+    ) -> None:
+        authority = load_authority()
+        mutations = (
+            (
+                "controller-child",
+                lambda paths: (paths["controller"] / "foreign").mkdir(),
+            ),
+            (
+                "service-sibling",
+                lambda paths: (paths["service"] / "foreign").mkdir(),
+            ),
+            (
+                "measurement-exclusive-effective",
+                lambda paths: write_value(
+                    paths["measurement"] / "cpuset.cpus.exclusive.effective",
+                    "",
+                ),
+            ),
+            (
+                "root-isolation",
+                lambda paths: write_value(
+                    paths["root"] / "cpuset.cpus.isolated", ""
+                ),
+            ),
+            (
+                "system-configured-cpus",
+                lambda paths: write_value(
+                    paths["system"] / "cpuset.cpus",
+                    authority.CAMPAIGN_CPUS,
+                ),
+            ),
+            (
+                "root-effective-memory-nodes",
+                lambda paths: write_value(
+                    paths["root"] / "cpuset.mems.effective", "1"
+                ),
+            ),
+            (
+                "root-configured-memory-interface",
+                lambda paths: write_value(
+                    paths["root"] / "cpuset.mems", authority.MEMORY_NODES
+                ),
+            ),
+            (
+                "service-configured-cpus",
+                lambda paths: write_value(paths["service"] / "cpuset.cpus", ""),
+            ),
+            (
+                "service-configured-memory-nodes",
+                lambda paths: write_value(
+                    paths["service"] / "cpuset.mems", authority.MEMORY_NODES
+                ),
+            ),
+            (
+                "system-uclamp",
+                lambda paths: write_value(
+                    paths["system"] / "cpu.uclamp.min", "1.00"
+                ),
+            ),
+            (
+                "payload-uclamp",
+                lambda paths: write_value(
+                    paths["payload"] / "cpu.uclamp.max", "50.00"
+                ),
+            ),
+            (
+                "measurement-type",
+                lambda paths: write_value(
+                    paths["measurement"] / "cgroup.type", "threaded"
+                ),
+            ),
+            (
+                "uclamp-cartesian-mix",
+                lambda paths: (
+                    write_value(
+                        paths["measurement"] / "cpu.uclamp.min", "max"
+                    ),
+                    write_value(
+                        paths["measurement"] / "cpu.uclamp.max", "100.00"
+                    ),
+                ),
+            ),
+            (
+                "noncanonical-full-uclamp",
+                lambda paths: (
+                    write_value(
+                        paths["measurement"] / "cpu.uclamp.min", "100.00"
+                    ),
+                    write_value(
+                        paths["measurement"] / "cpu.uclamp.max", "100.00"
+                    ),
+                ),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                paths = active_cgroup_fixture(authority, directory)
+                patch_values = {
+                    "CGROUP_ROOT": paths["root"],
+                    "SYSTEM_SLICE": paths["system"],
+                    "SERVICE": paths["service"],
+                    "CONTROLLER": paths["controller"],
+                    "PAYLOAD": paths["payload"],
+                    "MEASUREMENT": paths["measurement"],
+                    "CPU_POSSIBLE": paths["possible"],
+                    "CPU_ONLINE": paths["online"],
+                }
+                with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                    authority, "read_marker"
+                ), mock.patch.object(
+                    authority, "self_cgroup_path", return_value=paths["controller"]
+                ):
+                    authority.verify_active(SESSION)
+                    mutate(paths)
+                    marker = mock.Mock()
+                    marker.exists.return_value = True
+                    marker.is_symlink.return_value = False
+                    with mock.patch.object(
+                        authority, "MARKER", marker
+                    ), mock.patch.object(
+                        authority, "write_control"
+                    ) as write, mock.patch.object(
+                        authority, "require_empty_cgroup"
+                    ) as empty, self.assertRaises(authority.AuthorityError):
+                        authority.cleanup(SESSION)
+                write.assert_not_called()
+                empty.assert_not_called()
+
+    def test_marker_link_repair_follows_the_complete_read_only_gate(self) -> None:
+        authority = load_authority()
+        marker = mock.Mock()
+        marker.exists.return_value = True
+        marker.is_symlink.return_value = False
+        with (
+            mock.patch.object(authority, "MARKER", marker),
+            mock.patch.object(authority, "read_marker") as read_marker,
+            mock.patch.object(
+                authority,
+                "validate_cleanup_state",
+                side_effect=authority.AuthorityError("read-only gate failed"),
+            ) as validate,
+            mock.patch.object(authority, "cleanup_payload") as cleanup_payload,
+            self.assertRaisesRegex(
+                authority.AuthorityError, "read-only gate failed"
+            ),
+        ):
+            authority.cleanup(SESSION)
+        read_marker.assert_called_once_with(SESSION)
+        validate.assert_called_once_with(())
+        cleanup_payload.assert_not_called()
+
+    def test_active_controller_is_bound_to_the_current_helper(self) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["controller"]
+            ):
+                authority.require_controller_state(
+                    authority.CONTROLLER_CPUS, payload_present=True
+                )
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["service"]
+            ), self.assertRaisesRegex(
+                authority.AuthorityError, "active controller caller identity"
+            ):
+                authority.require_controller_state(
+                    authority.CONTROLLER_CPUS, payload_present=True
+                )
+
+    def test_service_control_subgroup_is_bound_to_the_current_helper(self) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            control = paths["service"] / ".control"
+            create_group(
+                control,
+                controllers=authority.REQUIRED_CONTROLLERS,
+                subtree=frozenset(),
+                cpus="",
+                effective_cpus=authority.CONTROLLER_CPUS,
+                exclusive="",
+                exclusive_effective="",
+                partition="member",
+                mems="",
+                uclamp=authority.DEFAULT_UCLAMP,
+            )
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=control
+            ):
+                authority.require_controller_state(
+                    authority.CONTROLLER_CPUS,
+                    payload_present=True,
+                    caller_role="recovery",
+                )
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["controller"]
+            ), self.assertRaisesRegex(
+                authority.AuthorityError, "foreign service control subgroup"
+            ):
+                authority.require_controller_state(
+                    authority.CONTROLLER_CPUS,
+                    payload_present=True,
+                    caller_role="recovery",
+                )
+
+    def test_recovery_control_subgroup_can_replace_absent_delegate(self) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            shutil.rmtree(paths["controller"])
+            control = paths["service"] / ".control"
+            create_group(
+                control,
+                controllers=authority.REQUIRED_CONTROLLERS,
+                subtree=frozenset(),
+                cpus="",
+                effective_cpus=authority.CAMPAIGN_CPUS,
+                exclusive="",
+                exclusive_effective="",
+                partition="member",
+                mems="",
+                uclamp=authority.DEFAULT_UCLAMP,
+            )
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=control
+            ):
+                authority.require_recovery_control_plane(
+                    authority.CAMPAIGN_CPUS, payload_present=True
+                )
+            shutil.rmtree(control)
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["service"]
+            ):
+                authority.require_recovery_control_plane(
+                    authority.CAMPAIGN_CPUS, payload_present=True
+                )
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["payload"]
+            ), self.assertRaisesRegex(
+                authority.AuthorityError, "startup recovery caller identity"
+            ):
+                authority.require_recovery_control_plane(
+                    authority.CAMPAIGN_CPUS, payload_present=True
+                )
+
+    def test_clean_exec_start_pre_accepts_only_undelegated_service_root(
+        self,
+    ) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            shutil.rmtree(paths["payload"])
+            shutil.rmtree(paths["controller"])
+            write_value(paths["root"] / "cpuset.cpus.isolated", "")
+            for path in (paths["system"], paths["service"]):
+                write_value(path / "cpuset.cpus.effective", authority.CAMPAIGN_CPUS)
+                write_value(path / "cpuset.cpus.exclusive", "")
+                write_value(path / "cpuset.cpus.exclusive.effective", "")
+            write_value(paths["service"] / "cgroup.subtree_control", "")
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["service"]
+            ):
+                authority.already_clean()
+                authority.validate_cleanup_state()
+                write_value(
+                    paths["service"] / "cgroup.subtree_control",
+                    " ".join(sorted(authority.REQUIRED_CONTROLLERS)),
+                )
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "service subtree controller inventory drift",
+                ):
+                    authority.already_clean()
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "service subtree controller inventory drift",
+                ):
+                    authority.validate_cleanup_state()
+
+    def test_cleanup_accepts_only_correlated_creation_and_restoration_cuts(
+        self,
+    ) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["controller"]
+            ):
+                authority.validate_cleanup_state()
+
+                write_value(paths["root"] / "cpuset.cpus.isolated", "")
+                write_value(
+                    paths["measurement"] / "cpuset.cpus.partition", "member"
+                )
+                for path in (
+                    paths["system"], paths["service"], paths["controller"],
+                    paths["payload"],
+                ):
+                    write_value(
+                        path / "cpuset.cpus.effective", authority.CAMPAIGN_CPUS
+                    )
+                authority.validate_cleanup_state()
+
+                shutil.rmtree(paths["measurement"])
+                authority.validate_cleanup_state()
+                write_value(paths["payload"] / "cgroup.subtree_control", "")
+                authority.validate_cleanup_state()
+                write_value(paths["payload"] / "cpuset.cpus.exclusive", "")
+                write_value(
+                    paths["payload"] / "cpuset.cpus.exclusive.effective", ""
+                )
+                authority.validate_cleanup_state()
+                write_value(paths["payload"] / "cpuset.cpus", "")
+                write_value(paths["payload"] / "cpuset.mems", "")
+                authority.validate_cleanup_state()
+
+                shutil.rmtree(paths["payload"])
+                authority.validate_cleanup_state()
+                write_value(paths["service"] / "cpuset.cpus.exclusive", "")
+                write_value(
+                    paths["service"] / "cpuset.cpus.exclusive.effective", ""
+                )
+                authority.validate_cleanup_state()
+                write_value(paths["system"] / "cpuset.cpus.exclusive", "")
+                write_value(
+                    paths["system"] / "cpuset.cpus.exclusive.effective", ""
+                )
+                authority.validate_cleanup_state()
+
+                shutil.rmtree(paths["service"])
+                authority.validate_cleanup_state()
+                write_value(
+                    paths["system"] / "cpuset.cpus.exclusive",
+                    authority.EXCLUSIVE_CPUS,
+                )
+                write_value(
+                    paths["system"] / "cpuset.cpus.exclusive.effective",
+                    authority.EXCLUSIVE_CPUS,
+                )
+                authority.validate_cleanup_state()
+
+    def test_clean_main_start_accepts_only_core_controller_subgroup(
+        self,
+    ) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            shutil.rmtree(paths["payload"])
+            shutil.rmtree(paths["controller"])
+            write_value(paths["root"] / "cpuset.cpus.isolated", "")
+            for path in (paths["system"], paths["service"]):
+                write_value(
+                    path / "cpuset.cpus.effective", authority.CAMPAIGN_CPUS
+                )
+                write_value(path / "cpuset.cpus.exclusive", "")
+                write_value(path / "cpuset.cpus.exclusive.effective", "")
+            write_value(paths["service"] / "cgroup.subtree_control", "")
+            paths["controller"].mkdir()
+            write_value(paths["controller"] / "cgroup.controllers", "")
+            write_value(paths["controller"] / "cgroup.subtree_control", "")
+            write_value(paths["controller"] / "cgroup.type", "domain")
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority,
+                "self_cgroup_path",
+                return_value=paths["controller"],
+            ):
+                authority.already_clean()
+                authority.validate_cleanup_state()
+                write_value(paths["controller"] / "cpuset.cpus", "")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "startup controller exposes unexpected cpuset.cpus",
+                ):
+                    authority.already_clean()
 
     def test_recover_discovers_the_durable_session_after_runtime_loss(self) -> None:
         authority = load_authority()
@@ -532,8 +1139,10 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             mock.patch.object(authority, "read_marker"),
             mock.patch.object(authority, "SERVICE", service),
             mock.patch.object(authority, "cgroup_value", side_effect=cgroup_value),
+            mock.patch.object(authority, "validate_cleanup_state"),
             mock.patch.object(authority, "cleanup_payload") as cleanup_payload,
             mock.patch.object(authority, "restore_ancestor", side_effect=restore),
+            mock.patch.object(authority, "already_clean"),
             mock.patch.object(authority, "remove_marker", side_effect=remove),
         ):
             with self.assertRaisesRegex(

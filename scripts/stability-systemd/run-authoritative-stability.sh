@@ -211,6 +211,13 @@ run_podman() {
         "$PODMAN" "${PODMAN_GLOBAL_OPTIONS[@]}" "$@"
 }
 
+run_bound_container() {
+    # Mutable roles receive only the measurement membership file as writable;
+    # still re-read the complete authority immediately before every boundary.
+    require_active_controller_inventory || return 1
+    run_podman "$@"
+}
+
 append_host_recovery_labels() {
     local kind="$1"
     local target_name="$2"
@@ -1301,6 +1308,7 @@ require_active_controller_inventory() {
     require_exact_controller_inventory \
         "$PAYLOAD_CGROUP" cgroup.subtree_control \
         "$DELEGATED_CONTROLLER_INVENTORY" "payload subtree" || return 1
+    "$CGROUP_AUTHORITY" verify-active --session "$session_name"
 }
 
 require_empty_cgroup() {
@@ -1580,7 +1588,7 @@ run_rootful_preflight_probe() {
         "${PAYLOAD_CGROUP_RELATIVE}/measurement"
         "$MEASUREMENT_CPU_LIST"
     )
-    run_podman "${probe_args[@]}" ||
+    run_bound_container "${probe_args[@]}" ||
         probe_exit=$?
     require_active_controller_inventory || probe_exit=1
     if (( probe_exit == 0 )) && [[ ! -f "$cidfile" || -L "$cidfile" ]]; then
@@ -1653,7 +1661,7 @@ run_inner_verifier() {
     done
     verifier_args+=("$PINNED_EVIDENCE_IMAGE" "${RUNTIME_VERIFIER_COMMAND[@]}")
 
-    run_podman "${verifier_args[@]}" \
+    run_bound_container "${verifier_args[@]}" \
         >"$inner_verifier_log" 2>"$stderr_path" || verifier_exit=$?
     require_active_controller_inventory || verifier_exit=1
     if (( verifier_exit == 0 )) && [[ ! -f "$cidfile" || -L "$cidfile" ]]; then
@@ -2301,7 +2309,8 @@ readonly -a CONTAINER_BIND_MOUNTS=(
     "${launch_root}:/launch:ro"
     "${evidence_output}:/evidence:rw"
     "${container_runtime}:/runtime:rw"
-    "/sys/fs/cgroup:/sys/fs/cgroup:rw"
+    "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+    "${MEASUREMENT_CGROUP}/cgroup.procs:${MEASUREMENT_CGROUP}/cgroup.procs:rw"
 )
 
 enable_service_controllers
@@ -2337,7 +2346,7 @@ done
 podman_run_args+=("$PINNED_EVIDENCE_IMAGE" "${RUNTIME_CONTROLLER_COMMAND[@]}")
 
 runner_exit=0
-run_podman "${podman_run_args[@]}" ||
+run_bound_container "${podman_run_args[@]}" ||
     runner_exit=$?
 require_active_controller_inventory || runner_exit=1
 

@@ -338,12 +338,18 @@ class StabilityWorkflowTest(unittest.TestCase):
                 "${launch_root}:/launch:ro",
                 "${evidence_output}:/evidence:rw",
                 "${container_runtime}:/runtime:rw",
-                "/sys/fs/cgroup:/sys/fs/cgroup:rw",
+                "/sys/fs/cgroup:/sys/fs/cgroup:ro",
+                (
+                    "${MEASUREMENT_CGROUP}/cgroup.procs:"
+                    "${MEASUREMENT_CGROUP}/cgroup.procs:rw"
+                ),
             ],
         )
         actual_mount_contract = []
+        measurement = literal_constant(CONTROLLER, "RUNTIME_MEASUREMENT_CGROUP")
         for binding in bind_mounts:
             _, destination, mode = binding.rsplit(":", 2)
+            destination = destination.replace("${MEASUREMENT_CGROUP}", measurement)
             actual_mount_contract.append({"destination": destination, "mode": mode})
         self.assertEqual(
             actual_mount_contract,

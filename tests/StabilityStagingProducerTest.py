@@ -115,7 +115,15 @@ stage = load_producer() if PRODUCER.is_file() else None
 
 def git(repository: Path, *arguments: str) -> str:
     completed = subprocess.run(
-        ["git", "-C", str(repository), *arguments],
+        [
+            "git",
+            "-c", "maintenance.auto=false",
+            "-c", "maintenance.autoDetach=false",
+            "-c", "gc.auto=0",
+            "-c", "gc.autoDetach=false",
+            "-C", str(repository),
+            *arguments,
+        ],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -618,6 +626,60 @@ class StabilityStagingProducerPresenceTest(unittest.TestCase):
 
 @unittest.skipUnless(PRODUCER.is_file(), "staging producer is the RED gap")
 class StabilityStagingProducerTest(unittest.TestCase):
+    @unittest.skipUnless(
+        sys.platform.startswith("linux"),
+        "Linux child-subreaper contract unavailable",
+    )
+    def test_fixture_git_never_leaves_detached_maintenance_children(self) -> None:
+        code = r"""
+import ctypes
+import importlib.util
+import os
+import pathlib
+import sys
+import tempfile
+import time
+
+if ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:
+    raise SystemExit(125)
+specification = importlib.util.spec_from_file_location("staging_fixture", sys.argv[1])
+if specification is None or specification.loader is None:
+    raise SystemExit(126)
+fixture = importlib.util.module_from_spec(specification)
+sys.modules[specification.name] = fixture
+specification.loader.exec_module(fixture)
+with tempfile.TemporaryDirectory() as directory:
+    fixture.initialize_lifecycle_source(pathlib.Path(directory) / "source")
+deadline = time.monotonic() + 2.0
+while True:
+    try:
+        pid, _status = os.waitpid(-1, os.WNOHANG)
+    except ChildProcessError:
+        print("CODESKEPTIC_FIXTURE_GIT_CHILDREN_CLEAN")
+        raise SystemExit(0)
+    if pid != 0:
+        print(f"unexpected adopted Git child: {pid}", file=sys.stderr)
+        raise SystemExit(1)
+    if time.monotonic() >= deadline:
+        print("adopted Git child did not exit", file=sys.stderr)
+        raise SystemExit(1)
+    time.sleep(0.02)
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", code, os.fspath(Path(__file__).resolve())],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=20,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stderr, "")
+        self.assertEqual(
+            completed.stdout,
+            "CODESKEPTIC_FIXTURE_GIT_CHILDREN_CLEAN\n",
+        )
+
     def test_trusted_sibling_loader_pins_one_inode_and_rejects_aliases(
         self,
     ) -> None:

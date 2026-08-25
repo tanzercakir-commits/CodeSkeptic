@@ -796,6 +796,148 @@ def _discover_marker(
     return value
 
 
+_HOST_MARKER_SAMPLE_BOOT = "11111111-1111-1111-1111-111111111111"
+_HOST_MARKER_SAMPLE_NONCE = "22222222-2222-2222-2222-222222222222"
+_HOST_MARKER_SAMPLE_TIMESTAMP = "00000000T000000Z"
+_UUID_SHAPE = "hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh"
+_TIMESTAMP_SHAPE = "ddddddddTddddddZ"
+
+
+def _host_marker_prefix_pattern(
+    mode: str,
+) -> tuple[bytes | tuple[str, str], ...]:
+    if mode == "campaign":
+        session = (
+            f"{_HOST_MARKER_SAMPLE_TIMESTAMP}-{_HOST_MARKER_SAMPLE_BOOT}-"
+            f"{_HOST_MARKER_SAMPLE_NONCE}"
+        )
+    elif mode == "probe-only":
+        session = f"probe-{_HOST_MARKER_SAMPLE_NONCE}"
+    else:
+        raise RecoveryError("host recovery marker prefix mode is malformed")
+    complete = compact_canonical(
+        expected_marker(
+            mode,
+            session,
+            boot_id=_HOST_MARKER_SAMPLE_BOOT,
+            verify_filesystem=False,
+        )
+    )
+    tokens = {
+        _HOST_MARKER_SAMPLE_TIMESTAMP.encode("ascii"): (
+            "timestamp",
+            _TIMESTAMP_SHAPE,
+        ),
+        _HOST_MARKER_SAMPLE_BOOT.encode("ascii"): ("boot_id", _UUID_SHAPE),
+        _HOST_MARKER_SAMPLE_NONCE.encode("ascii"): (
+            "session_nonce",
+            _UUID_SHAPE,
+        ),
+    }
+    parts: list[bytes | tuple[str, str]] = []
+    offset = 0
+    while offset < len(complete):
+        matches = [
+            (position, token, specification)
+            for token, specification in tokens.items()
+            if (position := complete.find(token, offset)) >= 0
+        ]
+        if not matches:
+            parts.append(complete[offset:])
+            break
+        position, token, specification = min(matches, key=lambda item: item[0])
+        if position > offset:
+            parts.append(complete[offset:position])
+        parts.append(specification)
+        offset = position + len(token)
+    return tuple(parts)
+
+
+def _matches_shape_prefix(value: bytes, shape: str) -> bool:
+    if len(value) > len(shape):
+        return False
+    for byte, expected in zip(value, shape):
+        if expected == "d":
+            if not ord("0") <= byte <= ord("9"):
+                return False
+        elif expected == "h":
+            if not (
+                ord("0") <= byte <= ord("9")
+                or ord("a") <= byte <= ord("f")
+            ):
+                return False
+        elif byte != ord(expected):
+            return False
+    return True
+
+
+def _matches_host_marker_pattern_prefix(
+    raw: bytes, pattern: tuple[bytes | tuple[str, str], ...]
+) -> bool:
+    position = 0
+    captured: dict[str, bytes] = {}
+    for part in pattern:
+        if position == len(raw):
+            return True
+        if isinstance(part, bytes):
+            available = min(len(part), len(raw) - position)
+            if raw[position : position + available] != part[:available]:
+                return False
+            position += available
+            if available < len(part):
+                return position == len(raw)
+            continue
+        name, shape = part
+        expected = captured.get(name)
+        available = min(len(shape), len(raw) - position)
+        observed = raw[position : position + available]
+        if expected is None:
+            if not _matches_shape_prefix(observed, shape):
+                return False
+            if available == len(shape):
+                captured[name] = observed
+        elif observed != expected[:available]:
+            return False
+        position += available
+        if available < len(shape):
+            return position == len(raw)
+    return False
+
+
+def is_strict_unpublished_host_marker_prefix(raw: bytes) -> bool:
+    return any(
+        _matches_host_marker_pattern_prefix(raw, _host_marker_prefix_pattern(mode))
+        for mode in ("campaign", "probe-only")
+    )
+
+
+def _read_unpublished_host_marker_prefix() -> tuple[os.stat_result, bytes]:
+    return read_exact_file(
+        MARKER_TEMP,
+        "unpublished host recovery marker temporary",
+        MAX_MARKER_BYTES,
+        allowed_links={1},
+        allow_empty=True,
+    )
+
+
+def _discard_unpublished_host_marker_prefix(
+    expected_metadata: os.stat_result, expected_raw: bytes
+) -> None:
+    metadata, raw = _read_unpublished_host_marker_prefix()
+    if (
+        metadata.st_dev != expected_metadata.st_dev
+        or metadata.st_ino != expected_metadata.st_ino
+        or raw != expected_raw
+        or not is_strict_unpublished_host_marker_prefix(raw)
+    ):
+        raise RecoveryError(
+            "unpublished host recovery marker changed before discard"
+        )
+    MARKER_TEMP.unlink()
+    fsync_directory(STATE_ROOT)
+
+
 def read_marker(
     session: str | None = None, *, verify_filesystem: bool = True
 ) -> dict[str, object]:
@@ -1338,7 +1480,7 @@ def expected_container_mounts(
     container_name(marker, kind)
     launch, evidence, runtime = _container_paths(marker)
     mutable = kind != "verifier"
-    return {
+    expected = {
         "/authority": (os.fspath(AUTHORITY_ROOT), False),
         "/operator": (os.fspath(OPERATOR_ROOT), False),
         "/config/runtime.json": (os.fspath(CONFIG_PATH), False),
@@ -1346,8 +1488,41 @@ def expected_container_mounts(
         "/evidence": (os.fspath(evidence), mutable),
         "/launch": (os.fspath(launch), False),
         "/runtime": (os.fspath(runtime), mutable),
-        "/sys/fs/cgroup": ("/sys/fs/cgroup", mutable),
+        "/sys/fs/cgroup": ("/sys/fs/cgroup", False),
     }
+    if mutable:
+        measurement_procs = MEASUREMENT_CGROUP / "cgroup.procs"
+        expected[os.fspath(measurement_procs)] = (
+            os.fspath(measurement_procs),
+            True,
+        )
+    return expected
+
+
+def expected_container_binds(
+    marker: dict[str, object], kind: str
+) -> list[str]:
+    container_name(marker, kind)
+    launch, evidence, runtime = _container_paths(marker)
+    mutable = kind != "verifier"
+    ordered = [
+        (AUTHORITY_ROOT, Path("/authority"), False),
+        (OPERATOR_ROOT, Path("/operator"), False),
+        (CONFIG_PATH, Path("/config/runtime.json"), False),
+        (CONFIG_SHA_PATH, Path("/config/runtime.json.sha256"), False),
+        (launch, Path("/launch"), False),
+        (evidence, Path("/evidence"), mutable),
+        (runtime, Path("/runtime"), mutable),
+        (Path("/sys/fs/cgroup"), Path("/sys/fs/cgroup"), False),
+    ]
+    if mutable:
+        measurement_procs = MEASUREMENT_CGROUP / "cgroup.procs"
+        ordered.append((measurement_procs, measurement_procs, True))
+    return [
+        f"{source}:{destination}:{'rw' if writable else 'ro'},"
+        "rprivate,nosuid,nodev,rbind"
+        for source, destination, writable in ordered
+    ]
 
 
 def expected_container_cidfile(marker: dict[str, object], kind: str) -> Path:
@@ -1503,6 +1678,8 @@ def _validate_container_execution_contract(
     }
     if any(host_config.get(name) != claim for name, claim in expected_host.items()):
         raise RecoveryError("owned container isolation contract drift")
+    if host_config.get("Binds") != expected_container_binds(marker, kind):
+        raise RecoveryError("owned container ordered bind contract drift")
     security = host_config.get("SecurityOpt")
     if (
         not isinstance(security, list)
@@ -1535,8 +1712,65 @@ def _validate_container_execution_contract(
     _validate_container_ulimit(host_config)
 
 
+def _container_lifecycle(value: dict[str, object]) -> str:
+    state = value.get("State")
+    if not isinstance(state, dict):
+        raise RecoveryError("owned container lifecycle claims are malformed")
+    status = state.get("Status")
+    pid = state.get("Pid")
+    if (
+        isinstance(pid, bool)
+        or not isinstance(pid, int)
+        or state.get("Paused") is not False
+        or state.get("Restarting") is not False
+        or state.get("Dead") is not False
+    ):
+        raise RecoveryError("owned container lifecycle state drift")
+    if status == "running" and state.get("Running") is True and pid > 0:
+        return "running"
+    conmon_pid = state.get("ConmonPid")
+    if (
+        status == "initialized"
+        and state.get("Running") is False
+        and pid > 0
+        and not isinstance(conmon_pid, bool)
+        and isinstance(conmon_pid, int)
+        and conmon_pid > 0
+    ):
+        return "initialized"
+    if (
+        status == "stopping"
+        and state.get("Running") is False
+        and pid > 0
+        and not isinstance(conmon_pid, bool)
+        and isinstance(conmon_pid, int)
+        and conmon_pid > 0
+        and state.get("StoppedByUser") is True
+    ):
+        return "stopping"
+    if (
+        status == "removing"
+        and state.get("Running") is False
+        and pid == 0
+    ):
+        # Podman persists this state only after process, namespace, cgroup,
+        # mount, and exec-session cleanup.  The caller additionally requires
+        # our fsync'd CID-first cutpoint before resuming the idempotent rm.
+        return "removing"
+    # Podman 5.8.4 exposes the durable non-running libpod states through
+    # inspect as created, stopped, and exited.
+    if (
+        status in {"created", "stopped", "exited"}
+        and state.get("Running") is False
+        and pid == 0
+    ):
+        return "stopped"
+    raise RecoveryError("owned container lifecycle state drift")
+
+
 def _owned_container_inventory(
     marker: dict[str, object],
+    lifecycles: dict[str, str] | None = None,
 ) -> list[tuple[str, str]]:
     identifiers = _podman_ids()
     owned: list[tuple[str, str]] = []
@@ -1585,6 +1819,9 @@ def _owned_container_inventory(
                 f"foreign container exists in the dedicated store: {identifier}"
             )
         _validate_container_execution_contract(marker, kind, value)
+        lifecycle = _container_lifecycle(value)
+        if lifecycles is not None:
+            lifecycles[identifier] = lifecycle
         seen_kinds.add(kind)
         owned.append((identifier, kind))
     return owned
@@ -1883,6 +2120,46 @@ def verify_active_cgroup_authority(
         ).strip()
         raise RecoveryError(
             "active cgroup authority verification failed "
+            f"({completed.returncode}): {detail}"
+        )
+
+
+def verify_recovery_cgroup_authority(
+    marker: dict[str, object],
+    owned_containers: Sequence[tuple[str, str]],
+) -> None:
+    """Read-only validation for a stopped container or reboot cutpoint."""
+
+    if not _is_present(CGROUP_MARKER):
+        raise RecoveryError("owned container exists without cgroup authority")
+    if _is_present(CGROUP_MARKER_TEMP):
+        raise RecoveryError("owned container overlaps cgroup publication")
+    validate_cgroup_session_binding(marker)
+    session = marker.get("session")
+    if not isinstance(session, str):
+        raise RecoveryError("cgroup verification session is malformed")
+    command = [
+        os.fspath(CGROUP_AUTHORITY),
+        "verify-recovery",
+        "--session",
+        session,
+    ]
+    for identifier, _kind in owned_containers:
+        if CONTAINER_ID.fullmatch(identifier) is None:
+            raise RecoveryError("cgroup container identity is malformed")
+        command.extend(("--container-id", identifier))
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=False,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or b"").decode(
+            "utf-8", errors="replace"
+        ).strip()
+        raise RecoveryError(
+            "recovery cgroup authority verification failed "
             f"({completed.returncode}): {detail}"
         )
 
@@ -2467,6 +2744,27 @@ def recover_cgroup_authority(
         )
 
 
+def check_clean_cgroup_authority() -> None:
+    completed = subprocess.run(
+        [os.fspath(CGROUP_AUTHORITY), "check-clean"],
+        capture_output=True,
+        text=False,
+        check=False,
+    )
+    expected_stdout = (
+        b"CODESKEPTIC_P10_09_CGROUP_AUTHORITY_OK "
+        b"action=check-clean result=clean\n"
+    )
+    if completed.returncode != 0 or completed.stdout != expected_stdout or completed.stderr:
+        detail = (completed.stderr or b"").decode(
+            "utf-8", errors="replace"
+        ).strip()
+        raise RecoveryError(
+            "cgroup clean-state verification failed "
+            f"({completed.returncode})" + (f": {detail}" if detail else "")
+        )
+
+
 def _unlink_exact(path: Path) -> None:
     path.unlink()
     fsync_directory(path.parent)
@@ -2478,21 +2776,93 @@ def _remove_marker() -> None:
     _unlink_exact(MARKER)
 
 
-def _recover_bound(marker: dict[str, object]) -> str:
+def _validate_bound_recovery_state(
+    marker: dict[str, object],
+    *,
+    allow_unpublished_cgroup: bool = False,
+) -> tuple[Path | None, list[Path], list[tuple[str, str]], bool]:
     if _is_present(PODMAN_INSPECTION_MARKER) or _is_present(
         PODMAN_INSPECTION_MARKER_TEMP
     ):
         raise RecoveryError("Podman inspection authority overlaps a host session")
     identity, runtime_files = _validate_owned_state(marker)
-    owned_containers = _owned_container_inventory(marker)
+    lifecycles: dict[str, str] = {}
+    owned_containers = _owned_container_inventory(marker, lifecycles)
     _validate_complete_cid_bindings(marker, owned_containers)
+    if len(owned_containers) > 1:
+        raise RecoveryError("multiple owned containers overlap one host session")
     validate_cgroup_session_binding(marker)
-    # The cgroup authority rejects runtime-created children before mutation,
-    # while the supplied IDs bind cleanup to this exact Podman inventory. It
-    # then resumes active, partially restored, or already-clean cutpoints
-    # idempotently.
-    # Podman metadata removal is safe only after that bounded recovery succeeds.
-    recover_cgroup_authority(owned_containers)
+    # First bind a live container to the exact active cgroup state.  Remove it
+    # before cgroup recovery so a root container cannot race recovery writes.
+    # The second, container-free recovery call re-reads the entire crash-cut
+    # tuple before its first kill/write/rmdir operation.
+    if owned_containers:
+        identifier, kind = owned_containers[0]
+        if lifecycles.get(identifier) == "running":
+            verify_active_cgroup_authority(marker, owned_containers)
+        elif lifecycles.get(identifier) == "initialized":
+            verify_active_cgroup_authority(marker, owned_containers)
+        elif lifecycles.get(identifier) == "stopping":
+            if _is_present(expected_container_cidfile(marker, kind)):
+                raise RecoveryError(
+                    "stopping container precedes the durable CID-first cutpoint"
+                )
+            verify_active_cgroup_authority(marker, owned_containers)
+        elif lifecycles.get(identifier) == "stopped":
+            verify_recovery_cgroup_authority(marker, owned_containers)
+        elif lifecycles.get(identifier) == "removing":
+            if _is_present(expected_container_cidfile(marker, kind)):
+                raise RecoveryError(
+                    "removing container precedes the durable CID-first cutpoint"
+                )
+            verify_recovery_cgroup_authority(marker, owned_containers)
+        else:
+            raise RecoveryError("owned container lifecycle binding drift")
+    elif _is_present(CGROUP_MARKER):
+        if _is_present(CGROUP_MARKER_TEMP):
+            raise RecoveryError(
+                "cgroup authority publication overlaps host marker repair"
+            )
+        verify_recovery_cgroup_authority(marker, [])
+    elif _is_present(CGROUP_MARKER_TEMP):
+        if not allow_unpublished_cgroup:
+            raise RecoveryError(
+                "unpublished cgroup authority overlaps host marker repair"
+            )
+        return identity, runtime_files, owned_containers, True
+    else:
+        check_clean_cgroup_authority()
+    return identity, runtime_files, owned_containers, False
+
+
+def _recover_bound(marker: dict[str, object]) -> str:
+    # Marker publication repair is itself a filesystem mutation.  First bind
+    # the unrepaired inode to every runtime, Podman, lifecycle, and cgroup
+    # claim; repair; then repeat the complete read-only gate.
+    host_marker_published = _is_present(MARKER)
+    _identity, _runtime_files, _owned_containers, unpublished_cgroup = (
+        _validate_bound_recovery_state(
+            marker,
+            allow_unpublished_cgroup=host_marker_published,
+        )
+    )
+    if unpublished_cgroup:
+        published = _discover_marker(repair=False)
+        if not _is_present(MARKER) or published != marker:
+            raise RecoveryError(
+                "host authority changed before cgroup publication recovery"
+            )
+        # cgroup-authority independently proves the clean startup tuple and
+        # accepts only its own canonical strict-prefix publication cutpoint.
+        recover_cgroup_authority()
+        _validate_bound_recovery_state(marker)
+    repaired = _discover_marker(repair=True)
+    if repaired != marker:
+        raise RecoveryError("host recovery marker changed during repair")
+    identity, runtime_files, owned_containers, _unpublished_cgroup = (
+        _validate_bound_recovery_state(repaired)
+    )
+    marker = repaired
     # CID-first makes every interruption unambiguous: a surviving container
     # can be rediscovered from its exact store projection, while a complete
     # CID can never outlive the container it names.
@@ -2502,6 +2872,7 @@ def _recover_bound(marker: dict[str, object]) -> str:
     if _podman_ids():
         raise RecoveryError("Podman containers survived bounded recovery")
     _verify_pinned_image_store()
+    recover_cgroup_authority()
     session = marker["session"]
     mode = marker["mode"]
     assert isinstance(session, str) and isinstance(mode, str)
@@ -2562,7 +2933,24 @@ def _recover_without_host_marker() -> str:
 def recover() -> str:
     require_root_caller()
     require_state_root()
-    marker = _discover_marker(repair=True)
+    try:
+        marker = _discover_marker(repair=False)
+    except RecoveryError:
+        if _is_present(MARKER) or not _is_present(MARKER_TEMP):
+            raise
+        metadata, raw = _read_unpublished_host_marker_prefix()
+        if not is_strict_unpublished_host_marker_prefix(raw):
+            raise
+        if _is_present(PODMAN_INSPECTION_MARKER) or _is_present(
+            PODMAN_INSPECTION_MARKER_TEMP
+        ):
+            raise RecoveryError(
+                "unpublished host marker overlaps Podman inspection authority"
+            )
+        _validate_unbound_filesystem_clean()
+        check_clean_cgroup_authority()
+        _discard_unpublished_host_marker_prefix(metadata, raw)
+        return _recover_without_host_marker()
     if marker is None:
         return _recover_without_host_marker()
     return _recover_bound(marker)

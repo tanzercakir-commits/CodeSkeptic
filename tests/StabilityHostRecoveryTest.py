@@ -141,6 +141,7 @@ class FakePodman:
             },
             "HostConfig": {
                 "AutoRemove": False,
+                "Binds": host_recovery.expected_container_binds(marker, kind),
                 "CapAdd": [],
                 "CapDrop": [],
                 "Cgroup": "",
@@ -182,6 +183,16 @@ class FakePodman:
             "Path": command[0],
             "Pod": "",
             "ProcessLabel": "",
+            "State": {
+                "ConmonPid": 4241,
+                "Dead": False,
+                "Paused": False,
+                "Pid": 4242,
+                "Restarting": False,
+                "Running": True,
+                "Status": "running",
+                "StoppedByUser": False,
+            },
         }
         self.containers[identifier] = inspection
         return inspection
@@ -350,6 +361,7 @@ class HostRecoveryTest(unittest.TestCase):
         self.installation_sha.chmod(0o400)
         self.fake_podman = FakePodman()
         self.cgroup_calls: list[str] = []
+        self.cgroup_clean_calls: list[str] = []
         self.patches = mock.patch.multiple(
             host_recovery,
             ROOT_UID=os.getuid(),
@@ -397,14 +409,30 @@ class HostRecoveryTest(unittest.TestCase):
             ),
         )
         self.installation_patch.start()
+
+        def record_cgroup_recovery(*_arguments: object) -> None:
+            self.cgroup_calls.append("recover")
+            if (
+                host_recovery.CGROUP_MARKER_TEMP.exists()
+                and not host_recovery.CGROUP_MARKER.exists()
+            ):
+                host_recovery.CGROUP_MARKER_TEMP.unlink()
+
         self.cgroup_patch = mock.patch.object(
             host_recovery,
             "recover_cgroup_authority",
-            side_effect=lambda *_arguments: self.cgroup_calls.append("recover"),
+            side_effect=record_cgroup_recovery,
         )
         self.cgroup_patch.start()
+        self.cgroup_clean_patch = mock.patch.object(
+            host_recovery,
+            "check_clean_cgroup_authority",
+            side_effect=lambda: self.cgroup_clean_calls.append("check-clean"),
+        )
+        self.cgroup_clean_patch.start()
 
     def tearDown(self) -> None:
+        self.cgroup_clean_patch.stop()
         self.cgroup_patch.stop()
         self.installation_patch.stop()
         self.run_patch.stop()
@@ -448,12 +476,113 @@ class HostRecoveryTest(unittest.TestCase):
         host_recovery.MARKER.unlink()
         self.assertEqual(host_recovery.recover(), "recovered")
         self.assertFalse(host_recovery.MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_clean_calls, ["check-clean"] * 6)
 
     def test_unpublished_partial_temporary_is_safely_discarded(self) -> None:
         host_recovery.MARKER_TEMP.write_bytes(b'{"boot_id"')
         host_recovery.MARKER_TEMP.chmod(0o400)
         self.assertEqual(host_recovery.recover(), "already-clean")
         self.assertFalse(host_recovery.MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_clean_calls, ["check-clean"])
+
+    def test_unpublished_host_marker_prefix_is_strict_and_correlated(self) -> None:
+        expected = compact_canonical(
+            host_recovery.expected_marker(
+                "campaign",
+                SESSION,
+                boot_id=BOOT_ID,
+                verify_filesystem=False,
+            )
+        )
+        self.assertFalse(
+            host_recovery.is_strict_unpublished_host_marker_prefix(expected)
+        )
+        nonce = NONCE.encode("ascii")
+        first = expected.index(nonce)
+        second = expected.index(nonce, first + len(nonce))
+        forged = bytearray(expected[: second + 5])
+        forged[second] = ord("3")
+        self.assertFalse(
+            host_recovery.is_strict_unpublished_host_marker_prefix(bytes(forged))
+        )
+
+    def test_noncanonical_unpublished_host_marker_fails_without_mutation(
+        self,
+    ) -> None:
+        host_recovery.MARKER_TEMP.write_bytes(b'{"boot_X"')
+        host_recovery.MARKER_TEMP.chmod(0o400)
+        with self.assertRaisesRegex(host_recovery.RecoveryError, "malformed"):
+            host_recovery.recover()
+        self.assertTrue(host_recovery.MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_clean_calls, [])
+        self.assertEqual(self.cgroup_calls, [])
+
+    def test_container_free_marker_repair_rechecks_exact_cgroup_state(
+        self,
+    ) -> None:
+        marker = self.arm()
+        self.arm_cgroup(marker)
+        recovery = mock.Mock()
+        with mock.patch.object(
+            host_recovery,
+            "verify_recovery_cgroup_authority",
+            recovery,
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        self.assertEqual(
+            recovery.call_args_list,
+            [mock.call(marker, []), mock.call(marker, [])],
+        )
+        self.assertEqual(self.cgroup_clean_calls, [])
+
+    def test_published_host_recovers_unpublished_cgroup_marker_first(
+        self,
+    ) -> None:
+        marker = self.arm()
+        raw = compact_canonical(host_recovery.expected_cgroup_marker(marker))
+        host_recovery.CGROUP_MARKER_TEMP.write_bytes(raw[:17])
+        host_recovery.CGROUP_MARKER_TEMP.chmod(0o400)
+        self.assertEqual(host_recovery.recover(), "recovered")
+        self.assertFalse(host_recovery.MARKER.exists())
+        self.assertFalse(host_recovery.CGROUP_MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_calls, ["recover", "recover"])
+        self.assertEqual(self.cgroup_clean_calls, ["check-clean", "check-clean"])
+
+    def test_unpublished_host_and_cgroup_markers_cannot_authorize_repair(
+        self,
+    ) -> None:
+        marker = self.arm()
+        os.link(host_recovery.MARKER, host_recovery.MARKER_TEMP)
+        host_recovery.MARKER.unlink()
+        raw = compact_canonical(host_recovery.expected_cgroup_marker(marker))
+        host_recovery.CGROUP_MARKER_TEMP.write_bytes(raw[:17])
+        host_recovery.CGROUP_MARKER_TEMP.chmod(0o400)
+        with self.assertRaisesRegex(
+            host_recovery.RecoveryError, "unpublished cgroup authority"
+        ):
+            host_recovery.recover()
+        self.assertFalse(host_recovery.MARKER.exists())
+        self.assertTrue(host_recovery.MARKER_TEMP.exists())
+        self.assertTrue(host_recovery.CGROUP_MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_clean_calls, [])
+        self.assertEqual(self.cgroup_calls, [])
+
+    def test_forged_unpublished_cgroup_marker_is_never_discarded(self) -> None:
+        marker = self.arm()
+        raw = bytearray(
+            compact_canonical(host_recovery.expected_cgroup_marker(marker))[:17]
+        )
+        raw[-1] = ord("X")
+        host_recovery.CGROUP_MARKER_TEMP.write_bytes(raw)
+        host_recovery.CGROUP_MARKER_TEMP.chmod(0o400)
+        with self.assertRaisesRegex(
+            host_recovery.RecoveryError, "cgroup authority marker temporary claims"
+        ):
+            host_recovery.recover()
+        self.assertTrue(host_recovery.MARKER.exists())
+        self.assertTrue(host_recovery.CGROUP_MARKER_TEMP.exists())
+        self.assertEqual(self.cgroup_clean_calls, [])
+        self.assertEqual(self.cgroup_calls, [])
 
     def test_no_marker_refuses_an_untrusted_guided_request(self) -> None:
         target = self.root / "foreign-request"
@@ -570,6 +699,248 @@ class HostRecoveryTest(unittest.TestCase):
         self.assertFalse(host_recovery.MARKER.exists())
         self.assertTrue(snapshot.exists())
 
+    def test_reboot_stopped_container_uses_read_only_recovery_gate(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state.update({"Pid": 0, "Running": False, "Status": "stopped"})
+        self.arm_cgroup(marker)
+        active = mock.Mock()
+        recovery = mock.Mock()
+        with (
+            mock.patch.object(
+                host_recovery,
+                "verify_active_cgroup_authority",
+                active,
+            ),
+            mock.patch.object(
+                host_recovery,
+                "verify_recovery_cgroup_authority",
+                recovery,
+            ),
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        active.assert_not_called()
+        self.assertEqual(
+            recovery.call_args_list,
+            [
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+            ],
+        )
+        self.assertEqual(self.fake_podman.removed, [CONTAINER_ID])
+        self.assertEqual(self.cgroup_calls, ["recover"])
+
+    def test_exact_durable_stopped_container_states_are_accepted(self) -> None:
+        for status in ("created", "stopped", "exited"):
+            with self.subTest(status=status):
+                state: dict[str, object] = {
+                    "Dead": False,
+                    "Paused": False,
+                    "Pid": 0,
+                    "Restarting": False,
+                    "Running": False,
+                    "Status": status,
+                }
+                self.assertEqual(host_recovery._container_lifecycle({"State": state}), "stopped")
+
+    def test_removing_container_requires_the_cid_first_cutpoint(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state.update({"Pid": 0, "Running": False, "Status": "removing"})
+        self.arm_cgroup(marker)
+        cidfile = host_recovery.expected_container_cidfile(marker, "campaign")
+        cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        cidfile.chmod(0o400)
+        with self.assertRaisesRegex(
+            host_recovery.RecoveryError, "CID-first cutpoint"
+        ):
+            host_recovery.recover()
+        self.assertEqual(self.fake_podman.removed, [])
+        cidfile.unlink()
+        active = mock.Mock()
+        recovery = mock.Mock()
+        with (
+            mock.patch.object(
+                host_recovery, "verify_active_cgroup_authority", active
+            ),
+            mock.patch.object(
+                host_recovery, "verify_recovery_cgroup_authority", recovery
+            ),
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        active.assert_not_called()
+        self.assertEqual(
+            recovery.call_args_list,
+            [
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+            ],
+        )
+        self.assertEqual(self.fake_podman.removed, [CONTAINER_ID])
+
+    def test_initialized_container_requires_launch_cid_and_active_gate(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state.update(
+            {
+                "ConmonPid": 4241,
+                "Pid": 4242,
+                "Running": False,
+                "Status": "initialized",
+            }
+        )
+        self.arm_cgroup(marker)
+        cidfile = host_recovery.expected_container_cidfile(marker, "campaign")
+        cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        cidfile.chmod(0o400)
+        active = mock.Mock()
+        recovery = mock.Mock()
+        with (
+            mock.patch.object(
+                host_recovery, "verify_active_cgroup_authority", active
+            ),
+            mock.patch.object(
+                host_recovery, "verify_recovery_cgroup_authority", recovery
+            ),
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        self.assertEqual(
+            active.call_args_list,
+            [
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+            ],
+        )
+        recovery.assert_not_called()
+        self.assertEqual(self.fake_podman.removed, [CONTAINER_ID])
+
+    def test_initialized_container_resumes_after_cid_first_interruption(
+        self,
+    ) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state.update(
+            {
+                "ConmonPid": 4241,
+                "Pid": 4242,
+                "Running": False,
+                "Status": "initialized",
+            }
+        )
+        self.arm_cgroup(marker)
+        active = mock.Mock()
+        recovery = mock.Mock()
+        with (
+            mock.patch.object(
+                host_recovery, "verify_active_cgroup_authority", active
+            ),
+            mock.patch.object(
+                host_recovery, "verify_recovery_cgroup_authority", recovery
+            ),
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        self.assertEqual(
+            active.call_args_list,
+            [
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+            ],
+        )
+        recovery.assert_not_called()
+        self.assertEqual(self.fake_podman.removed, [CONTAINER_ID])
+
+    def test_stopping_container_requires_cid_first_and_active_gate(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state.update(
+            {
+                "ConmonPid": 4241,
+                "Pid": 4242,
+                "Running": False,
+                "Status": "stopping",
+                "StoppedByUser": True,
+            }
+        )
+        self.arm_cgroup(marker)
+        cidfile = host_recovery.expected_container_cidfile(marker, "campaign")
+        cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        cidfile.chmod(0o400)
+        with self.assertRaisesRegex(
+            host_recovery.RecoveryError, "CID-first cutpoint"
+        ):
+            host_recovery.recover()
+        cidfile.unlink()
+        active = mock.Mock()
+        recovery = mock.Mock()
+        with (
+            mock.patch.object(
+                host_recovery, "verify_active_cgroup_authority", active
+            ),
+            mock.patch.object(
+                host_recovery, "verify_recovery_cgroup_authority", recovery
+            ),
+        ):
+            self.assertEqual(host_recovery.recover(), "recovered")
+        self.assertEqual(
+            active.call_args_list,
+            [
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+                mock.call(marker, [(CONTAINER_ID, "campaign")]),
+            ],
+        )
+        recovery.assert_not_called()
+        self.assertEqual(self.fake_podman.removed, [CONTAINER_ID])
+
+    def test_transitional_or_unknown_container_states_fail_before_mutation(
+        self,
+    ) -> None:
+        for status in ("configured", "initialized", "stopping"):
+            with self.subTest(status=status):
+                state: dict[str, object] = {
+                    "ConmonPid": 0,
+                    "Dead": False,
+                    "Paused": False,
+                    "Pid": 0,
+                    "Restarting": False,
+                    "Running": False,
+                    "Status": status,
+                }
+                with self.assertRaisesRegex(
+                    host_recovery.RecoveryError, "lifecycle state"
+                ):
+                    host_recovery._container_lifecycle({"State": state})
+
+    def test_ambiguous_container_lifecycle_fails_before_mutation(self) -> None:
+        self.initialise_podman_store()
+        marker = self.arm()
+        inspection = self.fake_podman.add_owned(marker, "campaign")
+        state = inspection["State"]
+        assert isinstance(state, dict)
+        state["Paused"] = True
+        self.arm_cgroup(marker)
+        with self.assertRaisesRegex(
+            host_recovery.RecoveryError, "lifecycle state"
+        ):
+            host_recovery.recover()
+        self.assertIn(CONTAINER_ID, self.fake_podman.containers)
+        self.assertEqual(self.fake_podman.removed, [])
+        self.assertEqual(self.cgroup_calls, [])
+
     def test_all_owned_container_kinds_require_the_exact_execution_contract(
         self,
     ) -> None:
@@ -613,6 +984,13 @@ class HostRecoveryTest(unittest.TestCase):
             mounts = value["Mounts"]
             assert isinstance(mounts, list) and isinstance(mounts[0], dict)
             mounts[0]["Propagation"] = "rshared"
+
+        def bind_order(value: dict[str, object]) -> None:
+            host = value["HostConfig"]
+            assert isinstance(host, dict)
+            binds = host["Binds"]
+            assert isinstance(binds, list)
+            host["Binds"] = list(reversed(binds))
 
         def environment(value: dict[str, object]) -> None:
             config = value["Config"]
@@ -701,6 +1079,7 @@ class HostRecoveryTest(unittest.TestCase):
             ("mount", mount),
             ("mount-mode", mount_mode),
             ("mount-propagation", mount_propagation),
+            ("bind-order", bind_order),
             ("environment", environment),
             ("extra-environment", extra_environment),
             ("image", image),
@@ -755,7 +1134,7 @@ class HostRecoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(host_recovery.RecoveryError, "image identity"):
             host_recovery.recover()
         self.assertTrue(host_recovery.MARKER.exists())
-        self.assertEqual(self.cgroup_calls, ["recover"])
+        self.assertEqual(self.cgroup_calls, [])
 
     def test_guided_decision_publication_cutpoints_are_recoverable(self) -> None:
         for name in ("guided-decision.json", ".guided-decision.consumed.789"):
@@ -957,21 +1336,16 @@ class HostRecoveryTest(unittest.TestCase):
         self.assertEqual(self.fake_podman.removed, [])
         self.assertEqual(self.cgroup_calls, [])
 
-    def test_recovery_unlinks_and_fsyncs_all_cids_before_first_container_rm(
+    def test_recovery_unlinks_and_fsyncs_cid_before_container_rm(
         self,
     ) -> None:
         self.initialise_podman_store()
         marker = self.arm()
-        second_id = "c" * 64
         self.fake_podman.add_owned(marker, "campaign")
-        self.fake_podman.add_owned(marker, "verifier", second_id)
-        for kind, identifier in (
-            ("campaign", CONTAINER_ID),
-            ("verifier", second_id),
-        ):
-            path = host_recovery.expected_container_cidfile(marker, kind)
-            path.write_text(f"{identifier}\n", encoding="ascii")
-            path.chmod(0o400)
+        self.arm_cgroup(marker)
+        path = host_recovery.expected_container_cidfile(marker, "campaign")
+        path.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+        path.chmod(0o400)
 
         events: list[str] = []
         real_unlink = host_recovery._unlink_exact
@@ -1004,11 +1378,11 @@ class HostRecoveryTest(unittest.TestCase):
         cid_unlinks = [
             index for index, item in enumerate(events) if item.startswith("unlink:")
         ]
-        self.assertEqual(len(cid_unlinks), 2)
+        self.assertEqual(len(cid_unlinks), 1)
         self.assertTrue(all(index < first_rm for index in cid_unlinks))
         self.assertGreaterEqual(
             sum(1 for item in events[:first_rm] if item == "fsync:runtime"),
-            2,
+            1,
         )
 
     def test_recovery_retries_container_removal_crash_cutpoints(self) -> None:
@@ -1016,19 +1390,16 @@ class HostRecoveryTest(unittest.TestCase):
             pass
 
         self.initialise_podman_store()
-        second_id = "c" * 64
-        for phase in ("before-first-rm", "after-first-rm", "after-final-rm"):
+        for phase in ("before-rm", "after-rm"):
             with self.subTest(phase=phase):
                 marker = self.arm()
                 self.fake_podman.add_owned(marker, "campaign")
-                self.fake_podman.add_owned(marker, "verifier", second_id)
-                for kind, identifier in (
-                    ("campaign", CONTAINER_ID),
-                    ("verifier", second_id),
-                ):
-                    cidfile = host_recovery.expected_container_cidfile(marker, kind)
-                    cidfile.write_text(f"{identifier}\n", encoding="ascii")
-                    cidfile.chmod(0o400)
+                self.arm_cgroup(marker)
+                cidfile = host_recovery.expected_container_cidfile(
+                    marker, "campaign"
+                )
+                cidfile.write_text(f"{CONTAINER_ID}\n", encoding="ascii")
+                cidfile.chmod(0o400)
 
                 real_run = host_recovery.run_podman
                 removals = 0
@@ -1037,13 +1408,11 @@ class HostRecoveryTest(unittest.TestCase):
                     nonlocal removals
                     if not arguments or arguments[0] != "rm":
                         return real_run(arguments)
-                    if phase == "before-first-rm" and removals == 0:
+                    if phase == "before-rm" and removals == 0:
                         raise SimulatedKill()
                     result = real_run(arguments)
                     removals += 1
-                    if phase == "after-first-rm" and removals == 1:
-                        raise SimulatedKill()
-                    if phase == "after-final-rm" and removals == 2:
+                    if phase == "after-rm" and removals == 1:
                         raise SimulatedKill()
                     return result
 
@@ -1058,13 +1427,11 @@ class HostRecoveryTest(unittest.TestCase):
                         marker, "campaign"
                     ).exists()
                 )
-                self.assertFalse(
-                    host_recovery.expected_container_cidfile(
-                        marker, "verifier"
-                    ).exists()
-                )
                 self.assertEqual(host_recovery.recover(), "recovered")
                 self.assertEqual(self.fake_podman.containers, {})
+                if host_recovery.CGROUP_MARKER.exists():
+                    host_recovery.CGROUP_MARKER.chmod(0o600)
+                    host_recovery.CGROUP_MARKER.unlink()
 
     def test_installation_identity_rejects_staging_contract_drift(self) -> None:
         original = json.loads(self.installation.read_text(encoding="utf-8"))

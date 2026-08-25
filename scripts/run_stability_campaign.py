@@ -209,7 +209,14 @@ RUNTIME_LAUNCH_MOUNTS = [
     {"destination": "/launch", "mode": "ro"},
     {"destination": "/evidence", "mode": "rw"},
     {"destination": "/runtime", "mode": "rw"},
-    {"destination": "/sys/fs/cgroup", "mode": "rw"},
+    {"destination": "/sys/fs/cgroup", "mode": "ro"},
+    {
+        "destination": (
+            "/sys/fs/cgroup/system.slice/codeskeptic-stability.service/"
+            "codeskeptic-p10-09/measurement/cgroup.procs"
+        ),
+        "mode": "rw",
+    },
 ]
 RUNTIME_CONTROLLER_COMMAND = [
     "/usr/bin/taskset",
