@@ -399,9 +399,11 @@ survives the runner's deliberate isolate through `IgnoreOnIsolate=yes`. It has
 null standard input and cannot request a password or Enter key. It is
 deliberately static and has no `[Install]` section, so reaching
 `multi-user.target` can never start the campaign by itself.
-The unit delegates its cgroup subtree, places its main operator in
-`DelegateSubgroup=controller`, exposes `AllowedCPUs=0-11`, and confines the
-operator/controller task affinity to logical CPUs 4-11. The payload parent and
+The unit delegates only `cpu`, `cpuset`, `memory`, and `pids`, places its main
+operator in `DelegateSubgroup=controller`, exposes `AllowedCPUs=0-11`, and
+confines the operator/controller task affinity to logical CPUs 4-11. The
+bounded controller list prevents systemd from propagating unrelated `hugetlb`
+and `misc` controllers into ancestor cgroups. The payload parent and
 its isolated measurement child are siblings of that systemd controller leaf,
 all below the same service unit. The runtime config must identify the exact
 measurement path

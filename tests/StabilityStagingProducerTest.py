@@ -299,7 +299,7 @@ def initialize_lifecycle_source(
         "ExecStopPost=/opt/codeskeptic-p10-09/operator/post-stop.sh\n"
         "KillMode=control-group\n"
         "TimeoutStopSec=2min\n"
-        "Delegate=yes\n"
+        "Delegate=cpu cpuset memory pids\n"
         "DelegateSubgroup=controller\n"
         "StateDirectory=codeskeptic-p10-09\n"
         "ProtectControlGroups=no\n",
@@ -3879,6 +3879,13 @@ class StabilityStagingProducerTest(unittest.TestCase):
 
     def test_service_unit_is_static_and_any_dropin_authority_is_rejected(self) -> None:
         assert stage is not None
+        source = UNIT.read_text(encoding="utf-8")
+        self.assertIn("Delegate=cpu cpuset memory pids", source.splitlines())
+        self.assertNotIn("Delegate=yes", source.splitlines())
+        self.assertIn(
+            "Delegate=cpu cpuset memory pids",
+            stage.STABILITY_UNIT_REQUIRED_LINES,
+        )
         stage.verify_static_unit(UNIT)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
@@ -3914,7 +3921,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 ("--what=sleep", "--what=shutdown:sleep"),
                 ("KillMode=control-group", "KillMode=process"),
                 ("TimeoutStopSec=2min", "TimeoutStopSec=infinity"),
-                ("Delegate=yes", "Delegate=no"),
+                ("Delegate=cpu cpuset memory pids", "Delegate=yes"),
                 ("DelegateSubgroup=controller", "DelegateSubgroup=payload"),
                 (
                     "StateDirectory=codeskeptic-p10-09",
@@ -3922,7 +3929,6 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 ),
                 ("ProtectControlGroups=no", "ProtectControlGroups=yes"),
             )
-            source = UNIT.read_text(encoding="utf-8")
             for expected, replacement in lifecycle_mutations:
                 with self.subTest(expected=expected):
                     self.assertIn(expected, source)

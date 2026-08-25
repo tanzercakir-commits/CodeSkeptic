@@ -169,7 +169,10 @@ class StabilityWorkflowTest(unittest.TestCase):
     def test_service_stops_fail_closed_without_restart_or_orphans(self) -> None:
         self.assertEqual(unit_value(self.unit, "Restart"), "no")
         self.assertEqual(unit_value(self.unit, "KillMode"), "control-group")
-        self.assertEqual(unit_value(self.unit, "Delegate"), "yes")
+        self.assertEqual(
+            unit_value(self.unit, "Delegate"),
+            "cpu cpuset memory pids",
+        )
         self.assertEqual(unit_value(self.unit, "DelegateSubgroup"), "controller")
         self.assertEqual(unit_value(self.unit, "AllowedCPUs"), "0-11")
         self.assertEqual(unit_value(self.unit, "CPUAffinity"), "4-11")
