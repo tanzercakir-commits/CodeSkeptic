@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -36,8 +37,17 @@ BASELINE_SCHEMA = "codeskeptic-determinism-baseline-v7"
 RECEIPT_SCHEMA = "codeskeptic-determinism-qualification-v7"
 REJECTED_SCHEMA = "codeskeptic-determinism-rejected-v7"
 CALIBRATION_SCHEMA = "codeskeptic-determinism-calibration-v7"
-ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v3"
+ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v4"
+RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA = (
+    "codeskeptic-determinism-environment-v3"
+)
 CMAKE_CACHE_IDENTITY_SCHEMA = "codeskeptic-cmake-cache-v2"
+TOOLCHAIN_VERIFICATION_LIVE = "live"
+TOOLCHAIN_VERIFICATION_HISTORICAL_RETAINED = "historical-retained"
+TOOLCHAIN_VERIFICATION_MODES = frozenset({
+    TOOLCHAIN_VERIFICATION_LIVE,
+    TOOLCHAIN_VERIFICATION_HISTORICAL_RETAINED,
+})
 KINDS = ("unit", "real-repository", "release-candidate")
 METRICS = ("wall_ms", "cpu_ms", "peak_rss_kib")
 TOOLCHAIN_NAMES = (
@@ -61,6 +71,18 @@ UCLAMP_SOURCE_CGROUP = "cgroup-v2"
 UCLAMP_SOURCE_UNAVAILABLE = "unavailable"
 MEASUREMENT_ENVIRONMENT_EXCLUSIVE = "exclusive-cgroup-v2"
 MEASUREMENT_ENVIRONMENT_UNAVAILABLE = "unavailable"
+MEASUREMENT_CGROUP_RELATIVE = Path(
+    "system.slice/codeskeptic-stability.service/"
+    "codeskeptic-p10-09/measurement"
+)
+MEASUREMENT_ANCESTOR_RELATIVES = (
+    Path("system.slice"),
+    Path("system.slice/codeskeptic-stability.service"),
+    Path("system.slice/codeskeptic-stability.service/codeskeptic-p10-09"),
+)
+CONTROLLER_CGROUP_RELATIVE = Path(
+    "system.slice/codeskeptic-stability.service/controller"
+)
 SHA256 = re.compile(r"[0-9a-f]{64}")
 FINGERPRINT = re.compile(r"csf1-[0-9a-f]{16}")
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,95}")
@@ -128,6 +150,100 @@ LLAMA_STAGING_BUILD_SYMLINKS = {
 
 class QualificationError(RuntimeError):
     """The qualification cannot produce or accept authoritative evidence."""
+
+
+def _toolchain_verification_mode(value: Any) -> str:
+    if type(value) is not str or value not in TOOLCHAIN_VERIFICATION_MODES:
+        raise QualificationError("toolchain verification mode is unsupported")
+    return value
+
+
+def _load_sibling_authority_module(
+    filename: str, private_name: str,
+) -> types.ModuleType:
+    """Execute exact sibling bytes privately, independent of sys.modules."""
+
+    if (not isinstance(filename, str) or Path(filename).name != filename or
+            not isinstance(private_name, str) or not private_name):
+        raise QualificationError("sibling authority module identity is malformed")
+    path = Path(__file__).resolve().with_name(filename)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise QualificationError(
+            f"cannot open sibling authority module {filename}"
+        ) from error
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or not 0 < before.st_size <= 16 << 20
+        ):
+            raise QualificationError(
+                f"sibling authority module {filename} is not a bounded regular file"
+            )
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1 << 20))
+            if not chunk:
+                raise QualificationError(
+                    f"sibling authority module {filename} was truncated"
+                )
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise QualificationError(
+                f"sibling authority module {filename} grew during loading"
+            )
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    try:
+        pathname = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise QualificationError(
+            f"cannot recheck sibling authority module {filename}"
+        ) from error
+    def identity(item: os.stat_result) -> tuple[int, ...]:
+        return (
+            item.st_dev,
+            item.st_ino,
+            item.st_mode,
+            item.st_nlink,
+            item.st_size,
+            item.st_mtime_ns,
+            item.st_ctime_ns,
+        )
+
+    if (
+        identity(before) != identity(after)
+        or identity(after) != identity(pathname)
+    ):
+        raise QualificationError(
+            f"sibling authority module {filename} changed during loading"
+        )
+    raw = b"".join(chunks)
+    try:
+        code = compile(raw, os.fspath(path), "exec", dont_inherit=True)
+    except (SyntaxError, ValueError) as error:
+        raise QualificationError(
+            f"sibling authority module {filename} cannot be compiled"
+        ) from error
+    module = types.ModuleType(private_name)
+    module.__file__ = os.fspath(path)
+    module.__package__ = ""
+    try:
+        exec(code, module.__dict__)
+    except Exception as error:
+        raise QualificationError(
+            f"sibling authority module {filename} cannot be loaded"
+        ) from error
+    return module
 
 
 FAILURE_FIELDS = {
@@ -714,7 +830,12 @@ def _cgroup_delta(
 def _validate_v6_environment_inputs(
     before: dict[str, Any], after: dict[str, Any], wall_ms: int,
     affinity: list[int], logical_cpus: int,
+    environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> None:
+    if environment_schema not in {
+            ENVIRONMENT_SCHEMA, RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA}:
+        raise QualificationError("determinism environment schema is unsupported")
+    retained_v3 = environment_schema == RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA
     _require_int(wall_ms, "environment wall time", 1, 1 << 62)
     _require_int(logical_cpus, "environment logical CPU count", 1, 65536)
     if (not isinstance(affinity, list) or not affinity or
@@ -735,6 +856,12 @@ def _validate_v6_environment_inputs(
         "exclusive_cpu_affinity", "partition", "uclamp_min", "uclamp_max",
         "ancestor_uclamp_max", "populated", "frozen",
     }
+    v4_group_fields = {
+        "configured_exclusive_cpu_affinity", "root_isolated_cpu_affinity",
+        "controller_cgroup_cpu_affinity", "exclusive_cpu_ancestry",
+    }
+    if not retained_v3:
+        group_fields |= v4_group_fields
     for snapshot, side in ((before, "before"), (after, "after")):
         exact = _exact_dict(snapshot, fields, f"environment {side}")
         group = _exact_dict(
@@ -760,8 +887,16 @@ def _validate_v6_environment_inputs(
             raise QualificationError(
                 "measurement controller affinity is malformed"
             )
-        for field in (
-                "effective_cpu_affinity", "exclusive_cpu_affinity"):
+        identity_fields = [
+            "effective_cpu_affinity", "exclusive_cpu_affinity",
+        ]
+        if not retained_v3:
+            identity_fields.extend((
+                "configured_exclusive_cpu_affinity",
+                "root_isolated_cpu_affinity",
+                "controller_cgroup_cpu_affinity",
+            ))
+        for field in identity_fields:
             value = group[field]
             if not isinstance(value, list):
                 raise QualificationError(
@@ -785,14 +920,23 @@ def _validate_v6_environment_inputs(
                 value, "measurement cgroup ancestor uclamp max", 0, 1024
             )
         if group["mode"] == MEASUREMENT_ENVIRONMENT_UNAVAILABLE:
-            if (any(group[field] is not None for field in group_fields - {
+            nullable_exceptions = {
                     "mode", "pressure", "controller_cpu_affinity",
                     "effective_cpu_affinity", "exclusive_cpu_affinity",
                     "ancestor_uclamp_max",
-                    }) or group["pressure"] != {} or
-                    group["effective_cpu_affinity"] != [] or
-                    group["exclusive_cpu_affinity"] != [] or
-                    group["ancestor_uclamp_max"] != []):
+            }
+            if not retained_v3:
+                nullable_exceptions |= v4_group_fields
+            empty_identity_fields = [
+                "effective_cpu_affinity", "exclusive_cpu_affinity",
+                "ancestor_uclamp_max",
+            ]
+            if not retained_v3:
+                empty_identity_fields.extend(v4_group_fields)
+            if (any(group[field] is not None
+                    for field in group_fields - nullable_exceptions) or
+                    group["pressure"] != {} or
+                    any(group[field] != [] for field in empty_identity_fields)):
                 raise QualificationError(
                     "unavailable measurement cgroup evidence is malformed"
                 )
@@ -811,14 +955,25 @@ def _validate_v6_environment_inputs(
             _require_int(
                 group["frozen"], "measurement cgroup frozen", 0, 1
             )
-        if group["mode"] == MEASUREMENT_ENVIRONMENT_EXCLUSIVE and (
-              not controller or set(controller) & set(affinity) or
-              group["effective_cpu_affinity"] != affinity or
-              group["exclusive_cpu_affinity"] != affinity or
-              group["partition"] != "isolated" or
-              group["uclamp_min"] != 1024 or group["uclamp_max"] != 1024 or
-              group["populated"] != 0 or group["frozen"] != 0 or
-              any(value != 1024 for value in ancestor_max)):
+        common_identity_invalid = (
+            not controller or set(controller) & set(affinity) or
+            group["effective_cpu_affinity"] != affinity or
+            group["exclusive_cpu_affinity"] != affinity or
+            group["partition"] != "isolated" or
+            group["uclamp_min"] != 1024 or group["uclamp_max"] != 1024 or
+            group["populated"] != 0 or group["frozen"] != 0 or
+            any(value != 1024 for value in ancestor_max)
+        )
+        v4_identity_invalid = not retained_v3 and (
+            group["configured_exclusive_cpu_affinity"] != affinity or
+            group["root_isolated_cpu_affinity"] != affinity or
+            group["controller_cgroup_cpu_affinity"] != controller or
+            group["exclusive_cpu_ancestry"] != _exclusive_ancestry_claim(
+                affinity, controller
+            )
+        )
+        if (group["mode"] == MEASUREMENT_ENVIRONMENT_EXCLUSIVE and
+                (common_identity_invalid or v4_identity_invalid)):
             raise QualificationError(
                 "measurement cgroup isolation identity is malformed"
             )
@@ -873,8 +1028,11 @@ def _v6_pressure_metrics(
 
 def _v6_control_metrics(
     before: dict[str, Any], after: dict[str, Any], affinity: list[int],
-    required: bool,
+    required: bool, environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> tuple[dict[str, int], list[str]]:
+    if environment_schema not in {
+            ENVIRONMENT_SCHEMA, RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA}:
+        raise QualificationError("determinism environment schema is unsupported")
     violations: list[str] = []
     before_group = before.get("measurement_cgroup")
     after_group = after.get("measurement_cgroup")
@@ -897,12 +1055,18 @@ def _v6_control_metrics(
         system_minimum, system_maximum,
         "system CPU utilization clamp", required,
     )
-    isolation_fields = (
+    isolation_fields = [
         "effective_cpu_affinity", "exclusive_cpu_affinity", "partition",
         "uclamp_min", "uclamp_max",
         "ancestor_uclamp_max",
         "populated", "frozen",
-    )
+    ]
+    if environment_schema == ENVIRONMENT_SCHEMA:
+        isolation_fields.extend((
+            "configured_exclusive_cpu_affinity",
+            "root_isolated_cpu_affinity", "controller_cgroup_cpu_affinity",
+            "exclusive_cpu_ancestry",
+        ))
     if any(before_group.get(field) != after_group.get(field)
            for field in isolation_fields):
         raise QualificationError("measurement cgroup isolation identity drift")
@@ -1080,17 +1244,17 @@ def _v6_cpu_metrics(
 def _evaluate_runtime_environment(
     before: dict[str, Any], after: dict[str, Any], wall_ms: int,
     affinity: list[int], logical_cpus: int, policy: dict[str, int],
-    required: bool,
+    required: bool, environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> dict[str, Any]:
     if policy != ENVIRONMENT_POLICY:
         raise QualificationError("determinism environment policy is not pinned")
     _validate_v6_environment_inputs(
-        before, after, wall_ms, affinity, logical_cpus
+        before, after, wall_ms, affinity, logical_cpus, environment_schema
     )
     cpu = _v6_cpu_metrics(before, after, wall_ms, affinity, logical_cpus)
     pressure = _v6_pressure_metrics(before, after, wall_ms)
     controls, violations = _v6_control_metrics(
-        before, after, affinity, required
+        before, after, affinity, required, environment_schema
     )
     if (required and cpu["affinity_external_cpu_basis_points"] >
             policy["runtime_affinity_external_cpu_limit_basis_points"]):
@@ -1122,17 +1286,17 @@ def _validate_batch_wall_evidence(
 def _evaluate_idle_environment(
     before: dict[str, Any], after: dict[str, Any], wall_ms: int,
     affinity: list[int], logical_cpus: int, policy: dict[str, int],
-    required: bool,
+    required: bool, environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> dict[str, Any]:
     if policy != ENVIRONMENT_POLICY:
         raise QualificationError("determinism environment policy is not pinned")
     _validate_v6_environment_inputs(
-        before, after, wall_ms, affinity, logical_cpus
+        before, after, wall_ms, affinity, logical_cpus, environment_schema
     )
     cpu = _v6_cpu_metrics(before, after, wall_ms, affinity, logical_cpus)
     pressure = _v6_pressure_metrics(before, after, wall_ms)
     controls, violations = _v6_control_metrics(
-        before, after, affinity, required
+        before, after, affinity, required, environment_schema
     )
     idle_minimum_ms = policy["idle_seconds"] * 1000
     if not (
@@ -1279,7 +1443,11 @@ def _measurement_cgroup_snapshot(
             "pressure": {},
             "controller_cpu_affinity": controller,
             "effective_cpu_affinity": [],
+            "configured_exclusive_cpu_affinity": [],
             "exclusive_cpu_affinity": [],
+            "root_isolated_cpu_affinity": [],
+            "controller_cgroup_cpu_affinity": [],
+            "exclusive_cpu_ancestry": [],
             "partition": None,
             "uclamp_min": None,
             "uclamp_max": None,
@@ -1326,7 +1494,13 @@ def _measurement_cgroup_snapshot(
         "pressure": pressure,
         "controller_cpu_affinity": controller,
         "effective_cpu_affinity": identity["cpus"],
+        "configured_exclusive_cpu_affinity": identity[
+            "configured_exclusive_cpus"
+        ],
         "exclusive_cpu_affinity": identity["exclusive_cpus"],
+        "root_isolated_cpu_affinity": identity["root_isolated_cpus"],
+        "controller_cgroup_cpu_affinity": identity["controller_cgroup_cpus"],
+        "exclusive_cpu_ancestry": identity["exclusive_ancestry"],
         "partition": identity["partition"],
         "uclamp_min": identity["uclamp_min"],
         "uclamp_max": identity["uclamp_max"],
@@ -2659,28 +2833,40 @@ def _root_for_marker(input_receipt: dict[str, Any], marker: str) -> Path:
 
 
 def _verify_raw_claims(
-    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any],
+    environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> None:
-    _verify_idle_preflight_claim(receipt, root, manifest)
-    _verify_workload_raw_claims(receipt, root, manifest)
+    if (environment_schema != ENVIRONMENT_SCHEMA and
+            (environment_schema != RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA or
+             receipt.get("schema") != CALIBRATION_SCHEMA)):
+        raise QualificationError("environment artifact schema is unsupported")
+    _verify_idle_preflight_claim(
+        receipt, root, manifest, environment_schema
+    )
+    _verify_workload_raw_claims(
+        receipt, root, manifest, environment_schema
+    )
 
 
 def _verify_idle_preflight_claim(
-    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any],
+    environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> None:
     preflight = _load_json(root / _idle_preflight_artifact_path())
     _exact_dict(
         preflight, {"schema", "scope", "wall_ms", "before", "after", "decision"},
         "idle preflight artifact",
     )
-    if (preflight["schema"] != ENVIRONMENT_SCHEMA or
+    if (preflight["schema"] != environment_schema or
             preflight["scope"] != "idle-preflight"):
         raise QualificationError("idle preflight artifact schema is unsupported")
     _verify_controller_snapshot_claim(
-        preflight["before"], receipt["host"], "idle preflight before"
+        preflight["before"], receipt["host"], "idle preflight before",
+        environment_schema,
     )
     _verify_controller_snapshot_claim(
-        preflight["after"], receipt["host"], "idle preflight after"
+        preflight["after"], receipt["host"], "idle preflight after",
+        environment_schema,
     )
     expected_preflight = _evaluate_idle_environment(
         preflight["before"], preflight["after"], preflight["wall_ms"],
@@ -2688,6 +2874,7 @@ def _verify_idle_preflight_claim(
         receipt["host"]["host_logical_cpus"],
         manifest["environment_policy"],
         receipt["configuration"].get("performance_policy") == "required",
+        environment_schema,
     )
     if canonical_json(preflight["decision"]) != canonical_json(expected_preflight):
         raise QualificationError("idle preflight decision differs from raw artifact")
@@ -2719,7 +2906,11 @@ def _verify_idle_preflight_claim(
 
 def _verify_controller_snapshot_claim(
     snapshot: Any, host: dict[str, Any], label: str,
+    environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> None:
+    if environment_schema not in {
+            ENVIRONMENT_SCHEMA, RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA}:
+        raise QualificationError("determinism environment schema is unsupported")
     if not isinstance(snapshot, dict) or not isinstance(
             snapshot.get("measurement_cgroup"), dict):
         raise QualificationError(f"{label} measurement identity is malformed")
@@ -2750,6 +2941,17 @@ def _verify_controller_snapshot_claim(
             "populated": host["measurement_cgroup_populated"],
             "frozen": host["measurement_cgroup_frozen"],
         }
+        if environment_schema == ENVIRONMENT_SCHEMA:
+            expected.update({
+                "configured_exclusive_cpu_affinity": host["cpu_affinity"],
+                "root_isolated_cpu_affinity": host["cpu_affinity"],
+                "controller_cgroup_cpu_affinity": host[
+                    "controller_cpu_affinity"
+                ],
+                "exclusive_cpu_ancestry": _exclusive_ancestry_claim(
+                    host["cpu_affinity"], host["controller_cpu_affinity"]
+                ),
+            })
         if any(group.get(field) != value for field, value in expected.items()):
             raise QualificationError(
                 f"{label} measurement identity differs from host identity"
@@ -2761,7 +2963,8 @@ def _verify_controller_snapshot_claim(
 
 
 def _verify_workload_raw_claims(
-    receipt: dict[str, Any], root: Path, manifest: dict[str, Any]
+    receipt: dict[str, Any], root: Path, manifest: dict[str, Any],
+    environment_schema: str = ENVIRONMENT_SCHEMA,
 ) -> None:
     definitions = {item["kind"]: item for item in manifest["workloads"]}
     for workload in receipt["workloads"]:
@@ -2789,7 +2992,7 @@ def _verify_workload_raw_claims(
                     },
                     f"{kind} environment artifact",
                 )
-                if (environment["schema"] != ENVIRONMENT_SCHEMA or
+                if (environment["schema"] != environment_schema or
                         environment["scope"] != "inner-record-only"):
                     raise QualificationError(
                         f"{kind} environment artifact schema is unsupported"
@@ -2797,10 +3000,12 @@ def _verify_workload_raw_claims(
                 _verify_controller_snapshot_claim(
                     environment["before"], receipt["host"],
                     f"{kind} inner environment before",
+                    environment_schema,
                 )
                 _verify_controller_snapshot_claim(
                     environment["after"], receipt["host"],
                     f"{kind} inner environment after",
+                    environment_schema,
                 )
                 try:
                     report = json.loads(report_raw.decode("utf-8"))
@@ -2848,6 +3053,7 @@ def _verify_workload_raw_claims(
                     receipt["host"]["cpu_affinity"],
                     receipt["host"]["host_logical_cpus"],
                     manifest["environment_policy"], False,
+                    environment_schema,
                 )
                 if (canonical_json(environment["decision"]) !=
                         canonical_json(expected_decision) or
@@ -2866,7 +3072,7 @@ def _verify_workload_raw_claims(
                 },
                 f"{kind} batch environment artifact",
             )
-            if (batch["schema"] != ENVIRONMENT_SCHEMA or
+            if (batch["schema"] != environment_schema or
                     batch["scope"] != "performance-batch"):
                 raise QualificationError(
                     f"{kind} batch environment artifact schema is unsupported"
@@ -2874,10 +3080,12 @@ def _verify_workload_raw_claims(
             _verify_controller_snapshot_claim(
                 batch["before"], receipt["host"],
                 f"{kind} batch environment before",
+                environment_schema,
             )
             _verify_controller_snapshot_claim(
                 batch["after"], receipt["host"],
                 f"{kind} batch environment after",
+                environment_schema,
             )
             _require_int(
                 batch["wall_ms"], f"{kind} batch wall time", 1, 1 << 62
@@ -2901,6 +3109,7 @@ def _verify_workload_raw_claims(
                 receipt["host"]["host_logical_cpus"],
                 manifest["environment_policy"],
                 receipt["configuration"].get("performance_policy") == "required",
+                environment_schema,
             )
             if (canonical_json(batch["decision"]) !=
                     canonical_json(expected_batch) or
@@ -3108,7 +3317,13 @@ def verify_receipt(
     baseline_path: Path,
     repo_root: Path | None = ROOT,
     baseline_authority_root: Path | None = None,
+    expected_environment_schema: str | None = None,
+    *,
+    toolchain_verification_mode: str = TOOLCHAIN_VERIFICATION_LIVE,
 ) -> dict[str, Any]:
+    verification_mode = _toolchain_verification_mode(
+        toolchain_verification_mode
+    )
     if _regular_kind(root) != "directory":
         raise QualificationError("evidence root is missing")
     receipt_bytes = _read_regular(root / "receipt.json", MAX_JSON_BYTES)
@@ -3165,6 +3380,7 @@ def verify_receipt(
                 verify_baseline_authority(
                     baseline, authority,
                     authority / "scripts" / "determinism_workloads.json",
+                    toolchain_verification_mode=verification_mode,
                 )
         _validate_rejected_payload(receipt, manifest, baseline)
         observations = receipt.get("observations")
@@ -3176,6 +3392,7 @@ def verify_receipt(
             _validate_manifest_inputs(
                 receipt["inputs"], manifest, repo_root.resolve(),
                 receipt["toolchain"], receipt["source"]["revision"],
+                toolchain_verification_mode=verification_mode,
             )
         if isinstance(observations, dict) and observations.get("complete") is True:
             observed = {
@@ -3197,8 +3414,17 @@ def verify_receipt(
             _validate_manifest_inputs(
                 receipt["inputs"], manifest, repo_root.resolve(),
                 receipt["toolchain"], receipt["source"]["revision"],
+                toolchain_verification_mode=verification_mode,
             )
-        _verify_raw_claims(receipt, root, manifest)
+        environment_schema = expected_environment_schema
+        if environment_schema is None and repo_root is not None:
+            environment_schema = environment_schema_at_revision(
+                repo_root.resolve(), receipt["source"]["revision"]
+            )
+        _verify_raw_claims(
+            receipt, root, manifest,
+            environment_schema or ENVIRONMENT_SCHEMA,
+        )
         return receipt
     baseline = load_baseline(baseline_path, digest_json(manifest))
     if baseline_authority_root is not None:
@@ -3206,6 +3432,7 @@ def verify_receipt(
         verify_baseline_authority(
             baseline, authority,
             authority / "scripts" / "determinism_workloads.json",
+            toolchain_verification_mode=verification_mode,
         )
     if receipt.get("baseline", {}).get("sha256") != sha256_file(baseline_path):
         raise QualificationError("receipt baseline file identity drift")
@@ -3218,6 +3445,7 @@ def verify_receipt(
         _validate_manifest_inputs(
             receipt["inputs"], manifest, repo_root.resolve(),
             receipt["toolchain"], receipt["source"]["revision"],
+            toolchain_verification_mode=verification_mode,
         )
     _verify_raw_claims(receipt, root, manifest)
     return receipt
@@ -3225,7 +3453,12 @@ def verify_receipt(
 
 def verify_baseline_authority(
     baseline: dict[str, Any], authority_root: Path, manifest_path: Path,
+    *,
+    toolchain_verification_mode: str = TOOLCHAIN_VERIFICATION_LIVE,
 ) -> None:
+    verification_mode = _toolchain_verification_mode(
+        toolchain_verification_mode
+    )
     authority_root = authority_root.resolve()
     if _regular_kind(authority_root) != "directory":
         raise QualificationError("baseline authority root is missing")
@@ -3235,9 +3468,14 @@ def verify_baseline_authority(
         provenance = profile["provenance"]
         evidence_path = provenance["calibration"]["evidence_path"]
         evidence_root = authority_root / evidence_path
+        environment_schema = environment_schema_at_revision(
+            authority_root, provenance["source_revision"]
+        )
         calibration = verify_receipt(
             evidence_root, manifest_path,
             authority_root / "scripts" / "determinism_baseline.json", None,
+            expected_environment_schema=environment_schema,
+            toolchain_verification_mode=verification_mode,
         )
         if calibration.get("schema") != CALIBRATION_SCHEMA:
             raise QualificationError(
@@ -3253,6 +3491,7 @@ def verify_baseline_authority(
         _validate_manifest_inputs(
             calibration["inputs"], manifest, authority_root,
             calibration["toolchain"], provenance["source_revision"],
+            toolchain_verification_mode=verification_mode,
         )
         if (sha256_file(evidence_root / "receipt.json") !=
                 provenance["calibration"]["receipt_sha256"]):
@@ -3628,6 +3867,33 @@ def _git_blob(repo: Path, revision: str, relative: str) -> bytes:
     return completed.stdout
 
 
+def environment_schema_at_revision(repo: Path, revision: str) -> str:
+    """Read the exact environment wire schema declared by its producer."""
+
+    raw = _git_blob(
+        repo.resolve(), revision, "scripts/run_determinism_qualification.py"
+    )
+    if len(raw) > MAX_LOG_BYTES:
+        raise QualificationError(
+            "determinism producer schema declaration is malformed"
+        )
+    try:
+        text = raw.decode("utf-8", errors="strict")
+    except UnicodeError as error:
+        raise QualificationError(
+            "determinism producer schema declaration is malformed"
+        ) from error
+    matches = re.findall(
+        r'^ENVIRONMENT_SCHEMA = "([a-z0-9.-]+)"$', text, flags=re.MULTILINE
+    )
+    if len(matches) != 1 or matches[0] not in {
+            ENVIRONMENT_SCHEMA, RETAINED_CALIBRATION_ENVIRONMENT_SCHEMA}:
+        raise QualificationError(
+            "determinism producer environment schema is unsupported"
+        )
+    return matches[0]
+
+
 def source_manifest_at_revision(repo: Path, revision: str) -> dict[str, Any]:
     resolved_revision = _git_output(repo, ["rev-parse", f"{revision}^{{commit}}"])
     completed = subprocess.run(
@@ -3866,7 +4132,12 @@ def _build_toolchain_identity(
 
 def _validate_build_toolchain_identity(
     value: Any, label: str, toolchain: dict[str, Any] | None,
+    *,
+    toolchain_verification_mode: str = TOOLCHAIN_VERIFICATION_LIVE,
 ) -> dict[str, Any]:
+    verification_mode = _toolchain_verification_mode(
+        toolchain_verification_mode
+    )
     identity = _exact_dict(value, {
         "cmake_cache_schema", "cmake_cache_canonical_sha256", "cmake",
         "ninja", "c_compiler", "cxx_compiler", "generator",
@@ -3883,7 +4154,10 @@ def _validate_build_toolchain_identity(
             raise QualificationError(f"{label} {field} path is malformed")
     if identity["generator"] != "Ninja":
         raise QualificationError(f"{label} generator drift")
-    if toolchain is not None:
+    if (
+        toolchain is not None
+        and verification_mode == TOOLCHAIN_VERIFICATION_LIVE
+    ):
         mapping = {
             "cmake": "cmake", "ninja": "ninja",
             "c_compiler": "c_compiler", "cxx_compiler": "cxx_compiler",
@@ -3968,6 +4242,40 @@ def _parse_cpu_list(value: str, label: str) -> list[int]:
     return cpus
 
 
+def _format_cpu_list(cpus: list[int]) -> str:
+    if cpus != sorted(set(cpus)) or any(
+        isinstance(cpu, bool) or not isinstance(cpu, int) or cpu < 0
+        for cpu in cpus
+    ):
+        raise QualificationError("CPU list is malformed")
+    ranges: list[str] = []
+    index = 0
+    while index < len(cpus):
+        start = cpus[index]
+        finish = start
+        while index + 1 < len(cpus) and cpus[index + 1] == finish + 1:
+            index += 1
+            finish = cpus[index]
+        ranges.append(str(start) if start == finish else f"{start}-{finish}")
+        index += 1
+    return ",".join(ranges)
+
+
+def _exclusive_ancestry_claim(
+    exclusive_cpus: list[int], controller_cpus: list[int],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "cgroup": f"/{relative.as_posix()}",
+            "configured_exclusive_cpu_affinity": list(exclusive_cpus),
+            "effective_exclusive_cpu_affinity": list(exclusive_cpus),
+            "effective_cpu_affinity": list(controller_cpus),
+            "partition": "member",
+        }
+        for relative in MEASUREMENT_ANCESTOR_RELATIVES
+    ]
+
+
 def _parse_cgroup_uclamp(
     value: str, label: str, allow_maximum_token: bool = False,
 ) -> int:
@@ -3997,11 +4305,13 @@ def _measurement_cgroup_identity(
     try:
         authority = authority_root.resolve(strict=True)
         resolved = measurement_cgroup.resolve(strict=True)
-        resolved.relative_to(authority)
+        relative = resolved.relative_to(authority)
     except (FileNotFoundError, OSError, ValueError) as error:
         raise QualificationError("measurement cgroup is unavailable") from error
     if resolved == authority or not resolved.is_dir():
         raise QualificationError("measurement cgroup is not a dedicated child")
+    if relative != MEASUREMENT_CGROUP_RELATIVE:
+        raise QualificationError("measurement cgroup path is not canonical")
     effective = _parse_cpu_list(
         _telemetry_text(
             resolved / "cpuset.cpus.effective",
@@ -4016,6 +4326,17 @@ def _measurement_cgroup_identity(
         ),
         "measurement exclusive CPU set",
     )
+    configured_exclusive = _parse_cpu_list(
+        _telemetry_text(
+            resolved / "cpuset.cpus.exclusive",
+            "measurement configured exclusive CPU set",
+        ),
+        "measurement configured exclusive CPU set",
+    )
+    if configured_exclusive != exclusive:
+        raise QualificationError(
+            "measurement configured exclusive CPU set differs from effective set"
+        )
     if effective != exclusive:
         raise QualificationError(
             "measurement cgroup exclusive CPU set differs from effective set"
@@ -4035,6 +4356,25 @@ def _measurement_cgroup_identity(
         raise QualificationError(
             "measurement controller affinity overlaps isolated CPUs"
         )
+    root_isolated = _parse_cpu_list(
+        _telemetry_text(
+            authority / "cpuset.cpus.isolated", "root isolated CPU set"
+        ),
+        "root isolated CPU set",
+    )
+    if root_isolated != exclusive:
+        raise QualificationError(
+            "root isolated CPU set differs from measurement exclusivity"
+        )
+    controller_cgroup = _parse_cpu_list(
+        _telemetry_text(
+            authority / CONTROLLER_CGROUP_RELATIVE / "cpuset.cpus.effective",
+            "controller cgroup effective CPU set",
+        ),
+        "controller cgroup effective CPU set",
+    )
+    if controller_cgroup != controller:
+        raise QualificationError("controller cgroup CPU affinity drift")
     membership_raw = _telemetry_bytes(
         resolved / "cgroup.procs", 64 * 1024,
         "measurement cgroup membership",
@@ -4077,14 +4417,47 @@ def _measurement_cgroup_identity(
             "measurement cgroup CPU utilization clamp is not pinned"
         )
     ancestor_uclamp_max: list[int] = []
-    ancestor = resolved.parent
-    while ancestor != authority:
-        try:
-            ancestor.relative_to(authority)
-        except ValueError as error:
+    exclusive_ancestry: list[dict[str, Any]] = []
+    for ancestor_relative in MEASUREMENT_ANCESTOR_RELATIVES:
+        ancestor = authority / ancestor_relative
+        configured = _parse_cpu_list(
+            _telemetry_text(
+                ancestor / "cpuset.cpus.exclusive",
+                "measurement cgroup ancestor configured exclusive CPU set",
+            ),
+            "measurement cgroup ancestor configured exclusive CPU set",
+        )
+        effective_exclusive = _parse_cpu_list(
+            _telemetry_text(
+                ancestor / "cpuset.cpus.exclusive.effective",
+                "measurement cgroup ancestor effective exclusive CPU set",
+            ),
+            "measurement cgroup ancestor effective exclusive CPU set",
+        )
+        ancestor_effective = _parse_cpu_list(
+            _telemetry_text(
+                ancestor / "cpuset.cpus.effective",
+                "measurement cgroup ancestor effective CPU set",
+            ),
+            "measurement cgroup ancestor effective CPU set",
+        )
+        ancestor_partition = _telemetry_text(
+            ancestor / "cpuset.cpus.partition",
+            "measurement cgroup ancestor partition",
+            128,
+        )
+        if configured != exclusive or effective_exclusive != exclusive:
             raise QualificationError(
-                "measurement cgroup ancestor escapes its authority root"
-            ) from error
+                "measurement cgroup ancestor exclusive CPU authority drift"
+            )
+        if ancestor_effective != controller:
+            raise QualificationError(
+                "measurement cgroup ancestor effective CPU authority drift"
+            )
+        if ancestor_partition != "member":
+            raise QualificationError(
+                "measurement cgroup ancestor partition is not member"
+            )
         maximum = _parse_cgroup_uclamp(
             _telemetry_text(
                 ancestor / "cpu.uclamp.max",
@@ -4097,11 +4470,23 @@ def _measurement_cgroup_identity(
                 "measurement cgroup ancestor caps CPU utilization"
             )
         ancestor_uclamp_max.append(maximum)
-        ancestor = ancestor.parent
+        exclusive_ancestry.append({
+            "cgroup": f"/{ancestor_relative.as_posix()}",
+            "configured_exclusive_cpu_affinity": configured,
+            "effective_exclusive_cpu_affinity": effective_exclusive,
+            "effective_cpu_affinity": ancestor_effective,
+            "partition": ancestor_partition,
+        })
+    if exclusive_ancestry != _exclusive_ancestry_claim(exclusive, controller):
+        raise QualificationError("measurement cgroup exclusive ancestry drift")
     return {
         "path": resolved,
         "cpus": effective,
+        "configured_exclusive_cpus": configured_exclusive,
         "exclusive_cpus": exclusive,
+        "root_isolated_cpus": root_isolated,
+        "controller_cgroup_cpus": controller_cgroup,
+        "exclusive_ancestry": exclusive_ancestry,
         "partition": partition,
         "uclamp_min": uclamp_minimum,
         "uclamp_max": uclamp_maximum,
@@ -5060,11 +5445,10 @@ def prepare_release_candidate(
     release_build: Path | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
     explicit_targets = release_source is not None or release_build is not None
-    sys.path.insert(0, str(repo / "scripts"))
-    try:
-        import run_realworld_campaign as campaign
-    except ImportError as error:
-        raise QualificationError("cannot import real-world campaign authority") from error
+    campaign = _load_sibling_authority_module(
+        "run_realworld_campaign.py",
+        "_codeskeptic_private_realworld_campaign",
+    )
     manifest_path = _inside(repo, workload["input"]["realworld_manifest"],
                             "real-world manifest")
     manifest = campaign.load_manifest(manifest_path)
@@ -5170,8 +5554,10 @@ def prepare_release_candidate(
 def _release_manifest_identity(
     repo: Path, workload: dict[str, Any]
 ) -> dict[str, Any]:
-    sys.path.insert(0, str(repo / "scripts"))
-    import run_realworld_campaign as campaign
+    campaign = _load_sibling_authority_module(
+        "run_realworld_campaign.py",
+        "_codeskeptic_private_realworld_campaign",
+    )
     manifest = campaign.load_manifest(
         _inside(repo, workload["input"]["realworld_manifest"], "real-world manifest")
     )
@@ -5219,7 +5605,12 @@ def _thesis_paths_from_bytes(raw: bytes, manifest_relative: str) -> list[str]:
 def _validate_manifest_inputs(
     inputs: dict[str, Any], manifest: dict[str, Any], repo: Path,
     toolchain: dict[str, Any], source_revision: str,
+    *,
+    toolchain_verification_mode: str = TOOLCHAIN_VERIFICATION_LIVE,
 ) -> None:
+    verification_mode = _toolchain_verification_mode(
+        toolchain_verification_mode
+    )
     repo = repo.resolve()
     definitions = {item["kind"]: item for item in manifest["workloads"]}
     source_tree = source_manifest_at_revision(repo, source_revision)
@@ -5263,7 +5654,8 @@ def _validate_manifest_inputs(
                     item["files"]):
                 raise QualificationError("repository source manifest identity drift")
             _validate_build_toolchain_identity(
-                extra["build_toolchain"], "repository build toolchain", toolchain
+                extra["build_toolchain"], "repository build toolchain", toolchain,
+                toolchain_verification_mode=verification_mode,
             )
         else:
             expected_paths = sorted(definition["input"]["translation_units"])
@@ -5285,6 +5677,7 @@ def _validate_manifest_inputs(
             _validate_build_toolchain_identity(
                 extra["build_toolchain"],
                 "release-candidate build toolchain", toolchain,
+                toolchain_verification_mode=verification_mode,
             )
         if kind != "release-candidate":
             for relative, expected_sha in file_hashes.items():
@@ -5292,7 +5685,7 @@ def _validate_manifest_inputs(
                     raise QualificationError(
                         f"{kind} input file identity drift: {relative}"
                     )
-        else:
+        elif verification_mode == TOOLCHAIN_VERIFICATION_LIVE:
             release_root = _root_for_marker(item, "$RELEASE_SOURCE")
             if _regular_kind(release_root) == "directory":
                 if _git_output(release_root, ["rev-parse", "HEAD"]) != extra["revision"]:
@@ -5303,7 +5696,10 @@ def _validate_manifest_inputs(
                         raise QualificationError(
                             f"release-candidate input file identity drift: {relative}"
                         )
-        if kind in {"real-repository", "release-candidate"}:
+        if (
+            kind in {"real-repository", "release-candidate"}
+            and verification_mode == TOOLCHAIN_VERIFICATION_LIVE
+        ):
             marker = "$BUILD" if kind == "real-repository" else "$RELEASE_BUILD"
             build_root = _root_for_marker(item, marker)
             if _regular_kind(build_root) == "directory":

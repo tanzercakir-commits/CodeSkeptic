@@ -2,8 +2,9 @@
 Description=CodeSkeptic P10-09 scope-bound stability campaign control plane
 Documentation=file:/opt/codeskeptic-p10-09/operator/README.md
 After=local-fs.target
-Conflicts=graphical.target sleep.target suspend.target hibernate.target hybrid-sleep.target
-ConditionKernelCommandLine=systemd.unit=multi-user.target
+Before=shutdown.target rescue.target emergency.target
+Conflicts=shutdown.target rescue.target emergency.target
+IgnoreOnIsolate=yes
 
 [Service]
 # Transport only: the runner receipt and verifier, not this unit, decide acceptance.
@@ -12,7 +13,9 @@ User=root
 Group=root
 UMask=0077
 Environment=CODESKEPTIC_TERMINAL_NOTIFY=0
-ExecStart=/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh
+ExecStartPre=/opt/codeskeptic-p10-09/operator/post-stop.sh --startup-recovery
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=CodeSkeptic-P10-09 --why=authoritative-scope-bound-stability-evidence-session --mode=block --no-ask-password /usr/bin/prlimit --nofile=4096:4096 -- /opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh
+ExecStopPost=/opt/codeskeptic-p10-09/operator/post-stop.sh
 Restart=no
 OOMPolicy=stop
 KillMode=control-group

@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import ast
+import json
+import os
 import re
 import shlex
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -18,6 +21,8 @@ OPERATOR_ROOT = ROOT / "scripts" / "stability-systemd"
 UNIT = OPERATOR_ROOT / "codeskeptic-stability.service"
 OPERATOR = OPERATOR_ROOT / "run-authoritative-stability.sh"
 GUIDED = OPERATOR_ROOT / "guided-stability.sh"
+POST_STOP = OPERATOR_ROOT / "post-stop.sh"
+HOST_RECOVERY = OPERATOR_ROOT / "host-recovery.py"
 README = OPERATOR_ROOT / "README.md"
 CONTROLLER = ROOT / "scripts" / "run_stability_campaign.py"
 
@@ -51,12 +56,76 @@ def literal_constant(path: Path, name: str):
     raise AssertionError(f"missing literal controller constant {name}")
 
 
-def guided_terminal_status_parser() -> str:
+def guided_handoff_parser() -> str:
     text = GUIDED.read_text(encoding="utf-8")
-    marker = '"$expected_probe_request" "$expected_campaign_request" <<\'PY\'\n'
+    marker = (
+        '"$HANDOFF_SCHEMA" "$expected_mode" "$expected_nonce" '
+        '"$MAX_HANDOFF_BYTES" <<\'PY\'\n'
+    )
     start = text.index(marker) + len(marker)
     end = text.index("\nPY\n}", start)
     return text[start:end]
+
+
+def post_stop_session_parser() -> str:
+    text = POST_STOP.read_text(encoding="utf-8")
+    marker = '"$PYTHON" -B - "$SESSION_PATH" <<\'PY\'\n'
+    start = text.index(marker) + len(marker)
+    end = text.index("\nPY\n}", start)
+    return text[start:end]
+
+
+def post_stop_restoration_parser() -> str:
+    text = POST_STOP.read_text(encoding="utf-8")
+    marker = (
+        '"$RESTORE_GRAPHICAL_SCHEMA" "$expected_session" <<\'PY\'\n'
+    )
+    start = text.index(marker) + len(marker)
+    end = text.index("\nPY\n}", start)
+    return text[start:end]
+
+
+def shell_function(text: str, name: str) -> str:
+    start = text.index(f"{name}() {{")
+    end = text.index("\n}\n", start) + 3
+    return text[start:end]
+
+
+def restoration_harness(
+    state_path: Path, systemctl_path: Path, attempts: int
+) -> str:
+    post_stop = POST_STOP.read_text(encoding="utf-8")
+    functions = "\n".join(
+        shell_function(post_stop, name)
+        for name in (
+            "read_bound_restoration_intent",
+            "clear_graphical_restoration_state",
+            "system_transition_clear",
+            "read_graphical_identity",
+            "read_display_manager_identity",
+            "restore_graphical_state",
+        )
+    )
+    functions = functions.replace(
+        "metadata.st_uid != 0", "metadata.st_uid != os.getuid()"
+    ).replace("metadata.st_gid != 0", "metadata.st_gid != os.getgid()")
+    return f"""#!/usr/bin/env bash
+set -u
+PYTHON={shlex.quote(sys.executable)}
+SYSTEMCTL={shlex.quote(os.fspath(systemctl_path))}
+RESTORE_GRAPHICAL_PATH={shlex.quote(os.fspath(state_path))}
+RESTORE_GRAPHICAL_SCHEMA=codeskeptic-graphical-restoration-v1
+RESTORE_WAIT_ATTEMPTS={attempts}
+RESTORE_WAIT_INTERVAL=0.05
+TRANSITION_TARGETS=(shutdown.target rescue.target emergency.target)
+session_name=unverified
+graphical_outcome=not-attempted
+{functions}
+result=0
+restore_graphical_state "" || result=$?
+printf '%s\n' "$graphical_outcome"
+exit "$result"
+"""
 
 
 class StabilityWorkflowTest(unittest.TestCase):
@@ -65,26 +134,27 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.operator = OPERATOR.read_text(encoding="utf-8")
         self.readme = README.read_text(encoding="utf-8")
 
-    def test_service_is_a_noninteractive_multi_user_control_plane(self) -> None:
-        self.assertEqual(
-            unit_value(self.unit, "ConditionKernelCommandLine"),
-            "systemd.unit=multi-user.target",
-        )
+    def test_service_is_gui_safe_and_survives_the_runner_isolate(self) -> None:
+        self.assertNotIn("ConditionKernelCommandLine=", self.unit)
         self.assertNotIn("[Install]", self.unit)
         self.assertNotIn("WantedBy=", self.unit)
-        conflicts = unit_value(self.unit, "Conflicts").split()
-        self.assertIn("graphical.target", conflicts)
-        self.assertIn("sleep.target", conflicts)
-        self.assertIn("suspend.target", conflicts)
+        transition_targets = {
+            "shutdown.target",
+            "rescue.target",
+            "emergency.target",
+        }
+        self.assertEqual(set(unit_value(self.unit, "Before").split()), transition_targets)
+        self.assertEqual(set(unit_value(self.unit, "Conflicts").split()), transition_targets)
+        self.assertEqual(unit_value(self.unit, "IgnoreOnIsolate"), "yes")
+        self.assertNotIn("graphical.target", unit_value(self.unit, "Conflicts"))
+        self.assertNotIn("sleep.target", unit_value(self.unit, "Conflicts"))
         self.assertEqual(unit_value(self.unit, "Type"), "exec")
         self.assertEqual(unit_value(self.unit, "User"), "root")
         self.assertEqual(unit_value(self.unit, "Group"), "root")
         self.assertEqual(unit_value(self.unit, "StandardInput"), "null")
 
-        self.assertNotIn("graphical.target", self.operator)
         executable_contract = self.unit + "\n" + self.operator
         for forbidden in (
-            "systemctl isolate",
             "/dev/tty",
             "read -p",
             "sudo ",
@@ -121,8 +191,23 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("/etc/codeskeptic-p10-09/runtime.json.sha256", read_only)
         self.assertNotIn("/etc/codeskeptic-p10-09/stability_manifest.json", read_only)
         self.assertEqual(
-            unit_value(self.unit, "ExecStart"),
-            "/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh",
+            shlex.split(unit_value(self.unit, "ExecStart")),
+            [
+                "/usr/bin/systemd-inhibit",
+                "--what=sleep",
+                "--who=CodeSkeptic-P10-09",
+                "--why=authoritative-scope-bound-stability-evidence-session",
+                "--mode=block",
+                "--no-ask-password",
+                "/usr/bin/prlimit",
+                "--nofile=4096:4096",
+                "--",
+                "/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh",
+            ],
+        )
+        self.assertEqual(
+            unit_value(self.unit, "ExecStopPost"),
+            "/opt/codeskeptic-p10-09/operator/post-stop.sh",
         )
 
     def test_operator_seals_launch_before_one_inhibited_fresh_run(self) -> None:
@@ -144,6 +229,25 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("--recursive --one-file-system --preserve-root=all", self.operator)
         self.assertIn("campaign runtime contains mountpoint", self.operator)
         self.assertIn("campaign runtime is a separate filesystem", self.operator)
+        cleanup = self.operator[
+            self.operator.index("cleanup_campaign_runtime() {"):
+            self.operator.index("require_closed_hooks_directory() {")
+        ]
+        runtime_remove = cleanup.index(
+            '/usr/bin/rm --recursive --one-file-system --preserve-root=all --'
+        )
+        runtime_sync = cleanup.index(
+            '/usr/bin/sync --file-system "$CONTAINER_RUNTIME_ROOT"'
+        )
+        identity_remove = cleanup.index(
+            '/usr/bin/rm -- "$container_runtime_identity"'
+        )
+        identity_sync = cleanup.index(
+            '/usr/bin/sync --file-system "$RUNTIME_IDENTITY_ROOT"'
+        )
+        self.assertLess(runtime_remove, runtime_sync)
+        self.assertLess(runtime_sync, identity_remove)
+        self.assertLess(identity_remove, identity_sync)
         self.assertIn("dedicated Podman store contains stale container state", self.operator)
         self.assertIn('readonly RUNTIME_ROOT="/run/codeskeptic-p10-09"', self.operator)
         self.assertIn('readonly PODMAN_ROOT="${STATE_ROOT}/podman-root"', self.operator)
@@ -155,9 +259,7 @@ class StabilityWorkflowTest(unittest.TestCase):
 
         self.assertEqual(self.operator.count("/usr/bin/flock"), 1)
         self.assertIn('/usr/bin/flock --nonblock "$LOCK_FD"', self.operator)
-        self.assertEqual(self.operator.count("/usr/bin/systemd-inhibit"), 1)
-        self.assertIn("--what=shutdown:sleep", self.operator)
-        self.assertIn("--mode=block", self.operator)
+        self.assertNotIn("/usr/bin/systemd-inhibit", self.operator)
 
         self.assertIn('[[ ! -e "$session_output" && ! -L "$session_output" ]]', self.operator)
         self.assertIn('/usr/bin/mkdir --mode=0700 -- "$session_output"', self.operator)
@@ -267,7 +369,9 @@ class StabilityWorkflowTest(unittest.TestCase):
                 "--cgroupns=host",
                 "--cgroup-parent",
                 "$PAYLOAD_CGROUP_RELATIVE",
+                "--ipc=private",
                 "--pid=private",
+                "--uts=private",
                 "--ulimit",
                 "nofile=4096:4096",
                 "--read-only",
@@ -336,7 +440,15 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn('readonly MEASUREMENT_CPUS="0-3"', self.operator)
         self.assertIn('prepare_measurement_cgroup() {', self.operator)
         self.assertIn('run_rootful_preflight_probe() {', self.operator)
-        self.assertIn('cleanup_measurement_cgroup() {', self.operator)
+        self.assertIn('cleanup_cgroup_authority() {', self.operator)
+        self.assertIn(
+            '"$CGROUP_AUTHORITY" arm --session "$session_name"',
+            self.operator,
+        )
+        self.assertIn(
+            '"$CGROUP_AUTHORITY" cleanup --session "$session_name"',
+            self.operator,
+        )
         self.assertIn(
             'local -a probe_args=("${PODMAN_CONTAINER_OPTIONS[@]}")',
             self.operator,
@@ -372,7 +484,7 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn('\nrun_rootful_preflight_probe\n', self.operator)
         self.assertLess(
             self.operator.rindex('\nrun_rootful_preflight_probe\n'),
-            self.operator.rindex('/usr/bin/systemd-inhibit'),
+            self.operator.rindex('\nrunner_exit=0\n'),
         )
         self.assertIn("private PID namespace", self.readme)
         self.assertIn("4096", self.readme)
@@ -399,7 +511,7 @@ class StabilityWorkflowTest(unittest.TestCase):
         )
         for function in (
             "capture_host_snapshot() {",
-            "read_bound_container_id() {",
+            "cleanup_container() {",
             "run_inner_verifier() {",
             "write_cleanup_record() {",
             "seal_operator_evidence() {",
@@ -411,12 +523,12 @@ class StabilityWorkflowTest(unittest.TestCase):
         )
         prepare = self.operator.rindex("\nprepare_measurement_cgroup\n")
         main = self.operator.rindex("\nrunner_exit=0\n")
+        main_cleanup = self.operator.rindex("\ncleanup_container 1\n")
         main_identity = self.operator.rindex(
-            '\nmain_container_id="$(read_bound_container_id)"\n'
+            '\nmain_container_id="$last_removed_container_id"\n'
         )
-        main_cleanup = self.operator.rindex("\ncleanup_container\n", main_identity)
         verifier_run = self.operator.rindex("\nrun_inner_verifier\n")
-        cgroup_cleanup = self.operator.rindex("\ncleanup_measurement_cgroup\n")
+        cgroup_cleanup = self.operator.rindex("\ncleanup_cgroup_authority\n")
         runtime_cleanup = self.operator.rindex("\ncleanup_campaign_runtime\n")
         cleanup_record = self.operator.rindex("\nwrite_cleanup_record\n")
         post = self.operator.rindex('\ncapture_host_snapshot "post"\n')
@@ -427,8 +539,8 @@ class StabilityWorkflowTest(unittest.TestCase):
             image_check,
             prepare,
             main,
-            main_identity,
             main_cleanup,
+            main_identity,
             verifier_run,
             cgroup_cleanup,
             runtime_cleanup,
@@ -444,6 +556,93 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn('"$RUNNER_PATH" seal-operator', self.operator)
         self.assertIn('"$RUNNER_PATH" verify-operator', self.operator)
 
+    def test_durable_host_recovery_wraps_every_host_mutation_and_acceptance(self) -> None:
+        post_stop = POST_STOP.read_text(encoding="utf-8")
+        guided = GUIDED.read_text(encoding="utf-8")
+        runner = self.operator
+        self.assertIn(
+            'readonly HOST_RECOVERY="${OPERATOR_ROOT}/host-recovery.py"',
+            runner,
+        )
+        self.assertIn(
+            'readonly HOST_RECOVERY_PATH="${OPERATOR_ROOT}/host-recovery.py"',
+            guided,
+        )
+        self.assertIn('require_root_immutable_file "$HOST_RECOVERY"', runner)
+        self.assertIn('require_root_immutable_executable "$HOST_RECOVERY_PATH"', guided)
+        self.assertIn('readonly PRLIMIT="/usr/bin/prlimit"', guided)
+        self.assertIn('require_root_immutable_executable "$PRLIMIT"', guided)
+        self.assertIn(
+            'readonly HOST_RECOVERY="/opt/codeskeptic-p10-09/operator/'
+            'host-recovery.py"',
+            post_stop,
+        )
+
+        startup_recovery = runner.index('\n"$HOST_RECOVERY" recover\n')
+        inspect_request = runner.index("\ninspect_launch_request\n")
+        arm = runner.index(
+            '\n"$HOST_RECOVERY" arm --mode "$operator_mode" '
+            '--session "$session_name"\n'
+        )
+        campaign_mkdir = runner.index(
+            '/usr/bin/mkdir --mode=0700 -- "$session_output"', arm
+        )
+        consume_request = runner.index("\nconsume_launch_request\n", arm)
+        probe_mkdir = runner.index(
+            '/usr/bin/mkdir --mode=0700 -- "$probe_root"', arm
+        )
+        snapshot = runner.index(
+            '"$HOST_RECOVERY" snapshot --session "$session_name"', arm
+        )
+        handoff = runner.rindex("\npublish_guided_handoff\n")
+        cgroup_arm = runner.rindex(
+            '\n"$CGROUP_AUTHORITY" arm --session "$session_name"\n'
+        )
+        self.assertLess(startup_recovery, inspect_request)
+        self.assertLess(inspect_request, arm)
+        self.assertLess(arm, consume_request)
+        self.assertLess(consume_request, campaign_mkdir)
+        self.assertLess(arm, campaign_mkdir)
+        self.assertLess(arm, probe_mkdir)
+        self.assertLess(snapshot, handoff)
+        self.assertLess(handoff, cgroup_arm)
+
+        self.assertIn("append_host_recovery_labels() {", runner)
+        for kind in ("preflight", "campaign", "verifier"):
+            self.assertIn(
+                f'append_host_recovery_labels {kind} ',
+                runner,
+            )
+        self.assertIn(
+            '"$HOST_RECOVERY" cleanup --session "$session_name"', runner
+        )
+        accepted = runner.index("CODESKEPTIC_ROOTFUL_PROBE_ACCEPTED")
+        probe_branch = runner.rindex(
+            'if [[ "$operator_mode" == "probe-only" ]]; then', 0, accepted
+        )
+        probe_cleanup = runner.index(
+            "complete_host_recovery_cleanup", probe_branch
+        )
+        self.assertLess(probe_cleanup, accepted)
+
+        startup_body = post_stop[post_stop.index(
+            'if (( $# == 1 )) && [[ "$1" == "--startup-recovery" ]]'
+        ):]
+        self.assertLess(
+            startup_body.index('"$HOST_RECOVERY" recover'),
+            startup_body.index('restore_graphical_state ""'),
+        )
+        normal_recovery = post_stop.rindex('"$HOST_RECOVERY" recover')
+        graphical_recovery = post_stop.rindex('restore_graphical_state "$runtime_session"')
+        self.assertLess(normal_recovery, graphical_recovery)
+
+        cleanup = shell_function(runner, "write_cleanup_record")
+        self.assertIn("codeskeptic-stability-host-cleanup-v4", cleanup)
+        self.assertIn("host-recovery-intent.json", cleanup)
+        self.assertIn("host_recovery_intent_bound", cleanup)
+        self.assertIn("host_recovery_marker_absent", cleanup)
+        self.assertIn("host_recovery_temporary_absent", cleanup)
+
     def test_probe_only_request_is_atomic_bound_and_creates_no_campaign(self) -> None:
         guided = GUIDED.read_text(encoding="utf-8")
         marker = "/run/codeskeptic-p10-09/probe-only.request"
@@ -454,7 +653,7 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("os.O_CREAT | os.O_EXCL", guided)
         self.assertIn("stat.S_IMODE(metadata.st_mode) != 0o600", guided)
         self.assertIn('cleanup_owned_probe_request() {', guided)
-        self.assertIn('values["mode"] != expected_mode', guided)
+        self.assertIn('value["mode"] != expected_mode', guided)
         self.assertIn('operator_mode="probe-only"', self.operator)
         self.assertIn('/usr/bin/mv --no-target-directory --', self.operator)
         self.assertIn('consume_probe_request() {', self.operator)
@@ -476,7 +675,8 @@ class StabilityWorkflowTest(unittest.TestCase):
             '\nelse\n    session_name="probe-', branch_start
         )
         branch_end = self.operator.index(
-            '\nfi\n\nif [[ "$operator_mode" == "campaign" ]]; then\n'
+            '\nfi\n\npublish_guided_handoff\nwait_for_guided_decision\n\n'
+            'if [[ "$operator_mode" == "campaign" ]]; then\n'
             '    capture_host_snapshot "pre"',
             branch_else,
         )
@@ -493,8 +693,13 @@ class StabilityWorkflowTest(unittest.TestCase):
             "seal-launch",
             self.operator[campaign_seal_branch:campaign_seal_end],
         )
+        handoff = self.operator.rindex("\npublish_guided_handoff\n")
+        arm = self.operator.rindex(
+            '\n"$CGROUP_AUTHORITY" arm --session "$session_name"\n'
+        )
+        self.assertLess(handoff, arm)
         probe_terminal = self.operator.index('CODESKEPTIC_ROOTFUL_PROBE_ACCEPTED')
-        self.assertLess(probe_terminal, self.operator.rindex('/usr/bin/systemd-inhibit'))
+        self.assertLess(probe_terminal, self.operator.rindex('\nrunner_exit=0\n'))
         self.assertIn("--probe-only", self.readme)
         self.assertIn("UnitFileState=static", self.readme)
         self.assertIn("--property=UnitFileState", guided)
@@ -502,10 +707,9 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("--property=DropInPaths --value", guided)
         self.assertIn('[[ -z "$drop_in_paths" ]]', guided)
         self.assertIn("rejects every systemd drop-in", self.readme)
-        self.assertIn("--property=ActiveState --value graphical.target", guided)
-        self.assertIn("display-manager.service must already be inactive/dead", guided)
-        self.assertIn("list-sessions --no-legend --no-pager", guided)
-        self.assertIn("x11|wayland|mir", guided)
+        self.assertIn("graphical.target must be active", guided)
+        self.assertIn("display-manager.service must be active/running", guided)
+        self.assertNotIn("list-sessions --no-legend --no-pager", guided)
         self.assertIn("codeskeptic-campaign-request-v1", guided)
         self.assertIn("create_campaign_request", guided)
         self.assertIn("cleanup_owned_campaign_request", guided)
@@ -516,39 +720,40 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertIn("probe and campaign requests cannot coexist", self.operator)
         self.assertRegex(self.readme.lower(), r"no\s+campaign evidence")
 
-    def test_campaign_terminal_status_is_bound_to_guided_nonce(self) -> None:
+    def test_guided_handoff_is_canonical_root_owned_and_nonce_bound(self) -> None:
         nonce = "11111111-2222-3333-4444-555555555555"
         boot_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-        parser = guided_terminal_status_parser().replace(
+        parser = guided_handoff_parser().replace(
             "metadata.st_uid != 0",
             "metadata.st_uid != os.getuid()",
             1,
+        ).replace(
+            "metadata.st_gid != 0",
+            "metadata.st_gid != os.getgid()",
+            1,
         )
         with tempfile.TemporaryDirectory() as directory:
-            status = Path(directory) / "terminal-status"
+            handoff = Path(directory) / "guided-handoff.json"
 
             def run(session_nonce: str) -> subprocess.CompletedProcess[bytes]:
-                status.write_text(
-                    "mode=campaign\n"
-                    "probe_request=none\n"
-                    "result=success\n"
-                    "exit_code=0\n"
-                    "session=/var/lib/codeskeptic-p10-09/sessions/"
-                    f"20260823T120000Z-{boot_id}-{session_nonce}\n"
-                    "completed_utc=2026-08-23T12:00:00Z\n",
+                handoff.unlink(missing_ok=True)
+                handoff.write_text(
+                    '{"mode":"campaign","nonce":"'
+                    f'{session_nonce}","schema":"codeskeptic-guided-handoff-v1",'
+                    f'"session":"20260823T120000Z-{boot_id}-{session_nonce}"}}\n',
                     encoding="ascii",
                 )
-                status.chmod(0o600)
+                handoff.chmod(0o400)
                 return subprocess.run(
                     [
                         sys.executable,
                         "-B",
                         "-",
-                        str(status),
-                        "1024",
+                        str(handoff),
+                        "codeskeptic-guided-handoff-v1",
                         "campaign",
-                        "",
                         nonce,
+                        "512",
                     ],
                     input=parser.encode("utf-8"),
                     stdout=subprocess.PIPE,
@@ -560,21 +765,53 @@ class StabilityWorkflowTest(unittest.TestCase):
             self.assertEqual(accepted.returncode, 0, accepted.stderr.decode())
             rejected = run("99999999-8888-7777-6666-555555555555")
             self.assertNotEqual(rejected.returncode, 0)
-            self.assertIn(b"differs from this campaign request", rejected.stderr)
+            self.assertIn(b"differs from this invocation", rejected.stderr)
 
     def test_cidfile_cleanup_is_fail_closed(self) -> None:
         self.assertIn('[[ ! -e "$cidfile" && ! -L "$cidfile" ]]', self.operator)
         self.assertIn('podman_run_args+=(--cidfile "$cidfile")', self.operator)
         self.assertIn('cleanup_container', self.operator)
-        self.assertIn("container inspect", self.operator)
-        self.assertIn('[[ "$bound_container_name" == "$container_name" ]]', self.operator)
-        self.assertIn('rm --force --ignore -- "$container_id"', self.operator)
+        self.assertNotIn("container inspect", self.operator)
+        self.assertNotIn('"$HOST_RECOVERY" owned-container-id', self.operator)
+        self.assertNotIn(
+            'rm --force --ignore -- "$container_name"', self.operator
+        )
+        self.assertNotIn("run_podman rm --force --ignore", self.operator)
+        self.assertIn(
+            '"$HOST_RECOVERY" remove-owned-container', self.operator
+        )
+        self.assertIn('cleanup_container 1', self.operator)
+        self.assertIn(
+            'fail "required container was absent from central cleanup"',
+            self.operator,
+        )
+        self.assertIn(
+            'main_container_id="$last_removed_container_id"', self.operator
+        )
         self.assertIn('trap publish_terminal_status EXIT', self.operator)
         self.assertIn("trap 'terminate_with_signal_status 1' HUP", self.operator)
         self.assertIn("trap 'terminate_with_signal_status 2' INT", self.operator)
         self.assertIn("trap 'terminate_with_signal_status 15' TERM", self.operator)
         self.assertIn('exit "$((128 + signal_number))"', self.operator)
         self.assertRegex(self.operator, r"if ! cleanup_container; then\n\s+exit_code=1")
+        terminal = self.operator[
+            self.operator.index("publish_terminal_status() {"):
+            self.operator.index("(( EUID == 0 ))")
+        ]
+        self.assertIn("bounded_cleanup_safe=0", terminal)
+        self.assertIn("if (( bounded_cleanup_safe == 1 )); then", terminal)
+        self.assertLess(
+            terminal.index("cleanup_container"),
+            terminal.index("cleanup_campaign_runtime"),
+        )
+        bounded = self.operator[
+            self.operator.index("cleanup_container() {"):
+            self.operator.index("run_rootful_preflight_probe() {")
+        ]
+        self.assertLess(
+            bounded.index("remove-owned-container"),
+            bounded.index("container ID file survived central cleanup"),
+        )
 
     def test_controller_exposes_the_exact_operator_entrypoint(self) -> None:
         completed = subprocess.run(
@@ -621,11 +858,19 @@ class StabilityWorkflowTest(unittest.TestCase):
             'readonly SERVICE_UNIT="codeskeptic-stability.service"', guided
         )
         self.assertIn(
-            'readonly STATUS_PATH="/var/lib/codeskeptic-p10-09/status/'
-            'terminal-status"',
+            'readonly HANDOFF_PATH="/run/codeskeptic-p10-09/'
+            'guided-handoff.json"',
             guided,
         )
-        self.assertIn('readonly MAX_STATUS_BYTES=1024', guided)
+        self.assertIn(
+            'readonly RESTORE_GRAPHICAL_PATH="/var/lib/codeskeptic-p10-09/'
+            'graphical-restoration-state.json"',
+            guided,
+        )
+        self.assertIn('readonly HANDOFF_SCHEMA="codeskeptic-guided-handoff-v1"', guided)
+        self.assertIn('readonly MAX_HANDOFF_BYTES=512', guided)
+        self.assertIn('readonly HANDOFF_WAIT_ATTEMPTS=600', guided)
+        self.assertIn('readonly HANDOFF_WAIT_INTERVAL=0.1', guided)
         self.assertIn("CODESKEPTIC_GUIDED_INPUT_REQUIRED", guided)
         self.assertIn("CODESKEPTIC_GUIDED_STAGING_UNAVAILABLE", guided)
         self.assertIn('/usr/bin/printf \'\\a\\a\\a\'', guided)
@@ -633,23 +878,430 @@ class StabilityWorkflowTest(unittest.TestCase):
             'exec /usr/bin/sudo -- "$GUIDED_PATH" --root', guided
         )
         self.assertIn(
-            '"$SYSTEMCTL" start --wait "$SERVICE_UNIT"', guided
+            '"$SYSTEMCTL" start --no-block "$SERVICE_UNIT"', guided
         )
-        self.assertIn('read_bounded_terminal_status() {', guided)
-        self.assertIn("MAX_STATUS_BYTES", guided)
-        self.assertIn("CODESKEPTIC_GUIDED_TERMINAL_STATUS", guided)
+        self.assertIn('read_bound_handoff() {', guided)
+        self.assertIn('wait_for_bound_handoff() {', guided)
+        self.assertIn("metadata.st_uid != 0", guided)
+        self.assertIn("metadata.st_gid != 0", guided)
+        self.assertIn("stat.S_IMODE(metadata.st_mode) != 0o400", guided)
+        self.assertIn('CODESKEPTIC_P10_09_HANDOFF_ACCEPTED', guided)
         self.assertIn('"$SYSTEMCTL" reset-failed "$SERVICE_UNIT"', guided)
         self.assertNotIn("systemctl isolate", guided)
         self.assertNotIn("systemctl reboot", guided)
         self.assertNotIn("systemctl poweroff", guided)
-        self.assertNotIn("--no-block", guided)
+        self.assertNotIn("start --wait", guided)
+        self.assertIn("unconfirmed graphical restoration state exists", guided)
+        graphical_check = guided.rindex("graphical.target must be active")
+        request = guided.rindex("create_campaign_request ||")
+        start = guided.rindex('"$SYSTEMCTL" start --no-block "$SERVICE_UNIT"')
+        handoff = guided.rindex(
+            'handoff_session="$(wait_for_bound_handoff "$guided_mode" "$expected_nonce")"'
+        )
+        release = guided.rindex('owned_campaign_nonce=""')
+        self.assertLess(graphical_check, request)
+        self.assertLess(request, start)
+        self.assertLess(start, handoff)
+        self.assertLess(handoff, release)
         self.assertIn(
             "/opt/codeskeptic-p10-09/operator/guided-stability.sh",
             self.readme,
         )
         self.assertIn("one command", self.readme.lower())
         self.assertIn("never reboots", self.readme.lower())
-        self.assertIn("never isolates", self.readme.lower())
+        self.assertIn("no manual isolate", self.readme.lower())
+        self.assertIn("no exit-code capture", self.readme.lower())
+
+    def test_post_stop_cleans_first_and_restores_graphics_fail_closed(self) -> None:
+        post_stop = POST_STOP.read_text(encoding="utf-8")
+        self.assertNotEqual(POST_STOP.stat().st_mode & 0o111, 0)
+        self.assertIn(
+            'readonly HOST_RECOVERY="/opt/codeskeptic-p10-09/operator/'
+            'host-recovery.py"',
+            post_stop,
+        )
+        self.assertIn(
+            'readonly SESSION_PATH="/run/codeskeptic-p10-09/session-name"',
+            post_stop,
+        )
+        self.assertIn(
+            'readonly RESTORE_GRAPHICAL_PATH="/var/lib/codeskeptic-p10-09/'
+            'graphical-restoration-state.json"',
+            post_stop,
+        )
+        self.assertIn('restore_graphical_state "$runtime_session"', post_stop)
+        cleanup = '"$HOST_RECOVERY" recover'
+        self.assertIn(cleanup, post_stop)
+        cleanup_position = post_stop.rindex(cleanup)
+        transition_position = post_stop.rindex(
+            'restore_graphical_state "$runtime_session"'
+        )
+        graphical_position = transition_position
+        self.assertLess(cleanup_position, transition_position)
+        self.assertLessEqual(transition_position, graphical_position)
+        self.assertIn("LoadState=loaded\\nActiveState=active", post_stop)
+        self.assertEqual(
+            set(shell_array(post_stop, "TRANSITION_TARGETS")),
+            {"shutdown.target", "rescue.target", "emergency.target"},
+        )
+        self.assertIn(
+            'readonly STATUS_PATH="/var/lib/codeskeptic-p10-09/status/'
+            'post-stop-status.txt"',
+            post_stop,
+        )
+        self.assertIn("skipped-system-transition", post_stop)
+        self.assertIn("skipped-unverified-transition", post_stop)
+        self.assertIn("not-requested", post_stop)
+        self.assertIn("host_cleanup=%s", post_stop)
+        self.assertIn("graphical=%s", post_stop)
+        self.assertIn("service_result=%s", post_stop)
+        self.assertIn("chmod 0400", post_stop)
+        self.assertNotIn("/etc/systemd/system/codeskeptic-stability.service", post_stop)
+        self.assertNotIn("rm -rf", post_stop)
+        self.assertIn("permanent unit and operator remain installed", self.readme.lower())
+
+        runner = self.operator
+        self.assertIn(
+            'readonly RESTORE_GRAPHICAL_PATH="/var/lib/codeskeptic-p10-09/'
+            'graphical-restoration-state.json"',
+            runner,
+        )
+        self.assertIn("publish_graphical_restoration_intent() {", runner)
+        intent = runner.rindex("\npublish_graphical_restoration_intent\n")
+        isolate = runner.rindex("\nisolate_graphical_session\n")
+        self.assertLess(intent, isolate)
+
+    def test_post_stop_session_marker_is_exact_and_root_bound(self) -> None:
+        parser = post_stop_session_parser().replace(
+            "metadata.st_uid != 0",
+            "metadata.st_uid != os.getuid()",
+            1,
+        ).replace(
+            "metadata.st_gid != 0",
+            "metadata.st_gid != os.getgid()",
+            1,
+        )
+        nonce = "11111111-2222-3333-4444-555555555555"
+        boot_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "session-name"
+
+            def run(value: str) -> subprocess.CompletedProcess[bytes]:
+                marker.unlink(missing_ok=True)
+                marker.write_text(value, encoding="ascii")
+                marker.chmod(0o400)
+                return subprocess.run(
+                    [sys.executable, "-B", "-", str(marker)],
+                    input=parser.encode("utf-8"),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+
+            session = f"20260823T120000Z-{boot_id}-{nonce}"
+            accepted = run(session + "\n")
+            self.assertEqual(accepted.returncode, 0, accepted.stderr.decode())
+            self.assertEqual(accepted.stdout, (session + "\n").encode("ascii"))
+            rejected = run(session + "\n\n")
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn(b"malformed", rejected.stderr)
+
+    def test_post_stop_restoration_intent_is_exact_and_session_bound(self) -> None:
+        parser = post_stop_restoration_parser().replace(
+            "metadata.st_uid != 0",
+            "metadata.st_uid != os.getuid()",
+            1,
+        ).replace(
+            "metadata.st_gid != 0",
+            "metadata.st_gid != os.getgid()",
+            1,
+        )
+        nonce = "11111111-2222-3333-4444-555555555555"
+        boot_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        session = f"20260823T120000Z-{boot_id}-{nonce}"
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "graphical-restoration-state.json"
+
+            def run(expected: str) -> subprocess.CompletedProcess[bytes]:
+                marker.unlink(missing_ok=True)
+                marker.write_text(
+                    '{"nonce":"'
+                    f'{nonce}","phase":"restore-required","schema":"'
+                    'codeskeptic-graphical-restoration-v1","session":"'
+                    f'{session}"}}\n',
+                    encoding="ascii",
+                )
+                marker.chmod(0o400)
+                return subprocess.run(
+                    [
+                        sys.executable,
+                        "-B",
+                        "-",
+                        str(marker),
+                        "codeskeptic-graphical-restoration-v1",
+                        expected,
+                    ],
+                    input=parser.encode("utf-8"),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+
+            accepted = run(session)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr.decode())
+            rejected = run(session + "-drift")
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn(b"graphical restoration intent", rejected.stderr)
+
+    def test_guided_requires_a_second_exact_ack_before_isolation(self) -> None:
+        guided = GUIDED.read_text(encoding="utf-8")
+        runner = self.operator
+        self.assertIn(
+            'readonly GUIDED_DECISION_PATH="/run/codeskeptic-p10-09/'
+            'guided-decision.json"',
+            guided,
+        )
+        self.assertIn(
+            'readonly GUIDED_DECISION_SCHEMA="codeskeptic-guided-decision-v1"',
+            guided,
+        )
+        self.assertIn("publish_guided_decision() {", guided)
+        self.assertIn('publish_guided_decision "accept"', guided)
+        self.assertIn('publish_guided_decision "cancel"', guided)
+        self.assertIn(
+            'readonly GUIDED_DECISION_PATH="${RUNTIME_ROOT}/guided-decision.json"',
+            runner,
+        )
+        self.assertIn("wait_for_guided_decision() {", runner)
+        self.assertIn('"$guided_decision" == "accept"', runner)
+        self.assertIn('"$guided_decision" == "cancel"', runner)
+        self.assertIn('guided_ack_consumed=1', runner)
+        handoff = runner.rindex("\npublish_guided_handoff\n")
+        ack = runner.rindex("\nwait_for_guided_decision\n")
+        restore = runner.rindex("\npublish_graphical_restoration_intent\n")
+        isolate = runner.rindex("\nisolate_graphical_session\n")
+        self.assertLess(handoff, ack)
+        self.assertLess(ack, restore)
+        self.assertLess(restore, isolate)
+        isolate_body = shell_function(runner, "isolate_graphical_session")
+        self.assertIn("guided_ack_consumed == 1", isolate_body)
+
+    def test_visible_control_files_are_published_atomically(self) -> None:
+        guided = GUIDED.read_text(encoding="utf-8")
+        runner = self.operator
+        for temporary in (
+            ".campaign.request.tmp",
+            ".probe-only.request.tmp",
+            ".guided-decision.json.tmp",
+        ):
+            self.assertIn(temporary, guided)
+        for temporary in (
+            ".session-name.tmp",
+            ".guided-handoff.json.tmp",
+            ".graphical-restoration-state.json.tmp",
+        ):
+            self.assertIn(temporary, runner)
+        for source in (guided, runner):
+            self.assertIn("os.link(temporary, path", source)
+            self.assertIn("os.fsync(descriptor)", source)
+            self.assertIn("os.fsync(directory)", source)
+
+    def test_graphical_restoration_is_durable_and_exactly_confirmed(self) -> None:
+        post_stop = POST_STOP.read_text(encoding="utf-8")
+        runner = self.operator
+        durable = (
+            "/var/lib/codeskeptic-p10-09/graphical-restoration-state.json"
+        )
+        self.assertIn(f'readonly RESTORE_GRAPHICAL_PATH="{durable}"', post_stop)
+        self.assertIn(f'readonly RESTORE_GRAPHICAL_PATH="{durable}"', runner)
+        self.assertIn("codeskeptic-graphical-restoration-v1", post_stop)
+        self.assertIn("codeskeptic-graphical-restoration-v1", runner)
+        self.assertIn('"phase": "restore-required"', runner)
+        self.assertIn("restore_graphical_state() {", post_stop)
+        self.assertIn("clear_graphical_restoration_state() {", post_stop)
+        restore = shell_function(post_stop, "restore_graphical_state")
+        exact_graphical = (
+            "LoadState=loaded\\nActiveState=active\\nSubState=active\\nJob="
+        )
+        exact_display = (
+            "LoadState=loaded\\nActiveState=active\\nSubState=running\\nJob="
+        )
+        self.assertIn(exact_graphical, restore)
+        self.assertIn(exact_display, restore)
+        self.assertIn('"$SYSTEMCTL" start --no-block graphical.target', restore)
+        self.assertIn("RESTORE_WAIT_ATTEMPTS", restore)
+        self.assertIn("clear_graphical_restoration_state", restore)
+        self.assertNotIn('graphical_outcome="restore-requested"', post_stop)
+        self.assertIn("--startup-recovery", post_stop)
+        self.assertIn(
+            "ExecStartPre=/opt/codeskeptic-p10-09/operator/post-stop.sh "
+            "--startup-recovery",
+            self.unit,
+        )
+
+    def test_async_graphical_start_never_counts_as_restored(self) -> None:
+        post_stop = POST_STOP.read_text(encoding="utf-8")
+        restore = shell_function(post_stop, "restore_graphical_state")
+        start = restore.index('"$SYSTEMCTL" start --no-block graphical.target')
+        clear = restore.index("clear_graphical_restoration_state")
+        proof = restore.index(
+            "LoadState=loaded\\nActiveState=active\\nSubState=active\\nJob=",
+            start,
+        )
+        self.assertLess(start, proof)
+        self.assertLess(proof, clear)
+        self.assertIn('graphical_outcome="restore-timeout"', restore)
+        self.assertRegex(
+            restore,
+            r'restore-timeout"\n\s+return 1',
+        )
+
+    def test_post_stop_interruption_leaves_durable_retry_authority(self) -> None:
+        post_stop = POST_STOP.read_text(encoding="utf-8")
+        clear = shell_function(post_stop, "clear_graphical_restoration_state")
+        restore = shell_function(post_stop, "restore_graphical_state")
+        self.assertNotIn("trap", restore)
+        self.assertIn("path.unlink()", clear)
+        self.assertIn("os.fsync(directory)", clear)
+        exact_proof = restore.index(
+            "LoadState=loaded\\nActiveState=active\\nSubState=active\\nJob="
+        )
+        clear_call = restore.index("clear_graphical_restoration_state")
+        self.assertLess(exact_proof, clear_call)
+        publish = shell_function(runner := self.operator, "publish_graphical_restoration_intent")
+        self.assertIn("os.fsync(descriptor)", publish)
+        self.assertIn("os.fsync(directory)", publish)
+        self.assertLess(
+            runner.rindex("\npublish_graphical_restoration_intent\n"),
+            runner.rindex("\nisolate_graphical_session\n"),
+        )
+
+    def test_async_failure_and_interrupted_post_stop_retry_behavior(self) -> None:
+        nonce = "11111111-2222-3333-4444-555555555555"
+        boot_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        session = f"20260823T120000Z-{boot_id}-{nonce}"
+        payload = {
+            "nonce": nonce,
+            "phase": "restore-required",
+            "schema": "codeskeptic-graphical-restoration-v1",
+            "session": session,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "graphical-restoration-state.json"
+            mode = root / "mode"
+            started = root / "start-called"
+            fake_systemctl = root / "systemctl"
+            harness = root / "restore-harness.sh"
+            fake_systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -u\n"
+                f"mode_file={shlex.quote(os.fspath(mode))}\n"
+                f"started={shlex.quote(os.fspath(started))}\n"
+                "if [[ \"$1\" == start ]]; then\n"
+                "  : >\"$started\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "target=\"${!#}\"\n"
+                "case \"$target\" in\n"
+                "  shutdown.target|rescue.target|emergency.target)\n"
+                "    printf 'ActiveState=inactive\\nJob=\\n' ;;\n"
+                "  graphical.target)\n"
+                "    if [[ \"$(<\"$mode_file\")\" == active ]]; then\n"
+                "      printf 'LoadState=loaded\\nActiveState=active\\nSubState=active\\nJob=\\n'\n"
+                "    else\n"
+                "      printf 'LoadState=loaded\\nActiveState=inactive\\nSubState=dead\\nJob=\\n'\n"
+                "    fi ;;\n"
+                "  display-manager.service)\n"
+                "    if [[ \"$(<\"$mode_file\")\" == active ]]; then\n"
+                "      printf 'LoadState=loaded\\nActiveState=active\\nSubState=running\\nJob=\\n'\n"
+                "    else\n"
+                "      printf 'LoadState=loaded\\nActiveState=inactive\\nSubState=dead\\nJob=\\n'\n"
+                "    fi ;;\n"
+                "  *) exit 2 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            fake_systemctl.chmod(0o700)
+
+            def create_state() -> None:
+                state.write_text(
+                    json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                    + "\n",
+                    encoding="ascii",
+                )
+                state.chmod(0o400)
+
+            mode.write_text("inactive\n", encoding="ascii")
+            create_state()
+            harness.write_text(
+                restoration_harness(state, fake_systemctl, 2),
+                encoding="utf-8",
+            )
+            harness.chmod(0o700)
+            timed_out = subprocess.run(
+                [os.fspath(harness)],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+            )
+            self.assertNotEqual(timed_out.returncode, 0)
+            self.assertEqual(timed_out.stdout, "restore-timeout\n")
+            self.assertTrue(state.exists(), "enqueue must retain durable state")
+
+            mode.write_text("active\n", encoding="ascii")
+            retried = subprocess.run(
+                [os.fspath(harness)],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+            )
+            self.assertEqual(retried.returncode, 0, retried.stderr)
+            self.assertEqual(retried.stdout, "restored-and-confirmed\n")
+            self.assertFalse(state.exists())
+
+            started.unlink(missing_ok=True)
+            mode.write_text("inactive\n", encoding="ascii")
+            create_state()
+            harness.write_text(
+                restoration_harness(state, fake_systemctl, 600),
+                encoding="utf-8",
+            )
+            process = subprocess.Popen(
+                [os.fspath(harness)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=True,
+            )
+            for _ in range(100):
+                if started.exists():
+                    break
+                time.sleep(0.01)
+            self.assertTrue(started.exists())
+            os.killpg(process.pid, 15)
+            process.communicate(timeout=5)
+            self.assertTrue(state.exists(), "interruption must retain retry state")
+
+            mode.write_text("active\n", encoding="ascii")
+            retried_after_interrupt = subprocess.run(
+                [os.fspath(harness)],
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+            )
+            self.assertEqual(
+                retried_after_interrupt.returncode,
+                0,
+                retried_after_interrupt.stderr,
+            )
+            self.assertFalse(state.exists())
 
     def test_transport_describes_scope_not_elapsed_time_as_the_gate(self) -> None:
         contract = self.unit + "\n" + self.operator + "\n" + self.readme

@@ -21,15 +21,17 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-TOOL_VERSION = "2"
+TOOL_VERSION = "3"
 BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 INVENTORY_SCHEMA = "codeskeptic-stability-staging-inventory-v1"
 INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
-RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v1"
+INSTALLATION_AUTHORITY_SCHEMA = "codeskeptic-stability-installation-authority-v1"
+RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v2"
 
 BUNDLE_RECEIPT_FIELDS = frozenset({
     "schema", "revision", "source_tree_sha1", "source_manifest_sha256",
@@ -85,6 +87,7 @@ UNIT_PATH = Path("/etc/systemd/system/codeskeptic-stability.service")
 INSTALLATION_ROOT = Path("/opt/codeskeptic-p10-09/installation")
 INSTALLATION_RECEIPT_PATH = INSTALLATION_ROOT / "receipt.json"
 STATE_ROOT = Path("/var/lib/codeskeptic-p10-09")
+INSTALLATION_AUTHORITY_PATH = STATE_ROOT / "installation-authority.json"
 PODMAN_ROOT = STATE_ROOT / "podman-root"
 PODMAN_RUNROOT = Path("/run/codeskeptic-p10-09/podman-runroot")
 PODMAN_ENVIRONMENT_NAME = "podman-environment"
@@ -93,6 +96,31 @@ PODMAN_ENVIRONMENT_DIRECTORIES = (
 )
 PINNED_ARCHIVE_NAME = "pinned-evidence-image.oci.tar"
 UNIT_NAME = "codeskeptic-stability.service"
+STABILITY_EXEC_START = (
+    "ExecStart=/usr/bin/systemd-inhibit --what=sleep "
+    "--who=CodeSkeptic-P10-09 "
+    "--why=authoritative-scope-bound-stability-evidence-session "
+    "--mode=block --no-ask-password /usr/bin/prlimit --nofile=4096:4096 -- "
+    "/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh"
+)
+STABILITY_UNIT_REQUIRED_LINES = frozenset({
+    "Before=shutdown.target rescue.target emergency.target",
+    "Conflicts=shutdown.target rescue.target emergency.target",
+    "IgnoreOnIsolate=yes",
+    "Type=exec",
+    (
+        "ExecStartPre=/opt/codeskeptic-p10-09/operator/"
+        "post-stop.sh --startup-recovery"
+    ),
+    STABILITY_EXEC_START,
+    "ExecStopPost=/opt/codeskeptic-p10-09/operator/post-stop.sh",
+    "KillMode=control-group",
+    "TimeoutStopSec=2min",
+    "Delegate=yes",
+    "DelegateSubgroup=controller",
+    "StateDirectory=codeskeptic-p10-09",
+    "ProtectControlGroups=no",
+})
 PODMAN = Path("/usr/bin/podman")
 CONMON = Path("/usr/bin/conmon")
 CRUN = Path("/usr/bin/crun")
@@ -824,13 +852,31 @@ def verify_static_unit(path: Path) -> None:
         raise StagingError(f"cannot read static service unit: {error}") from error
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
         raise StagingError("service unit is not a standalone regular file")
+    lines = [line.strip() for line in data.splitlines()]
     sections = [
-        line.strip().casefold()
-        for line in data.splitlines()
+        line.casefold()
+        for line in lines
         if line.strip().startswith("[") and line.strip().endswith("]")
     ]
-    if "[install]" in sections or data.count("[Service]") != 1:
+    if sections != ["[unit]", "[service]"]:
         raise StagingError("service unit is not static")
+    for required in STABILITY_UNIT_REQUIRED_LINES:
+        if lines.count(required) != 1:
+            raise StagingError("service unit lifecycle contract drift")
+    singleton_prefixes = (
+        "Before=", "Conflicts=", "IgnoreOnIsolate=", "ExecStartPre=", "ExecStart=",
+        "ExecStopPost=", "Type=", "KillMode=", "TimeoutStopSec=",
+        "Delegate=", "DelegateSubgroup=", "StateDirectory=",
+        "ProtectControlGroups=",
+    )
+    for prefix in singleton_prefixes:
+        if sum(line.startswith(prefix) for line in lines) != 1:
+            raise StagingError("service unit lifecycle authority is ambiguous")
+    if any(
+        line.startswith(("ConditionKernelCommandLine=", "WantedBy=", "RequiredBy="))
+        for line in lines
+    ):
+        raise StagingError("service unit contains a forbidden lifecycle authority")
 
 
 def reject_dropin_authority(unit_root: Path, unit_name: str) -> None:
@@ -1967,10 +2013,17 @@ def _temporary_inventory_capacity(
             f"cannot inspect temporary root inventory capacity: {error}"
         ) from error
     available_bytes = filesystem.f_bavail * filesystem.f_frsize
+    total_inodes = filesystem.f_files
     available_inodes = filesystem.f_favail
+    # Btrfs reports both fields as zero because its inode capacity is dynamic.
+    # Every other inode report remains an enforceable, fail-closed ceiling.
+    inode_capacity_unreported = total_inodes == 0 and available_inodes == 0
     if (
         available_bytes < required_bytes
-        or available_inodes < required_inodes
+        or (
+            not inode_capacity_unreported
+            and available_inodes < required_inodes
+        )
     ):
         raise StagingError(
             "temporary root has insufficient free space or inodes for "
@@ -3028,7 +3081,10 @@ def _prepare_operator(source_root: Path, output: Path) -> None:
     systemd = source_root / "scripts" / "stability-systemd"
     files = {
         "README.md": systemd / "README.md",
+        "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
+        "post-stop.sh": systemd / "post-stop.sh",
         "run-authoritative-stability.sh": (
             systemd / "run-authoritative-stability.sh"
         ),
@@ -3058,7 +3114,10 @@ def _verify_operator_exact_head(
     systemd = source_root / "scripts" / "stability-systemd"
     expected = {
         "README.md": systemd / "README.md",
+        "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
+        "post-stop.sh": systemd / "post-stop.sh",
         "run-authoritative-stability.sh": (
             systemd / "run-authoritative-stability.sh"
         ),
@@ -3138,7 +3197,7 @@ def prepare_staging(
         staged_identity = validate_staged_source(staged_source, revision)
         for relative in (
             "build", "build-authority", "release/source",
-            "release/build", "prerequisites/determinism",
+            "release/build",
             "prerequisites/hosted", "prerequisites/quality",
             "sanitizers/address", "sanitizers/undefined",
         ):
@@ -3395,7 +3454,7 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
         value["qualification"],
         frozenset({
             "hardware_class", "measurement_cgroup",
-            "baseline_authority_root", "release_source", "release_build",
+            "baseline_authority", "release_source", "release_build",
             "jobs", "tools",
         }),
         "runtime qualification",
@@ -3411,8 +3470,26 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
         "runtime measurement cgroup",
         exact=PurePosixPath(RUNTIME_MEASUREMENT_CGROUP),
     )
+    baseline_authority = _exact_dict(
+        qualification["baseline_authority"],
+        frozenset({
+            "root", "manifest_sha256", "baseline_sha256",
+            "projection_sha256",
+        }),
+        "runtime determinism baseline authority",
+    )
+    _config_path(
+        baseline_authority["root"], authority,
+        "runtime determinism baseline authority root", exact=source_root,
+    )
+    for field in (
+        "manifest_sha256", "baseline_sha256", "projection_sha256"
+    ):
+        _valid_sha256(
+            baseline_authority[field],
+            f"runtime determinism baseline authority {field}",
+        )
     for field, exact in {
-        "baseline_authority_root": source_root,
         "release_source": authority / "release" / "source",
         "release_build": authority / "release" / "build",
     }.items():
@@ -3443,24 +3520,21 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
 
     prerequisites = _exact_dict(
         value["prerequisites"],
-        frozenset({"determinism", "hosted_exact_head", "quality_floor"}),
+        frozenset({"hosted_exact_head", "quality_floor"}),
         "runtime prerequisites",
     )
-    for name, exact in {
-        "determinism": authority / "prerequisites" / "determinism",
-        "quality_floor": authority / "prerequisites" / "quality",
-    }.items():
-        record = _exact_dict(
-            prerequisites[name], frozenset({"root", "receipt_sha256"}),
-            f"runtime prerequisite {name}",
-        )
-        _config_path(
-            record["root"], authority, f"runtime prerequisite {name}",
-            exact=exact,
-        )
-        _valid_sha256(
-            record["receipt_sha256"], f"runtime prerequisite {name} receipt"
-        )
+    quality = _exact_dict(
+        prerequisites["quality_floor"],
+        frozenset({"root", "receipt_sha256"}),
+        "runtime prerequisite quality_floor",
+    )
+    _config_path(
+        quality["root"], authority, "runtime prerequisite quality_floor",
+        exact=authority / "prerequisites" / "quality",
+    )
+    _valid_sha256(
+        quality["receipt_sha256"], "runtime prerequisite quality_floor receipt"
+    )
     hosted = _exact_dict(
         prerequisites["hosted_exact_head"],
         frozenset({"root", "receipt_sha256", "repository"}),
@@ -3586,7 +3660,23 @@ def _verify_runtime_static_files_at(
             config["realworld"]["mirror_authority_sha256"], "mirror authority",
         ),
     ]
-    for section in ("determinism", "quality_floor", "hosted_exact_head"):
+    baseline_authority = config["qualification"]["baseline_authority"]
+    baseline_root = _map_authority_path(
+        authority_host_root, baseline_authority["root"]
+    )
+    checks.extend((
+        (
+            baseline_root / "scripts/determinism_workloads.json",
+            baseline_authority["manifest_sha256"],
+            "determinism manifest",
+        ),
+        (
+            baseline_root / "scripts/determinism_baseline.json",
+            baseline_authority["baseline_sha256"],
+            "determinism baseline",
+        ),
+    ))
+    for section in ("quality_floor", "hosted_exact_head"):
         record = config["prerequisites"][section]
         checks.append((
             _map_authority_path(authority_host_root, record["root"])
@@ -3626,11 +3716,202 @@ def _require_real_directory(path: Path, label: str) -> None:
         raise StagingError(f"{label} is not a real directory")
 
 
+def _load_trusted_sibling_module(module_name: str, filename: str) -> Any:
+    """Execute pinned sibling bytes without a path-reopen or module cache."""
+
+    if (
+        not isinstance(module_name, str)
+        or not module_name
+        or not isinstance(filename, str)
+        or Path(filename).name != filename
+    ):
+        raise StagingError("trusted Python dependency identity is malformed")
+    path = Path(__file__).resolve(strict=True).with_name(filename)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise StagingError(
+            f"trusted Python dependency is unavailable: {error}"
+        ) from error
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or not 0 < before.st_size <= 16 * 1024 * 1024
+        ):
+            raise StagingError(
+                "trusted Python dependency is not a bounded standalone "
+                "regular file"
+            )
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            block = os.read(descriptor, min(remaining, 1024 * 1024))
+            if not block:
+                raise StagingError("trusted Python dependency was truncated")
+            chunks.append(block)
+            remaining -= len(block)
+        if os.read(descriptor, 1):
+            raise StagingError("trusted Python dependency grew while loading")
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    try:
+        pathname = path.lstat()
+    except OSError as error:
+        raise StagingError(
+            f"cannot recheck trusted Python dependency: {error}"
+        ) from error
+
+    def identity(
+        metadata: os.stat_result,
+    ) -> tuple[int, int, int, int, int, int, int]:
+        return (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_mode,
+            metadata.st_nlink,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+
+    if identity(before) != identity(after) or identity(after) != identity(pathname):
+        raise StagingError("trusted Python dependency changed while loading")
+    raw = b"".join(chunks)
+    try:
+        code = compile(raw, os.fspath(path), "exec", dont_inherit=True)
+    except (SyntaxError, ValueError) as error:
+        raise StagingError("cannot compile trusted Python dependency") from error
+    module = types.ModuleType(module_name)
+    module.__file__ = os.fspath(path)
+    module.__package__ = ""
+    try:
+        exec(code, module.__dict__)
+    except Exception as error:
+        raise StagingError(
+            f"cannot initialize trusted Python dependency: {error}"
+        ) from error
+    return module
+
+
+def _trusted_baseline_authority_verifier() -> Any:
+    """Load the exact sibling verifier, never Python from the staged checkout."""
+
+    name = "codeskeptic_staging_baseline_authority_verifier"
+    dependency_names = (
+        "run_realworld_campaign",
+        "run_stability_fault_injection",
+    )
+    dependencies = {
+        dependency: _load_trusted_sibling_module(
+            f"codeskeptic_staging_{dependency}", f"{dependency}.py"
+        )
+        for dependency in dependency_names
+    }
+    missing = object()
+    previous = {
+        dependency: sys.modules.get(dependency, missing)
+        for dependency in dependency_names
+    }
+    sys.modules.update(dependencies)
+    try:
+        module = _load_trusted_sibling_module(
+            name, "run_stability_campaign.py"
+        )
+    finally:
+        for dependency, prior in previous.items():
+            if prior is missing:
+                sys.modules.pop(dependency, None)
+            else:
+                sys.modules[dependency] = prior
+    verifier = getattr(module, "verify_determinism_baseline_authority", None)
+    if (
+        getattr(module, "RUNTIME_CONFIG_SCHEMA", None) != RUNTIME_CONFIG_SCHEMA
+        or not callable(verifier)
+    ):
+        raise StagingError("trusted baseline authority verifier contract drift")
+    def invoke(*args: Any, **kwargs: Any) -> Any:
+        # The verifier imports its exact sibling determinism module lazily.
+        # Keep that sibling directory authoritative for the whole call, not
+        # merely while the stability module itself is loaded.
+        scripts = os.fspath(Path(__file__).resolve(strict=True).parent)
+        call_inserted = not sys.path or sys.path[0] != scripts
+        if call_inserted:
+            sys.path.insert(0, scripts)
+        try:
+            return verifier(*args, **kwargs)
+        finally:
+            if call_inserted:
+                try:
+                    sys.path.remove(scripts)
+                except ValueError:
+                    pass
+
+    return invoke
+
+
+def _derive_baseline_authority_config(
+    source: Path,
+    hardware_class: str,
+    verifier: Any | None,
+) -> dict[str, str]:
+    manifest_path = source / "scripts" / "determinism_workloads.json"
+    baseline_path = source / "scripts" / "determinism_baseline.json"
+    manifest_sha = _sha256_regular(manifest_path)
+    baseline_sha = _sha256_regular(baseline_path)
+    selected = _trusted_baseline_authority_verifier() if verifier is None else verifier
+    if not callable(selected):
+        raise StagingError("baseline authority verifier is not callable")
+    try:
+        verified = selected(
+            source, manifest_path, baseline_path, hardware_class
+        )
+    except StagingError:
+        raise
+    except Exception as error:
+        raise StagingError(
+            f"determinism baseline authority verification failed: {error}"
+        ) from error
+    if not isinstance(verified, dict):
+        raise StagingError("baseline authority verifier result is malformed")
+    projection = verified.get("projection")
+    projection_sha = verified.get("projection_sha256")
+    if not isinstance(projection, dict):
+        raise StagingError("baseline authority projection is malformed")
+    try:
+        derived_projection_sha = hashlib.sha256(
+            canonical_json(projection)
+        ).hexdigest()
+    except (TypeError, ValueError) as error:
+        raise StagingError("baseline authority projection is malformed") from error
+    if projection_sha != derived_projection_sha:
+        raise StagingError("baseline authority projection checksum drift")
+    if (
+        projection.get("schema")
+        != "codeskeptic-determinism-baseline-authority-v1"
+        or projection.get("hardware_class") != hardware_class
+        or projection.get("manifest_sha256") != manifest_sha
+        or projection.get("baseline_sha256") != baseline_sha
+    ):
+        raise StagingError("baseline authority projection identity drift")
+    return {
+        "root": "/authority/source",
+        "manifest_sha256": manifest_sha,
+        "baseline_sha256": baseline_sha,
+        "projection_sha256": projection_sha,
+    }
+
+
 def configure_staging(
     staging: Path,
     revision: str,
     *,
     repository: str,
+    baseline_authority_verifier: Any | None = None,
 ) -> dict[str, Any]:
     """Publish the canonical runtime config from fixed authority bytes."""
 
@@ -3671,7 +3952,6 @@ def configure_staging(
         authority / "mirrors",
         authority / "release/source",
         authority / "release/build",
-        authority / "prerequisites/determinism",
         authority / "prerequisites/hosted",
         authority / "prerequisites/quality",
         authority / "sanitizers/address",
@@ -3690,6 +3970,10 @@ def configure_staging(
     undefined_test_binary = (
         source / SANITIZER_WORK_ROOT / "undefined-tests"
         / "tests/codeskeptic_tests"
+    )
+    hardware_class = "fedora44-i5-1235u-exclusive-pcores-0-3"
+    baseline_authority = _derive_baseline_authority_config(
+        source, hardware_class, baseline_authority_verifier
     )
     config = _validate_runtime_config_contract({
         "schema": RUNTIME_CONFIG_SCHEMA,
@@ -3730,9 +4014,9 @@ def configure_staging(
             "test_binary_sha256": _sha256_regular(undefined_test_binary),
         },
         "qualification": {
-            "hardware_class": "fedora44-i5-1235u-exclusive-pcores-0-3",
+            "hardware_class": hardware_class,
             "measurement_cgroup": RUNTIME_MEASUREMENT_CGROUP,
-            "baseline_authority_root": "/authority/source",
+            "baseline_authority": baseline_authority,
             "release_source": "/authority/release/source",
             "release_build": "/authority/release/build",
             "jobs": 2,
@@ -3746,12 +4030,6 @@ def configure_staging(
             },
         },
         "prerequisites": {
-            "determinism": {
-                "root": "/authority/prerequisites/determinism",
-                "receipt_sha256": digest(
-                    "prerequisites/determinism/receipt.json"
-                ),
-            },
             "hosted_exact_head": {
                 "root": "/authority/prerequisites/hosted",
                 "receipt_sha256": digest(
@@ -4724,6 +5002,43 @@ def _installation_receipt_files(
     return receipt, receipt_data
 
 
+def _installation_authority_files(
+    owner_uid: int, owner_gid: int,
+) -> tuple[dict[str, Any], bytes]:
+    try:
+        metadata = INSTALLATION_AUTHORITY_PATH.lstat()
+    except OSError as error:
+        raise StagingError(
+            f"installation out-of-band authority is unavailable: {error}"
+        ) from error
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != owner_uid
+        or metadata.st_gid != owner_gid
+        or stat.S_IMODE(metadata.st_mode) != 0o400
+    ):
+        raise StagingError("installation out-of-band authority metadata drift")
+    data = _read_regular(INSTALLATION_AUTHORITY_PATH, 4096)
+    value = _load_canonical_document(
+        INSTALLATION_AUTHORITY_PATH, "installation out-of-band authority"
+    )
+    authority = _exact_dict(
+        value,
+        {"bundle_receipt_sha256", "bundle_revision", "schema"},
+        "installation out-of-band authority",
+    )
+    if authority["schema"] != INSTALLATION_AUTHORITY_SCHEMA:
+        raise StagingError("installation out-of-band authority schema drift")
+    _valid_git_sha1(authority["bundle_revision"], "authority bundle revision")
+    _valid_sha256(
+        authority["bundle_receipt_sha256"], "authority bundle receipt checksum"
+    )
+    if data != canonical_document(authority):
+        raise StagingError("installation out-of-band authority is not canonical")
+    return copy.deepcopy(authority), data
+
+
 def install_bundle(
     bundle: Path,
     *,
@@ -4863,6 +5178,20 @@ def install_bundle(
                     raise StagingError(
                         "fresh installation unexpectedly reused runtime state"
                     )
+            authority_data = canonical_document({
+                "bundle_receipt_sha256": expected_bundle_receipt_sha256,
+                "bundle_revision": expected_revision,
+                "schema": INSTALLATION_AUTHORITY_SCHEMA,
+            })
+            _write_new(
+                INSTALLATION_AUTHORITY_PATH,
+                authority_data,
+                0o400,
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                created_nodes=created,
+            )
+            _fsync_directory(STATE_ROOT)
             persistent_store_touched = True
             with _fixed_podman_runroot(owner_uid, owner_gid) as runroot:
                 options = _load_and_verify_image_archive(
@@ -5013,17 +5342,16 @@ def install_bundle(
         return verified_installation
 
 
-def verify_installation(
+def verify_installation_filesystem(
     receipt_path: Path,
     *,
     expected_revision: str,
     expected_bundle_receipt_sha256: str,
-    command_runner: Any | None = None,
     require_root: bool = True,
     owner_uid: int = 0,
     owner_gid: int = 0,
 ) -> dict[str, Any]:
-    """Rederive the exact fixed installation and offline runtime authority."""
+    """Rederive the fixed installation without touching Podman or runroot."""
 
     if require_root:
         _require_root()
@@ -5047,6 +5375,20 @@ def verify_installation(
         raise StagingError(
             "installation differs from out-of-band bundle authority"
         )
+    authority, _authority_data = _installation_authority_files(
+        owner_uid, owner_gid
+    )
+    expected_authority = {
+        "bundle_receipt_sha256": expected_bundle_receipt_sha256,
+        "bundle_revision": expected_revision,
+        "schema": INSTALLATION_AUTHORITY_SCHEMA,
+    }
+    if authority != expected_authority or (
+        authority["bundle_revision"] != receipt["bundle_revision"]
+        or authority["bundle_receipt_sha256"]
+        != receipt["bundle_receipt_sha256"]
+    ):
+        raise StagingError("installation out-of-band authority identity drift")
     try:
         metadata = INSTALLATION_ROOT.lstat()
         names = sorted(path.name for path in INSTALLATION_ROOT.iterdir())
@@ -5153,6 +5495,33 @@ def verify_installation(
     _verify_private_directory(STATE_ROOT, owner_uid, owner_gid)
     _verify_private_directory(PODMAN_ROOT, owner_uid, owner_gid)
     _verify_podman_environment(PODMAN_ROOT, owner_uid, owner_gid)
+    if _read_regular(INSTALLATION_ROOT / "SHA256SUMS") != (
+        _installation_manifest(INSTALLATION_ROOT)
+    ):
+        raise StagingError("installation checksum manifest mismatch")
+    return receipt
+
+
+def verify_installation(
+    receipt_path: Path,
+    *,
+    expected_revision: str,
+    expected_bundle_receipt_sha256: str,
+    command_runner: Any | None = None,
+    require_root: bool = True,
+    owner_uid: int = 0,
+    owner_gid: int = 0,
+) -> dict[str, Any]:
+    """Rederive the exact fixed installation and offline runtime authority."""
+
+    receipt = verify_installation_filesystem(
+        receipt_path,
+        expected_revision=expected_revision,
+        expected_bundle_receipt_sha256=expected_bundle_receipt_sha256,
+        require_root=require_root,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
     with _fixed_podman_runroot(owner_uid, owner_gid) as runroot:
         options = _podman_global_options(
             PODMAN_ROOT, runroot, OPERATOR_ROOT,
@@ -5162,10 +5531,6 @@ def verify_installation(
         _verify_static_authorities_in_image(
             options, AUTHORITY_ROOT, CONFIG_PATH, command_runner
         )
-    if _read_regular(INSTALLATION_ROOT / "SHA256SUMS") != (
-        _installation_manifest(INSTALLATION_ROOT)
-    ):
-        raise StagingError("installation checksum manifest mismatch")
     return receipt
 
 
@@ -5218,6 +5583,17 @@ def build_parser() -> argparse.ArgumentParser:
     verify_install.add_argument("--receipt", type=Path, required=True)
     verify_install.add_argument("--expected-revision", required=True)
     verify_install.add_argument(
+        "--expected-bundle-receipt-sha256", required=True
+    )
+    verify_install_filesystem = commands.add_parser(
+        "verify-install-filesystem",
+        help="verify installed immutable bytes without touching Podman",
+    )
+    verify_install_filesystem.add_argument(
+        "--receipt", type=Path, required=True
+    )
+    verify_install_filesystem.add_argument("--expected-revision", required=True)
+    verify_install_filesystem.add_argument(
         "--expected-bundle-receipt-sha256", required=True
     )
     return parser
@@ -5284,6 +5660,19 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
             print(f"CODESKEPTIC_INSTALLATION_VERIFIED {arguments.receipt}")
+            return 0
+        if arguments.command == "verify-install-filesystem":
+            verify_installation_filesystem(
+                arguments.receipt,
+                expected_revision=arguments.expected_revision,
+                expected_bundle_receipt_sha256=(
+                    arguments.expected_bundle_receipt_sha256
+                ),
+            )
+            print(
+                "CODESKEPTIC_INSTALLATION_FILESYSTEM_VERIFIED "
+                f"{arguments.receipt}"
+            )
             return 0
         raise StagingError("staging lifecycle command is unsupported")
     except StagingError as error:

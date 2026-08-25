@@ -17,7 +17,7 @@ import sys
 import tempfile
 import time
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from unittest import mock
 
 
@@ -281,6 +281,23 @@ def environment_snapshot(
         name: {"some_total_us": 100, "full_total_us": 10}
         for name in ("cpu", "memory", "io")
     }
+    ancestry = [
+        {
+            "cgroup": relative,
+            "configured_exclusive_cpu_affinity": list(affinity),
+            "effective_exclusive_cpu_affinity": list(affinity),
+            "effective_cpu_affinity": list(controller),
+            "partition": "member",
+        }
+        for relative in (
+            "/system.slice",
+            "/system.slice/codeskeptic-stability.service",
+            (
+                "/system.slice/codeskeptic-stability.service/"
+                "codeskeptic-p10-09"
+            ),
+        )
+    ]
     return {
         "cpu": {
             "clock_ticks_per_second": 100,
@@ -297,7 +314,11 @@ def environment_snapshot(
             "mode": qualification.MEASUREMENT_ENVIRONMENT_EXCLUSIVE,
             "controller_cpu_affinity": controller,
             "effective_cpu_affinity": list(affinity),
+            "configured_exclusive_cpu_affinity": list(affinity),
             "exclusive_cpu_affinity": list(affinity),
+            "root_isolated_cpu_affinity": list(affinity),
+            "controller_cgroup_cpu_affinity": list(controller),
+            "exclusive_cpu_ancestry": ancestry,
             "partition": "isolated",
             "uclamp_min": 1024,
             "uclamp_max": 1024,
@@ -404,10 +425,34 @@ def measurement_cgroup_fixture(
     members: str = "", uclamp_min: str = "100.00",
     uclamp_max: str = "100.00",
 ) -> Path:
-    group = authority / "codeskeptic.measurement"
+    group = authority / qualification.MEASUREMENT_CGROUP_RELATIVE
     group.mkdir(parents=True)
+    affinity = qualification._parse_cpu_list(effective, "fixture effective CPUs")
+    controller = list(
+        range(affinity[-1] + 1, affinity[-1] + 1 + len(affinity))
+    )
+    (authority / "cpuset.cpus.isolated").write_text(
+        exclusive + "\n", encoding="ascii"
+    )
+    for relative in qualification.MEASUREMENT_ANCESTOR_RELATIVES:
+        ancestor = authority / relative
+        ancestor.mkdir(parents=True, exist_ok=True)
+        for name, value in {
+            "cpuset.cpus.partition": "member",
+            "cpuset.cpus.exclusive": exclusive,
+            "cpuset.cpus.exclusive.effective": exclusive,
+            "cpuset.cpus.effective": qualification._format_cpu_list(controller),
+            "cpu.uclamp.max": "max",
+        }.items():
+            (ancestor / name).write_text(value + "\n", encoding="ascii")
+    controller_group = authority / qualification.CONTROLLER_CGROUP_RELATIVE
+    controller_group.mkdir(parents=True, exist_ok=True)
+    (controller_group / "cpuset.cpus.effective").write_text(
+        qualification._format_cpu_list(controller) + "\n", encoding="ascii"
+    )
     values = {
         "cpuset.cpus.effective": effective,
+        "cpuset.cpus.exclusive": exclusive,
         "cpuset.cpus.exclusive.effective": exclusive,
         "cpuset.cpus.partition": partition,
         "cgroup.procs": members,
@@ -457,6 +502,40 @@ def artifact_bytes(payload: dict) -> dict[str, bytes]:
                 scope="performance-batch", required=True,
             )[1]
     return result
+
+
+def legacy_v3_artifact_bytes(payload: dict) -> dict[str, bytes]:
+    """Project current fixture artifacts onto the retained v3 wire schema."""
+
+    result = artifact_bytes(payload)
+    removed_fields = {
+        "configured_exclusive_cpu_affinity",
+        "root_isolated_cpu_affinity",
+        "controller_cgroup_cpu_affinity",
+        "exclusive_cpu_ancestry",
+    }
+    for path, raw in tuple(result.items()):
+        if "environment" not in PurePosixPath(path).name:
+            continue
+        environment = json.loads(raw.decode("utf-8"))
+        environment["schema"] = "codeskeptic-determinism-environment-v3"
+        for side in ("before", "after"):
+            group = environment[side]["measurement_cgroup"]
+            for field in removed_fields:
+                group.pop(field)
+        result[path] = qualification.canonical_json(environment)
+    return result
+
+
+def bind_artifact_descriptors(payload: dict, artifacts: dict[str, bytes]) -> None:
+    """Rebind fixture receipt descriptors after a wire-format projection."""
+
+    descriptors = {item["path"]: item for item in payload["artifacts"]}
+    if set(descriptors) != set(artifacts):
+        raise AssertionError("fixture artifact inventory drift")
+    for path, raw in artifacts.items():
+        descriptors[path]["sha256"] = sha256(raw)
+        descriptors[path]["size"] = len(raw)
 
 
 def toolchain_identity() -> dict:
@@ -529,7 +608,9 @@ def write_determinism_infrastructure(repo: Path, raw_manifest: dict) -> None:
         "scripts/determinism_workloads.json": qualification.canonical_json(
             raw_manifest
         ),
-        "scripts/run_determinism_qualification.py": "# fixture runner\n",
+        "scripts/run_determinism_qualification.py": (
+            f'ENVIRONMENT_SCHEMA = "{qualification.ENVIRONMENT_SCHEMA}"\n'
+        ),
         "scripts/run_in_measurement_cgroup.py": "# fixture cgroup entry\n",
         "tests/DeterminismQualificationTest.py": "# fixture contract\n",
         "tests/DeterminismWorkflowTest.py": "# fixture workflow contract\n",
@@ -873,6 +954,96 @@ def receipt(
     }
 
 
+def retained_baseline_authority(
+    directory: str,
+    *,
+    mismatched_ambient_tools: bool = False,
+) -> tuple[Path, Path, Path, dict, dict, Path]:
+    """Create a sealed promoted-baseline authority for replay tests."""
+
+    raw_manifest = manifest()
+    manifest_sha = qualification.digest_json(raw_manifest)
+    authority = temporary_root(directory) / "authority"
+    initialize_source_repo(authority)
+    write_determinism_infrastructure(authority, raw_manifest)
+    source_revision = git_commit(authority, "determinism infrastructure")
+    source = qualification.source_manifest_at_revision(
+        authority, source_revision
+    )
+    calibration = calibration_receipt(
+        manifest_sha,
+        repo_root=authority,
+        source_revision=source_revision,
+        source=source,
+    )
+
+    if mismatched_ambient_tools:
+        tools = temporary_root(directory) / "ambient-tools"
+        tools.mkdir()
+        paths = {}
+        for field in ("cmake", "ninja", "c_compiler", "cxx_compiler"):
+            path = tools / field
+            path.write_bytes(f"ambient {field}\n".encode("ascii"))
+            paths[field] = path.as_posix()
+        for kind in ("real-repository", "release-candidate"):
+            input_value = calibration["inputs"][kind]
+            input_value["extra"]["build_toolchain"].update(paths)
+            input_value["identity_sha256"] = qualification.digest_json(
+                qualification._input_identity_material(input_value)
+            )
+
+    artifacts = artifact_bytes(calibration)
+    bind_artifact_descriptors(calibration, artifacts)
+    evidence_path = (
+        authority / "docs" / "evidence" / "phase10" /
+        "determinism" / "calibrations" / "test-linux-x86_64"
+    )
+    qualification.write_receipt(evidence_path, calibration, artifacts)
+
+    base = baseline(
+        manifest_sha,
+        repo_root=authority,
+        source_revision=source_revision,
+    )
+    profile = base["profiles"]["test-linux-x86_64"]
+    measured = {item["kind"]: item for item in calibration["workloads"]}
+    for kind in KINDS:
+        source_input = calibration["inputs"][kind]
+        reference = {
+            "semantic_sha256": measured[kind]["semantic_sha256"],
+            "input_identity_sha256": source_input["identity_sha256"],
+            "translation_unit_sha256": source_input[
+                "translation_unit_sha256"
+            ],
+            "translation_unit_plan_sha256": source_input[
+                "translation_unit_plan_sha256"
+            ],
+        }
+        base["semantic_reference"][kind] = copy.deepcopy(reference)
+        profile["workloads"][kind] = {
+            **reference,
+            "statistics": copy.deepcopy(measured[kind]["statistics"]),
+        }
+    profile["provenance"]["toolchain"] = copy.deepcopy(
+        calibration["toolchain"]
+    )
+    profile["provenance"]["calibration"][
+        "receipt_sha256"
+    ] = qualification.sha256_file(evidence_path / "receipt.json")
+    manifest_path = authority / "scripts" / "determinism_workloads.json"
+    baseline_path = authority / "scripts" / "determinism_baseline.json"
+    baseline_path.write_bytes(qualification.canonical_json(base))
+    qualification.validate_baseline(base, manifest_sha)
+    return (
+        authority,
+        manifest_path,
+        baseline_path,
+        base,
+        calibration,
+        evidence_path,
+    )
+
+
 class DeterminismQualificationTest(unittest.TestCase):
     def test_exclusive_batch_environment_uses_distinct_v7_schemas(self) -> None:
         self.assertEqual(
@@ -897,7 +1068,7 @@ class DeterminismQualificationTest(unittest.TestCase):
         )
         self.assertEqual(
             qualification.ENVIRONMENT_SCHEMA,
-            "codeskeptic-determinism-environment-v3",
+            "codeskeptic-determinism-environment-v4",
         )
         sample = receipt(qualification.digest_json(manifest()))
         self.assertEqual(len(sample["artifacts"]), 631)
@@ -922,6 +1093,114 @@ class DeterminismQualificationTest(unittest.TestCase):
                 forged_policy, manifest(),
                 baseline(qualification.digest_json(manifest())),
             )
+
+    def test_retained_v3_environment_is_accepted_only_for_calibration(self) -> None:
+        raw_manifest = manifest()
+        manifest_sha = qualification.digest_json(raw_manifest)
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            authority = root / "authority"
+            initialize_source_repo(authority)
+            write_determinism_infrastructure(authority, raw_manifest)
+            producer = authority / "scripts" / "run_determinism_qualification.py"
+            producer.write_text(
+                'ENVIRONMENT_SCHEMA = "codeskeptic-determinism-environment-v3"\n',
+                encoding="utf-8",
+            )
+            v3_revision = git_commit(authority, "v3 producer")
+            manifest_path = authority / "scripts" / "determinism_workloads.json"
+            calibration = calibration_receipt(
+                manifest_sha, repo_root=authority,
+                source_revision=v3_revision,
+                source=qualification.source_manifest_at_revision(
+                    authority, v3_revision
+                ),
+            )
+            artifacts = legacy_v3_artifact_bytes(calibration)
+            bind_artifact_descriptors(calibration, artifacts)
+            calibration_root = root / "calibration"
+            qualification.write_receipt(calibration_root, calibration, artifacts)
+            qualification.verify_receipt(
+                calibration_root, manifest_path,
+                root / "unused-baseline.json", authority,
+            )
+
+            mixed = copy.deepcopy(calibration)
+            mixed_artifacts = dict(artifacts)
+            mixed_path = qualification._iteration_artifact_paths(
+                "unit", 1, 1
+            )[4]
+            mixed_environment = json.loads(
+                mixed_artifacts[mixed_path].decode("utf-8")
+            )
+            mixed_environment["schema"] = qualification.ENVIRONMENT_SCHEMA
+            mixed_artifacts[mixed_path] = qualification.canonical_json(
+                mixed_environment
+            )
+            bind_artifact_descriptors(mixed, mixed_artifacts)
+            mixed_root = root / "mixed"
+            qualification.write_receipt(mixed_root, mixed, mixed_artifacts)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "environment artifact schema is unsupported",
+            ):
+                qualification.verify_receipt(
+                    mixed_root, manifest_path,
+                    root / "unused-baseline.json", authority,
+                )
+
+            forged = copy.deepcopy(calibration)
+            forged_artifacts = dict(artifacts)
+            preflight_path = qualification._idle_preflight_artifact_path()
+            forged_preflight = json.loads(
+                forged_artifacts[preflight_path].decode("utf-8")
+            )
+            forged_preflight["before"]["measurement_cgroup"][
+                "configured_exclusive_cpu_affinity"
+            ] = [0, 1]
+            forged_artifacts[preflight_path] = qualification.canonical_json(
+                forged_preflight
+            )
+            bind_artifact_descriptors(forged, forged_artifacts)
+            forged_root = root / "forged-v3"
+            qualification.write_receipt(
+                forged_root, forged, forged_artifacts
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "measurement cgroup before",
+            ):
+                qualification.verify_receipt(
+                    forged_root, manifest_path,
+                    root / "unused-baseline.json", authority,
+                )
+
+            producer.write_text(
+                f'ENVIRONMENT_SCHEMA = "{qualification.ENVIRONMENT_SCHEMA}"\n',
+                encoding="utf-8",
+            )
+            v4_revision = git_commit(authority, "v4 producer")
+            v4_bound = calibration_receipt(
+                manifest_sha, repo_root=authority,
+                source_revision=v4_revision,
+                source=qualification.source_manifest_at_revision(
+                    authority, v4_revision
+                ),
+            )
+            v4_bound_artifacts = legacy_v3_artifact_bytes(v4_bound)
+            bind_artifact_descriptors(v4_bound, v4_bound_artifacts)
+            v4_bound_root = root / "v4-bound"
+            qualification.write_receipt(
+                v4_bound_root, v4_bound, v4_bound_artifacts
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "idle preflight artifact schema is unsupported",
+            ):
+                qualification.verify_receipt(
+                    v4_bound_root, manifest_path,
+                    root / "unused-baseline.json", authority,
+                )
 
     def test_v7_baseline_profile_binds_exact_kernel_os_identity(self) -> None:
         raw_manifest = manifest()
@@ -1365,6 +1644,10 @@ class DeterminismQualificationTest(unittest.TestCase):
                 group, [2, 3], authority
             )
             self.assertEqual(identity["cpus"], [0, 1])
+            self.assertEqual(identity["configured_exclusive_cpus"], [0, 1])
+            self.assertEqual(identity["root_isolated_cpus"], [0, 1])
+            self.assertEqual(identity["controller_cgroup_cpus"], [2, 3])
+            self.assertEqual(len(identity["exclusive_ancestry"]), 3)
             self.assertEqual(identity["uclamp_min"], 1024)
             self.assertEqual(identity["uclamp_max"], 1024)
 
@@ -1380,6 +1663,7 @@ class DeterminismQualificationTest(unittest.TestCase):
             self.assertEqual(canonical_identity["uclamp_max"], 1024)
 
             cases = (
+                ("cpuset.cpus.exclusive", "0\n", "configured exclusive CPU"),
                 ("cpuset.cpus.exclusive.effective", "0\n", "exclusive CPU"),
                 ("cpuset.cpus.partition", "member\n", "partition"),
                 ("cgroup.procs", "123\n", "not empty"),
@@ -1409,27 +1693,61 @@ class DeterminismQualificationTest(unittest.TestCase):
                     group, [1, 2], authority
                 )
 
-            delegated = authority / "delegated"
-            delegated.mkdir()
-            (delegated / "cpu.uclamp.max").write_text(
-                "max\n", encoding="ascii"
-            )
-            nested = measurement_cgroup_fixture(delegated)
+            first_ancestor = authority / qualification.MEASUREMENT_ANCESTOR_RELATIVES[-1]
             nested_identity = qualification._measurement_cgroup_identity(
-                nested, [2, 3], authority
+                group, [2, 3], authority
             )
             self.assertEqual(
-                nested_identity["ancestor_uclamp_max"], [1024]
+                nested_identity["ancestor_uclamp_max"], [1024, 1024, 1024]
             )
-            (delegated / "cpu.uclamp.max").write_text(
+            (first_ancestor / "cpu.uclamp.max").write_text(
                 "50.00\n", encoding="ascii"
             )
             with self.assertRaisesRegex(
                 qualification.QualificationError, "ancestor.*pinned|ancestor.*caps"
             ):
                 qualification._measurement_cgroup_identity(
-                    nested, [2, 3], authority
+                    group, [2, 3], authority
                 )
+
+            authority_mutations = (
+                (authority / "cpuset.cpus.isolated", "0\n", "root isolated"),
+                (
+                    authority
+                    / qualification.MEASUREMENT_ANCESTOR_RELATIVES[0]
+                    / "cpuset.cpus.exclusive",
+                    "0\n",
+                    "ancestor.*exclusive",
+                ),
+                (
+                    authority
+                    / qualification.MEASUREMENT_ANCESTOR_RELATIVES[1]
+                    / "cpuset.cpus.effective",
+                    "0-3\n",
+                    "ancestor.*effective",
+                ),
+                (
+                    authority
+                    / qualification.CONTROLLER_CGROUP_RELATIVE
+                    / "cpuset.cpus.effective",
+                    "1-3\n",
+                    "controller cgroup",
+                ),
+            )
+            (first_ancestor / "cpu.uclamp.max").write_text(
+                "max\n", encoding="ascii"
+            )
+            for path, value, message in authority_mutations:
+                original = path.read_bytes()
+                path.write_text(value, encoding="ascii")
+                with self.subTest(authority_path=path):
+                    with self.assertRaisesRegex(
+                        qualification.QualificationError, message
+                    ):
+                        qualification._measurement_cgroup_identity(
+                            group, [2, 3], authority
+                        )
+                path.write_bytes(original)
 
             outside_authority = root / "outside"
             outside_authority.mkdir()
@@ -1487,6 +1805,43 @@ class DeterminismQualificationTest(unittest.TestCase):
                     before, reset, 1000, [0, 1], 4,
                     qualification.ENVIRONMENT_POLICY, True,
                 )
+
+            identity_mutations = (
+                (
+                    "root isolated CPUs",
+                    lambda group: group.update(root_isolated_cpu_affinity=[0]),
+                ),
+                (
+                    "controller cgroup type confusion",
+                    lambda group: group.update(
+                        controller_cgroup_cpu_affinity=False
+                    ),
+                ),
+                (
+                    "resealed ancestor cross-field drift",
+                    lambda group: group["exclusive_cpu_ancestry"][0].update(
+                        effective_cpu_affinity=[0, 1]
+                    ),
+                ),
+                (
+                    "extra ancestor claim",
+                    lambda group: group["exclusive_cpu_ancestry"][0].update(
+                        extra="forged"
+                    ),
+                ),
+            )
+            for label, mutate in identity_mutations:
+                forged = copy.deepcopy(after)
+                mutate(forged["measurement_cgroup"])
+                with self.subTest(label=label):
+                    with self.assertRaisesRegex(
+                        qualification.QualificationError,
+                        "isolation identity|CPU identity|affinity",
+                    ):
+                        qualification._evaluate_runtime_environment(
+                            before, forged, 1000, [0, 1], 4,
+                            qualification.ENVIRONMENT_POLICY, True,
+                        )
 
     def test_measurement_wrapper_enters_only_the_bounded_cgroup(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
@@ -4389,6 +4744,184 @@ class DeterminismQualificationTest(unittest.TestCase):
                     base, authority, manifest_path
                 )
 
+    def test_historical_replay_skips_only_ambient_tool_path_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            (
+                authority,
+                manifest_path,
+                _baseline_path,
+                base,
+                _calibration,
+                _evidence_path,
+            ) = retained_baseline_authority(
+                directory, mismatched_ambient_tools=True
+            )
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "binary identity drift",
+            ):
+                qualification.verify_baseline_authority(
+                    base, authority, manifest_path
+                )
+            qualification.verify_baseline_authority(
+                base,
+                authority,
+                manifest_path,
+                toolchain_verification_mode=(
+                    qualification.TOOLCHAIN_VERIFICATION_HISTORICAL_RETAINED
+                ),
+            )
+
+    def test_historical_replay_mode_is_explicit_and_fail_closed(self) -> None:
+        for invalid in (None, True, False, "ambient", ""):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(
+                qualification.QualificationError,
+                "toolchain verification mode",
+            ):
+                qualification.verify_baseline_authority(
+                    {},
+                    Path("/does-not-matter"),
+                    Path("/does-not-matter/manifest.json"),
+                    toolchain_verification_mode=invalid,
+                )
+
+    def test_private_sibling_authority_loader_rejects_hardlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            source = root / "authority-source.py"
+            source.write_text("VALUE = 1\n", encoding="utf-8")
+            sibling = root / "run_realworld_campaign.py"
+            os.link(source, sibling)
+            with (
+                mock.patch.object(
+                    qualification,
+                    "__file__",
+                    os.fspath(root / "run_determinism_qualification.py"),
+                ),
+                self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "bounded regular file",
+                ),
+            ):
+                qualification._load_sibling_authority_module(
+                    "run_realworld_campaign.py",
+                    "_fixture_private_realworld",
+                )
+
+    def test_historical_replay_rejects_retained_authority_mutations(self) -> None:
+        historical = "historical-retained"
+
+        def verify(
+            base: dict, authority: Path, manifest_path: Path,
+        ) -> None:
+            qualification.verify_baseline_authority(
+                base,
+                authority,
+                manifest_path,
+                toolchain_verification_mode=historical,
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            (
+                authority,
+                manifest_path,
+                _baseline_path,
+                base,
+                _calibration,
+                _evidence_path,
+            ) = retained_baseline_authority(directory)
+            base["profiles"]["test-linux-x86_64"]["provenance"][
+                "toolchain"
+            ]["cmake"]["sha256"] = "f" * 64
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "calibration provenance drift",
+            ):
+                verify(base, authority, manifest_path)
+
+        for field, value in (
+            ("generator", "Unix Makefiles"),
+            ("cmake", "/retained/mutated-cmake"),
+            ("cmake_cache_canonical_sha256", "e" * 64),
+        ):
+            with (
+                self.subTest(build_toolchain_field=field),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                (
+                    authority,
+                    manifest_path,
+                    _baseline_path,
+                    base,
+                    calibration,
+                    evidence_path,
+                ) = retained_baseline_authority(directory)
+                input_value = calibration["inputs"]["real-repository"]
+                input_value["extra"]["build_toolchain"][field] = value
+                input_value["identity_sha256"] = qualification.digest_json(
+                    qualification._input_identity_material(input_value)
+                )
+                artifacts = artifact_bytes(calibration)
+                bind_artifact_descriptors(calibration, artifacts)
+                shutil.rmtree(evidence_path)
+                qualification.write_receipt(
+                    evidence_path, calibration, artifacts
+                )
+                with self.assertRaises(qualification.QualificationError):
+                    verify(base, authority, manifest_path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            (
+                authority,
+                manifest_path,
+                _baseline_path,
+                base,
+                calibration,
+                evidence_path,
+            ) = retained_baseline_authority(directory)
+            calibration["started_at"] = "2026-08-14T23:59:59+00:00"
+            artifacts = artifact_bytes(calibration)
+            bind_artifact_descriptors(calibration, artifacts)
+            shutil.rmtree(evidence_path)
+            qualification.write_receipt(evidence_path, calibration, artifacts)
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "receipt identity drift",
+            ):
+                verify(base, authority, manifest_path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            (
+                authority,
+                manifest_path,
+                _baseline_path,
+                base,
+                _calibration,
+                evidence_path,
+            ) = retained_baseline_authority(directory)
+            original_revision = base["profiles"]["test-linux-x86_64"][
+                "provenance"
+            ]["source_revision"]
+            base["profiles"]["test-linux-x86_64"]["provenance"][
+                "source_revision"
+            ] = "f" * 40
+            with self.assertRaises(qualification.QualificationError):
+                verify(base, authority, manifest_path)
+
+            base["profiles"]["test-linux-x86_64"]["provenance"][
+                "source_revision"
+            ] = original_revision
+            raw_path = (
+                evidence_path / "raw" / "unit" / "run-01" /
+                "iteration-01" / "time.txt"
+            )
+            raw_path.write_bytes(raw_path.read_bytes() + b"mutated\n")
+            with self.assertRaisesRegex(
+                qualification.QualificationError,
+                "checksum|raw|manifest|file set",
+            ):
+                verify(base, authority, manifest_path)
+
     def test_path_manifest_canonicalizes_its_root_and_reports_escape(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temporary = temporary_root(directory)
@@ -4552,8 +5085,15 @@ class DeterminismQualificationTest(unittest.TestCase):
         manifest_sha = qualification.digest_json(raw_manifest)
         with tempfile.TemporaryDirectory() as directory:
             repo = temporary_root(directory) / "repo"
-            source = initialize_source_repo(repo)
-            source_revision = source["revision"]
+            initialize_source_repo(repo)
+            (repo / "scripts" / "run_determinism_qualification.py").write_text(
+                f'ENVIRONMENT_SCHEMA = "{qualification.ENVIRONMENT_SCHEMA}"\n',
+                encoding="utf-8",
+            )
+            source_revision = git_commit(repo, "declare environment schema")
+            source = qualification.source_manifest_at_revision(
+                repo, source_revision
+            )
             payload = calibration_receipt(
                 manifest_sha, repo_root=repo,
                 source_revision=source_revision, source=source,

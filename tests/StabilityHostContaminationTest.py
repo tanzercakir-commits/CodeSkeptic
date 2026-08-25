@@ -26,6 +26,12 @@ BOOT_ID = "12345678-1234-1234-1234-123456789abc"
 NONCE = "abcdefab-cdef-abcd-efab-cdefabcdefab"
 USER = "tester"
 UID = 1000
+SOURCE_REVISION = "2" * 40
+SOURCE_TREE_SHA1 = "8" * 40
+SOURCE_MANIFEST_SHA256 = "7" * 64
+RUNTIME_CONFIG_SHA256 = "6" * 64
+BUNDLE_INVENTORY_SHA256 = "1" * 64
+IMAGE_ARCHIVE_SHA256 = "4" * 64
 SYSTEM_CURSOR = b"-- cursor: system-cursor\n"
 USER_CURSOR = b"-- cursor: user-cursor\n"
 SYSTEM_LIFECYCLE_MESSAGE_IDS = (
@@ -583,9 +589,9 @@ def session_record(
         "realworld_mirror_authority_sha256": "a" * 64,
         "determinism_manifest_sha256": "b" * 64,
         "baseline_sha256": "c" * 64,
+        "baseline_authority_projection_sha256": "f" * 64,
         "sanitizer_receipts": {"address": "d" * 64, "undefined": "e" * 64},
         "prerequisite_receipts": {
-            "determinism": "f" * 64,
             "hosted_exact_head": "0" * 64,
             "quality_floor": "1" * 64,
         },
@@ -633,8 +639,147 @@ def write_inner_campaign(
     return stability.finalize_evidence(campaign, base)
 
 
-def write_cleanup(root: Path, operator: Path, container_id: str = "4" * 64) -> None:
+def cgroup_intent(session: str) -> dict:
+    return {
+        "schema": stability.CGROUP_AUTHORITY_INTENT_SCHEMA,
+        "status": "armed",
+        "source_revision": SOURCE_REVISION,
+        "session": session,
+        "exclusive_cpus": "0-3",
+        "system_slice_cgroup": stability.RUNTIME_SYSTEM_SLICE_CGROUP,
+        "service_cgroup": stability.RUNTIME_SERVICE_CGROUP,
+        "payload_cgroup": f"/sys/fs/cgroup{stability.RUNTIME_CGROUP_PARENT}",
+        "measurement_cgroup": stability.RUNTIME_MEASUREMENT_CGROUP,
+        "original_root_isolated_cpus": "",
+        "original_system_slice_exclusive_cpus": "",
+        "original_service_exclusive_cpus": "",
+    }
+
+
+def host_recovery_intent(
+    session: str,
+    *,
+    runtime_config_sha256: str = RUNTIME_CONFIG_SHA256,
+    source_tree_sha1: str = SOURCE_TREE_SHA1,
+    source_manifest_sha256: str = SOURCE_MANIFEST_SHA256,
+) -> dict:
+    bundle_receipt = {
+        "image_archive_sha256": IMAGE_ARCHIVE_SHA256,
+        "image_digest": stability.PINNED_EVIDENCE_IMAGE_DIGEST,
+        "image_id": stability.PINNED_EVIDENCE_IMAGE_ID,
+        "image_reference": stability.PINNED_EVIDENCE_IMAGE,
+        "inventory_sha256": BUNDLE_INVENTORY_SHA256,
+        "revision": SOURCE_REVISION,
+        "runtime_config_sha256": runtime_config_sha256,
+        "schema": stability.BUNDLE_RECEIPT_SCHEMA,
+        "source_manifest_sha256": source_manifest_sha256,
+        "source_tree_sha1": source_tree_sha1,
+    }
+    bundle_receipt_sha256 = hashlib.sha256(
+        stability.canonical_document(bundle_receipt)
+    ).hexdigest()
+    installation_authority = {
+        "bundle_receipt_sha256": bundle_receipt_sha256,
+        "bundle_revision": SOURCE_REVISION,
+        "schema": stability.INSTALLATION_AUTHORITY_SCHEMA,
+    }
+    installation_receipt = {
+        "authority_root": "/opt/codeskeptic-p10-09/authority",
+        "bundle_inventory_sha256": BUNDLE_INVENTORY_SHA256,
+        "bundle_receipt_sha256": bundle_receipt_sha256,
+        "bundle_revision": SOURCE_REVISION,
+        "config_path": "/etc/codeskeptic-p10-09/runtime.json",
+        "image": {
+            "archive_sha256": IMAGE_ARCHIVE_SHA256,
+            "digest": stability.PINNED_EVIDENCE_IMAGE_DIGEST,
+            "id": stability.PINNED_EVIDENCE_IMAGE_ID,
+            "reference": stability.PINNED_EVIDENCE_IMAGE,
+        },
+        "installed_inventory_sha256": BUNDLE_INVENTORY_SHA256,
+        "operator_root": "/opt/codeskeptic-p10-09/operator",
+        "schema": stability.INSTALLATION_RECEIPT_SCHEMA,
+        "unit_path": "/etc/systemd/system/codeskeptic-stability.service",
+    }
+    return {
+        "boot_id": BOOT_ID,
+        "containers": {
+            "campaign": f"codeskeptic-p10-09-{NONCE}",
+            "preflight": f"codeskeptic-p10-09-preflight-{NONCE}",
+            "verifier": f"codeskeptic-p10-09-verifier-{NONCE}",
+        },
+        "installation": {
+            "bundle_inventory_sha256": BUNDLE_INVENTORY_SHA256,
+            "bundle_receipt_sha256": bundle_receipt_sha256,
+            "bundle_revision": SOURCE_REVISION,
+            "image_archive_sha256": IMAGE_ARCHIVE_SHA256,
+            "image_digest": stability.PINNED_EVIDENCE_IMAGE_DIGEST,
+            "image_id": stability.PINNED_EVIDENCE_IMAGE_ID,
+            "image_reference": stability.PINNED_EVIDENCE_IMAGE,
+            "installation_authority_sha256": hashlib.sha256(
+                stability.canonical_document(installation_authority)
+            ).hexdigest(),
+            "installation_receipt_sha256": hashlib.sha256(
+                stability.canonical_document(installation_receipt)
+            ).hexdigest(),
+            "installed_inventory_sha256": BUNDLE_INVENTORY_SHA256,
+            "runtime_config_sha256": runtime_config_sha256,
+            "source_manifest_sha256": source_manifest_sha256,
+            "source_tree_sha1": source_tree_sha1,
+        },
+        "mode": "campaign",
+        "schema": stability.HOST_RECOVERY_INTENT_SCHEMA,
+        "session": session,
+        "session_nonce": NONCE,
+        "status": "armed",
+    }
+
+
+def write_restored_cgroup_tree(root: Path) -> None:
+    root.mkdir(parents=True)
+    (root / "cpuset.cpus.isolated").write_text("\n", encoding="ascii")
+    for relative in (
+        Path("system.slice"),
+        Path("system.slice/codeskeptic-stability.service"),
+    ):
+        cgroup = root / relative
+        cgroup.mkdir(parents=True)
+        for name, value in {
+            "cpuset.cpus.partition": "member\n",
+            "cpuset.cpus.exclusive": "\n",
+            "cpuset.cpus.exclusive.effective": "\n",
+            "cpuset.cpus.effective": "0-11\n",
+        }.items():
+            (cgroup / name).write_text(value, encoding="ascii")
+
+
+def write_cleanup(
+    root: Path,
+    operator: Path,
+    container_id: str = "4" * 64,
+    *,
+    runtime_config_sha256: str = RUNTIME_CONFIG_SHA256,
+    source_tree_sha1: str = SOURCE_TREE_SHA1,
+    source_manifest_sha256: str = SOURCE_MANIFEST_SHA256,
+) -> None:
     session = root.name
+    intent_path = root / stability.CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH
+    intent_data = stability.canonical_json(cgroup_intent(session)) + b"\n"
+    intent_path.write_bytes(intent_data)
+    intent_sha256 = hashlib.sha256(intent_data).hexdigest()
+    host_recovery_path = root / stability.HOST_RECOVERY_INTENT_EVIDENCE_PATH
+    host_recovery_data = (
+        stability.canonical_json(
+            host_recovery_intent(
+                session,
+                runtime_config_sha256=runtime_config_sha256,
+                source_tree_sha1=source_tree_sha1,
+                source_manifest_sha256=source_manifest_sha256,
+            )
+        )
+        + b"\n"
+    )
+    host_recovery_path.write_bytes(host_recovery_data)
+    host_recovery_sha256 = hashlib.sha256(host_recovery_data).hexdigest()
     value = {
         "schema": stability.HOST_CLEANUP_SCHEMA,
         "boot_id": BOOT_ID,
@@ -669,9 +814,48 @@ def write_cleanup(root: Path, operator: Path, container_id: str = "4" * 64) -> N
             "image_id": stability.PINNED_EVIDENCE_IMAGE_ID,
             "command": stability.RUNTIME_VERIFIER_COMMAND,
         },
+        "completion": {
+            "campaign": "inner-verified",
+            "cleanup": "authoritative-runner",
+            "exec_stop_post_recovery": False,
+        },
+        "cgroup_authority": {
+            "intent": {
+                "path": stability.CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH,
+                "sha256": intent_sha256,
+            },
+            "marker": stability.CGROUP_AUTHORITY_MARKER,
+            "temporary_marker": stability.CGROUP_AUTHORITY_MARKER_TEMP,
+        },
+        "host_recovery": {
+            "intent": {
+                "path": stability.HOST_RECOVERY_INTENT_EVIDENCE_PATH,
+                "sha256": host_recovery_sha256,
+            },
+            "marker": stability.HOST_RECOVERY_MARKER,
+            "temporary_marker": stability.HOST_RECOVERY_MARKER_TEMP,
+        },
         "cgroups": {
+            "root": "/sys/fs/cgroup",
+            "system_slice": stability.RUNTIME_SYSTEM_SLICE_CGROUP,
+            "service": stability.RUNTIME_SERVICE_CGROUP,
             "measurement": stability.RUNTIME_MEASUREMENT_CGROUP,
             "payload": f"/sys/fs/cgroup{stability.RUNTIME_CGROUP_PARENT}",
+        },
+        "cgroup_restoration": {
+            "root": {"cpuset_cpus_isolated": ""},
+            "system_slice": {
+                "cpuset_cpus_partition": "member",
+                "cpuset_cpus_exclusive": "",
+                "cpuset_cpus_exclusive_effective": "",
+                "cpuset_cpus_effective": "0-11",
+            },
+            "service": {
+                "cpuset_cpus_partition": "member",
+                "cpuset_cpus_exclusive": "",
+                "cpuset_cpus_exclusive_effective": "",
+                "cpuset_cpus_effective": "0-11",
+            },
         },
         "runtime": {
             "identity_marker": (
@@ -684,15 +868,41 @@ def write_cleanup(root: Path, operator: Path, container_id: str = "4" * 64) -> N
             "campaign_cidfile_absent": "pass",
             "campaign_container_identity_absent": "pass",
             "container_inventory_empty": "pass",
+            "cgroup_authority_intent_bound": "pass",
+            "cgroup_authority_marker_absent": "pass",
+            "cgroup_authority_temporary_absent": "pass",
+            "host_recovery_intent_bound": "pass",
+            "host_recovery_marker_absent": "pass",
+            "host_recovery_temporary_absent": "pass",
             "measurement_cgroup_empty": "pass",
             "payload_cgroup_empty": "pass",
+            "root_isolated_cpus_empty": "pass",
             "runtime_absent": "pass",
             "runtime_identity_absent": "pass",
+            "service_effective_cpus_restored": "pass",
+            "service_exclusive_cpus_effective_empty": "pass",
+            "service_exclusive_cpus_empty": "pass",
+            "service_partition_member": "pass",
+            "system_slice_effective_cpus_restored": "pass",
+            "system_slice_exclusive_cpus_effective_empty": "pass",
+            "system_slice_exclusive_cpus_empty": "pass",
+            "system_slice_partition_member": "pass",
             "verifier_cidfile_absent": "pass",
             "verifier_container_identity_absent": "pass",
         },
     }
     (root / "host" / "cleanup.json").write_bytes(stability.canonical_document(value))
+
+
+def cleanup_validation_authority(
+    *, runtime_config_sha256: str = RUNTIME_CONFIG_SHA256,
+) -> dict[str, str]:
+    return {
+        "expected_runtime_config_sha256": runtime_config_sha256,
+        "expected_source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "expected_source_revision": SOURCE_REVISION,
+        "expected_source_tree_sha1": SOURCE_TREE_SHA1,
+    }
 
 
 class StabilityHostContaminationTest(unittest.TestCase):
@@ -1031,7 +1241,13 @@ class StabilityHostContaminationTest(unittest.TestCase):
             operator = base / "operator" / "run.sh"
             operator.parent.mkdir()
             operator.write_text("#!/bin/sh\n", encoding="ascii")
-            write_cleanup(root, operator)
+            write_cleanup(
+                root, operator, runtime_config_sha256=config_sha
+            )
+            live_cgroup_root = base / "cgroup"
+            live_state_root = base / "state"
+            write_restored_cgroup_tree(live_cgroup_root)
+            live_state_root.mkdir()
             inner = write_inner_campaign(root, "f" * 64, launch_sha)
             inner_sha = stability.sha256_file(root / "campaign" / "receipt.json")
             (root / "host" / "inner-verification.log").write_text(
@@ -1041,7 +1257,17 @@ class StabilityHostContaminationTest(unittest.TestCase):
             )
             runner = FakeHostRunner()
             with (
-                mock.patch.object(stability, "load_runtime_config_file", return_value={}),
+                mock.patch.object(
+                    stability,
+                    "load_runtime_config_file",
+                    return_value={
+                        "source": {
+                            "manifest_sha256": SOURCE_MANIFEST_SHA256,
+                            "revision": SOURCE_REVISION,
+                            "tree_sha1": SOURCE_TREE_SHA1,
+                        }
+                    },
+                ),
                 mock.patch.object(stability, "load_runtime_launch_receipt", return_value={}),
             ):
                 with self.assertRaisesRegex(
@@ -1051,6 +1277,8 @@ class StabilityHostContaminationTest(unittest.TestCase):
                         root, config, launch, operator, BOOT_ID, NONCE,
                         root / "host" / "inner-verification.log",
                         cleanup_command_runner=runner,
+                        cleanup_live_cgroup_root=live_cgroup_root,
+                        cleanup_live_state_root=live_state_root,
                     )
                 shutil.rmtree(root / "campaign")
                 (root / "host" / "inner-verification.log").unlink()
@@ -1067,8 +1295,17 @@ class StabilityHostContaminationTest(unittest.TestCase):
                     root, config, launch, operator, BOOT_ID, NONCE,
                     root / "host" / "inner-verification.log",
                     cleanup_command_runner=runner,
+                    cleanup_live_cgroup_root=live_cgroup_root,
+                    cleanup_live_state_root=live_state_root,
                 )
                 self.assertEqual(receipt["status"], "accepted")
+                host_recovery_path = (
+                    root / stability.HOST_RECOVERY_INTENT_EVIDENCE_PATH
+                )
+                self.assertEqual(
+                    receipt["authorities"]["host_recovery_intent"]["sha256"],
+                    hashlib.sha256(host_recovery_path.read_bytes()).hexdigest(),
+                )
                 config.write_text("{ }\n", encoding="ascii")
                 with self.assertRaisesRegex(
                     stability.StabilityError,
@@ -1100,7 +1337,295 @@ class StabilityHostContaminationTest(unittest.TestCase):
                     target_uid=UID,
                     operator_path=operator,
                     verify_live=False,
+                    **cleanup_validation_authority(),
                 )
+
+    def test_cleanup_authority_is_exact_and_resealed_mutations_fail(self) -> None:
+        mutations = (
+            ("extra cleanup field", lambda cleanup, intent: cleanup.update(extra=True)),
+            (
+                "type-confused intent digest",
+                lambda cleanup, intent: cleanup["cgroup_authority"]["intent"].update(
+                    sha256=0
+                ),
+            ),
+            (
+                "ExecStopPost recovery",
+                lambda cleanup, intent: cleanup["completion"].update(
+                    exec_stop_post_recovery=True
+                ),
+            ),
+            (
+                "foreign restored exclusive CPUs",
+                lambda cleanup, intent: cleanup["cgroup_restoration"][
+                    "service"
+                ].update(cpuset_cpus_exclusive="0-3"),
+            ),
+            (
+                "type-confused gate",
+                lambda cleanup, intent: cleanup["gates"].update(
+                    root_isolated_cpus_empty=True
+                ),
+            ),
+            (
+                "resealed intent claims",
+                lambda cleanup, intent: intent.update(extra="forged"),
+            ),
+            (
+                "resealed intent revision",
+                lambda cleanup, intent: intent.update(source_revision="3" * 40),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                base = Path(temporary)
+                root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+                (root / "host").mkdir(parents=True)
+                operator = base / "operator" / "run.sh"
+                write_cleanup(root, operator)
+                cleanup_path = root / "host" / "cleanup.json"
+                intent_path = root / stability.CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH
+                cleanup = json.loads(cleanup_path.read_text(encoding="utf-8"))
+                intent = json.loads(intent_path.read_text(encoding="utf-8"))
+                mutate(cleanup, intent)
+                intent_data = stability.canonical_json(intent) + b"\n"
+                intent_path.write_bytes(intent_data)
+                if label.startswith("resealed intent"):
+                    cleanup["cgroup_authority"]["intent"]["sha256"] = (
+                        hashlib.sha256(intent_data).hexdigest()
+                    )
+                cleanup_path.write_bytes(stability.canonical_document(cleanup))
+                with self.assertRaises(stability.StabilityError):
+                    stability._validate_cleanup_record(
+                        cleanup_path,
+                        session_root=root,
+                        boot_id=BOOT_ID,
+                        session_nonce=NONCE,
+                        target_user=USER,
+                        target_uid=UID,
+                        operator_path=operator,
+                        verify_live=False,
+                        **cleanup_validation_authority(),
+                    )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+            (root / "host").mkdir(parents=True)
+            operator = base / "operator" / "run.sh"
+            write_cleanup(root, operator)
+            (root / stability.CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH).write_bytes(
+                b'{"schema":\n'
+            )
+            with self.assertRaisesRegex(stability.StabilityError, "JSON.*malformed"):
+                stability._validate_cleanup_record(
+                    root / "host" / "cleanup.json",
+                    session_root=root,
+                    boot_id=BOOT_ID,
+                    session_nonce=NONCE,
+                    target_user=USER,
+                    target_uid=UID,
+                    operator_path=operator,
+                    verify_live=False,
+                    **cleanup_validation_authority(),
+                )
+
+    def test_cleanup_binds_exact_host_recovery_authority(self) -> None:
+        mutations = (
+            (
+                "type-confused digest",
+                lambda cleanup, intent: cleanup["host_recovery"]["intent"].update(
+                    sha256=0
+                ),
+            ),
+            (
+                "wrong mode",
+                lambda cleanup, intent: intent.update(mode="probe-only"),
+            ),
+            (
+                "wrong revision",
+                lambda cleanup, intent: intent["installation"].update(
+                    bundle_revision="9" * 40
+                ),
+            ),
+            (
+                "installed inventory mismatch",
+                lambda cleanup, intent: intent["installation"].update(
+                    installed_inventory_sha256="9" * 64
+                ),
+            ),
+            (
+                "resealed alternate inventory",
+                lambda cleanup, intent: intent["installation"].update(
+                    bundle_inventory_sha256="9" * 64,
+                    installed_inventory_sha256="9" * 64,
+                ),
+            ),
+            (
+                "wrong bundle receipt",
+                lambda cleanup, intent: intent["installation"].update(
+                    bundle_receipt_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong installation authority",
+                lambda cleanup, intent: intent["installation"].update(
+                    installation_authority_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong installation receipt",
+                lambda cleanup, intent: intent["installation"].update(
+                    installation_receipt_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong runtime config",
+                lambda cleanup, intent: intent["installation"].update(
+                    runtime_config_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong source manifest",
+                lambda cleanup, intent: intent["installation"].update(
+                    source_manifest_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong source tree",
+                lambda cleanup, intent: intent["installation"].update(
+                    source_tree_sha1="9" * 40
+                ),
+            ),
+            (
+                "wrong image archive",
+                lambda cleanup, intent: intent["installation"].update(
+                    image_archive_sha256="9" * 64
+                ),
+            ),
+            (
+                "wrong pinned image digest",
+                lambda cleanup, intent: intent["installation"].update(
+                    image_digest="sha256:" + "9" * 64
+                ),
+            ),
+            (
+                "malformed source tree",
+                lambda cleanup, intent: intent["installation"].update(
+                    source_tree_sha1="9" * 64
+                ),
+            ),
+            (
+                "extra marker claim",
+                lambda cleanup, intent: intent.update(foreign=True),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                base = Path(temporary)
+                root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+                (root / "host").mkdir(parents=True)
+                operator = base / "operator" / "run.sh"
+                write_cleanup(root, operator)
+                cleanup_path = root / "host" / "cleanup.json"
+                intent_path = root / stability.HOST_RECOVERY_INTENT_EVIDENCE_PATH
+                cleanup = json.loads(cleanup_path.read_text(encoding="utf-8"))
+                intent = json.loads(intent_path.read_text(encoding="utf-8"))
+                mutate(cleanup, intent)
+                intent_data = stability.canonical_json(intent) + b"\n"
+                intent_path.write_bytes(intent_data)
+                if label != "type-confused digest":
+                    cleanup["host_recovery"]["intent"]["sha256"] = (
+                        hashlib.sha256(intent_data).hexdigest()
+                    )
+                cleanup_path.write_bytes(stability.canonical_document(cleanup))
+                with self.assertRaises(stability.StabilityError):
+                    stability._validate_cleanup_record(
+                        cleanup_path,
+                        session_root=root,
+                        boot_id=BOOT_ID,
+                        session_nonce=NONCE,
+                        target_user=USER,
+                        target_uid=UID,
+                        operator_path=operator,
+                        verify_live=False,
+                        **cleanup_validation_authority(),
+                    )
+
+    def test_cleanup_live_restoration_rejects_survivors_and_cpuset_drift(self) -> None:
+        mutations = (
+            (
+                "durable marker",
+                lambda state, cgroup: (
+                    state / Path(stability.CGROUP_AUTHORITY_MARKER).name
+                ).write_text("survived\n", encoding="ascii"),
+            ),
+            (
+                "temporary marker",
+                lambda state, cgroup: (
+                    state / Path(stability.CGROUP_AUTHORITY_MARKER_TEMP).name
+                ).write_text("survived\n", encoding="ascii"),
+            ),
+            (
+                "host recovery marker",
+                lambda state, cgroup: (
+                    state / Path(stability.HOST_RECOVERY_MARKER).name
+                ).write_text("survived\n", encoding="ascii"),
+            ),
+            (
+                "host recovery temporary marker",
+                lambda state, cgroup: (
+                    state / Path(stability.HOST_RECOVERY_MARKER_TEMP).name
+                ).write_text("survived\n", encoding="ascii"),
+            ),
+            (
+                "root isolated CPUs",
+                lambda state, cgroup: (cgroup / "cpuset.cpus.isolated").write_text(
+                    "0-3\n", encoding="ascii"
+                ),
+            ),
+            (
+                "service exclusive CPUs",
+                lambda state, cgroup: (
+                    cgroup
+                    / "system.slice/codeskeptic-stability.service"
+                    / "cpuset.cpus.exclusive"
+                ).write_text("0-3\n", encoding="ascii"),
+            ),
+            (
+                "system slice effective CPUs",
+                lambda state, cgroup: (
+                    cgroup / "system.slice" / "cpuset.cpus.effective"
+                ).write_text("4-11\n", encoding="ascii"),
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+                base = Path(temporary)
+                root = base / f"20260823T000000Z-{BOOT_ID}-{NONCE}"
+                (root / "host").mkdir(parents=True)
+                operator = base / "operator" / "run.sh"
+                write_cleanup(root, operator)
+                cgroup_root = base / "cgroup"
+                state_root = base / "state"
+                write_restored_cgroup_tree(cgroup_root)
+                state_root.mkdir()
+                mutate(state_root, cgroup_root)
+                with self.assertRaises(stability.StabilityError):
+                    stability._validate_cleanup_record(
+                        root / "host" / "cleanup.json",
+                        session_root=root,
+                        boot_id=BOOT_ID,
+                        session_nonce=NONCE,
+                        target_user=USER,
+                        target_uid=UID,
+                        operator_path=operator,
+                        verify_live=True,
+                        **cleanup_validation_authority(),
+                        command_runner=FakeHostRunner(),
+                        live_cgroup_root=cgroup_root,
+                        live_state_root=state_root,
+                    )
 
 
 if __name__ == "__main__":

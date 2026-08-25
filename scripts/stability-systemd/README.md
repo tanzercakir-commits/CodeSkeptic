@@ -1,8 +1,9 @@
 # P10-09 system control-plane contract
 
-This bundle keeps the authoritative campaign outside graphical and interactive
-user sessions. It is only a transport and lifecycle boundary: a zero service
-exit does not prove any P10-09 gate. Acceptance belongs to the sealed campaign
+This bundle provides a one-command launch from the active graphical session,
+then keeps the authoritative campaign outside graphical and interactive user
+sessions. It is only a transport and lifecycle boundary: a zero service exit
+does not prove any P10-09 gate. Acceptance belongs to the sealed campaign
 receipt and its independent verifier.
 
 ## Scope contract
@@ -14,6 +15,10 @@ the retained determinism, sanitizer, resource, descendant, restart,
 checkpoint, fault-injection, performance, and semantic gates. Elapsed time is
 metadata, not an acceptance threshold. The seven-day systemd ceiling is only
 an outer runaway guard and cannot create an accepted receipt.
+The cold round's first action is the exact final-HEAD 10-of-10 qualification.
+No fault injection or real-world shard may start unless that action publishes
+an accepted receipt. The warm round retains the matching post qualification,
+so the final receipt binds both ends of the measured scope.
 The real-world manifest's `window_minutes` value is likewise a bounded
 scheduling envelope inherited from the campaign catalog, not a required
 elapsed duration and not part of the P10-09 completion decision.
@@ -58,6 +63,9 @@ The installed paths are fixed:
   tmpfs and RAM budget from becoming the campaign's storage ceiling.
 - `/var/lib/codeskeptic-p10-09/status/terminal-status` is only a convenience
   report for the most recent operator result.
+- `/var/lib/codeskeptic-p10-09/status/post-stop-status.txt` is the atomic,
+  root-only outcome of whole-host recovery and the guarded graphical restoration
+  decision. The permanent unit and operator remain installed after every run.
 
 The portable disk guard is deliberately described as observed detection, not
 as a kernel filesystem quota. Each action inherits an 8-GiB per-file hard
@@ -102,15 +110,21 @@ digest and image ID before any installation path is changed.
 ## Staging lifecycle
 
 `scripts/stage_stability_campaign.py` exposes exactly `prepare`, `configure`,
-`seal`, `verify`, `install`, and `verify-install`. `prepare` clones a clean,
+`seal`, `verify`, `install`, `verify-install`, and
+`verify-install-filesystem`. `prepare` clones a clean,
 detached, standalone exact-head source and creates only the fixed authority
 layout; the `config` root remains absent until publication. It
 deliberately leaves `authority/mirrors` absent so the real-world mirror sealer
 can publish that authority create-new rather than reuse a producer placeholder.
 After all prerequisite producers populate the mutable layout, `configure`
 derives every source, receipt, analyzer, mirror, policy, and fault-binary hash
-from the fixed authority paths and atomically publishes the canonical config
-pair. `seal` binds every root-executed operator byte to its exact-head source
+from the fixed authority paths. It also replays the promoted determinism
+baseline authority from its retained calibration evidence and binds the
+manifest, baseline, and canonical projection hashes before atomically
+publishing the config pair. There is deliberately no external pre-accepted
+determinism receipt: requiring one before the final bundle exists would be a
+circular authority. The campaign's cold-first 10-of-10 action is the first
+live acceptance gate. `seal` binds every root-executed operator byte to its exact-head source
 counterpart, validates the data-only config schema without importing staged
 Python on the host, normalizes modes, and publishes a checksummed bundle with
 an atomic no-replace rename. `verify` rederives the complete inventory and
@@ -125,12 +139,33 @@ still match that invocation. The installation receipt is written last as the
 commit marker. `verify`, `install`, and `verify-install` all require the
 operator's out-of-band expected Git revision and bundle-receipt SHA-256; bundle
 metadata cannot nominate its own trust root. `install` records that pair in the
-root-owned installation receipt, and the guided entrypoint carries the same
-pair into `verify-install` before executing any staged verifier. Both install
-and verify-install create, use, and remove the exact service pathname
+create-new, root-owned, mode-`0400`
+`/var/lib/codeskeptic-p10-09/installation-authority.json` record before it
+publishes the installation receipt as the final commit marker. The guided
+entrypoint obtains the pair from that separate persistent record, and both the
+receipt and the fully rederived installed bytes must agree with it before any
+staged verifier executes. This protects against accidental or partial
+installation drift within the root-controlled trust domain; it is not a trust
+boundary against a malicious root administrator. Both install and
+verify-install create, use, and remove the exact service pathname
 `/run/codeskeptic-p10-09/podman-runroot`. Recreating that same pathname after a
 cold boot reopens the persistent dedicated store without changing Podman's
 storage identity.
+
+`verify-install-filesystem` is the mutation-free recovery subset. It rederives
+the receipt and sidecar, retained bundle metadata and manifests, mapped payload
+inventory and ownership, exact-head source/operator/config/unit bytes, and the
+retained image archive without listing, starting, or removing a Podman object
+and without creating the runroot. Whole-host recovery runs this subset before
+it trusts a recovery marker or container identity. The explicit staging/admin
+`verify-install` action retains the full image-store execution checks, but the
+guided launch does not call it: mutating Podman before durable recovery
+authority would create an unowned crash window. During a guided launch, the
+service instead checks the pinned image and empty dedicated container store
+after publishing the host-recovery marker, then arms the cgroup marker and runs
+the in-image source, policy, static-authority identity, PyYAML, namespace,
+affinity, limit, and measurement-cgroup checks in its rootful preflight
+container.
 
 The `seal`, `verify`, and `install` command-line actions require an explicit
 large temporary root rather than trusting ambient `TMPDIR`, which `sudo`
@@ -175,21 +210,68 @@ one command starts and follows the operator:
 /opt/codeskeptic-p10-09/operator/guided-stability.sh
 ```
 
-The guided entrypoint rings a triple bell only when the `sudo` password may be
-needed and when the service reaches a terminal success or failure. It verifies
-the root-owned, non-writable installed files, the canonical config checksum,
-the exact loaded unit, and the required `systemd.unit=multi-user.target` boot
-before calling `systemctl start --wait codeskeptic-stability.service`. It also
-requires `UnitFileState=static`: the unit has no install target, must never be
-enabled, and can only be started by this explicit guided invocation. Before
-starting it also requires `graphical.target` inactive, the display manager
-inactive/dead or absent, and no X11/Wayland/Mir login session. It fails instead
-of asking systemd to close a graphical environment. A prior
-failed unit state is reset automatically. At completion it prints only the
-strictly parsed, 1024-byte-bounded terminal status plus a short success or
-recovery message. It never reboots the host, never isolates a target, and never
-starts a ladder of manual attempts. If staging or the boot precondition is
-missing, it fails closed with one actionable
+The guided entrypoint rings a triple bell when the one `sudo` authorization may
+be needed. Its root re-exec first parses the separate installation authority
+and runs only `verify-install-filesystem`. That mutation-free check completes
+before it acquires the fixed global guided-lifecycle lock. The helper opens the
+root-owned lock inode with `O_NOFOLLOW`, takes a nonblocking exclusive lock, and
+re-execs guided with the still-locked descriptor; a concurrent guided launch
+cannot publish, consume, or clean another invocation's request. While holding
+that lock, guided verifies the canonical config checksum and exact loaded unit,
+runs idempotent startup recovery, and only then requires active
+`graphical.target` and an active/running display manager before publishing a
+request and starting the service. It requires `UnitFileState=static`: the unit
+has no install target, must never be enabled, and can only be started by this
+explicit guided invocation. A prior failed unit state is reset automatically.
+The unit's `ExecStartPre` repeats startup recovery as the final service-side
+gate.
+
+The installed guided command, optionally with `--probe-only`, is the sole
+supported public launch entrypoint. The staging commands remain the separate
+provisioning interface; direct or concurrent invocation of lifecycle helpers
+such as `host-recovery.py`, `cgroup-authority.py`, `post-stop.sh`, or the runner
+is an internal implementation path and has no public concurrency contract.
+
+The guided process creates one nonce-bound request, calls
+`systemctl start --no-block codeskeptic-stability.service`, and waits for at
+most 60 seconds for `/run/codeskeptic-p10-09/guided-handoff.json`. The runner
+publishes that create-new, canonical, root-owned mode-0400 acknowledgment only
+after it has atomically consumed and validated the exact request and bound the
+session name. The root guided process validates the file type, owner, group,
+mode, bounded canonical bytes, mode, nonce, and session identity before
+releasing its request cleanup ownership. This closes the race in which loss of
+the graphical terminal could otherwise remove an unconsumed request.
+
+That handoff is only phase one. Guided next publishes one create-new,
+canonical, root-owned mode-0400 decision bound to the exact mode, nonce, and
+session. The runner atomically consumes an `accept` decision before any
+graphical isolation; `cancel`, a missing decision, or the 60-second decision
+deadline rejects the run. If guided times out before a handoff, absence of the
+second acknowledgment is itself fail-closed, so a delayed runner can never
+isolate the desktop. If it fails after learning the session, it publishes the
+same exact decision as `cancel`.
+
+For a campaign, the runner first publishes a canonical, root-owned,
+session-and-nonce-bound `restore-required` state under
+`/var/lib/codeskeptic-p10-09`, synchronizes both the file and parent directory,
+and only then requests the nonblocking transition to `multi-user.target`;
+`IgnoreOnIsolate=yes` keeps the service alive. This
+requires no manual isolate, no TTY, and no exit-code capture. When the
+service stops, the immutable post-stop program first runs nonce/session-bound
+cgroup recovery. Without the exact durable restoration state it never starts
+a GUI. Only if shutdown, rescue, and emergency targets are each
+exactly inactive with no queued job may it request graphical restoration. A
+successful `start --no-block` is only an enqueue result, never restoration
+success. Post-stop polls for at most 60 seconds and clears the durable state
+only after exact proof that `graphical.target` is loaded/active/active with no
+job and `display-manager.service` is loaded/active/running with no job. A kill,
+timeout, reboot, asynchronous start failure, real transition, or unverified
+state leaves the durable record for the next ExecStopPost or startup-recovery
+attempt. Guided and the unit's `ExecStartPre` both run that idempotent startup
+recovery before a new campaign. The permanent service unit and operator are
+never removed.
+The lifecycle never reboots or powers off the host.
+If staging or handoff is missing, guided fails with one actionable
 `CODESKEPTIC_GUIDED_STAGING_UNAVAILABLE` message.
 
 Every full campaign start also creates one exclusive root-owned request that
@@ -199,7 +281,7 @@ uses the user identity for the host DrKonqi guard, and removes only the
 nonce-bound request in its terminal cleanup. A direct `systemctl start`, an
 ambient/stale request, or simultaneous probe and campaign requests fail closed.
 
-Before committing to the multi-hour campaign, the same entrypoint can perform
+Before committing to the full campaign, the same entrypoint can perform
 only the short rootful launch and cgroup validation:
 
 ```text
@@ -207,13 +289,13 @@ only the short rootful launch and cgroup validation:
 ```
 
 This mode creates one root-private, exclusive probe request in `/run`, which
-the operator atomically consumes and binds to the terminal status as
-`mode=probe-only`. It uses the same unit, pinned image, Podman options, cgroup
+the operator atomically consumes and binds to both the handoff and terminal
+status as `mode=probe-only`. It uses the same unit, pinned image, Podman options, cgroup
 topology, limits, hooks directory, and seven bind destinations, but substitutes
 fresh ephemeral `/run` directories for the launch, evidence, and runtime
 mounts. It exits immediately after the probe and full cleanup: it creates no
-campaign evidence, no campaign launch receipt, and never starts the campaign
-controller. Normal mode refuses a stale probe request, and cleanup removes a
+campaign evidence, no campaign launch receipt, never starts the campaign
+controller, and does not isolate the active graphical target. Normal mode refuses a stale probe request, and cleanup removes a
 request only when its exact schema, root ownership, mode, and nonce still match
 the invocation that created or consumed it. Probe success proves only that the
 host launch topology works; it is not campaign acceptance.
@@ -221,10 +303,11 @@ host launch topology works; it is not campaign acceptance.
 ## Container boundary
 
 The rootful container is launched with `network=none`, `cgroups=no-conmon`, the
-host cgroup namespace, a private PID namespace, a read-only root filesystem,
-user `0:0`, and exact soft/hard `nofile` limits of 4096. The unit also fixes
-`LimitNOFILE=4096`, so the operator, probe, controller, and descendants cannot
-inherit a wider descriptor ceiling. The
+host cgroup namespace, private IPC, PID, and UTS namespaces, a read-only root
+filesystem, user `0:0`, and exact soft/hard `nofile` limits of 4096. The unit also fixes
+`LimitNOFILE=4096`; its inhibited command explicitly enters through
+`prlimit --nofile=4096:4096` as well, so an inhibitor-manager limit cannot
+silently narrow the operator, probe, controller, or descendant ceiling. The
 `no-conmon` mode avoids an extra conmon cgroup while preserving the delegated
 container cgroup model required for the fixed measurement child; Podman's
 incompatible `cgroups=disabled`/`cgroupns=host` combination is forbidden.
@@ -234,7 +317,15 @@ below the systemd service cgroup, keeping every payload inside
 `KillMode=control-group` coverage.
 Pulling, host environment inheritance, proxy inheritance, image
 volumes, writable implicit read-only tmpfs mounts, and ambient OCI hooks are
-disabled. Its fixed bind topology is:
+disabled. Podman inspection must expose exactly eight environment claims:
+`PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
+`container=podman`, `HOME=/runtime/home`, `TMPDIR=/runtime/tmp`,
+`XDG_CACHE_HOME=/runtime/xdg-cache`, `LANG=C`, `LC_ALL=C`, and `TZ=UTC`.
+The label inventory is also exact: the pinned image's
+`io.buildah.version=1.43.0` and `org.opencontainers.image.version=24.04`, plus
+the four marker-derived CodeSkeptic owner, session, bundle-revision, and
+container-kind labels. Any additional or missing environment claim or label is
+foreign state. Its fixed bind topology is:
 
 - `/authority` read-only;
 - `/config/runtime.json` read-only;
@@ -251,9 +342,32 @@ The exact in-container command is:
 ```
 
 The container is not auto-removed. Podman must create a fresh CID file; the
-operator's terminal trap uses that exact ID to force-remove the container and
-then removes the consumed CID file. Malformed cleanup identity or failed
-cleanup changes the terminal result to failure.
+operator binds it to the durable session marker and host recovery rederives the
+effective command, process argv, seven semantic bind mounts, exact environment
+and labels, image digest/name/ID, CID path, IPC/PID/UTS and
+cgroup/network topology, rootfs mode, security options, user, workdir, runtime,
+and resource limit from Podman inspection. Every Podman removal is centralized
+in host recovery; the runner has no direct `podman rm`, name-only fallback, or
+alternate cleanup authority. After validating the full installation, host,
+cgroup, container, and CID chain, recovery durably unlinks the owned CID first
+and only then force-removes the exact 64-hex Podman ID. An interruption can
+therefore rediscover a surviving container from its exact dedicated-store
+projection, while a complete CID can never outlive the container it names.
+Normal successful preflight, controller, and verifier cleanup requires an
+actual removed ID and rejects an `absent` result; only idempotent failure/EXIT
+recovery may accept that the already-validated container is absent. Malformed
+or partial cleanup identity, an additional environment claim or label, or any
+execution-contract drift leaves the durable marker in place and changes the
+terminal result to failure.
+
+Before cgroup mutation or container removal, recovery supplies the exact live
+Podman IDs to the cgroup authority. The cgroup helper permits only the
+corresponding `libpod-<ID>` descendants, rejects foreign children, kills and
+empties the owned subtree, restores the ancestor CPU partition state, and
+removes its marker last. Its recovery path is cutpoint-aware and idempotent:
+it can complete active, partially restored, or already-clean states, including
+a strict unpublished-marker prefix only when the machine is otherwise proven
+clean.
 
 After the controller exits successfully, the operator starts a second fresh
 container from the same pinned image with the exact `verify` command. The
@@ -274,10 +388,11 @@ failure rejects the activation.
 
 ## systemd and evidence boundary
 
-The service is eligible only after an explicit `multi-user.target` boot and
-conflicts with graphical and sleep-family targets. It has null standard input
-and cannot request a password, Enter key, TTY action, or graphical transition.
-It is deliberately static and has no `[Install]` section, so reaching
+The service can be authorized from the normal active graphical boot. It is
+ordered before and conflicts with shutdown, rescue, and emergency targets, and
+survives the runner's deliberate isolate through `IgnoreOnIsolate=yes`. It has
+null standard input and cannot request a password or Enter key. It is
+deliberately static and has no `[Install]` section, so reaching
 `multi-user.target` can never start the campaign by itself.
 The unit delegates its cgroup subtree, places its main operator in
 `DelegateSubgroup=controller`, exposes `AllowedCPUs=0-11`, and confines the
@@ -300,8 +415,10 @@ partial output, nonzero controller exit, or cleanup failure rejects the whole
 session. A later activation starts distinct empty paths and cannot combine
 receipts or shards from another attempt. `Restart=no`,
 `KillMode=control-group`, and `OOMPolicy=stop` expose controller, descendant,
-and memory failures. A nonblocking lock excludes concurrent campaigns, and
-`systemd-inhibit` blocks shutdown and sleep only while Podman is attached.
+and memory failures. A nonblocking lock excludes concurrent campaigns. The
+unit wraps the exact-`nofile` runner in `systemd-inhibit --what=sleep`; shutdown is not
+hidden by an inhibitor and instead stops the conflicting service so post-stop
+can recover cgroups while refusing to restart graphics during the transition.
 
 Before the first Podman probe, the root operator captures opaque journal
 cursors for both the system journal and the nonce-bound target user's journal.
@@ -319,6 +436,7 @@ fails closed.
 
 The staged service fixes `CODESKEPTIC_TERMINAL_NOTIFY=0`, and the guided
 entrypoint rejects every systemd drop-in so the effective service authority
-cannot be changed outside the staged unit. The guided entrypoint itself emits
-a triple terminal bell when it returns. Notification delivery is never an
-acceptance condition.
+cannot be changed outside the staged unit. Guided emits a triple terminal bell
+when its bounded handoff wait returns; post-stop also attempts the console bell
+after persisting its exact outcome. Notification delivery is never an
+acceptance condition, and no exit-code capture is required from the user.

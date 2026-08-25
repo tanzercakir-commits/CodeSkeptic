@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import types
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Protocol
 
@@ -32,12 +33,13 @@ import run_stability_fault_injection as fault_injection
 
 
 POLICY_SCHEMA = "codeskeptic-stability-campaign-v2"
-RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v1"
+RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v2"
 RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v1"
 EVENT_SCHEMA = "codeskeptic-stability-event-v1"
-SESSION_SCHEMA = "codeskeptic-stability-session-v1"
+SESSION_SCHEMA = "codeskeptic-stability-session-v2"
 CYCLE_SCHEMA = "codeskeptic-stability-cycle-v1"
-RECEIPT_SCHEMA = "codeskeptic-stability-receipt-v1"
+RECEIPT_SCHEMA = "codeskeptic-stability-receipt-v2"
+ESTABLISHMENT_SCHEMA = "codeskeptic-stability-establishment-v2"
 CYCLE_IDENTITY_SCHEMA = "codeskeptic-stability-cycle-identity-v1"
 ACTION_IDENTITY_SCHEMA = "codeskeptic-stability-action-identity-v1"
 CYCLE_PLAN_SCHEMA = "codeskeptic-stability-cycle-plan-v1"
@@ -45,6 +47,9 @@ ACTION_PLAN_SCHEMA = "codeskeptic-stability-action-plan-v1"
 ACTION_RECEIPT_SCHEMA = "codeskeptic-stability-action-receipt-v1"
 DETERMINISM_PROJECTION_SCHEMA = (
     "codeskeptic-stability-determinism-projection-v1"
+)
+DETERMINISM_BASELINE_AUTHORITY_SCHEMA = (
+    "codeskeptic-determinism-baseline-authority-v1"
 )
 REALWORLD_PROJECTION_SCHEMA = "codeskeptic-stability-realworld-projection-v2"
 REALWORLD_SHARD_PROJECTION_SCHEMA = (
@@ -65,8 +70,15 @@ FAULT_INJECTION_PROJECTION_SCHEMA = (
     "codeskeptic-stability-fault-injection-projection-v1"
 )
 HOST_SNAPSHOT_SCHEMA = "codeskeptic-stability-host-snapshot-v2"
-HOST_CLEANUP_SCHEMA = "codeskeptic-stability-host-cleanup-v2"
-OPERATOR_RECEIPT_SCHEMA = "codeskeptic-stability-operator-receipt-v2"
+HOST_CLEANUP_SCHEMA = "codeskeptic-stability-host-cleanup-v4"
+OPERATOR_RECEIPT_SCHEMA = "codeskeptic-stability-operator-receipt-v3"
+CGROUP_AUTHORITY_INTENT_SCHEMA = "codeskeptic-p10-09-cgroup-authority-intent-v1"
+HOST_RECOVERY_INTENT_SCHEMA = "codeskeptic-p10-09-host-recovery-intent-v1"
+INSTALLATION_AUTHORITY_SCHEMA = (
+    "codeskeptic-stability-installation-authority-v1"
+)
+INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
+BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 REQUIRED_HOSTED_GATES = [
     "build-and-test",
     "resource-budget-macos",
@@ -166,9 +178,27 @@ PERFORMANCE_SCOPE = "p10-07-representative-pre-post"
 RUNTIME_CGROUP_PARENT = (
     "/system.slice/codeskeptic-stability.service/codeskeptic-p10-09"
 )
+RUNTIME_SYSTEM_SLICE_CGROUP = "/sys/fs/cgroup/system.slice"
+RUNTIME_SERVICE_CGROUP = (
+    "/sys/fs/cgroup/system.slice/codeskeptic-stability.service"
+)
 RUNTIME_MEASUREMENT_CGROUP = (
     "/sys/fs/cgroup/system.slice/codeskeptic-stability.service/"
     "codeskeptic-p10-09/measurement"
+)
+CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH = "host/cgroup-authority-intent.json"
+CGROUP_AUTHORITY_MARKER = (
+    "/var/lib/codeskeptic-p10-09/cgroup-authority-intent.json"
+)
+CGROUP_AUTHORITY_MARKER_TEMP = (
+    "/var/lib/codeskeptic-p10-09/.cgroup-authority-intent.tmp"
+)
+HOST_RECOVERY_INTENT_EVIDENCE_PATH = "host/host-recovery-intent.json"
+HOST_RECOVERY_MARKER = (
+    "/var/lib/codeskeptic-p10-09/host-recovery-intent.json"
+)
+HOST_RECOVERY_MARKER_TEMP = (
+    "/var/lib/codeskeptic-p10-09/.host-recovery-intent.tmp"
 )
 RUNTIME_LAUNCH_MOUNTS = [
     {"destination": "/authority", "mode": "ro"},
@@ -243,6 +273,92 @@ HOST_SOCKET_PROPERTIES = [
 
 class StabilityError(RuntimeError):
     """The stability evidence is unavailable or violates its fixed policy."""
+
+
+def _load_private_determinism_authority() -> types.ModuleType:
+    """Load exact sibling verifier bytes without consulting sys.modules."""
+
+    filename = "run_determinism_qualification.py"
+    path = Path(__file__).resolve().with_name(filename)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise StabilityError(
+            "cannot open private determinism authority"
+        ) from error
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or not 0 < before.st_size <= 16 << 20
+        ):
+            raise StabilityError(
+                "private determinism authority is not a bounded regular file"
+            )
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1 << 20))
+            if not chunk:
+                raise StabilityError(
+                    "private determinism authority was truncated"
+                )
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise StabilityError(
+                "private determinism authority grew during loading"
+            )
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    try:
+        pathname = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise StabilityError(
+            "cannot recheck private determinism authority"
+        ) from error
+
+    def identity(item: os.stat_result) -> tuple[int, ...]:
+        return (
+            item.st_dev,
+            item.st_ino,
+            item.st_mode,
+            item.st_nlink,
+            item.st_size,
+            item.st_mtime_ns,
+            item.st_ctime_ns,
+        )
+
+    if (
+        identity(before) != identity(after)
+        or identity(after) != identity(pathname)
+    ):
+        raise StabilityError(
+            "private determinism authority changed during loading"
+        )
+    try:
+        code = compile(
+            b"".join(chunks), os.fspath(path), "exec", dont_inherit=True
+        )
+    except (SyntaxError, ValueError) as error:
+        raise StabilityError(
+            "private determinism authority cannot be compiled"
+        ) from error
+    module = types.ModuleType("_codeskeptic_private_determinism_qualification")
+    module.__file__ = os.fspath(path)
+    module.__package__ = ""
+    try:
+        exec(code, module.__dict__)
+    except Exception as error:
+        raise StabilityError(
+            "private determinism authority cannot be loaded"
+        ) from error
+    return module
 
 
 class _ActionTaskSnapshotChanged(StabilityError):
@@ -2139,7 +2255,7 @@ def validate_runtime_config(
     qualification = _exact_dict(
         value["qualification"],
         {
-            "hardware_class", "measurement_cgroup", "baseline_authority_root",
+            "hardware_class", "measurement_cgroup", "baseline_authority",
             "release_source", "release_build", "jobs", "tools",
         },
         "runtime qualification",
@@ -2155,8 +2271,26 @@ def validate_runtime_config(
         "runtime measurement cgroup",
         exact=Path(RUNTIME_MEASUREMENT_CGROUP),
     )
+    baseline_authority = _exact_dict(
+        qualification["baseline_authority"],
+        {
+            "root", "manifest_sha256", "baseline_sha256",
+            "projection_sha256",
+        },
+        "runtime determinism baseline authority",
+    )
+    _absolute_config_path(
+        baseline_authority["root"],
+        authority_root,
+        "runtime determinism baseline authority root",
+        exact=source_root,
+    )
+    for field in ("manifest_sha256", "baseline_sha256", "projection_sha256"):
+        _valid_sha(
+            baseline_authority[field],
+            f"runtime determinism baseline authority {field}",
+        )
     for field, exact in {
-        "baseline_authority_root": source_root,
         "release_source": authority_root / "release" / "source",
         "release_build": authority_root / "release" / "build",
     }.items():
@@ -2183,14 +2317,13 @@ def validate_runtime_config(
 
     prerequisites = _exact_dict(
         value["prerequisites"],
-        {"determinism", "hosted_exact_head", "quality_floor"},
+        {"hosted_exact_head", "quality_floor"},
         "runtime prerequisites",
     )
     prerequisite_roots = {
-        "determinism": authority_root / "prerequisites" / "determinism",
         "quality_floor": authority_root / "prerequisites" / "quality",
     }
-    for name in ("determinism", "quality_floor"):
+    for name in ("quality_floor",):
         record = _exact_dict(
             prerequisites[name], {"root", "receipt_sha256"},
             f"runtime prerequisite {name}",
@@ -2462,7 +2595,8 @@ def build_session_identity(material: Any) -> str:
         "build_authority_receipt_sha256",
         "realworld_manifest_sha256", "realworld_mirror_authority_sha256",
         "determinism_manifest_sha256",
-        "baseline_sha256", "sanitizer_receipts", "prerequisite_receipts",
+        "baseline_sha256", "baseline_authority_projection_sha256",
+        "sanitizer_receipts", "prerequisite_receipts",
         "fault_injection_test_binary", "hardware_class", "boot_id",
     }, "stability session identity")
     if value["schema"] != SESSION_SCHEMA:
@@ -2483,7 +2617,7 @@ def build_session_identity(material: Any) -> str:
         "build_authority_receipt_sha256",
         "realworld_manifest_sha256", "realworld_mirror_authority_sha256",
         "determinism_manifest_sha256",
-        "baseline_sha256",
+        "baseline_sha256", "baseline_authority_projection_sha256",
     ):
         _valid_sha(value[field], f"session {field}")
     sanitizer = _exact_dict(
@@ -2494,10 +2628,10 @@ def build_session_identity(material: Any) -> str:
         _valid_sha(sanitizer[profile], f"session sanitizer {profile}")
     prerequisites = _exact_dict(
         value["prerequisite_receipts"],
-        {"determinism", "hosted_exact_head", "quality_floor"},
+        {"hosted_exact_head", "quality_floor"},
         "session prerequisite receipts",
     )
-    for prerequisite in ("determinism", "hosted_exact_head", "quality_floor"):
+    for prerequisite in ("hosted_exact_head", "quality_floor"):
         _valid_sha(
             prerequisites[prerequisite],
             f"session prerequisite {prerequisite}",
@@ -2580,6 +2714,9 @@ def build_runtime_session_record(
         "baseline_sha256": sha256_file(
             scripts / "determinism_baseline.json"
         ),
+        "baseline_authority_projection_sha256": value["qualification"][
+            "baseline_authority"
+        ]["projection_sha256"],
         "sanitizer_receipts": {
             profile: value["sanitizers"][profile]["receipt_sha256"]
             for profile in ("address", "undefined")
@@ -2588,9 +2725,7 @@ def build_runtime_session_record(
             prerequisite: value["prerequisites"][prerequisite][
                 "receipt_sha256"
             ]
-            for prerequisite in (
-                "determinism", "hosted_exact_head", "quality_floor"
-            )
+            for prerequisite in ("hosted_exact_head", "quality_floor")
         },
         "fault_injection_test_binary": {
             "path": value["fault_injection"]["test_binary"],
@@ -2919,7 +3054,7 @@ def build_action_spec(
             python, "-B", os.fspath(scripts / "run_determinism_qualification.py"),
             "--manifest", os.fspath(scripts / "determinism_workloads.json"),
             "--baseline", os.fspath(scripts / "determinism_baseline.json"),
-            "--baseline-authority-root", qualification["baseline_authority_root"],
+            "--baseline-authority-root", qualification["baseline_authority"]["root"],
             "--binary", config_value["analyzer"]["path"],
             "--repo-root", config_value["source"]["root"],
             "--build-path", config_value["build_authority"]["build_path"],
@@ -4529,7 +4664,7 @@ def verify_planned_action_projection(
             scripts / "determinism_workloads.json",
             scripts / "determinism_baseline.json",
             source,
-            Path(config["qualification"]["baseline_authority_root"]),
+            Path(config["qualification"]["baseline_authority"]["root"]),
             expected,
         )
         return verified["projection"]
@@ -7294,7 +7429,9 @@ def verify_realworld_mirror_authority(
 
 def verify_runtime_source_and_policy(
     config: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+]:
     """Re-derive source, analyzer, policy, and exact schedule in-container."""
 
     value = validate_runtime_config(config)
@@ -7353,6 +7490,164 @@ def verify_runtime_source_and_policy(
     return policy, schedule, source_now
 
 
+def _determinism_baseline_projection_bytes(value: Any) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("ascii")
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise StabilityError(
+            f"determinism baseline projection is not canonical: {error}"
+        ) from error
+
+
+def verify_determinism_baseline_authority(
+    source_root: Path,
+    manifest_path: Path,
+    baseline_path: Path,
+    hardware_class: str,
+) -> dict[str, Any]:
+    """Verify and project the promoted baseline used by both live gates."""
+
+    source = Path(source_root).absolute()
+    manifest_file = Path(manifest_path).absolute()
+    baseline_file = Path(baseline_path).absolute()
+    try:
+        source_metadata = source.lstat()
+    except OSError as error:
+        raise StabilityError(
+            f"cannot inspect determinism baseline authority root: {error}"
+        ) from error
+    if not stat.S_ISDIR(source_metadata.st_mode) or source.resolve() != source:
+        raise StabilityError(
+            "determinism baseline authority root is not a canonical real directory"
+        )
+    canonical_manifest = source / "scripts" / "determinism_workloads.json"
+    canonical_baseline = source / "scripts" / "determinism_baseline.json"
+    if manifest_file != canonical_manifest or baseline_file != canonical_baseline:
+        raise StabilityError(
+            "determinism baseline authority files are not canonical"
+        )
+    if not isinstance(hardware_class, str) or not hardware_class:
+        raise StabilityError("determinism baseline hardware class is malformed")
+
+    determinism = _load_private_determinism_authority()
+
+    try:
+        manifest_sha = sha256_file(manifest_file)
+        baseline_sha = sha256_file(baseline_file)
+        manifest = determinism.load_manifest(manifest_file)
+        baseline = determinism.load_baseline(
+            baseline_file, determinism.digest_json(manifest)
+        )
+        profiles = baseline.get("profiles")
+        if not isinstance(profiles, dict) or hardware_class not in profiles:
+            raise StabilityError(
+                "determinism baseline hardware class is absent"
+            )
+        profile = profiles[hardware_class]
+        provenance = profile["provenance"]
+        calibration = provenance["calibration"]
+        evidence_path = calibration["evidence_path"]
+        calibration_root = source / evidence_path
+        try:
+            calibration_metadata = calibration_root.lstat()
+        except OSError as error:
+            raise StabilityError(
+                f"cannot inspect determinism calibration authority: {error}"
+            ) from error
+        if (
+            not stat.S_ISDIR(calibration_metadata.st_mode)
+            or calibration_root.resolve() != calibration_root
+        ):
+            raise StabilityError(
+                "determinism calibration authority is not canonical"
+            )
+        calibration_receipt = calibration_root / "receipt.json"
+        calibration_sums = calibration_root / "SHA256SUMS"
+        identity_before = {
+            "manifest_sha256": manifest_sha,
+            "baseline_sha256": baseline_sha,
+            "calibration_receipt_sha256": sha256_file(calibration_receipt),
+            "calibration_sha256sums_sha256": sha256_file(calibration_sums),
+        }
+        if (
+            identity_before["calibration_receipt_sha256"]
+            != calibration["receipt_sha256"]
+        ):
+            raise StabilityError(
+                "determinism calibration receipt differs from baseline provenance"
+            )
+        determinism.verify_baseline_authority(
+            baseline,
+            source,
+            manifest_file,
+            toolchain_verification_mode=(
+                determinism.TOOLCHAIN_VERIFICATION_HISTORICAL_RETAINED
+            ),
+        )
+        identity_after = {
+            "manifest_sha256": sha256_file(manifest_file),
+            "baseline_sha256": sha256_file(baseline_file),
+            "calibration_receipt_sha256": sha256_file(calibration_receipt),
+            "calibration_sha256sums_sha256": sha256_file(calibration_sums),
+        }
+        if identity_after != identity_before:
+            raise StabilityError(
+                "determinism baseline authority changed during verification"
+            )
+    except StabilityError:
+        raise
+    except Exception as error:
+        raise StabilityError(
+            f"determinism baseline authority verification failed: {error}"
+        ) from error
+
+    promotion = provenance["promotion"]
+    projection = {
+        "schema": DETERMINISM_BASELINE_AUTHORITY_SCHEMA,
+        "hardware_class": hardware_class,
+        "manifest_sha256": manifest_sha,
+        "baseline_sha256": baseline_sha,
+        "semantic_reference_sha256": digest_json(
+            baseline["semantic_reference"]
+        ),
+        "profile_source_revision": provenance["source_revision"],
+        "toolchain_sha256": digest_json(provenance["toolchain"]),
+        "hardware_sha256": digest_json(profile["hardware"]),
+        "workloads_sha256": digest_json(profile["workloads"]),
+        "calibration": {
+            "evidence_path": evidence_path,
+            "receipt_sha256": calibration["receipt_sha256"],
+            "sha256sums_sha256": identity_before[
+                "calibration_sha256sums_sha256"
+            ],
+        },
+        "promotion": {
+            "previous_baseline_sha256": promotion[
+                "previous_baseline_sha256"
+            ],
+            "previous_profile_sha256": promotion[
+                "previous_profile_sha256"
+            ],
+            "reason_sha256": hashlib.sha256(
+                promotion["reason"].encode("utf-8")
+            ).hexdigest(),
+        },
+    }
+    return {
+        "projection": projection,
+        "projection_sha256": hashlib.sha256(
+            _determinism_baseline_projection_bytes(projection)
+        ).hexdigest(),
+        "identity": identity_before,
+    }
+
+
 def verify_runtime_static_authorities(
     config: dict[str, Any],
     policy: dict[str, Any],
@@ -7361,7 +7656,6 @@ def verify_runtime_static_authorities(
 
     value = validate_runtime_config(config)
     source = Path(value["source"]["root"])
-    scripts = source / "scripts"
     expected = {
         "source_revision": value["source"]["revision"],
         "source_manifest_sha256": value["source"]["manifest_sha256"],
@@ -7390,28 +7684,22 @@ def verify_runtime_static_authorities(
         "receipt_sha256"
     ]:
         raise StabilityError("configured quality-floor receipt drift")
-    determinism_expected = {
-        **expected,
-        "hardware_class": value["qualification"]["hardware_class"],
-        "manifest_sha256": sha256_file(
-            scripts / policy["qualification"]["manifest"].split("/")[-1]
-        ),
-        "baseline_sha256": sha256_file(
-            scripts / policy["qualification"]["baseline"].split("/")[-1]
-        ),
-    }
-    determinism = verify_determinism_evidence(
-        Path(value["prerequisites"]["determinism"]["root"]),
+    baseline_authority = verify_determinism_baseline_authority(
+        Path(value["qualification"]["baseline_authority"]["root"]),
         source / policy["qualification"]["manifest"],
         source / policy["qualification"]["baseline"],
-        source,
-        Path(value["qualification"]["baseline_authority_root"]),
-        determinism_expected,
+        value["qualification"]["hardware_class"],
     )
-    if determinism["receipt_sha256"] != value["prerequisites"]["determinism"][
-        "receipt_sha256"
-    ]:
-        raise StabilityError("configured determinism prerequisite receipt drift")
+    configured_baseline = value["qualification"]["baseline_authority"]
+    if (
+        baseline_authority["projection"]["manifest_sha256"]
+        != configured_baseline["manifest_sha256"]
+        or baseline_authority["projection"]["baseline_sha256"]
+        != configured_baseline["baseline_sha256"]
+        or baseline_authority["projection_sha256"]
+        != configured_baseline["projection_sha256"]
+    ):
+        raise StabilityError("configured determinism baseline authority drift")
     hosted_config = value["prerequisites"]["hosted_exact_head"]
     hosted = verify_hosted_exact_head_authority(
         Path(hosted_config["root"]),
@@ -7457,7 +7745,7 @@ def verify_runtime_static_authorities(
     return {
         "build_authority": build,
         "quality_floor": quality,
-        "determinism": determinism,
+        "determinism_baseline": baseline_authority,
         "hosted_exact_head": hosted,
         "sanitizers": sanitizers,
         "fault_injection_test_binary": fault_binary,
@@ -7533,11 +7821,6 @@ def runtime_establishment_sources(
             Path(value["build_authority"]["root"]) / "receipt.json",
             "authorities/build_authority.json",
         ),
-        "determinism": (
-            Path(value["prerequisites"]["determinism"]["root"])
-            / "receipt.json",
-            "authorities/determinism.json",
-        ),
         "hosted_exact_head": (
             Path(value["prerequisites"]["hosted_exact_head"]["root"])
             / "receipt.json",
@@ -7593,8 +7876,49 @@ def stage_runtime_establishment(
     ).items():
         stage(name, source_path, relative)
 
+    baseline_result = static_authorities.get("determinism_baseline")
+    if not isinstance(baseline_result, dict):
+        raise StabilityError("determinism baseline authority result is malformed")
+    baseline_projection = baseline_result.get("projection")
+    if not isinstance(baseline_projection, dict):
+        raise StabilityError("determinism baseline projection is malformed")
+    baseline_data = _determinism_baseline_projection_bytes(
+        baseline_projection
+    )
+    baseline_projection_sha = hashlib.sha256(baseline_data).hexdigest()
+    if (
+        baseline_result.get("projection_sha256") != baseline_projection_sha
+        or value["qualification"]["baseline_authority"]["projection_sha256"]
+        != baseline_projection_sha
+    ):
+        raise StabilityError("determinism baseline projection identity drift")
+    baseline_destination = (
+        establishment_root / "authorities" / "determinism_baseline.json"
+    )
+    baseline_destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        baseline_parent_metadata = baseline_destination.parent.lstat()
+    except OSError as error:
+        raise StabilityError(
+            f"cannot inspect determinism baseline staging parent: {error}"
+        ) from error
+    if not stat.S_ISDIR(baseline_parent_metadata.st_mode):
+        raise StabilityError(
+            "determinism baseline staging parent is not a real directory"
+        )
+    _atomic_create(baseline_destination, baseline_data)
+    staged["determinism_baseline"] = {
+        "path": _relative_evidence_path(
+            baseline_destination,
+            evidence_root,
+            "staged determinism baseline",
+        ),
+        "sha256": baseline_projection_sha,
+        "size": len(baseline_data),
+    }
+
     establishment = {
-        "schema": "codeskeptic-stability-establishment-v1",
+        "schema": ESTABLISHMENT_SCHEMA,
         "status": "accepted",
         "failures": [],
         "session": session_value,
@@ -7608,7 +7932,8 @@ def stage_runtime_establishment(
     establishment_sha = sha256_file(establishment_path)
 
     authority_names = (
-        "build_authority", "determinism", "hosted_exact_head", "quality_floor"
+        "build_authority", "determinism_baseline",
+        "hosted_exact_head", "quality_floor",
     )
     authorities = {
         name: {
@@ -7654,6 +7979,7 @@ def verify_runtime_establishment(
     )
     if not isinstance(records, dict) or not records:
         raise StabilityError("runtime establishment source map is malformed")
+    include_baseline_projection = source_records is None
     establishment_path = evidence_root / "establishment" / "receipt.json"
     retained = _load_document(
         establishment_path, "runtime establishment receipt"
@@ -7667,7 +7993,7 @@ def verify_runtime_establishment(
         "runtime establishment receipt",
     )
     if (
-        value["schema"] != "codeskeptic-stability-establishment-v1"
+        value["schema"] != ESTABLISHMENT_SCHEMA
         or value["status"] != "accepted"
         or value["failures"] != []
         or value["session"] != session_value
@@ -7679,7 +8005,10 @@ def verify_runtime_establishment(
             "runtime establishment differs from rederived authorities"
         )
     staged = value["staged"]
-    if not isinstance(staged, dict) or set(staged) != set(records):
+    expected_names = set(records)
+    if include_baseline_projection:
+        expected_names.add("determinism_baseline")
+    if not isinstance(staged, dict) or set(staged) != expected_names:
         raise StabilityError("runtime establishment staged inventory drift")
     normalized_staged: dict[str, dict[str, Any]] = {}
     for name, source_record in records.items():
@@ -7739,6 +8068,41 @@ def verify_runtime_establishment(
                 f"staged runtime authority checksum mismatch: {name}"
             )
         normalized_staged[name] = copy.deepcopy(record)
+    if include_baseline_projection:
+        baseline_result = static_authorities.get("determinism_baseline")
+        if not isinstance(baseline_result, dict):
+            raise StabilityError(
+                "determinism baseline authority result is malformed"
+            )
+        baseline_projection = baseline_result.get("projection")
+        if not isinstance(baseline_projection, dict):
+            raise StabilityError("determinism baseline projection is malformed")
+        baseline_data = _determinism_baseline_projection_bytes(
+            baseline_projection
+        )
+        baseline_sha = hashlib.sha256(baseline_data).hexdigest()
+        if baseline_result.get("projection_sha256") != baseline_sha:
+            raise StabilityError("determinism baseline projection identity drift")
+        record = _exact_dict(
+            staged["determinism_baseline"],
+            {"path", "sha256", "size"},
+            "staged determinism baseline authority",
+        )
+        expected_path = (
+            "establishment/authorities/determinism_baseline.json"
+        )
+        retained_path = evidence_root / expected_path
+        if (
+            record["path"] != expected_path
+            or record["sha256"] != baseline_sha
+            or record["size"] != len(baseline_data)
+            or _read_regular_bytes(retained_path, MAX_DOCUMENT_BYTES)
+            != baseline_data
+        ):
+            raise StabilityError(
+                "staged determinism baseline authority checksum mismatch"
+            )
+        normalized_staged["determinism_baseline"] = copy.deepcopy(record)
     if normalized_staged != staged:
         raise StabilityError("runtime establishment staged inventory drift")
     return {
@@ -7759,7 +8123,7 @@ def verify_runtime_static_authority_identities(
     expected = _exact_dict(
         static_authorities,
         {
-            "build_authority", "quality_floor", "determinism",
+            "build_authority", "quality_floor", "determinism_baseline",
             "hosted_exact_head", "sanitizers", "realworld_mirror",
             "fault_injection_test_binary",
         },
@@ -7768,7 +8132,6 @@ def verify_runtime_static_authority_identities(
     roots = {
         "build_authority": Path(value["build_authority"]["root"]),
         "quality_floor": Path(value["prerequisites"]["quality_floor"]["root"]),
-        "determinism": Path(value["prerequisites"]["determinism"]["root"]),
         "hosted_exact_head": Path(
             value["prerequisites"]["hosted_exact_head"]["root"]
         ),
@@ -7782,6 +8145,20 @@ def verify_runtime_static_authority_identities(
             raise StabilityError(f"runtime {name} authority result is malformed")
         if directory_identity(root, f"runtime {name} authority") != result["bundle"]:
             raise StabilityError(f"runtime {name} authority changed after verification")
+    baseline = verify_determinism_baseline_authority(
+        Path(value["qualification"]["baseline_authority"]["root"]),
+        Path(value["source"]["root"])
+        / "scripts"
+        / "determinism_workloads.json",
+        Path(value["source"]["root"])
+        / "scripts"
+        / "determinism_baseline.json",
+        value["qualification"]["hardware_class"],
+    )
+    if baseline != expected["determinism_baseline"]:
+        raise StabilityError(
+            "runtime determinism baseline authority changed after verification"
+        )
     sanitizers = _exact_dict(
         expected["sanitizers"], {"address", "undefined"},
         "runtime sanitizer authority results",
@@ -8141,11 +8518,15 @@ def verify_evidence_structure(
     )
     authorities = _exact_dict(
         receipt["authorities"],
-        {"build_authority", "determinism", "hosted_exact_head", "quality_floor"},
+        {
+            "build_authority", "determinism_baseline",
+            "hosted_exact_head", "quality_floor",
+        },
         "receipt authorities",
     )
     for authority in (
-        "build_authority", "determinism", "hosted_exact_head", "quality_floor"
+        "build_authority", "determinism_baseline",
+        "hosted_exact_head", "quality_floor",
     ):
         record = _exact_dict(
             authorities[authority], {"path", "sha256"},
@@ -8157,6 +8538,14 @@ def verify_evidence_structure(
         if authority == "build_authority":
             if record["sha256"] != session_identity["build_authority_receipt_sha256"]:
                 raise StabilityError("build authority session identity mismatch")
+        elif authority == "determinism_baseline":
+            if (
+                record["sha256"]
+                != session_identity["baseline_authority_projection_sha256"]
+            ):
+                raise StabilityError(
+                    "determinism baseline session identity mismatch"
+                )
         elif record["sha256"] != session_identity["prerequisite_receipts"][authority]:
             raise StabilityError(f"prerequisite {authority} session identity mismatch")
     diagnostics = _exact_dict(
@@ -8328,7 +8717,8 @@ def verify_production_evidence(
         )
     staged = establishment["staged"]
     for authority in (
-        "build_authority", "determinism", "hosted_exact_head", "quality_floor"
+        "build_authority", "determinism_baseline",
+        "hosted_exact_head", "quality_floor",
     ):
         expected_record = {
             "path": staged[authority]["path"],
@@ -9659,6 +10049,241 @@ def _cgroup_absent_or_empty(path: Path) -> bool:
     return events.get("populated") == "0" and events.get("frozen") == "0"
 
 
+def _expected_cgroup_authority_intent(
+    session: str, source_revision: str,
+) -> dict[str, Any]:
+    if not isinstance(source_revision, str) or GIT_SHA1.fullmatch(source_revision) is None:
+        raise StabilityError("cgroup authority source revision is malformed")
+    return {
+        "schema": CGROUP_AUTHORITY_INTENT_SCHEMA,
+        "status": "armed",
+        "source_revision": source_revision,
+        "session": session,
+        "exclusive_cpus": "0-3",
+        "system_slice_cgroup": RUNTIME_SYSTEM_SLICE_CGROUP,
+        "service_cgroup": RUNTIME_SERVICE_CGROUP,
+        "payload_cgroup": f"/sys/fs/cgroup{RUNTIME_CGROUP_PARENT}",
+        "measurement_cgroup": RUNTIME_MEASUREMENT_CGROUP,
+        "original_root_isolated_cpus": "",
+        "original_system_slice_exclusive_cpus": "",
+        "original_service_exclusive_cpus": "",
+    }
+
+
+def _validate_cgroup_authority_intent(
+    path: Path, *, session: str, source_revision: str,
+) -> dict[str, Any]:
+    raw = _read_regular_bytes(path, MAX_DOCUMENT_BYTES)
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise StabilityError("cgroup authority intent JSON is malformed") from error
+    expected = _expected_cgroup_authority_intent(session, source_revision)
+    if not isinstance(value, dict) or value != expected:
+        raise StabilityError("cgroup authority intent claims drift")
+    if raw != canonical_json(value) + b"\n":
+        raise StabilityError("cgroup authority intent is not canonical JSON")
+    return value
+
+
+def _validate_host_recovery_intent(
+    path: Path,
+    *,
+    boot_id: str,
+    session: str,
+    session_nonce: str,
+    source_revision: str,
+    source_tree_sha1: str,
+    source_manifest_sha256: str,
+    runtime_config_sha256: str,
+) -> dict[str, Any]:
+    raw = _read_regular_bytes(path, MAX_DOCUMENT_BYTES)
+    try:
+        value = json.loads(raw.decode("ascii", errors="strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise StabilityError("host recovery intent JSON is malformed") from error
+    intent = _exact_dict(
+        value,
+        {
+            "boot_id", "containers", "installation", "mode", "schema",
+            "session", "session_nonce", "status",
+        },
+        "host recovery intent",
+    )
+    if (
+        intent["schema"] != HOST_RECOVERY_INTENT_SCHEMA
+        or intent["status"] != "armed"
+        or intent["mode"] != "campaign"
+        or intent["boot_id"] != boot_id
+        or intent["session"] != session
+        or intent["session_nonce"] != session_nonce
+    ):
+        raise StabilityError("host recovery intent session claims drift")
+    containers = _exact_dict(
+        intent["containers"],
+        {"campaign", "preflight", "verifier"},
+        "host recovery container authority",
+    )
+    expected_containers = {
+        "campaign": f"codeskeptic-p10-09-{session_nonce}",
+        "preflight": f"codeskeptic-p10-09-preflight-{session_nonce}",
+        "verifier": f"codeskeptic-p10-09-verifier-{session_nonce}",
+    }
+    if containers != expected_containers:
+        raise StabilityError("host recovery container authority drift")
+    installation = _exact_dict(
+        intent["installation"],
+        {
+            "bundle_inventory_sha256", "bundle_receipt_sha256",
+            "bundle_revision", "image_archive_sha256", "image_digest",
+            "image_id", "image_reference", "installation_receipt_sha256",
+            "installation_authority_sha256", "installed_inventory_sha256",
+            "runtime_config_sha256", "source_manifest_sha256",
+            "source_tree_sha1",
+        },
+        "host recovery installation authority",
+    )
+    if (
+        installation["bundle_revision"] != source_revision
+        or installation["source_tree_sha1"] != source_tree_sha1
+        or installation["source_manifest_sha256"]
+        != source_manifest_sha256
+        or installation["runtime_config_sha256"]
+        != runtime_config_sha256
+        or installation["image_id"] != PINNED_EVIDENCE_IMAGE_ID
+        or installation["image_digest"] != PINNED_EVIDENCE_IMAGE_DIGEST
+        or installation["image_reference"] != PINNED_EVIDENCE_IMAGE
+        or not isinstance(installation["source_tree_sha1"], str)
+        or GIT_SHA1.fullmatch(installation["source_tree_sha1"]) is None
+    ):
+        raise StabilityError("host recovery installation identity drift")
+    for field in (
+        "bundle_inventory_sha256",
+        "bundle_receipt_sha256",
+        "image_archive_sha256",
+        "installation_authority_sha256",
+        "installation_receipt_sha256",
+        "installed_inventory_sha256",
+        "runtime_config_sha256",
+        "source_manifest_sha256",
+    ):
+        digest = installation[field]
+        if not isinstance(digest, str) or SHA256.fullmatch(digest) is None:
+            raise StabilityError("host recovery installation digest is malformed")
+    if (
+        installation["bundle_inventory_sha256"]
+        != installation["installed_inventory_sha256"]
+    ):
+        raise StabilityError("host recovery installed inventory identity drift")
+    bundle_receipt = {
+        "image_archive_sha256": installation["image_archive_sha256"],
+        "image_digest": PINNED_EVIDENCE_IMAGE_DIGEST,
+        "image_id": PINNED_EVIDENCE_IMAGE_ID,
+        "image_reference": PINNED_EVIDENCE_IMAGE,
+        "inventory_sha256": installation["bundle_inventory_sha256"],
+        "revision": source_revision,
+        "runtime_config_sha256": runtime_config_sha256,
+        "schema": BUNDLE_RECEIPT_SCHEMA,
+        "source_manifest_sha256": source_manifest_sha256,
+        "source_tree_sha1": source_tree_sha1,
+    }
+    bundle_receipt_sha256 = hashlib.sha256(
+        canonical_document(bundle_receipt)
+    ).hexdigest()
+    if installation["bundle_receipt_sha256"] != bundle_receipt_sha256:
+        raise StabilityError("host recovery bundle receipt identity drift")
+    installation_authority = {
+        "bundle_receipt_sha256": bundle_receipt_sha256,
+        "bundle_revision": source_revision,
+        "schema": INSTALLATION_AUTHORITY_SCHEMA,
+    }
+    if installation["installation_authority_sha256"] != hashlib.sha256(
+        canonical_document(installation_authority)
+    ).hexdigest():
+        raise StabilityError("host recovery installation authority drift")
+    installation_receipt = {
+        "authority_root": "/opt/codeskeptic-p10-09/authority",
+        "bundle_inventory_sha256": installation["bundle_inventory_sha256"],
+        "bundle_receipt_sha256": bundle_receipt_sha256,
+        "bundle_revision": source_revision,
+        "config_path": "/etc/codeskeptic-p10-09/runtime.json",
+        "image": {
+            "archive_sha256": installation["image_archive_sha256"],
+            "digest": PINNED_EVIDENCE_IMAGE_DIGEST,
+            "id": PINNED_EVIDENCE_IMAGE_ID,
+            "reference": PINNED_EVIDENCE_IMAGE,
+        },
+        "installed_inventory_sha256": installation[
+            "installed_inventory_sha256"
+        ],
+        "operator_root": "/opt/codeskeptic-p10-09/operator",
+        "schema": INSTALLATION_RECEIPT_SCHEMA,
+        "unit_path": (
+            "/etc/systemd/system/codeskeptic-stability.service"
+        ),
+    }
+    if installation["installation_receipt_sha256"] != hashlib.sha256(
+        canonical_document(installation_receipt)
+    ).hexdigest():
+        raise StabilityError("host recovery installation receipt identity drift")
+    if raw != canonical_json(intent) + b"\n":
+        raise StabilityError("host recovery intent is not canonical JSON")
+    return intent
+
+
+def _live_cgroup_path(claimed: str, cgroup_root: Path) -> Path:
+    try:
+        relative = Path(claimed).relative_to("/sys/fs/cgroup")
+    except (TypeError, ValueError) as error:
+        raise StabilityError("cleanup live cgroup path escapes its authority") from error
+    return cgroup_root / relative
+
+
+def _cleanup_cgroup_value(path: Path, label: str) -> str:
+    raw = _read_pseudofile(path, 4096)
+    try:
+        return raw.decode("ascii", errors="strict").strip()
+    except UnicodeDecodeError as error:
+        raise StabilityError(f"{label} is malformed") from error
+
+
+def _live_cgroup_restoration(
+    cgroups: dict[str, Any], cgroup_root: Path,
+) -> dict[str, Any]:
+    root = _live_cgroup_path(cgroups["root"], cgroup_root)
+    result: dict[str, Any] = {
+        "root": {
+            "cpuset_cpus_isolated": _cleanup_cgroup_value(
+                root / "cpuset.cpus.isolated", "root isolated CPUs"
+            )
+        }
+    }
+    for name in ("system_slice", "service"):
+        path = _live_cgroup_path(cgroups[name], cgroup_root)
+        try:
+            metadata = path.lstat()
+        except OSError as error:
+            raise StabilityError(f"cannot inspect restored {name} cgroup") from error
+        if not stat.S_ISDIR(metadata.st_mode) or path.is_symlink():
+            raise StabilityError(f"restored {name} cgroup is not an exact directory")
+        result[name] = {
+            "cpuset_cpus_partition": _cleanup_cgroup_value(
+                path / "cpuset.cpus.partition", f"{name} partition"
+            ),
+            "cpuset_cpus_exclusive": _cleanup_cgroup_value(
+                path / "cpuset.cpus.exclusive", f"{name} exclusive CPUs"
+            ),
+            "cpuset_cpus_exclusive_effective": _cleanup_cgroup_value(
+                path / "cpuset.cpus.exclusive.effective",
+                f"{name} effective exclusive CPUs",
+            ),
+            "cpuset_cpus_effective": _cleanup_cgroup_value(
+                path / "cpuset.cpus.effective", f"{name} effective CPUs"
+            ),
+        }
+    return result
+
+
 def _validate_cleanup_record(
     path: Path,
     *,
@@ -9668,16 +10293,25 @@ def _validate_cleanup_record(
     target_user: str,
     target_uid: int,
     operator_path: Path,
+    expected_source_revision: str,
+    expected_source_tree_sha1: str,
+    expected_source_manifest_sha256: str,
+    expected_runtime_config_sha256: str,
     verify_live: bool,
     command_runner: HostCommandRunner | None = None,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+    live_cgroup_root: Path = Path("/sys/fs/cgroup"),
+    live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
+) -> tuple[
+    dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+]:
     cleanup = _load_document(path, "host cleanup record")
     _exact_dict(
         cleanup,
         {
             "schema", "boot_id", "session", "session_nonce", "target_user",
             "target_uid", "podman", "container", "verifier_container",
-            "cgroups", "runtime", "gates",
+            "completion", "cgroup_authority", "host_recovery", "cgroups",
+            "cgroup_restoration", "runtime", "gates",
         },
         "host cleanup record",
     )
@@ -9690,6 +10324,17 @@ def _validate_cleanup_record(
         or cleanup["target_uid"] != target_uid
     ):
         raise StabilityError("host cleanup session identity drift")
+    completion = _exact_dict(
+        cleanup["completion"],
+        {"campaign", "cleanup", "exec_stop_post_recovery"},
+        "host cleanup completion",
+    )
+    if (
+        completion["campaign"] != "inner-verified"
+        or completion["cleanup"] != "authoritative-runner"
+        or completion["exec_stop_post_recovery"] is not False
+    ):
+        raise StabilityError("ExecStopPost recovery is not campaign acceptance")
     container = _exact_dict(
         cleanup["container"], {"id", "name", "cidfile", "image_id", "command"},
         "host cleanup container",
@@ -9744,16 +10389,102 @@ def _validate_cleanup_record(
     }
     if podman != expected_podman:
         raise StabilityError("host cleanup Podman authority drift")
+    cgroup_authority = _exact_dict(
+        cleanup["cgroup_authority"], {"intent", "marker", "temporary_marker"},
+        "host cleanup cgroup authority",
+    )
+    intent_claim = _exact_dict(
+        cgroup_authority["intent"], {"path", "sha256"},
+        "host cleanup cgroup authority intent",
+    )
+    if (
+        intent_claim["path"] != CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH
+        or not isinstance(intent_claim["sha256"], str)
+        or SHA256.fullmatch(intent_claim["sha256"]) is None
+        or cgroup_authority["marker"] != CGROUP_AUTHORITY_MARKER
+        or cgroup_authority["temporary_marker"] != CGROUP_AUTHORITY_MARKER_TEMP
+    ):
+        raise StabilityError("host cleanup cgroup authority identity drift")
+    intent_path = session_root / CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH
+    _validate_cgroup_authority_intent(
+        intent_path,
+        session=session_root.name,
+        source_revision=expected_source_revision,
+    )
+    intent_sha256 = sha256_file(intent_path, MAX_DOCUMENT_BYTES)
+    if intent_sha256 != intent_claim["sha256"]:
+        raise StabilityError("host cleanup cgroup authority intent checksum drift")
+    host_recovery = _exact_dict(
+        cleanup["host_recovery"], {"intent", "marker", "temporary_marker"},
+        "host cleanup recovery authority",
+    )
+    host_recovery_claim = _exact_dict(
+        host_recovery["intent"], {"path", "sha256"},
+        "host cleanup recovery intent",
+    )
+    if (
+        host_recovery_claim["path"] != HOST_RECOVERY_INTENT_EVIDENCE_PATH
+        or not isinstance(host_recovery_claim["sha256"], str)
+        or SHA256.fullmatch(host_recovery_claim["sha256"]) is None
+        or host_recovery["marker"] != HOST_RECOVERY_MARKER
+        or host_recovery["temporary_marker"] != HOST_RECOVERY_MARKER_TEMP
+    ):
+        raise StabilityError("host cleanup recovery identity drift")
+    host_recovery_path = session_root / HOST_RECOVERY_INTENT_EVIDENCE_PATH
+    _validate_host_recovery_intent(
+        host_recovery_path,
+        boot_id=boot_id,
+        session=session_root.name,
+        session_nonce=session_nonce,
+        source_revision=expected_source_revision,
+        source_tree_sha1=expected_source_tree_sha1,
+        source_manifest_sha256=expected_source_manifest_sha256,
+        runtime_config_sha256=expected_runtime_config_sha256,
+    )
+    host_recovery_sha256 = sha256_file(
+        host_recovery_path, MAX_DOCUMENT_BYTES
+    )
+    if host_recovery_sha256 != host_recovery_claim["sha256"]:
+        raise StabilityError("host cleanup recovery intent checksum drift")
     cgroups = _exact_dict(
-        cleanup["cgroups"], {"measurement", "payload"},
+        cleanup["cgroups"],
+        {"root", "system_slice", "service", "measurement", "payload"},
         "host cleanup cgroups",
     )
     expected_cgroups = {
+        "root": "/sys/fs/cgroup",
+        "system_slice": RUNTIME_SYSTEM_SLICE_CGROUP,
+        "service": RUNTIME_SERVICE_CGROUP,
         "measurement": RUNTIME_MEASUREMENT_CGROUP,
         "payload": f"/sys/fs/cgroup{RUNTIME_CGROUP_PARENT}",
     }
     if cgroups != expected_cgroups:
         raise StabilityError("host cleanup cgroup identity drift")
+    expected_restoration = {
+        "root": {"cpuset_cpus_isolated": ""},
+        "system_slice": {
+            "cpuset_cpus_partition": "member",
+            "cpuset_cpus_exclusive": "",
+            "cpuset_cpus_exclusive_effective": "",
+            "cpuset_cpus_effective": "0-11",
+        },
+        "service": {
+            "cpuset_cpus_partition": "member",
+            "cpuset_cpus_exclusive": "",
+            "cpuset_cpus_exclusive_effective": "",
+            "cpuset_cpus_effective": "0-11",
+        },
+    }
+    restoration = _exact_dict(
+        cleanup["cgroup_restoration"], {"root", "system_slice", "service"},
+        "host cleanup cgroup restoration",
+    )
+    for name, fields in expected_restoration.items():
+        exact = _exact_dict(
+            restoration[name], set(fields), f"host cleanup {name} restoration"
+        )
+        if exact != fields:
+            raise StabilityError(f"host cleanup {name} restoration drift")
     runtime = _exact_dict(
         cleanup["runtime"], {"identity_marker", "tree"},
         "host cleanup runtime",
@@ -9771,10 +10502,25 @@ def _validate_cleanup_record(
         "campaign_cidfile_absent": "pass",
         "campaign_container_identity_absent": "pass",
         "container_inventory_empty": "pass",
+        "cgroup_authority_intent_bound": "pass",
+        "cgroup_authority_marker_absent": "pass",
+        "cgroup_authority_temporary_absent": "pass",
+        "host_recovery_intent_bound": "pass",
+        "host_recovery_marker_absent": "pass",
+        "host_recovery_temporary_absent": "pass",
         "measurement_cgroup_empty": "pass",
         "payload_cgroup_empty": "pass",
+        "root_isolated_cpus_empty": "pass",
         "runtime_absent": "pass",
         "runtime_identity_absent": "pass",
+        "service_effective_cpus_restored": "pass",
+        "service_exclusive_cpus_effective_empty": "pass",
+        "service_exclusive_cpus_empty": "pass",
+        "service_partition_member": "pass",
+        "system_slice_effective_cpus_restored": "pass",
+        "system_slice_exclusive_cpus_effective_empty": "pass",
+        "system_slice_exclusive_cpus_empty": "pass",
+        "system_slice_partition_member": "pass",
         "verifier_cidfile_absent": "pass",
         "verifier_container_identity_absent": "pass",
     }
@@ -9790,8 +10536,24 @@ def _validate_cleanup_record(
         ):
             if not _path_absent(Path(item)):
                 raise StabilityError(f"{label} survived cleanup")
+        for marker_name in ("marker", "temporary_marker"):
+            marker = live_state_root / Path(cgroup_authority[marker_name]).name
+            if not _path_absent(marker):
+                raise StabilityError(
+                    f"cgroup authority {marker_name.replace('_', ' ')} survived cleanup"
+                )
+        for marker_name in ("marker", "temporary_marker"):
+            marker = live_state_root / Path(host_recovery[marker_name]).name
+            if not _path_absent(marker):
+                raise StabilityError(
+                    f"host recovery {marker_name.replace('_', ' ')} survived cleanup"
+                )
+        observed_restoration = _live_cgroup_restoration(cgroups, live_cgroup_root)
+        if observed_restoration != expected_restoration:
+            raise StabilityError("live cgroup restoration differs from cleanup evidence")
         for name in ("payload", "measurement"):
-            if not _cgroup_absent_or_empty(Path(cgroups[name])):
+            live_path = _live_cgroup_path(cgroups[name], live_cgroup_root)
+            if not _cgroup_absent_or_empty(live_path):
                 raise StabilityError(f"{name} cgroup is not empty after cleanup")
         inventory_argv = [
             podman["executable"],
@@ -9811,7 +10573,17 @@ def _validate_cleanup_record(
         )
         if inventory:
             raise StabilityError("dedicated Podman container inventory is not empty")
-    return cleanup, expected_gates
+    intent_record = {
+        "path": CGROUP_AUTHORITY_INTENT_EVIDENCE_PATH,
+        "sha256": intent_sha256,
+        "size": intent_path.lstat().st_size,
+    }
+    host_recovery_record = {
+        "path": HOST_RECOVERY_INTENT_EVIDENCE_PATH,
+        "sha256": host_recovery_sha256,
+        "size": host_recovery_path.lstat().st_size,
+    }
+    return cleanup, expected_gates, intent_record, host_recovery_record
 
 
 def _payload_inventory(root: Path, paths: list[str]) -> dict[str, Any]:
@@ -9849,6 +10621,8 @@ def _build_operator_receipt(
     *,
     verify_live_cleanup: bool,
     cleanup_command_runner: HostCommandRunner | None = None,
+    cleanup_live_cgroup_root: Path = Path("/sys/fs/cgroup"),
+    cleanup_live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
 ) -> dict[str, Any]:
     if not isinstance(boot_id, str) or BOOT_ID.fullmatch(boot_id) is None:
         raise StabilityError("operator receipt boot identity is malformed")
@@ -9886,6 +10660,18 @@ def _build_operator_receipt(
         raise StabilityError("strict inner verifier success log is not exact")
 
     config = load_runtime_config_file(config_path)
+    source_revision = config.get("source", {}).get("revision")
+    source_tree_sha1 = config.get("source", {}).get("tree_sha1")
+    source_manifest_sha256 = config.get("source", {}).get("manifest_sha256")
+    if (
+        not isinstance(source_revision, str)
+        or GIT_SHA1.fullmatch(source_revision) is None
+        or not isinstance(source_tree_sha1, str)
+        or GIT_SHA1.fullmatch(source_tree_sha1) is None
+        or not isinstance(source_manifest_sha256, str)
+        or SHA256.fullmatch(source_manifest_sha256) is None
+    ):
+        raise StabilityError("runtime config source identity is malformed")
     config_record = _authority_file_record(config_path, "runtime config")
     config_sidecar_path = Path(f"{config_path}.sha256")
     config_sidecar_record = _authority_file_record(
@@ -9914,7 +10700,12 @@ def _build_operator_receipt(
     runner_record = _authority_file_record(runner_path, "stability runner")
 
     cleanup_path = host_root / "cleanup.json"
-    cleanup, cleanup_gates = _validate_cleanup_record(
+    (
+        cleanup,
+        cleanup_gates,
+        cgroup_intent_record,
+        host_recovery_intent_record,
+    ) = _validate_cleanup_record(
         cleanup_path,
         session_root=session_root,
         boot_id=boot_id,
@@ -9922,8 +10713,14 @@ def _build_operator_receipt(
         target_user=identity["target_user"],
         target_uid=identity["target_uid"],
         operator_path=operator_path,
+        expected_source_revision=source_revision,
+        expected_source_tree_sha1=source_tree_sha1,
+        expected_source_manifest_sha256=source_manifest_sha256,
+        expected_runtime_config_sha256=config_record["sha256"],
         verify_live=verify_live_cleanup,
         command_runner=cleanup_command_runner,
+        live_cgroup_root=cleanup_live_cgroup_root,
+        live_state_root=cleanup_live_state_root,
     )
     del cleanup
 
@@ -9931,7 +10728,9 @@ def _build_operator_receipt(
     reserved = {"receipt.json", "receipt.json.sha256", "SHA256SUMS"}
     payload_paths = [relative for relative in all_files if relative not in reserved]
     expected_host_files = {
-        "host/cleanup.json", "host/inner-verification.log",
+        "host/cgroup-authority-intent.json", "host/host-recovery-intent.json",
+        "host/cleanup.json",
+        "host/inner-verification.log",
         *{
             f"host/pre/{relative}"
             for relative in {
@@ -10002,6 +10801,8 @@ def _build_operator_receipt(
             "target_home": identity["target_home"],
         },
         "authorities": {
+            "cgroup_intent": cgroup_intent_record,
+            "host_recovery_intent": host_recovery_intent_record,
             "config": config_record,
             "config_checksum": config_sidecar_record,
             "launch_receipt": launch_record,
@@ -10057,6 +10858,8 @@ def seal_operator_evidence(
     inner_verifier_log: Path,
     *,
     cleanup_command_runner: HostCommandRunner | None = None,
+    cleanup_live_cgroup_root: Path = Path("/sys/fs/cgroup"),
+    cleanup_live_state_root: Path = Path("/var/lib/codeskeptic-p10-09"),
 ) -> dict[str, Any]:
     for reserved in ("receipt.json", "receipt.json.sha256", "SHA256SUMS"):
         if (session_root / reserved).exists() or (session_root / reserved).is_symlink():
@@ -10066,6 +10869,8 @@ def seal_operator_evidence(
         boot_id, session_nonce, inner_verifier_log,
         verify_live_cleanup=True,
         cleanup_command_runner=cleanup_command_runner,
+        cleanup_live_cgroup_root=cleanup_live_cgroup_root,
+        cleanup_live_state_root=cleanup_live_state_root,
     )
     receipt_data = canonical_document(receipt)
     _atomic_create(session_root / "receipt.json", receipt_data)

@@ -9,6 +9,9 @@ readonly STAGING_TOOL_PATH="${OPERATOR_ROOT}/stage_stability_campaign.py"
 readonly AUTHORITY_ROOT="/opt/codeskeptic-p10-09/authority"
 readonly RUNNER_PATH="${AUTHORITY_ROOT}/source/scripts/run_stability_campaign.py"
 readonly OPERATOR_PATH="${OPERATOR_ROOT}/run-authoritative-stability.sh"
+readonly CGROUP_AUTHORITY_PATH="${OPERATOR_ROOT}/cgroup-authority.py"
+readonly HOST_RECOVERY_PATH="${OPERATOR_ROOT}/host-recovery.py"
+readonly POST_STOP_PATH="${OPERATOR_ROOT}/post-stop.sh"
 readonly README_PATH="${OPERATOR_ROOT}/README.md"
 readonly UNIT_BUNDLE_PATH="${OPERATOR_ROOT}/codeskeptic-stability.service"
 readonly UNIT_PATH="/etc/systemd/system/codeskeptic-stability.service"
@@ -17,16 +20,27 @@ readonly CONFIG_PATH="${CONFIG_ROOT}/runtime.json"
 readonly CONFIG_SHA_PATH="${CONFIG_PATH}.sha256"
 readonly RUNTIME_ROOT="/run/codeskeptic-p10-09"
 readonly PROBE_REQUEST_PATH="/run/codeskeptic-p10-09/probe-only.request"
+readonly PROBE_REQUEST_TEMP="/run/codeskeptic-p10-09/.probe-only.request.tmp"
 readonly PROBE_REQUEST_SCHEMA="codeskeptic-probe-only-v1"
 readonly CAMPAIGN_REQUEST_PATH="/run/codeskeptic-p10-09/campaign.request"
+readonly CAMPAIGN_REQUEST_TEMP="/run/codeskeptic-p10-09/.campaign.request.tmp"
 readonly CAMPAIGN_REQUEST_SCHEMA="codeskeptic-campaign-request-v1"
-readonly STATUS_PATH="/var/lib/codeskeptic-p10-09/status/terminal-status"
+readonly HANDOFF_PATH="/run/codeskeptic-p10-09/guided-handoff.json"
+readonly HANDOFF_SCHEMA="codeskeptic-guided-handoff-v1"
+readonly GUIDED_DECISION_PATH="/run/codeskeptic-p10-09/guided-decision.json"
+readonly GUIDED_DECISION_TEMP="/run/codeskeptic-p10-09/.guided-decision.json.tmp"
+readonly GUIDED_DECISION_SCHEMA="codeskeptic-guided-decision-v1"
+readonly SESSION_PATH="/run/codeskeptic-p10-09/session-name"
+readonly RESTORE_GRAPHICAL_PATH="/var/lib/codeskeptic-p10-09/graphical-restoration-state.json"
 readonly INSTALLATION_RECEIPT_PATH="/opt/codeskeptic-p10-09/installation/receipt.json"
+readonly INSTALLATION_AUTHORITY_PATH="/var/lib/codeskeptic-p10-09/installation-authority.json"
 readonly SERVICE_UNIT="codeskeptic-stability.service"
 readonly SYSTEMCTL="/usr/bin/systemctl"
-readonly LOGINCTL="/usr/bin/loginctl"
+readonly PRLIMIT="/usr/bin/prlimit"
 readonly PYTHON="/usr/bin/python3"
-readonly MAX_STATUS_BYTES=1024
+readonly MAX_HANDOFF_BYTES=512
+readonly HANDOFF_WAIT_ATTEMPTS=600
+readonly HANDOFF_WAIT_INTERVAL=0.1
 readonly MAX_CONFIG_BYTES=1048576
 
 guided_mode="campaign"
@@ -34,6 +48,11 @@ owned_probe_nonce=""
 owned_campaign_nonce=""
 campaign_target_user=""
 campaign_target_uid=""
+expected_nonce=""
+handoff_session=""
+guided_decision_published=0
+guided_lock_inherited=0
+guided_lock_fd=""
 
 terminal_bell() {
     /usr/bin/printf '\a\a\a' >/dev/tty 2>/dev/null ||
@@ -142,6 +161,17 @@ PY
 guided_exit() {
     local exit_code=$?
     trap - EXIT
+    if (( exit_code != 0 && guided_decision_published == 0 )) \
+        && [[ -n "$handoff_session" && -n "$expected_nonce" ]] \
+        && [[ ! -e "$GUIDED_DECISION_PATH" \
+            && ! -L "$GUIDED_DECISION_PATH" ]]; then
+        if ! publish_guided_decision "cancel" "$guided_mode" \
+            "$expected_nonce" "$handoff_session"; then
+            /usr/bin/printf \
+                'CODESKEPTIC_GUIDED_FAILURE could not publish the bound cancellation\n' >&2
+            exit_code=1
+        fi
+    fi
     if ! cleanup_owned_probe_request; then
         /usr/bin/printf \
             'CODESKEPTIC_GUIDED_FAILURE refused to remove an unbound probe request\n' >&2
@@ -206,7 +236,8 @@ ensure_root_private_directory() {
 }
 
 create_probe_request() {
-    "$PYTHON" -B - "$PROBE_REQUEST_PATH" "$PROBE_REQUEST_SCHEMA" \
+    "$PYTHON" -B - "$PROBE_REQUEST_PATH" "$PROBE_REQUEST_TEMP" \
+        "$PROBE_REQUEST_SCHEMA" \
         "$owned_probe_nonce" <<'PY'
 import json
 import os
@@ -214,8 +245,11 @@ import pathlib
 import sys
 
 path = pathlib.Path(sys.argv[1])
-schema = sys.argv[2]
-nonce = sys.argv[3]
+temporary = pathlib.Path(sys.argv[2])
+schema = sys.argv[3]
+nonce = sys.argv[4]
+if temporary.parent != path.parent or temporary.name != ".probe-only.request.tmp":
+    raise SystemExit("probe request temporary path drift")
 payload = (
     json.dumps(
         {"mode": "probe-only", "nonce": nonce, "schema": schema},
@@ -229,7 +263,7 @@ if hasattr(os, "O_CLOEXEC"):
     flags |= os.O_CLOEXEC
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
-descriptor = os.open(path, flags, 0o600)
+descriptor = os.open(temporary, flags, 0o600)
 try:
     os.fchmod(descriptor, 0o600)
     written = 0
@@ -239,13 +273,33 @@ try:
             raise OSError("probe request write was incomplete")
         written += count
     os.fsync(descriptor)
-finally:
+except BaseException:
     os.close(descriptor)
+    try:
+        temporary.unlink()
+    except OSError:
+        pass
+    raise
+else:
+    os.close(descriptor)
+os.link(temporary, path, follow_symlinks=False)
+directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+temporary.unlink()
+directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
 PY
 }
 
 create_campaign_request() {
-    "$PYTHON" -B - "$CAMPAIGN_REQUEST_PATH" "$CAMPAIGN_REQUEST_SCHEMA" \
+    "$PYTHON" -B - "$CAMPAIGN_REQUEST_PATH" "$CAMPAIGN_REQUEST_TEMP" \
+        "$CAMPAIGN_REQUEST_SCHEMA" \
         "$owned_campaign_nonce" "$campaign_target_user" \
         "$campaign_target_uid" <<'PY'
 import json
@@ -256,13 +310,16 @@ import re
 import sys
 
 path = pathlib.Path(sys.argv[1])
-schema = sys.argv[2]
-nonce = sys.argv[3]
-user = sys.argv[4]
+temporary = pathlib.Path(sys.argv[2])
+schema = sys.argv[3]
+nonce = sys.argv[4]
+user = sys.argv[5]
 try:
-    uid = int(sys.argv[5])
+    uid = int(sys.argv[6])
 except ValueError as error:
     raise SystemExit("campaign target UID is malformed") from error
+if temporary.parent != path.parent or temporary.name != ".campaign.request.tmp":
+    raise SystemExit("campaign request temporary path drift")
 if (
     re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", user) is None
     or uid < 1
@@ -286,7 +343,7 @@ if hasattr(os, "O_CLOEXEC"):
     flags |= os.O_CLOEXEC
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
-descriptor = os.open(path, flags, 0o600)
+descriptor = os.open(temporary, flags, 0o600)
 try:
     os.fchmod(descriptor, 0o600)
     offset = 0
@@ -296,34 +353,35 @@ try:
             raise OSError("campaign request write was incomplete")
         offset += written
     os.fsync(descriptor)
-finally:
+except BaseException:
     os.close(descriptor)
+    try:
+        temporary.unlink()
+    except OSError:
+        pass
+    raise
+else:
+    os.close(descriptor)
+os.link(temporary, path, follow_symlinks=False)
+directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+temporary.unlink()
+directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
 PY
 }
 
-status_fingerprint() {
-    local size
-    if [[ ! -L "$STATUS_PATH" && -f "$STATUS_PATH" ]]; then
-        size="$(/usr/bin/stat --format='%s' -- "$STATUS_PATH")" || {
-            /usr/bin/printf 'invalid\n'
-            return
-        }
-        if (( size > MAX_STATUS_BYTES )); then
-            /usr/bin/printf 'invalid\n'
-            return
-        fi
-        /usr/bin/sha256sum --binary -- "$STATUS_PATH"
-    else
-        /usr/bin/printf 'absent\n'
-    fi
-}
-
-read_bounded_terminal_status() {
+read_bound_handoff() {
     local expected_mode="$1"
-    local expected_probe_request="$2"
-    local expected_campaign_request="$3"
-    "$PYTHON" -B - "$STATUS_PATH" "$MAX_STATUS_BYTES" "$expected_mode" \
-        "$expected_probe_request" "$expected_campaign_request" <<'PY'
+    local expected_nonce="$2"
+    "$PYTHON" -B - "$HANDOFF_PATH" "$HANDOFF_SCHEMA" "$expected_mode" "$expected_nonce" "$MAX_HANDOFF_BYTES" <<'PY'
+import json
 import os
 import pathlib
 import re
@@ -331,22 +389,26 @@ import stat
 import sys
 
 path = pathlib.Path(sys.argv[1])
-maximum = int(sys.argv[2])
+schema = sys.argv[2]
 expected_mode = sys.argv[3]
-expected_probe_request = sys.argv[4] or "none"
-expected_campaign_request = sys.argv[5] or "none"
+expected_nonce = sys.argv[4]
+maximum = int(sys.argv[5])
 try:
     metadata = path.lstat()
 except OSError as error:
-    raise SystemExit(f"terminal status is unavailable: {error}")
+    raise SystemExit(f"guided handoff is unavailable: {error}")
 if (
     not stat.S_ISREG(metadata.st_mode)
     or metadata.st_uid != 0
-    or stat.S_IMODE(metadata.st_mode) != 0o600
+    or metadata.st_gid != 0
+    or stat.S_IMODE(metadata.st_mode) != 0o400
+    or metadata.st_nlink != 1
     or metadata.st_size > maximum
 ):
-    raise SystemExit("terminal status ownership, mode, type, or size is invalid")
+    raise SystemExit("guided handoff ownership, mode, type, or size is invalid")
 flags = os.O_RDONLY
+if hasattr(os, "O_CLOEXEC"):
+    flags |= os.O_CLOEXEC
 if hasattr(os, "O_NOFOLLOW"):
     flags |= os.O_NOFOLLOW
 descriptor = os.open(path, flags)
@@ -357,74 +419,153 @@ try:
         or opened.st_ino != metadata.st_ino
         or opened.st_size != metadata.st_size
     ):
-        raise SystemExit("terminal status changed while opening")
+        raise SystemExit("guided handoff changed while opening")
     data = os.read(descriptor, maximum + 1)
     after = os.fstat(descriptor)
 finally:
     os.close(descriptor)
-if len(data) > maximum or after.st_size != metadata.st_size:
-    raise SystemExit("terminal status changed while reading")
+if (
+    len(data) > maximum
+    or len(data) != metadata.st_size
+    or after.st_size != metadata.st_size
+):
+    raise SystemExit("guided handoff changed while reading")
 try:
-    text = data.decode("ascii", errors="strict")
-except UnicodeDecodeError as error:
-    raise SystemExit(f"terminal status is not ASCII: {error}")
-lines = text.splitlines(keepends=True)
-if len(lines) != 6 or any(not line.endswith("\n") for line in lines):
-    raise SystemExit("terminal status line inventory is invalid")
-values = {}
-for line in lines:
-    key, separator, value = line[:-1].partition("=")
-    if separator != "=" or key in values:
-        raise SystemExit("terminal status fields are invalid")
-    values[key] = value
-if set(values) != {
-    "mode", "probe_request", "result", "exit_code", "session", "completed_utc",
-}:
-    raise SystemExit("terminal status fields are incomplete")
-if values["mode"] != expected_mode or expected_mode not in {"campaign", "probe-only"}:
-    raise SystemExit("terminal status mode differs from this invocation")
-if values["probe_request"] != expected_probe_request:
-    raise SystemExit("terminal status probe request differs from this invocation")
-if expected_mode == "campaign" and values["probe_request"] != "none":
-    raise SystemExit("campaign status claimed a probe request")
+    value = json.loads(data.decode("ascii", errors="strict"))
+except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    raise SystemExit(f"guided handoff is malformed: {error}")
+if not isinstance(value, dict) or set(value) != {"mode", "nonce", "schema", "session"}:
+    raise SystemExit("guided handoff fields are invalid")
 uuid = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-if expected_mode == "campaign" and re.fullmatch(uuid, expected_campaign_request) is None:
-    raise SystemExit("campaign request identity is malformed")
-if values["result"] not in {"success", "failure"}:
-    raise SystemExit("terminal status result is invalid")
+if expected_mode == "campaign":
+    session_pattern = rf"[0-9]{{8}}T[0-9]{{6}}Z-{uuid}-{re.escape(expected_nonce)}"
+elif expected_mode == "probe-only":
+    session_pattern = rf"probe-{re.escape(expected_nonce)}"
+else:
+    raise SystemExit("guided handoff mode is invalid")
 if (
-    re.fullmatch(r"0|[1-9][0-9]{0,2}", values["exit_code"]) is None
-    or int(values["exit_code"]) > 255
-    or (values["result"] == "success") != (values["exit_code"] == "0")
+    value["schema"] != schema
+    or value["mode"] != expected_mode
+    or value["nonce"] != expected_nonce
+    or re.fullmatch(uuid, expected_nonce) is None
+    or not isinstance(value["session"], str)
+    or re.fullmatch(session_pattern, value["session"]) is None
 ):
-    raise SystemExit("terminal status exit code is invalid")
-if values["session"] != "none" and re.fullmatch(
-    r"/var/lib/codeskeptic-p10-09/sessions/"
-    rf"[0-9]{{8}}T[0-9]{{6}}Z-{uuid}-{uuid}",
-    values["session"],
-) is None:
-    raise SystemExit("terminal status session is invalid")
-if (
-    expected_mode == "campaign"
-    and values["session"] != "none"
-    and not values["session"].endswith("-" + expected_campaign_request)
-):
-    raise SystemExit("terminal status session differs from this campaign request")
-if expected_mode == "probe-only" and values["session"] != "none":
-    raise SystemExit("probe-only status claimed campaign evidence")
-if (
-    expected_mode == "campaign"
-    and values["result"] == "success"
-    and values["session"] == "none"
-):
-    raise SystemExit("successful campaign status omitted its evidence session")
-if re.fullmatch(
-    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
-    values["completed_utc"],
-) is None:
-    raise SystemExit("terminal status completion time is invalid")
-sys.stdout.write(text)
+    raise SystemExit("guided handoff differs from this invocation")
+canonical = (
+    json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
+).encode("ascii")
+if data != canonical:
+    raise SystemExit("guided handoff is not canonical")
+print(value["session"])
 PY
+}
+
+wait_for_bound_handoff() {
+    local expected_mode="$1"
+    local expected_nonce="$2"
+    local handoff_session=""
+    local attempt
+    for (( attempt = 0; attempt < HANDOFF_WAIT_ATTEMPTS; attempt++ )); do
+        if [[ -e "$HANDOFF_PATH" || -L "$HANDOFF_PATH" ]]; then
+            handoff_session="$(read_bound_handoff "$expected_mode" "$expected_nonce")" ||
+                return 1
+            /usr/bin/printf '%s\n' "$handoff_session"
+            return 0
+        fi
+        /usr/bin/sleep "$HANDOFF_WAIT_INTERVAL"
+    done
+    return 1
+}
+
+publish_guided_decision() {
+    local action="$1"
+    local mode="$2"
+    local nonce="$3"
+    local session="$4"
+    "$PYTHON" -B - "$GUIDED_DECISION_PATH" "$GUIDED_DECISION_TEMP" \
+        "$GUIDED_DECISION_SCHEMA" \
+        "$action" "$mode" "$nonce" "$session" <<'PY'
+import json
+import os
+import pathlib
+import re
+import stat
+import sys
+
+path = pathlib.Path(sys.argv[1])
+temporary = pathlib.Path(sys.argv[2])
+schema, action, mode, nonce, session = sys.argv[3:]
+uuid = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+if action not in {"accept", "cancel"} or re.fullmatch(uuid, nonce) is None:
+    raise SystemExit("guided decision action or nonce is malformed")
+if mode == "campaign":
+    session_pattern = rf"[0-9]{{8}}T[0-9]{{6}}Z-{uuid}-{re.escape(nonce)}"
+elif mode == "probe-only":
+    session_pattern = rf"probe-{re.escape(nonce)}"
+else:
+    raise SystemExit("guided decision mode is malformed")
+if re.fullmatch(session_pattern, session) is None:
+    raise SystemExit("guided decision session is malformed")
+parent = path.parent
+if temporary.parent != parent or temporary.name != ".guided-decision.json.tmp":
+    raise SystemExit("guided decision temporary path drift")
+metadata = parent.lstat()
+if (
+    not stat.S_ISDIR(metadata.st_mode)
+    or parent.is_symlink()
+    or metadata.st_uid != 0
+    or metadata.st_gid != 0
+    or stat.S_IMODE(metadata.st_mode) != 0o700
+):
+    raise SystemExit("guided decision runtime authority drift")
+payload = (json.dumps(
+    {
+        "action": action,
+        "mode": mode,
+        "nonce": nonce,
+        "schema": schema,
+        "session": session,
+    },
+    sort_keys=True,
+    separators=(",", ":"),
+) + "\n").encode("ascii")
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
+flags |= getattr(os, "O_NOFOLLOW", 0)
+descriptor = os.open(temporary, flags, 0o400)
+try:
+    os.fchown(descriptor, 0, 0)
+    os.fchmod(descriptor, 0o400)
+    offset = 0
+    while offset < len(payload):
+        written = os.write(descriptor, payload[offset:])
+        if written <= 0:
+            raise OSError("guided decision write was incomplete")
+        offset += written
+    os.fsync(descriptor)
+except BaseException:
+    os.close(descriptor)
+    try:
+        temporary.unlink()
+    except OSError:
+        pass
+    raise
+else:
+    os.close(descriptor)
+os.link(temporary, path, follow_symlinks=False)
+directory = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+temporary.unlink()
+directory = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+PY
+    guided_decision_published=1
 }
 
 if (( $# == 0 )); then
@@ -435,6 +576,12 @@ elif (( $# == 1 )) && [[ "$1" == "--probe-only" ]]; then
     guided_mode="probe-only"
 elif (( $# == 2 )) && [[ "$1" == "--root" && "$2" == "--probe-only" ]]; then
     guided_mode="probe-only"
+elif (( $# == 3 )) && [[ "$1" == "--root-locked" \
+    && ( "$2" == "campaign" || "$2" == "probe-only" ) \
+    && "$3" =~ ^[1-9][0-9]*$ ]]; then
+    guided_mode="$2"
+    guided_lock_fd="$3"
+    guided_lock_inherited=1
 else
     staging_unavailable "run exactly ${GUIDED_PATH} [--probe-only]"
 fi
@@ -453,25 +600,30 @@ for directory in "$OPERATOR_ROOT" "$AUTHORITY_ROOT" "${AUTHORITY_ROOT}/source" \
     "$CONFIG_ROOT"; do
     require_root_immutable_directory "$directory"
 done
-for file in "$GUIDED_PATH" "$OPERATOR_PATH" "$README_PATH" \
+for file in "$GUIDED_PATH" "$OPERATOR_PATH" "$CGROUP_AUTHORITY_PATH" \
+    "$HOST_RECOVERY_PATH" \
+    "$POST_STOP_PATH" "$README_PATH" \
     "$STAGING_TOOL_PATH" "$INSTALLATION_RECEIPT_PATH" \
+    "$INSTALLATION_AUTHORITY_PATH" \
     "$UNIT_BUNDLE_PATH" "$UNIT_PATH" "$RUNNER_PATH" "$CONFIG_PATH" \
     "$CONFIG_SHA_PATH"; do
     require_root_immutable_file "$file"
 done
 require_root_immutable_executable "$SYSTEMCTL"
-require_root_immutable_executable "$LOGINCTL"
+require_root_immutable_executable "$PRLIMIT"
 require_root_immutable_executable "$PYTHON"
+require_root_immutable_executable "$CGROUP_AUTHORITY_PATH"
+require_root_immutable_executable "$HOST_RECOVERY_PATH"
 installation_authority="$({
-    "$PYTHON" -B - "$INSTALLATION_RECEIPT_PATH" <<'PY'
+    "$PYTHON" -B - "$INSTALLATION_AUTHORITY_PATH" <<'PY'
 import json
 import pathlib
 import re
 import sys
 
 path = pathlib.Path(sys.argv[1])
-if path.stat().st_size > 1024 * 1024:
-    raise SystemExit("installation receipt is oversized")
+if path.stat().st_size > 4096:
+    raise SystemExit("installation authority is oversized")
 data = path.read_bytes()
 value = json.loads(data.decode("utf-8", errors="strict"))
 canonical = (
@@ -484,6 +636,8 @@ revision = value.get("bundle_revision")
 receipt_sha = value.get("bundle_receipt_sha256")
 if (
     data != canonical
+    or set(value) != {"bundle_receipt_sha256", "bundle_revision", "schema"}
+    or value.get("schema") != "codeskeptic-stability-installation-authority-v1"
     or not isinstance(revision, str)
     or re.fullmatch(r"[0-9a-f]{40}", revision) is None
     or not isinstance(receipt_sha, str)
@@ -499,12 +653,23 @@ IFS=' ' read -r expected_revision expected_bundle_receipt_sha extra \
 [[ -z "${extra:-}" && "$expected_revision" =~ ^[0-9a-f]{40}$ \
     && "$expected_bundle_receipt_sha" =~ ^[0-9a-f]{64}$ ]] ||
     staging_unavailable "installed out-of-band bundle authority is malformed"
-"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install \
+"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install-filesystem \
     --receipt "$INSTALLATION_RECEIPT_PATH" \
     --expected-revision "$expected_revision" \
     --expected-bundle-receipt-sha256 "$expected_bundle_receipt_sha" ||
-    staging_unavailable "installed staging receipt verification failed"
+    staging_unavailable "installed filesystem authority verification failed"
 ensure_root_private_directory "$RUNTIME_ROOT"
+# A second root guided process must never publish or clean a request while
+# this invocation is between validation, publication, service consumption,
+# and EXIT cleanup. host-recovery opens the fixed inode with O_NOFOLLOW and
+# O_CLOEXEC, validates it before use, locks it, then execs this script with an
+# explicitly inherited descriptor.
+if (( guided_lock_inherited == 0 )); then
+    "$HOST_RECOVERY_PATH" lock-guided --mode "$guided_mode"
+    exit $?
+fi
+"$HOST_RECOVERY_PATH" validate-guided-lock --fd "$guided_lock_fd" ||
+    staging_unavailable "guided invocation lock is not exactly inherited"
 /usr/bin/cmp --silent -- "$UNIT_BUNDLE_PATH" "$UNIT_PATH" ||
     staging_unavailable "reinstall ${UNIT_PATH} from the staged operator bundle"
 
@@ -527,18 +692,6 @@ if sidecar_path.read_bytes() != expected:
 PY
     staging_unavailable "reinstall the canonical runtime config pair"
 
-kernel_arguments=()
-IFS=' ' read -r -a kernel_arguments </proc/cmdline
-kernel_target_found=0
-for kernel_argument in "${kernel_arguments[@]}"; do
-    if [[ "$kernel_argument" == "systemd.unit=multi-user.target" ]]; then
-        kernel_target_found=1
-        break
-    fi
-done
-(( kernel_target_found == 1 )) || staging_unavailable \
-    "boot with systemd.unit=multi-user.target; this command never reboots or isolates"
-
 "$SYSTEMCTL" daemon-reload ||
     staging_unavailable "systemd daemon-reload failed"
 fragment_path="$(
@@ -558,46 +711,6 @@ drop_in_paths="$(
     staging_unavailable \
         "${SERVICE_UNIT} must remain static and must never be enabled at boot"
 
-graphical_state="$(
-    "$SYSTEMCTL" show --property=ActiveState --value graphical.target
-)" || staging_unavailable "cannot inspect graphical.target"
-[[ "$graphical_state" == "inactive" ]] ||
-    staging_unavailable \
-        "graphical.target must already be inactive; this command will not stop it"
-display_manager_load="$(
-    "$SYSTEMCTL" show --property=LoadState --value display-manager.service
-)" || staging_unavailable "cannot inspect display-manager.service"
-if [[ "$display_manager_load" != "not-found" ]]; then
-    [[ "$display_manager_load" == "loaded" ]] ||
-        staging_unavailable \
-            "display-manager.service has unexpected load state ${display_manager_load}"
-    display_manager_state="$(
-        "$SYSTEMCTL" show --property=ActiveState --value display-manager.service
-    )"
-    display_manager_substate="$(
-        "$SYSTEMCTL" show --property=SubState --value display-manager.service
-    )"
-    [[ "$display_manager_state" == "inactive" \
-        && "$display_manager_substate" == "dead" ]] ||
-        staging_unavailable \
-            "display-manager.service must already be inactive/dead"
-fi
-session_inventory="$($LOGINCTL list-sessions --no-legend --no-pager)" ||
-    staging_unavailable "cannot inspect login sessions"
-while IFS=' ' read -r session_id _; do
-    [[ -n "$session_id" ]] || continue
-    [[ "$session_id" =~ ^[A-Za-z0-9_.:-]+$ ]] ||
-        staging_unavailable "login session identity is malformed"
-    session_type="$($LOGINCTL show-session --property=Type --value "$session_id")" ||
-        staging_unavailable "cannot inspect login session ${session_id}"
-    case "$session_type" in
-        x11|wayland|mir)
-            staging_unavailable \
-                "graphical login session ${session_id} must be closed before this command"
-            ;;
-    esac
-done <<<"$session_inventory"
-
 active_state="$(
     "$SYSTEMCTL" show --property=ActiveState --value "$SERVICE_UNIT"
 )"
@@ -615,12 +728,54 @@ fi
     staging_unavailable \
         "${SERVICE_UNIT} must be inactive before a new guided invocation"
 
+# A durable restoration record can survive a killed service or reboot. Retry
+# it before requiring the normal graphical authorization boundary.
+"$POST_STOP_PATH" --startup-recovery ||
+    staging_unavailable \
+        "pending graphical restoration could not be exactly confirmed"
+"$HOST_RECOVERY_PATH" discard-unbound-launch-requests ||
+    staging_unavailable "stale unpublished launch authority could not be discarded"
+# Dynamic image, empty-store, and in-image static-authority probes run only
+# after the service has published its durable host marker. The guided process
+# stays mutation-free with respect to Podman, so SIGKILL cannot create an
+# anonymous container outside the recovery envelope.
+
+graphical_identity="$(
+    "$SYSTEMCTL" show --no-pager --property=LoadState \
+        --property=ActiveState --property=SubState --property=Job \
+        graphical.target
+)" || staging_unavailable "cannot inspect graphical.target"
+[[ "$graphical_identity" == \
+    $'LoadState=loaded\nActiveState=active\nSubState=active\nJob=' ]] ||
+    staging_unavailable \
+        "graphical.target must be active with no queued job at authorization"
+display_manager_identity="$(
+    "$SYSTEMCTL" show --no-pager --property=LoadState --property=ActiveState \
+        --property=SubState --property=Job display-manager.service
+)" || staging_unavailable "cannot inspect display-manager.service"
+[[ "$display_manager_identity" == \
+    $'LoadState=loaded\nActiveState=active\nSubState=running\nJob=' ]] ||
+    staging_unavailable \
+        "display-manager.service must be active/running with no queued job at authorization"
+
 [[ ! -e "$PROBE_REQUEST_PATH" && ! -L "$PROBE_REQUEST_PATH" ]] ||
     staging_unavailable \
         "stale probe request exists; inspect ${PROBE_REQUEST_PATH} as root"
 [[ ! -e "$CAMPAIGN_REQUEST_PATH" && ! -L "$CAMPAIGN_REQUEST_PATH" ]] ||
     staging_unavailable \
         "stale campaign request exists; inspect ${CAMPAIGN_REQUEST_PATH} as root"
+[[ ! -e "$HANDOFF_PATH" && ! -L "$HANDOFF_PATH" ]] ||
+    staging_unavailable \
+        "stale guided handoff exists; inspect ${HANDOFF_PATH} as root"
+[[ ! -e "$GUIDED_DECISION_PATH" && ! -L "$GUIDED_DECISION_PATH" ]] ||
+    staging_unavailable \
+        "stale guided decision exists; inspect ${GUIDED_DECISION_PATH} as root"
+[[ ! -e "$SESSION_PATH" && ! -L "$SESSION_PATH" ]] ||
+    staging_unavailable \
+        "stale cgroup session marker exists; inspect ${SESSION_PATH} as root"
+[[ ! -e "$RESTORE_GRAPHICAL_PATH" && ! -L "$RESTORE_GRAPHICAL_PATH" ]] ||
+    staging_unavailable \
+        "unconfirmed graphical restoration state exists after startup recovery"
 stale_consumed_request="$(
     /usr/bin/find "$RUNTIME_ROOT" -mindepth 1 -maxdepth 1 \
         \( -name '.probe-only.consumed.*' \
@@ -630,7 +785,6 @@ stale_consumed_request="$(
     staging_unavailable \
         "stale consumed probe request exists; inspect ${stale_consumed_request} as root"
 
-before_status="$(status_fingerprint)"
 if [[ "$guided_mode" == "probe-only" ]]; then
     owned_probe_nonce="$(/usr/bin/tr --delete '\n' </proc/sys/kernel/random/uuid)"
     [[ "$owned_probe_nonce" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] ||
@@ -644,40 +798,24 @@ else
     create_campaign_request ||
         staging_unavailable "cannot create the exclusive root-owned campaign request"
 fi
-service_exit=0
-"$SYSTEMCTL" start --wait "$SERVICE_UNIT" || service_exit=$?
-
-after_status=""
-for _ in {1..50}; do
-    after_status="$(status_fingerprint)"
-    [[ "$after_status" != "$before_status" && "$after_status" != "absent" ]] && break
-    /usr/bin/sleep 0.1
-done
-[[ "$after_status" != "$before_status" && "$after_status" != "absent" ]] ||
-    staging_unavailable \
-        "no fresh terminal status; inspect journalctl -u ${SERVICE_UNIT} -b"
-
-terminal_status="$(
-    read_bounded_terminal_status "$guided_mode" "$owned_probe_nonce" \
-        "$owned_campaign_nonce"
-)" ||
-    staging_unavailable \
-        "terminal status is invalid; inspect journalctl -u ${SERVICE_UNIT} -b"
-/usr/bin/printf 'CODESKEPTIC_GUIDED_TERMINAL_STATUS\n%s\n' "$terminal_status"
-
-terminal_result="$(
-    /usr/bin/printf '%s\n' "$terminal_status" |
-        /usr/bin/awk -F= '$1 == "result" { print $2 }'
-)"
-terminal_exit="$(
-    /usr/bin/printf '%s\n' "$terminal_status" |
-        /usr/bin/awk -F= '$1 == "exit_code" { print $2 }'
-)"
-if (( service_exit != 0 )) || [[ "$terminal_result" != "success" ]] ||
-    (( terminal_exit != 0 )); then
-    /usr/bin/printf \
-        'CODESKEPTIC_GUIDED_FAILURE inspect journalctl -u %s -b\n' \
-        "$SERVICE_UNIT" >&2
-    exit 1
+"$SYSTEMCTL" start --no-block "$SERVICE_UNIT" ||
+    staging_unavailable "systemd refused the nonblocking service start"
+if [[ "$guided_mode" == "probe-only" ]]; then
+    expected_nonce="$owned_probe_nonce"
+else
+    expected_nonce="$owned_campaign_nonce"
 fi
-/usr/bin/printf 'CODESKEPTIC_GUIDED_SUCCESS\n'
+handoff_session="$(wait_for_bound_handoff "$guided_mode" "$expected_nonce")" ||
+    staging_unavailable \
+        "no exact request-consumed handoff; inspect journalctl -u ${SERVICE_UNIT} -b"
+publish_guided_decision "accept" "$guided_mode" "$expected_nonce" \
+    "$handoff_session" ||
+    staging_unavailable "cannot publish the exact session-bound guided ACK"
+
+# The service owns the consumed request and the durable ACK. Clearing these
+# fields prevents this invocation's EXIT trap from racing either authority.
+owned_probe_nonce=""
+owned_campaign_nonce=""
+/usr/bin/printf 'CODESKEPTIC_P10_09_HANDOFF_ACCEPTED %s\n' "$handoff_session"
+/usr/bin/printf \
+    'CODESKEPTIC_P10_09_STARTED no exit-code capture is required; wait for graphical recovery\n'

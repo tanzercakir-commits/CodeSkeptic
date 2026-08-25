@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path, PurePosixPath
 from unittest import mock
@@ -28,6 +29,24 @@ AUTHORITATIVE = (
     / "scripts"
     / "stability-systemd"
     / "run-authoritative-stability.sh"
+)
+CGROUP_AUTHORITY = (
+    ROOT
+    / "scripts"
+    / "stability-systemd"
+    / "cgroup-authority.py"
+)
+HOST_RECOVERY = (
+    ROOT
+    / "scripts"
+    / "stability-systemd"
+    / "host-recovery.py"
+)
+POST_STOP = (
+    ROOT
+    / "scripts"
+    / "stability-systemd"
+    / "post-stop.sh"
 )
 UNIT = (
     ROOT
@@ -158,6 +177,43 @@ def write_payload(path: Path, payload: bytes, mode: int = 0o600) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def fixture_baseline_authority_verifier(
+    source: Path,
+    manifest_path: Path,
+    baseline_path: Path,
+    hardware_class: str,
+) -> dict:
+    if manifest_path != source / "scripts/determinism_workloads.json":
+        raise AssertionError("fixture determinism manifest path drift")
+    if baseline_path != source / "scripts/determinism_baseline.json":
+        raise AssertionError("fixture determinism baseline path drift")
+    projection = {
+        "schema": "codeskeptic-determinism-baseline-authority-v1",
+        "hardware_class": hardware_class,
+        "manifest_sha256": sha256_file(manifest_path),
+        "baseline_sha256": sha256_file(baseline_path),
+        "fixture": "trusted-current-producer-verifier",
+    }
+    return {
+        "projection": projection,
+        "projection_sha256": hashlib.sha256(
+            stage.canonical_json(projection)
+        ).hexdigest(),
+    }
+
+
+def configure_fixture(
+    staging: Path, revision: str, *, repository: str,
+) -> dict:
+    assert stage is not None
+    return stage.configure_staging(
+        staging,
+        revision,
+        repository=repository,
+        baseline_authority_verifier=fixture_baseline_authority_verifier,
+    )
+
+
 def initialize_lifecycle_source(
     repository: Path, *, execution_marker: Path | None = None,
 ) -> str:
@@ -202,6 +258,12 @@ def initialize_lifecycle_source(
         '{"schema":"codeskeptic-staging-fixture-policy-v1"}\n',
         encoding="ascii",
     )
+    (scripts / "determinism_workloads.json").write_text(
+        '{"fixture":"determinism-manifest"}\n', encoding="ascii"
+    )
+    (scripts / "determinism_baseline.json").write_text(
+        '{"fixture":"determinism-baseline"}\n', encoding="ascii"
+    )
     (systemd / "README.md").write_text("fixture operator\n", encoding="utf-8")
     (systemd / "guided-stability.sh").write_text(
         "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
@@ -209,12 +271,45 @@ def initialize_lifecycle_source(
     (systemd / "run-authoritative-stability.sh").write_text(
         "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
     )
+    (systemd / "cgroup-authority.py").write_text(
+        "#!/usr/bin/env python3\nraise SystemExit(0)\n", encoding="utf-8"
+    )
+    (systemd / "host-recovery.py").write_text(
+        "#!/usr/bin/env python3\nraise SystemExit(0)\n", encoding="utf-8"
+    )
+    (systemd / "post-stop.sh").write_text(
+        "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
+    )
     (systemd / UNIT.name).write_text(
-        "[Unit]\nDescription=fixture\n\n[Service]\nType=oneshot\nExecStart=/bin/true\n",
+        "[Unit]\n"
+        "Description=fixture\n"
+        "Before=shutdown.target rescue.target emergency.target\n"
+        "Conflicts=shutdown.target rescue.target emergency.target\n"
+        "IgnoreOnIsolate=yes\n\n"
+        "[Service]\n"
+        "Type=exec\n"
+        "ExecStartPre=/opt/codeskeptic-p10-09/operator/"
+        "post-stop.sh --startup-recovery\n"
+        "ExecStart=/usr/bin/systemd-inhibit --what=sleep "
+        "--who=CodeSkeptic-P10-09 "
+        "--why=authoritative-scope-bound-stability-evidence-session "
+        "--mode=block --no-ask-password "
+        "/usr/bin/prlimit --nofile=4096:4096 -- "
+        "/opt/codeskeptic-p10-09/operator/run-authoritative-stability.sh\n"
+        "ExecStopPost=/opt/codeskeptic-p10-09/operator/post-stop.sh\n"
+        "KillMode=control-group\n"
+        "TimeoutStopSec=2min\n"
+        "Delegate=yes\n"
+        "DelegateSubgroup=controller\n"
+        "StateDirectory=codeskeptic-p10-09\n"
+        "ProtectControlGroups=no\n",
         encoding="utf-8",
     )
-    (systemd / "guided-stability.sh").chmod(0o755)
-    (systemd / "run-authoritative-stability.sh").chmod(0o755)
+    for executable in (
+        "guided-stability.sh", "run-authoritative-stability.sh",
+        "cgroup-authority.py", "host-recovery.py", "post-stop.sh",
+    ):
+        (systemd / executable).chmod(0o755)
     git(repository, "add", ".")
     git(repository, "commit", "--quiet", "-m", "staging fixture")
     revision = git(repository, "rev-parse", "HEAD")
@@ -232,7 +327,6 @@ def populate_prepared_authorities(
     blobs: dict[str, bytes] = {
         "build/src/codeskeptic": b"fixture analyzer\n",
         "build-authority/receipt.json": b'{"accepted":true}\n',
-        "prerequisites/determinism/receipt.json": b'{"gate":"determinism"}\n',
         "prerequisites/hosted/receipt.json": b'{"gate":"hosted"}\n',
         "prerequisites/quality/receipt.json": b'{"gate":"quality"}\n',
         "sanitizers/address/receipt.json": b'{"profile":"address"}\n',
@@ -267,7 +361,7 @@ def populate_prepared_authorities(
         (authority / relative).mkdir(parents=True, exist_ok=True)
 
     assert stage is not None
-    stage.configure_staging(
+    configure_fixture(
         prepared,
         revision,
         repository="codeskeptic/staging-fixture",
@@ -295,7 +389,6 @@ def make_manual_prepared_tree(
         "build-authority",
         "release/source",
         "release/build",
-        "prerequisites/determinism",
         "prerequisites/hosted",
         "prerequisites/quality",
         "sanitizers/address",
@@ -313,7 +406,10 @@ def make_manual_prepared_tree(
     systemd = source / "scripts" / "stability-systemd"
     operator_files = {
         "README.md": systemd / "README.md",
+        "cgroup-authority.py": systemd / "cgroup-authority.py",
+        "host-recovery.py": systemd / "host-recovery.py",
         "guided-stability.sh": systemd / "guided-stability.sh",
+        "post-stop.sh": systemd / "post-stop.sh",
         "run-authoritative-stability.sh": (
             systemd / "run-authoritative-stability.sh"
         ),
@@ -382,6 +478,10 @@ def patched_install_layout(workspace: Path):
             / "opt/codeskeptic-p10-09/installation/receipt.json"
         ),
         "STATE_ROOT": workspace / "var/lib/codeskeptic-p10-09",
+        "INSTALLATION_AUTHORITY_PATH": (
+            workspace
+            / "var/lib/codeskeptic-p10-09/installation-authority.json"
+        ),
         "PODMAN_ROOT": workspace / "var/lib/codeskeptic-p10-09/podman-root",
         "PODMAN_RUNROOT": workspace / "run/codeskeptic-p10-09/podman-runroot",
     }
@@ -509,9 +609,141 @@ class StabilityStagingProducerPresenceTest(unittest.TestCase):
 
 @unittest.skipUnless(PRODUCER.is_file(), "staging producer is the RED gap")
 class StabilityStagingProducerTest(unittest.TestCase):
+    def test_trusted_sibling_loader_pins_one_inode_and_rejects_aliases(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fake_stage = root / "stage_stability_campaign.py"
+            fake_stage.write_text("# loader anchor\n", encoding="ascii")
+            victim = root / "victim.py"
+            victim.write_text("VALUE = 'original'\n", encoding="ascii")
+            victim.chmod(0o600)
+            with mock.patch.object(stage, "__file__", os.fspath(fake_stage)):
+                loaded = stage._load_trusted_sibling_module(
+                    "private_victim", "victim.py"
+                )
+            self.assertEqual(loaded.VALUE, "original")
+
+            if hasattr(os, "link"):
+                hardlink = root / "hardlink.py"
+                os.link(victim, hardlink)
+                with (
+                    mock.patch.object(stage, "__file__", os.fspath(fake_stage)),
+                    self.assertRaisesRegex(
+                        stage.StagingError, "bounded standalone"
+                    ),
+                ):
+                    stage._load_trusted_sibling_module(
+                        "private_hardlink", "hardlink.py"
+                    )
+                hardlink.unlink()
+
+            symlink = root / "symlink.py"
+            try:
+                symlink.symlink_to(victim.name)
+            except (OSError, NotImplementedError):
+                pass
+            else:
+                with (
+                    mock.patch.object(stage, "__file__", os.fspath(fake_stage)),
+                    self.assertRaisesRegex(stage.StagingError, "unavailable"),
+                ):
+                    stage._load_trusted_sibling_module(
+                        "private_symlink", "symlink.py"
+                    )
+
+            replacement = root / "replacement.py"
+            replacement.write_text("VALUE = 'swapped'\n", encoding="ascii")
+            real_read = os.read
+            swapped = False
+
+            def swap_after_read(descriptor: int, count: int) -> bytes:
+                nonlocal swapped
+                data = real_read(descriptor, count)
+                if not swapped:
+                    swapped = True
+                    os.replace(replacement, victim)
+                return data
+
+            with (
+                mock.patch.object(stage, "__file__", os.fspath(fake_stage)),
+                mock.patch.object(stage.os, "read", side_effect=swap_after_read),
+                self.assertRaisesRegex(stage.StagingError, "changed while loading"),
+            ):
+                stage._load_trusted_sibling_module(
+                    "private_swapped", "victim.py"
+                )
+            self.assertTrue(swapped)
+
+    def test_trusted_baseline_loader_ignores_preloaded_dependency_poison(
+        self,
+    ) -> None:
+        assert stage is not None
+        poisoned_realworld = types.ModuleType("run_realworld_campaign")
+        poisoned_fault = types.ModuleType("run_stability_fault_injection")
+        poisoned_realworld.__file__ = os.fspath(
+            ROOT / "scripts/run_realworld_campaign.py"
+        )
+        poisoned_fault.__file__ = os.fspath(
+            ROOT / "scripts/run_stability_fault_injection.py"
+        )
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "run_realworld_campaign": poisoned_realworld,
+                "run_stability_fault_injection": poisoned_fault,
+            },
+        ):
+            wrapped = stage._trusted_baseline_authority_verifier()
+            closure = dict(zip(
+                wrapped.__code__.co_freevars,
+                (cell.cell_contents for cell in wrapped.__closure__ or ()),
+            ))
+            raw = closure["verifier"]
+            self.assertIsNot(raw.__globals__["realworld"], poisoned_realworld)
+            self.assertIsNot(
+                raw.__globals__["fault_injection"], poisoned_fault
+            )
+            self.assertEqual(
+                Path(raw.__globals__["realworld"].__file__).resolve(),
+                (ROOT / "scripts/run_realworld_campaign.py").resolve(),
+            )
+            self.assertEqual(
+                Path(raw.__globals__["fault_injection"].__file__).resolve(),
+                (ROOT / "scripts/run_stability_fault_injection.py").resolve(),
+            )
+
+    def test_trusted_baseline_verifier_keeps_exact_sibling_imports_available(
+        self,
+    ) -> None:
+        assert stage is not None
+        scripts = os.fspath(ROOT / "scripts")
+        original_path = list(sys.path)
+        previous = sys.modules.pop("run_determinism_qualification", None)
+        sys.path[:] = [entry for entry in sys.path if entry != scripts]
+        try:
+            verifier = stage._trusted_baseline_authority_verifier()
+            with self.assertRaisesRegex(
+                Exception, "determinism baseline hardware class is absent"
+            ):
+                verifier(
+                    ROOT,
+                    ROOT / "scripts/determinism_workloads.json",
+                    ROOT / "scripts/determinism_baseline.json",
+                    "deliberately-absent-staging-test-profile",
+                )
+            self.assertNotIn(scripts, sys.path)
+        finally:
+            sys.modules.pop("run_determinism_qualification", None)
+            if previous is not None:
+                sys.modules["run_determinism_qualification"] = previous
+            sys.path[:] = original_path
+
     def test_cli_is_versioned_and_exposes_the_complete_lifecycle(self) -> None:
         assert stage is not None
-        self.assertEqual(stage.TOOL_VERSION, "2")
+        self.assertEqual(stage.TOOL_VERSION, "3")
         parser = stage.build_parser()
         subparser_actions = [
             action
@@ -523,7 +755,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             set(subparser_actions[0].choices),
             {
                 "prepare", "configure", "seal", "verify", "install",
-                "verify-install",
+                "verify-install", "verify-install-filesystem",
             },
         )
         for command in ("seal", "verify", "install"):
@@ -545,7 +777,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
         )
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertEqual(version.stderr, "")
-        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 2\n")
+        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 3\n")
 
     def test_cli_dispatches_every_lifecycle_command(self) -> None:
         assert stage is not None
@@ -606,6 +838,15 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 ],
                 "verify_installation",
             ),
+            (
+                [
+                    "verify-install-filesystem",
+                    "--receipt", "/fixture/installation/receipt.json",
+                    "--expected-revision", "1" * 40,
+                    "--expected-bundle-receipt-sha256", "2" * 64,
+                ],
+                "verify_installation_filesystem",
+            ),
         )
         lifecycle = (
             "prepare_staging", "configure_staging",
@@ -613,6 +854,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             "verify_bundle",
             "install_bundle",
             "verify_installation",
+            "verify_installation_filesystem",
         )
         for arguments, expected in cases:
             with self.subTest(command=arguments[0]), contextlib.ExitStack() as stack:
@@ -757,7 +999,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             with publish_patch, lstat_patch, self.assertRaisesRegex(
                 stage.StagingError, "temporary cleanup failure"
             ):
-                stage.configure_staging(
+                configure_fixture(
                     prepared,
                     revision,
                     repository="codeskeptic/staging-fixture",
@@ -792,7 +1034,37 @@ class StabilityStagingProducerTest(unittest.TestCase):
             config = json.loads(data.decode("utf-8"))
 
             self.assertEqual(data, stage.canonical_document(config))
+            self.assertEqual(
+                config["schema"], "codeskeptic-stability-runtime-v2"
+            )
             self.assertEqual(config["source"]["revision"], revision)
+            self.assertEqual(
+                set(config["prerequisites"]),
+                {"hosted_exact_head", "quality_floor"},
+            )
+            baseline_authority = config["qualification"][
+                "baseline_authority"
+            ]
+            self.assertEqual(
+                baseline_authority["root"], "/authority/source"
+            )
+            self.assertEqual(
+                baseline_authority["manifest_sha256"],
+                sha256_file(
+                    prepared
+                    / "authority/source/scripts/determinism_workloads.json"
+                ),
+            )
+            self.assertEqual(
+                baseline_authority["baseline_sha256"],
+                sha256_file(
+                    prepared
+                    / "authority/source/scripts/determinism_baseline.json"
+                ),
+            )
+            self.assertRegex(
+                baseline_authority["projection_sha256"], r"^[0-9a-f]{64}$"
+            )
             self.assertEqual(
                 config["prerequisites"]["hosted_exact_head"]["repository"],
                 "codeskeptic/staging-fixture",
@@ -812,7 +1084,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
 
             before = (data, sidecar_path.read_bytes())
             with self.assertRaisesRegex(stage.StagingError, "previously absent"):
-                stage.configure_staging(
+                configure_fixture(
                     prepared,
                     revision,
                     repository="codeskeptic/staging-fixture",
@@ -820,6 +1092,50 @@ class StabilityStagingProducerTest(unittest.TestCase):
             self.assertEqual(
                 (config_path.read_bytes(), sidecar_path.read_bytes()), before
             )
+
+    def test_runtime_v1_and_external_determinism_prerequisite_fail_closed(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prepared, _revision = make_manual_prepared_tree(Path(temporary))
+            config_path = prepared / "config/runtime.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+
+            old_schema = copy.deepcopy(config)
+            old_schema["schema"] = "codeskeptic-stability-runtime-v1"
+            with self.assertRaisesRegex(stage.StagingError, "schema"):
+                stage._validate_runtime_config_contract(old_schema)
+
+            external = copy.deepcopy(config)
+            external["prerequisites"]["determinism"] = {
+                "root": "/authority/prerequisites/determinism",
+                "receipt_sha256": "0" * 64,
+            }
+            with self.assertRaisesRegex(stage.StagingError, "fields"):
+                stage._validate_runtime_config_contract(external)
+
+    def test_configure_rejects_baseline_projection_digest_drift(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            prepared, revision = make_manual_prepared_tree(Path(temporary))
+            shutil.rmtree(prepared / "config")
+
+            def drifted(*args, **kwargs):
+                result = fixture_baseline_authority_verifier(*args, **kwargs)
+                result["projection_sha256"] = "0" * 64
+                return result
+
+            with self.assertRaisesRegex(
+                stage.StagingError, "baseline authority projection"
+            ):
+                stage.configure_staging(
+                    prepared,
+                    revision,
+                    repository="codeskeptic/staging-fixture",
+                    baseline_authority_verifier=drifted,
+                )
+            self.assertFalse((prepared / "config").exists())
 
     def test_configure_is_atomic_and_rejects_missing_authority_inputs(self) -> None:
         assert stage is not None
@@ -862,7 +1178,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     repository = "codeskeptic/staging-fixture"
 
                 with context, self.assertRaises(stage.StagingError):
-                    stage.configure_staging(
+                    configure_fixture(
                         prepared,
                         revision,
                         repository=repository,
@@ -888,7 +1204,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             ), self.assertRaisesRegex(
                 stage.StagingError, "cleanup withheld"
             ):
-                stage.configure_staging(
+                configure_fixture(
                     prepared,
                     revision,
                     repository="codeskeptic/staging-fixture",
@@ -929,7 +1245,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             ), self.assertRaisesRegex(
                 stage.StagingError, "cleanup failure|identity changed"
             ):
-                stage.configure_staging(
+                configure_fixture(
                     prepared,
                     revision,
                     repository="codeskeptic/staging-fixture",
@@ -989,7 +1305,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     expected_exception = stage.StagingError
 
                 with context, self.assertRaises(expected_exception):
-                    stage.configure_staging(
+                    configure_fixture(
                         prepared,
                         revision,
                         repository="codeskeptic/staging-fixture",
@@ -1401,11 +1717,13 @@ class StabilityStagingProducerTest(unittest.TestCase):
             roomy = mock.Mock(
                 f_bavail=2,
                 f_frsize=4096,
+                f_files=2,
                 f_favail=2,
             )
             exhausted = mock.Mock(
                 f_bavail=0,
                 f_frsize=4096,
+                f_files=2,
                 f_favail=0,
             )
             try:
@@ -1421,6 +1739,51 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     )
             finally:
                 os.close(source_fd)
+
+    def test_temporary_inventory_capacity_accepts_dynamic_inode_reporting(
+        self,
+    ) -> None:
+        assert stage is not None
+        filesystem = mock.Mock(
+            f_bavail=2,
+            f_frsize=4096,
+            f_files=0,
+            f_favail=0,
+        )
+        with mock.patch.object(stage.os, "statvfs", return_value=filesystem):
+            stage._temporary_inventory_capacity(Path("/fixture"), 4096, 2)
+
+    def test_temporary_inventory_capacity_enforces_bytes_when_inodes_unreported(
+        self,
+    ) -> None:
+        assert stage is not None
+        filesystem = mock.Mock(
+            f_bavail=0,
+            f_frsize=4096,
+            f_files=0,
+            f_favail=0,
+        )
+        with (
+            mock.patch.object(stage.os, "statvfs", return_value=filesystem),
+            self.assertRaisesRegex(stage.StagingError, "space or inodes"),
+        ):
+            stage._temporary_inventory_capacity(Path("/fixture"), 4096, 2)
+
+    def test_temporary_inventory_capacity_rejects_fixed_inode_exhaustion(
+        self,
+    ) -> None:
+        assert stage is not None
+        filesystem = mock.Mock(
+            f_bavail=2,
+            f_frsize=4096,
+            f_files=1024,
+            f_favail=0,
+        )
+        with (
+            mock.patch.object(stage.os, "statvfs", return_value=filesystem),
+            self.assertRaisesRegex(stage.StagingError, "space or inodes"),
+        ):
+            stage._temporary_inventory_capacity(Path("/fixture"), 4096, 2)
 
     def test_snapshot_copy_separates_path_and_descriptor_ctime(self) -> None:
         assert stage is not None
@@ -1603,7 +1966,10 @@ class StabilityStagingProducerTest(unittest.TestCase):
         assert stage is not None
         mutations = (
             ("README.md", False),
+            ("cgroup-authority.py", False),
+            ("host-recovery.py", False),
             ("guided-stability.sh", False),
+            ("post-stop.sh", False),
             ("run-authoritative-stability.sh", False),
             (PRODUCER.name, False),
             (UNIT.name, True),
@@ -2893,6 +3259,7 @@ class StabilityStagingProducerTest(unittest.TestCase):
             for name in (
                 "AUTHORITY_ROOT", "OPERATOR_ROOT", "CONFIG_PATH",
                 "UNIT_PATH", "INSTALLATION_ROOT", "STATE_ROOT",
+                "INSTALLATION_AUTHORITY_PATH",
                 "PODMAN_ROOT", "PODMAN_RUNROOT",
             ):
                 self.assertFalse(layout[name].exists(), name)
@@ -2982,6 +3349,10 @@ class StabilityStagingProducerTest(unittest.TestCase):
             hasattr(stage, "verify_installation"),
             "verify-install lifecycle implementation is missing",
         )
+        self.assertTrue(
+            hasattr(stage, "verify_installation_filesystem"),
+            "pure installation verification lifecycle is missing",
+        )
         with sealed_bundle_fixture() as fixture:
             workspace, _prepared, _revision, sealed, _receipt = fixture
             install_workspace = workspace / "installation-root"
@@ -3018,6 +3389,50 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     f"{hashlib.sha256(receipt_bytes).hexdigest()}  receipt.json\n"
                 ).encode("ascii")
                 self.assertEqual(sidecar_bytes, expected_sidecar)
+                authority_path = layout["INSTALLATION_AUTHORITY_PATH"]
+                authority_bytes = authority_path.read_bytes()
+                self.assertEqual(
+                    json.loads(authority_bytes.decode("utf-8")),
+                    {
+                        "bundle_receipt_sha256": bundle_authority(sealed)[
+                            "expected_bundle_receipt_sha256"
+                        ],
+                        "bundle_revision": bundle_authority(sealed)[
+                            "expected_revision"
+                        ],
+                        "schema": stage.INSTALLATION_AUTHORITY_SCHEMA,
+                    },
+                )
+
+                layout["PODMAN_RUNROOT"].parent.mkdir(
+                    parents=True, exist_ok=True, mode=0o700
+                )
+                layout["PODMAN_RUNROOT"].parent.chmod(0o700)
+                layout["PODMAN_RUNROOT"].mkdir(mode=0o700)
+                runroot_sentinel = layout["PODMAN_RUNROOT"] / "sentinel"
+                runroot_sentinel.write_bytes(b"must-not-change\n")
+                sentinel_before = runroot_sentinel.stat()
+                commands_before = list(runner.commands)
+                pure_verified = stage.verify_installation_filesystem(
+                    receipt_path,
+                    require_root=False,
+                    owner_uid=os.getuid(),
+                    owner_gid=os.getgid(),
+                    **bundle_authority(sealed),
+                )
+                sentinel_after = runroot_sentinel.stat()
+                self.assertEqual(
+                    pure_verified,
+                    json.loads(receipt_bytes.decode("utf-8")),
+                )
+                self.assertEqual(runner.commands, commands_before)
+                self.assertEqual(runroot_sentinel.read_bytes(), b"must-not-change\n")
+                self.assertEqual(
+                    (sentinel_after.st_dev, sentinel_after.st_ino),
+                    (sentinel_before.st_dev, sentinel_before.st_ino),
+                )
+                runroot_sentinel.unlink()
+                layout["PODMAN_RUNROOT"].rmdir()
 
                 verified = stage.verify_installation(
                     receipt_path, **arguments
@@ -3067,6 +3482,27 @@ class StabilityStagingProducerTest(unittest.TestCase):
                     stage.verify_installation(receipt_path, **arguments)
                 receipt_path.write_bytes(receipt_bytes)
                 receipt_path.chmod(original_mode)
+
+                authority_path.chmod(0o600)
+                forged_authority = json.loads(authority_bytes.decode("utf-8"))
+                forged_authority["bundle_revision"] = "f" * 40
+                authority_path.write_bytes(
+                    stage.canonical_document(forged_authority)
+                )
+                authority_path.chmod(0o400)
+                with self.assertRaisesRegex(
+                    stage.StagingError, "out-of-band authority"
+                ):
+                    stage.verify_installation_filesystem(
+                        receipt_path,
+                        require_root=False,
+                        owner_uid=os.getuid(),
+                        owner_gid=os.getgid(),
+                        **bundle_authority(sealed),
+                    )
+                authority_path.chmod(0o600)
+                authority_path.write_bytes(authority_bytes)
+                authority_path.chmod(0o400)
 
                 stage.install_bundle(sealed, **arguments)
                 self.assertEqual(receipt_path.stat().st_ino, receipt_inode)
@@ -3455,6 +3891,60 @@ class StabilityStagingProducerTest(unittest.TestCase):
             with self.assertRaises(stage.StagingError):
                 stage.verify_static_unit(drifted)
 
+            lifecycle_mutations = (
+                (
+                    "Before=shutdown.target rescue.target emergency.target",
+                    "Before=shutdown.target",
+                ),
+                (
+                    "Conflicts=shutdown.target rescue.target emergency.target",
+                    "Conflicts=shutdown.target",
+                ),
+                ("IgnoreOnIsolate=yes", "IgnoreOnIsolate=no"),
+                ("Type=exec", "Type=oneshot"),
+                (
+                    "ExecStartPre=/opt/codeskeptic-p10-09/operator/"
+                    "post-stop.sh --startup-recovery",
+                    "ExecStartPre=/bin/true",
+                ),
+                (
+                    "ExecStopPost=/opt/codeskeptic-p10-09/operator/post-stop.sh",
+                    "ExecStopPost=/bin/true",
+                ),
+                ("--what=sleep", "--what=shutdown:sleep"),
+                ("KillMode=control-group", "KillMode=process"),
+                ("TimeoutStopSec=2min", "TimeoutStopSec=infinity"),
+                ("Delegate=yes", "Delegate=no"),
+                ("DelegateSubgroup=controller", "DelegateSubgroup=payload"),
+                (
+                    "StateDirectory=codeskeptic-p10-09",
+                    "StateDirectory=elsewhere",
+                ),
+                ("ProtectControlGroups=no", "ProtectControlGroups=yes"),
+            )
+            source = UNIT.read_text(encoding="utf-8")
+            for expected, replacement in lifecycle_mutations:
+                with self.subTest(expected=expected):
+                    self.assertIn(expected, source)
+                    drifted.write_text(
+                        source.replace(expected, replacement, 1),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(stage.StagingError):
+                        stage.verify_static_unit(drifted)
+
+            for forbidden in (
+                "ConditionKernelCommandLine=systemd.unit=multi-user.target",
+                "Conflicts=graphical.target",
+                "[Install]\nWantedBy=multi-user.target",
+            ):
+                with self.subTest(forbidden=forbidden):
+                    drifted.write_text(
+                        source + f"\n{forbidden}\n", encoding="utf-8"
+                    )
+                    with self.assertRaises(stage.StagingError):
+                        stage.verify_static_unit(drifted)
+
             unit_root = workspace / "systemd"
             unit_root.mkdir()
             stage.reject_dropin_authority(unit_root, UNIT.name)
@@ -3685,24 +4175,70 @@ class StabilityStagingProducerTest(unittest.TestCase):
                 stage._remove_private_tree(workspace)
         self.assertFalse(workspace.exists())
 
-    def test_guided_entrypoint_binds_execution_to_verify_install_receipt(self) -> None:
+    def test_guided_entrypoint_binds_execution_to_out_of_band_install_authority(
+        self,
+    ) -> None:
         guided = GUIDED.read_text(encoding="utf-8")
         self.assertIn(
             'readonly STAGING_TOOL_PATH="${OPERATOR_ROOT}/stage_stability_campaign.py"',
             guided,
         )
         self.assertIn("INSTALLATION_RECEIPT_PATH=", guided)
+        self.assertIn(
+            'readonly INSTALLATION_AUTHORITY_PATH="/var/lib/'
+            'codeskeptic-p10-09/installation-authority.json"',
+            guided,
+        )
         for token in (
-            '"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install',
+            '"$PYTHON" -B - "$INSTALLATION_AUTHORITY_PATH"',
+            '"codeskeptic-stability-installation-authority-v1"',
+            '"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install-filesystem',
             '--receipt "$INSTALLATION_RECEIPT_PATH"',
             '--expected-revision "$expected_revision"',
             '--expected-bundle-receipt-sha256 '
             '"$expected_bundle_receipt_sha"',
         ):
             self.assertIn(token, " ".join(guided.split()))
-        self.assertLess(
-            guided.index("verify-install"), guided.index('"$SYSTEMCTL" start')
+        authority_parse = guided.index('installation_authority="$({')
+        pure_verify = guided.index(
+            '"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install-filesystem'
         )
+        startup_recovery = guided.index(
+            '"$POST_STOP_PATH" --startup-recovery'
+        )
+        guided_lock = guided.index(
+            '"$HOST_RECOVERY_PATH" lock-guided --mode "$guided_mode"'
+        )
+        inherited_lock = guided.index(
+            '"$HOST_RECOVERY_PATH" validate-guided-lock '
+            '--fd "$guided_lock_fd"'
+        )
+        service_start = guided.index(
+            '"$SYSTEMCTL" start --no-block "$SERVICE_UNIT"'
+        )
+        self.assertLess(authority_parse, pure_verify)
+        self.assertLess(pure_verify, guided_lock)
+        self.assertLess(guided_lock, inherited_lock)
+        self.assertLess(guided_lock, startup_recovery)
+        self.assertLess(startup_recovery, service_start)
+        self.assertNotIn(
+            '"$PYTHON" -B "$STAGING_TOOL_PATH" verify-install \\\n',
+            guided,
+        )
+        recovery = HOST_RECOVERY.read_text(encoding="utf-8")
+        self.assertIn('GUIDED_LIFECYCLE_LOCK = STATE_ROOT / "guided.lock"', recovery)
+        self.assertIn('getattr(os, "O_NOFOLLOW", 0)', recovery)
+        self.assertIn('fcntl.LOCK_EX | fcntl.LOCK_NB', recovery)
+        self.assertNotIn('flock --unlock', guided)
+        self.assertNotIn('rm -- "$GUIDED_LOCK_PATH"', guided)
+
+        operator = AUTHORITATIVE.read_text(encoding="utf-8")
+        for token in (
+            "verify_runtime_source_and_policy(config)",
+            "verify_runtime_static_authorities(config, policy)",
+            "verify_runtime_static_authority_identities(config, authorities)",
+        ):
+            self.assertIn(token, operator)
 
     def test_authoritative_operator_uses_only_the_persistent_private_podman_environment(self) -> None:
         operator = AUTHORITATIVE.read_text(encoding="utf-8")

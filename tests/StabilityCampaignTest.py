@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import run_stability_campaign as stability  # noqa: E402
+import run_determinism_qualification as determinism  # noqa: E402
 import seal_hosted_exact_head as hosted_authority  # noqa: E402
 
 
@@ -57,6 +58,7 @@ def session_material() -> dict:
         "baseline_sha256": stability.sha256_file(
             ROOT / "scripts" / "determinism_baseline.json"
         ),
+        "baseline_authority_projection_sha256": "8" * 64,
         "fault_injection_test_binary": {
             "path": (
                 "/authority/source/build/p10-09-sanitizers/"
@@ -71,7 +73,6 @@ def session_material() -> dict:
             "undefined": "e" * 64,
         },
         "prerequisite_receipts": {
-            "determinism": "8" * 64,
             "hosted_exact_head": "9" * 64,
             "quality_floor": "f" * 64,
         },
@@ -119,7 +120,12 @@ def runtime_config() -> dict:
         "qualification": {
             "hardware_class": "fedora44-i5-1235u-exclusive-pcores-0-3",
             "measurement_cgroup": stability.RUNTIME_MEASUREMENT_CGROUP,
-            "baseline_authority_root": "/authority/source",
+            "baseline_authority": {
+                "root": "/authority/source",
+                "manifest_sha256": "d" * 64,
+                "baseline_sha256": "e" * 64,
+                "projection_sha256": "f" * 64,
+            },
             "release_source": "/authority/release/source",
             "release_build": "/authority/release/build",
             "jobs": 2,
@@ -133,10 +139,6 @@ def runtime_config() -> dict:
             },
         },
         "prerequisites": {
-            "determinism": {
-                "root": "/authority/prerequisites/determinism",
-                "receipt_sha256": "8" * 64,
-            },
             "hosted_exact_head": {
                 "root": "/authority/prerequisites/hosted",
                 "receipt_sha256": "9" * 64,
@@ -477,6 +479,9 @@ def session_record_for_config(config: dict) -> dict:
         ],
     }
     identity["hardware_class"] = config["qualification"]["hardware_class"]
+    identity["baseline_authority_projection_sha256"] = config[
+        "qualification"
+    ]["baseline_authority"]["projection_sha256"]
     session["id"] = stability.build_session_identity(identity)
     return session
 
@@ -751,7 +756,9 @@ def build_evidence_bundle(root: Path) -> dict:
     authority_records: dict[str, dict[str, str]] = {}
     authority_paths = {
         "build_authority": Path("authorities") / "build" / "receipt.json",
-        "determinism": Path("authorities") / "prerequisites" / "determinism.json",
+        "determinism_baseline": (
+            Path("authorities") / "determinism-baseline.json"
+        ),
         "hosted_exact_head": (
             Path("authorities") / "prerequisites" / "hosted-exact-head.json"
         ),
@@ -781,9 +788,12 @@ def build_evidence_bundle(root: Path) -> dict:
     identity["build_authority_receipt_sha256"] = authority_records[
         "build_authority"
     ]["sha256"]
+    identity["baseline_authority_projection_sha256"] = authority_records[
+        "determinism_baseline"
+    ]["sha256"]
     identity["prerequisite_receipts"] = {
         prerequisite: authority_records[prerequisite]["sha256"]
-        for prerequisite in ("determinism", "hosted_exact_head", "quality_floor")
+        for prerequisite in ("hosted_exact_head", "quality_floor")
     }
     identity["sanitizer_receipts"] = {
         profile: record["sha256"]
@@ -842,7 +852,7 @@ def build_evidence_bundle(root: Path) -> dict:
         root / establishment_path,
         {
             "fixture": True,
-            "schema": "codeskeptic-stability-establishment-v1",
+            "schema": stability.ESTABLISHMENT_SCHEMA,
             "status": "accepted",
         },
     )
@@ -1259,7 +1269,424 @@ class ManifestContractTest(unittest.TestCase):
                         )
 
 
+class BaselineAuthorityContractTest(unittest.TestCase):
+    def test_private_determinism_loader_rejects_hardlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            source = root / "authority-source.py"
+            source.write_text("VALUE = 1\n", encoding="utf-8")
+            sibling = root / "run_determinism_qualification.py"
+            os.link(source, sibling)
+            with (
+                mock.patch.object(
+                    stability,
+                    "__file__",
+                    os.fspath(root / "run_stability_campaign.py"),
+                ),
+                self.assertRaisesRegex(
+                    stability.StabilityError,
+                    "bounded regular file",
+                ),
+            ):
+                stability._load_private_determinism_authority()
+
+    def test_real_retained_authority_replays_without_ambient_tool_bytes(
+        self,
+    ) -> None:
+        manifest_path = ROOT / "scripts" / "determinism_workloads.json"
+        baseline_path = ROOT / "scripts" / "determinism_baseline.json"
+        baseline = determinism.load_baseline(
+            baseline_path,
+            determinism.digest_json(determinism.load_manifest(manifest_path)),
+        )
+        hardware_class = next(iter(baseline["profiles"]))
+        verified = stability.verify_determinism_baseline_authority(
+            ROOT,
+            manifest_path,
+            baseline_path,
+            hardware_class,
+        )
+        self.assertEqual(
+            verified["projection"]["hardware_class"], hardware_class
+        )
+
+    def test_private_verifier_ignores_poisoned_ambient_modules(self) -> None:
+        manifest_path = ROOT / "scripts" / "determinism_workloads.json"
+        baseline_path = ROOT / "scripts" / "determinism_baseline.json"
+        baseline = determinism.load_baseline(
+            baseline_path,
+            determinism.digest_json(determinism.load_manifest(manifest_path)),
+        )
+        hardware_class = next(iter(baseline["profiles"]))
+        poisoned_determinism = mock.Mock()
+        poisoned_determinism.verify_baseline_authority.side_effect = (
+            AssertionError("poisoned determinism verifier executed")
+        )
+        poisoned_realworld = mock.Mock()
+        poisoned_realworld.load_manifest.side_effect = AssertionError(
+            "poisoned real-world verifier executed"
+        )
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "run_determinism_qualification": poisoned_determinism,
+                "run_realworld_campaign": poisoned_realworld,
+            },
+        ):
+            verified = stability.verify_determinism_baseline_authority(
+                ROOT,
+                manifest_path,
+                baseline_path,
+                hardware_class,
+            )
+        self.assertEqual(
+            verified["projection"]["hardware_class"], hardware_class
+        )
+        poisoned_determinism.verify_baseline_authority.assert_not_called()
+        poisoned_realworld.load_manifest.assert_not_called()
+
+    def test_projection_binds_promoted_profile_and_retained_calibration(self) -> None:
+        manifest_path = ROOT / "scripts" / "determinism_workloads.json"
+        baseline_path = ROOT / "scripts" / "determinism_baseline.json"
+        manifest = determinism.load_manifest(manifest_path)
+        baseline = determinism.load_baseline(
+            baseline_path, determinism.digest_json(manifest)
+        )
+        hardware_class = next(iter(baseline["profiles"]))
+        profile = baseline["profiles"][hardware_class]
+        provenance = profile["provenance"]
+        calibration_root = ROOT / provenance["calibration"]["evidence_path"]
+
+        with (
+            mock.patch.object(
+                stability,
+                "_load_private_determinism_authority",
+                return_value=determinism,
+            ),
+            mock.patch.object(
+                determinism, "verify_baseline_authority"
+            ) as verifier,
+        ):
+            verified = stability.verify_determinism_baseline_authority(
+                ROOT,
+                manifest_path,
+                baseline_path,
+                hardware_class,
+            )
+        verifier.assert_called_once_with(
+            baseline,
+            ROOT,
+            manifest_path,
+            toolchain_verification_mode="historical-retained",
+        )
+        projection = verified["projection"]
+        self.assertEqual(
+            projection["schema"],
+            "codeskeptic-determinism-baseline-authority-v1",
+        )
+        self.assertEqual(projection["hardware_class"], hardware_class)
+        self.assertEqual(
+            projection["manifest_sha256"],
+            stability.sha256_file(manifest_path),
+        )
+        self.assertEqual(
+            projection["baseline_sha256"],
+            stability.sha256_file(baseline_path),
+        )
+        self.assertEqual(
+            projection["profile_source_revision"],
+            provenance["source_revision"],
+        )
+        self.assertEqual(
+            projection["semantic_reference_sha256"],
+            stability.digest_json(baseline["semantic_reference"]),
+        )
+        self.assertEqual(
+            projection["toolchain_sha256"],
+            stability.digest_json(provenance["toolchain"]),
+        )
+        self.assertEqual(
+            projection["hardware_sha256"],
+            stability.digest_json(profile["hardware"]),
+        )
+        self.assertEqual(
+            projection["workloads_sha256"],
+            stability.digest_json(profile["workloads"]),
+        )
+        self.assertEqual(
+            projection["calibration"],
+            {
+                "evidence_path": provenance["calibration"]["evidence_path"],
+                "receipt_sha256": provenance["calibration"][
+                    "receipt_sha256"
+                ],
+                "sha256sums_sha256": stability.sha256_file(
+                    calibration_root / "SHA256SUMS"
+                ),
+            },
+        )
+        self.assertEqual(
+            projection["promotion"],
+            {
+                "previous_baseline_sha256": provenance["promotion"][
+                    "previous_baseline_sha256"
+                ],
+                "previous_profile_sha256": provenance["promotion"][
+                    "previous_profile_sha256"
+                ],
+                "reason_sha256": hashlib.sha256(
+                    provenance["promotion"]["reason"].encode("utf-8")
+                ).hexdigest(),
+            },
+        )
+        self.assertEqual(
+            verified["projection_sha256"],
+            hashlib.sha256(
+                stability._determinism_baseline_projection_bytes(projection)
+            ).hexdigest(),
+        )
+
+    def test_authority_rejects_wrong_paths_absent_class_and_mutation(self) -> None:
+        manifest_path = ROOT / "scripts" / "determinism_workloads.json"
+        baseline_path = ROOT / "scripts" / "determinism_baseline.json"
+        with self.assertRaisesRegex(stability.StabilityError, "canonical"):
+            stability.verify_determinism_baseline_authority(
+                ROOT,
+                ROOT / "determinism_workloads.json",
+                baseline_path,
+                "missing",
+            )
+        with mock.patch.object(
+            determinism, "verify_baseline_authority"
+        ), self.assertRaisesRegex(stability.StabilityError, "hardware class"):
+            stability.verify_determinism_baseline_authority(
+                ROOT,
+                manifest_path,
+                baseline_path,
+                "missing",
+            )
+
+        baseline = determinism.load_baseline(
+            baseline_path,
+            determinism.digest_json(determinism.load_manifest(manifest_path)),
+        )
+        hardware_class = next(iter(baseline["profiles"]))
+        evidence_path = baseline["profiles"][hardware_class]["provenance"][
+            "calibration"
+        ]["evidence_path"]
+        with tempfile.TemporaryDirectory() as temporary:
+            authority = Path(temporary) / "source"
+            (authority / "scripts").mkdir(parents=True)
+            (authority / "scripts" / manifest_path.name).write_bytes(
+                manifest_path.read_bytes()
+            )
+            (authority / "scripts" / baseline_path.name).write_bytes(
+                baseline_path.read_bytes()
+            )
+            calibration = authority / evidence_path
+            calibration.mkdir(parents=True)
+            original_calibration = ROOT / evidence_path
+            for name in ("receipt.json", "SHA256SUMS"):
+                (calibration / name).write_bytes(
+                    (original_calibration / name).read_bytes()
+                )
+
+            def mutate(*args: object, **kwargs: object) -> None:
+                del args, kwargs
+                (calibration / "SHA256SUMS").write_text(
+                    "mutated\n", encoding="utf-8"
+                )
+
+            with (
+                mock.patch.object(
+                    stability,
+                    "_load_private_determinism_authority",
+                    return_value=determinism,
+                ),
+                mock.patch.object(
+                    determinism,
+                    "verify_baseline_authority",
+                    side_effect=mutate,
+                ),
+                self.assertRaisesRegex(stability.StabilityError, "changed"),
+            ):
+                stability.verify_determinism_baseline_authority(
+                    authority,
+                    authority / "scripts" / manifest_path.name,
+                    authority / "scripts" / baseline_path.name,
+                    hardware_class,
+                )
+
+    def test_static_authorities_use_baseline_projection_not_external_receipt(
+        self,
+    ) -> None:
+        config = runtime_config()
+        policy = stability.validate_policy(canonical_policy(), ROOT)
+        baseline = {
+            "projection": {
+                "manifest_sha256": config["qualification"][
+                    "baseline_authority"
+                ]["manifest_sha256"],
+                "baseline_sha256": config["qualification"][
+                    "baseline_authority"
+                ]["baseline_sha256"],
+            },
+            "projection_sha256": config["qualification"][
+                "baseline_authority"
+            ]["projection_sha256"],
+            "identity": {"fixture": True},
+        }
+        build = {
+            "receipt_sha256": config["build_authority"]["receipt_sha256"],
+            "projection": {"build_identity_sha256": "0" * 64},
+        }
+        quality = {
+            "receipt_sha256": config["prerequisites"]["quality_floor"][
+                "receipt_sha256"
+            ]
+        }
+        hosted = {
+            "receipt_sha256": config["prerequisites"]["hosted_exact_head"][
+                "receipt_sha256"
+            ],
+            "projection": {"source_tree_sha1": config["source"]["tree_sha1"]},
+        }
+
+        with (
+            mock.patch.object(
+                stability,
+                "verify_build_authority_evidence",
+                return_value=build,
+            ),
+            mock.patch.object(
+                stability,
+                "verify_quality_floor_evidence",
+                return_value=quality,
+            ),
+            mock.patch.object(
+                stability,
+                "verify_determinism_baseline_authority",
+                return_value=baseline,
+            ) as baseline_verifier,
+            mock.patch.object(
+                stability,
+                "verify_determinism_evidence",
+                side_effect=AssertionError("external determinism was consulted"),
+            ),
+            mock.patch.object(
+                stability,
+                "verify_hosted_exact_head_authority",
+                return_value=hosted,
+            ),
+            mock.patch.object(
+                stability,
+                "verify_sanitizer_evidence",
+                side_effect=[
+                    {"receipt_sha256": config["sanitizers"]["address"]["receipt_sha256"]},
+                    {"receipt_sha256": config["sanitizers"]["undefined"]["receipt_sha256"]},
+                ],
+            ),
+            mock.patch.object(
+                stability,
+                "verify_fault_injection_test_binary_authority",
+                return_value={"fixture": "fault-binary"},
+            ),
+            mock.patch.object(
+                stability,
+                "verify_realworld_mirror_authority",
+                return_value={
+                    "authority_sha256": config["realworld"][
+                        "mirror_authority_sha256"
+                    ]
+                },
+            ),
+        ):
+            verified = stability.verify_runtime_static_authorities(
+                config, policy
+            )
+        self.assertIs(verified["determinism_baseline"], baseline)
+        self.assertNotIn("determinism", verified)
+        baseline_verifier.assert_called_once_with(
+            Path("/authority/source"),
+            Path("/authority/source/scripts/determinism_workloads.json"),
+            Path("/authority/source/scripts/determinism_baseline.json"),
+            config["qualification"]["hardware_class"],
+        )
+
+    def test_static_identity_recheck_reverifies_the_baseline_authority(self) -> None:
+        config = runtime_config()
+        bundle = {"fixture": "stable-directory"}
+        baseline = {
+            "projection": {"fixture": "baseline"},
+            "projection_sha256": config["qualification"][
+                "baseline_authority"
+            ]["projection_sha256"],
+            "identity": {"fixture": "baseline-files"},
+        }
+        static = {
+            "build_authority": {"bundle": bundle},
+            "quality_floor": {"bundle": bundle},
+            "determinism_baseline": baseline,
+            "hosted_exact_head": {"bundle": bundle},
+            "sanitizers": {
+                "address": {"bundle": bundle},
+                "undefined": {"bundle": bundle},
+            },
+            "realworld_mirror": {"bundle": bundle},
+            "fault_injection_test_binary": {"fixture": "fault-binary"},
+        }
+        with (
+            mock.patch.object(
+                stability, "directory_identity", return_value=bundle
+            ),
+            mock.patch.object(
+                stability,
+                "verify_determinism_baseline_authority",
+                return_value=baseline,
+            ) as baseline_verifier,
+            mock.patch.object(
+                stability,
+                "verify_fault_injection_test_binary_authority",
+                return_value=static["fault_injection_test_binary"],
+            ),
+        ):
+            stability.verify_runtime_static_authority_identities(config, static)
+        baseline_verifier.assert_called_once()
+
+        with (
+            mock.patch.object(
+                stability, "directory_identity", return_value=bundle
+            ),
+            mock.patch.object(
+                stability,
+                "verify_determinism_baseline_authority",
+                return_value={**baseline, "identity": {"fixture": "mutated"}},
+            ),
+            self.assertRaisesRegex(stability.StabilityError, "changed"),
+        ):
+            stability.verify_runtime_static_authority_identities(config, static)
+
+
 class RuntimeConfigContractTest(unittest.TestCase):
+    def test_runtime_v2_replaces_external_determinism_with_baseline_authority(
+        self,
+    ) -> None:
+        self.assertEqual(
+            stability.RUNTIME_CONFIG_SCHEMA,
+            "codeskeptic-stability-runtime-v2",
+        )
+        config = runtime_config()
+        self.assertEqual(stability.validate_runtime_config(config), config)
+        self.assertEqual(
+            set(config["prerequisites"]),
+            {"hosted_exact_head", "quality_floor"},
+        )
+
+        legacy = copy.deepcopy(config)
+        legacy["schema"] = "codeskeptic-stability-runtime-v1"
+        with self.assertRaisesRegex(stability.StabilityError, "schema"):
+            stability.validate_runtime_config(legacy)
+
     def test_exact_pinned_runtime_config_is_accepted_without_ambient_fields(self) -> None:
         config = runtime_config()
         self.assertEqual(stability.validate_runtime_config(config), config)
@@ -1447,6 +1874,20 @@ class RuntimeConfigContractTest(unittest.TestCase):
 
 
 class SessionIdentityContractTest(unittest.TestCase):
+    def test_session_and_final_contract_schemas_are_v2(self) -> None:
+        self.assertEqual(
+            stability.SESSION_SCHEMA,
+            "codeskeptic-stability-session-v2",
+        )
+        self.assertEqual(
+            stability.RECEIPT_SCHEMA,
+            "codeskeptic-stability-receipt-v2",
+        )
+        legacy = session_material()
+        legacy["schema"] = "codeskeptic-stability-session-v1"
+        with self.assertRaisesRegex(stability.StabilityError, "schema"):
+            stability.build_session_identity(legacy)
+
     def test_exact_authorities_derive_the_session_identity(self) -> None:
         material = session_material()
         self.assertEqual(
@@ -2542,6 +2983,38 @@ class CycleSealerContractTest(unittest.TestCase):
             self.assertEqual(call["argv"][3], "_action")
             self.assertEqual(call["argv"][-1], self.runtime_root.as_posix())
 
+    def test_rejected_cold_prequalification_cannot_advance_to_payload(self) -> None:
+        session = session_record_for_config(self.config)
+        plan = stability.build_cycle_plan(
+            self.policy, self.schedule, session["id"], 1
+        )
+        calls: list[str] = []
+
+        def reject_prequalification(*args: object, **kwargs: object) -> dict:
+            del args
+            calls.append(str(kwargs["kind"]))
+            raise stability.StabilityError("cold pre-qualification rejected")
+
+        with self.assertRaisesRegex(
+            stability.StabilityError, "cold pre-qualification rejected"
+        ):
+            stability.execute_production_cycle(
+                mock.Mock(),
+                self.config,
+                session,
+                plan,
+                config_path=Path("/config/runtime.json"),
+                evidence_root=self.root,
+                runtime_root=self.runtime_root,
+                runner=object(),
+                supervisor=reject_prequalification,
+            )
+        self.assertEqual(calls, ["qualification"])
+        self.assertFalse(
+            (self.root / "cycles" / "000001" / "cycle.json").exists()
+        )
+        self.assertFalse((self.root / "receipt.json").exists())
+
     def test_owned_production_runner_is_closed_when_cycle_execution_raises(self) -> None:
         session = session_record_for_config(self.config)
         plan = stability.build_cycle_plan(
@@ -3553,7 +4026,7 @@ class RuntimeEstablishmentContractTest(unittest.TestCase):
                 "size": source.stat().st_size,
             }
         receipt = {
-            "schema": "codeskeptic-stability-establishment-v1",
+            "schema": stability.ESTABLISHMENT_SCHEMA,
             "status": "accepted",
             "failures": [],
             "session": self.session,
@@ -3604,6 +4077,114 @@ class RuntimeEstablishmentContractTest(unittest.TestCase):
         with self.assertRaisesRegex(stability.StabilityError, "source"):
             self.verify()
 
+    def test_legacy_establishment_schema_is_rejected(self) -> None:
+        path = self.evidence / "establishment" / "receipt.json"
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+        receipt["schema"] = "codeskeptic-stability-establishment-v1"
+        path.write_bytes(stability.canonical_document(receipt))
+        with self.assertRaisesRegex(stability.StabilityError, "authorities"):
+            self.verify()
+
+
+class RuntimeEstablishmentBaselineProjectionContractTest(unittest.TestCase):
+    def test_generated_projection_replaces_external_determinism_receipt(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence = root / "evidence"
+            sources = root / "sources"
+            evidence.mkdir()
+            sources.mkdir()
+            projection = {
+                "schema": stability.DETERMINISM_BASELINE_AUTHORITY_SCHEMA,
+                "hardware_class": "fixture-hardware",
+                "manifest_sha256": "1" * 64,
+                "baseline_sha256": "2" * 64,
+            }
+            projection_sha = hashlib.sha256(
+                stability._determinism_baseline_projection_bytes(projection)
+            ).hexdigest()
+            config = runtime_config()
+            config["qualification"]["baseline_authority"][
+                "projection_sha256"
+            ] = projection_sha
+            identity = session_material()
+            identity["baseline_authority_projection_sha256"] = projection_sha
+            session = {
+                "id": stability.build_session_identity(identity),
+                "controller_id": CONTROLLER_ID,
+                "identity": identity,
+            }
+            static = {
+                "determinism_baseline": {
+                    "projection": projection,
+                    "projection_sha256": projection_sha,
+                    "identity": {"fixture": True},
+                },
+                "fixture": "other-static-authorities",
+            }
+            records: dict[str, tuple[Path, str]] = {}
+            for name in (
+                "build_authority",
+                "hosted_exact_head",
+                "quality_floor",
+                "sanitizer_address",
+                "sanitizer_undefined",
+            ):
+                source = sources / f"{name}.json"
+                source.write_bytes(
+                    stability.canonical_document({"authority": name})
+                )
+                records[name] = (source, f"authorities/{name}.json")
+            source_identity = {"fixture": "source"}
+            resources = {"fixture": "resources"}
+            config_path = sources / "runtime.json"
+
+            with mock.patch.object(
+                stability,
+                "runtime_establishment_sources",
+                return_value=records,
+            ):
+                staged = stability.stage_runtime_establishment(
+                    evidence,
+                    config_path,
+                    config,
+                    session,
+                    source_identity,
+                    static,
+                    resources,
+                )
+                verified = stability.verify_runtime_establishment(
+                    evidence,
+                    config_path,
+                    config,
+                    session,
+                    source_identity,
+                    static,
+                    resources,
+                )
+            self.assertEqual(
+                set(staged["authorities"]),
+                {
+                    "build_authority",
+                    "determinism_baseline",
+                    "hosted_exact_head",
+                    "quality_floor",
+                },
+            )
+            baseline_record = staged["authorities"]["determinism_baseline"]
+            self.assertEqual(baseline_record["sha256"], projection_sha)
+            self.assertEqual(
+                (evidence / baseline_record["path"]).read_bytes(),
+                stability._determinism_baseline_projection_bytes(projection),
+            )
+            self.assertEqual(
+                verified["staged"]["determinism_baseline"]["sha256"],
+                projection_sha,
+            )
+            self.assertNotIn("determinism", verified["staged"])
+
 
 class EvidenceBundleContractTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -3635,6 +4216,13 @@ class EvidenceBundleContractTest(unittest.TestCase):
         after = self.snapshot()
         self.assertEqual(verified, self.receipt)
         self.assertEqual(after, before)
+
+    def test_legacy_final_receipt_schema_is_rejected(self) -> None:
+        mutation = copy.deepcopy(self.receipt)
+        mutation["schema"] = "codeskeptic-stability-receipt-v1"
+        reseal_outer(self.root, mutation)
+        with self.assertRaisesRegex(stability.StabilityError, "accepted"):
+            self.verify()
 
     def test_artifact_tamper_extra_file_and_symlink_are_rejected(self) -> None:
         journal = self.root / "journal.jsonl"

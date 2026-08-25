@@ -103,6 +103,10 @@ IGNORED_SOURCE_PREFIXES = (
     "docs/evidence/",
     # The human-readable entry is also an output of the matrix.
     "docs/devlog/changelog.md",
+    # Calibration changes the performance baseline without changing the
+    # executable source identity.  Keep this scope identical to the P10-09
+    # staging/determinism manifest used by the final stability preflight.
+    "scripts/determinism_baseline.json",
 )
 SANITIZER_ENVIRONMENT = {
     "ASAN_OPTIONS", "LSAN_OPTIONS", "UBSAN_OPTIONS", "TSAN_OPTIONS",

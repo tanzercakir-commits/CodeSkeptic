@@ -117,6 +117,18 @@ add_test(NAME HostedStatusWorkflowContract
          COMMAND ${Python3_EXECUTABLE}
                  ${CMAKE_CURRENT_SOURCE_DIR}/HostedStatusWorkflowTest.py)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME DeterminismCalibrationImportContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/DeterminismCalibrationImportTest.py)
+    add_test(NAME StabilityEvidenceExportContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityEvidenceExportTest.py)
+    add_test(NAME StabilityCgroupAuthorityContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityCgroupAuthorityTest.py)
+    add_test(NAME StabilityHostRecoveryContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityHostRecoveryTest.py)
     add_test(NAME StabilityHostContaminationContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/StabilityHostContaminationTest.py)
@@ -228,3 +240,14 @@ if(NOT WIN32)
              COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/test_review_diff.sh
                      $<TARGET_FILE:codeskeptic>)
 endif()
+
+# Contract tests repeatedly import repository scripts while later authority
+# tests hash the exact source tree.  Keep the suite observational: no test may
+# leave Python bytecode inside the source tree and thereby perturb a later
+# manifest or staging check.  Applying the environment to every test defined
+# in this directory also covers shell contracts that invoke Python children.
+get_property(CODESKEPTIC_DIRECTORY_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(
+    ${CODESKEPTIC_DIRECTORY_TESTS}
+    PROPERTIES ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+)

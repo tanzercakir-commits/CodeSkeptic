@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -16,6 +17,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "run_sanitizer_matrix.py"
+STAGING_PATH = ROOT / "scripts" / "stage_stability_campaign.py"
 EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" /
                  "sanitizers" / "2026-08-15-cache-linux-x86_64")
 MATERIALIZED_BUILDS = {
@@ -37,6 +39,16 @@ def load_runner():
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     return runner
+
+
+def load_staging():
+    spec = importlib.util.spec_from_file_location(
+        "sanitizer_staging_contract", STAGING_PATH)
+    assert spec and spec.loader
+    staging = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = staging
+    spec.loader.exec_module(staging)
+    return staging
 
 
 def cmake_compiler(environment: str, candidates: tuple[str, ...]) -> str:
@@ -157,6 +169,7 @@ class SanitizerContractTest(unittest.TestCase):
             self.assertIn(required, files)
         self.assertFalse(any(path.startswith("docs/evidence/") for path in files))
         self.assertNotIn("docs/devlog/changelog.md", files)
+        self.assertNotIn("scripts/determinism_baseline.json", files)
         self.assertFalse(any("__pycache__" in path for path in files))
         self.assertFalse(any(path.endswith((".pyc", ".pyo")) for path in files))
 
@@ -172,6 +185,14 @@ class SanitizerContractTest(unittest.TestCase):
         with mock.patch.object(
                 runner, "sha256_file", side_effect=changed_test_digest):
             self.assertNotEqual(first, runner.source_manifest())
+
+    def test_source_manifest_matches_stability_staging_scope(self) -> None:
+        runner = load_runner()
+        staging = load_staging()
+        self.assertEqual(
+            runner.source_manifest()["digest"],
+            staging._runtime_source_manifest(ROOT),
+        )
 
     def test_runtime_environment_is_hermetic_and_receipted(self) -> None:
         runner = load_runner()
