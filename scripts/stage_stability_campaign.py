@@ -766,9 +766,12 @@ def _runtime_source_manifest(source: Path) -> str:
             descendants: list[Path] = []
             for child in children:
                 path = Path(child.path)
-                relative = path.relative_to(source).as_posix()
+                relative_path = path.relative_to(source)
+                relative = relative_path.as_posix()
                 if (
-                    any(
+                    "__pycache__" in relative_path.parts
+                    or path.suffix in {".pyc", ".pyo"}
+                    or any(
                         relative.startswith(prefix)
                         for prefix in RUNTIME_SOURCE_IGNORED_PREFIXES
                     )

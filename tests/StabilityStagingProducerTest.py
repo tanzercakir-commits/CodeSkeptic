@@ -2127,6 +2127,18 @@ while True:
             self.assertFalse(marker.exists())
             self.assertEqual(runner.commands, [])
 
+    def test_runtime_source_manifest_ignores_python_cache_outputs(self) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source"
+            initialize_lifecycle_source(source)
+            expected = stage._runtime_source_manifest(source)
+            cache = source / "scripts" / "__pycache__"
+            cache.mkdir()
+            (cache / "generated.cpython-314.pyc").write_bytes(b"cache output")
+            (source / "tests" / "generated.pyo").write_bytes(b"cache output")
+            self.assertEqual(stage._runtime_source_manifest(source), expected)
+
     def test_verify_and_install_require_out_of_band_bundle_identity(self) -> None:
         assert stage is not None
         with sealed_bundle_fixture() as fixture:
