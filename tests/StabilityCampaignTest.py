@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import run_stability_campaign as stability  # noqa: E402
 import run_determinism_qualification as determinism  # noqa: E402
+import provision_stability_authorities as provision  # noqa: E402
 import seal_hosted_exact_head as hosted_authority  # noqa: E402
 
 
@@ -48,6 +49,7 @@ def session_material() -> dict:
         "runtime_config_sha256": "4" * 64,
         "runtime_launch_receipt_sha256": "5" * 64,
         "build_authority_receipt_sha256": "7" * 64,
+        "release_candidate_receipt_sha256": "1" * 64,
         "realworld_manifest_sha256": stability.sha256_file(
             ROOT / "scripts" / "realworld_manifest.json"
         ),
@@ -128,6 +130,7 @@ def runtime_config() -> dict:
             },
             "release_source": "/authority/release/source",
             "release_build": "/authority/release/build",
+            "release_receipt_sha256": "1" * 64,
             "jobs": 2,
             "tools": {
                 "clang": "/usr/bin/clang-20",
@@ -482,6 +485,9 @@ def session_record_for_config(config: dict) -> dict:
     identity["baseline_authority_projection_sha256"] = config[
         "qualification"
     ]["baseline_authority"]["projection_sha256"]
+    identity["release_candidate_receipt_sha256"] = config[
+        "qualification"
+    ]["release_receipt_sha256"]
     session["id"] = stability.build_session_identity(identity)
     return session
 
@@ -763,6 +769,7 @@ def build_evidence_bundle(root: Path) -> dict:
             Path("authorities") / "prerequisites" / "hosted-exact-head.json"
         ),
         "quality_floor": Path("authorities") / "prerequisites" / "quality-floor.json",
+        "release_candidate": Path("authorities") / "release-candidate.json",
     }
     for authority, relative in authority_paths.items():
         digest = write_document(
@@ -790,6 +797,9 @@ def build_evidence_bundle(root: Path) -> dict:
     ]["sha256"]
     identity["baseline_authority_projection_sha256"] = authority_records[
         "determinism_baseline"
+    ]["sha256"]
+    identity["release_candidate_receipt_sha256"] = authority_records[
+        "release_candidate"
     ]["sha256"]
     identity["prerequisite_receipts"] = {
         prerequisite: authority_records[prerequisite]["sha256"]
@@ -1551,6 +1561,13 @@ class BaselineAuthorityContractTest(unittest.TestCase):
             ],
             "projection": {"source_tree_sha1": config["source"]["tree_sha1"]},
         }
+        release = {
+            "bundle": {"fixture": "release-directory"},
+            "receipt_sha256": config["qualification"][
+                "release_receipt_sha256"
+            ],
+            "projection": {"fixture": "release-receipt"},
+        }
 
         with (
             mock.patch.object(
@@ -1600,12 +1617,18 @@ class BaselineAuthorityContractTest(unittest.TestCase):
                     ]
                 },
             ),
+            mock.patch.object(
+                stability,
+                "verify_release_candidate_authority",
+                return_value=release,
+            ),
         ):
             verified = stability.verify_runtime_static_authorities(
                 config, policy
             )
         self.assertIs(verified["determinism_baseline"], baseline)
         self.assertNotIn("determinism", verified)
+        self.assertIs(verified["release_candidate"], release)
         baseline_verifier.assert_called_once_with(
             Path("/authority/source"),
             Path("/authority/source/scripts/determinism_workloads.json"),
@@ -1633,6 +1656,7 @@ class BaselineAuthorityContractTest(unittest.TestCase):
                 "undefined": {"bundle": bundle},
             },
             "realworld_mirror": {"bundle": bundle},
+            "release_candidate": {"bundle": bundle},
             "fault_injection_test_binary": {"fixture": "fault-binary"},
         }
         with (
@@ -1667,13 +1691,96 @@ class BaselineAuthorityContractTest(unittest.TestCase):
             stability.verify_runtime_static_authority_identities(config, static)
 
 
+class ReleaseCandidateAuthorityContractTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name) / "release"
+        self.root.mkdir()
+        self.receipt = self.root / "receipt.json"
+        self.receipt.write_bytes(
+            stability.canonical_document({"fixture": "release-authority"})
+        )
+        self.expected_sha = stability.sha256_file(self.receipt)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def verify(self) -> dict:
+        return stability.verify_release_candidate_authority(
+            self.root,
+            Path("/authority/source"),
+            Path("/authority/mirrors"),
+            "a" * 40,
+            self.expected_sha,
+        )
+
+    def test_semantic_verifier_result_is_bound_without_writing(self) -> None:
+        projection = {"schema": provision.RELEASE_RECEIPT_SCHEMA}
+        before = self.receipt.read_bytes()
+        with mock.patch.object(
+            provision,
+            "verify_release_authority_in_current_runtime",
+            return_value=projection,
+        ) as verifier:
+            result = self.verify()
+        self.assertEqual(self.receipt.read_bytes(), before)
+        self.assertEqual(result["receipt_sha256"], self.expected_sha)
+        self.assertEqual(result["projection"], projection)
+        verifier.assert_called_once_with(
+            self.root,
+            Path("/authority/source"),
+            Path("/authority/mirrors"),
+            "a" * 40,
+        )
+
+    def test_configured_receipt_drift_fails_before_semantic_verification(self) -> None:
+        self.expected_sha = "f" * 64
+        with (
+            mock.patch.object(
+                provision,
+                "verify_release_authority_in_current_runtime",
+            ) as verifier,
+            self.assertRaisesRegex(stability.StabilityError, "configured"),
+        ):
+            self.verify()
+        verifier.assert_not_called()
+
+    def test_semantic_rejection_and_verifier_mutation_are_fail_closed(self) -> None:
+        with (
+            mock.patch.object(
+                provision,
+                "verify_release_authority_in_current_runtime",
+                side_effect=provision.ProvisionError("project identity drift"),
+            ),
+            self.assertRaisesRegex(stability.StabilityError, "project identity drift"),
+        ):
+            self.verify()
+
+        def mutate(*args: object, **kwargs: object) -> dict:
+            del args, kwargs
+            self.receipt.write_bytes(
+                stability.canonical_document({"fixture": "mutated"})
+            )
+            return {"schema": provision.RELEASE_RECEIPT_SCHEMA}
+
+        with (
+            mock.patch.object(
+                provision,
+                "verify_release_authority_in_current_runtime",
+                side_effect=mutate,
+            ),
+            self.assertRaisesRegex(stability.StabilityError, "changed"),
+        ):
+            self.verify()
+
+
 class RuntimeConfigContractTest(unittest.TestCase):
-    def test_runtime_v2_replaces_external_determinism_with_baseline_authority(
+    def test_runtime_v3_binds_release_candidate_authority(
         self,
     ) -> None:
         self.assertEqual(
             stability.RUNTIME_CONFIG_SCHEMA,
-            "codeskeptic-stability-runtime-v2",
+            "codeskeptic-stability-runtime-v3",
         )
         config = runtime_config()
         self.assertEqual(stability.validate_runtime_config(config), config)
@@ -1682,10 +1789,15 @@ class RuntimeConfigContractTest(unittest.TestCase):
             {"hosted_exact_head", "quality_floor"},
         )
 
-        legacy = copy.deepcopy(config)
-        legacy["schema"] = "codeskeptic-stability-runtime-v1"
-        with self.assertRaisesRegex(stability.StabilityError, "schema"):
-            stability.validate_runtime_config(legacy)
+        for schema in (
+            "codeskeptic-stability-runtime-v1",
+            "codeskeptic-stability-runtime-v2",
+        ):
+            with self.subTest(schema=schema):
+                legacy = copy.deepcopy(config)
+                legacy["schema"] = schema
+                with self.assertRaisesRegex(stability.StabilityError, "schema"):
+                    stability.validate_runtime_config(legacy)
 
     def test_exact_pinned_runtime_config_is_accepted_without_ambient_fields(self) -> None:
         config = runtime_config()
@@ -1739,6 +1851,9 @@ class RuntimeConfigContractTest(unittest.TestCase):
             "/authority/release/alternate-build"
         )
         mutations.append(("release-layout", release_layout))
+        release_receipt = runtime_config()
+        release_receipt["qualification"]["release_receipt_sha256"] = "0" * 63
+        mutations.append(("release-receipt", release_receipt))
         for name, mutation in mutations:
             with self.subTest(name=name):
                 with self.assertRaises(stability.StabilityError):
@@ -1875,19 +1990,25 @@ class RuntimeConfigContractTest(unittest.TestCase):
 
 
 class SessionIdentityContractTest(unittest.TestCase):
-    def test_session_and_final_contract_schemas_are_v2(self) -> None:
+    def test_session_and_final_contract_schemas_are_v3(self) -> None:
         self.assertEqual(
             stability.SESSION_SCHEMA,
-            "codeskeptic-stability-session-v2",
+            "codeskeptic-stability-session-v3",
         )
         self.assertEqual(
             stability.RECEIPT_SCHEMA,
-            "codeskeptic-stability-receipt-v2",
+            "codeskeptic-stability-receipt-v3",
         )
-        legacy = session_material()
-        legacy["schema"] = "codeskeptic-stability-session-v1"
-        with self.assertRaisesRegex(stability.StabilityError, "schema"):
-            stability.build_session_identity(legacy)
+        for schema in (
+            "codeskeptic-stability-session-v1",
+            "codeskeptic-stability-session-v2",
+        ):
+            legacy = session_material()
+            legacy["schema"] = schema
+            with self.subTest(schema=schema), self.assertRaisesRegex(
+                stability.StabilityError, "schema"
+            ):
+                stability.build_session_identity(legacy)
 
     def test_exact_authorities_derive_the_session_identity(self) -> None:
         material = session_material()
@@ -1907,6 +2028,8 @@ class SessionIdentityContractTest(unittest.TestCase):
         del missing_prerequisite["prerequisite_receipts"]["hosted_exact_head"]
         missing_mirror = session_material()
         del missing_mirror["realworld_mirror_authority_sha256"]
+        missing_release = session_material()
+        del missing_release["release_candidate_receipt_sha256"]
         missing_fault = session_material()
         del missing_fault["fault_injection_test_binary"]
         unlinked_fault = session_material()
@@ -1919,6 +2042,7 @@ class SessionIdentityContractTest(unittest.TestCase):
             ("missing", missing),
             ("missing-prerequisite", missing_prerequisite),
             ("missing-mirror", missing_mirror),
+            ("missing-release", missing_release),
             ("missing-fault", missing_fault),
             ("unlinked-fault", unlinked_fault),
         ):
@@ -1938,6 +2062,10 @@ class SessionIdentityContractTest(unittest.TestCase):
         )
         self.assertEqual(record["controller_id"], CONTROLLER_ID)
         self.assertEqual(record["identity"]["boot_id"], BOOT_ID)
+        self.assertEqual(
+            record["identity"]["release_candidate_receipt_sha256"],
+            config["qualification"]["release_receipt_sha256"],
+        )
         self.assertEqual(
             record["identity"]["fault_injection_test_binary"],
             {
@@ -4080,11 +4208,18 @@ class RuntimeEstablishmentContractTest(unittest.TestCase):
 
     def test_legacy_establishment_schema_is_rejected(self) -> None:
         path = self.evidence / "establishment" / "receipt.json"
-        receipt = json.loads(path.read_text(encoding="utf-8"))
-        receipt["schema"] = "codeskeptic-stability-establishment-v1"
-        path.write_bytes(stability.canonical_document(receipt))
-        with self.assertRaisesRegex(stability.StabilityError, "authorities"):
-            self.verify()
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for schema in (
+            "codeskeptic-stability-establishment-v1",
+            "codeskeptic-stability-establishment-v2",
+        ):
+            receipt = copy.deepcopy(original)
+            receipt["schema"] = schema
+            path.write_bytes(stability.canonical_document(receipt))
+            with self.subTest(schema=schema), self.assertRaises(
+                stability.StabilityError
+            ):
+                self.verify()
 
 
 class RuntimeEstablishmentBaselineProjectionContractTest(unittest.TestCase):
@@ -4130,6 +4265,7 @@ class RuntimeEstablishmentBaselineProjectionContractTest(unittest.TestCase):
                 "build_authority",
                 "hosted_exact_head",
                 "quality_floor",
+                "release_candidate",
                 "sanitizer_address",
                 "sanitizer_undefined",
             ):
@@ -4172,6 +4308,7 @@ class RuntimeEstablishmentBaselineProjectionContractTest(unittest.TestCase):
                     "determinism_baseline",
                     "hosted_exact_head",
                     "quality_floor",
+                    "release_candidate",
                 },
             )
             baseline_record = staged["authorities"]["determinism_baseline"]
@@ -4219,11 +4356,17 @@ class EvidenceBundleContractTest(unittest.TestCase):
         self.assertEqual(after, before)
 
     def test_legacy_final_receipt_schema_is_rejected(self) -> None:
-        mutation = copy.deepcopy(self.receipt)
-        mutation["schema"] = "codeskeptic-stability-receipt-v1"
-        reseal_outer(self.root, mutation)
-        with self.assertRaisesRegex(stability.StabilityError, "accepted"):
-            self.verify()
+        for schema in (
+            "codeskeptic-stability-receipt-v1",
+            "codeskeptic-stability-receipt-v2",
+        ):
+            mutation = copy.deepcopy(self.receipt)
+            mutation["schema"] = schema
+            reseal_outer(self.root, mutation)
+            with self.subTest(schema=schema), self.assertRaisesRegex(
+                stability.StabilityError, "accepted"
+            ):
+                self.verify()
 
     def test_artifact_tamper_extra_file_and_symlink_are_rejected(self) -> None:
         journal = self.root / "journal.jsonl"
@@ -4295,6 +4438,20 @@ class EvidenceBundleContractTest(unittest.TestCase):
         )
         reseal_outer(self.root, mutation)
         with self.assertRaisesRegex(stability.StabilityError, "prerequisite"):
+            self.verify()
+
+    def test_release_authority_hash_must_match_the_session_identity(self) -> None:
+        mutation = copy.deepcopy(self.receipt)
+        mutation["session"]["identity"][
+            "release_candidate_receipt_sha256"
+        ] = "0" * 64
+        mutation["session"]["id"] = stability.build_session_identity(
+            mutation["session"]["identity"]
+        )
+        reseal_outer(self.root, mutation)
+        with self.assertRaisesRegex(
+            stability.StabilityError, "release-candidate"
+        ):
             self.verify()
 
 

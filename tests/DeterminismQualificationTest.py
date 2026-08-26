@@ -549,7 +549,7 @@ def initialize_source_repo(path: Path) -> dict:
     path.mkdir(parents=True)
     for relative in (
         ".github/workflows", "src", "fuzz", "scripts", "tests", "docs",
-        "profiles",
+        "profiles", "third_party",
     ):
         (path / relative).mkdir(parents=True)
     for relative, content in (
@@ -563,6 +563,7 @@ def initialize_source_repo(path: Path) -> dict:
         ("docs/fixture.md", "fixture\n"),
         ("docs/TODO.md", "# Queue\n\nbase\n"),
         ("profiles/fixture.txt", "fixture\n"),
+        ("third_party/fixture.txt", "fixture dependency\n"),
     ):
         (path / relative).write_text(content, encoding="utf-8")
     (path / "src" / "sample.cpp").write_bytes(SAMPLE_BYTES)
@@ -4138,6 +4139,51 @@ class DeterminismQualificationTest(unittest.TestCase):
                     release_build=build,
                 )
 
+    def test_release_preparation_can_checkout_from_an_offline_mirror(self) -> None:
+        release_workload = manifest()["workloads"][2]
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            source = root / "release" / "source"
+            build = root / "release" / "build"
+            source.mkdir(parents=True)
+            build.mkdir()
+            mirror = "file:///authority/mirrors/llama-cpp.git"
+            with mock.patch.object(
+                qualification,
+                "_prepare_release_checkout",
+                side_effect=qualification.QualificationError("fixture stop"),
+            ) as checkout, self.assertRaisesRegex(
+                qualification.QualificationError, "fixture stop"
+            ):
+                qualification.prepare_release_candidate(
+                    ROOT,
+                    release_workload,
+                    None,
+                    1,
+                    Path("/usr/bin/cmake"),
+                    Path("/usr/bin/ninja"),
+                    Path("/usr/bin/clang-20"),
+                    Path("/usr/bin/clang++-20"),
+                    release_source=source,
+                    release_build=build,
+                    checkout_repository=mirror,
+                )
+            self.assertEqual(
+                checkout.call_args.args[1],
+                qualification._release_manifest_identity(
+                    ROOT, release_workload
+                )["repository"],
+            )
+            self.assertEqual(
+                checkout.call_args.kwargs["checkout_repository"], mirror
+            )
+            self.assertEqual(
+                checkout.call_args.args[2],
+                qualification._release_manifest_identity(
+                    ROOT, release_workload
+                )["revision"],
+            )
+
     def test_release_checkout_ignores_ambient_templates_and_hooks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = temporary_root(directory)
@@ -4247,6 +4293,27 @@ class DeterminismQualificationTest(unittest.TestCase):
             self.assertIn("remote", commands[1])
             self.assertIn("fetch", commands[2])
             self.assertIn("checkout", commands[3])
+
+            offline_source = root / "mocked-offline-release-source"
+            mirror = (root / "sealed-mirror.git").as_uri()
+            upstream_repository = "https://example.invalid/upstream.git"
+            with mock.patch.object(
+                qualification.subprocess, "run", return_value=completed
+            ) as invoked:
+                qualification._prepare_release_checkout(
+                    offline_source,
+                    upstream_repository,
+                    revision,
+                    checkout_repository=mirror,
+                )
+            commands = [call.args[0] for call in invoked.call_args_list]
+            self.assertEqual(commands[1][-2:], ["origin", upstream_repository])
+            self.assertEqual(commands[2][-2:], [mirror, revision])
+            expected_environment = qualification._release_git_environment(
+                offline_source, mirror
+            )
+            for invocation in invoked.call_args_list:
+                self.assertEqual(invocation.kwargs["env"], expected_environment)
 
     def test_explicit_target_pin_detects_target_and_parent_replacement(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -4459,7 +4526,10 @@ class DeterminismQualificationTest(unittest.TestCase):
                 unused_repository: str,
                 unused_revision: str,
                 unused_pin: object = None,
+                *,
+                checkout_repository: str | None = None,
             ) -> None:
+                del checkout_repository
                 checkout_source.mkdir(parents=True, exist_ok=True)
 
             prepared = False
@@ -4542,7 +4612,10 @@ class DeterminismQualificationTest(unittest.TestCase):
                 unused_repository: str,
                 unused_revision: str,
                 unused_pin: object = None,
+                *,
+                checkout_repository: str | None = None,
             ) -> None:
+                del checkout_repository
                 return None
 
             prepared = False
@@ -5640,6 +5713,182 @@ class DeterminismQualificationTest(unittest.TestCase):
                     [sys.executable, "-c", "print('x' * 10000)"],
                     os.environ.copy(), 5, stdout, stderr, [], 128,
                 )
+
+    def test_bounded_process_default_enforces_output_and_file_limits(
+        self,
+    ) -> None:
+        if qualification.resource is None:
+            self.skipTest("RLIMIT_FSIZE contract unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            payload = root / "child-output.bin"
+            maximum = 1024
+            write_program = (
+                "import os,sys; "
+                "descriptor=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT,0o600); "
+                "os.write(descriptor,b'x'*8192); os.close(descriptor)"
+            )
+
+            completed = qualification._run_bounded_process(
+                [sys.executable, "-c", write_program, os.fspath(payload)],
+                os.environ.copy(),
+                5,
+                stdout,
+                stderr,
+                [],
+                maximum,
+            )
+            self.assertEqual(completed.returncode, 0)
+            self.assertTrue(payload.is_file())
+            self.assertEqual(payload.stat().st_size, maximum)
+
+            with self.assertRaisesRegex(
+                qualification.QualificationError, "size limit"
+            ):
+                qualification._run_bounded_process(
+                    [sys.executable, "-c", "print('x' * 10000)"],
+                    os.environ.copy(),
+                    5,
+                    stdout,
+                    stderr,
+                    [],
+                    128,
+                )
+
+    def test_bounded_process_can_lift_only_the_child_file_size_limit(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            payload = root / "child-output.bin"
+            maximum = 128
+            write_program = (
+                "import pathlib,sys; "
+                "pathlib.Path(sys.argv[1]).write_bytes(b'x'*4096); "
+                "print('stdout-ok'); print('stderr-ok',file=sys.stderr)"
+            )
+
+            completed = qualification._run_bounded_process(
+                [sys.executable, "-c", write_program, os.fspath(payload)],
+                os.environ.copy(),
+                5,
+                stdout,
+                stderr,
+                [],
+                maximum,
+                file_size_limit_bytes=None,
+            )
+
+            self.assertEqual(completed.returncode, 0)
+            self.assertEqual(payload.stat().st_size, 4096)
+            self.assertGreater(payload.stat().st_size, maximum)
+            self.assertEqual(completed.stdout, b"stdout-ok\n")
+            self.assertEqual(completed.stderr, b"stderr-ok\n")
+            self.assertLess(stdout.stat().st_size, maximum)
+            self.assertLess(stderr.stat().st_size, maximum)
+
+    def test_bounded_process_failure_monitor_terminates_and_reaps(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group contract")
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            real_popen = subprocess.Popen
+            processes: list[subprocess.Popen[bytes]] = []
+            monitor_calls = 0
+
+            def capture_popen(
+                *args: object, **kwargs: object
+            ) -> subprocess.Popen[bytes]:
+                process = real_popen(*args, **kwargs)
+                processes.append(process)
+                return process
+
+            def reject_process() -> str:
+                nonlocal monitor_calls
+                monitor_calls += 1
+                return "fixture failure monitor rejected process"
+
+            with (
+                mock.patch.object(
+                    qualification.subprocess,
+                    "Popen",
+                    side_effect=capture_popen,
+                ),
+                self.assertRaisesRegex(
+                    qualification.QualificationError,
+                    "fixture failure monitor rejected process",
+                ),
+            ):
+                qualification._run_bounded_process(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    os.environ.copy(),
+                    60,
+                    stdout,
+                    stderr,
+                    [],
+                    1024,
+                    failure_monitor=reject_process,
+                )
+
+            self.assertEqual(monitor_calls, 1)
+            self.assertEqual(len(processes), 1)
+            self.assertIsNotNone(processes[0].poll())
+            self.assertFalse(
+                qualification._process_group_exists(processes[0].pid)
+            )
+
+    def test_bounded_process_reaps_its_group_when_interrupted(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group contract")
+        with tempfile.TemporaryDirectory() as directory:
+            root = temporary_root(directory)
+            stdout = root / "stdout.log"
+            stderr = root / "stderr.log"
+            real_popen = subprocess.Popen
+            real_sleep = time.sleep
+            processes: list[subprocess.Popen[bytes]] = []
+            sleep_calls = 0
+
+            def capture_popen(*args: object, **kwargs: object) -> subprocess.Popen[bytes]:
+                process = real_popen(*args, **kwargs)
+                processes.append(process)
+                return process
+
+            def interrupt_once(delay: float) -> None:
+                nonlocal sleep_calls
+                sleep_calls += 1
+                if sleep_calls == 1:
+                    raise KeyboardInterrupt
+                real_sleep(min(delay, 0.01))
+
+            with (
+                mock.patch.object(
+                    qualification.subprocess, "Popen", side_effect=capture_popen
+                ),
+                mock.patch.object(
+                    qualification.time, "sleep", side_effect=interrupt_once
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                qualification._run_bounded_process(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    os.environ.copy(),
+                    60,
+                    stdout,
+                    stderr,
+                    [],
+                    1024,
+                )
+
+            self.assertEqual(len(processes), 1)
+            self.assertIsNotNone(processes[0].poll())
+            self.assertFalse(qualification._process_group_exists(processes[0].pid))
 
     def test_process_group_reaps_finished_leader_before_forced_signal(self) -> None:
         if os.name != "posix":

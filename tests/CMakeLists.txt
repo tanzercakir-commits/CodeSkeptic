@@ -1,8 +1,12 @@
 include(FetchContent)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 FetchContent_Declare(
     googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
+    URL "${CMAKE_CURRENT_LIST_DIR}/../third_party/googletest-v1.14.0.tar.gz"
+    URL_HASH
+        "SHA256=8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7"
 )
 # MSVC: googletest defaults to the static CRT (/MT) while this project
 # uses CMake's default /MD — mixing them is a hard link error (LNK2038).
@@ -141,6 +145,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_test(NAME StabilityStagingProducerContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/StabilityStagingProducerTest.py)
+    add_test(NAME StabilityAuthorityProvisioningContract
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/StabilityAuthorityProvisioningTest.py)
     add_test(NAME HostedExactHeadReceiptContract
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/HostedExactHeadReceiptTest.py)

@@ -63,9 +63,9 @@ if(APPLE AND NOT DEFINED CMAKE_PREFIX_PATH)
     set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/llvm")
 endif()
 
-# OFF for artifact builds (Docker image): the tests FetchContent
-# googletest, which needs git + network — a hermetic image build
-# shouldn't. CI and dev builds keep the default ON.
+# OFF for artifact builds (Docker image), where unit-test binaries are not
+# shipped. Test builds use the checksum-pinned local GoogleTest archive and do
+# not need Git or network access.
 option(CODESKEPTIC_BUILD_TESTS "Build unit tests" ON)
 option(CODESKEPTIC_BUILD_FUZZERS
        "Build deterministic libFuzzer parser targets" OFF)

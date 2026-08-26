@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -10,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest import mock
@@ -18,6 +20,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "run_sanitizer_matrix.py"
 STAGING_PATH = ROOT / "scripts" / "stage_stability_campaign.py"
+DETERMINISM_PATH = ROOT / "scripts" / "run_determinism_qualification.py"
 EVIDENCE_ROOT = (ROOT / "docs" / "evidence" / "phase10" /
                  "sanitizers" / "2026-08-15-cache-linux-x86_64")
 MATERIALIZED_BUILDS = {
@@ -51,6 +54,17 @@ def load_staging():
     return staging
 
 
+def load_determinism():
+    spec = importlib.util.spec_from_file_location(
+        "sanitizer_determinism_contract", DETERMINISM_PATH
+    )
+    assert spec and spec.loader
+    determinism = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = determinism
+    spec.loader.exec_module(determinism)
+    return determinism
+
+
 def cmake_compiler(environment: str, candidates: tuple[str, ...]) -> str:
     configured = os.environ.get(environment)
     if configured:
@@ -65,6 +79,50 @@ def cmake_compiler(environment: str, candidates: tuple[str, ...]) -> str:
 
 
 class SanitizerContractTest(unittest.TestCase):
+    def test_googletest_dependency_is_local_checksummed_and_source_bound(
+        self,
+    ) -> None:
+        archive = ROOT / "third_party" / "googletest-v1.14.0.tar.gz"
+        self.assertTrue(archive.is_file())
+        self.assertEqual(
+            hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
+        )
+        cmake = (ROOT / "tests" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("third_party/googletest-v1.14.0.tar.gz", cmake)
+        self.assertIn(
+            "SHA256=8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7",
+            cmake,
+        )
+        for forbidden in ("GIT_REPOSITORY", "GIT_TAG", "http://", "https://"):
+            self.assertNotIn(forbidden, cmake)
+        license_copy = ROOT / "third_party" / "googletest-LICENSE"
+        self.assertTrue(license_copy.is_file())
+        with tarfile.open(archive, "r:gz") as source_archive:
+            members = source_archive.getmembers()
+            self.assertTrue(members)
+            self.assertEqual(
+                {Path(member.name).parts[0] for member in members},
+                {"googletest-1.14.0"},
+            )
+            self.assertTrue(
+                all(member.isfile() or member.isdir() for member in members)
+            )
+            license_member = source_archive.extractfile(
+                "googletest-1.14.0/LICENSE"
+            )
+            self.assertIsNotNone(license_member)
+            assert license_member is not None
+            self.assertEqual(license_member.read(), license_copy.read_bytes())
+        runner = load_runner()
+        files = {
+            path.relative_to(ROOT).as_posix()
+            for path in runner._regular_files(runner.SOURCE_ROOTS)
+        }
+        self.assertIn("third_party/googletest-v1.14.0.tar.gz", files)
+
     def test_cmake_exposes_one_validated_sanitizer_profile(self) -> None:
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertIn('set(CODESKEPTIC_SANITIZER "none" CACHE STRING', cmake)
@@ -189,10 +247,51 @@ class SanitizerContractTest(unittest.TestCase):
     def test_source_manifest_matches_stability_staging_scope(self) -> None:
         runner = load_runner()
         staging = load_staging()
+        determinism = load_determinism()
+        runner_manifest = runner.source_manifest()
+        staging_manifest = staging._runtime_source_manifest(ROOT)
+        determinism_manifest = determinism.source_manifest(ROOT)
         self.assertEqual(
-            runner.source_manifest()["digest"],
-            staging._runtime_source_manifest(ROOT),
+            runner_manifest["digest"], staging_manifest,
         )
+        self.assertEqual(
+            determinism_manifest["manifest_sha256"], staging_manifest,
+        )
+        self.assertEqual(
+            determinism_manifest["file_count"], runner_manifest["file_count"],
+        )
+
+        archive = ROOT / "third_party" / "googletest-v1.14.0.tar.gz"
+        runner_hash = runner.sha256_file
+        staging_hash = staging._sha256_regular
+        determinism_hash = determinism.sha256_file
+
+        def changed(original):
+            def digest(path):
+                if Path(path) == archive:
+                    return "0" * 64
+                return original(path)
+            return digest
+
+        with (
+            mock.patch.object(runner, "sha256_file", side_effect=changed(runner_hash)),
+            mock.patch.object(
+                staging, "_sha256_regular", side_effect=changed(staging_hash)
+            ),
+            mock.patch.object(
+                determinism,
+                "sha256_file",
+                side_effect=changed(determinism_hash),
+            ),
+        ):
+            self.assertNotEqual(runner.source_manifest()["digest"], staging_manifest)
+            self.assertNotEqual(
+                staging._runtime_source_manifest(ROOT), staging_manifest
+            )
+            self.assertNotEqual(
+                determinism.source_manifest(ROOT)["manifest_sha256"],
+                staging_manifest,
+            )
 
     def test_runtime_environment_is_hermetic_and_receipted(self) -> None:
         runner = load_runner()

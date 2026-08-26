@@ -7,9 +7,11 @@ import copy
 import io
 import json
 import os
+import selectors
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path, PureWindowsPath
@@ -198,6 +200,17 @@ raise SystemExit(17)
 '''
     _write_executable(path, program)
     return path
+
+
+def _wait_for_process_absence(process_id: int) -> bool:
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        try:
+            os.kill(process_id, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.01)
+    return False
 
 
 def _rewrite_manifest(root: Path) -> None:
@@ -482,6 +495,188 @@ class AnalyzerBuildAuthorityTest(unittest.TestCase):
 
             with mock.patch.object(authority.subprocess, "run", side_effect=completed):
                 authority._execute_container(["/usr/bin/podman", "run"], log)
+
+    @unittest.skipUnless(os.name == "posix", "process-group contract is POSIX-only")
+    def test_runtime_identity_timeout_reaps_the_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            process_id = root / "probe.pid"
+            podman = root / "podman"
+            _write_executable(
+                podman,
+                "#!/usr/bin/python3\n"
+                "import os\n"
+                "import time\n"
+                "from pathlib import Path\n"
+                f"Path({str(process_id)!r}).write_text(str(os.getpid()))\n"
+                "time.sleep(60)\n",
+            )
+            with (
+                mock.patch.object(
+                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 0.05
+                ),
+                self.assertRaisesRegex(
+                    authority.BuildAuthorityError, "Podman identity timed out"
+                ),
+            ):
+                authority._runtime_authority(podman)
+            self.assertTrue(process_id.is_file())
+            self.assertTrue(
+                _wait_for_process_absence(int(process_id.read_text()))
+            )
+
+    @unittest.skipUnless(os.name == "posix", "process-group contract is POSIX-only")
+    def test_runtime_image_inspect_timeout_reaps_the_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            process_id = root / "probe.pid"
+            podman = root / "podman"
+            _write_executable(
+                podman,
+                "#!/usr/bin/python3\n"
+                "import os\n"
+                "import sys\n"
+                "import time\n"
+                "from pathlib import Path\n"
+                "if sys.argv[1:] == ['--version']:\n"
+                "    print('podman version timeout-fixture')\n"
+                "    raise SystemExit(0)\n"
+                f"Path({str(process_id)!r}).write_text(str(os.getpid()))\n"
+                "time.sleep(60)\n",
+            )
+            with (
+                mock.patch.object(
+                    authority, "RUNTIME_IDENTITY_TIMEOUT_SECONDS", 0.05
+                ),
+                self.assertRaisesRegex(
+                    authority.BuildAuthorityError,
+                    "pinned image inspect timed out",
+                ),
+            ):
+                authority._runtime_authority(podman)
+            self.assertTrue(process_id.is_file())
+            self.assertTrue(
+                _wait_for_process_absence(int(process_id.read_text()))
+            )
+
+    @unittest.skipUnless(os.name == "posix", "process-group contract is POSIX-only")
+    def test_runtime_identity_interruption_reaps_the_probe(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            process_id = root / "probe.pid"
+            probe = root / "probe"
+            _write_executable(
+                probe,
+                "#!/usr/bin/python3\n"
+                "import os\n"
+                "import time\n"
+                "from pathlib import Path\n"
+                f"Path({str(process_id)!r}).write_text(str(os.getpid()))\n"
+                "time.sleep(60)\n",
+            )
+
+            def interrupt_after_start(
+                _selector: selectors.BaseSelector, _timeout: float,
+            ) -> list[tuple[selectors.SelectorKey, int]]:
+                deadline = time.monotonic() + 1.0
+                while not process_id.is_file() and time.monotonic() < deadline:
+                    time.sleep(0.005)
+                raise KeyboardInterrupt
+
+            with (
+                mock.patch.object(
+                    authority.selectors.DefaultSelector,
+                    "select",
+                    autospec=True,
+                    side_effect=interrupt_after_start,
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                authority._run_bounded_runtime_identity(
+                    [str(probe)],
+                    {"PATH": "/usr/bin:/bin"},
+                    "interrupt probe",
+                    stdout_limit=1024,
+                    stderr_limit=1024,
+                    timeout_seconds=2.0,
+                )
+            self.assertTrue(process_id.is_file())
+            self.assertTrue(
+                _wait_for_process_absence(int(process_id.read_text()))
+            )
+
+    def test_runtime_identity_closes_stdin_and_does_not_inherit_environment(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / "probe"
+            _write_executable(
+                probe,
+                "#!/usr/bin/python3\n"
+                "import json\n"
+                "import os\n"
+                "import sys\n"
+                "print(json.dumps({\n"
+                "    'expected': os.environ.get('EXPECTED'),\n"
+                "    'hostile': os.environ.get('HOSTILE_RUNTIME_PROBE'),\n"
+                "    'stdin': sys.stdin.read(),\n"
+                "}, sort_keys=True))\n",
+            )
+            with mock.patch.dict(
+                os.environ, {"HOSTILE_RUNTIME_PROBE": "inherited"}
+            ):
+                completed = authority._run_bounded_runtime_identity(
+                    [str(probe)],
+                    {"EXPECTED": "closed", "PATH": "/usr/bin:/bin"},
+                    "closed probe",
+                    stdout_limit=1024,
+                    stderr_limit=1024,
+                    timeout_seconds=2.0,
+                )
+            self.assertEqual(completed.returncode, 0)
+            self.assertEqual(
+                json.loads(completed.stdout),
+                {"expected": "closed", "hostile": None, "stdin": ""},
+            )
+            self.assertEqual(completed.stderr, b"")
+
+    def test_runtime_image_inspect_output_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            podman = Path(directory) / "podman"
+            _write_executable(
+                podman,
+                "#!/usr/bin/python3\n"
+                "import sys\n"
+                "if sys.argv[1:] == ['--version']:\n"
+                "    print('podman version bounded-fixture')\n"
+                "else:\n"
+                "    print('x' * 2048)\n",
+            )
+            with (
+                mock.patch.object(authority, "MAX_JSON_BYTES", 1024),
+                self.assertRaisesRegex(
+                    authority.BuildAuthorityError,
+                    "pinned image inspect output exceeds size limit",
+                ),
+            ):
+                authority._runtime_authority(podman)
+
+    def test_runtime_version_output_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            podman = Path(directory) / "podman"
+            _write_executable(
+                podman,
+                "#!/usr/bin/python3\n"
+                "print('x' * 2048)\n",
+            )
+            with (
+                mock.patch.object(authority, "RUNTIME_VERSION_MAX_BYTES", 1024),
+                self.assertRaisesRegex(
+                    authority.BuildAuthorityError,
+                    "Podman identity output exceeds size limit",
+                ),
+            ):
+                authority._runtime_authority(podman)
 
     def test_runtime_tripwire_pins_digest_id_podman_and_normalized_argv(self) -> None:
         with Fixture() as fixture:

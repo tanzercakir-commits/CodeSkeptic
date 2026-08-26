@@ -24,6 +24,7 @@ on:
       - "scripts/render_quality_dashboard.py"
       - "src/**"
       - "tests/**"
+      - "third_party/**"
       - "CMakeLists.txt"
   push:
     # Same paths, phase* branches: the sandbox-driven loop (see ci.yml)
@@ -38,6 +39,7 @@ on:
       - "scripts/render_quality_dashboard.py"
       - "src/**"
       - "tests/**"
+      - "third_party/**"
       - "CMakeLists.txt"
 
 # Job-status mirroring (refs/status/*, see ci.yml) needs push rights.

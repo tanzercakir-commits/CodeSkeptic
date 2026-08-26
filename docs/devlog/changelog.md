@@ -85,6 +85,26 @@
   Staging, hosted capture, and hosted sealing also recheck the published inode
   after the durable parent sync instead of reporting success over a concurrent
   replacement.
+- Removed the last network dependency from test and sanitizer configuration by
+  retaining the official GoogleTest `v1.14.0` archive, its license, upstream
+  tag identity, and exact SHA-256 in the source authority. CMake now accepts
+  only those local checksum-pinned bytes; source, sanitizer, determinism, and
+  staging manifests all bind the new `third_party` inventory.
+- Split prepared-tree creation from machine-specific authority production.
+  Staging now leaves sanitizer and release destinations absent, while a
+  create-new provisioner builds them in the pinned networkless image and asks
+  separate containers to re-derive each result. Fsynced operation and
+  publication journals recover interrupted work, bind complete source/build
+  inventories, bound runtime-identity probes, and verify invocation-owned
+  containers before cleanup. Rollback now rechecks the complete recorded tree;
+  ambiguous ownership is preserved fail-closed, while failed producer logs are
+  sealed as read-only, checksummed rejection evidence before owned scratch
+  state is removed.
+- Versioned runtime, session, establishment, and final receipts to schema 3.
+  The exact release-candidate receipt is now part of configuration and session
+  identity, is semantically re-derived before execution, is copied into the
+  establishment record, and must remain byte- and directory-identical through
+  final evidence verification.
 
 ## 2026-08-22 — Phase 10.8 cumulative quality-floor audit (in progress)
 

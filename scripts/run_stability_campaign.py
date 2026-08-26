@@ -33,13 +33,13 @@ import run_stability_fault_injection as fault_injection
 
 
 POLICY_SCHEMA = "codeskeptic-stability-campaign-v2"
-RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v2"
+RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v3"
 RUNTIME_LAUNCH_SCHEMA = "codeskeptic-stability-runtime-launch-v2"
 EVENT_SCHEMA = "codeskeptic-stability-event-v1"
-SESSION_SCHEMA = "codeskeptic-stability-session-v2"
+SESSION_SCHEMA = "codeskeptic-stability-session-v3"
 CYCLE_SCHEMA = "codeskeptic-stability-cycle-v1"
-RECEIPT_SCHEMA = "codeskeptic-stability-receipt-v2"
-ESTABLISHMENT_SCHEMA = "codeskeptic-stability-establishment-v2"
+RECEIPT_SCHEMA = "codeskeptic-stability-receipt-v3"
+ESTABLISHMENT_SCHEMA = "codeskeptic-stability-establishment-v3"
 CYCLE_IDENTITY_SCHEMA = "codeskeptic-stability-cycle-identity-v1"
 ACTION_IDENTITY_SCHEMA = "codeskeptic-stability-action-identity-v1"
 CYCLE_PLAN_SCHEMA = "codeskeptic-stability-cycle-plan-v1"
@@ -2263,7 +2263,8 @@ def validate_runtime_config(
         value["qualification"],
         {
             "hardware_class", "measurement_cgroup", "baseline_authority",
-            "release_source", "release_build", "jobs", "tools",
+            "release_source", "release_build", "release_receipt_sha256",
+            "jobs", "tools",
         },
         "runtime qualification",
     )
@@ -2305,6 +2306,10 @@ def validate_runtime_config(
             qualification[field], authority_root,
             f"runtime qualification {field}", exact=exact,
         )
+    _valid_sha(
+        qualification["release_receipt_sha256"],
+        "runtime qualification release receipt",
+    )
     _fixed_integer(qualification["jobs"], 2, "runtime qualification jobs")
     tools = _exact_dict(
         qualification["tools"],
@@ -2599,6 +2604,7 @@ def build_session_identity(material: Any) -> str:
         "source_manifest_sha256", "analyzer_sha256",
         "runtime_config_sha256", "runtime_launch_receipt_sha256",
         "build_authority_receipt_sha256",
+        "release_candidate_receipt_sha256",
         "realworld_manifest_sha256", "realworld_mirror_authority_sha256",
         "determinism_manifest_sha256",
         "baseline_sha256", "baseline_authority_projection_sha256",
@@ -2621,6 +2627,7 @@ def build_session_identity(material: Any) -> str:
         "policy_sha256", "source_manifest_sha256", "analyzer_sha256",
         "runtime_config_sha256", "runtime_launch_receipt_sha256",
         "build_authority_receipt_sha256",
+        "release_candidate_receipt_sha256",
         "realworld_manifest_sha256", "realworld_mirror_authority_sha256",
         "determinism_manifest_sha256",
         "baseline_sha256", "baseline_authority_projection_sha256",
@@ -2707,6 +2714,9 @@ def build_runtime_session_record(
         "runtime_launch_receipt_sha256": launch_sha,
         "build_authority_receipt_sha256": value["build_authority"][
             "receipt_sha256"
+        ],
+        "release_candidate_receipt_sha256": value["qualification"][
+            "release_receipt_sha256"
         ],
         "realworld_manifest_sha256": sha256_file(
             scripts / "realworld_manifest.json"
@@ -7654,6 +7664,58 @@ def verify_determinism_baseline_authority(
     }
 
 
+def verify_release_candidate_authority(
+    release_root: Path,
+    source_root: Path,
+    mirror_root: Path,
+    revision: str,
+    expected_receipt_sha256: str,
+) -> dict[str, Any]:
+    """Re-derive and bind the immutable release-candidate authority."""
+
+    release_before = directory_identity(
+        release_root, "release-candidate authority"
+    )
+    receipt_path = release_root / "receipt.json"
+    receipt_before = sha256_file(receipt_path)
+    if receipt_before != expected_receipt_sha256:
+        raise StabilityError("configured release-candidate authority drift")
+    try:
+        import provision_stability_authorities as provision
+
+        projection = provision.verify_release_authority_in_current_runtime(
+            release_root,
+            source_root,
+            mirror_root,
+            revision,
+        )
+    except Exception as error:
+        raise StabilityError(
+            f"release-candidate authority verification failed: {error}"
+        ) from error
+    release_after = directory_identity(
+        release_root, "release-candidate authority"
+    )
+    receipt_after = sha256_file(receipt_path)
+    if (
+        release_after != release_before
+        or receipt_after != receipt_before
+        or receipt_after != expected_receipt_sha256
+    ):
+        raise StabilityError(
+            "release-candidate authority changed during verification"
+        )
+    if not isinstance(projection, dict):
+        raise StabilityError(
+            "release-candidate authority projection is malformed"
+        )
+    return {
+        "bundle": release_before,
+        "receipt_sha256": receipt_before,
+        "projection": projection,
+    }
+
+
 def verify_runtime_static_authorities(
     config: dict[str, Any],
     policy: dict[str, Any],
@@ -7748,6 +7810,13 @@ def verify_runtime_static_authorities(
         "mirror_authority_sha256"
     ]:
         raise StabilityError("configured real-world mirror authority drift")
+    release = verify_release_candidate_authority(
+        Path(value["qualification"]["release_source"]).parent,
+        source,
+        Path(value["realworld"]["mirror_authority"]).parent,
+        value["source"]["revision"],
+        value["qualification"]["release_receipt_sha256"],
+    )
     return {
         "build_authority": build,
         "quality_floor": quality,
@@ -7756,6 +7825,7 @@ def verify_runtime_static_authorities(
         "sanitizers": sanitizers,
         "fault_injection_test_binary": fault_binary,
         "realworld_mirror": mirror,
+        "release_candidate": release,
     }
 
 
@@ -7849,6 +7919,11 @@ def runtime_establishment_sources(
             Path(value["realworld"]["mirror_authority"]),
             "authorities/realworld_mirror.json",
         ),
+        "release_candidate": (
+            Path(value["qualification"]["release_source"]).parent
+            / "receipt.json",
+            "authorities/release_candidate.json",
+        ),
     }
 
 
@@ -7939,7 +8014,7 @@ def stage_runtime_establishment(
 
     authority_names = (
         "build_authority", "determinism_baseline",
-        "hosted_exact_head", "quality_floor",
+        "hosted_exact_head", "quality_floor", "release_candidate",
     )
     authorities = {
         name: {
@@ -8131,7 +8206,7 @@ def verify_runtime_static_authority_identities(
         {
             "build_authority", "quality_floor", "determinism_baseline",
             "hosted_exact_head", "sanitizers", "realworld_mirror",
-            "fault_injection_test_binary",
+            "fault_injection_test_binary", "release_candidate",
         },
         "runtime static authority results",
     )
@@ -8143,6 +8218,9 @@ def verify_runtime_static_authority_identities(
         ),
         "realworld_mirror": Path(
             value["realworld"]["mirror_authority"]
+        ).parent,
+        "release_candidate": Path(
+            value["qualification"]["release_source"]
         ).parent,
     }
     for name, root in roots.items():
@@ -8526,13 +8604,13 @@ def verify_evidence_structure(
         receipt["authorities"],
         {
             "build_authority", "determinism_baseline",
-            "hosted_exact_head", "quality_floor",
+            "hosted_exact_head", "quality_floor", "release_candidate",
         },
         "receipt authorities",
     )
     for authority in (
         "build_authority", "determinism_baseline",
-        "hosted_exact_head", "quality_floor",
+        "hosted_exact_head", "quality_floor", "release_candidate",
     ):
         record = _exact_dict(
             authorities[authority], {"path", "sha256"},
@@ -8551,6 +8629,14 @@ def verify_evidence_structure(
             ):
                 raise StabilityError(
                     "determinism baseline session identity mismatch"
+                )
+        elif authority == "release_candidate":
+            if (
+                record["sha256"]
+                != session_identity["release_candidate_receipt_sha256"]
+            ):
+                raise StabilityError(
+                    "release-candidate session identity mismatch"
                 )
         elif record["sha256"] != session_identity["prerequisite_receipts"][authority]:
             raise StabilityError(f"prerequisite {authority} session identity mismatch")
@@ -8724,7 +8810,7 @@ def verify_production_evidence(
     staged = establishment["staged"]
     for authority in (
         "build_authority", "determinism_baseline",
-        "hosted_exact_head", "quality_floor",
+        "hosted_exact_head", "quality_floor", "release_candidate",
     ):
         expected_record = {
             "path": staged[authority]["path"],

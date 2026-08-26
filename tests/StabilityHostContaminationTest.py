@@ -589,6 +589,7 @@ def session_record(
         "runtime_config_sha256": runtime_config_sha256,
         "runtime_launch_receipt_sha256": runtime_launch_receipt_sha256,
         "build_authority_receipt_sha256": "8" * 64,
+        "release_candidate_receipt_sha256": "4" * 64,
         "realworld_manifest_sha256": "9" * 64,
         "realworld_mirror_authority_sha256": "a" * 64,
         "determinism_manifest_sha256": "b" * 64,

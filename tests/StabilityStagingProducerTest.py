@@ -240,6 +240,7 @@ def initialize_lifecycle_source(
         )
     for relative in (
         ".github/workflows", "src", "fuzz", "tests", "docs", "profiles",
+        "third_party",
     ):
         directory = repository / relative
         directory.mkdir(parents=True, exist_ok=True)
@@ -344,6 +345,7 @@ def populate_prepared_authorities(
         "build-authority/receipt.json": b'{"accepted":true}\n',
         "prerequisites/hosted/receipt.json": b'{"gate":"hosted"}\n',
         "prerequisites/quality/receipt.json": b'{"gate":"quality"}\n',
+        "release/receipt.json": b'{"project":"llama-cpp"}\n',
         "sanitizers/address/receipt.json": b'{"profile":"address"}\n',
         "sanitizers/undefined/receipt.json": b'{"profile":"undefined"}\n',
         (
@@ -399,24 +401,8 @@ def make_manual_prepared_tree(
     for relative in ("authority", "image", "operator", "unit"):
         (prepared / relative).mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, prepared / "authority" / "source")
-    for relative in (
-        "build",
-        "build-authority",
-        "release/source",
-        "release/build",
-        "prerequisites/hosted",
-        "prerequisites/quality",
-        "sanitizers/address",
-        "sanitizers/undefined",
-    ):
+    for relative in ("build", "build-authority", "prerequisites"):
         (prepared / "authority" / relative).mkdir(parents=True, exist_ok=True)
-    (
-        prepared
-        / "authority"
-        / "source"
-        / "build"
-        / "p10-09-sanitizers"
-    ).mkdir(parents=True)
 
     systemd = source / "scripts" / "stability-systemd"
     operator_files = {
@@ -814,7 +800,7 @@ while True:
 
     def test_cli_is_versioned_and_exposes_the_complete_lifecycle(self) -> None:
         assert stage is not None
-        self.assertEqual(stage.TOOL_VERSION, "3")
+        self.assertEqual(stage.TOOL_VERSION, "4")
         parser = stage.build_parser()
         subparser_actions = [
             action
@@ -848,7 +834,7 @@ while True:
         )
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertEqual(version.stderr, "")
-        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 3\n")
+        self.assertEqual(version.stdout, "CodeSkeptic P10-09 staging producer 4\n")
 
     def test_cli_dispatches_every_lifecycle_command(self) -> None:
         assert stage is not None
@@ -941,6 +927,304 @@ while True:
                     if name != expected:
                         function.assert_not_called()
 
+    def test_configure_and_seal_reject_unresolved_authority_lifecycle(
+        self,
+    ) -> None:
+        assert stage is not None
+        token = "a" * 32
+        reserved_paths = [
+            (Path(name), "file")
+            for name in sorted(stage.AUTHORITY_OPERATION_MARKERS)
+        ]
+        journal_token = "b" * 64
+        for journal in ("operation", "transaction"):
+            staging_name = (
+                f".p10-09-authority-{journal}.json."
+                f"{journal_token}.staging"
+            )
+            reserved_paths.extend((
+                (Path(staging_name), "file"),
+                (Path(staging_name + ".cleanup"), "file"),
+                (
+                    Path(
+                        f".p10-09-authority-{journal}.json."
+                        "malformed.staging"
+                    ),
+                    "file",
+                ),
+            ))
+        for base in (
+            Path(f".sanitizers.{token}"),
+            Path(f".release.{token}"),
+            Path("source/build") / f".p10-09-sanitizers.{token}",
+        ):
+            reserved_paths.extend(
+                (base.with_name(base.name + suffix), kind)
+                for suffix, kind in (
+                    ("", "directory"),
+                    (".cleanup", "directory"),
+                    (".owner.json", "file"),
+                    (".owner.json.cleanup", "file"),
+                    (".rollback", "directory"),
+                )
+            )
+
+        for lifecycle, worker_name in (
+            ("configure", "_configure_staging_unlocked"),
+            ("seal", "_seal_staging_unlocked"),
+        ):
+            for relative, kind in reserved_paths:
+                with (
+                    self.subTest(lifecycle=lifecycle, reserved=relative),
+                    tempfile.TemporaryDirectory() as temporary,
+                ):
+                    workspace = Path(temporary)
+                    staging = workspace / "prepared"
+                    authority = staging / "authority"
+                    authority.mkdir(parents=True)
+                    reserved = authority / relative
+                    reserved.parent.mkdir(parents=True, exist_ok=True)
+                    if kind == "directory":
+                        reserved.mkdir()
+                    else:
+                        reserved.write_bytes(b"unresolved fixture state\n")
+                    output = workspace / "sealed"
+
+                    with (
+                        mock.patch.object(
+                            stage, worker_name, create=True
+                        ) as worker,
+                        self.assertRaisesRegex(
+                            stage.StagingError,
+                            "unresolved authority provisioning lifecycle",
+                        ),
+                    ):
+                        if lifecycle == "configure":
+                            stage.configure_staging(
+                                staging,
+                                "1" * 40,
+                                repository="codeskeptic/staging-fixture",
+                            )
+                        else:
+                            stage.seal_staging(
+                                staging,
+                                "1" * 40,
+                                output,
+                            )
+
+                    worker.assert_not_called()
+                    self.assertTrue(
+                        reserved.is_dir()
+                        if kind == "directory"
+                        else reserved.is_file()
+                    )
+                    self.assertFalse(output.exists())
+
+    def test_configure_and_seal_fail_closed_on_lifecycle_lock_contention(
+        self,
+    ) -> None:
+        assert stage is not None
+        for lifecycle, worker_name in (
+            ("configure", "_configure_staging_unlocked"),
+            ("seal", "_seal_staging_unlocked"),
+        ):
+            with (
+                self.subTest(lifecycle=lifecycle),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                staging = workspace / "prepared"
+                (staging / "authority").mkdir(parents=True)
+                output = workspace / "sealed"
+
+                with stage._authority_lifecycle_lock(staging):
+                    with (
+                        mock.patch.object(
+                            stage, worker_name, create=True
+                        ) as worker,
+                        self.assertRaisesRegex(
+                            stage.StagingError,
+                            "authority provisioning is still active",
+                        ),
+                    ):
+                        if lifecycle == "configure":
+                            stage.configure_staging(
+                                staging,
+                                "1" * 40,
+                                repository="codeskeptic/staging-fixture",
+                            )
+                        else:
+                            stage.seal_staging(
+                                staging,
+                                "1" * 40,
+                                output,
+                            )
+
+                worker.assert_not_called()
+                self.assertFalse(output.exists())
+
+    def test_lifecycle_lock_pins_root_and_parent_before_lock_creation(
+        self,
+    ) -> None:
+        assert stage is not None
+        real_open = os.open
+        for target in ("root", "parent"):
+            with (
+                self.subTest(target=target),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                parent = workspace / "authority-workspace"
+                staging = parent / "prepared"
+                staging.mkdir(parents=True)
+                original: Path | None = None
+                replaced = False
+
+                def replace_before_parent_open(
+                    path,
+                    flags,
+                    mode=0o777,
+                    *,
+                    dir_fd=None,
+                ):
+                    nonlocal original, replaced
+                    if (
+                        not replaced
+                        and dir_fd is None
+                        and Path(path) == parent
+                    ):
+                        replaced = True
+                        if target == "root":
+                            original = parent / "prepared-original"
+                            staging.rename(original)
+                            staging.mkdir()
+                        else:
+                            original = workspace / "authority-workspace-original"
+                            parent.rename(original)
+                            parent.mkdir()
+                            staging.mkdir()
+                    if dir_fd is None:
+                        return real_open(path, flags, mode)
+                    return real_open(path, flags, mode, dir_fd=dir_fd)
+
+                with (
+                    mock.patch.object(
+                        stage.os,
+                        "open",
+                        side_effect=replace_before_parent_open,
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError,
+                        f"authority lifecycle {target} identity drift",
+                    ),
+                ):
+                    with stage._authority_lifecycle_lock(staging):
+                        self.fail("replacement reached the protected lifecycle")
+
+                self.assertTrue(replaced)
+                assert original is not None
+                self.assertTrue(original.is_dir())
+                self.assertTrue(staging.is_dir())
+
+    def test_lifecycle_lock_revalidates_root_and_parent_after_flock(
+        self,
+    ) -> None:
+        assert stage is not None
+        real_flock = stage.fcntl.flock
+        exclusive = stage.fcntl.LOCK_EX | stage.fcntl.LOCK_NB
+        for target in ("root", "parent"):
+            with (
+                self.subTest(target=target),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                workspace = Path(temporary)
+                parent = workspace / "authority-workspace"
+                staging = parent / "prepared"
+                staging.mkdir(parents=True)
+                original: Path | None = None
+                replaced = False
+
+                def replace_after_flock(descriptor: int, operation: int):
+                    nonlocal original, replaced
+                    result = real_flock(descriptor, operation)
+                    if not replaced and operation == exclusive:
+                        replaced = True
+                        if target == "root":
+                            original = parent / "prepared-original"
+                            staging.rename(original)
+                            staging.mkdir()
+                        else:
+                            original = workspace / "authority-workspace-original"
+                            parent.rename(original)
+                            parent.mkdir()
+                            staging.mkdir()
+                    return result
+
+                with (
+                    mock.patch.object(
+                        stage.fcntl,
+                        "flock",
+                        side_effect=replace_after_flock,
+                    ),
+                    self.assertRaisesRegex(
+                        stage.StagingError,
+                        f"authority lifecycle {target} identity drift",
+                    ),
+                ):
+                    with stage._authority_lifecycle_lock(staging):
+                        self.fail("replacement reached the protected lifecycle")
+
+                self.assertTrue(replaced)
+                assert original is not None
+                self.assertTrue(original.is_dir())
+                self.assertTrue(staging.is_dir())
+
+    def test_lifecycle_lock_rejects_lock_file_replacement_after_flock(
+        self,
+    ) -> None:
+        assert stage is not None
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            parent = workspace / "authority-workspace"
+            staging = parent / "prepared"
+            staging.mkdir(parents=True)
+            suffix = hashlib.sha256(
+                staging.absolute().as_posix().encode("utf-8")
+            ).hexdigest()[:32]
+            lock_path = parent / f".codeskeptic-p10-09-{suffix}.lock"
+            original_lock = parent / "original-lifecycle.lock"
+            real_flock = stage.fcntl.flock
+            exclusive = stage.fcntl.LOCK_EX | stage.fcntl.LOCK_NB
+            replaced = False
+
+            def replace_after_flock(descriptor: int, operation: int):
+                nonlocal replaced
+                result = real_flock(descriptor, operation)
+                if not replaced and operation == exclusive:
+                    replaced = True
+                    lock_path.rename(original_lock)
+                    lock_path.write_bytes(b"")
+                    lock_path.chmod(0o600)
+                return result
+
+            with (
+                mock.patch.object(
+                    stage.fcntl,
+                    "flock",
+                    side_effect=replace_after_flock,
+                ),
+                self.assertRaisesRegex(
+                    stage.StagingError,
+                    "authority lifecycle lock identity drift",
+                ),
+            ):
+                with stage._authority_lifecycle_lock(staging):
+                    self.fail("replacement reached the protected lifecycle")
+
+            self.assertTrue(replaced)
+            self.assertTrue(original_lock.is_file())
+            self.assertTrue(lock_path.is_file())
+
     def test_prepare_creates_a_fresh_exact_head_layout_and_never_overwrites(self) -> None:
         assert stage is not None
         temporary = tempfile.TemporaryDirectory()
@@ -963,6 +1247,20 @@ while True:
                 (prepared / "authority" / "mirrors").exists(),
                 "real-world mirror sealer output must remain create-new",
             )
+            self.assertTrue(
+                (prepared / "authority" / "prerequisites").is_dir()
+            )
+            for relative in (
+                "prerequisites/hosted",
+                "prerequisites/quality",
+                "release",
+                "sanitizers",
+                "source/build/p10-09-sanitizers",
+            ):
+                self.assertFalse(
+                    (prepared / "authority" / relative).exists(),
+                    f"producer output must remain create-new: {relative}",
+                )
             staged_identity = stage.validate_staged_source(
                 prepared / "authority" / "source", revision
             )
@@ -1106,7 +1404,7 @@ while True:
 
             self.assertEqual(data, stage.canonical_document(config))
             self.assertEqual(
-                config["schema"], "codeskeptic-stability-runtime-v2"
+                config["schema"], "codeskeptic-stability-runtime-v3"
             )
             self.assertEqual(config["source"]["revision"], revision)
             self.assertEqual(
@@ -1164,7 +1462,7 @@ while True:
                 (config_path.read_bytes(), sidecar_path.read_bytes()), before
             )
 
-    def test_runtime_v1_and_external_determinism_prerequisite_fail_closed(
+    def test_legacy_runtime_and_external_determinism_prerequisite_fail_closed(
         self,
     ) -> None:
         assert stage is not None
@@ -1173,10 +1471,15 @@ while True:
             config_path = prepared / "config/runtime.json"
             config = json.loads(config_path.read_text(encoding="utf-8"))
 
-            old_schema = copy.deepcopy(config)
-            old_schema["schema"] = "codeskeptic-stability-runtime-v1"
-            with self.assertRaisesRegex(stage.StagingError, "schema"):
-                stage._validate_runtime_config_contract(old_schema)
+            for schema in (
+                "codeskeptic-stability-runtime-v1",
+                "codeskeptic-stability-runtime-v2",
+            ):
+                with self.subTest(schema=schema):
+                    old_schema = copy.deepcopy(config)
+                    old_schema["schema"] = schema
+                    with self.assertRaisesRegex(stage.StagingError, "schema"):
+                        stage._validate_runtime_config_contract(old_schema)
 
             external = copy.deepcopy(config)
             external["prerequisites"]["determinism"] = {
@@ -1212,6 +1515,7 @@ while True:
         assert stage is not None
         for case in (
             "missing-receipt",
+            "missing-release-receipt",
             "malformed-repository-suffix",
             "malformed-repository-component",
             "sidecar-write",
@@ -1226,6 +1530,12 @@ while True:
                     (
                         prepared
                         / "authority/prerequisites/hosted/receipt.json"
+                    ).unlink()
+                    context = contextlib.nullcontext()
+                    repository = "codeskeptic/staging-fixture"
+                elif case == "missing-release-receipt":
+                    (
+                        prepared / "authority/release/receipt.json"
                     ).unlink()
                     context = contextlib.nullcontext()
                     repository = "codeskeptic/staging-fixture"

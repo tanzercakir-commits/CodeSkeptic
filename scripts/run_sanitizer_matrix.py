@@ -91,6 +91,7 @@ SOURCE_ROOTS = (
     ROOT / "fuzz",
     ROOT / "scripts",
     ROOT / "tests",
+    ROOT / "third_party",
     ROOT / "docs",
     ROOT / "profiles",
 )

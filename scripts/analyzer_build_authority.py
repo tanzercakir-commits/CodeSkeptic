@@ -20,11 +20,14 @@ import hashlib
 import json
 import os
 import re
+import selectors
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -74,6 +77,10 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 MAX_LOG_BYTES = 64 << 20
 MAX_JSON_BYTES = 4 << 20
 MAX_BINARY_BYTES = 1 << 30
+RUNTIME_VERSION_MAX_BYTES = 1 << 16
+RUNTIME_IDENTITY_TIMEOUT_SECONDS = 30.0
+RUNTIME_IDENTITY_POLL_SECONDS = 0.025
+RUNTIME_IDENTITY_CLEANUP_SECONDS = 0.5
 DEFAULT_PODMAN = Path("/usr/bin/podman")
 INNER_TOKEN_ENV = "CODESKEPTIC_BUILD_AUTHORITY_LAUNCH_SHA256"
 ROOT = Path(__file__).resolve().parents[1]
@@ -563,6 +570,203 @@ def _tool_path_map(tools: _ToolPaths) -> dict[str, Path]:
     }
 
 
+def _runtime_process_group_exists(process_group: int) -> bool:
+    if os.name != "posix":
+        return False
+    try:
+        os.killpg(process_group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def _wait_for_runtime_process_group_exit(
+    process: subprocess.Popen[bytes], timeout_seconds: float,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        process.poll()
+        if not _runtime_process_group_exists(process.pid):
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(0.01, remaining))
+
+
+def _terminate_runtime_identity_process(
+    process: subprocess.Popen[bytes], label: str,
+) -> None:
+    """Terminate one identity probe and its process group, then reap it."""
+    group_failure: str | None = None
+    if os.name == "posix":
+        term_error: OSError | None = None
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except OSError as error:
+            term_error = error
+        if not _wait_for_runtime_process_group_exit(
+            process, RUNTIME_IDENTITY_CLEANUP_SECONDS
+        ):
+            kill_error: OSError | None = None
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError as error:
+                kill_error = error
+            if not _wait_for_runtime_process_group_exit(
+                process, RUNTIME_IDENTITY_CLEANUP_SECONDS
+            ):
+                signal_error = kill_error or term_error
+                detail = f": {signal_error}" if signal_error is not None else ""
+                group_failure = "process group remained after SIGKILL" + detail
+    elif process.poll() is None:
+        process.terminate()
+
+    if process.poll() is None:
+        try:
+            process.wait(timeout=RUNTIME_IDENTITY_CLEANUP_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            try:
+                process.wait(timeout=RUNTIME_IDENTITY_CLEANUP_SECONDS)
+            except subprocess.TimeoutExpired as error:
+                raise BuildAuthorityError(
+                    f"{label} cleanup failed: process could not be reaped"
+                ) from error
+    else:
+        # ``poll`` reaps the direct child on POSIX.  ``wait`` also makes the
+        # reaping contract explicit and is harmless after a completed poll.
+        process.wait()
+    if group_failure is not None:
+        raise BuildAuthorityError(f"{label} cleanup failed: {group_failure}")
+
+
+def _run_bounded_runtime_identity(
+    command: list[str], environment: dict[str, str], label: str,
+    *, stdout_limit: int, stderr_limit: int,
+    stderr_to_stdout: bool = False,
+    timeout_seconds: float | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a runtime identity probe with closed input and bounded output."""
+    if timeout_seconds is None:
+        timeout_seconds = RUNTIME_IDENTITY_TIMEOUT_SECONDS
+    if (
+        not command
+        or stdout_limit <= 0
+        or stderr_limit <= 0
+        or timeout_seconds <= 0
+    ):
+        raise BuildAuthorityError(f"{label} bounded execution contract is invalid")
+
+    process: subprocess.Popen[bytes] | None = None
+    selector = selectors.DefaultSelector()
+    captured = {"stdout": bytearray(), "stderr": bytearray()}
+    limits = {"stdout": stdout_limit, "stderr": stderr_limit}
+    failure: str | None = None
+    started = time.monotonic()
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=(subprocess.STDOUT if stderr_to_stdout else subprocess.PIPE),
+            env=dict(environment),
+            start_new_session=(os.name == "posix"),
+            bufsize=0,
+        )
+        if process.stdout is None:
+            raise BuildAuthorityError(f"{label} stdout pipe is unavailable")
+        selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+        if not stderr_to_stdout:
+            if process.stderr is None:
+                raise BuildAuthorityError(f"{label} stderr pipe is unavailable")
+            selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+
+        while selector.get_map():
+            remaining = timeout_seconds - (time.monotonic() - started)
+            if remaining <= 0:
+                failure = f"{label} timed out"
+                break
+            events = selector.select(
+                min(RUNTIME_IDENTITY_POLL_SECONDS, remaining)
+            )
+            for key, _mask in events:
+                stream_name = key.data
+                remaining_bytes = limits[stream_name] - len(captured[stream_name])
+                block = os.read(key.fd, min(65536, remaining_bytes + 1))
+                if not block:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    continue
+                if len(block) > remaining_bytes:
+                    failure = f"{label} output exceeds size limit"
+                    break
+                captured[stream_name].extend(block)
+            if failure is not None:
+                break
+
+        if failure is None:
+            remaining = timeout_seconds - (time.monotonic() - started)
+            try:
+                process.wait(timeout=max(0.0, remaining))
+            except subprocess.TimeoutExpired:
+                failure = f"{label} timed out"
+            if (
+                failure is None
+                and os.name == "posix"
+                and _runtime_process_group_exists(process.pid)
+            ):
+                failure = f"{label} left live descendants"
+
+        if failure is not None:
+            try:
+                _terminate_runtime_identity_process(process, label)
+            except BuildAuthorityError as cleanup_error:
+                raise BuildAuthorityError(
+                    f"{failure}; {cleanup_error}"
+                ) from cleanup_error
+            raise BuildAuthorityError(failure)
+
+        return subprocess.CompletedProcess(
+            command,
+            process.returncode,
+            bytes(captured["stdout"]),
+            bytes(captured["stderr"]),
+        )
+    except BaseException as error:
+        if (
+            process is not None
+            and (
+                process.poll() is None
+                or (
+                    os.name == "posix"
+                    and _runtime_process_group_exists(process.pid)
+                )
+            )
+        ):
+            try:
+                _terminate_runtime_identity_process(process, label)
+            except BaseException as cleanup_error:
+                raise BuildAuthorityError(
+                    f"{label} interruption cleanup failed: {cleanup_error}"
+                ) from error
+        if isinstance(error, (BuildAuthorityError, KeyboardInterrupt, SystemExit)):
+            raise
+        raise BuildAuthorityError(f"cannot execute {label}: {error}") from error
+    finally:
+        selector.close()
+        if process is not None:
+            for stream in (process.stdout, process.stderr):
+                if stream is not None and not stream.closed:
+                    stream.close()
+
+
 def _tool_record(
     path: Path,
     label: str,
@@ -586,15 +790,20 @@ def _tool_record(
         if environment is None:
             identity = determinism._tool_identity(path, label)
         else:
-            completed = subprocess.run(
+            completed = _run_bounded_runtime_identity(
                 [str(path), "--version"],
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=environment,
+                environment,
+                f"{label} identity",
+                stdout_limit=RUNTIME_VERSION_MAX_BYTES,
+                stderr_limit=RUNTIME_VERSION_MAX_BYTES,
+                stderr_to_stdout=True,
             )
             raw = completed.stdout
-            if completed.returncode != 0 or not raw or len(raw) > 65536:
+            if (
+                completed.returncode != 0
+                or not raw
+                or len(raw) > RUNTIME_VERSION_MAX_BYTES
+            ):
                 raise BuildAuthorityError(f"cannot capture {label} identity")
             version = raw.decode("utf-8").strip()
             if not version or "\x00" in version:
@@ -807,16 +1016,13 @@ def _runtime_authority(
         "{{json .}}",
         PINNED_IMAGE,
     ]
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=environment,
-        )
-    except OSError as error:
-        raise BuildAuthorityError(f"cannot inspect pinned image: {error}") from error
+    completed = _run_bounded_runtime_identity(
+        command,
+        environment,
+        "pinned image inspect",
+        stdout_limit=MAX_JSON_BYTES,
+        stderr_limit=MAX_JSON_BYTES,
+    )
     if completed.returncode != 0 or not completed.stdout:
         message = completed.stderr.decode("utf-8", errors="replace")
         raise BuildAuthorityError(

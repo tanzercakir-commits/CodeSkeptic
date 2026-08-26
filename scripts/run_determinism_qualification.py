@@ -22,7 +22,7 @@ import time
 import types
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 from urllib.parse import urlsplit
 
 try:
@@ -111,7 +111,7 @@ SOURCE_FILE_RELATIVES = (
 )
 SOURCE_DIRECTORY_RELATIVES = (
     ".github/workflows", "src", "fuzz", "scripts", "tests", "docs",
-    "profiles",
+    "profiles", "third_party",
 )
 SOURCE_ROOTS = tuple(
     ROOT / relative
@@ -4981,17 +4981,25 @@ def _prepare_release_checkout(
     repository: str,
     revision: str,
     target_pin: "_PinnedReleaseTargets | None" = None,
+    *,
+    checkout_repository: str | None = None,
 ) -> None:
+    fetch_repository = (
+        "origin" if checkout_repository is None else checkout_repository
+    )
     commands = (
         ["/usr/bin/git", "init", "--quiet", "--template=", os.fspath(source)],
         ["/usr/bin/git", "-C", os.fspath(source), "remote", "add",
-         "origin", repository],
+        "origin", repository],
         ["/usr/bin/git", "-C", os.fspath(source), "fetch", "--quiet",
-         "--depth", "1", "origin", revision],
+         "--depth", "1", fetch_repository, revision],
         ["/usr/bin/git", "-C", os.fspath(source), "checkout", "--quiet",
          "--detach", "FETCH_HEAD"],
     )
-    environment = _release_git_environment(source, repository)
+    environment = _release_git_environment(
+        source,
+        repository if checkout_repository is None else checkout_repository,
+    )
     for command in commands:
         if target_pin is not None:
             target_pin.verify("before release-candidate checkout command")
@@ -5443,6 +5451,7 @@ def prepare_release_candidate(
     *,
     release_source: Path | None = None,
     release_build: Path | None = None,
+    checkout_repository: str | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
     explicit_targets = release_source is not None or release_build is not None
     campaign = _load_sibling_authority_module(
@@ -5465,7 +5474,11 @@ def prepare_release_candidate(
     )
     try:
         _prepare_release_checkout(
-            source, project["repository"], project["revision"], target_pin
+            source,
+            project["repository"],
+            project["revision"],
+            target_pin,
+            checkout_repository=checkout_repository,
         )
         for operation in project["copies"]:
             if target_pin is not None:
@@ -6187,45 +6200,77 @@ def _run_bounded_process(
     command: list[str], environment: dict[str, str], timeout_seconds: float,
     stdout_path: Path, stderr_path: Path, monitored_paths: list[Path],
     maximum_bytes: int = MAX_LOG_BYTES,
+    *,
+    file_size_limit_bytes: int | None = 0,
+    failure_monitor: Callable[[], str | None] | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     with stdout_path.open("wb") as stdout_stream, stderr_path.open("wb") as stderr_stream:
         child_setup = None
-        if resource is not None:
+        effective_file_limit = (
+            maximum_bytes
+            if file_size_limit_bytes == 0
+            else file_size_limit_bytes
+        )
+        if resource is not None and effective_file_limit is not None:
             def child_setup() -> None:
                 resource.setrlimit(
-                    resource.RLIMIT_FSIZE, (maximum_bytes, maximum_bytes)
+                    resource.RLIMIT_FSIZE,
+                    (effective_file_limit, effective_file_limit),
                 )
-        process = subprocess.Popen(
-            command, stdout=stdout_stream, stderr=stderr_stream,
-            env=environment, start_new_session=(os.name == "posix"),
-            preexec_fn=child_setup,
-        )
+        process: subprocess.Popen[bytes] | None = None
         failure: str | None = None
-        while process.poll() is None:
-            if time.monotonic() - started >= timeout_seconds:
-                failure = "qualification process timed out"
-                break
-            for path in (stdout_path, stderr_path, *monitored_paths):
-                try:
-                    size = path.stat().st_size
-                except FileNotFoundError:
-                    continue
-                if size >= maximum_bytes:
-                    failure = f"qualification output exceeds size limit: {path.name}"
+        try:
+            process = subprocess.Popen(
+                command, stdout=stdout_stream, stderr=stderr_stream,
+                env=environment, start_new_session=(os.name == "posix"),
+                preexec_fn=child_setup,
+            )
+            while process.poll() is None:
+                if time.monotonic() - started >= timeout_seconds:
+                    failure = "qualification process timed out"
                     break
+                for path in (stdout_path, stderr_path, *monitored_paths):
+                    try:
+                        size = path.stat().st_size
+                    except FileNotFoundError:
+                        continue
+                    if size >= maximum_bytes:
+                        failure = (
+                            "qualification output exceeds size limit: "
+                            f"{path.name}"
+                        )
+                        break
+                if failure:
+                    break
+                if failure_monitor is not None:
+                    failure = failure_monitor()
+                    if failure:
+                        break
+                time.sleep(0.025)
             if failure:
-                break
-            time.sleep(0.025)
-        if failure:
-            _terminate_process_group(process, failure)
-        else:
-            process.wait()
-            if os.name == "posix" and _process_group_exists(process.pid):
-                failure = "qualification process left live descendants"
                 _terminate_process_group(process, failure)
+            else:
+                process.wait()
+                if os.name == "posix" and _process_group_exists(process.pid):
+                    failure = "qualification process left live descendants"
+                    _terminate_process_group(process, failure)
+        except BaseException as error:
+            if process is not None:
+                try:
+                    _terminate_process_group(
+                        process, "qualification process interrupted"
+                    )
+                except BaseException as cleanup_error:
+                    raise QualificationError(
+                        "qualification process interruption cleanup failed: "
+                        f"{error}; {cleanup_error}"
+                    ) from error
+            raise
+    if process is None:
+        raise QualificationError("qualification process did not start")
     for path in (stdout_path, stderr_path, *monitored_paths):
         try:
             size = path.stat().st_size
@@ -6235,7 +6280,11 @@ def _run_bounded_process(
             failure = f"qualification output exceeds size limit: {path.name}"
     if failure:
         raise QualificationError(failure)
-    if (resource is not None and process.returncode == -signal.SIGXFSZ):
+    if (
+        resource is not None
+        and effective_file_limit is not None
+        and process.returncode == -signal.SIGXFSZ
+    ):
         raise QualificationError("qualification output exceeds size limit")
     return subprocess.CompletedProcess(
         command, process.returncode,

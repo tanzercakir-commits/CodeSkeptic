@@ -8,6 +8,7 @@ import copy
 import contextlib
 import ctypes
 import errno
+import fcntl
 import hashlib
 import json
 import os
@@ -26,12 +27,18 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-TOOL_VERSION = "3"
+TOOL_VERSION = "4"
 BUNDLE_RECEIPT_SCHEMA = "codeskeptic-stability-staging-bundle-v1"
 INVENTORY_SCHEMA = "codeskeptic-stability-staging-inventory-v1"
 INSTALLATION_RECEIPT_SCHEMA = "codeskeptic-stability-installation-v1"
 INSTALLATION_AUTHORITY_SCHEMA = "codeskeptic-stability-installation-authority-v1"
-RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v2"
+RUNTIME_CONFIG_SCHEMA = "codeskeptic-stability-runtime-v3"
+AUTHORITY_OPERATION_MARKERS = frozenset({
+    ".p10-09-authority-operation.json",
+    ".p10-09-authority-operation.json.cleanup",
+    ".p10-09-authority-transaction.json",
+    ".p10-09-authority-transaction.json.cleanup",
+})
 
 BUNDLE_RECEIPT_FIELDS = frozenset({
     "schema", "revision", "source_tree_sha1", "source_manifest_sha256",
@@ -58,7 +65,7 @@ RUNTIME_SOURCE_FILES = (
 )
 RUNTIME_SOURCE_DIRECTORIES = (
     ".github/workflows", "src", "fuzz", "scripts", "tests", "docs",
-    "profiles",
+    "profiles", "third_party",
 )
 RUNTIME_SOURCE_IGNORED_PREFIXES = (
     "docs/evidence/", "docs/devlog/changelog.md",
@@ -2282,6 +2289,179 @@ def _fsync_directory(path: Path) -> None:
         raise StagingError(f"cannot durably sync directory {path}: {error}") from error
 
 
+@contextlib.contextmanager
+def _authority_lifecycle_lock(staging_root: Path):
+    """Exclude authority recovery/production while configuring or sealing."""
+
+    root = staging_root.absolute()
+    parent = root.parent
+    try:
+        root_metadata = root.lstat()
+        parent_metadata = parent.lstat()
+        root_is_canonical = root.resolve() == root
+        parent_is_canonical = parent.resolve() == parent
+    except OSError as error:
+        raise StagingError(f"cannot inspect authority lifecycle root: {error}") from error
+    if (
+        root == parent
+        or not root.name
+        or not stat.S_ISDIR(root_metadata.st_mode)
+        or not stat.S_ISDIR(parent_metadata.st_mode)
+        or not root_is_canonical
+        or not parent_is_canonical
+    ):
+        raise StagingError("authority lifecycle root is not one real directory")
+    suffix = hashlib.sha256(root.as_posix().encode("utf-8")).hexdigest()[:32]
+    lock_name = f".codeskeptic-p10-09-{suffix}.lock"
+    directory_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    directory_flags |= getattr(os, "O_DIRECTORY", 0)
+    directory_flags |= getattr(os, "O_NOFOLLOW", 0)
+    lock_flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
+    lock_flags |= getattr(os, "O_NOFOLLOW", 0)
+    parent_descriptor: int | None = None
+    root_descriptor: int | None = None
+    lock_descriptor: int | None = None
+    locked = False
+
+    def identity(metadata: os.stat_result) -> tuple[int, int]:
+        return metadata.st_dev, metadata.st_ino
+
+    try:
+        parent_descriptor = os.open(parent, directory_flags)
+        opened_parent = os.fstat(parent_descriptor)
+        if (
+            not stat.S_ISDIR(opened_parent.st_mode)
+            or identity(opened_parent) != identity(parent_metadata)
+        ):
+            raise StagingError("authority lifecycle parent identity drift")
+        root_descriptor = os.open(
+            root.name,
+            directory_flags,
+            dir_fd=parent_descriptor,
+        )
+        opened_root = os.fstat(root_descriptor)
+        if (
+            not stat.S_ISDIR(opened_root.st_mode)
+            or identity(opened_root) != identity(root_metadata)
+        ):
+            raise StagingError("authority lifecycle root identity drift")
+        lock_descriptor = os.open(
+            lock_name, lock_flags, 0o600, dir_fd=parent_descriptor
+        )
+        lock_metadata = os.fstat(lock_descriptor)
+        if (
+            not stat.S_ISREG(lock_metadata.st_mode)
+            or lock_metadata.st_nlink != 1
+            or lock_metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(lock_metadata.st_mode) != 0o600
+        ):
+            raise StagingError("authority lifecycle lock identity drift")
+        os.fsync(lock_descriptor)
+        os.fsync(parent_descriptor)
+        try:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise StagingError("authority provisioning is still active") from error
+        locked = True
+
+        try:
+            current_parent = parent.lstat()
+            current_root = root.lstat()
+            pinned_root = os.stat(
+                root.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            pinned_lock = os.stat(
+                lock_name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            current_lock = os.fstat(lock_descriptor)
+            root_is_canonical = root.resolve() == root
+            parent_is_canonical = parent.resolve() == parent
+        except OSError as error:
+            raise StagingError(
+                f"authority lifecycle identity changed after lock: {error}"
+            ) from error
+        if (
+            identity(current_parent) != identity(opened_parent)
+            or not stat.S_ISDIR(current_parent.st_mode)
+            or not parent_is_canonical
+        ):
+            raise StagingError("authority lifecycle parent identity drift")
+        if (
+            identity(current_root) != identity(opened_root)
+            or identity(pinned_root) != identity(opened_root)
+            or not stat.S_ISDIR(current_root.st_mode)
+            or not stat.S_ISDIR(pinned_root.st_mode)
+            or not root_is_canonical
+        ):
+            raise StagingError("authority lifecycle root identity drift")
+        if (
+            identity(pinned_lock) != identity(lock_metadata)
+            or identity(current_lock) != identity(lock_metadata)
+            or not stat.S_ISREG(pinned_lock.st_mode)
+            or pinned_lock.st_nlink != 1
+            or pinned_lock.st_uid != os.geteuid()
+            or stat.S_IMODE(pinned_lock.st_mode) != 0o600
+            or current_lock.st_nlink != 1
+            or current_lock.st_uid != os.geteuid()
+            or stat.S_IMODE(current_lock.st_mode) != 0o600
+        ):
+            raise StagingError("authority lifecycle lock identity drift")
+        yield
+    except StagingError:
+        raise
+    except OSError as error:
+        raise StagingError(f"cannot hold authority lifecycle lock: {error}") from error
+    finally:
+        if lock_descriptor is not None:
+            if locked:
+                try:
+                    fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            os.close(lock_descriptor)
+        if root_descriptor is not None:
+            os.close(root_descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+
+
+def _reject_unresolved_authority_lifecycle(staging_root: Path) -> None:
+    authority = staging_root / "authority"
+    try:
+        top = {entry.name for entry in authority.iterdir()}
+    except OSError as error:
+        raise StagingError(f"cannot inspect authority lifecycle state: {error}") from error
+    unresolved = sorted(
+        name for name in top
+        if name in AUTHORITY_OPERATION_MARKERS
+        or name.startswith(".p10-09-authority-operation.json.")
+        or name.startswith(".p10-09-authority-transaction.json.")
+        or name.startswith(".sanitizers.")
+        or name.startswith(".release.")
+    )
+    build_root = authority / "source" / "build"
+    if build_root.is_dir() and not build_root.is_symlink():
+        try:
+            unresolved.extend(
+                f"source/build/{entry.name}"
+                for entry in build_root.iterdir()
+                if entry.name.startswith(".p10-09-sanitizers.")
+            )
+        except OSError as error:
+            raise StagingError(
+                f"cannot inspect authority build lifecycle state: {error}"
+            ) from error
+    if unresolved:
+        raise StagingError(
+            "unresolved authority provisioning lifecycle: "
+            + ", ".join(sorted(unresolved))
+        )
+
+
 def _fsync_tree(root: Path) -> None:
     inventory = collect_inventory(root)
     for entry in inventory:
@@ -3202,14 +3382,8 @@ def prepare_staging(
             os.fspath(staged_source), "remote", "remove", "origin",
         ], cwd=temporary)
         staged_identity = validate_staged_source(staged_source, revision)
-        for relative in (
-            "build", "build-authority", "release/source",
-            "release/build",
-            "prerequisites/hosted", "prerequisites/quality",
-            "sanitizers/address", "sanitizers/undefined",
-        ):
+        for relative in ("build", "build-authority", "prerequisites"):
             (authority / relative).mkdir(parents=True, mode=0o700, exist_ok=True)
-        (staged_source / SANITIZER_WORK_ROOT).mkdir(parents=True, mode=0o700)
         _prepare_operator(staged_source, temporary / "operator")
         _copy_regular_exact(
             staged_source / "scripts" / "stability-systemd" / UNIT_NAME,
@@ -3462,7 +3636,7 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
         frozenset({
             "hardware_class", "measurement_cgroup",
             "baseline_authority", "release_source", "release_build",
-            "jobs", "tools",
+            "release_receipt_sha256", "jobs", "tools",
         }),
         "runtime qualification",
     )
@@ -3504,6 +3678,10 @@ def _validate_runtime_config_contract(raw: Any) -> dict[str, Any]:
             qualification[field], authority,
             f"runtime qualification {field}", exact=exact,
         )
+    _valid_sha256(
+        qualification["release_receipt_sha256"],
+        "runtime qualification release receipt",
+    )
     _fixed_config_integer(
         qualification["jobs"], 2, "runtime qualification jobs"
     )
@@ -3682,6 +3860,11 @@ def _verify_runtime_static_files_at(
             baseline_authority["baseline_sha256"],
             "determinism baseline",
         ),
+    ))
+    checks.append((
+        authority_host_root / "release" / "receipt.json",
+        config["qualification"]["release_receipt_sha256"],
+        "release candidate receipt",
     ))
     for section in ("quality_floor", "hosted_exact_head"):
         record = config["prerequisites"][section]
@@ -3913,7 +4096,7 @@ def _derive_baseline_authority_config(
     }
 
 
-def configure_staging(
+def _configure_staging_unlocked(
     staging: Path,
     revision: str,
     *,
@@ -4026,6 +4209,7 @@ def configure_staging(
             "baseline_authority": baseline_authority,
             "release_source": "/authority/release/source",
             "release_build": "/authority/release/build",
+            "release_receipt_sha256": digest("release/receipt.json"),
             "jobs": 2,
             "tools": {
                 "clang": "/usr/bin/clang-20",
@@ -4174,7 +4358,7 @@ def _normalize_payload_modes(root: Path) -> None:
                 raise StagingError("payload normalization found a special node")
 
 
-def seal_staging(
+def _seal_staging_unlocked(
     staging: Path,
     revision: str,
     output: Path,
@@ -4361,6 +4545,50 @@ def seal_staging(
     )
     assert receipt is not None
     return receipt
+
+
+def configure_staging(
+    staging: Path,
+    revision: str,
+    *,
+    repository: str,
+    baseline_authority_verifier: Any | None = None,
+) -> dict[str, Any]:
+    """Publish runtime config only while authority lifecycle is quiescent."""
+
+    with _authority_lifecycle_lock(staging):
+        _reject_unresolved_authority_lifecycle(staging)
+        result = _configure_staging_unlocked(
+            staging,
+            revision,
+            repository=repository,
+            baseline_authority_verifier=baseline_authority_verifier,
+        )
+        _reject_unresolved_authority_lifecycle(staging)
+        return result
+
+
+def seal_staging(
+    staging: Path,
+    revision: str,
+    output: Path,
+    *,
+    command_runner: Any | None = None,
+    temporary_root: Path | None = None,
+) -> dict[str, Any]:
+    """Seal only a quiescent authority tree under the lifecycle lock."""
+
+    with _authority_lifecycle_lock(staging):
+        _reject_unresolved_authority_lifecycle(staging)
+        result = _seal_staging_unlocked(
+            staging,
+            revision,
+            output,
+            command_runner=command_runner,
+            temporary_root=temporary_root,
+        )
+        _reject_unresolved_authority_lifecycle(staging)
+        return result
 
 
 def _verify_bundle_metadata(
