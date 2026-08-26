@@ -420,6 +420,21 @@ class StabilityWorkflowTest(unittest.TestCase):
         self.assertNotIn("--cgroup-parent", self.operator)
         self.assertNotIn("--cpuset-cpus=", self.operator)
         self.assertIn("cgroup creation disabled", self.readme)
+        self.assertIn(
+            "The verifier therefore has\nexactly eight semantic bind mounts",
+            self.readme,
+        )
+        self.assertIn(
+            "the two mutable roles have exactly\nnine",
+            self.readme,
+        )
+        self.assertIn("`/sys/fs/cgroup` read-only", self.readme)
+        self.assertIn("never\nwrites `cgroup.kill`", self.readme)
+        self.assertIn(
+            "A populated, foreign, or orphan\nsubtree fails closed",
+            self.readme,
+        )
+        self.assertNotIn("It kills and empties the owned subtree", self.readme)
         self.assertEqual(
             CONTAINERS_CONF.read_text(encoding="utf-8"),
             '[containers]\ncgroupns = "host"\n',

@@ -343,16 +343,24 @@ The label inventory is also exact: the pinned image's
 `io.buildah.version=1.43.0` and `org.opencontainers.image.version=24.04`, plus
 the four marker-derived CodeSkeptic owner, session, bundle-revision, and
 container-kind labels. Any additional or missing environment claim or label is
-foreign state. Its fixed bind topology is:
+foreign state. Its fixed base bind topology is:
 
 - `/authority` read-only;
 - `/operator` read-only;
 - `/config/runtime.json` read-only;
 - `/config/runtime.json.sha256` read-only;
 - `/launch` read-only;
-- `/evidence` read-write;
-- `/runtime` read-write; and
-- `/sys/fs/cgroup` read-write.
+- `/evidence` and `/runtime` read-write for the preflight and campaign roles,
+  but read-only for the verifier; and
+- `/sys/fs/cgroup` read-only.
+
+The preflight and campaign roles add one narrowly writable nested bind for the
+exact
+`/sys/fs/cgroup/system.slice/codeskeptic-stability.service/codeskeptic-p10-09/measurement/cgroup.procs`
+pseudofile. The verifier does not receive that bind. The verifier therefore has
+exactly eight semantic bind mounts, while the two mutable roles have exactly
+nine; no role can mutate any other cgroup control file from inside the
+container.
 
 The exact in-container command is:
 
@@ -362,8 +370,8 @@ The exact in-container command is:
 
 The container is not auto-removed. Podman must create a fresh CID file; the
 operator binds it to the durable session marker and host recovery rederives the
-effective command, process argv, eight semantic bind mounts, exact environment
-and labels, image digest/name/ID, CID path, IPC/PID/UTS and
+effective command, process argv, the role's exact eight-or-nine semantic bind
+mounts, exact environment and labels, image digest/name/ID, CID path, IPC/PID/UTS and
 cgroup/network topology, rootfs mode, security options, user, workdir, runtime,
 and resource limit from Podman inspection. Every Podman removal is centralized
 in host recovery; the runner has no direct `podman rm`, name-only fallback, or
@@ -382,9 +390,14 @@ terminal result to failure.
 Before cgroup mutation or container removal, recovery supplies the exact live
 Podman IDs to the cgroup authority. Podman cgroup creation is disabled, so the
 cgroup helper permits only the fixed `measurement` child and rejects every
-unexpected runtime child. It kills and empties the owned subtree, restores the
-ancestor CPU partition state, and removes its marker last. Its recovery path is
-cutpoint-aware and idempotent:
+unexpected runtime child. The helper never terminates processes and never
+writes `cgroup.kill`; Podman alone owns exact-ID process termination and
+removal. After that removal, the helper requires `frozen 0`, `populated 0`, and
+an empty `cgroup.procs` at every owned boundary. A populated, foreign, or orphan
+subtree fails closed instead of being killed. Only after those gates pass does
+the helper restore the ancestor CPU partition state, remove the exact empty
+measurement and payload cgroups, and remove its marker last. Its recovery path
+is cutpoint-aware and idempotent:
 it can complete active, partially restored, or already-clean states, including
 a strict unpublished-marker prefix only when the machine is otherwise proven
 clean.

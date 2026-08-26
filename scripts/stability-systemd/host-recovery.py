@@ -2795,7 +2795,7 @@ def _validate_bound_recovery_state(
     # First bind a live container to the exact active cgroup state.  Remove it
     # before cgroup recovery so a root container cannot race recovery writes.
     # The second, container-free recovery call re-reads the entire crash-cut
-    # tuple before its first kill/write/rmdir operation.
+    # tuple before the cgroup authority's first control write or rmdir.
     if owned_containers:
         identifier, kind = owned_containers[0]
         if lifecycles.get(identifier) == "running":
