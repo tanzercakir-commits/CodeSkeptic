@@ -56,7 +56,8 @@ readonly CAMPAIGN_CPUS="0-11"
 readonly MEASUREMENT_CPUS="0-3"
 readonly MEASUREMENT_CPU_LIST="0,1,2,3"
 readonly ROOT_AVAILABLE_CONTROLLER_INVENTORY="cpu cpuset dmem hugetlb io memory misc pids rdma"
-readonly HOST_SUBTREE_CONTROLLER_INVENTORY="cpu cpuset hugetlb io memory misc pids"
+readonly ROOT_SUBTREE_CONTROLLER_INVENTORY="cpu cpuset io memory pids"
+readonly SYSTEM_SLICE_AVAILABLE_CONTROLLER_INVENTORY="cpu cpuset io memory pids"
 readonly DELEGATED_CONTROLLER_INVENTORY="cpu cpuset memory pids"
 readonly PODMAN="/usr/bin/podman"
 readonly ENV="/usr/bin/env"
@@ -1281,19 +1282,19 @@ require_ancestor_controller_inventory() {
         "root available" || return 1
     require_exact_controller_inventory \
         "$CGROUP_ROOT" cgroup.subtree_control \
-        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "$ROOT_SUBTREE_CONTROLLER_INVENTORY" \
         "root subtree" || return 1
     require_exact_controller_inventory \
         "$SYSTEM_SLICE_CGROUP" cgroup.controllers \
-        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "$SYSTEM_SLICE_AVAILABLE_CONTROLLER_INVENTORY" \
         "system.slice available" || return 1
     require_exact_controller_inventory \
         "$SYSTEM_SLICE_CGROUP" cgroup.subtree_control \
-        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "$DELEGATED_CONTROLLER_INVENTORY" \
         "system.slice subtree" || return 1
     require_exact_controller_inventory \
         "$SERVICE_CGROUP" cgroup.controllers \
-        "$HOST_SUBTREE_CONTROLLER_INVENTORY" \
+        "$DELEGATED_CONTROLLER_INVENTORY" \
         "service available" || return 1
     require_exact_controller_inventory \
         "$SERVICE_CGROUP" cgroup.subtree_control \

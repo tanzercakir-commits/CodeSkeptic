@@ -43,9 +43,16 @@ REQUIRED_CONTROLLERS = frozenset({"cpuset", "cpu", "memory", "pids"})
 ROOT_CONTROLLERS = frozenset(
     {"cpu", "cpuset", "dmem", "hugetlb", "io", "memory", "misc", "pids", "rdma"}
 )
-HOST_CONTROLLERS = frozenset(
-    {"cpu", "cpuset", "hugetlb", "io", "memory", "misc", "pids"}
+IDLE_ROOT_SUBTREE_CONTROLLERS = frozenset(
+    {"cpu", "io", "memory", "pids"}
 )
+IDLE_SYSTEM_SLICE_SUBTREE_CONTROLLERS = frozenset({"memory", "pids"})
+ACTIVE_ROOT_SUBTREE_CONTROLLERS = frozenset(
+    {"cpu", "cpuset", "io", "memory", "pids"}
+)
+TOPOLOGY_IDLE = "idle"
+TOPOLOGY_PREPARED = "prepared"
+TOPOLOGY_ACTIVE = "active"
 CPU_POSSIBLE = Path("/sys/devices/system/cpu/possible")
 CPU_ONLINE = Path("/sys/devices/system/cpu/online")
 ROOT_UID = 0
@@ -698,6 +705,34 @@ def require_cgroup_structure(
         raise AuthorityError(f"{label} child cgroup inventory drift")
 
 
+def require_core_only_subgroup(path: Path, label: str) -> None:
+    """Validate a systemd-created subgroup before delegation is enabled."""
+
+    require_exact_directory(path, label)
+    if word_inventory(path / "cgroup.controllers", label):
+        raise AuthorityError(f"{label} available controller inventory drift")
+    if word_inventory(path / "cgroup.subtree_control", label):
+        raise AuthorityError(f"{label} subtree controller inventory drift")
+    if cgroup_value(path / "cgroup.type", label) != "domain":
+        raise AuthorityError(f"{label} cgroup type drift")
+    if child_directories(path):
+        raise AuthorityError(f"{label} child cgroup inventory drift")
+    for name in (
+        "cpuset.cpus",
+        "cpuset.cpus.effective",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+        "cpuset.mems.effective",
+        "cpu.uclamp.min",
+        "cpu.uclamp.max",
+    ):
+        interface = path / name
+        if interface.exists() or interface.is_symlink():
+            raise AuthorityError(f"{label} exposes unexpected {name}")
+
+
 def cpuset_state(path: Path, label: str) -> tuple[str, str, str, str, str]:
     return (
         cgroup_value(path / "cpuset.cpus", label),
@@ -708,25 +743,69 @@ def cpuset_state(path: Path, label: str) -> tuple[str, str, str, str, str]:
     )
 
 
-def require_topology() -> None:
+def controller_topology_snapshot() -> tuple[
+    bool,
+    frozenset[str],
+    frozenset[str],
+    frozenset[str],
+    frozenset[str],
+]:
+    return (
+        SERVICE.exists() or SERVICE.is_symlink(),
+        word_inventory(CGROUP_ROOT / "cgroup.controllers", "cgroup root"),
+        word_inventory(CGROUP_ROOT / "cgroup.subtree_control", "cgroup root"),
+        word_inventory(
+            SYSTEM_SLICE / "cgroup.controllers", "system.slice"
+        ),
+        word_inventory(
+            SYSTEM_SLICE / "cgroup.subtree_control", "system.slice"
+        ),
+    )
+
+
+def require_topology() -> str:
     require_exact_directory(CGROUP_ROOT, "cgroup root")
     if cgroup_value(CPU_POSSIBLE, "possible CPUs") != CAMPAIGN_CPUS:
         raise AuthorityError("possible CPU topology drift")
     if cgroup_value(CPU_ONLINE, "online CPUs") != CAMPAIGN_CPUS:
         raise AuthorityError("online CPU topology drift")
-    for path, label, controllers, subtree in (
-        (CGROUP_ROOT, "cgroup root", ROOT_CONTROLLERS, HOST_CONTROLLERS),
-        (SYSTEM_SLICE, "system.slice", HOST_CONTROLLERS, HOST_CONTROLLERS),
-    ):
-        require_exact_directory(path, label)
-        if word_inventory(path / "cgroup.controllers", label) != controllers:
-            raise AuthorityError(f"{label} available controller inventory drift")
-        if word_inventory(path / "cgroup.subtree_control", label) != subtree:
-            raise AuthorityError(f"{label} subtree controller inventory drift")
-        if path != CGROUP_ROOT and cgroup_value(
-            path / "cgroup.type", label
-        ) != "domain":
-            raise AuthorityError(f"{label} cgroup type drift")
+    require_exact_directory(SYSTEM_SLICE, "system.slice")
+    first = controller_topology_snapshot()
+    second = controller_topology_snapshot()
+    if first != second:
+        raise AuthorityError("controller topology changed while reading")
+    (
+        service_present,
+        root_available,
+        root_subtree,
+        system_available,
+        system_subtree,
+    ) = first
+    if root_available != ROOT_CONTROLLERS:
+        raise AuthorityError("cgroup root available controller inventory drift")
+    if cgroup_value(SYSTEM_SLICE / "cgroup.type", "system.slice") != "domain":
+        raise AuthorityError("system.slice cgroup type drift")
+    observed = (root_subtree, system_available, system_subtree)
+    idle = (
+        IDLE_ROOT_SUBTREE_CONTROLLERS,
+        IDLE_ROOT_SUBTREE_CONTROLLERS,
+        IDLE_SYSTEM_SLICE_SUBTREE_CONTROLLERS,
+    )
+    activated = (
+        ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+        ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+        REQUIRED_CONTROLLERS,
+    )
+    if service_present:
+        if observed != activated:
+            raise AuthorityError("active correlated controller topology drift")
+        profile = TOPOLOGY_ACTIVE
+    elif observed == idle:
+        profile = TOPOLOGY_IDLE
+    elif observed == activated:
+        profile = TOPOLOGY_PREPARED
+    else:
+        raise AuthorityError("service-absent correlated controller topology drift")
     for name in (
         "cgroup.type",
         "cpuset.cpus",
@@ -748,17 +827,35 @@ def require_topology() -> None:
         CGROUP_ROOT / "cpuset.mems.effective", "cgroup root"
     ) != MEMORY_NODES:
         raise AuthorityError("cgroup root effective memory node inventory drift")
-    if cgroup_value(SYSTEM_SLICE / "cpuset.cpus", "system.slice"):
-        raise AuthorityError("system.slice configured CPU inventory drift")
-    require_memory_state(
-        SYSTEM_SLICE,
-        "system.slice",
-        configured=frozenset({""}),
-        effective=MEMORY_NODES,
+    cpuset_interfaces = (
+        "cpuset.cpus",
+        "cpuset.cpus.effective",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+        "cpuset.mems.effective",
     )
+    if profile != TOPOLOGY_IDLE:
+        if cgroup_value(SYSTEM_SLICE / "cpuset.cpus", "system.slice"):
+            raise AuthorityError("system.slice configured CPU inventory drift")
+        require_memory_state(
+            SYSTEM_SLICE,
+            "system.slice",
+            configured=frozenset({""}),
+            effective=MEMORY_NODES,
+        )
+    else:
+        for name in cpuset_interfaces:
+            interface = SYSTEM_SLICE / name
+            if interface.exists() or interface.is_symlink():
+                raise AuthorityError(
+                    f"idle system.slice exposes unexpected {name}"
+                )
     require_uclamp_state(
         SYSTEM_SLICE, "system.slice", frozenset({DEFAULT_UCLAMP})
     )
+    return profile
 
 
 def self_cgroup_path() -> Path:
@@ -776,11 +873,12 @@ def require_service_structure(
     controller_required: bool = True,
     caller_role: str = "controller",
     service_subtree: frozenset[str] = REQUIRED_CONTROLLERS,
+    control_core_only: bool = False,
 ) -> None:
     require_exact_directory(SERVICE, "service")
     if word_inventory(
         SERVICE / "cgroup.controllers", "service"
-    ) != HOST_CONTROLLERS:
+    ) != REQUIRED_CONTROLLERS:
         raise AuthorityError("service available controller inventory drift")
     if word_inventory(
         SERVICE / "cgroup.subtree_control", "service"
@@ -806,8 +904,12 @@ def require_service_structure(
         expected_children.append(PAYLOAD)
     control = SERVICE / ".control"
     control_present = control.exists() or control.is_symlink()
-    if control_present:
-        expected_children.append(control)
+    if not control_present:
+        raise AuthorityError("service control subgroup is absent")
+    expected_children.append(control)
+    if control_core_only:
+        require_core_only_subgroup(control, "startup service control")
+    else:
         require_cgroup_structure(
             control,
             "service control",
@@ -837,17 +939,17 @@ def require_service_structure(
         raise AuthorityError("service child cgroup inventory drift")
     caller = self_cgroup_path()
     if caller_role == "controller":
-        if caller != CONTROLLER or control_present:
+        if caller != CONTROLLER:
             raise AuthorityError("active controller caller identity drift")
+        require_empty_cgroup(control, "service control")
     elif caller_role == "recovery":
-        if control_present:
-            if caller != control:
-                raise AuthorityError("foreign service control subgroup")
-        elif controller_required:
-            if caller != CONTROLLER:
-                raise AuthorityError("recovery controller caller identity drift")
-        elif caller != SERVICE:
-            raise AuthorityError("startup recovery caller identity drift")
+        if caller == control:
+            if controller_required:
+                require_empty_cgroup(CONTROLLER, "controller")
+        elif controller_required and caller == CONTROLLER:
+            require_empty_cgroup(control, "service control")
+        else:
+            raise AuthorityError("foreign service control subgroup")
     else:
         raise AuthorityError("service caller role is malformed")
 
@@ -943,40 +1045,22 @@ def require_clean_start_controller_state(effective_cpus: str) -> None:
         effective_cpus=effective_cpus,
         caller_role="recovery",
         service_subtree=frozenset(),
+        control_core_only=True,
     )
-    require_exact_directory(CONTROLLER, "startup controller")
-    if word_inventory(
-        CONTROLLER / "cgroup.controllers", "startup controller"
-    ):
-        raise AuthorityError(
-            "startup controller available controller inventory drift"
-        )
-    if word_inventory(
-        CONTROLLER / "cgroup.subtree_control", "startup controller"
-    ):
-        raise AuthorityError(
-            "startup controller subtree controller inventory drift"
-        )
-    if cgroup_value(CONTROLLER / "cgroup.type", "startup controller") != "domain":
-        raise AuthorityError("startup controller cgroup type drift")
-    if child_directories(CONTROLLER):
-        raise AuthorityError("startup controller child cgroup inventory drift")
-    for name in (
-        "cpuset.cpus",
-        "cpuset.cpus.effective",
-        "cpuset.cpus.exclusive",
-        "cpuset.cpus.exclusive.effective",
-        "cpuset.cpus.partition",
-        "cpuset.mems",
-        "cpuset.mems.effective",
-        "cpu.uclamp.min",
-        "cpu.uclamp.max",
-    ):
-        path = CONTROLLER / name
-        if path.exists() or path.is_symlink():
-            raise AuthorityError(
-                f"startup controller exposes unexpected {name}"
-            )
+    require_core_only_subgroup(CONTROLLER, "startup controller")
+
+
+def require_clean_start_control_state(effective_cpus: str) -> None:
+    """Validate systemd's ExecStartPre subgroup before delegation is enabled."""
+
+    require_service_structure(
+        payload_present=False,
+        effective_cpus=effective_cpus,
+        controller_required=False,
+        caller_role="recovery",
+        service_subtree=frozenset(),
+        control_core_only=True,
+    )
 
 
 def require_recovery_control_plane(
@@ -985,10 +1069,15 @@ def require_recovery_control_plane(
     payload_present: bool,
     allow_clean_start: bool = False,
 ) -> None:
-    if CONTROLLER.exists() or CONTROLLER.is_symlink():
-        if allow_clean_start and not payload_present and word_inventory(
+    clean_start = (
+        allow_clean_start
+        and not payload_present
+        and word_inventory(
             SERVICE / "cgroup.subtree_control", "service"
-        ) == frozenset():
+        ) == frozenset()
+    )
+    if CONTROLLER.exists() or CONTROLLER.is_symlink():
+        if clean_start:
             require_clean_start_controller_state(effective_cpus)
             return
         require_controller_state(
@@ -997,19 +1086,8 @@ def require_recovery_control_plane(
             caller_role="recovery",
         )
         return
-    control = SERVICE / ".control"
-    if (
-        allow_clean_start
-        and not payload_present
-        and not (control.exists() or control.is_symlink())
-    ):
-        require_service_structure(
-            payload_present=False,
-            effective_cpus=effective_cpus,
-            controller_required=False,
-            caller_role="recovery",
-            service_subtree=frozenset(),
-        )
+    if clean_start:
+        require_clean_start_control_state(effective_cpus)
         return
     require_service_structure(
         payload_present=payload_present,
@@ -1293,7 +1371,8 @@ def validate_cleanup_state(owned_container_ids: tuple[str, ...] = ()) -> None:
     """Accept only literal crash cutpoints before any recovery mutation."""
 
     valid_container_ids(owned_container_ids)
-    require_topology()
+    topology = require_topology()
+    service_present = topology == TOPOLOGY_ACTIVE
     root_isolated = cgroup_value(
         CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"
     )
@@ -1301,8 +1380,6 @@ def validate_cleanup_state(owned_container_ids: tuple[str, ...] = ()) -> None:
         raise AuthorityError("root isolated CPU recovery state drift")
     payload_present = PAYLOAD.exists() or PAYLOAD.is_symlink()
     measurement_present = MEASUREMENT.exists() or MEASUREMENT.is_symlink()
-    service_present = SERVICE.exists() or SERVICE.is_symlink()
-
     if measurement_present and not payload_present:
         raise AuthorityError("measurement exists without its payload ancestor")
     if payload_present:
@@ -1313,8 +1390,8 @@ def validate_cleanup_state(owned_container_ids: tuple[str, ...] = ()) -> None:
     if root_isolated:
         raise AuthorityError("isolated CPUs remain without a payload")
 
-    system_state = cpuset_state(SYSTEM_SLICE, "system.slice")
     if service_present:
+        system_state = cpuset_state(SYSTEM_SLICE, "system.slice")
         service_state = cpuset_state(SERVICE, "service")
         arm_pairs = {
             ("", ""),
@@ -1344,13 +1421,17 @@ def validate_cleanup_state(owned_container_ids: tuple[str, ...] = ()) -> None:
 
     if CONTROLLER.exists() or CONTROLLER.is_symlink():
         raise AuthorityError("controller exists without its service ancestor")
-    if (
-        system_state[1] != CAMPAIGN_CPUS
-        or system_state[2] not in {"", EXCLUSIVE_CPUS}
-        or system_state[2] != system_state[3]
-        or system_state[4] != "member"
-    ):
-        raise AuthorityError("service-absent system.slice recovery state drift")
+    if topology == TOPOLOGY_PREPARED:
+        system_state = cpuset_state(SYSTEM_SLICE, "system.slice")
+        if (
+            system_state[1] != CAMPAIGN_CPUS
+            or system_state[2] not in {"", EXCLUSIVE_CPUS}
+            or system_state[2] != system_state[3]
+            or system_state[4] != "member"
+        ):
+            raise AuthorityError(
+                "service-absent system.slice recovery state drift"
+            )
 
 
 def restore_ancestor(path: Path, label: str, *, allow_absent: bool = False) -> bool:
@@ -1394,16 +1475,16 @@ def require_restored_ancestor(
 
 
 def already_clean() -> None:
-    require_topology()
+    topology = require_topology()
     if PAYLOAD.exists() or PAYLOAD.is_symlink() or MEASUREMENT.exists() or MEASUREMENT.is_symlink():
         raise AuthorityError("cgroup authority marker is absent but payload remains")
-    require_ancestor_state(
-        SYSTEM_SLICE,
-        "system.slice",
-        exclusive="",
-        effective_cpus=CAMPAIGN_CPUS,
-    )
-    if SERVICE.exists() or SERVICE.is_symlink():
+    if topology == TOPOLOGY_ACTIVE:
+        require_ancestor_state(
+            SYSTEM_SLICE,
+            "system.slice",
+            exclusive="",
+            effective_cpus=CAMPAIGN_CPUS,
+        )
         require_ancestor_state(
             SERVICE,
             "service",
@@ -1414,6 +1495,13 @@ def already_clean() -> None:
             CAMPAIGN_CPUS,
             payload_present=False,
             allow_clean_start=True,
+        )
+    elif topology == TOPOLOGY_PREPARED:
+        require_ancestor_state(
+            SYSTEM_SLICE,
+            "system.slice",
+            exclusive="",
+            effective_cpus=CAMPAIGN_CPUS,
         )
     elif CONTROLLER.exists() or CONTROLLER.is_symlink():
         raise AuthorityError("controller exists without its service ancestor")
@@ -1445,7 +1533,8 @@ def cleanup(
     validate_cleanup_state(owned_container_ids)
     restore_ancestor(SERVICE, "service", allow_absent=True)
     validate_cleanup_state(owned_container_ids)
-    restore_ancestor(SYSTEM_SLICE, "system.slice")
+    if require_topology() != TOPOLOGY_IDLE:
+        restore_ancestor(SYSTEM_SLICE, "system.slice")
     validate_cleanup_state(owned_container_ids)
     if cgroup_value(CGROUP_ROOT / "cpuset.cpus.isolated", "root isolated CPUs"):
         raise AuthorityError("root isolated CPUs were not restored")

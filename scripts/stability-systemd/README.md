@@ -322,17 +322,27 @@ controller and verifier enter through `taskset --cpu-list 4-11`. Recovery
 requires empty `HostConfig.CgroupParent` and `HostConfig.CpusetCpus` claims and
 the exact disabled cgroup mode. Before and after every Podman lifecycle edge,
 the operator requires the qualified Fedora host's exact nine-controller root
-availability, exact seven-controller root and `system.slice` delegation, and
-exact four-controller service and payload delegation. A kernel or
+availability, exact five-controller root delegation and `system.slice`
+availability, and exact four-controller `system.slice`, service, and payload
+delegation. A kernel or
 controller-set change therefore requires explicit
 requalification instead of becoming a live baseline. Measurement work alone
 moves into the fixed
 `/system.slice/codeskeptic-stability.service/codeskeptic-p10-09/measurement`
 cgroup and remains constrained to the isolated 0-3 partition.
 The sorted inventories are `cpu cpuset dmem hugetlb io memory misc pids rdma`
-at root availability, `cpu cpuset hugetlb io memory misc pids` at the root and
-`system.slice` delegation boundary, and `cpu cpuset memory pids` below the
-service boundary.
+at root availability, `cpu cpuset io memory pids` at the root subtree and
+`system.slice` availability boundary, and `cpu cpuset memory pids` at the
+`system.slice` subtree and below the service boundary.
+Before activation, an absent-service boundary is separately exact. A fresh
+idle boundary has `cpu io memory pids` at the root subtree and `system.slice`
+availability, `memory pids` at the `system.slice` subtree, and no
+`system.slice` cpuset interfaces. An exact pre-enabled boundary may retain the
+five/four-controller mapping and restored cpuset interfaces after a prior
+activation or sibling realization. Only those two complete correlated
+profiles are accepted after two identical reads; a mixed or changing
+transition is rejected. Merely loading the
+unit or running `daemon-reload` does not itself widen the fresh idle boundary.
 Pulling, host environment inheritance, proxy inheritance, image
 volumes, writable implicit read-only tmpfs mounts, and ambient OCI hooks are
 disabled. Podman inspection must expose exactly eight environment claims:
@@ -449,6 +459,23 @@ measurement path
 `/sys/fs/cgroup/system.slice/codeskeptic-stability.service/codeskeptic-p10-09/measurement`,
 whose effective and exclusive CPU sets are both 0-3. The controller payload
 inherits effective CPUs 4-11 after the isolated partition is established.
+
+During activation, systemd widens the idle ancestor boundary to the exact
+five/four-controller mapping above, creates the service cgroup, and clears the
+service's subtree controllers. Its
+`ExecStartPre` recovery process therefore runs alone in a core-files-only
+`.control` subgroup while the service subtree inventory is empty. After that
+process exits, its empty core-only `.control` subgroup remains and `ExecStart`
+begins in a new core-files-only `controller` sibling. The runner requires both
+exact subgroups, including an empty `.control`, and only then enables the four
+delegated service controllers. If main startup fails before that write,
+`ExecStopPost` runs from `.control` and must instead prove the core-only
+`controller` sibling empty. The same caller/sibling emptiness correlation is
+required after delegation: main recovery requires empty `.control`, while
+stop recovery requires empty `controller`. From that point onward,
+`controller`, `.control` when present during stop/recovery, the payload, and
+the measurement leaf expose only the phase-appropriate delegated interfaces.
+The `.control` subgroup persists until systemd prunes the inactive unit.
 
 The controller must seal its pre-run receipt after validating the exact source,
 build, image, workload, sanitizer, boot, cgroup, resource, thermal, coredump,

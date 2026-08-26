@@ -59,10 +59,14 @@ def create_group(
     mems: str,
     effective_mems: str = "0",
     uclamp: tuple[str, str] | None = None,
+    populated: bool = False,
+    processes: str = "",
 ) -> None:
     path.mkdir(parents=True, exist_ok=True)
     values = {
         "cgroup.controllers": " ".join(sorted(controllers)),
+        "cgroup.events": f"frozen 0\npopulated {int(populated)}",
+        "cgroup.procs": processes,
         "cgroup.subtree_control": " ".join(sorted(subtree)),
         "cgroup.type": "domain",
         "cpuset.cpus": cpus,
@@ -79,10 +83,47 @@ def create_group(
         write_value(path / name, value)
 
 
+def create_core_group(
+    path: Path, *, populated: bool = False, processes: str = ""
+) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    write_value(path / "cgroup.controllers", "")
+    write_value(path / "cgroup.events", f"frozen 0\npopulated {int(populated)}")
+    write_value(path / "cgroup.procs", processes)
+    write_value(path / "cgroup.subtree_control", "")
+    write_value(path / "cgroup.type", "domain")
+
+
+def set_idle_ancestor_controller_state(authority, paths: dict[str, Path]) -> None:
+    write_value(
+        paths["root"] / "cgroup.subtree_control",
+        " ".join(sorted(authority.IDLE_ROOT_SUBTREE_CONTROLLERS)),
+    )
+    write_value(
+        paths["system"] / "cgroup.controllers",
+        " ".join(sorted(authority.IDLE_ROOT_SUBTREE_CONTROLLERS)),
+    )
+    write_value(
+        paths["system"] / "cgroup.subtree_control",
+        " ".join(sorted(authority.IDLE_SYSTEM_SLICE_SUBTREE_CONTROLLERS)),
+    )
+    for name in (
+        "cpuset.cpus",
+        "cpuset.cpus.effective",
+        "cpuset.cpus.exclusive",
+        "cpuset.cpus.exclusive.effective",
+        "cpuset.cpus.partition",
+        "cpuset.mems",
+        "cpuset.mems.effective",
+    ):
+        (paths["system"] / name).unlink()
+
+
 def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
     root = Path(directory) / "cgroup"
     system = root / "system.slice"
     service = system / "codeskeptic-stability.service"
+    control = service / ".control"
     controller = service / "controller"
     payload = service / "codeskeptic-p10-09"
     measurement = payload / "measurement"
@@ -91,7 +132,7 @@ def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
     create_group(
         root,
         controllers=authority.ROOT_CONTROLLERS,
-        subtree=authority.HOST_CONTROLLERS,
+        subtree=authority.ACTIVE_ROOT_SUBTREE_CONTROLLERS,
         cpus="",
         effective_cpus=authority.CAMPAIGN_CPUS,
         exclusive="",
@@ -111,8 +152,8 @@ def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
     write_value(root / "cpuset.cpus.isolated", authority.EXCLUSIVE_CPUS)
     create_group(
         system,
-        controllers=authority.HOST_CONTROLLERS,
-        subtree=authority.HOST_CONTROLLERS,
+        controllers=authority.ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+        subtree=authority.REQUIRED_CONTROLLERS,
         cpus="",
         effective_cpus=authority.CONTROLLER_CPUS,
         exclusive=authority.EXCLUSIVE_CPUS,
@@ -123,12 +164,24 @@ def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
     )
     create_group(
         service,
-        controllers=authority.HOST_CONTROLLERS,
+        controllers=authority.REQUIRED_CONTROLLERS,
         subtree=authority.REQUIRED_CONTROLLERS,
         cpus=authority.CAMPAIGN_CPUS,
         effective_cpus=authority.CONTROLLER_CPUS,
         exclusive=authority.EXCLUSIVE_CPUS,
         exclusive_effective=authority.EXCLUSIVE_CPUS,
+        partition="member",
+        mems="",
+        uclamp=authority.DEFAULT_UCLAMP,
+    )
+    create_group(
+        control,
+        controllers=authority.REQUIRED_CONTROLLERS,
+        subtree=frozenset(),
+        cpus="",
+        effective_cpus=authority.CONTROLLER_CPUS,
+        exclusive="",
+        exclusive_effective="",
         partition="member",
         mems="",
         uclamp=authority.DEFAULT_UCLAMP,
@@ -175,6 +228,7 @@ def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
         "root": root,
         "system": system,
         "service": service,
+        "control": control,
         "controller": controller,
         "payload": payload,
         "measurement": measurement,
@@ -186,6 +240,7 @@ def active_cgroup_fixture(authority, directory: str) -> dict[str, Path]:
 class StabilityCgroupAuthorityTest(unittest.TestCase):
     def test_helper_and_runner_share_the_exact_lifecycle(self) -> None:
         self.assertTrue(AUTHORITY_PATH.is_file())
+        module = load_authority()
         authority = AUTHORITY_PATH.read_text(encoding="utf-8")
         runner = RUNNER_PATH.read_text(encoding="utf-8")
 
@@ -193,6 +248,22 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         self.assertIn('SERVICE = SYSTEM_SLICE / "codeskeptic-stability.service"', authority)
         self.assertIn('PAYLOAD = SERVICE / "codeskeptic-p10-09"', authority)
         self.assertIn('MEASUREMENT = PAYLOAD / "measurement"', authority)
+        self.assertEqual(
+            module.IDLE_ROOT_SUBTREE_CONTROLLERS,
+            frozenset({"cpu", "io", "memory", "pids"}),
+        )
+        self.assertEqual(
+            module.IDLE_SYSTEM_SLICE_SUBTREE_CONTROLLERS,
+            frozenset({"memory", "pids"}),
+        )
+        self.assertEqual(
+            module.ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+            frozenset({"cpu", "cpuset", "io", "memory", "pids"}),
+        )
+        self.assertEqual(
+            module.REQUIRED_CONTROLLERS,
+            frozenset({"cpu", "cpuset", "memory", "pids"}),
+        )
         self.assertIn(
             '"arm", "verify-active", "verify-recovery", "cleanup",',
             authority,
@@ -627,6 +698,34 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         authority = load_authority()
         mutations = (
             (
+                "root-subtree-controller",
+                lambda paths: write_value(
+                    paths["root"] / "cgroup.subtree_control",
+                    "cpu cpuset hugetlb io memory pids",
+                ),
+            ),
+            (
+                "system-available-controller",
+                lambda paths: write_value(
+                    paths["system"] / "cgroup.controllers",
+                    "cpu cpuset hugetlb io memory pids",
+                ),
+            ),
+            (
+                "system-subtree-controller",
+                lambda paths: write_value(
+                    paths["system"] / "cgroup.subtree_control",
+                    "cpu cpuset io memory pids",
+                ),
+            ),
+            (
+                "service-available-controller",
+                lambda paths: write_value(
+                    paths["service"] / "cgroup.controllers",
+                    "cpu cpuset io memory pids",
+                ),
+            ),
+            (
                 "controller-child",
                 lambda paths: (paths["controller"] / "foreign").mkdir(),
             ),
@@ -749,7 +848,11 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                     ) as empty, self.assertRaises(authority.AuthorityError):
                         authority.cleanup(SESSION)
                 write.assert_not_called()
-                empty.assert_not_called()
+                for observed in empty.call_args_list:
+                    self.assertEqual(
+                        observed,
+                        mock.call(paths["control"], "service control"),
+                    )
 
     def test_marker_link_repair_follows_the_complete_read_only_gate(self) -> None:
         authority = load_authority()
@@ -807,19 +910,7 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         authority = load_authority()
         with tempfile.TemporaryDirectory() as directory:
             paths = active_cgroup_fixture(authority, directory)
-            control = paths["service"] / ".control"
-            create_group(
-                control,
-                controllers=authority.REQUIRED_CONTROLLERS,
-                subtree=frozenset(),
-                cpus="",
-                effective_cpus=authority.CONTROLLER_CPUS,
-                exclusive="",
-                exclusive_effective="",
-                partition="member",
-                mems="",
-                uclamp=authority.DEFAULT_UCLAMP,
-            )
+            control = paths["control"]
             patch_values = {
                 "CGROUP_ROOT": paths["root"],
                 "SYSTEM_SLICE": paths["system"],
@@ -838,8 +929,35 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                     payload_present=True,
                     caller_role="recovery",
                 )
+                write_value(
+                    paths["controller"] / "cgroup.events",
+                    "frozen 0\npopulated 1",
+                )
+                write_value(paths["controller"] / "cgroup.procs", "999")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "controller cgroup remains populated",
+                ):
+                    authority.require_controller_state(
+                        authority.CONTROLLER_CPUS,
+                        payload_present=True,
+                        caller_role="recovery",
+                    )
+                write_value(
+                    paths["controller"] / "cgroup.events",
+                    "frozen 0\npopulated 0",
+                )
+                write_value(paths["controller"] / "cgroup.procs", "")
             with mock.patch.multiple(authority, **patch_values), mock.patch.object(
                 authority, "self_cgroup_path", return_value=paths["controller"]
+            ):
+                authority.require_controller_state(
+                    authority.CONTROLLER_CPUS,
+                    payload_present=True,
+                    caller_role="recovery",
+                )
+            with mock.patch.multiple(authority, **patch_values), mock.patch.object(
+                authority, "self_cgroup_path", return_value=paths["payload"]
             ), self.assertRaisesRegex(
                 authority.AuthorityError, "foreign service control subgroup"
             ):
@@ -854,18 +972,9 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             paths = active_cgroup_fixture(authority, directory)
             shutil.rmtree(paths["controller"])
-            control = paths["service"] / ".control"
-            create_group(
-                control,
-                controllers=authority.REQUIRED_CONTROLLERS,
-                subtree=frozenset(),
-                cpus="",
-                effective_cpus=authority.CAMPAIGN_CPUS,
-                exclusive="",
-                exclusive_effective="",
-                partition="member",
-                mems="",
-                uclamp=authority.DEFAULT_UCLAMP,
+            control = paths["control"]
+            write_value(
+                control / "cpuset.cpus.effective", authority.CAMPAIGN_CPUS
             )
             patch_values = {
                 "CGROUP_ROOT": paths["root"],
@@ -886,6 +995,8 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             shutil.rmtree(control)
             with mock.patch.multiple(authority, **patch_values), mock.patch.object(
                 authority, "self_cgroup_path", return_value=paths["service"]
+            ), self.assertRaisesRegex(
+                authority.AuthorityError, "service control subgroup is absent"
             ):
                 authority.require_recovery_control_plane(
                     authority.CAMPAIGN_CPUS, payload_present=True
@@ -893,13 +1004,13 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             with mock.patch.multiple(authority, **patch_values), mock.patch.object(
                 authority, "self_cgroup_path", return_value=paths["payload"]
             ), self.assertRaisesRegex(
-                authority.AuthorityError, "startup recovery caller identity"
+                authority.AuthorityError, "service control subgroup is absent"
             ):
                 authority.require_recovery_control_plane(
                     authority.CAMPAIGN_CPUS, payload_present=True
                 )
 
-    def test_clean_exec_start_pre_accepts_only_undelegated_service_root(
+    def test_clean_exec_start_pre_accepts_only_core_control_subgroup(
         self,
     ) -> None:
         authority = load_authority()
@@ -913,6 +1024,9 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                 write_value(path / "cpuset.cpus.exclusive", "")
                 write_value(path / "cpuset.cpus.exclusive.effective", "")
             write_value(paths["service"] / "cgroup.subtree_control", "")
+            control = paths["control"]
+            shutil.rmtree(control)
+            create_core_group(control, populated=True, processes="123")
             patch_values = {
                 "CGROUP_ROOT": paths["root"],
                 "SYSTEM_SLICE": paths["system"],
@@ -924,24 +1038,182 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                 "CPU_ONLINE": paths["online"],
             }
             with mock.patch.multiple(authority, **patch_values), mock.patch.object(
-                authority, "self_cgroup_path", return_value=paths["service"]
+                authority, "self_cgroup_path", return_value=control
             ):
                 authority.already_clean()
                 authority.validate_cleanup_state()
+
+                with mock.patch.object(
+                    authority,
+                    "self_cgroup_path",
+                    return_value=paths["service"],
+                ), self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "foreign service control subgroup",
+                ):
+                    authority.already_clean()
+
+                write_value(control / "cgroup.controllers", "cpu")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "startup service control available controller inventory drift",
+                ):
+                    authority.already_clean()
+                write_value(control / "cgroup.controllers", "")
+
+                write_value(control / "cpuset.cpus", "")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "startup service control exposes unexpected cpuset.cpus",
+                ):
+                    authority.already_clean()
+                (control / "cpuset.cpus").unlink()
+
+                (control / "foreign").mkdir()
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "startup service control child cgroup inventory drift",
+                ):
+                    authority.already_clean()
+                (control / "foreign").rmdir()
+
+    def test_idle_topology_requires_exact_9_4_4_2_without_cpuset(
+        self,
+    ) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            shutil.rmtree(paths["service"])
+            write_value(paths["root"] / "cpuset.cpus.isolated", "")
+            set_idle_ancestor_controller_state(authority, paths)
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values):
+                authority.already_clean()
+                authority.validate_cleanup_state()
+
+                stable = authority.controller_topology_snapshot()
+                changed = (
+                    True,
+                    stable[1],
+                    authority.ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+                    authority.ACTIVE_ROOT_SUBTREE_CONTROLLERS,
+                    authority.REQUIRED_CONTROLLERS,
+                )
+                with mock.patch.object(
+                    authority,
+                    "controller_topology_snapshot",
+                    side_effect=(stable, changed),
+                ), self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "controller topology changed while reading",
+                ):
+                    authority.require_topology()
+
                 write_value(
-                    paths["service"] / "cgroup.subtree_control",
-                    " ".join(sorted(authority.REQUIRED_CONTROLLERS)),
+                    paths["root"] / "cgroup.subtree_control",
+                    "cpu cpuset io memory pids",
                 )
                 with self.assertRaisesRegex(
                     authority.AuthorityError,
-                    "service subtree controller inventory drift",
+                    "service-absent correlated controller topology drift",
                 ):
                     authority.already_clean()
+                write_value(
+                    paths["root"] / "cgroup.subtree_control",
+                    "cpu io memory pids",
+                )
+
+                write_value(
+                    paths["system"] / "cgroup.controllers",
+                    "cpu cpuset io memory pids",
+                )
                 with self.assertRaisesRegex(
                     authority.AuthorityError,
-                    "service subtree controller inventory drift",
+                    "service-absent correlated controller topology drift",
                 ):
-                    authority.validate_cleanup_state()
+                    authority.already_clean()
+                write_value(
+                    paths["system"] / "cgroup.controllers",
+                    "cpu io memory pids",
+                )
+
+                write_value(
+                    paths["system"] / "cgroup.subtree_control",
+                    "cpu memory pids",
+                )
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "service-absent correlated controller topology drift",
+                ):
+                    authority.already_clean()
+                write_value(
+                    paths["system"] / "cgroup.subtree_control",
+                    "memory pids",
+                )
+
+                write_value(paths["system"] / "cpuset.cpus", "")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "idle system.slice exposes unexpected cpuset.cpus",
+                ):
+                    authority.already_clean()
+
+    def test_prepared_service_absent_topology_is_exact_and_restorable(
+        self,
+    ) -> None:
+        authority = load_authority()
+        with tempfile.TemporaryDirectory() as directory:
+            paths = active_cgroup_fixture(authority, directory)
+            shutil.rmtree(paths["service"])
+            write_value(paths["root"] / "cpuset.cpus.isolated", "")
+            write_value(
+                paths["system"] / "cpuset.cpus.effective",
+                authority.CAMPAIGN_CPUS,
+            )
+            write_value(paths["system"] / "cpuset.cpus.exclusive", "")
+            write_value(
+                paths["system"] / "cpuset.cpus.exclusive.effective", ""
+            )
+            patch_values = {
+                "CGROUP_ROOT": paths["root"],
+                "SYSTEM_SLICE": paths["system"],
+                "SERVICE": paths["service"],
+                "CONTROLLER": paths["controller"],
+                "PAYLOAD": paths["payload"],
+                "MEASUREMENT": paths["measurement"],
+                "CPU_POSSIBLE": paths["possible"],
+                "CPU_ONLINE": paths["online"],
+            }
+            with mock.patch.multiple(authority, **patch_values):
+                self.assertEqual(
+                    authority.require_topology(), authority.TOPOLOGY_PREPARED
+                )
+                authority.already_clean()
+                authority.validate_cleanup_state()
+
+                write_value(
+                    paths["system"] / "cpuset.cpus.exclusive",
+                    authority.EXCLUSIVE_CPUS,
+                )
+                write_value(
+                    paths["system"] / "cpuset.cpus.exclusive.effective",
+                    authority.EXCLUSIVE_CPUS,
+                )
+                authority.validate_cleanup_state()
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "system.slice correlated cpuset state drift",
+                ):
+                    authority.already_clean()
 
     def test_cleanup_accepts_only_correlated_creation_and_restoration_cuts(
         self,
@@ -969,8 +1241,8 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                     paths["measurement"] / "cpuset.cpus.partition", "member"
                 )
                 for path in (
-                    paths["system"], paths["service"], paths["controller"],
-                    paths["payload"],
+                    paths["system"], paths["service"], paths["control"],
+                    paths["controller"], paths["payload"],
                 ):
                     write_value(
                         path / "cpuset.cpus.effective", authority.CAMPAIGN_CPUS
@@ -1005,14 +1277,7 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
 
                 shutil.rmtree(paths["service"])
                 authority.validate_cleanup_state()
-                write_value(
-                    paths["system"] / "cpuset.cpus.exclusive",
-                    authority.EXCLUSIVE_CPUS,
-                )
-                write_value(
-                    paths["system"] / "cpuset.cpus.exclusive.effective",
-                    authority.EXCLUSIVE_CPUS,
-                )
+                set_idle_ancestor_controller_state(authority, paths)
                 authority.validate_cleanup_state()
 
     def test_clean_main_start_accepts_only_core_controller_subgroup(
@@ -1031,10 +1296,11 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                 write_value(path / "cpuset.cpus.exclusive", "")
                 write_value(path / "cpuset.cpus.exclusive.effective", "")
             write_value(paths["service"] / "cgroup.subtree_control", "")
-            paths["controller"].mkdir()
-            write_value(paths["controller"] / "cgroup.controllers", "")
-            write_value(paths["controller"] / "cgroup.subtree_control", "")
-            write_value(paths["controller"] / "cgroup.type", "domain")
+            shutil.rmtree(paths["control"])
+            create_core_group(paths["control"])
+            create_core_group(
+                paths["controller"], populated=True, processes="123"
+            )
             patch_values = {
                 "CGROUP_ROOT": paths["root"],
                 "SYSTEM_SLICE": paths["system"],
@@ -1056,6 +1322,62 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     authority.AuthorityError,
                     "startup controller exposes unexpected cpuset.cpus",
+                ):
+                    authority.already_clean()
+                (paths["controller"] / "cpuset.cpus").unlink()
+
+                write_value(paths["control"] / "cgroup.events", "frozen 0\npopulated 1")
+                write_value(paths["control"] / "cgroup.procs", "999")
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "service control cgroup remains populated",
+                ):
+                    authority.already_clean()
+                write_value(paths["control"] / "cgroup.events", "frozen 0\npopulated 0")
+                write_value(paths["control"] / "cgroup.procs", "")
+
+                write_value(
+                    paths["controller"] / "cgroup.events",
+                    "frozen 0\npopulated 0",
+                )
+                write_value(paths["controller"] / "cgroup.procs", "")
+                write_value(
+                    paths["control"] / "cgroup.events",
+                    "frozen 0\npopulated 1",
+                )
+                write_value(paths["control"] / "cgroup.procs", "456")
+                with mock.patch.object(
+                    authority,
+                    "self_cgroup_path",
+                    return_value=paths["control"],
+                ):
+                    authority.already_clean()
+                    authority.validate_cleanup_state()
+                    write_value(
+                        paths["controller"] / "cgroup.events",
+                        "frozen 0\npopulated 1",
+                    )
+                    write_value(paths["controller"] / "cgroup.procs", "999")
+                    with self.assertRaisesRegex(
+                        authority.AuthorityError,
+                        "controller cgroup remains populated",
+                    ):
+                        authority.already_clean()
+                write_value(
+                    paths["controller"] / "cgroup.events",
+                    "frozen 0\npopulated 0",
+                )
+                write_value(paths["controller"] / "cgroup.procs", "")
+                write_value(
+                    paths["control"] / "cgroup.events",
+                    "frozen 0\npopulated 0",
+                )
+                write_value(paths["control"] / "cgroup.procs", "")
+
+                shutil.rmtree(paths["control"])
+                with self.assertRaisesRegex(
+                    authority.AuthorityError,
+                    "service control subgroup is absent",
                 ):
                     authority.already_clean()
 
@@ -1139,6 +1461,11 @@ class StabilityCgroupAuthorityTest(unittest.TestCase):
             mock.patch.object(authority, "read_marker"),
             mock.patch.object(authority, "SERVICE", service),
             mock.patch.object(authority, "cgroup_value", side_effect=cgroup_value),
+            mock.patch.object(
+                authority,
+                "require_topology",
+                return_value=authority.TOPOLOGY_ACTIVE,
+            ),
             mock.patch.object(authority, "validate_cleanup_state"),
             mock.patch.object(authority, "cleanup_payload") as cleanup_payload,
             mock.patch.object(authority, "restore_ancestor", side_effect=restore),

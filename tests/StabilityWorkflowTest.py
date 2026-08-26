@@ -175,6 +175,18 @@ class StabilityWorkflowTest(unittest.TestCase):
             unit_value(self.unit, "Delegate"),
             "cpu cpuset memory pids",
         )
+        self.assertIn(
+            'readonly ROOT_SUBTREE_CONTROLLER_INVENTORY="cpu cpuset io memory pids"',
+            self.operator,
+        )
+        self.assertIn(
+            'readonly SYSTEM_SLICE_AVAILABLE_CONTROLLER_INVENTORY="cpu cpuset io memory pids"',
+            self.operator,
+        )
+        self.assertIn(
+            'readonly DELEGATED_CONTROLLER_INVENTORY="cpu cpuset memory pids"',
+            self.operator,
+        )
         self.assertEqual(unit_value(self.unit, "DelegateSubgroup"), "controller")
         self.assertEqual(unit_value(self.unit, "AllowedCPUs"), "0-11")
         self.assertEqual(unit_value(self.unit, "CPUAffinity"), "4-11")
@@ -581,7 +593,8 @@ SYSTEM_SLICE_CGROUP=/system.slice
 SERVICE_CGROUP=/service
 PAYLOAD_CGROUP=/payload
 ROOT_AVAILABLE_CONTROLLER_INVENTORY=root-available
-HOST_SUBTREE_CONTROLLER_INVENTORY=host-subtree
+ROOT_SUBTREE_CONTROLLER_INVENTORY=root-subtree
+SYSTEM_SLICE_AVAILABLE_CONTROLLER_INVENTORY=system-available
 DELEGATED_CONTROLLER_INVENTORY=delegated-baseline
 FAILURE_LABEL={shlex.quote(failure_label)}
 require_exact_controller_inventory() {{
@@ -600,6 +613,47 @@ exit 0
                     stderr=subprocess.PIPE,
                 )
                 self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_controller_inventory_gate_matches_bounded_delegate_topology(
+        self,
+    ) -> None:
+        function = shell_function(
+            self.operator, "require_ancestor_controller_inventory"
+        )
+        harness = f"""#!/usr/bin/env bash
+set -uo pipefail
+CGROUP_ROOT=/root
+SYSTEM_SLICE_CGROUP=/system.slice
+SERVICE_CGROUP=/service
+ROOT_AVAILABLE_CONTROLLER_INVENTORY='cpu cpuset dmem hugetlb io memory misc pids rdma'
+ROOT_SUBTREE_CONTROLLER_INVENTORY='cpu cpuset io memory pids'
+SYSTEM_SLICE_AVAILABLE_CONTROLLER_INVENTORY='cpu cpuset io memory pids'
+DELEGATED_CONTROLLER_INVENTORY='cpu cpuset memory pids'
+require_exact_controller_inventory() {{
+    printf '%s=%s\n' "$4" "$3"
+}}
+{function}
+require_ancestor_controller_inventory
+"""
+        completed = subprocess.run(
+            ["/usr/bin/bash", "-c", harness],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            completed.stdout.splitlines(),
+            [
+                "root available=cpu cpuset dmem hugetlb io memory misc pids rdma",
+                "root subtree=cpu cpuset io memory pids",
+                "system.slice available=cpu cpuset io memory pids",
+                "system.slice subtree=cpu cpuset memory pids",
+                "service available=cpu cpuset memory pids",
+                "service subtree=cpu cpuset memory pids",
+            ],
+        )
 
     def test_empty_cgroup_gate_propagates_pseudofile_read_failures(self) -> None:
         function = shell_function(self.operator, "require_empty_cgroup")
