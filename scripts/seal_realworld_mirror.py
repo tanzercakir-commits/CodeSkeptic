@@ -87,10 +87,26 @@ def _workspace_allocated_bytes(root: Path) -> int:
                     entries += 1
                     if entries > 1_000_000:
                         raise SealError("mirror workspace entry count exceeds the safety limit")
-                    metadata = entry.stat(follow_symlinks=False)
+                    try:
+                        metadata = entry.stat(follow_symlinks=False)
+                    except FileNotFoundError:
+                        # Git creates and removes lock files while the bounded
+                        # process monitor walks this mutable workspace.  A
+                        # vanished entry consumes one inventory slot but no
+                        # longer consumes blocks, so it is safe to skip.
+                        continue
                     total += metadata.st_blocks * 512
                     if stat.S_ISDIR(metadata.st_mode):
                         pending.append(Path(entry.path))
+        except FileNotFoundError as error:
+            if current != root:
+                # A directory can disappear after its parent DirEntry was
+                # accounted and queued.  The next periodic scan observes the
+                # current tree; the authority root itself must remain pinned.
+                continue
+            raise SealError(
+                f"cannot inspect mirror workspace allocation: {error}"
+            ) from error
         except OSError as error:
             raise SealError(f"cannot inspect mirror workspace allocation: {error}") from error
     return total

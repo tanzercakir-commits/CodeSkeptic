@@ -491,6 +491,63 @@ class MirrorAuthorityProducerTest(unittest.TestCase):
             if destination.exists():
                 self.assertLessEqual(destination.stat().st_size, 128)
 
+    def test_workspace_scan_tolerates_entries_removed_by_active_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            transient = root / "transient.lock"
+            transient.write_bytes(b"lock\n")
+            real_scandir = producer.os.scandir
+            removed = False
+
+            class RemovingStream:
+                def __init__(self, path: Path) -> None:
+                    self.stream = real_scandir(path)
+
+                def __enter__(self):
+                    nonlocal removed
+                    entries = list(self.stream)
+                    transient.unlink()
+                    removed = True
+                    return iter(entries)
+
+                def __exit__(self, *arguments: object) -> None:
+                    self.stream.close()
+
+            def remove_before_stat(path: Path):
+                if Path(path) == root and not removed:
+                    return RemovingStream(Path(path))
+                return real_scandir(path)
+
+            with mock.patch.object(
+                producer.os, "scandir", side_effect=remove_before_stat
+            ):
+                self.assertEqual(producer._workspace_allocated_bytes(root), 0)
+
+            nested = root / "nested"
+            nested.mkdir()
+            (nested / "payload").write_bytes(b"payload\n")
+            removed_nested = False
+
+            def remove_before_nested_scan(path: Path):
+                nonlocal removed_nested
+                if Path(path) == nested and not removed_nested:
+                    (nested / "payload").unlink()
+                    nested.rmdir()
+                    removed_nested = True
+                return real_scandir(path)
+
+            with mock.patch.object(
+                producer.os, "scandir", side_effect=remove_before_nested_scan
+            ):
+                self.assertGreaterEqual(
+                    producer._workspace_allocated_bytes(root), 0
+                )
+
+            with self.assertRaisesRegex(
+                producer.SealError, "cannot inspect mirror workspace allocation"
+            ):
+                producer._workspace_allocated_bytes(root / "missing")
+
     def test_workspace_multi_file_growth_is_stopped_after_pipes_close(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
