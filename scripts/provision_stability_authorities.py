@@ -95,7 +95,7 @@ CONTAINER_MIRRORS = Path("/authority/mirrors")
 CONTAINER_RELEASE = Path("/authority/release")
 CONTAINER_RELEASE_SOURCE = CONTAINER_RELEASE / "source"
 CONTAINER_RELEASE_BUILD = CONTAINER_RELEASE / "build"
-CONTAINER_SANITIZER_WORK = CONTAINER_SOURCE / "build/p10-09-sanitizers"
+CONTAINER_SANITIZER_WORK = Path("/authority/work/p10-09-sanitizers")
 CONTAINER_SANITIZERS = Path("/authority/sanitizers")
 CONTAINER_SCRATCH = Path("/work")
 

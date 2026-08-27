@@ -303,8 +303,8 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                     self.assertIn("$SOURCE:/authority/source:ro", argv)
                     suffix = "rw" if mode.endswith("produce") else "ro"
                     self.assertIn(
-                        f"$TEST_BUILD:/authority/source/build/"
-                        f"p10-09-sanitizers/{profile}-tests:{suffix}",
+                        f"$TEST_BUILD:{provision.CONTAINER_SANITIZER_WORK}/"
+                        f"{profile}-tests:{suffix}",
                         argv,
                     )
                     self.assertIn(
@@ -413,6 +413,113 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                     f"{profile}-tests:rw",
                     verifier,
                 )
+
+    def test_sanitizer_work_mount_namespace_is_outside_source_authority(self) -> None:
+        self.assertEqual(
+            provision.CONTAINER_SANITIZER_WORK,
+            Path("/authority/work/p10-09-sanitizers"),
+        )
+        self.assertFalse(
+            provision.CONTAINER_SANITIZER_WORK.is_relative_to(
+                provision.CONTAINER_SOURCE
+            )
+        )
+        for profile in provision.PROFILES:
+            with self.subTest(profile=profile):
+                verifier = provision._normalized_container_argv(
+                    "sanitizer-verify", profile
+                )
+                nested_source_prefix = f"{provision.CONTAINER_SOURCE}/"
+                for marker in ("$TEST_BUILD:", "$FUZZ_BUILD:"):
+                    mount = next(
+                        argument
+                        for argument in verifier
+                        if argument.startswith(marker)
+                    )
+                    target = mount.split(":", 2)[1]
+                    self.assertFalse(target.startswith(nested_source_prefix))
+                tmpfs_targets = [
+                    verifier[index + 1]
+                    for index, argument in enumerate(verifier[:-1])
+                    if argument == "--tmpfs"
+                ]
+                self.assertIn(
+                    provision._sanitizer_verifier_ctest_tmpfs(profile),
+                    tmpfs_targets,
+                )
+                for target in tmpfs_targets:
+                    self.assertFalse(target.startswith(nested_source_prefix))
+
+    def test_sanitizer_mounts_do_not_materialize_publication_destination(self) -> None:
+        podman = "/usr/bin/podman"
+        environment = provision.build_authority._podman_environment()
+        try:
+            image_exists = provision.staging._bounded_command(
+                [
+                    podman,
+                    "--events-backend=none",
+                    "image",
+                    "exists",
+                    provision.build_authority.PINNED_IMAGE,
+                ],
+                environment=environment,
+                cwd=None,
+                maximum_output=4096,
+                timeout_seconds=15,
+            )
+        except Exception as error:
+            self.skipTest(f"local container runtime unavailable: {error}")
+        if image_exists.returncode != 0:
+            self.skipTest("pinned local container image is unavailable")
+
+        with tempfile.TemporaryDirectory(
+            prefix="codeskeptic-sanitizer-mount-probe-",
+            dir=ROOT.parent,
+        ) as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            test_build = root / "test-build"
+            fuzz_build = root / "fuzz-build"
+            source.mkdir()
+            test_build.mkdir()
+            fuzz_build.mkdir()
+            publication = source / "build/p10-09-sanitizers"
+            profile = "address"
+            completed = provision.staging._bounded_command(
+                [
+                    podman,
+                    "--events-backend=none",
+                    "run",
+                    "--rm",
+                    "--pull=never",
+                    "--network=none",
+                    "--read-only",
+                    "--cap-drop=all",
+                    "--security-opt",
+                    "label=disable",
+                    "-v",
+                    f"{source}:{provision.CONTAINER_SOURCE}:ro",
+                    "-v",
+                    f"{test_build}:{provision.CONTAINER_SANITIZER_WORK}/"
+                    f"{profile}-tests:rw",
+                    "-v",
+                    f"{fuzz_build}:{provision.CONTAINER_SANITIZER_WORK}/"
+                    f"{profile}-fuzz:rw",
+                    provision.build_authority.PINNED_IMAGE,
+                    "/usr/bin/true",
+                ],
+                environment=environment,
+                cwd=None,
+                maximum_output=1 << 20,
+                timeout_seconds=30,
+            )
+            output = completed.stdout + completed.stderr
+            self.assertEqual(
+                completed.returncode,
+                0,
+                output.decode(errors="replace"),
+            )
+            self.assertFalse(publication.exists())
 
     def test_ephemeral_ctest_mount_preserves_readonly_host_build(self) -> None:
         podman = "/usr/bin/podman"
