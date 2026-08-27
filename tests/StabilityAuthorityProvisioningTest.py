@@ -607,6 +607,90 @@ class StabilityAuthorityProvisioningTest(unittest.TestCase):
                 monitor = provision._workspace_failure_monitor((root,))
                 self.assertIsNone(monitor())
 
+    def test_workspace_scan_tolerates_entries_removed_by_active_build(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            transient = root / "object.cpp-deadbeef.o.tmp"
+            transient.write_bytes(b"temporary object\n")
+            real_scandir = provision.os.scandir
+            removed = False
+
+            class RemovingStream:
+                def __init__(self, path: Path) -> None:
+                    self.stream = real_scandir(path)
+
+                def __enter__(self):
+                    nonlocal removed
+                    entries = list(self.stream)
+                    transient.unlink()
+                    removed = True
+                    return iter(entries)
+
+                def __exit__(self, *arguments: object) -> None:
+                    self.stream.close()
+
+            def remove_before_stat(path: Path):
+                if Path(path) == root and not removed:
+                    return RemovingStream(Path(path))
+                return real_scandir(path)
+
+            with mock.patch.object(
+                provision.os, "scandir", side_effect=remove_before_stat
+            ):
+                self.assertEqual(provision._workspace_allocation((root,)), (0, 0))
+
+            nested = root / "nested"
+            nested.mkdir()
+            (nested / "payload").write_bytes(b"payload\n")
+            removed_nested = False
+
+            def remove_before_nested_scan(path: Path):
+                nonlocal removed_nested
+                if Path(path) == nested and not removed_nested:
+                    (nested / "payload").unlink()
+                    nested.rmdir()
+                    removed_nested = True
+                return real_scandir(path)
+
+            with mock.patch.object(
+                provision.os, "scandir", side_effect=remove_before_nested_scan
+            ):
+                allocated, inodes = provision._workspace_allocation((root,))
+            self.assertGreaterEqual(allocated, 0)
+            self.assertEqual(inodes, 1)
+
+            with self.assertRaisesRegex(
+                provision.ProvisionError,
+                "cannot inspect writable container workspace",
+            ):
+                provision._workspace_allocation((root / "missing",))
+
+            class UnreadableEntry:
+                path = str(root / "blocked")
+
+                def stat(self, *, follow_symlinks: bool):
+                    if follow_symlinks:
+                        raise AssertionError("workspace scan followed a symlink")
+                    raise PermissionError(13, "permission denied", self.path)
+
+            class UnreadableStream:
+                def __enter__(self):
+                    return iter((UnreadableEntry(),))
+
+                def __exit__(self, *arguments: object) -> None:
+                    pass
+
+            with (
+                mock.patch.object(
+                    provision.os, "scandir", return_value=UnreadableStream()
+                ),
+                self.assertRaisesRegex(
+                    provision.ProvisionError,
+                    "cannot inventory writable container workspace",
+                ),
+            ):
+                provision._workspace_allocation((root,))
+
     def test_writable_workspace_monitor_rejects_byte_and_inode_breaches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

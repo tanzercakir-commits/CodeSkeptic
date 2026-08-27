@@ -869,7 +869,15 @@ def _workspace_allocation(roots: tuple[Path, ...]) -> tuple[int, int]:
             try:
                 with os.scandir(directory) as entries:
                     for entry in entries:
-                        metadata = entry.stat(follow_symlinks=False)
+                        try:
+                            metadata = entry.stat(follow_symlinks=False)
+                        except FileNotFoundError:
+                            # Compilers atomically publish and unlink temporary
+                            # object files while this periodic budget scan is
+                            # walking the mutable bind.  A vanished entry no
+                            # longer consumes blocks or an inode; the next scan
+                            # observes the current tree.
+                            continue
                         if metadata.st_dev != root_device:
                             raise ProvisionError(
                                 "writable container workspace crosses a filesystem"
@@ -884,6 +892,15 @@ def _workspace_allocation(roots: tuple[Path, ...]) -> tuple[int, int]:
                             stack.append(Path(entry.path))
             except ProvisionError:
                 raise
+            except FileNotFoundError as error:
+                if directory != root:
+                    # A queued build directory may be atomically replaced or
+                    # removed after its parent DirEntry was accounted.  The
+                    # authority root itself remains an identity requirement.
+                    continue
+                raise ProvisionError(
+                    f"cannot inventory writable container workspace: {error}"
+                ) from error
             except OSError as error:
                 raise ProvisionError(
                     f"cannot inventory writable container workspace: {error}"
